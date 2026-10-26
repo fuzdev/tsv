@@ -37,7 +37,9 @@ The strip reads the goal as `format` does, one rule for the two: a named goal (`
 `--source-type` with `--content` / `--stdin`, `Some(goal)`) is exact, and with none named the
 source is parsed as a **module, retried as a script** only if that fails — so a legacy
 sloppy script (a `with` statement, a leading-zero literal, `await` as a name) strips, while
-a module-valid source is never reinterpreted. When both attempts fail, the error reported
+a module-valid source is never reinterpreted. A module the depth limit refuses is refused,
+not retried ([cli.md §Recursion Depth](./cli.md#recursion-depth)): the limit is no verdict on
+the grammar, and a script could succeed only by reading `await` as a name. When both attempts fail, the error reported
 is the one `format` reports ([cli.md §Multi-File Formatting](./cli.md#multi-file-formatting)).
 A CLI path whose extension settles the goal — `.mts`, a module by name — takes no retry;
 `--source-type` beside a path is refused, as on `format`. With no goal named the result does

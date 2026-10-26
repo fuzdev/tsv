@@ -164,7 +164,7 @@ element or trailing comma after it and no default initializer — so
 recovered from a `spread_trailing_comma` flag the array/object literal parser
 records (the literal itself is valid, so the parser can't reject it outright;
 the cover-grammar conversion consults the flag). A for-in/of destructuring LHS
-is routed through the same cover-grammar conversion (`to_assignable`), so
+is routed through the same cover-grammar conversion (`refine_assignable`), so
 the rest constraints hold there too (`for ([...a, b] of y)`,
 `for ([...x = 1] of y)`, `for ({...a, b} of y)` are rejected) — matching the
 spec's "an `ObjectLiteral`/`ArrayLiteral` for-in/of LHS must cover an

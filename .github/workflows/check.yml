@@ -17,8 +17,10 @@
 #               gate on a dev machine (and the round-trip leg again at conformance
 #               cadence, in audit:corpus).
 #   artifacts — publish-parity: builds the WASM/npm packages, checks size
-#               bounds, runs the Node package tests, and covers the Linux half
-#               of the N-API npm shape and its size bounds (see the job comment).
+#               bounds, runs the Node package tests, covers the Linux half
+#               of the N-API npm shape and its size bounds, and grades the depth
+#               limits' stack contract in the shipped native build and the WASM
+#               engine (see the job comment).
 #   platforms — macOS + Windows confidence for the native builds: the full
 #               `cargo test --workspace` suite plus the N-API JS-boundary and
 #               npm-package tests, per OS (see the job comment). Linux is
@@ -215,6 +217,15 @@ jobs:
       - name: Validate N-API artifact sizes (linux)
         run: deno task validate:napi
 
+      # The depth limits' stack contract in the SHIPPED optimization — the napi
+      # profile the addon above was built in (fat LTO, one codegen unit). `check`
+      # grades the same test in its `corpus` world, whose frames differ from the
+      # shipped builds' by more than the contract's margin, so only this run can
+      # say an accepted input fits 2 MiB in what ships (deno.json
+      # `//test:depth:napi`).
+      - name: Depth contract, shipped build
+        run: deno task test:depth:napi
+
       # ENGINE PARITY, and the only place it can run: one Rust source compiled
       # to wasm32 and natively must format to the same bytes, and this is the
       # first step at which BOTH artifacts exist — `build:packages` above made
@@ -223,6 +234,14 @@ jobs:
       # real-code one.
       - name: Engine parity (wasm vs native)
         run: deno task engines:audit
+
+      # The depth limits' stack contract in the WASM engine, on a Node main thread:
+      # every shape the native gate above generates, at its accepted depth, through
+      # the `all` package `build:packages` staged — cold and tiered up. The shapes
+      # come from the native test built under the napi profile the depth step above
+      # already compiled (deno.json `//test:depth:wasm`).
+      - name: Depth contract, WASM engine
+        run: deno task test:depth:wasm
 
   # Platform confidence for the native builds: the committed-tree test suite
   # (fixtures, CLI integration, the napi in-crate tests) plus the real N-API

@@ -152,6 +152,9 @@ pub(crate) fn parse_forgiving_selector_list<'arena>(
             Ok(selector) => {
                 selectors.push(selector);
             }
+            // a depth limit is no verdict on the selector: forgiving it would keep a raw
+            // reading chosen for the stack's sake
+            Err(error) if error.is_too_deep() => return Err(error),
             Err(_) => {
                 // Parse error - advance past the invalid selector and wrap as Invalid
                 // (its raw text is recovered from the span at print time).

@@ -6,7 +6,7 @@ use crate::parser::expression_assignable::AssignableContext;
 use crate::parser::statement::DecoratorListKind;
 use tsv_lang::{ParseError, Span};
 
-use super::Parser;
+use super::{Checkpoint, Parser};
 
 impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a simple parameter: identifier with optional `?`, type annotation, and default value.
@@ -137,7 +137,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         kind: ExpressionKind::ArrayExpression(array),
                     }
                 } else {
-                    let (object, span) = p.parse_object_expression()?;
+                    let (object, span) = p.nested(1, Self::parse_object_expression)?;
                     Expression {
                         span,
                         kind: ExpressionKind::ObjectExpression(object),
@@ -148,7 +148,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Binding context: a type assertion, a member expression and a parenthesized
         // target are none of them binding targets (`let [x as T] = …`, `let [a.b] = …`,
         // `function f([(x)])` all reject, matching acorn).
-        let pattern = literal.and_then(|expr| self.to_assignable(expr, AssignableContext::Binding));
+        let pattern =
+            literal.and_then(|expr| self.refine_assignable(expr, AssignableContext::Binding));
         self.grouping_parens.truncate(mark);
         pattern
     }
@@ -323,188 +324,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         allow_decorators: bool,
     ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
         self.expect(&TokenKind::ParenOpen)?;
-        self.enter_grouping();
+        self.enter_grouping()?;
 
         let mut params = self.bvec();
         if !self.check(&TokenKind::ParenClose) {
+            // the parameters are siblings (`ListFrame`)
+            let mut frame = self.list_frame();
             loop {
-                // Parameter decorators: `@dec1 @dec2 <param>`. Parsed up front so the
-                // parameter body below can be any binding form — a parameter property
-                // (`@dec private a`) or a destructuring pattern (`@dec { a }: T`), not
-                // just a bare identifier — and the decorators are attached afterwards.
-                let decorators: &'arena [Decorator<'arena>] = if self.check(&TokenKind::At) {
-                    // Reject decorators where the position forbids them (arrow
-                    // parameters, type-member signatures). Checked per-parameter, so
-                    // a mid-list decorator (`(a, @dec b)`) rejects too.
-                    if !allow_decorators {
-                        return Err(self.error_msg("Decorators are not valid here"));
-                    }
-                    // Uses the shared restricted ES decorators grammar
-                    // (`parse_decorator_expression`), NOT a full assignment
-                    // expression — so `@dec [a, b]` reads as a decorator on `dec`
-                    // plus an array-pattern parameter, not the computed member
-                    // `dec[a, b]` (matching acorn).
-                    let decorators = self.parse_decorators(DecoratorListKind::Parameter)?;
-                    // Decorators are not valid on a rest parameter (acorn rejects `@d ...a`).
-                    if self.check(&TokenKind::DotDotDot) {
-                        return Err(self.error_msg("Decorators are not valid on a rest parameter"));
-                    }
-                    decorators.into_bump_slice()
-                } else {
-                    &[]
-                };
-
-                // Parse parameter: identifier, parameter property, or destructuring pattern
-                let param = match self.current_kind() {
-                    TokenKind::Identifier => {
-                        let param_start = self.current_pos().0;
-
-                        // Check for parameter property modifiers, in TS order:
-                        // accessibility → override → readonly. Every one of the five is
-                        // also a valid parameter NAME, so each is a modifier only when a
-                        // binding follows it on the same line — one shared rule, see
-                        // `eat_param_modifier_keyword`.
-                        let accessibility = if self.eat_param_modifier_keyword("public")? {
-                            Some(Accessibility::Public)
-                        } else if self.eat_param_modifier_keyword("private")? {
-                            Some(Accessibility::Private)
-                        } else if self.eat_param_modifier_keyword("protected")? {
-                            Some(Accessibility::Protected)
-                        } else {
-                            None
-                        };
-
-                        let is_override = self.eat_param_modifier_keyword("override")?;
-                        let readonly = self.eat_param_modifier_keyword("readonly")?;
-
-                        // If we have modifiers, this is a parameter property
-                        if accessibility.is_some() || is_override || readonly {
-                            let parameter = self.parse_simple_param()?;
-                            let param_end = parameter.span().end;
-                            Expression {
-                                span: Span::new(param_start as u32, param_end),
-                                kind: ExpressionKind::TSParameterProperty(TSParameterProperty {
-                                    accessibility,
-                                    readonly,
-                                    r#override: is_override,
-                                    parameter: self.alloc(parameter),
-                                }),
-                            }
-                        } else {
-                            // Simple identifier parameter (no modifiers)
-                            self.parse_simple_param()?
-                        }
-                    }
-                    // Keywords that can be used as parameter names — the contextual
-                    // keywords (`from`, `async`, the type keywords) plus `let`/`yield`,
-                    // whose only bar is a deferred strict-mode early error. `await` is
-                    // goal-dependent and gets its own arm below; `void` is a
-                    // `ReservedWord` and stays out.
-                    TokenKind::Keyword(kw) if kw.can_be_binding_name() => {
-                        self.parse_simple_param()?
-                    }
-                    // TypeScript `this` parameter: `function f(this: T) {}`
-                    TokenKind::Keyword(KeywordKind::This) => self.parse_simple_param()?,
-                    // `await` as a parameter name — a `BindingIdentifier`, so valid at
-                    // Script goal whatever the `[Await]` context (`async function
-                    // h(await) {}`); the `[Await]` bar is a deferred early error like
-                    // the `[Yield]` twin, the goal bullet is enforced.
-                    // `parse_simple_param` reads its name via `try_param_name`.
-                    TokenKind::Keyword(KeywordKind::Await) if self.await_is_binding_name() => {
-                        self.parse_simple_param()?
-                    }
-                    TokenKind::BracketOpen | TokenKind::BraceOpen => {
-                        // Destructuring pattern: [a, b] / {a, b}, with optional `?`
-                        // marker, type annotation and default value
-                        let pattern = self.parse_destructured_binding(true)?;
-
-                        // Check for default value
-                        if self.eat(TokenKind::Equals)? {
-                            let pattern_start = pattern.span().start;
-                            let default_value = self.parse_assignment_expression_ref()?;
-                            // prev_token_end covers a parenthesized default's closing `)`
-                            let assign_end = self.prev_token_end() as u32;
-                            Expression {
-                                span: Span::new(pattern_start, assign_end),
-                                kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
-                                    left: self.alloc(pattern),
-                                    right: default_value,
-                                    decorators: None,
-                                }),
-                            }
-                        } else {
-                            pattern
-                        }
-                    }
-                    TokenKind::DotDotDot => {
-                        // Rest parameter: ...args, ...args: type, or a
-                        // destructuring pattern (...[a, b] / ...{ a }). Per
-                        // `BindingRestElement : ... BindingPattern`, the rest
-                        // argument may itself be an array/object pattern.
-                        let rest_start = self.current_pos().0;
-                        self.advance()?; // consume '...'
-
-                        if matches!(
-                            self.current_kind(),
-                            TokenKind::BracketOpen | TokenKind::BraceOpen
-                        ) {
-                            // ...[a, b] / ...{ a } — the rest argument is itself a
-                            // binding pattern. A trailing `: Type` annotates the
-                            // *rest element* (`...[a, b]: T`), not the inner pattern,
-                            // so parse the bare pattern and bind the type here
-                            // (matching acorn; `parse_destructured_binding` would
-                            // wrongly attach it to the pattern).
-                            let pattern = self.parse_binding_pattern()?;
-                            // A trailing `?`/`: T` binds to the rest element (acorn's
-                            // shape), never to the inner pattern.
-                            let (optional, type_annotation, arg_end) =
-                                self.parse_rest_param_tail(pattern.span().end)?;
-                            Expression::from_rest_element(RestElement {
-                                argument: self.alloc(pattern),
-                                optional,
-                                type_annotation,
-                                span: Span::new(rest_start as u32, arg_end),
-                            })
-                        } else {
-                            // ...args, ...args?, ...args: type, or ...args?: type.
-                            // The argument span stays name-only (`id_start..id_end`);
-                            // any `?`/`: T` binds to the rest element (acorn's shape).
-                            // The name is a `BindingIdentifier` — the same channel the
-                            // non-rest parameters take, so a contextual type keyword is
-                            // legal (`function fn(...string: any[]) {}`). The FUNCTION-TYPE
-                            // rest path already went through it.
-                            let (id_start, id_end) = self.current_pos();
-                            let Some(name) = self.try_binding_name() else {
-                                return Err(self.error_expected("parameter name"));
-                            };
-                            self.advance()?;
-                            let argument = Expression::from_identifier(Identifier::simple(
-                                name,
-                                Span::new(id_start as u32, id_end as u32),
-                            ));
-                            let (optional, type_annotation, arg_end) =
-                                self.parse_rest_param_tail(id_end as u32)?;
-                            Expression::from_rest_element(RestElement {
-                                argument: self.alloc(argument),
-                                optional,
-                                type_annotation,
-                                span: Span::new(rest_start as u32, arg_end),
-                            })
-                        }
-                    }
-                    _ => {
-                        return Err(
-                            self.error_expected_found("parameter name or destructuring pattern")
-                        );
-                    }
-                };
-
-                // Attach any parameter decorators to the binding node (matching acorn).
-                let param = if decorators.is_empty() {
-                    param
-                } else {
-                    self.attach_param_decorators(param, decorators)
-                };
+                frame.element(self, params.len());
+                // one wire level: the parameter, over its decorators, its pattern, its
+                // annotation and its default (the depth limit's count)
+                let param = self.nested(1, |p| p.parse_parameter(allow_decorators))?;
 
                 let is_rest = matches!(param.kind, ExpressionKind::RestElement(_));
                 params.push(param);
@@ -534,11 +364,225 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     break;
                 }
             }
+            frame.close(self);
         }
 
         self.expect(&TokenKind::ParenClose)?;
         self.exit_grouping();
         Ok(params)
+    }
+
+    /// One parameter of a list ([`Parser::parse_parameter_list_inner`]): its decorators
+    /// (`allow_decorators`, else a `@` rejects), then the binding — an identifier, a
+    /// parameter property, a destructuring pattern or a rest element — with its marker,
+    /// annotation and default.
+    fn parse_parameter(
+        &mut self,
+        allow_decorators: bool,
+    ) -> Result<Expression<'arena>, ParseError> {
+        // Parameter decorators: `@dec1 @dec2 <param>`. Parsed up front so the
+        // parameter body below can be any binding form — a parameter property
+        // (`@dec private a`) or a destructuring pattern (`@dec { a }: T`), not
+        // just a bare identifier — and the decorators are attached afterwards.
+        //
+        // A parameter property's decorators sit on the binding inside it, one wire level
+        // deeper than a plain parameter's, and which one this is is known only past the
+        // run: a run read uncharged that turns out to be a property's is rewound and read
+        // again with the level charged (`Parser::decorated_parameter_properties`).
+        let decorators_start = self.current_pos().0 as u32;
+        let mut reread: Option<Checkpoint<'arena>> = None;
+        let decorators: &'arena [Decorator<'arena>] = if self.check(&TokenKind::At) {
+            // Reject decorators where the position forbids them (arrow
+            // parameters, type-member signatures). Checked per-parameter, so
+            // a mid-list decorator (`(a, @dec b)`) rejects too.
+            if !allow_decorators {
+                return Err(self.error_msg("Decorators are not valid here"));
+            }
+            // Uses the shared restricted ES decorators grammar
+            // (`parse_decorator_expression`), NOT a full assignment
+            // expression — so `@dec [a, b]` reads as a decorator on `dec`
+            // plus an array-pattern parameter, not the computed member
+            // `dec[a, b]` (matching acorn).
+            let decorators = if self
+                .decorated_parameter_properties
+                .binary_search(&decorators_start)
+                .is_ok()
+            {
+                // one wire level: the property's binding, the decorators' holder
+                self.nested(1, |p| p.parse_decorators(DecoratorListKind::Parameter))?
+            } else {
+                reread = Some(self.checkpoint());
+                self.parse_decorators(DecoratorListKind::Parameter)?
+            };
+            // Decorators are not valid on a rest parameter (acorn rejects `@d ...a`).
+            if self.check(&TokenKind::DotDotDot) {
+                return Err(self.error_msg("Decorators are not valid on a rest parameter"));
+            }
+            decorators.into_bump_slice()
+        } else {
+            &[]
+        };
+
+        // Parse parameter: identifier, parameter property, or destructuring pattern
+        let param = match self.current_kind() {
+            TokenKind::Identifier => {
+                let param_start = self.current_pos().0;
+
+                // Check for parameter property modifiers, in TS order:
+                // accessibility → override → readonly. Every one of the five is
+                // also a valid parameter NAME, so each is a modifier only when a
+                // binding follows it on the same line — one shared rule, see
+                // `eat_param_modifier_keyword`.
+                let accessibility = if self.eat_param_modifier_keyword("public")? {
+                    Some(Accessibility::Public)
+                } else if self.eat_param_modifier_keyword("private")? {
+                    Some(Accessibility::Private)
+                } else if self.eat_param_modifier_keyword("protected")? {
+                    Some(Accessibility::Protected)
+                } else {
+                    None
+                };
+
+                let is_override = self.eat_param_modifier_keyword("override")?;
+                let readonly = self.eat_param_modifier_keyword("readonly")?;
+
+                // If we have modifiers, this is a parameter property
+                if accessibility.is_some() || is_override || readonly {
+                    if let Some(checkpoint) = reread {
+                        // its decorators were read a level short: read them again, charged
+                        if let Err(at) = self
+                            .decorated_parameter_properties
+                            .binary_search(&decorators_start)
+                        {
+                            self.decorated_parameter_properties
+                                .insert(at, decorators_start);
+                        }
+                        self.rewind(checkpoint);
+                        return self.parse_parameter(allow_decorators);
+                    }
+                    // one wire level: the binding inside the `TSParameterProperty`
+                    let parameter = self.nested(1, Self::parse_simple_param)?;
+                    let param_end = parameter.span().end;
+                    Expression {
+                        span: Span::new(param_start as u32, param_end),
+                        kind: ExpressionKind::TSParameterProperty(TSParameterProperty {
+                            accessibility,
+                            readonly,
+                            r#override: is_override,
+                            parameter: self.alloc(parameter),
+                        }),
+                    }
+                } else {
+                    // Simple identifier parameter (no modifiers)
+                    self.parse_simple_param()?
+                }
+            }
+            // Keywords that can be used as parameter names — the contextual
+            // keywords (`from`, `async`, the type keywords) plus `let`/`yield`,
+            // whose only bar is a deferred strict-mode early error. `await` is
+            // goal-dependent and gets its own arm below; `void` is a
+            // `ReservedWord` and stays out.
+            TokenKind::Keyword(kw) if kw.can_be_binding_name() => self.parse_simple_param()?,
+            // TypeScript `this` parameter: `function f(this: T) {}`
+            TokenKind::Keyword(KeywordKind::This) => self.parse_simple_param()?,
+            // `await` as a parameter name — a `BindingIdentifier`, so valid at
+            // Script goal whatever the `[Await]` context (`async function
+            // h(await) {}`); the `[Await]` bar is a deferred early error like
+            // the `[Yield]` twin, the goal bullet is enforced.
+            // `parse_simple_param` reads its name via `try_param_name`.
+            TokenKind::Keyword(KeywordKind::Await) if self.await_is_binding_name() => {
+                self.parse_simple_param()?
+            }
+            TokenKind::BracketOpen | TokenKind::BraceOpen => {
+                // Destructuring pattern: [a, b] / {a, b}, with optional `?`
+                // marker, type annotation and default value
+                let pattern = self.parse_destructured_binding(true)?;
+
+                // Check for default value
+                if self.eat(TokenKind::Equals)? {
+                    let pattern_start = pattern.span().start;
+                    let default_value = self.parse_assignment_expression_ref()?;
+                    // prev_token_end covers a parenthesized default's closing `)`
+                    let assign_end = self.prev_token_end() as u32;
+                    Expression {
+                        span: Span::new(pattern_start, assign_end),
+                        kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
+                            left: self.alloc(pattern),
+                            right: default_value,
+                            decorators: None,
+                        }),
+                    }
+                } else {
+                    pattern
+                }
+            }
+            TokenKind::DotDotDot => {
+                // Rest parameter: ...args, ...args: type, or a
+                // destructuring pattern (...[a, b] / ...{ a }). Per
+                // `BindingRestElement : ... BindingPattern`, the rest
+                // argument may itself be an array/object pattern.
+                let rest_start = self.current_pos().0;
+                self.advance()?; // consume '...'
+
+                if matches!(
+                    self.current_kind(),
+                    TokenKind::BracketOpen | TokenKind::BraceOpen
+                ) {
+                    // ...[a, b] / ...{ a } — the rest argument is itself a
+                    // binding pattern. A trailing `: Type` annotates the
+                    // *rest element* (`...[a, b]: T`), not the inner pattern,
+                    // so parse the bare pattern and bind the type here
+                    // (matching acorn; `parse_destructured_binding` would
+                    // wrongly attach it to the pattern).
+                    let pattern = self.parse_binding_pattern()?;
+                    // A trailing `?`/`: T` binds to the rest element (acorn's
+                    // shape), never to the inner pattern.
+                    let (optional, type_annotation, arg_end) =
+                        self.parse_rest_param_tail(pattern.span().end)?;
+                    Expression::from_rest_element(RestElement {
+                        argument: self.alloc(pattern),
+                        optional,
+                        type_annotation,
+                        span: Span::new(rest_start as u32, arg_end),
+                    })
+                } else {
+                    // ...args, ...args?, ...args: type, or ...args?: type.
+                    // The argument span stays name-only (`id_start..id_end`);
+                    // any `?`/`: T` binds to the rest element (acorn's shape).
+                    // The name is a `BindingIdentifier` — the same channel the
+                    // non-rest parameters take, so a contextual type keyword is
+                    // legal (`function fn(...string: any[]) {}`). The FUNCTION-TYPE
+                    // rest path already went through it.
+                    let (id_start, id_end) = self.current_pos();
+                    let Some(name) = self.try_binding_name() else {
+                        return Err(self.error_expected("parameter name"));
+                    };
+                    self.advance()?;
+                    let argument = Expression::from_identifier(Identifier::simple(
+                        name,
+                        Span::new(id_start as u32, id_end as u32),
+                    ));
+                    let (optional, type_annotation, arg_end) =
+                        self.parse_rest_param_tail(id_end as u32)?;
+                    Expression::from_rest_element(RestElement {
+                        argument: self.alloc(argument),
+                        optional,
+                        type_annotation,
+                        span: Span::new(rest_start as u32, arg_end),
+                    })
+                }
+            }
+            _ => {
+                return Err(self.error_expected_found("parameter name or destructuring pattern"));
+            }
+        };
+
+        // Attach any parameter decorators to the binding node (matching acorn).
+        Ok(if decorators.is_empty() {
+            param
+        } else {
+            self.attach_param_decorators(param, decorators)
+        })
     }
 
     /// Enforce accessor parameter arity: a getter takes no parameters and a

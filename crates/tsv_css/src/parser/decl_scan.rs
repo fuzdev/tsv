@@ -1601,7 +1601,7 @@ mod tests {
     /// that identifier — which it does exactly where the byte walks located the declaration.
     fn identifier_child(source: &str) -> (bool, bool) {
         let arena = bumpalo::Bump::new();
-        let parser = CssParser::new(source, 0, &arena).expect("test source lexes");
+        let parser = CssParser::new(source, 0, 0, &arena).expect("test source lexes");
         assert_eq!(parser.current_kind(), TokenKind::Identifier);
         let is_rule = identifier_child_is_rule(&parser).expect("test source disambiguates");
         let stashed = parser.take_declaration(parser.current_end()).is_some();

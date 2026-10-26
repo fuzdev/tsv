@@ -9,11 +9,11 @@ use crate::ast::internal::*;
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
-use super::Parser;
 use super::expression_lookahead::{generic_function_type_arrow_end, paren_starts_function_type};
 use super::scan::{
     identifier_starts_at, is_word_at, skip_identifier, skip_whitespace_and_comments,
 };
+use super::{LINK_OPERATOR, LINK_TYPE_SUFFIX, Parser};
 
 // The type ladder's return (see `Parser::parse_type`): a reference plus the pointer-sized
 // `ParseError` needs a discriminant word, so the `Result` is two words — 16 B on 64-bit,
@@ -43,7 +43,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
 
-        let type_annotation = self.parse_type()?;
+        // one wire level: the `TSTypeAnnotation` (the depth limit's count)
+        let type_annotation = self.nested(1, Self::parse_type)?;
         let end = type_annotation.span().end;
 
         Ok(TSTypeAnnotation {
@@ -116,21 +117,37 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 // The extends clause cannot itself be a conditional — a nested
                 // `? T : F` binds to this conditional; parens re-enable it.
-                Some(p.with_conditional_type_disallowed(true, Self::parse_union_type)?)
+                // one wire level: the extends type under its `TSConditionalType`
+                Some(p.nested(1, |p| {
+                    p.with_conditional_type_disallowed(true, Self::parse_union_type)
+                })?)
             } else {
                 None
             };
 
             if let Some(extends_type) = extends_type {
+                // the check type, parsed before the `extends` said it was one, is the
+                // conditional's left operand: a spine link (`(A extends B ? C : D) extends …`
+                // nests a conditional per grouping paren)
+                p.spine_link(LINK_TYPE_SUFFIX)?;
                 // Expect '?'
                 p.expect(&TokenKind::Question)?;
 
-                let true_type = p.parse_type()?;
+                // Each branch is a recursion that stays inside this frame, past the
+                // check type's own depth level, so it takes one of its own: one wire level,
+                // the branch under the `TSConditionalType` (the depth limit's count).
+                let true_type = p.nested(1, Self::parse_type)?;
+                // the pair the printer adds around a bare conditional true branch while it
+                // stays flat (`A extends B ? (C extends D ? E : F) : G`), a level of the
+                // output's nesting — an author's pair it strips and writes back
+                if matches!(true_type, TSType::Conditional(_)) {
+                    p.printer_pair()?;
+                }
 
                 // Expect ':'
                 p.expect(&TokenKind::Colon)?;
 
-                let false_type = p.parse_type()?;
+                let false_type = p.nested(1, Self::parse_type)?;
                 let end = false_type.span().end;
 
                 Ok(p.alloc(TSType::Conditional(TSConditionalType {
@@ -173,10 +190,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let mut types = self.bvec();
         types.push(first);
+        // the constituents are siblings (`ListFrame`); the first is already counted
+        let mut frame = self.list_frame();
         while self.eat(TokenKind::Pipe)? {
-            types.push(self.with_fn_type_disallowed(true, Self::parse_intersection_type)?);
+            self.first_member_pair(&types)?;
+            frame.element(self, types.len());
+            // one wire level beyond the constituent's own: the `TSUnionType` it sits in,
+            // known only once a `|` follows the first (the depth limit's count)
+            let member = self.nested(1, |p| {
+                p.with_fn_type_disallowed(true, Self::parse_intersection_type)
+            })?;
+            self.member_pair(member)?;
+            types.push(member);
         }
 
+        frame.close(self);
         let end = types.last().map_or_else(|| start as u32, |t| t.span().end);
         Ok(self.alloc(TSType::Union(TSUnionType {
             types: types.into_bump_slice(),
@@ -209,9 +237,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let mut types = self.bvec();
         types.push(first);
+        // the constituents are siblings (`ListFrame`); the first is already counted
+        let mut frame = self.list_frame();
         while self.eat(TokenKind::Ampersand)? {
-            types.push(self.with_fn_type_disallowed(true, Self::parse_array_type)?);
+            self.first_member_pair(&types)?;
+            frame.element(self, types.len());
+            // one wire level beyond the constituent's own: the `TSIntersectionType`
+            let member = self.nested(1, |p| {
+                p.with_fn_type_disallowed(true, Self::parse_array_type)
+            })?;
+            self.member_pair(member)?;
+            types.push(member);
         }
+
+        frame.close(self);
 
         let end = types.last().map_or_else(|| start as u32, |t| t.span().end);
         Ok(self.alloc(TSType::Intersection(TSIntersectionType {
@@ -232,12 +271,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// tsc guards the postfix `?` of a tuple element on the same rule, in the same loop
     /// — see [`Self::error_optional_marker_after_line_break`], where acorn's port drops
     /// the guard and tsv keeps it.
+    ///
     fn parse_array_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         let mut result = self.parse_primary_type()?;
 
         // Array type suffix [] or indexed access T[K], stopping at a newline-`[`.
         while !self.had_line_terminator && self.check(&TokenKind::BracketOpen) {
+            self.spine_link(LINK_TYPE_SUFFIX)?;
+            // the pair the printer adds around a bare element / object that binds looser
+            // than the suffix (`(typeof a)[]`, `(infer U)[K]`, `(-1)[]`), a level of the
+            // output's nesting
+            if bare_type_takes_pair(result, TypePairPosition::Suffix) {
+                self.printer_pair()?;
+            }
             if matches!(self.peek_kind(), TokenKind::BracketClose) {
                 // Array type: T[]
                 self.advance()?; // consume '['
@@ -251,7 +298,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             } else {
                 // Indexed access type: T[K]
                 self.advance()?; // consume '['
-                let index_type = self.parse_type()?;
+                // one wire level: the index (the depth limit's count)
+                let index_type = self.nested(1, Self::parse_type)?;
                 let (_, end) = self.current_pos();
                 self.expect(&TokenKind::BracketClose)?;
 
@@ -303,7 +351,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let this_name = self.current_raw_ident_name();
                     self.advance()?; // past `this`
                     self.advance()?; // past `is`
-                    let type_node = self.parse_type()?;
+                    let type_node = self.nested(1, Self::parse_type)?;
                     let type_end = type_node.span().end;
                     let predicate = TSTypePredicate {
                         parameter_name: Identifier::simple(
@@ -448,8 +496,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // A type-operator operand is not a full-type position: function/constructor
         // types are disallowed (`keyof () => T` must be `keyof (() => T)`), so a
         // `(` here is a parenthesized type (`keyof ([a])[]` stays valid).
-        let type_annotation = self.with_fn_type_disallowed(true, Self::parse_array_type)?;
+        // one wire level: the operand (the depth limit's count)
+        let type_annotation = self.nested(1, |p| {
+            p.with_fn_type_disallowed(true, Self::parse_array_type)
+        })?;
         let end = type_annotation.span().end;
+        // the pair the printer adds around a bare operand that is itself a prefix operator
+        // (`keyof (keyof T)`, `keyof (infer U)`), a level of the output's nesting
+        if matches!(type_annotation, TSType::TypeOperator(_) | TSType::Infer(_)) {
+            self.printer_pair()?;
+        }
 
         Ok(self.alloc(TSType::TypeOperator(TSTypeOperator {
             operator,
@@ -792,7 +848,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Span::new(id_start as u32, id_end as u32),
         ));
 
-        while self.eat(TokenKind::Dot)? {
+        while self.check(&TokenKind::Dot) {
+            self.spine_link(LINK_OPERATOR)?;
+            self.advance()?; // consume '.'
             let right_name = if allow_reserved_words {
                 self.try_identifier_name()
             } else {
@@ -863,14 +921,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let mut params = self.bvec();
         if !self.check_greater_than_in_type() {
-            params.push(self.parse_type()?);
+            params.push(self.parse_type_argument()?);
+            // the arguments are siblings (`ListFrame`); the first is already counted
+            let mut frame = self.list_frame();
             while self.eat(TokenKind::Comma)? {
                 // Allow trailing comma - check for closing > before parsing another type
                 if self.check_greater_than_in_type() {
                     break;
                 }
-                params.push(self.parse_type()?);
+                frame.element(self, params.len());
+                params.push(self.parse_type_argument()?);
             }
+            frame.close(self);
         }
 
         // Type argument list cannot be empty
@@ -915,7 +977,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if self.fn_type_disallowed
             || !paren_starts_function_type(self.source.as_bytes(), paren_offset)
         {
-            let inner_type = self.parse_type()?;
+            // one wire level: the `TSParenthesizedType` (the depth limit's count)
+            let inner_type = self.nested(1, Self::parse_type)?;
             self.expect(&TokenKind::ParenClose)?;
             let end = self.prev_token_end();
 
@@ -934,7 +997,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // (asserts x, x is T).
         let arrow_start = self.current_pos().0 as u32;
         self.expect(&TokenKind::Arrow)?;
-        let return_type = self.parse_return_type_inner(arrow_start)?;
+        // two wire levels: the function type and its `TSTypeAnnotation` (the depth
+        // limit's count)
+        let return_type = self.nested(2, |p| p.parse_return_type_inner(arrow_start))?;
         let end = return_type.span.end;
 
         Ok(self.alloc(TSType::Function(TSFunctionType {
@@ -955,8 +1020,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let start = self.current_pos().0;
 
-        // Parse type parameters: <T, U extends V, ...>
-        let type_parameters = self.parse_type_parameters()?;
+        // Parse type parameters: <T, U extends V, ...> — one wire level: the function type
+        // over its type parameters
+        let type_parameters = self.nested(1, Self::parse_type_parameters)?;
 
         // Parse parameter list
         self.expect(&TokenKind::ParenOpen)?;
@@ -968,7 +1034,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::Arrow)?;
 
         // Parse return type (may be a type predicate)
-        let return_type = self.parse_return_type_inner(arrow_start)?;
+        // two wire levels: the function type and its `TSTypeAnnotation` (the depth
+        // limit's count)
+        let return_type = self.nested(2, |p| p.parse_return_type_inner(arrow_start))?;
         let end = return_type.span.end;
 
         Ok(self.alloc(TSType::Function(TSFunctionType {
@@ -1000,8 +1068,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Expect 'new' keyword
         self.expect(&TokenKind::Keyword(KeywordKind::New))?;
 
-        // Parse optional type parameters: <T>
-        let type_parameters = self.parse_optional_type_parameters()?;
+        // Parse optional type parameters: <T> — one wire level: the constructor type over
+        // its type parameters
+        let type_parameters = self.nested(1, Self::parse_optional_type_parameters)?;
 
         // Parse parameter list
         self.expect(&TokenKind::ParenOpen)?;
@@ -1013,7 +1082,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::Arrow)?;
 
         // Parse return type (may be a type predicate)
-        let return_type = self.parse_return_type_inner(arrow_start)?;
+        // two wire levels: the function type and its `TSTypeAnnotation` (the depth
+        // limit's count)
+        let return_type = self.nested(2, |p| p.parse_return_type_inner(arrow_start))?;
         let end = return_type.span.end;
 
         Ok(
@@ -1033,10 +1104,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
         let mut params = self.bvec();
 
+        // two wire levels each: the function type over its parameters, and the parameter
+        // over its pattern and annotation (the depth limit's count; the function type's
+        // own level rides its return type's path apart)
         if !self.check(&TokenKind::ParenClose) {
-            let first = self.parse_function_type_param()?;
+            let first = self.nested(2, Self::parse_function_type_param)?;
             let mut rest_seen = matches!(first.kind, ExpressionKind::RestElement(_));
             params.push(first);
+            // the parameters are siblings (`ListFrame`); the first is already counted
+            let mut frame = self.list_frame();
             while self.eat(TokenKind::Comma)? {
                 // A rest parameter must be last: nothing — not even a trailing
                 // comma — may follow it (see `parse_parameter_list`). In an
@@ -1052,10 +1128,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 if self.check(&TokenKind::ParenClose) {
                     break;
                 }
-                let param = self.parse_function_type_param()?;
+                frame.element(self, params.len());
+                let param = self.nested(2, Self::parse_function_type_param)?;
                 rest_seen = matches!(param.kind, ExpressionKind::RestElement(_));
                 params.push(param);
             }
+            frame.close(self);
         }
 
         Ok(params)
@@ -1163,7 +1241,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return self.parse_mapped_type_body(start);
         }
 
-        let members = self.parse_type_members()?;
+        // one wire level: the `TSTypeLiteral` its members sit in (the depth limit's count)
+        let members = self.nested(1, Self::parse_type_members)?;
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
@@ -1212,13 +1291,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         param_name: IdentName<'arena>,
         readonly: Option<TSMappedTypeModifier>,
     ) -> Result<&'arena TSType<'arena>, ParseError> {
-        // Parse constraint type (e.g., `keyof T`)
-        let constraint = self.parse_type()?;
+        // Parse constraint type (e.g., `keyof T`); two wire levels: the `TSMappedType` and
+        // the `TSTypeParameter` the constraint sits in
+        let constraint = self.nested(2, Self::parse_type)?;
         let param_end = constraint.span().end;
 
         // Check for optional `as` clause: `as NewKey`
         let name_type = if self.eat(TokenKind::Keyword(KeywordKind::As))? {
-            Some(self.parse_type()?)
+            Some(self.nested(1, Self::parse_type)?)
         } else {
             None
         };
@@ -1232,7 +1312,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse optional `:` and value type — the annotation may be absent
         // entirely (`{ [K in T] }`, `{ [K in T]+? }`), matching acorn.
         let type_annotation = if self.eat(TokenKind::Colon)? {
-            Some(self.parse_type()?)
+            Some(self.nested(1, Self::parse_type)?)
         } else {
             None
         };
@@ -1325,13 +1405,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let mut element_types = self.bvec();
         if !self.check(&TokenKind::BracketClose) {
-            element_types.push(self.parse_tuple_element()?);
+            // each element one wire level below the `TSTupleType` (the depth limit's count)
+            element_types.push(self.nested(1, Self::parse_tuple_element)?);
+            // the elements are siblings (`ListFrame`); the first is already counted
+            let mut frame = self.list_frame();
             while self.eat(TokenKind::Comma)? {
                 if self.check(&TokenKind::BracketClose) {
                     break; // trailing comma
                 }
-                element_types.push(self.parse_tuple_element()?);
+                // the pair the printer adds around a union element of a tuple of more than
+                // one once the tuple breaks (`[⏎\t(⏎\t\t| A⏎\t\t| B⏎\t),⏎\tc⏎]`), a level of
+                // the output's nesting: the first element's, now that a second follows
+                if element_types.len() == 1 && is_union_element(element_types[0]) {
+                    self.printer_pair()?;
+                }
+                frame.element(self, element_types.len());
+                let element = self.nested(1, Self::parse_tuple_element)?;
+                if is_union_element(element) {
+                    self.printer_pair()?;
+                }
+                element_types.push(element);
             }
+            frame.close(self);
         }
 
         let (_, end) = self.current_pos();
@@ -1349,7 +1444,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Check for rest element: `...T` or `...label: T`
         if self.eat(TokenKind::DotDotDot)? {
-            let inner = self.parse_tuple_element_inner()?;
+            // one wire level: the `TSRestType` over its element
+            let inner = self.nested(1, Self::parse_tuple_element_inner)?;
             let end = inner.span().end;
             return Ok(self.alloc(TSType::Rest(TSRestType {
                 type_annotation: inner,
@@ -1483,6 +1579,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         label_name,
                         Span::new(label_start as u32, label_end as u32),
                     )?;
+                    // the postfix `?` wraps the type before it: a spine link
+                    self.spine_link(LINK_TYPE_SUFFIX)?;
                     return Ok(self.alloc(TSType::Optional(TSOptionalType {
                         type_annotation: head,
                         span: Span::new(elem_start as u32, self.prev_token_end() as u32),
@@ -1492,9 +1590,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 false
             };
 
-            // Expect `:` and parse the element type
+            // Expect `:` and parse the element type; one wire level: the element type under
+            // its `TSNamedTupleMember`
             self.expect(&TokenKind::Colon)?;
-            let element_type = self.parse_type()?;
+            let element_type = self.nested(1, Self::parse_type)?;
             let end = element_type.span().end;
 
             return Ok(self.alloc(TSType::NamedTupleMember(TSNamedTupleMember {
@@ -1518,6 +1617,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 return Err(self.error_optional_marker_after_line_break(self.current_pos().0));
             }
             self.advance()?; // consume `?`
+            // the postfix `?` wraps the type before it, as a `[]` does: a spine link
+            // (`[[A?]?]` nests an optional type per tuple)
+            self.spine_link(LINK_TYPE_SUFFIX)?;
+            // the pair the printer adds around a bare element the `?` would rebind
+            // (`[(A | B)?]`), a level of the output's nesting
+            if bare_type_takes_pair(inner_type, TypePairPosition::Optional) {
+                self.printer_pair()?;
+            }
             let end = self.prev_token_end();
             Ok(self.alloc(TSType::Optional(TSOptionalType {
                 type_annotation: inner_type,
@@ -1565,10 +1672,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 quasis.push(element);
 
-                // Parse types and remaining template parts
+                // Parse types and remaining template parts; the interpolations are siblings
+                // (`ListFrame`)
+                let mut frame = self.list_frame();
                 loop {
-                    // Parse the interpolated type (not expression!)
-                    let ts_type = self.parse_type()?;
+                    frame.element(self, types.len());
+                    // Parse the interpolated type (not expression!); two wire levels: the
+                    // `TSLiteralType` and the `TemplateLiteral` it holds
+                    let ts_type = self.nested(2, Self::parse_type)?;
                     types.push(ts_type);
 
                     // Expect closing } of the interpolation
@@ -1595,6 +1706,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             self.advance()?;
 
                             quasis.push(element);
+                            frame.close(self);
 
                             return Ok(TemplateLiteralType {
                                 quasis: quasis.into_bump_slice(),
@@ -1649,8 +1761,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let mut params = self.bvec();
         let mut trailing_comma = None;
+        // the parameters are siblings (`ListFrame`)
+        let mut frame = self.list_frame();
         loop {
-            let param = self.parse_type_parameter()?;
+            frame.element(self, params.len());
+            // two wire levels: the `TSTypeParameterDeclaration` and the parameter
+            let param = self.nested(2, Self::parse_type_parameter)?;
             params.push(param);
 
             if !self.eat(TokenKind::Comma)? {
@@ -1662,6 +1778,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 break;
             }
         }
+        frame.close(self);
 
         let end = self.greater_than_end_in_type()?;
 
@@ -1756,6 +1873,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let constraint = if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
             self.advance()?;
             let constraint_type = self.parse_type()?;
+            // the pair the printer keeps around a conditional constraint for clarity
+            // (`<T extends (A extends B ? C : D)>`), a level of the output's nesting
+            if matches!(constraint_type, TSType::Conditional(_)) {
+                self.printer_pair()?;
+            }
             end = constraint_type.span().end;
             Some(constraint_type)
         } else {
@@ -1806,7 +1928,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<(u32, &'arena TSType<'arena>), ParseError> {
         let start = self.current_pos().0 as u32;
         self.expect_less_than_in_type()?;
-        Ok((start, self.parse_type()?))
+        Ok((start, self.parse_type_argument()?))
+    }
+
+    /// One argument of a type-argument list: two wire levels below the type that takes the
+    /// list — the `TSTypeParameterInstantiation`, and the argument (the depth limit's
+    /// count, [`Parser::nested`]). A type's nesting is counted where the type grammar
+    /// recurses, as here, so a type that holds no other pays nothing.
+    fn parse_type_argument(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+        self.nested(2, Self::parse_type)
     }
 
     /// The tail of a type-argument list, behind the first argument
@@ -1819,13 +1949,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<TSTypeParameterInstantiation<'arena>, ParseError> {
         let mut params = self.bvec();
         params.push(first);
+        // the arguments are siblings (`ListFrame`); the first is already counted
+        let mut frame = self.list_frame();
         while self.eat(TokenKind::Comma)? {
             // Handle trailing comma
             if self.check_greater_than_in_type() {
                 break;
             }
-            params.push(self.parse_type()?);
+            frame.element(self, params.len());
+            params.push(self.parse_type_argument()?);
         }
+        frame.close(self);
 
         let end = self.greater_than_end_in_type()?;
 
@@ -1833,5 +1967,100 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             params: params.into_bump_slice(),
             span: Span::new(start, end),
         })
+    }
+}
+
+/// Whether a tuple element is a union the printer parenthesizes once the tuple breaks,
+/// where the author wrote no pair (`build_tuple_element_doc`, which strips an author's pair
+/// and writes its own in its place).
+fn is_union_element(element: &TSType<'_>) -> bool {
+    matches!(element, TSType::Union(_))
+}
+
+/// The type positions whose pair the printer adds around a bare type that binds looser
+/// than the position (`printer::types::helpers`'s `type_needs_parens_*` rules).
+#[derive(Clone, Copy)]
+enum TypePairPosition {
+    /// A union or intersection member: `(A & B) | C`, `A | (infer U extends X)`.
+    Member,
+    /// An array element or an indexed access's object: `(typeof a)[]`, `(infer U)[K]`,
+    /// `(-1)[]`.
+    Suffix,
+    /// An optional tuple element: `[(A | B)?]`.
+    Optional,
+}
+
+/// Whether the printer adds a pair around `ts_type` in `position` where the author wrote
+/// none — never around an author's pair (a `TSParenthesizedType` the parse counted as a
+/// level already, which the printer keeps or strips), and around a bare type its rule
+/// parenthesizes, read past a one-member union or intersection the printer prints as its
+/// member as well as at it, so the answer is the printer's or above it.
+fn bare_type_takes_pair(ts_type: &TSType<'_>, position: TypePairPosition) -> bool {
+    if matches!(ts_type, TSType::Parenthesized(_)) {
+        return false;
+    }
+    let mut ty = ts_type;
+    loop {
+        if type_takes_pair(ty, position) {
+            return true;
+        }
+        ty = match ty {
+            TSType::Union(u) if u.types.len() == 1 => u.types[0],
+            TSType::Intersection(i) if i.types.len() == 1 => i.types[0],
+            _ => return false,
+        };
+    }
+}
+
+/// [`bare_type_takes_pair`]'s rule for one type.
+fn type_takes_pair(ty: &TSType<'_>, position: TypePairPosition) -> bool {
+    let looser = matches!(
+        ty,
+        TSType::Union(_)
+            | TSType::Intersection(_)
+            | TSType::Function(_)
+            | TSType::Constructor(_)
+            | TSType::Conditional(_)
+    );
+    match position {
+        TypePairPosition::Member => {
+            looser || matches!(ty, TSType::Infer(i) if i.type_parameter.constraint.is_some())
+        }
+        TypePairPosition::Suffix => {
+            looser
+                || matches!(
+                    ty,
+                    TSType::TypeQuery(_)
+                        | TSType::TypeOperator(_)
+                        | TSType::Infer(_)
+                        | TSType::Literal(TSLiteralType::UnaryExpression(_))
+                )
+        }
+        TypePairPosition::Optional => {
+            looser || matches!(ty, TSType::TypeOperator(_) | TSType::Infer(_))
+        }
+    }
+}
+
+impl<'arena> Parser<'_, 'arena> {
+    /// Count the pair the printer adds around a bare union or intersection `member` that
+    /// binds looser than its neighbours ([`TypePairPosition::Member`]), a level of the
+    /// output's nesting.
+    fn member_pair(&mut self, member: &TSType<'_>) -> Result<(), ParseError> {
+        if bare_type_takes_pair(member, TypePairPosition::Member) {
+            self.printer_pair()
+        } else {
+            Ok(())
+        }
+    }
+
+    /// [`Parser::member_pair`] for a union's or intersection's first member, asked once a
+    /// second follows it (`types` holding the first alone): a member of one is printed as
+    /// itself.
+    fn first_member_pair(&mut self, types: &[&TSType<'_>]) -> Result<(), ParseError> {
+        match types {
+            [first] => self.member_pair(first),
+            _ => Ok(()),
+        }
     }
 }

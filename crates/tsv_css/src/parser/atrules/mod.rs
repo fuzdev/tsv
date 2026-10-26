@@ -61,6 +61,15 @@ pub(crate) fn parse_atrule<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     nested_in_rule: bool,
 ) -> Result<CssAtrule<'arena>, ParseError> {
+    // two wire levels: the `Atrule` and its `Block` (the depth limit's count)
+    parser.nested(2, |p| parse_atrule_body(p, nested_in_rule))
+}
+
+/// [`parse_atrule`] inside its depth levels.
+fn parse_atrule_body<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    nested_in_rule: bool,
+) -> Result<CssAtrule<'arena>, ParseError> {
     let start = parser.span_pos(parser.current_start());
 
     // Expect @ symbol

@@ -488,7 +488,7 @@ fn yield_in_a_generator_is_still_the_operator() {
 /// Binding-pattern **elements** take the widened words too, in all three pattern
 /// contexts. tsv parses a binding pattern by running the **expression** parser and
 /// converting (`parse_destructured_binding` runs `parse_array_expression` /
-/// `parse_object_expression`, then `to_assignable`), so an element head asks the
+/// `parse_object_expression`, then `refine_assignable`), so an element head asks the
 /// `IdentifierReference` channel rather than the binding one — which is why these
 /// went on rejecting for as long as that channel was narrow, and why widening it
 /// closed a declaration, a parameter and a `catch` binding in one move. Object

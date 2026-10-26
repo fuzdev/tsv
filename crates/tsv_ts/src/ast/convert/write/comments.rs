@@ -19,7 +19,7 @@
 //! ⭐ **Child visit order is acorn's by construction.** zimmerframe visits a node's
 //! object-valued properties in property-insertion order, and the writer's field order
 //! already *is* that order (`write_arrow_function_expression`,
-//! `write_function_expression`, `write_new_expression`, `write_call_expression` and the
+//! `write_function_expression`, `write_new_expression`, `write_call_expression_tail` and the
 //! `SwitchCase` / `LabeledStatement` / `MethodDefinition` writers each carry the note).
 //! An emit-driven walk cannot disagree with the field order it is itself emitting, so
 //! the whole class of "the walk and the wire order a node's children differently" bugs

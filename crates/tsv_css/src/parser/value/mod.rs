@@ -49,6 +49,14 @@ use strings::parse_string_literal;
 /// * `colon_is_operator` - whether a top-level `:` in this value is a value operator,
 ///   which it is in a **custom property's** value and nowhere else at the top level (see
 ///   `operators::split_value_run`). The caller knows it from the property name.
+/// * `room` - the function levels the parse may enter (the depth limit's count, one level
+///   a function or parenthesized group — [`FunctionLevels`]).
+///
+/// # Errors
+///
+/// The host offset of the `(` whose function would enter past `room`, the parse
+/// abandoned there.
+#[expect(clippy::too_many_arguments)]
 pub fn parse_value_from_source<'arena>(
     source: &str,
     source_relative_span: Span,
@@ -56,19 +64,20 @@ pub fn parse_value_from_source<'arena>(
     class: Option<ValueSeparator>,
     group_closes_value: bool,
     colon_is_operator: bool,
+    room: u32,
     arena: &'arena Bump,
-) -> CssValue<'arena> {
+) -> Result<CssValue<'arena>, u32> {
     let value_str = source_relative_span.extract(source);
     let absolute_start = base_offset + source_relative_span.start;
 
     // An all-whitespace (or empty) value keeps the span it was handed.
     let Some((trimmed, leading)) = locate_value(value_str) else {
-        return CssValue::Identifier {
+        return Ok(CssValue::Identifier {
             span: Span {
                 start: absolute_start,
                 end: base_offset + source_relative_span.end,
             },
-        };
+        });
     };
 
     // The value's own span: where it starts, plus how long it is. The end needs
@@ -98,7 +107,100 @@ pub fn parse_value_from_source<'arena>(
     } else {
         parser::ValueParser::new(trimmed, absolute_span)
     };
-    parser.parse_scanned(arena, class, group_closes_text)
+    // Every level the parse enters is a function's or a group's `(`, a byte of the text,
+    // so a text no longer than the room cannot run out of it: the count is skipped, and the
+    // parse runs unbounded, as it does outside any value's parse (`FunctionLevels::within`
+    // never nests — no value parse reaches the declaration parser).
+    if trimmed.len() <= room as usize {
+        return Ok(parser.parse_scanned(arena, class, group_closes_text));
+    }
+    FunctionLevels::within(room, || {
+        parser.parse_scanned(arena, class, group_closes_text)
+    })
+}
+
+/// The function levels a value's parse may still enter, and the `(` where it ran out — the
+/// depth limit's count for the one recursion the declaration parser does not see: a
+/// function's argument list is parsed by re-reading its text
+/// ([`parse_function_arguments`], which reaches [`parse_function_leaf`] again for a
+/// function or group nested in it), and every walk of the tree recurses the same way, a
+/// level a function. The value parser cannot fail, so the count rides beside it (a
+/// thread-local, set for one value's parse by [`FunctionLevels::within`] — skipped for a
+/// value too short to run out of the room), and a function past the room parses as
+/// nothing — the declaration then refuses at the `(` it recorded.
+///
+/// Counting the functions the parse enters, rather than the parens the declaration's
+/// boundary scan steps over, is what makes the count the walks': that scan reads a url-token
+/// whole (`url(((x)))` is one token to the lexer), the value parser does not.
+#[derive(Clone, Copy)]
+struct FunctionLevels {
+    room: u32,
+    /// The host offset of the `(` the parse ran out of room at; `u32::MAX` while it has not.
+    refused_at: u32,
+}
+
+thread_local! {
+    static FUNCTION_LEVELS: std::cell::Cell<FunctionLevels> = const {
+        std::cell::Cell::new(FunctionLevels::UNBOUNDED)
+    };
+}
+
+impl FunctionLevels {
+    /// Outside [`FunctionLevels::within`] (a unit test's own value parse): no bound.
+    const UNBOUNDED: FunctionLevels = FunctionLevels {
+        room: u32::MAX,
+        refused_at: u32::MAX,
+    };
+
+    /// Run `parse` with `room` function levels to enter: its value, or the `(` where the
+    /// room ran out. Every exit — a panic unwinding through `parse` included, which a
+    /// binding catches and lives on past on the same thread — restores the count it found
+    /// (outside any parse, unbounded).
+    fn within<T>(room: u32, parse: impl FnOnce() -> T) -> Result<T, u32> {
+        /// Restores the count `within` displaced when it goes out of scope.
+        struct Restore(FunctionLevels);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                FUNCTION_LEVELS.set(self.0);
+            }
+        }
+        let _restore = Restore(FUNCTION_LEVELS.replace(FunctionLevels {
+            room,
+            refused_at: u32::MAX,
+        }));
+        let value = parse();
+        let refused_at = FUNCTION_LEVELS.get().refused_at;
+        if refused_at == u32::MAX {
+            Ok(value)
+        } else {
+            Err(refused_at)
+        }
+    }
+
+    /// Enter a function whose `(` sits at host offset `open`: `false` (the `(` recorded,
+    /// where it is the first) where no room is left.
+    #[inline]
+    fn enter(open: u32) -> bool {
+        let mut levels = FUNCTION_LEVELS.get();
+        if levels.room == 0 {
+            if levels.refused_at == u32::MAX {
+                levels.refused_at = open;
+                FUNCTION_LEVELS.set(levels);
+            }
+            return false;
+        }
+        levels.room -= 1;
+        FUNCTION_LEVELS.set(levels);
+        true
+    }
+
+    /// Leave a function [`FunctionLevels::enter`] entered.
+    #[inline]
+    fn leave() {
+        let mut levels = FUNCTION_LEVELS.get();
+        levels.room += 1;
+        FUNCTION_LEVELS.set(levels);
+    }
 }
 
 /// A value's text with its surrounding **CSS** whitespace removed, and how many
@@ -396,9 +498,16 @@ fn parse_function_leaf<'arena>(
         start: span.start + name_start as u32,
         end: span.start + (name_start + name.len()) as u32,
     };
+    // one level of the depth limit's count, the argument list's recursion; past the room
+    // the function parses as nothing, the declaration refusing it ([`FunctionLevels`])
+    if !FunctionLevels::enter(span.start + paren_pos as u32) {
+        return CssValue::Identifier { span };
+    }
+    let args = parse_function_arguments(args, args_span, arena);
+    FunctionLevels::leave();
     CssValue::Function {
         name_span,
-        args: parse_function_arguments(args, args_span, arena),
+        args,
         span,
     }
 }
@@ -783,7 +892,18 @@ mod value_span_tests {
     /// The span `parse_value_from_source` gives the value it parsed.
     fn value_span(source: &str, start: u32, end: u32) -> Span {
         let arena = Bump::new();
-        parse_value_from_source(source, Span { start, end }, 0, None, false, false, &arena).span()
+        parse_value_from_source(
+            source,
+            Span { start, end },
+            0,
+            None,
+            false,
+            false,
+            256,
+            &arena,
+        )
+        .expect("within the room")
+        .span()
     }
 
     /// The already-trimmed fast path must agree with the trimming path on where
@@ -862,5 +982,29 @@ mod value_span_tests {
         assert_eq!(value_span(r"50px\   ", 0, 8), Span { start: 0, end: 6 });
         // An even backslash run is a completed `\\` — the space is just padding.
         assert_eq!(value_span(r"50px\\ ", 0, 7), Span { start: 0, end: 6 });
+    }
+}
+
+#[cfg(test)]
+mod function_levels_tests {
+    use super::{FUNCTION_LEVELS, FunctionLevels};
+
+    /// A panic inside a value's parse — which a binding catches, the thread living on —
+    /// leaves no room behind: the next parse on the thread starts unbounded.
+    #[test]
+    fn a_panic_leaves_the_count_unbounded() {
+        let caught = std::panic::catch_unwind(|| {
+            FunctionLevels::within(3, || {
+                assert!(FunctionLevels::enter(0));
+                panic!("a parse panicked mid-function");
+            })
+        });
+        assert!(caught.is_err());
+        let levels = FUNCTION_LEVELS.get();
+        assert_eq!(
+            (levels.room, levels.refused_at),
+            (u32::MAX, u32::MAX),
+            "the count it found is restored"
+        );
     }
 }

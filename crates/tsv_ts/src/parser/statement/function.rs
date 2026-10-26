@@ -30,7 +30,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         // No ASI - parse the return value expression
+        let argument_token = self.current_pos().0;
         let argument = self.parse_expression_ref()?;
+        self.restricted_argument_pair(argument, argument_token)?;
         let end = self.semicolon_end()?;
 
         Ok(Statement {
@@ -336,7 +338,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let params: &'arena [Expression<'arena>] =
                     p.parse_parameter_list()?.into_bump_slice();
                 let return_type = p.parse_optional_return_type()?;
-                let body = p.parse_function_body()?;
+                // three wire levels: the `FunctionExpression`, its body's `BlockStatement`
+                // and its statements — a declaration's own level is its statement's
+                let body = p.parse_function_body_levels(3)?;
                 Ok((params, return_type, body))
             })
         })?;

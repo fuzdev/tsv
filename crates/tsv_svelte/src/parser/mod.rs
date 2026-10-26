@@ -213,6 +213,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             comments,
             snippet_wire_parameters,
             holds_nested_raw_text: self.holds_nested_raw_text,
+            nested_raw_text_nesting: self.nested_raw_text_nesting,
         })
     }
 

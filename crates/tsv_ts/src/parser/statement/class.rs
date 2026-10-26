@@ -9,6 +9,7 @@ use crate::ast::internal::{
     TSTypeParameterInstantiation,
 };
 use crate::lexer::{KeywordKind, TokenKind};
+use crate::printer::ParenContext;
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
@@ -328,8 +329,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
     ) -> Result<&'arena Expression<'arena>, ParseError> {
         let start = self.current_pos().0;
-        let decorators = self.parse_decorators(DecoratorListKind::Class)?;
-        self.finish_decorated_class_expression(start, decorators, false)
+        // one wire level: the `ClassExpression` over its decorators, heritage and body
+        self.nested(1, |p| {
+            let decorators = p.parse_decorators(DecoratorListKind::Class)?;
+            p.finish_decorated_class_expression(start, decorators, false)
+        })
     }
 
     /// Whether the current token is an `abstract` modifier heading a class: `abstract`
@@ -423,11 +427,27 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // parenthesized full expression) — NOT a full `AssignmentExpression`, so
         // a trailing `*` or binary operator is left for the following construct
         // (e.g. a decorated generator method `@fn *a() {}`).
-        let expression = self.parse_decorator_expression()?;
+        // one wire level: the `Decorator` over its expression (the depth limit's count) —
+        // the holder's own level is its caller's (`Parser::parse_decorated_class_expression`,
+        // a member's and a parameter's list position)
+        let expression = self.nested(1, Self::parse_decorator_expression)?;
 
         // The decorator span covers a parenthesized expression's closing `)`
         // (`@(expr)`), which the paren-stripped expression span excludes
         let end = self.prev_token_end();
+
+        // the pair the printer writes around an expression the bare decorator grammar
+        // cannot spell (`@a!(…)` prints `@(a!(…))`), a level of the output's nesting —
+        // unless the author's own pair wraps the whole expression (`@(a + b)`), which
+        // ends before the decorator does; a pair around a callee alone (`@(a!)(…)`) holds
+        // less than the printer's would
+        // (a wire-only parse keeps that pair as a node, `parse_preserve_parens`)
+        if crate::printer::decorator_takes_pair(&expression)
+            && expression.span().end as usize == end
+            && !matches!(expression.kind, ExpressionKind::ParenthesizedExpression(_))
+        {
+            self.printer_pair()?;
+        }
 
         Ok(Decorator {
             expression,
@@ -456,7 +476,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Ok((None, None));
         }
         self.advance()?; // consume 'extends'
+        let heritage_start = self.current_pos().0;
+        // no level of its own: the superclass is a node of its own wherever it holds one
+        // (`class extends class extends …` counts each class, `class extends f(…)` the
+        // call's arguments), under a class whose level is counted already
         let expr = self.parse_heritage_expression()?;
+        // the pair the printer adds around a bare heritage it parenthesizes for clarity
+        // (`extends (new B())`), a level of the output's nesting
+        if expr.span().start as usize == heritage_start
+            && expr.span().end as usize == self.prev_token_end()
+        {
+            self.count_operand_pairs(Some((expr, ParenContext::SuperClass)), None)?;
+        }
         let type_args = self.parse_optional_type_arguments()?;
         Ok((Some(expr), type_args))
     }
@@ -502,7 +533,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
     ) -> Result<&'arena Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
-        self.parse_class_expression_from(start, None, false)
+        // one wire level: the `ClassExpression` over its heritage and body — a declaration's
+        // is its statement's
+        self.nested(1, |p| p.parse_class_expression_from(start, None, false))
     }
 
     /// Parse a class expression whose span starts at `start` and which carries
@@ -595,7 +628,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             // Parse class body (ambient members share the concrete grammar; see
             // `parse_class_body`)
-            let body = p.parse_class_body()?;
+            // one wire level: the `ClassBody` (the depth limit's count)
+            let body = p.nested(1, Self::parse_class_body)?;
             Ok(ClassHead {
                 id,
                 type_parameters,
@@ -689,15 +723,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // in a for-header init. A nested for-header inside re-disables it.
         let body = self.with_body_frame(|p| {
             let mut body = p.bvec();
+            // the members are siblings (`ListFrame`)
+            let mut frame = p.list_frame();
             while !matches!(p.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
                 // Stray semicolons are empty class members — acorn skips them,
                 // producing no node (prettier strips them on format).
                 if p.eat(TokenKind::Semicolon)? {
                     continue;
                 }
-                let member = p.parse_class_member()?;
+                frame.element(p, body.len());
+                // one wire level: the member (the depth limit's count)
+                let member = p.nested(1, Self::parse_class_member)?;
                 body.push(member);
             }
+            frame.close(p);
             Ok(body)
         })?;
 
@@ -1071,7 +1110,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// ambient signatures).
     ///
     /// `inline(always)`, into its one caller: a frame of its own sits on the recursion
-    /// path of every class nested in a member body, lowering the nesting ceiling (the
+    /// path of every class nested in a member body, eating the depth limits' margin (the
     /// same holds for `finish_property_member`).
     #[expect(clippy::inline_always)]
     #[inline(always)]
@@ -1233,8 +1272,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 end,
             )
         } else {
-            let body_block =
-                self.with_fn_context(is_async, is_generator, Self::parse_function_body)?;
+            // one wire level beyond the body's own: the method's `FunctionExpression`
+            let body_block = self.nested(1, |p| {
+                p.with_fn_context(is_async, is_generator, Self::parse_function_body)
+            })?;
             let end = body_block.span.end;
             (body_block, end)
         };
@@ -1276,7 +1317,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// optional type annotation, optional initializer, and trailing semicolon.
     ///
     /// `inline(always)`, into its one caller: a frame of its own sits on the recursion
-    /// path of every class nested in a member body, lowering the nesting ceiling (the
+    /// path of every class nested in a member body, eating the depth limits' margin (the
     /// same holds for `finish_method_member`).
     #[expect(clippy::inline_always)]
     #[inline(always)]
@@ -1397,8 +1438,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Parse type annotation on parameter: `: KeyType`
+        // one wire level: the parameter's `Identifier`, above the annotation's own (the
+        // depth limit's count, `Parser::nested`)
         let param_type = if self.check(&TokenKind::Colon) {
-            Some(self.parse_type_annotation()?)
+            Some(self.nested(1, Self::parse_type_annotation)?)
         } else {
             return Err(self.error_expected("type annotation for index signature parameter"));
         };

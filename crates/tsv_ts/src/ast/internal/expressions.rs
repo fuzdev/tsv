@@ -392,7 +392,7 @@ pub struct ObjectExpression<'arena> {
     /// Valid in an object *literal*, but a syntax error once the literal is
     /// refined to an object pattern — the grammar's rest property admits no
     /// trailing comma. The literal parser discards the comma, so this flag is
-    /// the only surviving record of it for `to_assignable` to consult.
+    /// the only surviving record of it for `refine_assignable` to consult.
     pub spread_trailing_comma: bool,
 }
 
@@ -457,7 +457,7 @@ pub struct ArrayExpression<'arena> {
     /// Valid in an array *literal*, but a syntax error once the literal is
     /// refined to an array pattern — the grammar's rest element admits no
     /// trailing comma. The literal parser discards the comma, so this flag is
-    /// the only surviving record of it for `to_assignable` to consult.
+    /// the only surviving record of it for `refine_assignable` to consult.
     pub spread_trailing_comma: bool,
 }
 

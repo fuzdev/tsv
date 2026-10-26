@@ -3,6 +3,7 @@
 use std::fmt;
 use std::fmt::Write as _;
 
+use crate::depth::DepthLimit;
 use crate::location::{WireCoordinates, WirePoint};
 
 /// Where a located error sits: its point in the document's wire coordinates and the
@@ -155,6 +156,14 @@ enum ParseErrorKind {
         position: usize,
         context: Option<ErrorContext>,
     },
+    // Constructed only by `ParseError::too_deep`: a located syntax error like the four
+    // above, kept apart so a caller can tell a resource limit from malformed source
+    // (`ParseError::is_too_deep`).
+    TooDeep {
+        limit: DepthLimit,
+        position: usize,
+        context: Option<ErrorContext>,
+    },
     // Constructed only by `ensure_source_fits`, which every public parse entry point
     // calls before touching the source — that guard is what makes `Token`/`Span`'s
     // `u32` offsets sound (see `tsv_ts/src/lexer/token.rs`).
@@ -192,6 +201,17 @@ impl ParseErrorKind {
             ParseErrorKind::InvalidExpression { found, .. } => {
                 format!("Expected expression, found {found}")
             }
+            ParseErrorKind::TooDeep { limit, .. } => match limit {
+                DepthLimit::Nesting => format!(
+                    "Nesting exceeds tsv's depth limit of {} levels",
+                    limit.value()
+                ),
+                // no number: the limit counts weighted units, not links, with the nesting
+                // on the chain's path charged on top, so no count of links names it
+                DepthLimit::Spine => "Chain of operators, member accesses, calls, assertions or \
+                                      type suffixes exceeds tsv's length limit"
+                    .to_string(),
+            },
             ParseErrorKind::FileTooLarge { size, max } => {
                 format!("File too large: {size} bytes (maximum: {max} bytes / 4 GiB)")
             }
@@ -449,6 +469,23 @@ impl ParseError {
         self.0.kind.located().is_some()
     }
 
+    /// The [`ParseError::too_deep`] payload, built here where the kind is visible.
+    pub(crate) fn depth_limit(limit: DepthLimit, position: usize) -> Self {
+        ParseError::new(ParseErrorKind::TooDeep {
+            limit,
+            position,
+            context: None,
+        })
+    }
+
+    /// Whether this is a [`ParseError::too_deep`] — the source passed one of the parsers'
+    /// depth limits, a resource bound rather than a grammar verdict. A speculative parse
+    /// hands such an error back instead of rewinding to another reading, since the other
+    /// reading would be chosen for the stack's sake, not the grammar's.
+    pub fn is_too_deep(&self) -> bool {
+        matches!(self.0.kind, ParseErrorKind::TooDeep { .. })
+    }
+
     /// Source exceeds the 4 GiB − 1 cap the `u32` span offsets assume.
     fn file_too_large(size: usize, max: usize) -> Self {
         ParseError::new(ParseErrorKind::FileTooLarge { size, max })
@@ -644,6 +681,9 @@ impl ParseErrorKind {
             }
             | ParseErrorKind::InvalidExpression {
                 position, context, ..
+            }
+            | ParseErrorKind::TooDeep {
+                position, context, ..
             } => Some((position, context)),
             ParseErrorKind::FileTooLarge { .. } | ParseErrorKind::Refused { .. } => None,
         }
@@ -660,6 +700,9 @@ impl ParseErrorKind {
                 position, context, ..
             }
             | ParseErrorKind::InvalidExpression {
+                position, context, ..
+            }
+            | ParseErrorKind::TooDeep {
                 position, context, ..
             } => Some((position, context)),
             ParseErrorKind::FileTooLarge { .. } | ParseErrorKind::Refused { .. } => None,

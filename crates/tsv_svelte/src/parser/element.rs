@@ -335,6 +335,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         parent: ElementParent,
     ) -> Result<ParsedElement<'arena>, ParseError> {
+        // two wire levels: the element and the `Fragment` its children sit in (the depth
+        // limit's count)
+        self.nested(2, |p| p.parse_element_or_special_body(parent))
+    }
+
+    /// [`Self::parse_element_or_special`] inside its depth levels.
+    fn parse_element_or_special_body(
+        &mut self,
+        parent: ElementParent,
+    ) -> Result<ParsedElement<'arena>, ParseError> {
         let start = self.current_start();
 
         // Parse opening tag: <tag>
@@ -474,56 +484,58 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Resolve this element's children and end offset. The four content regimes differ
         // only in how they produce `(nodes, end)`; the element is assembled once below.
-        let (nodes, end): (&'arena [FragmentNode<'arena>], u32) =
-            if facts.is_void() || opening.self_closing {
-                // Void and self-closing elements have no children or closing tag
-                // (classification lives in tsv_html, shared with the printer).
-                self.advance()?; // consume >
-                (&[], opening.after_gt as u32)
-            } else if facts.is_raw_text() {
-                // Nested <style>/<script> are raw text (not parsed as Svelte template) —
-                // per Svelte docs, "the <style> tag will be inserted as-is into the DOM".
-                self.holds_nested_raw_text = true;
-                let child_nodes = self.parse_raw_text_content(tag_name, opening.after_gt, start)?;
-                let end = self.parse_closing_tag(tag_name)?;
-                (child_nodes.into_bump_slice(), end)
-            } else if tag_name == "textarea" {
-                // <textarea> is RCDATA: raw text with live {expr} interpolation up to a
-                // whitespace/attribute-tolerant </textarea…>, where `<` is literal text
-                // (never a nested element). Svelte's sole RCDATA element — a sibling of the
-                // <script>/<style> raw-text branch above, but interleaving Text +
-                // ExpressionTag chunks.
-                let (child_nodes, end) = self.parse_rcdata_content(opening.after_gt, start)?;
-                (child_nodes.into_bump_slice(), end)
+        let (nodes, end): (&'arena [FragmentNode<'arena>], u32) = if facts.is_void()
+            || opening.self_closing
+        {
+            // Void and self-closing elements have no children or closing tag
+            // (classification lives in tsv_html, shared with the printer).
+            self.advance()?; // consume >
+            (&[], opening.after_gt as u32)
+        } else if facts.is_raw_text() {
+            // Nested <style>/<script> are raw text (not parsed as Svelte template) —
+            // per Svelte docs, "the <style> tag will be inserted as-is into the DOM".
+            self.holds_nested_raw_text = true;
+            self.nested_raw_text_nesting = self.nested_raw_text_nesting.max(self.island_nesting());
+            let child_nodes = self.parse_raw_text_content(tag_name, opening.after_gt, start)?;
+            let end = self.parse_closing_tag(tag_name)?;
+            (child_nodes.into_bump_slice(), end)
+        } else if tag_name == "textarea" {
+            // <textarea> is RCDATA: raw text with live {expr} interpolation up to a
+            // whitespace/attribute-tolerant </textarea…>, where `<` is literal text
+            // (never a nested element). Svelte's sole RCDATA element — a sibling of the
+            // <script>/<style> raw-text branch above, but interleaving Text +
+            // ExpressionTag chunks.
+            let (child_nodes, end) = self.parse_rcdata_content(opening.after_gt, start)?;
+            (child_nodes.into_bump_slice(), end)
+        } else {
+            // Parse children. Only HTML elements participate in HTML5 implicit tag
+            // closing (Svelte gates auto-close on `parent.type === 'RegularElement'`);
+            // components and `svelte:*` keep the strict explicit-close requirement.
+            // `parse_children` resolves `end` — past this element's `</tag>` (explicit
+            // close) or at the `<` that implicitly closed it.
+            self.advance()?; // consume >
+            let is_html = facts.element_kind() == ElementKind::Html;
+            // Enter this element's ancestor context: a RegularElement/Component resets head
+            // context (mirrors Svelte's `parent_is_head`), and a RegularElement carrying
+            // `shadowrootmode` turns on shadow-root-template context for its subtree
+            // (`parent_is_shadowroot_template`).
+            let in_shadow = self.in_shadowroot_template
+                || (is_html && self.attrs_have_shadowrootmode(&attributes));
+            let implicit_close = if is_html {
+                ImplicitClose::for_html_element(tag_name)
             } else {
-                // Parse children. Only HTML elements participate in HTML5 implicit tag
-                // closing (Svelte gates auto-close on `parent.type === 'RegularElement'`);
-                // components and `svelte:*` keep the strict explicit-close requirement.
-                // `parse_children` resolves `end` — past this element's `</tag>` (explicit
-                // close) or at the `<` that implicitly closed it.
-                self.advance()?; // consume >
-                let is_html = facts.element_kind() == ElementKind::Html;
-                // Enter this element's ancestor context: a RegularElement/Component resets head
-                // context (mirrors Svelte's `parent_is_head`), and a RegularElement carrying
-                // `shadowrootmode` turns on shadow-root-template context for its subtree
-                // (`parent_is_shadowroot_template`).
-                let in_shadow = self.in_shadowroot_template
-                    || (is_html && self.attrs_have_shadowrootmode(&attributes));
-                let implicit_close = if is_html {
-                    ImplicitClose::for_html_element(tag_name)
-                } else {
-                    ImplicitClose::Never
-                };
-                let (child_nodes, end) = self.parse_children_in_context(
-                    false,
-                    in_shadow,
-                    tag_name,
-                    opening.after_gt,
-                    start,
-                    implicit_close,
-                )?;
-                (child_nodes.into_bump_slice(), end)
+                ImplicitClose::Never
             };
+            let (child_nodes, end) = self.parse_children_in_context(
+                false,
+                in_shadow,
+                tag_name,
+                opening.after_gt,
+                start,
+                implicit_close,
+            )?;
+            (child_nodes.into_bump_slice(), end)
+        };
 
         Ok(ParsedElement::Element(Element {
             kind: facts.element_kind(),

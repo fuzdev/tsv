@@ -1244,7 +1244,8 @@ mod tests {
         let source = "/* c */ name";
         let arena = bumpalo::Bump::new();
         let (expression, comments) =
-            crate::parse_expression_with_comments(source, 0, &arena, |_| Ok(())).expect("parses");
+            crate::parse_expression_with_comments(source, 0, 0, &arena, |_| Ok(()))
+                .expect("parses");
         let internal::ExpressionKind::Identifier(id) = &expression.kind else {
             panic!("an identifier expected");
         };

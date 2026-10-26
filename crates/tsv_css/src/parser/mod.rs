@@ -16,7 +16,7 @@ use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use decl_scan::{ScannedDeclaration, TerminatorKind};
 use std::cell::Cell;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{DepthBudget, DepthLimit, NESTING_LIMIT, ParseError, Span};
 
 pub(crate) struct CssParser<'a, 'arena> {
     source: &'a str,
@@ -43,6 +43,10 @@ pub(crate) struct CssParser<'a, 'arena> {
     /// `inside_pseudo_class` the same way, so top-level selectors keep rejecting bare
     /// numbers. Saved/restored around the two selector-list arg arms in `pseudo.rs`.
     pub(crate) in_pseudo_args: bool,
+    /// The parse's depth counts against `tsv_lang`'s nesting limit ([`DepthBudget`]),
+    /// seeded with the host markup's nesting for a Svelte `<style>`. CSS builds no left
+    /// spine, so only the nesting half is used.
+    depth: DepthBudget,
     pub(crate) comments: Vec<Comment>,
     /// Bump arena that owns every AST node this parser allocates. Supplied by
     /// the caller (caller-owns-`Bump`); the returned `CssStyleSheet<'arena>`
@@ -67,6 +71,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     pub(crate) fn new(
         source: &'a str,
         base_offset: usize,
+        host_nesting: u32,
         arena: &'arena Bump,
     ) -> Result<Self, ParseError> {
         // The lexer scans `source` (the island) but reports errors against the document
@@ -84,6 +89,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             peek: None,
             base_offset,
             in_pseudo_args: false,
+            depth: DepthBudget::at(host_nesting),
             comments: Vec::new(),
             arena,
             speculative_declaration: Cell::new(None),
@@ -982,6 +988,38 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         )
     }
 
+    /// Run `f` `units` wire levels deeper — the depth limit's count ([`DepthBudget`]),
+    /// refused at the current token where it would pass `tsv_lang::NESTING_LIMIT`, and
+    /// left on every path out.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub(crate) fn nested<T>(
+        &mut self,
+        units: u32,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        if !self.depth.try_enter(units) {
+            return Err(self.too_deep(self.current_pos()));
+        }
+        let result = f(self);
+        self.depth.leave(units);
+        result
+    }
+
+    /// The levels of nesting left before the limit — what a declaration value's parse may
+    /// enter (`value::parse_value_from_source`).
+    #[inline]
+    pub(crate) fn nesting_room(&self) -> u32 {
+        NESTING_LIMIT - self.depth.nesting()
+    }
+
+    /// The depth-limit error at `position` (host coordinates).
+    #[cold]
+    #[inline(never)]
+    pub(crate) fn too_deep(&self, position: usize) -> ParseError {
+        ParseError::too_deep(DepthLimit::Nesting, position)
+    }
+
     /// Create an error: "Unexpected X"
     pub(crate) fn error_unexpected(&self, what: &str) -> ParseError {
         ParseError::invalid_syntax(format!("Unexpected {what}"), self.current_pos())
@@ -1031,12 +1069,16 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 
 /// Parse CSS source into AST nodes
 /// base_offset is the position of the CSS source in a larger file (for embedded CSS)
+///
+/// `host_nesting` is the nesting the host document has spent around the stylesheet (`0`
+/// standalone), the start of this parse's depth count.
 pub fn parse_css<'arena>(
     source: &str,
     base_offset: usize,
+    host_nesting: u32,
     arena: &'arena Bump,
 ) -> Result<CssStyleSheet<'arena>, ParseError> {
-    let mut parser = CssParser::new(source, base_offset, arena)?;
+    let mut parser = CssParser::new(source, base_offset, host_nesting, arena)?;
     parser.parse()
 }
 
@@ -1062,7 +1104,7 @@ mod tests {
         ];
         for (source, expected) in cases {
             let arena = Bump::new();
-            let parser = CssParser::new(source, 0, &arena).expect("test source lexes");
+            let parser = CssParser::new(source, 0, 0, &arena).expect("test source lexes");
             assert_eq!(parser.current_kind(), TokenKind::Identifier, "{source:?}");
             assert_eq!(
                 parser.current_identifier_is_custom_property(),

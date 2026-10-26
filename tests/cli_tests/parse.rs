@@ -97,9 +97,9 @@ fn test_parse_default_is_span_only_and_locations_adds_loc() {
 fn test_parse_pretty_has_no_depth_ceiling_of_its_own() {
     // `--pretty` re-indents the compact bytes rather than reading them back through
     // a `serde_json::Value`, whose default recursion limit refused ~60 nested arrays
-    // the compact route had just emitted. 300 levels is well past that limit and well
-    // inside the parser's own ceiling (~25,000 arrays on the sized stack).
-    let n = 300;
+    // the compact route had just emitted. 250 levels is well past that limit and just
+    // inside the parser's depth limit (`tsv_lang::NESTING_LIMIT`).
+    let n = 250;
     let source = format!("const x = {}{};", "[".repeat(n), "]".repeat(n));
     let output = tsv(&[
         "parse",

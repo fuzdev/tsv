@@ -15,6 +15,10 @@ Each `## Unreleased` section must be non-empty and carry a
 
 - **breaking** chore: GitHub Release checksums are `SHA512SUMS` (`sha512sum -c`), not `SHA256SUMS`
 
+- fix: deeply nested or very long chained input is refused with a parse error instead of
+  overflowing the host's stack
+- fix: parser and formatter fixes across TypeScript edge cases, comment placement and layout
+
 ## 0.7.1
 
 - fix: formatting nested callbacks that follow another argument (`a(l, (x) => b(l, (y) => …))`)

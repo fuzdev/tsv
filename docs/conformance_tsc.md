@@ -255,7 +255,17 @@ layering, not a tsv-invented label:
   parameter default is an `Initializer[+In]`, so `for ((q = a in b) => 1; ;)` parses
   though tsc's parser reports `',' expected`.
 - **Floors:** deferring requires that the drop-in wire shape can represent the construct
-  and that the format output reprints it faithfully; failing either, tsv rejects.
+  and that the format output reprints it faithfully; failing either, tsv rejects. A third
+  floor is the stack: every walk tsv runs over an accepted tree must fit the stack
+  contract, so an input nested past 256 wire levels (the parens its format would add
+  counted with them), or chained past 6,000 spine units, is refused whatever the grammar says — an over-rejection against tsc and every
+  canonical parser, none of which bounds depth below its own stack
+  ([cli.md §Recursion Depth](./cli.md#recursion-depth),
+  [conformance_svelte.md §Depth Limits](./conformance_svelte.md#depth-limits)). Every
+  input `conformance:ts-repo` parses sits under both; the closest are tsc's two
+  `binderBinaryExpressionStress` files, at 5,440 of the 6,000 units. A long `else if`
+  ladder is nesting, not a chain — each `if` is the alternate of the one before it, and
+  every walk recurses into it — so one is refused a little short of 256 links, by design.
 - Where the rules leave a row open, accept is the default; a reject must pay for itself —
   forced by a floor, or the simpler line to state because the sibling positions already
   draw it (a repeated type-parameter modifier, `<out out T>`, rejects as a repeated

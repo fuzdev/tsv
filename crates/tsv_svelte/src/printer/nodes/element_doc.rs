@@ -1249,13 +1249,20 @@ impl<'a> Printer<'a> {
         let arena =
             bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(content.len()));
         let base_offset = text.raw_span.start as usize;
+        // a body too deep for the document's depth budget fails to parse and keeps its
+        // author's bytes (the fallback below)
+        let host_nesting = self.nested_raw_text_nesting.get();
         let body = match kind {
-            RawTextKind::Script => tsv_ts::parse_embedded(&content, base_offset, &arena)
-                .ok()
-                .and_then(|program| self.build_nested_script_body_doc(&program)),
-            RawTextKind::Style => tsv_css::parse_embedded(&content, base_offset, &arena)
-                .ok()
-                .and_then(|stylesheet| self.build_nested_style_body_doc(&stylesheet)),
+            RawTextKind::Script => {
+                tsv_ts::parse_embedded(&content, base_offset, host_nesting, &arena)
+                    .ok()
+                    .and_then(|program| self.build_nested_script_body_doc(&program))
+            }
+            RawTextKind::Style => {
+                tsv_css::parse_embedded(&content, base_offset, host_nesting, &arena)
+                    .ok()
+                    .and_then(|stylesheet| self.build_nested_style_body_doc(&stylesheet))
+            }
         };
 
         match body {

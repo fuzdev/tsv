@@ -22,7 +22,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<TSTypeElement<'arena>, ParseError> {
         let param_colon_start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
-        let param_type = self.parse_type()?;
+        // two wire levels: the parameter's `Identifier` and its `TSTypeAnnotation` (the
+        // depth limit's count, `Parser::nested`)
+        let param_type = self.nested(2, Self::parse_type)?;
         let param_type_end = param_type.span().end;
 
         let extra: &'arena IdentifierParamExtra<'arena> = self.alloc(IdentifierParamExtra {
@@ -73,8 +75,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
     ) -> Result<bumpalo::collections::Vec<'arena, TSTypeElement<'arena>>, ParseError> {
         let mut members = self.bvec();
+        // the members are siblings (`ListFrame`)
+        let mut frame = self.list_frame();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            let mut element = self.parse_type_element()?;
+            frame.element(self, members.len());
+            // one wire level: the member (the depth limit's count, `Parser::nested`)
+            let mut element = self.nested(1, Self::parse_type_element)?;
             // A type member ends at a `;`/`,` separator, the body's `}`/EOF, or a
             // line terminator (ASI) — acorn's `tsExpectStatementEnd`. Without one,
             // two members are glued on the same line (`interface I { a b }`,
@@ -89,6 +95,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             members.push(element);
         }
+        frame.close(self);
         Ok(members)
     }
 
@@ -211,7 +218,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // (ecma262), whatever the type itself stands in — a `for` header, a
             // conditional's consequent. An object literal's key takes the same from
             // the literal's own braces.
-            self.enter_grouping();
+            self.enter_grouping()?;
             let key = self.parse_computed_member_key()?;
             self.exit_grouping();
             (true, key)

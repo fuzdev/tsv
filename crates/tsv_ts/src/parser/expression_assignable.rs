@@ -10,7 +10,7 @@ use tsv_lang::{ParseError, Span};
 
 use super::Parser;
 
-/// Which assignable position `to_assignable` is converting for — the axis that
+/// Which assignable position `refine_assignable` is converting for — the axis that
 /// decides whether a type-assertion or JSDoc-cast target is allowed, and what a
 /// non-simple target does. `Assignment` and `ForHead` (a no-declaration for-in/of
 /// head) both accept an assertion or a JSDoc cast over a simple target
@@ -64,7 +64,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - AssignmentExpression with a plain `=` (a default) → AssignmentPattern; a
     ///   compound operator is a syntax error (it names no default, and the pattern
     ///   node has no slot for it), and the WHOLE target of an `=` / for-head may not
-    ///   convert to one at all (`to_whole_assignable`)
+    ///   convert to one at all (`refine_whole_assignable`)
     /// - Identifier, MemberExpression → unchanged (valid assignment targets)
     ///
     /// `AssignableContext` selects which simple-target wrappers are legal and what a
@@ -77,8 +77,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// every wrapper. The assertion node is kept, and the public AST keeps it too
     /// (acorn preserves it on a simple `=` left and on an `AssignmentPattern` left);
     /// only the internal-only JSDoc cast unwraps at convert.
-    pub(super) fn to_assignable(
-        &self,
+    ///
+    /// It takes the parser mutably because a conversion can owe the depth limit a printer
+    /// pair (a default that is itself a bare assignment, [`Parser::printer_pair`]).
+    pub(super) fn refine_assignable(
+        &mut self,
         expr: Expression<'arena>,
         context: AssignableContext,
     ) -> Result<Expression<'arena>, ParseError> {
@@ -214,7 +217,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                     e.span().start_usize(),
                                 ));
                             }
-                            Some(self.to_assignable((*e).clone(), context)?)
+                            Some(self.refine_assignable((*e).clone(), context)?)
                         }
                         None => None,
                     };
@@ -269,7 +272,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     AssignableContext::ForHead => AssignableContext::Assignment,
                     c => c,
                 };
-                let left = self.to_assignable(assign.left.clone(), left_context)?;
+                let left = self.refine_assignable(assign.left.clone(), left_context)?;
+                // the pair the printer writes around a default that is itself a bare
+                // assignment (`[a = (b = c)] = x`): parsed as an assignment's right side,
+                // the one position that takes none, it counted none — a level of the
+                // output's nesting (`Parser::self_pair`)
+                if matches!(assign.right.kind, ExpressionKind::AssignmentExpression(_))
+                    && self.authored_pairs(
+                        assign.left.span().end as usize,
+                        assign.right.span().start as usize,
+                    ) == 0
+                {
+                    self.printer_pair()?;
+                }
                 Ok(Expression {
                     span: expr.span,
                     kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
@@ -362,13 +377,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// never converted, so it survives as itself and defers with the rest. Only the
     /// parenthesized spelling reaches this: an unparenthesized `a = b = 1` parses
     /// right-associative, so its left is never an assignment.
-    pub(super) fn to_whole_assignable(
-        &self,
+    pub(super) fn refine_whole_assignable(
+        &mut self,
         expr: Expression<'arena>,
         context: AssignableContext,
     ) -> Result<Expression<'arena>, ParseError> {
         let start = expr.span().start_usize();
-        let target = self.to_assignable(expr, context)?;
+        let target = self.refine_assignable(expr, context)?;
         if matches!(target.kind, ExpressionKind::AssignmentPattern(_)) {
             return Err(self.error_msg_at("Invalid assignment target", start));
         }
@@ -377,7 +392,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Reject an assignment left that no `LeftHandSideExpression` derives — the
     /// GRAMMAR error, as opposed to the deferred `AssignmentTargetType` early error
-    /// `to_assignable` lets through.
+    /// `refine_assignable` lets through.
     ///
     /// `AssignmentExpression : LeftHandSideExpression AssignmentOperator
     /// AssignmentExpression` (ecma262 §13.15, and the same left for `=` and the logical
@@ -458,17 +473,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Convert a `...expr` spread into a `RestElement` — the shared core of both
-    /// pattern arms (array/assignment-target spreads in `to_assignable`, object
+    /// pattern arms (array/assignment-target spreads in `refine_assignable`, object
     /// rest properties in `object_property_to_pattern`). A rest element binds its
     /// target directly: the grammar's `BindingRestElement` / `AssignmentRestElement`
     /// / `BindingRestProperty` / `AssignmentRestProperty` carry no `Initializer`, so
     /// a default (`[...a = 1]`, `{...a = 1}`) is a syntax error.
     fn spread_to_rest_element(
-        &self,
+        &mut self,
         spread: &SpreadElement<'arena>,
         context: AssignableContext,
     ) -> Result<RestElement<'arena>, ParseError> {
-        let argument = self.to_assignable(spread.argument.clone(), context)?;
+        let argument = self.refine_assignable(spread.argument.clone(), context)?;
         if matches!(argument.kind, ExpressionKind::AssignmentPattern(_)) {
             return Err(self.error_msg_at(
                 "A rest element cannot have a default value",
@@ -485,7 +500,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Convert an object property to a pattern property
     fn object_property_to_pattern(
-        &self,
+        &mut self,
         prop: ObjectProperty<'arena>,
         context: AssignableContext,
     ) -> Result<ObjectPatternProperty<'arena>, ParseError> {
@@ -503,7 +518,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         .error_msg_at("Invalid assignment target", p.value.span().start_usize()));
                 }
                 // Convert the value to a pattern
-                let value = self.to_assignable(p.value.clone(), context)?;
+                let value = self.refine_assignable(p.value.clone(), context)?;
 
                 Ok(ObjectPatternProperty::Property(Property {
                     key: p.key,

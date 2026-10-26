@@ -1207,7 +1207,7 @@ impl<'a> Printer<'a> {
                     // `p.value` can never be a bare `AssignmentExpression` here:
                     // `ObjectPatternProperty::Property` is built at exactly one site
                     // (`object_property_to_pattern`), which routes the value through
-                    // `to_assignable`, and that converts every `AssignmentExpression`
+                    // `refine_assignable`, and that converts every `AssignmentExpression`
                     // into an `AssignmentPattern`.
                     debug_assert!(
                         !matches!(p.value.kind, ExpressionKind::AssignmentExpression(_)),

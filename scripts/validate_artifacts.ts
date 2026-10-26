@@ -134,9 +134,9 @@ for (const variant of VARIANTS) {
 }
 await assert_staged_fresh(freshness_checks);
 
-// Centers (deno target; npm == deno, identical `.wasm`): format 2,398,778 B and parse
-// 967,938 B measured 2026-10-04; all 2,764,517 B measured 2026-10-17, with the type strip
-// (the `strip` feature, which the umbrella alone builds). Bounds are ±8% of each.
+// Centers (deno target; npm == deno, identical `.wasm`): format 2,584,809 B, parse
+// 1,066,881 B and all 2,895,446 B measured 2026-10-25; all carries the type strip (the
+// `strip` feature, which the umbrella alone builds). Bounds are ±8% of each.
 //
 // Recenter (and re-measure the deltas below) whenever a measure has drifted to
 // within a few percent of a band edge through accumulated work — otherwise the
@@ -146,9 +146,9 @@ await assert_staged_fresh(freshness_checks);
 // named in the commit. The retired centers and what moved them are recorded
 // elsewhere, not here.
 const BOUNDS = {
-	format: { min: 2_206_000, max: 2_591_000 },
-	parse: { min: 890_000, max: 1_046_000 },
-	all: { min: 2_543_000, max: 2_986_000 }
+	format: { min: 2_378_000, max: 2_792_000 },
+	parse: { min: 982_000, max: 1_152_000 },
+	all: { min: 2_664_000, max: 3_127_000 }
 };
 
 // all = format + parse. `all − format` is what the parse feature adds (parser
@@ -162,10 +162,10 @@ const BOUNDS = {
 // bundles means a feature boundary shifted, not that code got smaller. The `strip`
 // feature rides `all` alone, so the type strip counts in both deltas.
 //
-// At the current center: `all − format` 300,965 B; `all − parse` 1,745,686 B.
+// At the current center: `all − format` 310,637 B; `all − parse` 1,828,565 B.
 const DELTAS = {
-	format: { min: 277_000, max: 325_000 }, // all − format
-	parse: { min: 1_606_000, max: 1_885_000 } // all − parse
+	format: { min: 286_000, max: 335_000 }, // all − format
+	parse: { min: 1_682_000, max: 1_975_000 } // all − parse
 };
 
 console.log('=== WASM binary sizes ===');

@@ -278,233 +278,315 @@ Implemented in `tsv_cli/src/cli/commands/strip.rs`
 
 ## Recursion Depth
 
-The parser and the printer are recursive descents, so nesting depth costs stack — and a
-stack overflow is not a catchable panic. No `catch_unwind` and no panic contract can
-turn it into a per-file error the way they do every other failure; it kills the process,
-and a directory format that dies that way has already rewritten some files, having
-printed none of them (changed paths are reported after the run, not as they are
-written). What the user sees is exit 134 (SIGABRT on Unix), two lines of runtime message naming
-the thread that overflowed (`tsv` for the subcommand, `tsv-format` for a pool worker —
-which is why those threads are named at all: it is the only diagnostic the failure
-leaves), and no record of what changed.
+The parser, the wire-JSON writers, the printers and the type strip all recurse over the
+tree, and a stack overflow is not a catchable panic: no `catch_unwind` and no panic
+contract can turn it into a per-file error. Natively it aborts the process (exit 134 on
+Unix for the CLI; a bare `SIGSEGV` with no message for a Node or Deno process holding the
+N-API addon or the FFI library, since Rust's guard-page handler is installed by its
+runtime startup, which a library loaded into a host never runs), and a directory format
+that dies that way has already rewritten files it never got to report. In WASM it traps,
+and the trap strands the instance (below). So **the parsers bound the depth of the tree
+they build**, and refuse a deeper input with a syntax error before any walk sees it.
 
-So the ceiling is stated rather than inherited. `main` runs the whole subcommand on a
-thread with `STACK_SIZE` reserved (`cli/stack.rs`), and the format workers reserve the
-same, which makes the depth a property of tsv instead of a property of the route, the
-host and the platform:
+### The depth limits
 
-- inherited, the main thread's stack is the process `RLIMIT_STACK` on Unix — commonly
-  8 MiB, but whatever the machine says — and **1 MiB on Windows**, where the linker
-  writes it into the executable header and nothing at run time can raise it. A spawned
-  thread inherits Rust's 2 MiB instead, and `RUST_MIN_STACK` moves that one but not the
-  main thread's.
-- so without the reservation, one binary has an **8x** depth difference between
-  `tsv format <path>` and `tsv format --content` on the same input on the same Windows
-  machine — and the asymmetry points the *other* way on a machine whose `RLIMIT_STACK`
-  is above the pool's own reservation, where the pool becomes the shallower route.
-  `tsv parse` has no pool at all, so it took the inherited stack on every platform.
-- which recursion binds **depends on the shape**, and on parens — the shape the flat
-  figure below is quoted on — the two sides are level: `parse` reaches the same depth as
-  `format` on the same input (~41,700 parens at 32 MiB on both). ⚠️ That does **not**
-  generalize. Wherever a **member chain** is involved the printer binds, and by a wide
-  margin: a nested memberish call (`a.f(a.f(…))`) parses to 30,296 levels and formats to
-  10,384, and a nested computed subscript (`a[a[…]]`) parses to 40,989 and formats to
-  12,135 — the chain printer's own frames set the ceiling at ~⅓ of the parser's. **Svelte
-  elements** split too, by less: nested elements parse to 34,270 levels and format to
-  24,849. The wire-JSON writer adds nothing on top of the parser on any shape measured, and `strip` walks no deeper than its parse.
+Two counts, both in `tsv_lang` (`NESTING_LIMIT`, `SPINE_LIMIT`), because no single
+counter bounds both shapes a walk recurses through:
 
-Measured on `const x = ((((…1…))));`, one nesting level costs ~0.78 KiB of stack in a
-release build (~17 KiB in a debug build, where frames are much larger), so the shipped
-CLI reaches ~41,700 levels on every route and every platform. For scale: the parsers tsv
-stands in for stop earlier and on the same input — acorn + `@sveltejs/acorn-typescript`
-at 497 levels and prettier at 805, both through V8's own checked stack limit, which is
-why theirs is a catchable `RangeError` and tsv's is not. The deepest file in the tsc
-corpus nests 69 levels; the exposure is generated and minified code.
+- **Nesting, at most 256 wire levels.** The parsers' own recursion, counted where the
+  grammar recurses: each step charges **at least** the wire-JSON nodes it puts on the path
+  from the root — one for a paren, an array, a call's arguments, a computed member, a
+  template's `${` (a tagged template's quasi one more), an operator's operand, an
+  assignment's right side, a conditional's branch, a unary operand, a `new`'s callee, a
+  spread, a statement, a class expression, a parameter, a parameter property's binding
+  (its decorators sit on that binding, a level below a plain parameter's), a declarator, a
+  `catch` clause, an enum member, a decorator, a declaration under its `export`, a tuple
+  element (a named one's type one more), a conditional type's extends type and branches,
+  an arrow's concise body; two for an object literal (the object and its `Property`), a
+  type argument (the `TSTypeParameterInstantiation` and the argument), a function type's
+  parameter (the function type and the parameter), an index signature's parameter type
+  (the parameter and its `TSTypeAnnotation`), a type predicate's type, a mapped type's
+  constraint, a template literal type's span, a `{@const}`'s binding and init (the
+  `VariableDeclaration` and its `VariableDeclarator`), a Svelte element or block (the node
+  and its `Fragment`), a CSS rule or at-rule (the node and its `Block`); three for a
+  function expression's or an arrow function's block body, whatever the arrow's head. An
+  arrow's bare parameter (`a => …`) is charged as the format writes it, in a pair: the
+  parameter and the pair, a step that returns before the body. A step
+  can charge more than its nodes — a list's own level where its first element's node
+  already counts one, a parameter list's level beside a declaration's — but never fewer:
+  `tests/depth_limit.rs` checks, for every shape it generates, that no path through the
+  accepted input's wire nests past the limit, and for the calibrated shapes that it sits at
+  it. An optional chain's `ChainExpression` is the one wire node no walk recurses through
+  (the wire writer emits it inline, and no other walk's tree holds it), so it is charged
+  nothing. A CSS declaration value is a string on the wire but a tree to the
+  printer, so its functions and parenthesized groups are counted too, one level each, as
+  the value parser enters them — which counts what every walk of the value recurses
+  through, an unquoted `url(`'s interior parens included, though the lexer reads that
+  url-token whole.
+- **Spine, at most 6,000 units.** The chains the parsers build *iteratively*, without
+  recursing — a binary or logical operator chain (`a + b + c` nests to the left), a member
+  / call / non-null / tagged-template / instantiation / `as` / `satisfies` chain, a type's
+  `[]` suffixes, a qualified name — and the other nodes that wrap an operand parsed before
+  the parser knew it was one: a conditional's test, a sequence's first expression, a
+  conditional type's check type, a tuple element's `?`. Each repetition of one of those is
+  a level no nesting count can see coming (`((a ? b : c) ? d : e)` nests a conditional per
+  paren), so it is counted as a link. Their parse costs no stack, and neither do the walks
+  that iterate a spine rather than recurse down it — every walk over an operator chain
+  (the wire writers, the printers' chain collectors, the type strip), and the wire writers
+  over a member, call and non-null chain — but every other walk recurses down the spine,
+  so a flat chain needs a bound of its own; a nesting count never sees one. A link counts
+  the units its walks spend stack for: one for an operator or a qualified name's `.`; two
+  for a member access, a call, a non-null assertion or an instantiation; eight for an
+  assertion; six for a type's `[]` or `[K]`, a conditional type's check type or a tuple
+  element's `?`; fourteen for a tagged template; and ten for a conditional's test, a
+  sequence's first expression, and a link whose walk **re-enters the expression printer**
+  for its operand rather than continuing the chain it is printing. Which links
+  re-enter is the printer's own answer, asked of the same predicates the printer decides
+  by, so the price follows the walk: an operator whose left operand the binary-chain
+  printer does not flatten into its chain (`a == b == c`, `a * b / c`, `a % b % c`,
+  `a << b << c`, `a && b || c`, every `in` in a `for` header's init, an operator over an
+  `as` / `satisfies`); a call on a call, through any run of `!` and instantiations
+  (`f()()`, `f()!!()`, `f()<T>()`); a link over a tagged template, which the member-chain
+  printer takes for its chain's base; and a member or `!` over a call the printer prints
+  whole — a curried call on a member chain, or a call whose sole argument is a multi-line
+  template — and that call itself. The fixed units are set by the build that spends the
+  most on the link, over every build the contract covers, and graded by the gate below,
+  which generates every pair of link kinds and a seeded sample of triples, rather than
+  trusting a list. The re-entry weight is the WASM engine's: its shadow stack, once V8 has
+  tiered the walks up, needs the most, and the weight keeps about a quarter over the
+  smallest one at which every leg holds its margin. A run of `!`, each with a block comment
+  in its gap (`a!/*c*/!/*c*/`), is printed iteratively, so its links stay plain non-null
+  assertions.
 
-Parens are not the tightest shape, only the easiest to state. Per nesting level, formatting
-in a release build: **nested arrow bodies (`() => {…}`) ~3.41 KiB** (the worst measured, at
-~9,600 levels — the depth every shape clears), nested memberish calls (`a.f(a.f(…))`)
-~3.16, nested computed subscripts (`a[a[…]]`) ~2.7, TS object literals ~2.4, statement
-nesting ~1.9, calls ~1.44, Svelte elements ~1.32 (~0.96 to parse), TS *types* ~1.32,
-unary chains ~1.24, nested binary operands (`1 + (1 + …)`) ~1.16, array literals ~1.05,
-parens ~0.78, CSS rules ~0.42, ternary / assignment chains ~0.38.
+**The spine count bounds every root-to-leaf path, not one chain.** A path can pass
+several chains (a chain whose leaf holds another, `(a + … + a) + a + …`), and the leaf is
+parsed before the chain over it is known, so the count runs over frames: within a frame
+every link adds up, and a closed frame hands its count up as the greater of it and its
+siblings'. Frames open where siblings can run long — the statements of a list, the
+operands of an operator chain, and the elements of every other list (array and object
+elements, call arguments, sequences, declarators, class and type members, union and
+intersection constituents, switch cases, enum members, parameters, type parameters and
+type arguments, tuple elements, function-type parameters, heritage lists, and a template
+literal's interpolations) — once the count has run past a few dozen units or a list past
+eight elements, so short code pays nothing for them. The count is exact for
+a lone chain and loose by at most those few dozen units elsewhere: a long list of short
+chains (a data table, a minified file) is charged one element's chains, never their total. **Nesting is charged against the spine too**, at
+15 units a level: each limit alone fits the stack, but a chain at its limit whose leaf is
+nested to its limit costs both walks' stack at once, which neither limit sees. A link is
+checked with the deepest nesting its frame has reached charged on top (at least 32 levels,
+below which the count is not tracked), so a flat chain at shallow nesting gets 5,520 units.
+The deepest nesting is framed as the count is — per statement, and per element of a long
+list — so a chain is charged the nesting of its own paths, never a sibling's, and whether
+a document parses does not depend on the order of its statements.
 
-The two chain shapes once headed that list, because a member chain is printed from a
-*grouped* view of a linearized chain and those frames sit on the expression cycle. Three
-borrows took them down from 7.4 and 6.7 KiB a level: `ChainGroup` is a borrowed sub-slice
-(16 bytes) rather than a `SmallVec` of node copies (~2.2 KiB a level on both, ~0.5 on
-nested arrow bodies); the peeled trailing member tail is a pair of borrowed runs rather
-than a second `SmallVec` (~1.2 KiB on both); and the chain linearizer fills the caller's
-464-byte node buffer rather than *returning* it — the buffer lives in the caller either
-way, so a returned one cost a second slot in the expression dispatcher's frame, which
-every shape on the expression cycle pays: 0.39 KiB each off both chain shapes, nested
-arrow bodies, TS object literals and unary chains (1.64 → 1.25, nearly a quarter of a
-level there). The two chain shapes are also the ones on which the printer, not the
-parser, sets the ceiling — see the bullet above. ⚠️ And they are the only two shapes the
-`Expression`'s own width does *not* reach: every other row above moved when it went
-from 176 bytes to 72 (Svelte elements 3.1 → 1.7, parens 1.2 → 0.94),
-while these two stayed put, because the chain printer's frames — not an `Expression`
-slot — are what sets them. The `TSType` enum's width reaches a different subset again:
-narrowing it 112 → 80 moved TS types 3.2 → 2.35, ternary 0.56 → 0.50, parens 0.94 → 0.88
-and array literals 1.2 → 1.14, and left Svelte elements, TS object
-literals and both chain shapes exactly where they were. Returning `&'arena TSType` rather
-than `TSType` from the type parser's precedence ladder moved TS types 2.35 → 1.32 (below).
-The expression ladder likewise returns a bare `&'arena Expression` rather than a reference
-plus two paren-bound positions, which would come back through a stack slot; that is what
-holds ternary chains at 0.38, parens at 0.78 and array literals at 1.05, and it sets the
-parse-side cost of every expression shape with them (computed subscripts parse at 0.80).
+**The count runs document-wide.** A Svelte template expression, a `<script>` or a
+`<style>` starts its own count at the depth of the markup around it (the embedded entry
+points take that depth, `host_nesting`), so an expression deep in the markup has what the
+markup left of the 256 levels, not all of them. A `<script>` or `<style>` nested inside the markup is raw text to the parser and
+is parsed by the printer, from the depth of the deepest one; a body past the budget keeps
+its author's bytes.
 
-What sets a shape's cost is the stack slots its cycle's functions **reserve**, not the
-work they do: a frame is sized once for the widest arm, and every level pays all of it
-whichever arm it takes — so a dispatcher that holds one by-value AST node per arm
-multiplies that node's size by its arm count, at every level, forever. This is why no
-`parse_*` on the expression cycle hands its caller a bare `Expression` by value, and no
-`parse_*` on the type ladder a bare `TSType`: a node builder either boxes into the arena at
-its own tail (`alloc_expr` for expressions, `Parser::alloc` for types, leaving
-the caller an 8-byte reference) or returns its own concrete node struct — an
-`ObjectExpression` is 24 B, and the dispatcher arm that wraps one back into an
-`Expression` builds a temporary the compiler merges with its sibling arms' rather than a
-return slot it cannot. The printer answers the same pressure with the same move on its own
-side: the chain entry points fill a caller-owned `ChainNodeVec` rather than returning one,
-because a returned buffer needs a slot to be built in *and* a slot in the caller to be
-handed to, and only the second of those is load-bearing.
+**The pairs the printer adds are charged as nesting.** A format writes grouping parens,
+and argument lists, the source does not hold — `(a == b) == c`, `-(-a)`, `f((a = b))`,
+`new A()`, `keyof (keyof T)` — and in the output each one is a level of nesting, which the
+output's own parse counts. So the parse charges every such pair as it reads the input, at
+the node the printer writes it around, asked of the printer's own predicates where it has
+one:
 
-The node enums also answer the same pressure from the other side, by *density*, and in
-two different ways. The first is **rare-variant boxing** — a variant wide enough to set
-the enum's size on its own, and rare enough that an arena allocation apiece is free,
-holds its payload by reference. `Expression`'s five widest (`ClassExpression` /
-`FunctionExpression` / `ArrowFunctionExpression` / `MetaProperty` /
-`TaggedTemplateExpression`) make it 72 B rather than 176; `TSType`'s three widest
-(`TSImportType`, `TSConstructorType`, `TSInferType`) make it 80 B rather than 112;
-`Statement`'s rare declaration heads (`TSTypeAliasDeclaration`,
-`ExportDefaultDeclaration`, `ClassDeclaration`, `FunctionDeclaration`,
-`TSInterfaceDeclaration`, `TSDeclareFunction`, `ExportAllDeclaration`,
-`TSImportEqualsDeclaration`, `TSEnumDeclaration`, `TSModuleDeclaration`,
-`TSExportAssignment`) plus its four loop / `try` heads one level down do the same.
-Rarity is what makes those free — each is ≤0.2% of statements, a
-classic `for (;;)` is 0.05–0.22%, and the five expression variants together are ~3% of
-expressions, of which the two widest are ~0.02% — while the width is paid on every
-element of every slice and on every `?`-propagation copy. `Expression`'s ladder stops
-where rarity does: the next-widest is `CallExpression` at 56 B and it is 14–21% of
-expressions.
+- **an operand's position**: a binary's operand (the clarity pairs, the non-flattening
+  chains, a function dividend), an `as` / `satisfies` operand (`async` included), a unary,
+  prefix update, `await` or angle-bracket cast's operand, a spread's argument, a numeric
+  literal a member access reads (`(1).a`), a function expression a chain calls or tags, an
+  instantiation instantiated again (`(f<T>)<U>`), a class heritage, a `new` callee, a
+  conditional's test and branches (`(a ?? b) ? (c as T) : d`, a consequent that is itself
+  a conditional), an arrow's body (a conditional, a decorated class), and a decorator's
+  expression where the bare decorator grammar cannot spell it (`@a!(…)` prints
+  `@(a!(…))`; asked of the printer's own predicate, and counted only where the author's
+  pair does not wrap the whole expression — a pair around a callee alone, `@(a!)(…)`,
+  holds less than the printer's);
+- **a node that takes a pair wherever it stands**: an assignment used as a value
+  (everywhere but a statement's expression, a `for` header's own clause and another
+  assignment's right side — a right side that becomes a destructuring default once the
+  `=` after its pattern is read takes one again, `[a = (b = c)] = x`), a sequence (everywhere but a `for` header's init and update),
+  and every `in` binary in a `for` header's init;
+- **a shell or list the printer writes**: an angle-bracket cast's break shell
+  (`<T>(⏎	x⏎)`), a unary's comment holder (`!(/* c */ x)`), a `return` / `throw` argument
+  that is a binary chain (`return (⏎	a &&⏎	b⏎)`), an argument-less `new`'s argument
+  list, a bare arrow parameter's pair (`a => …` prints `(a) => …`), a `let` heading a
+  `for`-in head;
+- **types**: a type operator over a type operator or an `infer`, a union or intersection
+  member that binds looser than its neighbours (`(A & B) | C`), an array element or
+  indexed access's object (`(typeof a)[]`, `(-1)[]`), an optional tuple element
+  (`[(A | B)?]`), a union element of a tuple, a conditional true branch, a conditional
+  type-parameter constraint, and an arrow's function return type.
 
-The second is a **slot borrow**, which needs no rarity argument at all, because the
-inline slot was never where the node lives: the expression parser threads an
-`&'arena Expression`, so a by-value `Expression` field is a 72-byte copy *out* of the
-arena, and naming it by reference removes work rather than adding an allocation. That is
-how `Property` (an object literal's `key: value`, and a destructuring pattern's) and
-`VariableDeclarator` went from 160 B to 32, and how every `Expression`-holding statement
-head followed (with the span now in `Statement`'s header: `ExpressionStatement` 16 B,
-`IfStatement` / `SwitchStatement` 24, `WhileStatement` / `DoWhileStatement` /
-`WithStatement` 16, `ReturnStatement` / `ThrowStatement` 8; `SwitchCase`, which keeps its
-own span, 32). With those heads narrowed, `ImportDeclaration` (6.8–11.7% of statements)
-and `ExportNamedDeclaration` (2.4–4.0%) were the only variants left setting
-the enum's width, so they are arena-boxed too — not for rarity but because they are the
-ceiling, and a boxed head copies the same bytes into the arena that it would have moved
-into the enum. Together those take `Statement` to **72 B rather than 544** (an 8-byte
-span header over a 64-byte `StatementKind`); the next-widest inline variant is
-`TryStatement`, which is where the ladder stops.
+The count at a node is the pairs the printer may write there, less the pairs the author
+wrote: what the printer writes is a function of the tree and its comments, which a format
+keeps, so on the output — whose pairs are the ones the printer wrote — the count is none,
+and the reparse counts no more than the parse did. A pair is counted in the frame of its
+node, against the nesting limit with the frame's deepest nesting under it, and against the
+spine limit with the frame's links beside it. The frames open where they would for the
+output, since no frame decision reads the pairs, so **the output of an accepted input
+parses again**. `tests/depth_limit.rs` grades that — with the output being its own format —
+for every shape it generates, a prefix-operator alphabet among them that nests every
+prefix operator over every other, bare and commented, so a site the parse does not charge
+fails the gate. The cost is a lower limit wherever the printer parenthesizes link by link:
+an `==`, `%` or `<<` chain ends below the nesting limit's 256 operators — the 32 levels
+every chain is charged come off it first — rather than near the spine limit, and a run of
+`- - -` or of `<T>` casts at a half or a third of the 256 levels.
+
+The refusal is an ordinary syntax error at the token where the count tripped (`Nesting
+exceeds tsv's depth limit of 256 levels`, `Chain of operators, member accesses, calls,
+assertions or type suffixes exceeds tsv's length limit` — no number, since the spine limit
+counts weighted units with the nesting charged on top, which no count of links names; a
+CSS value's at the `(` that passes the limit): `parse` and `format` report it like any other,
+and `ParseError::is_too_deep` tells it apart. A speculative parse that meets it hands it
+back rather than trying the other reading, since that reading would be chosen for the
+stack's sake, not the grammar's — and for the same reason a format's module goal refused by
+it is not retried as a script, which could only succeed by reading `await` as a name. It is a deliberate over-rejection — every canonical
+parser accepts deeper input, up to its own stack
+([conformance_tsc.md §The reject-vs-defer line](./conformance_tsc.md#the-reject-vs-defer-line),
+[conformance_svelte.md §Depth Limits](./conformance_svelte.md#depth-limits)) — set above
+every input the conformance gates parse, the decision both limits rest on: the deepest
+nesting is tsc's `parsingDeepParenthensizedExpression.ts` at 137 counted levels, the
+longest spine tsc's two `binderBinaryExpressionStress` files, whose 4,953 operators come
+to 5,440 units with the nesting charge.
+
+### The stack contract
+
+**Every walk of an accepted tree fits a 2 MiB thread in an optimized build, and a 16 MiB
+thread in a debug one.** `tests/depth_limit.rs` holds the contract: for every shape the
+limits count — each TypeScript expression, statement and type shape, the flat chains, CSS
+rules, at-rules, selectors and value parens, Svelte elements, blocks and islands, the two
+counts at once, a **catalog of grammar positions** (positions that hold an
+expression, a statement, a type, a pattern, a member or a selector which can hold the
+position again, each nested in itself — a position the catalog lacks is one the gate cannot see), and a **generated sweep** of every ordered pair, and a seeded sample of
+triples, over the whole link alphabet (every chain link kind and every binary operator)
+behind each of a set of heads, with the same links again with comments in their gaps; the prefix
+alphabet: every prefix operator over every other, bare and with a comment in its gap, over
+operands ending in each link and as each binary operator's operand, and over an authored
+pair in each commented form; and the decorators: a class nested in a decorator's argument
+on a class expression, a member and a parameter, behind every callee shape and inside
+every payload (a spread, an assertion, a `!`, a member) — it generates
+the deepest accepted input, checks that no path through its wire passes either limit (the
+count charges at least what the walks recurse through, so a construct the parse leaves
+uncounted fails here, whatever its stack), runs parse, both wire writers (span-only and
+`loc`), format and the type strip on a thread nine tenths of the contract's size, checks
+that the format's output parses again and is its own format, and that one level more is
+refused. An overflow
+aborts the test binary. The tenth kept in hand is the minimum margin the gate enforces: a frame that grows
+fails the gate while every accepted input still fits the contract. Frame sizes move with
+every printer change, and differ between optimizations by more than that margin, so the
+gate runs in each world it speaks for: `deno task test:depth:napi` in the shipped
+optimization (the `napi` profile, gating every release in publish.ts and every push in
+CI's `artifacts` job) over the whole sweep, `deno task test:depth` in `deno task check`'s
+`corpus` world over a smaller one — the pairs behind two of the heads, a smaller triple
+sample, every commented link, the bare prefix pairs, a sample of the rest of the prefix
+alphabet and of the decorators — and a plain `cargo test` against the debug contract, over the
+named shapes and a fixed stride of that smaller sweep. `deno task test:depth:wasm` runs the
+whole sweep's shapes at the same depths through the WASM package on a Node main thread
+(below), in CI's `artifacts` job and publish's artifact validation.
+
+**A consumer's debug tests sit below the debug contract.** Rust's test harness runs each
+test on a 2 MiB thread, so `cargo test` over code that hands tsv its deepest accepted
+input can overflow in a debug build. Raise the test threads' stack to the debug contract
+with `RUST_MIN_STACK=16777216`, or build tsv optimized in the dev profile
+(`[profile.dev.package.tsv_ts] opt-level = 2`, and the same for `tsv_lang`, `tsv_css`
+and `tsv_svelte`), which keeps a dev build's checks and brings its frames within the
+optimized contract's 2 MiB — the harness's own default.
+
+### The CLI's stack reservation
+
+`main` runs the whole subcommand on a thread with `STACK_SIZE` reserved (32 MiB,
+`cli/stack.rs`), and the format workers reserve the same, so the stack is a property of
+tsv rather than of the route, the host and the platform: inherited, the main thread's
+stack is the process `RLIMIT_STACK` on Unix — commonly 8 MiB, but whatever the machine
+says — and **1 MiB on Windows**, where the linker writes it into the executable header,
+below the contract; a spawned thread takes Rust's 2 MiB. The reservation also keeps a
+debug build of the CLI above its contract, and it names the threads (`tsv`,
+`tsv-format`), because the runtime's `thread '<name>' has overflowed its stack` line is
+the one diagnostic an overflow leaves. A reservation is address space, not memory: pages
+commit lazily.
 
 **The wire has no reader ceiling of its own.** `tsv parse --pretty` re-indents the compact
 wire bytes in one linear pass (`json_utils::indent_json_with_tabs`) rather than reading
-them back into a tree, so it stops exactly where the parser stops. The pretty route once
-round-tripped through a `serde_json::Value`, and serde_json's default recursion limit of
-128 JSON levels — two per nested array (the node and its `elements`), three per nested
-object literal — refused a wire past ~60 nested arrays or ~40 nested objects that the
-compact route had just emitted, a clean exit 1 on input the parser handles at 400× the
-depth; fixture
+them back into a tree, so it reads whatever the parser accepts; fixture
 [`typescript/expressions/objects/nested_deep`](../tests/fixtures/typescript/expressions/objects/nested_deep/)
-(45 nested object literals, 145 wire levels) pins the pipeline past that old ceiling. No
-tool tsv stands in for bounds depth by choice: `JSON.parse` is iterative in V8 and JSC and
-takes a million levels, and acorn, Svelte's parser and prettier each stop only at V8's
-stack (1,023 nested arrays for acorn + `@sveltejs/acorn-typescript`, 767 for prettier's
-`typescript` parser).
+pins the pipeline past `serde_json`'s default recursion limit of 128 JSON levels. The
+one reader of the wire left is `tsv_debug`'s `json` module, which reads with that limit
+disabled on the same reservation.
 
-The one reader of the wire left is `tsv_debug`'s `json` module (the fixture gate, the
-sidecar transport, every audit's `Value` walk), which reads with the limit disabled on the
-same `STACK_SIZE` reservation: a `Value` read costs ~0.6 KiB of stack per JSON level
-(measured, and the same for the drop, `==` and pretty-print walks), so it binds, not the
-parse, wherever the parser spends less per source level than ~0.6 KiB times the JSON levels
-that level adds to the wire — which is **most nesting shapes**. A nested array adds two
-(~1.2 KiB against the parser's ~1.05) and reads to ~27,500 where the parse reaches ~31,200;
-a nested object literal adds three (~1.8 KiB against ~1.68) and reads to ~18,300 where the
-parse reaches ~19,500. Where the parser is cheap the gap is wide: left-nested binary, unary
-and ternary chains add one JSON level each and read to ~55,000, far under their parse
-ceilings, and CSS rules (three JSON levels a rule, ~0.42 KiB to parse) read to a fraction
-of theirs; calls and statement nesting bind in the read too. The parser binds only where a
-level adds no wire level at all (parens) or costs more than the levels it adds (computed
-subscripts: one JSON level at ~0.80 KiB to parse, so the parse stops near ~41,000 where the
-read would reach ~55,000). All of it is input hundreds of times deeper than any corpus, on
-which a *dev tool* overflows instead of erroring.
+### The other surfaces
 
-**The other surfaces have their own ceilings, set by their hosts, and the CLI's
-reservation does not reach them:**
+The bindings run on their host's thread, so the host's stack decides whether the
+contract holds there:
 
-| surface | stack | depth |
+| surface | stack | at the limits |
 | --- | --- | --- |
-| `tsv` (this CLI), every route | `STACK_SIZE`, explicit | ~41,700 |
-| N-API addon on the host's main thread | the host process's `RLIMIT_STACK` | ~7,810 at 8 MiB |
-| N-API addon on a `worker_threads` worker | Node's 4 MiB `stackSizeMb` default | ~3,880 |
-| WASM, any host | the wasm shadow stack, 1 MiB by link default | ~2,510 |
+| `tsv` (this CLI), every route | `STACK_SIZE`, explicit | holds |
+| N-API addon on the host's main thread | the host process's `RLIMIT_STACK` | holds at 2 MiB and up |
+| N-API addon on a `worker_threads` worker | Node's 4 MiB `stackSizeMb` default | holds |
+| FFI library | the calling thread (Deno's main thread: the process stack) | the `release` contract: holds at 2 MiB and up |
+| WASM on Node, Deno or Bun, main thread | the 1 MiB shadow stack, and the engine's own | holds, cold and tiered up |
+| WASM on a Node, Deno or Bun worker | as above, on the worker's stack | holds |
 
-The two binding rows are the host's thread, so the addon cannot size them; a host that
-needs the depth raises it itself (`new Worker(…, {resourceLimits: {stackSizeMb}})`), which
-is the same shape as the arena-retention advice in
-[tsv_napi/CLAUDE.md §Threading & host residency](../crates/tsv_napi/CLAUDE.md). A native
-overflow there is a bare `SIGSEGV` with no message, since Rust's guard-page handler is
-installed by its runtime startup and a cdylib loaded into Node never runs it.
+Every row was measured with every shape `tests/depth_limit.rs` generates, at its deepest
+accepted depth, through the packages' API (parse with and without `locations`, the `_json`
+string, format, strip); the WASM main-thread row on Node is the standing gate,
+`deno task test:depth:wasm`, which runs V8's stack at nine tenths of its default, the
+native gate's margin. A WASM build keeps its spilled frames on a 1 MiB shadow stack in
+linear memory (wasm-ld's default) and its call frames on the engine's native stack, about
+1 MiB on a V8 main thread — and **an engine's tier decides those frames**: V8's optimizing
+compiler lays a recursive walk's frames out larger than its baseline compiler does, so a
+call that fits a fresh process can overflow the same process once its code has tiered up.
+The gate grades both, each pass in fresh processes: on the baseline compiler alone, and
+after a warm-up pass has tiered up every function the run makes hot — under V8's default
+dynamic tiering, which optimizes what runs hot; an engine flagged to compile everything
+optimized up front (`--no-liftoff`) lays out larger frames still, and is outside the
+contract. That is also why the
+walks over a binary operator chain, and the wire writers over a member, call and non-null
+chain, iterate the spine rather than recurse down it: a frame per link of a chain thousands
+of links long spends the optimized engine's main-thread stack whatever the per-link frame,
+where an iteration spends none.
 
 The packages' `{locations: true}` reconstruction (`locations.js`) walks the tree with an
-explicit stack rather than recursion, so it adds no ceiling of its own: a deep tree that
-parses gets its `loc` on every engine. A JS frame per nesting level would meet the host's
-JS stack (a `RangeError`) several times shallower than the N-API parse reaches on nested
-elements and arrays.
+explicit stack rather than recursion, so it adds no depth of its own.
 
-The WASM overflow is a trap the process survives but the *instance* does not — it
-poisons every later call. The npm packages ship a `reinstantiate()` recovery hook, and
-the JS CLI (`cli.js`) calls it on any trap in `format_one` — and on the `RangeError` V8
-raises when a deep call exhausts the engine's native stack before its shadow stack, which
-strands the instance too — so a too-deep file is one per-file error (`… (WASM engine
-trapped and was reinstantiated)`) and the rest of the run formats normally — on the sequential path and in every pool worker alike. See
+Below those stacks, a WASM overflow is a trap the process survives but the *instance* does
+not — the shadow stack pointer stays where the deep call left it, poisoning every later
+call. The npm packages ship a `reinstantiate()` recovery hook, and the JS CLI (`cli.js`)
+calls it on any trap in `format_one` — and on the `RangeError` an engine raises when a deep
+call exhausts its native stack first, which strands the instance too — so a file that meets
+either is one per-file error (`… (WASM engine trapped and was reinstantiated)`) and the
+rest of the run formats normally, on the sequential path and in every pool worker alike. See
 [tsv_wasm/CLAUDE.md §Panic Reporting](../crates/tsv_wasm/CLAUDE.md#panic-reporting).
+`cli.js` gives every pool worker the native CLI's `STACK_SIZE` (`resourceLimits.stackSizeMb`,
+restated as `WORKER_STACK_SIZE_MB`) where the engine honors it, and re-runs a file whose
+main-thread format hit a `RangeError` in a one-worker pool (`retry_overflowed_files`). On
+the N-API engine an overflow is a process-fatal `SIGSEGV` rather than a `RangeError`, so
+`cli.js` never formats a path on the N-API main thread: a `--jobs 1` run there is a pool of
+one worker (`resolve_route`); its single-input mode (`--content`/`--stdin`, `parse`) runs
+on the main thread, under the table's main-thread row.
 
-On the JS side each route reserves the same stack, because a route would otherwise decide the
-depth: `cli.js` meets V8's own stack before the module's on any thread smaller than a few MiB,
-and the main thread holds ~1 MiB where a Node worker holds 4. So every pool worker reserves the
-native CLI's `STACK_SIZE`
-(`resourceLimits.stackSizeMb`, restated as `WORKER_STACK_SIZE_MB`), and the sequential route
-re-runs a file whose main-thread format hit V8's `RangeError` in a one-worker pool
-(`retry_overflowed_files`) — one worker start, paid only when a file overflowed. Measured on a
-flat `a + a + …` chain with the WASM package:
+### What a level costs
 
-| runtime | sequential route (`--jobs 1`) | pool (`--jobs 2`) |
-| --- | --- | --- |
-| Node | ~62,600 terms, on the retry — the module's own stack traps | ~62,600 |
-| Deno | ~8,000 — its workers ignore `stackSizeMb` | ~8,000 |
-| Bun | ~27,800, on the retry | ~5,700, whatever `stackSizeMb` says |
-
-On Bun the two columns are not two stacks. Bun ignores `stackSizeMb` (a pool worker reads
-~5,700 at 4, 32 and 256 MiB alike), and what moves its depth is whether the recursive wasm
-code has already been **warmed**: JavaScriptCore compiles a wasm function in tiers, and a
-worker handed a module whose recursion another thread has exercised — which the shared
-`WebAssembly.Module` carries across — reaches ~27,800 on the same stack where a cold one
-stops at ~5,700. The sequential route's retry is always warm, because the main thread's
-failed attempt ran the very file first; a pool worker is warm only once it has formatted
-the same shapes at some depth itself (a 2,000-term chain twenty times does it, 400 small
-unrelated files do not), so on Bun a pool's depth depends on what the pool formatted before
-the deep file. Bun's main thread reads ~7,200 cold and ~35,400 warm by the same measure —
-so on Bun, unlike Deno, the retry clears files the first attempt overflowed on.
-
-Without the reservation Node's routes stop near 7,800 and 31,000 terms. On the N-API engine
-an overflow is a process-fatal `SIGSEGV` rather than a `RangeError`, so nothing can be retried —
-which is why `cli.js` never formats a path on the N-API main thread: a `--jobs 1` run there is a
-pool of one worker (`resolve_route`), and path mode's ceiling is the worker's reserved stack on
-every route, as the native CLI's is. Its pool workers take the same reservation, so the 4 MiB
-worker row in the table above is not `cli.js`'s own pool. What keeps the table's main-thread row
-on N-API is the single-input mode — `--content`/`--stdin` and `parse` run on the main thread and
-take the process's `RLIMIT_STACK` — so a deep single input there is a bare `SIGSEGV` with no
-output and nothing written; on the WASM engine the same input is reported as the engine's failure
-(`Error: the engine failed on this input …`), never as a parse error.
+A walk's stack per level is its frames', and **a frame is sized once for its widest arm**:
+every level pays all of it whichever arm it takes, so a dispatcher that holds one by-value
+AST node per arm multiplies that node's size by its arm count, at every level. That is why
+no `parse_*` on the expression cycle hands its caller a bare `Expression` by value, and no
+`parse_*` on the type ladder a bare `TSType`: a node builder either boxes into the arena at
+its own tail (`alloc_expr` for expressions, `Parser::alloc` for types, leaving the caller
+an 8-byte reference) or returns its own concrete node struct, whose wrapping temporary the
+compiler merges with its sibling arms'. The printer answers the same pressure the same
+way — the chain entry points fill a caller-owned `ChainNodeVec` rather than returning one.
+The node enums answer it by density: a variant wide enough to set its enum's size on its
+own, and rare enough that an arena allocation apiece is free, holds its payload by
+reference (`Expression`'s five widest variants, `TSType`'s three, `Statement`'s rare
+declaration heads), and a by-value field that only copies a node out of the arena
+borrows it instead (`Property`, `VariableDeclarator`, every `Expression`-holding statement
+head). The `size_of` asserts beside the AST pin those widths, so a variant that widens an
+enum fails the build instead of quietly eating the limits' margin; the margin itself is
+graded by `tests/depth_limit.rs`.
 
 ## Multi-File Formatting
 
@@ -622,7 +704,7 @@ output and nothing written; on the WASM engine the same input is reported as the
   file as an error, and leave every byte in place. The same strict-UTF-8 rule holds
   for `--stdin` and for `parse`, each with its own message (`Error reading from
   stdin: …`, `Error reading file <path>: …`).
-- **Source type: module, retried as a script.** Path mode names no source type — a directory can hold Svelte and CSS beside JS/TS, and there is no one grammar to declare for the run — so each JS/TS file is parsed as a **module**, and only if that parse *fails* is it retried as a **script**. That is what lets a legacy sloppy script (a `with` statement, a leading-zero literal or escape, `await` as an ordinary name) format from a bare path. The retry runs on the error path only, so nothing the module grammar already accepts is ever reinterpreted, and the printer never reads the goal — no formatted output changes for any module-valid file.
+- **Source type: module, retried as a script.** Path mode names no source type — a directory can hold Svelte and CSS beside JS/TS, and there is no one grammar to declare for the run — so each JS/TS file is parsed as a **module**, and only if that parse *fails* is it retried as a **script** — on the grammar: a module the depth limit refuses takes no retry, since the limit is no verdict on the grammar and the script grammar could accept the text only by reading `await` as a name (`await <T>a` as `await < T > a`), so the refusal stands ([§Recursion Depth](#recursion-depth)). That is what lets a legacy sloppy script (a `with` statement, a leading-zero literal or escape, `await` as an ordinary name) format from a bare path. The retry runs on the error path only, so nothing the module grammar already accepts is ever reinterpreted, and the printer never reads the goal — no formatted output changes for any module-valid file.
 
   When **both** grammars reject the file, the reported error is the attempt's whose grammar the file was written against, decided in two steps. A script retry that died on a **goal gate** — a top-level `import`/`export`, an `import.meta`, a top-level `for await`, or the operand a module reads after a top-level `await`, the constructs only a module holds — has proved the file a module wherever that construct sits, so the module error is reported: a broken module's script attempt dies there even when its real error comes first (definitions first, `export` at the bottom — position alone would blame the valid `export` line). Otherwise the error that reached **further into the source** is reported, the module's on a tie: a broken *sloppy script*'s module attempt dies early at its first `with`/legacy literal/`await` name — the construct the retry exists to admit — so the script error (the typo) is reported rather than a pointer at a line tsv accepts. prettier's babel parser reaches the same answer by tolerating those strict-mode productions at the module goal (`allowedReasonCodes`). Pinned by `tests/format_fallback_error_attribution.rs`.
 

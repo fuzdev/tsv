@@ -164,7 +164,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<bumpalo::collections::Vec<'arena, TSInterfaceHeritage<'arena>>, ParseError> {
         let mut heritages = self.bvec();
 
+        // the heritages are siblings (`ListFrame`)
+        let mut frame = self.list_frame();
         loop {
+            frame.element(self, heritages.len());
             let start = self.current_pos().0;
 
             // A heritage element is a type REFERENCE, whose head is an
@@ -221,6 +224,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 break;
             }
         }
+        frame.close(self);
 
         Ok(heritages)
     }
@@ -507,7 +511,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<TSTypeAnnotation<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
-        self.parse_return_type_inner(start as u32)
+        // one wire level: the `TSTypeAnnotation` (the depth limit's count)
+        self.nested(1, |p| p.parse_return_type_inner(start as u32))
     }
 
     /// Parse return type after colon/arrow, handling type predicates
@@ -552,8 +557,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Consume 'is' keyword
                 self.advance()?;
 
-                // Parse the type
-                let type_node = self.parse_type()?;
+                // Parse the type; two wire levels: the `TSTypePredicate` and the
+                // `TSTypeAnnotation` its type sits in
+                let type_node = self.nested(2, Self::parse_type)?;
                 let end = type_node.span().end;
 
                 let predicate = TSTypePredicate {
@@ -666,8 +672,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::BraceOpen)?;
 
         let mut members = self.bvec();
+        // the members are siblings (`ListFrame`)
+        let mut frame = self.list_frame();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            members.push(self.parse_enum_member()?);
+            frame.element(self, members.len());
+            // one wire level: the `TSEnumMember` over its initializer
+            members.push(self.nested(1, Self::parse_enum_member)?);
 
             // Consume comma if present (trailing comma is allowed)
             if !self.eat(TokenKind::Comma)? {
@@ -677,6 +687,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
             }
         }
+        frame.close(self);
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
@@ -918,7 +929,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse the inner declaration recursively
         let nested_start = self.current_pos().0;
-        let nested = self.parse_module_declaration_inner(nested_start as u32, kind)?;
+        // one wire level: the inner `TSModuleDeclaration` (the depth limit's count)
+        let nested = self.nested(1, |p| {
+            p.parse_module_declaration_inner(nested_start as u32, kind)
+        })?;
         let body = TSModuleDeclarationBody::TSModuleDeclaration(self.alloc(nested));
         let end = module_body_end(&body);
 
@@ -953,7 +967,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Parse nested declaration (recursively)
             // Nested parts inherit the same kind (namespace vs module)
             let nested_start = self.current_pos().0;
-            let nested = self.parse_module_declaration_inner(nested_start as u32, kind)?;
+            let nested = self.nested(1, |p| {
+                p.parse_module_declaration_inner(nested_start as u32, kind)
+            })?;
             TSModuleDeclarationBody::TSModuleDeclaration(self.alloc(nested))
         } else {
             // Parse block body: `{ statements }`
@@ -1003,18 +1019,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // module-item context, so `import`/`export` declarations are valid here
         // (unlike an ordinary block) — at either goal ([`ModuleItemContext`]).
         let ambient = is_ambient || self.in_ambient_context;
-        let body = self.with_context_flag(
-            |p| &mut p.in_ambient_context,
-            ambient,
-            |p| {
-                let mut body = p.bvec();
-                while !matches!(p.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-                    let stmt = p.parse_module_item(ModuleItemContext::NamespaceBody)?;
-                    body.push(stmt);
-                }
-                Ok(body)
-            },
-        )?;
+        // one wire level: the `TSModuleBlock` (the depth limit's count)
+        let body = self.nested(1, |p| {
+            p.with_context_flag(
+                |p| &mut p.in_ambient_context,
+                ambient,
+                |p| {
+                    p.statement_list(1, |p, frame| {
+                        let mut body = p.bvec();
+                        while !matches!(p.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
+                            let stmt = p.parse_module_item(ModuleItemContext::NamespaceBody)?;
+                            frame.next(p);
+                            body.push(stmt);
+                        }
+                        Ok(body)
+                    })
+                },
+            )
+        })?;
 
         // Expect closing brace
         if !matches!(self.current_kind(), TokenKind::BraceClose) {

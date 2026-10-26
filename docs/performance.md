@@ -783,7 +783,7 @@ paid once per level and not once per node. Narrowing a by-value-returned
 `TSType` 112 → 80 B outmeasured a `Statement` rung carrying ~3× its slot
 megabytes, by ~1.6× on every corpus; returning `&'arena TSType` from the type
 parser's `?`-chain closes that channel for types. The instrument that reads the
-per-level channel directly is the recursion-depth probe
+per-level channel directly is the stack the deepest accepted input of a shape needs
 ([cli.md §Recursion Depth](./cli.md#recursion-depth)), worth a look before
 ranking two rungs a slot census puts close together.
 
@@ -2666,6 +2666,42 @@ Three spellings of the same body, measured on `instructions:u`:
   0.045 back where it is not. Take it when the arm is genuinely rare — this is
   the mirror of §Where a peel's SET boundary lands: there the unpriced path is a
   branch the peel does not take, here it is a *register* the arm does not need.
+
+### The parser's recursive ladder: a counter is cheap, the state around it is not
+
+The depth limits' bookkeeping (`tsv_lang`'s `DepthBudget` and `SpineCount`: a nesting level
+per recursive step, a spine link per chain link, a frame per statement and per element of a
+long list, the printer's pairs) sits on the parser's hottest recursion. Each counter is a
+few instructions. Most of what the bookkeeping first cost was not the counters but what they
+did to the functions holding them: `parse_expression_bp` and `parse_postfix_expression` are
+register-starved, so every value a step keeps live across a recursive call is a spill on
+every path through the function, the ones that never take the step included — the same
+mechanism as §A RARE arm of a hot switch, at the parser's scale.
+
+- **Answer a printer predicate by the node's kind inline, and keep the rule out of line.**
+  The parser asks the printer's paren rules at every operator (`printer_adds_operand_pair`),
+  and nearly every operand is a name, a literal or a member-chain link that no operator
+  position parenthesizes (`operator_operand_takes_no_pair`; a numeric literal as a chain's
+  base is the one exception, charged at the chain by `chain_base_pair`); a binary operand of a binary is
+  decided by its two operators alone where no `>` join can reach it. Each kind arm must be a
+  reading of `needs_parens` for that kind, not a guess — it is exact or it is a bug.
+- **Outline the steps the ladder rarely takes, whole.** A binary operator, an assignment, a
+  conditional, a sequence, an optional or tagged link: each as an `#[inline(never)]` step
+  function, so the common path (an operand and no operator) carries none of its state. The
+  frames shrink with it, and a frame is what each level of the depth limit's stack margin is
+  made of — re-run the depth gates after any such move.
+- **Re-read from the tree rather than carry across a recursive call.** A call link's units
+  are read again from the built call's callee once its arguments are parsed, not held live
+  across the argument list.
+- **A cache carried around a hot loop can cost more than the walks it saves.** Caching the
+  spine answers a member link reads (whether the first call down the chain may print whole)
+  in loop-carried state measured worse than walking the spine again each link: the postfix
+  loop has no register to spare.
+
+The instrument for attributing such a change is a skid-free sample: on AMD,
+`perf record -e ibs_op/cnt_ctl=1/` attributes ops to the instruction that retired them,
+where `instructions:u` sampling smears samples into neighbours. Scale each symbol's share to the run's `perf stat` total to read it in
+instructions.
 
 ### A per-line `memchr` is mostly not a word scan
 

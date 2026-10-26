@@ -65,6 +65,15 @@ pub(crate) fn parse_rule<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     nested: bool,
 ) -> Result<CssRule<'arena>, ParseError> {
+    // two wire levels: the `Rule` and its `Block` (the depth limit's count)
+    parser.nested(2, |p| parse_rule_body(p, nested))
+}
+
+/// [`parse_rule`] inside its depth levels.
+fn parse_rule_body<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    nested: bool,
+) -> Result<CssRule<'arena>, ParseError> {
     // Ahead of the capture: this offset becomes the rule's AND its prelude's `start`, both
     // of which sit past a boundary whitespace run in `parseCss` (see
     // `skip_boundary_whitespace`). Two of the three callers reach here having already
@@ -354,8 +363,11 @@ pub(crate) fn parse_declaration<'arena>(
             // prettier's parser throws on a plain property's (`a { b: c:d }`), so there
             // is no oracle for splitting one. This is where the `--` is known.
             is_custom_property,
+            // the value parser's own recursion, a level a function, counted as it parses
+            parser.nesting_room(),
             parser.arena,
         )
+        .map_err(|open| parser.too_deep(open as usize))?
     };
 
     // Optionally consume semicolon (but don't include it in the declaration span)

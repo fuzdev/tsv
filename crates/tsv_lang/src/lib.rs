@@ -8,6 +8,7 @@
 //!   byte→UTF-16 map, and the line table under the `locations` feature);
 //!   `LocationMapper` - the line/column view a `loc` emitter reads from them
 //! - `ParseError` - error types and result aliases
+//! - `DepthBudget` / `NESTING_LIMIT` / `SPINE_LIMIT` - the parsers' depth limits
 //! - `OutputBuffer` - shared printer output utilities
 //! - `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` - hardcoded formatter settings, and
 //!   `EmbedContext` / `LayoutMode` - the per-input embedding state
@@ -30,6 +31,7 @@ mod comment;
 #[cfg(feature = "comment_check")]
 pub mod comment_ledger;
 mod config;
+mod depth;
 pub mod doc;
 mod error;
 mod escapes;
@@ -61,6 +63,10 @@ pub use comment::{
     range_too_narrow_for_a_comment,
 };
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
+pub use depth::{
+    DepthBudget, DepthLimit, NESTING_FLOOR, NESTING_LIMIT, NESTING_SPINE_WEIGHT, SPINE_LIMIT,
+    SpineCount,
+};
 pub use error::{ErrorReport, ParseError, Result, lex_err};
 pub use hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 #[cfg(feature = "json")]

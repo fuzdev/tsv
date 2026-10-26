@@ -191,7 +191,13 @@ enum EachHeadSplit {
 /// The probe is read-only: it collects no comments and keeps no node (see
 /// [`tsv_ts::parse_type_extent`]) — the caller re-reads both regions with the real
 /// iterable and binding parses, so a probe that registered anything would double it.
-fn each_binding_separator(s: &str, s_offset: usize, arena: &Bump) -> EachHeadSplit {
+/// Its type parses start at `host_nesting`, as the real ones do.
+fn each_binding_separator(
+    s: &str,
+    s_offset: usize,
+    host_nesting: u32,
+    arena: &Bump,
+) -> EachHeadSplit {
     // Every position the walk names is a subslice of `s`, so one rule converts them all
     // and no offset is ever summed from parts. Via [`subslice_offset`] rather than a
     // length subtraction, which is the same value only while the slice stays a SUFFIX —
@@ -216,7 +222,7 @@ fn each_binding_separator(s: &str, s_offset: usize, arena: &Bump) -> EachHeadSpl
         // No type here ⇒ this item is the binding, and the keyword before it is the
         // separator — the one recorded below, or the head's first `as` when none is.
         let item_at = offset_of(item);
-        let Ok(type_end) = tsv_ts::parse_type_extent(item, item_at, arena) else {
+        let Ok(type_end) = tsv_ts::parse_type_extent(item, item_at, host_nesting, arena) else {
             break;
         };
         let after_type = skip_ws_and_comments(&item[type_end - item_at..]);
@@ -303,6 +309,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// Dispatches to specific block parsers based on the keyword.
     pub(crate) fn parse_block(&mut self) -> Result<FragmentNode<'arena>, ParseError> {
+        // two wire levels: the block and the `Fragment` its children sit in (the depth
+        // limit's count)
+        self.nested(2, Self::parse_block_body)
+    }
+
+    /// [`Self::parse_block`] inside its depth levels.
+    fn parse_block_body(&mut self) -> Result<FragmentNode<'arena>, ParseError> {
         let start = self.current_start();
 
         // We're at {#, consume it
@@ -385,7 +398,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             if is_else_if {
                 // {:else if} - parse as nested if block
                 let elseif_start = self.current_start();
-                let elseif_block = self.parse_if_block_inner(elseif_start, true)?;
+                // two wire levels: the `alternate` fragment and the nested `IfBlock` in it
+                let elseif_block =
+                    self.nested(2, |p| p.parse_if_block_inner(elseif_start, true))?;
                 let mut nodes = self.bvec();
                 nodes.push(elseif_block);
                 Some(Fragment {
@@ -570,7 +585,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // one rule the separator walk uses — and `content[abs - content_offset]`
                 // is how every absolute position below indexes back into the head.
                 let binding_offset = content_offset + subslice_offset(content, binding_str);
-                match each_binding_separator(binding_str, binding_offset, self.arena) {
+                match each_binding_separator(
+                    binding_str,
+                    binding_offset,
+                    self.island_nesting(),
+                    self.arena,
+                ) {
                     EachHeadSplit::FirstAs => Some((binding_str, binding_offset)),
                     EachHeadSplit::LaterAs { separator, binding } => {
                         let iterable = &content[..separator - content_offset];
@@ -1519,8 +1539,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // The preserved parse is Svelte's own reader, so it alone decides acceptance.
             // It is also the only parse a head without a pair needs — the two trees are
             // then the same tree.
-            let (preserved, preserved_a_paren) =
-                tsv_ts::parse_embedded_preserve_parens(&wrapper, base, self.arena)?;
+            let (preserved, preserved_a_paren) = tsv_ts::parse_embedded_preserve_parens(
+                &wrapper,
+                base,
+                self.island_nesting(),
+                self.arena,
+            )?;
             // The wrapper is literally a `function` declaration, so the signature is
             // there by construction — stated as an error rather than an `if let` so a head
             // whose pieces went nowhere can never reach the printer as a silently empty
@@ -1533,7 +1557,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // parser bug, and it surfaces as the paren-free parse's own error rather
                 // than as a silent fallback to the wire tree (which prints a pair's
                 // contents bare).
-                let plain = tsv_ts::parse_embedded(&wrapper, base, self.arena)?;
+                let plain =
+                    tsv_ts::parse_embedded(&wrapper, base, self.island_nesting(), self.arena)?;
                 // The same comments, though not the same claims on them: `owned_by_node`
                 // binds a glued block to the node its token begins, and a pair's `(` begins
                 // a node only in the preserved tree (`/* c */ (x + y)`). The wire reads no
@@ -1863,7 +1888,7 @@ mod tests {
             let EachHeadSplit::LaterAs {
                 separator,
                 binding: start,
-            } = each_binding_separator(input, 0, &arena)
+            } = each_binding_separator(input, 0, 0, &arena)
             else {
                 panic!("expected a later `as` in {input:?}");
             };
@@ -1896,7 +1921,7 @@ mod tests {
             "A satisfies { a = 1 }",
         ] {
             assert_eq!(
-                each_binding_separator(input, 0, &arena),
+                each_binding_separator(input, 0, 0, &arena),
                 EachHeadSplit::FirstAs,
                 "{input:?}"
             );
@@ -1918,7 +1943,7 @@ mod tests {
             ("A satisfies B, i (i)", "A satisfies B"),
         ] {
             assert_eq!(
-                each_binding_separator(input, 0, &arena),
+                each_binding_separator(input, 0, 0, &arena),
                 EachHeadSplit::NoBinding { run_end: run.len() },
                 "{input:?}"
             );

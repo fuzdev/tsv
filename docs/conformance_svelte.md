@@ -13,6 +13,7 @@ The tsv parser aims for **exact AST compatibility** with Svelte's parser on ever
 - **Compat behavior** — Svelte has quirky but harmless behavior (design choices, tokenization quirks, output that doesn't affect semantics). tsv replicates it in AST output
 - **Correction** — Svelte/acorn violates spec, corrupts semantics, or lacks a spec-defined feature (e.g. acorn omitting an anonymous class expression's `id` for implements-first heritage). tsv produces correct/complete AST
 - **Representation limit** — a value acorn keeps can't round-trip tsv's UTF-8 strings (lone surrogate → U+FFFD; `raw` unaffected). Rare, not a correction
+- **Resource limit** — an input nested or chained past tsv's depth limits is refused, where the canonical parser accepts it up to its own stack (§Depth Limits). A sanctioned over-rejection, not a correction
 
 **Critical distinction**: Compat behaviors apply ONLY to **AST/JSON output** for tool compatibility. The tsv **formatter** always produces clean, standards-compliant code.
 
@@ -734,7 +735,7 @@ tsc reads both positions the other way, committing `let` to a declaration on the
 
 There is no fixture for the strict-reserved words themselves, because acorn rejects every case and no `expected.json` oracle is producible; the shapes are pinned by [`tests/strict_reserved_word_as_name.rs`](../tests/strict_reserved_word_as_name.rs), several of whose assertions check a **node type** rather than an accept, since an over-permissive parser can take a widened word and still build the wrong node for it.
 
-Binding-pattern **elements** follow from the reference widening rather than needing their own rule: tsv parses a binding pattern by running the expression parser and converting (`parse_destructured_binding` → `to_assignable`), so an element head asks the `IdentifierReference` channel. Widening that channel closed a declaration (`var [let] = a`, `var {a: let} = o`), a parameter (`function f([let]) {}`) and a `catch` binding (`try {} catch ([let]) {}`) in one move; object shorthand always worked, having its own keyword arm. A `void` element still rejects — a production bar, not a deferred early error.
+Binding-pattern **elements** follow from the reference widening rather than needing their own rule: tsv parses a binding pattern by running the expression parser and converting (`parse_destructured_binding` → `refine_assignable`), so an element head asks the `IdentifierReference` channel. Widening that channel closed a declaration (`var [let] = a`, `var {a: let} = o`), a parameter (`function f([let]) {}`) and a `catch` binding (`try {} catch ([let]) {}`) in one move; object shorthand always worked, having its own keyword arm. A `void` element still rejects — a production bar, not a deferred early error.
 
 **A contextual keyword as a label or an `infer` name** — the two channels the same work reached, and here acorn agrees, so they are ordinary fixtures. A `LabelIdentifier` and an `infer` type-parameter name are both plain names, and a `TokenKind::Identifier` test there sees only the words the lexer never keyword-izes — it would reject `async: for (;;) break async;`, `string: while (0) continue string;` and `type A<T> = T extends Array<infer string> ? string : never` while `foo:` / `infer U` work. Both use the shared name channel, so a label can be declared *and* referenced with any of these words. Pinned by [labeled/contextual_keyword_name](../tests/fixtures/typescript/statements/labeled/contextual_keyword_name/) and [infer/contextual_keyword_name](../tests/fixtures/typescript/types/infer/contextual_keyword_name/). What may be *labelled* is unchanged: `LabelledItem : Statement | FunctionDeclaration`, and the `FunctionDeclaration` arm carries the "It is a Syntax Error if any source text is matched by this production" phrasing — the relaxation is an Annex B extension, normative but optional for a host that is not a web browser, so it is out of tsv's grammar at either goal — so `lbl: function f() {}` and `label: let x = 1` both still reject.
 
@@ -1983,6 +1984,29 @@ occurrence, and any occurrence inside an element, is unaffected either way.
 The class question generalizes past this site: `tsv_svelte`'s
 [`whitespace.rs`](../crates/tsv_svelte/src/whitespace.rs) module doc carries the crate's rule
 and the other sites where the same reach was the whole bug.
+
+---
+
+## Depth Limits
+
+tsv refuses a document nested deeper than 256 wire levels, or holding a left-nested chain
+(an operator, member, call or type chain) longer than 6,000 spine units, with a syntax
+error — `Nesting exceeds tsv's depth limit of 256 levels`, or `Chain of operators, member
+accesses, calls, assertions or type suffixes exceeds tsv's length limit` — in every
+language and across the islands of a Svelte document, which share one count. Svelte's
+parser, acorn and acorn-typescript accept deeper input, until V8's own stack stops them
+with a `RangeError`. That makes the limit a **sanctioned over-rejection on a floor**: every
+walk tsv runs over an accepted tree — the wire writers, the printers, the type strip —
+recurses, and an overflow aborts the host process rather than raising an error, so a tree
+too deep for the stack contract is not built. The nesting counted includes the grouping
+parens a format would add, so the formatted output of an accepted document always parses
+again. Every input the conformance gates parse sits
+under both limits (the closest, tsc's binder stress files, near the spine limit); real
+code nests and chains far below either.
+
+The limits, what they count, how they are sized and the stack contract they keep are in
+[cli.md §Recursion Depth](./cli.md#recursion-depth); `tests/depth_limit.rs` pins the
+refusal one level past each limit, shape by shape (no fixture: the inputs are generated).
 
 ---
 

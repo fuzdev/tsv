@@ -664,6 +664,51 @@ fn callee_is_curried_member_chain_call(callee: &internal::Expression<'_>) -> boo
     )
 }
 
+/// The first call down `expr`'s object spine — through member objects and `!` operands —
+/// with its span, or `None` where the spine reaches anything else first. The walk
+/// [`Printer::spine_first_call_prints_whole`] and the parser's depth limit
+/// ([`call_may_print_whole`]) share.
+fn spine_first_call<'e>(
+    expr: &'e internal::Expression<'e>,
+) -> Option<(&'e internal::CallExpression<'e>, Span)> {
+    let mut expr = expr;
+    loop {
+        expr = match &expr.kind {
+            internal::ExpressionKind::MemberExpression(member) => member.object,
+            internal::ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+            internal::ExpressionKind::CallExpression(call) => return Some((call, expr.span)),
+            _ => return None,
+        };
+    }
+}
+
+/// Whether the call a chain link is printed over may be one the printer prints WHOLE,
+/// re-entering the expression printer for its callee: a call on a curried call on a member
+/// chain ([`callee_is_curried_member_chain_call`]), or one whose sole argument is a
+/// multi-line template — the shape test [`Printer::call_takes_template_bypass`] opens with,
+/// so a superset of the calls that take the bypass. Of `operand` itself (`spine: false`,
+/// the call link's own question, asked once its arguments are read) or of the first call
+/// down its object spine (`spine: true`, the question of a member or `!` over it, which
+/// prints over such a call whole — [`Printer::spine_first_call_prints_whole`]).
+///
+/// The parser's question (`Parser::member_link_units`, `Parser::settle_call_link`),
+/// asked of the printer's own predicates so the depth limit prices the walk the printer
+/// takes.
+pub(crate) fn call_may_print_whole(operand: &internal::Expression<'_>, spine: bool) -> bool {
+    let call = if spine {
+        spine_first_call(operand).map(|(call, _)| call)
+    } else {
+        match &operand.kind {
+            internal::ExpressionKind::CallExpression(call) => Some(call),
+            _ => None,
+        }
+    };
+    call.is_some_and(|call| {
+        callee_is_curried_member_chain_call(call.callee)
+            || is_sole_multiline_template_arg(call.arguments)
+    })
+}
+
 /// Whether `call`'s callee is a call taking more arguments than `call` does, and `call` takes
 /// at least one — prettier's `isLongCurriedCallExpression`, asked from the outer call. The
 /// chain decides the same question per link ([`chain::ChainCall::ungroup_args`]); this is
@@ -745,18 +790,10 @@ impl<'a> Printer<'a> {
     /// absorbs the templates, and the curried calls, once a call of its own opens the chain
     /// (`` …o(`⏎b⏎`).p(x) ``, `…fnnn(x)(z).p()`).
     fn spine_first_call_prints_whole(&self, expr: &internal::Expression<'_>) -> bool {
-        let mut expr = expr;
-        loop {
-            expr = match &expr.kind {
-                internal::ExpressionKind::MemberExpression(member) => member.object,
-                internal::ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
-                internal::ExpressionKind::CallExpression(call) => {
-                    return callee_is_curried_member_chain_call(call.callee)
-                        || self.call_takes_template_bypass(call, expr.span);
-                }
-                _ => return false,
-            };
-        }
+        spine_first_call(expr).is_some_and(|(call, span)| {
+            callee_is_curried_member_chain_call(call.callee)
+                || self.call_takes_template_bypass(call, span)
+        })
     }
 
     /// The doc of `operand` printed whole, when the member or `!` spanning `span` over it

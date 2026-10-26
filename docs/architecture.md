@@ -1039,7 +1039,7 @@ payload by `&'arena` reference:
 
 All three widths are pinned by `const` asserts in `ast/internal/mod.rs`, so a variant
 that widens any of these enums fails the build rather than silently fattening every
-slice element and lowering the nesting ceiling. **Rarity is normally the whole of the
+slice element and thinning the depth limits' margin. **Rarity is normally the whole of the
 argument for this rule** — boxing a *common* variant buys density and pays an
 allocation plus a pointer chase on the majority of the traffic, so it has to be
 measured rather than assumed (`Statement`'s last two heads are the one place it was,
@@ -1135,12 +1135,12 @@ because even a narrow `{&Expression, u32, u32}` is a three-field aggregate retur
 through an sret stack slot. (wasm32 returns every `Result` through a slot either way.)
 The reference buys the *caller's frame* as much as the return: an arm holding a node by
 value reserves its bytes at every recursion level, whichever arm the dispatcher takes,
-so the choice sets nesting depth rather than throughput — the per-construct ceilings
-are in [cli.md §Recursion Depth](./cli.md#recursion-depth). Node *layout* is tuned for
+so the choice sets the stack a level costs rather than throughput — and with it the
+margin the depth limits keep ([cli.md §Recursion Depth](./cli.md#recursion-depth)). Node *layout* is tuned for
 the format traversal while parse-time recursion is paid in pointer moves, so the
 *parse recursion* is never the reason to box a fat inline variant — the density rule
 above is; and because the enums sit on the expression and statement cycles, shrinking
-them moves the nesting ceilings too, as a side effect rather than the goal.
+them widens that margin too, as a side effect rather than the goal.
 
 **Rationale vs flat/indexed:** Flat/indexed layouts (index arrays, à la Zig's
 `MultiArrayList`) were benchmarked early in development and were slower —

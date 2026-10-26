@@ -85,7 +85,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .trim_start_matches(is_svelte_ws);
 
         let decl_offset = tag_content_start + subslice_offset(tag_content, decl_str);
-        let (id, init) = self.parse_declarator(decl_str, decl_offset)?;
+        // two wire levels: the `VariableDeclaration` and `VariableDeclarator` the wire puts
+        // between the tag and its binding and init, beyond an island's own
+        // (the depth limit's count, `SvelteParser::nested`)
+        let (id, init) = self.nested(2, |p| p.parse_declarator(decl_str, decl_offset))?;
 
         Ok(FragmentNode::ConstTag(ConstTag {
             id,

@@ -3,9 +3,9 @@
 use super::super::super::internal;
 use super::declarations::write_class_expression;
 use super::functions::{
-    write_arrow_function_expression, write_await_expression, write_call_expression,
-    write_conditional_expression, write_function_expression, write_member_expression,
-    write_new_expression, write_yield_expression,
+    call_callee_flags, write_arrow_function_expression, write_await_expression,
+    write_call_expression_tail, write_conditional_expression, write_function_expression,
+    write_member_expression_tail, write_new_expression, write_yield_expression,
 };
 use super::patterns::{
     write_assignment_pattern, write_object_pattern, write_property, write_rest_element,
@@ -17,6 +17,7 @@ use super::{
     write_bare_node, write_identifier_parts, write_identifier_plain, write_literal,
     write_name_field, write_type_annotation_field, write_type_arguments_field,
 };
+use smallvec::SmallVec;
 use tsv_lang::Span;
 
 /// What a call/member/non-null node has inherited from its parent about the
@@ -176,6 +177,54 @@ fn write_expression_identifier(
     );
 }
 
+/// A binary or logical expression and the binaries down its left spine, written without
+/// recursing down that spine — the chain's length is bounded only by `SPINE_LIMIT`, so a
+/// recursion per link would spend a frame per operator. Each binary's header and `left`
+/// key outermost first, then the leftmost operand, then each binary's operator, right
+/// operand and close innermost first: the bytes, and the order of the comment-attach
+/// node events, of the recursion down the left.
+#[inline(never)]
+fn write_binary_chain(
+    w: &mut JsonWriter,
+    binary: &internal::BinaryExpression<'_>,
+    span: Span,
+    ctx: &Ctx<'_>,
+) {
+    // LogicalExpression for `&&`/`||`/`??`, BinaryExpression otherwise.
+    fn node_type(operator: internal::BinaryOperator) -> &'static str {
+        match operator {
+            internal::BinaryOperator::AmpersandAmpersand
+            | internal::BinaryOperator::PipePipe
+            | internal::BinaryOperator::QuestionQuestion => "LogicalExpression",
+            _ => "BinaryExpression",
+        }
+    }
+    let mut spine: SmallVec<[(&internal::BinaryExpression<'_>, Span); 8]> = SmallVec::new();
+    let (mut node, mut node_span) = (binary, span);
+    loop {
+        node_header(w, node_type(node.operator), node_span, ctx);
+        w.raw(",\"left\":");
+        spine.push((node, node_span));
+        match &node.left.kind {
+            internal::ExpressionKind::BinaryExpression(left) => {
+                node_span = node.left.span;
+                node = left;
+            }
+            _ => {
+                write_expression(w, node.left, ctx);
+                break;
+            }
+        }
+    }
+    for &(node, node_span) in spine.iter().rev() {
+        w.raw(",\"operator\":\"");
+        w.raw(node.operator.as_str());
+        w.raw("\",\"right\":");
+        write_expression(w, node.right, ctx);
+        close_node(w, node_type(node.operator), node_span, ctx);
+    }
+}
+
 /// Every expression kind's arm, the leaf kinds' included, so this is a total answer on
 /// its own; [`write_expression_inner`] answers the leaves before reaching it.
 // Out of line: inlined into its front, its frame would be paid by the leaf kinds the
@@ -269,21 +318,7 @@ fn write_expression_full_dispatch(
             close_node(w, "UpdateExpression", expr.span, ctx);
         }
         internal::ExpressionKind::BinaryExpression(binary) => {
-            // LogicalExpression for `&&`/`||`/`??`, BinaryExpression otherwise.
-            let node_type = match binary.operator {
-                internal::BinaryOperator::AmpersandAmpersand
-                | internal::BinaryOperator::PipePipe
-                | internal::BinaryOperator::QuestionQuestion => "LogicalExpression",
-                _ => "BinaryExpression",
-            };
-            node_header(w, node_type, expr.span, ctx);
-            w.raw(",\"left\":");
-            write_expression(w, binary.left, ctx);
-            w.raw(",\"operator\":\"");
-            w.raw(binary.operator.as_str());
-            w.raw("\",\"right\":");
-            write_expression(w, binary.right, ctx);
-            close_node(w, node_type, expr.span, ctx);
+            write_binary_chain(w, binary, expr.span, ctx);
         }
         internal::ExpressionKind::ArrowFunctionExpression(arrow) => {
             write_arrow_function_expression(w, arrow, expr.span, ctx);
@@ -300,34 +335,11 @@ fn write_expression_full_dispatch(
             write_expression(w, spread.argument, ctx);
             close_node(w, "SpreadElement", spread.span, ctx);
         }
-        internal::ExpressionKind::CallExpression(call) => {
-            let needs_chain = needs_chain_wrap(expr, flags);
-            let callee_chain = child_chain(
-                expr.span.start,
-                call.callee.span().start,
-                needs_chain,
-                flags,
-            );
-            let (force, strip) = flags_after_wrap(flags, needs_chain);
-            maybe_wrap_chain(w, needs_chain, expr.span, ctx, |w| {
-                write_call_expression(w, call, expr.span, ctx, callee_chain, force, strip);
-            });
-        }
+        internal::ExpressionKind::CallExpression(_)
+        | internal::ExpressionKind::MemberExpression(_)
+        | internal::ExpressionKind::TSNonNullExpression(_) => write_chain(w, expr, ctx, flags),
         internal::ExpressionKind::NewExpression(new_expr) => {
             write_new_expression(w, new_expr, expr.span, ctx);
-        }
-        internal::ExpressionKind::MemberExpression(member) => {
-            let needs_chain = needs_chain_wrap(expr, flags);
-            let object_chain = child_chain(
-                expr.span.start,
-                member.object.span().start,
-                needs_chain,
-                flags,
-            );
-            let (force, strip) = flags_after_wrap(flags, needs_chain);
-            maybe_wrap_chain(w, needs_chain, expr.span, ctx, |w| {
-                write_member_expression(w, member, expr.span, ctx, object_chain, force, strip);
-            });
         }
         internal::ExpressionKind::ConditionalExpression(cond) => {
             write_conditional_expression(w, cond, expr.span, ctx);
@@ -458,33 +470,6 @@ fn write_expression_full_dispatch(
             write_type_parameter_instantiation(w, &inst_expr.type_arguments, ctx);
             close_node(w, "TSInstantiationExpression", expr.span, ctx);
         }
-        internal::ExpressionKind::TSNonNullExpression(non_null_expr) => {
-            let needs_chain = needs_chain_wrap(expr, flags);
-            // A parenthesized inner chain seals at the parens, so the
-            // paren-aware child check applies like it does for calls/members.
-            let inner_chain = child_chain(
-                expr.span.start,
-                non_null_expr.expression.span().start,
-                needs_chain,
-                flags,
-            );
-            maybe_wrap_chain(w, needs_chain, expr.span, ctx, |w| {
-                node_header(w, "TSNonNullExpression", expr.span, ctx);
-                w.raw(",\"expression\":");
-                // force/strip die here: TSNonNullExpression is not a
-                // call/member spine node.
-                write_expression_inner(
-                    w,
-                    non_null_expr.expression,
-                    ctx,
-                    ExprFlags {
-                        chain: inner_chain,
-                        ..ExprFlags::default()
-                    },
-                );
-                close_node(w, "TSNonNullExpression", expr.span, ctx);
-            });
-        }
         internal::ExpressionKind::ImportExpression(import_expr) => {
             node_header(w, "ImportExpression", expr.span, ctx);
             w.raw(",\"source\":");
@@ -558,6 +543,185 @@ fn write_expression_full_dispatch(
     }
 }
 
+/// The deferred half of one link [`write_chain`] walks down: what the node writes after
+/// the child its walk continues into.
+enum ChainTail<'e> {
+    Call {
+        call: &'e internal::CallExpression<'e>,
+        callee_chain: ChainState,
+        force: bool,
+        strip: bool,
+    },
+    Member {
+        member: &'e internal::MemberExpression<'e>,
+        force: bool,
+        strip: bool,
+    },
+    NonNull,
+}
+
+/// A call, member or non-null expression and the links of those kinds down its spine,
+/// written without recursing down the spine — the chain's length is bounded only by
+/// `SPINE_LIMIT`, so a recursion per link would spend a frame per link. Down the spine,
+/// each link's `ChainExpression` wrap (where it opens one), its header and its child key;
+/// then the spine's base through the dispatch, with the flags the last link hands it; then
+/// each link's tail and closes, innermost first — the bytes, and the order of the
+/// comment-attach node events, of the recursion down the spine. Each link reads the flags
+/// its parent hands it exactly as the recursion did (`needs_chain_wrap`, `child_chain`,
+/// `flags_after_wrap`).
+#[inline(never)]
+fn write_chain(
+    w: &mut JsonWriter,
+    expr: &internal::Expression<'_>,
+    ctx: &Ctx<'_>,
+    flags: ExprFlags,
+) {
+    let mut tails: SmallVec<[(ChainTail<'_>, Span, bool); 8]> = SmallVec::new();
+    let (mut expr, mut flags) = (expr, flags);
+    loop {
+        let (child, child_flags, tail) = match &expr.kind {
+            internal::ExpressionKind::CallExpression(call) => {
+                let needs_chain = needs_chain_wrap(expr, flags);
+                let callee_chain = child_chain(
+                    expr.span.start,
+                    call.callee.span().start,
+                    needs_chain,
+                    flags,
+                );
+                let (force, strip) = flags_after_wrap(flags, needs_chain);
+                open_chain_link(
+                    w,
+                    needs_chain,
+                    "CallExpression",
+                    ",\"callee\":",
+                    expr.span,
+                    ctx,
+                );
+                (
+                    call.callee,
+                    call_callee_flags(call, callee_chain, strip),
+                    (
+                        ChainTail::Call {
+                            call,
+                            callee_chain,
+                            force,
+                            strip,
+                        },
+                        needs_chain,
+                    ),
+                )
+            }
+            internal::ExpressionKind::MemberExpression(member) => {
+                let needs_chain = needs_chain_wrap(expr, flags);
+                let object_chain = child_chain(
+                    expr.span.start,
+                    member.object.span().start,
+                    needs_chain,
+                    flags,
+                );
+                let (force, strip) = flags_after_wrap(flags, needs_chain);
+                open_chain_link(
+                    w,
+                    needs_chain,
+                    "MemberExpression",
+                    ",\"object\":",
+                    expr.span,
+                    ctx,
+                );
+                (
+                    member.object,
+                    ExprFlags {
+                        chain: object_chain,
+                        force_optional: false,
+                        strip_optional: strip,
+                    },
+                    (
+                        ChainTail::Member {
+                            member,
+                            force,
+                            strip,
+                        },
+                        needs_chain,
+                    ),
+                )
+            }
+            internal::ExpressionKind::TSNonNullExpression(non_null) => {
+                let needs_chain = needs_chain_wrap(expr, flags);
+                // A parenthesized inner chain seals at the parens, so the paren-aware
+                // child check applies like it does for calls/members.
+                let inner_chain = child_chain(
+                    expr.span.start,
+                    non_null.expression.span().start,
+                    needs_chain,
+                    flags,
+                );
+                open_chain_link(
+                    w,
+                    needs_chain,
+                    "TSNonNullExpression",
+                    ",\"expression\":",
+                    expr.span,
+                    ctx,
+                );
+                (
+                    non_null.expression,
+                    // force/strip die here: TSNonNullExpression is not a call/member
+                    // spine node.
+                    ExprFlags {
+                        chain: inner_chain,
+                        ..ExprFlags::default()
+                    },
+                    (ChainTail::NonNull, needs_chain),
+                )
+            }
+            _ => {
+                write_expression_inner(w, expr, ctx, flags);
+                break;
+            }
+        };
+        tails.push((tail.0, expr.span, tail.1));
+        expr = child;
+        flags = child_flags;
+    }
+    for (tail, span, needs_chain) in tails.into_iter().rev() {
+        match tail {
+            ChainTail::Call {
+                call,
+                callee_chain,
+                force,
+                strip,
+            } => write_call_expression_tail(w, call, span, ctx, callee_chain, force, strip),
+            ChainTail::Member {
+                member,
+                force,
+                strip,
+            } => write_member_expression_tail(w, member, span, ctx, force, strip),
+            ChainTail::NonNull => close_node(w, "TSNonNullExpression", span, ctx),
+        }
+        if needs_chain {
+            close_node(w, "ChainExpression", span, ctx);
+        }
+    }
+}
+
+/// Open one link of [`write_chain`]: its `ChainExpression` wrap where `needs_chain`, then
+/// its own header and the key of the child the walk continues into.
+fn open_chain_link(
+    w: &mut JsonWriter,
+    needs_chain: bool,
+    node_type: &'static str,
+    child_key: &'static str,
+    span: Span,
+    ctx: &Ctx<'_>,
+) {
+    if needs_chain {
+        node_header(w, "ChainExpression", span, ctx);
+        w.raw(",\"expression\":");
+    }
+    node_header(w, node_type, span, ctx);
+    w.raw(child_key);
+}
+
 /// Whether this call/member/non-null node opens a `ChainExpression` wrap.
 ///
 /// Only an [`ChainState::Unresolved`] node walks: the other two states are the
@@ -588,25 +752,6 @@ fn child_chain(
         ChainState::InChain
     } else {
         ChainState::KnownFree
-    }
-}
-
-/// Emit `inner` wrapped in a `ChainExpression` node when `needs_chain`, bare
-/// otherwise.
-fn maybe_wrap_chain(
-    w: &mut JsonWriter,
-    needs_chain: bool,
-    span: Span,
-    ctx: &Ctx<'_>,
-    inner: impl FnOnce(&mut JsonWriter),
-) {
-    if needs_chain {
-        node_header(w, "ChainExpression", span, ctx);
-        w.raw(",\"expression\":");
-        inner(w);
-        close_node(w, "ChainExpression", span, ctx);
-    } else {
-        inner(w);
     }
 }
 

@@ -464,6 +464,10 @@ pub(crate) struct Printer<'a> {
     /// restores the previous value on the way out (so nested contexts reset
     /// correctly).
     block_dangle_allowed: Cell<bool>,
+    /// The nesting the printer's own parse of a nested `<script>` / `<style>` body starts
+    /// from ([`internal::Root::nested_raw_text_nesting`]), so that parse shares the
+    /// document's depth budget.
+    pub(crate) nested_raw_text_nesting: Cell<u32>,
     /// Whether the fragment being built is a `<textarea>`'s content — RCDATA, which Svelte
     /// reads with `read_sequence`, where a `{/` opens an expression rather than closing a
     /// block. Read by [`Printer::build_text_expression_tag_doc`]; set (and restored) by the
@@ -671,6 +675,7 @@ impl<'a> Printer<'a> {
             has_format_ignore,
             line_breaks,
             block_dangle_allowed: Cell::new(true),
+            nested_raw_text_nesting: Cell::new(0),
             in_textarea_content: Cell::new(false),
             fragment_depth: Cell::new(0),
             css_host_scan_cache: Cell::new(None),
@@ -1705,6 +1710,9 @@ fn format_root<'a>(
         EmbedContext::default(),
         line_breaks,
     );
+    printer
+        .nested_raw_text_nesting
+        .set(root.nested_raw_text_nesting);
     // Which fragment content edges are line-box edges — asked by the nested `<script>` /
     // `<style>` glue, and indexed before anything reads it.
     printer.index_fragment_edges(root);

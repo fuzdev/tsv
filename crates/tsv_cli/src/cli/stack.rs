@@ -4,40 +4,34 @@
 //! and a stack overflow is **not** a catchable panic — no `catch_unwind` and no panic
 //! contract can turn it into a per-file error the way they do every other failure. It
 //! aborts the process, which for a directory format means dying partway through with
-//! some files already rewritten.
+//! some files already rewritten. The parsers' depth limits (`tsv_lang::NESTING_LIMIT`,
+//! `tsv_lang::SPINE_LIMIT`) bound how deep an accepted tree goes, sized so its walks fit
+//! a 2 MiB thread in an optimized build and a 16 MiB one in a debug build; what this
+//! module decides is that every tsv thread has at least that.
 //!
-//! So the ceiling has to be a decision rather than an inheritance. Left alone, every
+//! So the stack has to be a decision rather than an inheritance. Left alone, every
 //! route picks up a different one from its host: the main thread takes the platform
 //! default (the process `RLIMIT_STACK` on Unix — commonly 8 MiB, but larger or smaller
 //! on any given machine — and 1 MiB on Windows, where the linker writes it into the
 //! executable header and nothing at run time can raise it), a spawned thread takes
-//! Rust's 2 MiB, and `RUST_MIN_STACK` moves the second but not the first. One binary
-//! would then have an 8x depth difference between `tsv format <path>` and
-//! `tsv format --content` on the same input on the same Windows machine — a
-//! same-output-everywhere problem, not only a robustness one.
+//! Rust's 2 MiB, and `RUST_MIN_STACK` moves the second but not the first. The Windows
+//! main thread sits below the limits' contract, and a debug build's every inherited
+//! stack does.
 //!
 //! Stating it once and applying it to **every** thread tsv dispatches language work on —
 //! the wrapper [`run_on_sized_stack`] puts around the whole subcommand, each format
 //! worker, and, in `tsv_debug`, each injection-audit worker and each thread of the tokio
-//! runtime its async commands format on — is what makes the ceiling a property of tsv
+//! runtime its async commands format on — is what makes the stack a property of tsv
 //! rather than of the route, the host and the platform. [`sized_thread`] is the single
 //! constructor every `thread::Builder` spawn goes through, so one cannot quietly miss the
 //! reservation by building its own; the runtime, which builds its own threads by
 //! construction, takes [`STACK_SIZE`] directly.
 //!
-//! The value is chosen so that even the **debug** profile out-reaches the parsers tsv
-//! stands in for. Measured on `const x = ((((…1…))));`, the cost is ~0.78 KiB of stack
-//! per nesting level in a release build and ~17 KiB in a debug build, where frames are
-//! far larger; acorn + `@sveltejs/acorn-typescript` give up at 497 levels and prettier
-//! at 805, both through V8's own checked stack limit. 32 MiB clears ~41,700 levels in
-//! release and ~1,930 in debug, so no profile of tsv dies before the tools it replaces
-//! do. Parens are the easiest shape to state, not the tightest — a nested arrow body
-//! (`() => {…}`) costs ~3.41 KiB a level, so ~9,600 is the depth every shape
-//! clears (the per-construct table is in `docs/cli.md` §Recursion Depth, which also
-//! records that the chain shapes are the ones where the PRINTER, not the parser, sets
-//! the ceiling). Nesting is not the only recursion that
-//! costs stack, but it is the deepest real code reaches: the deepest file in the tsc
-//! corpus nests 69 levels, and the exposure is generated and minified code.
+//! The value clears both contracts with room: 32 MiB is twice the debug build's, so a
+//! debug CLI and every audit `tsv_debug` runs over whole corpora (which also read the
+//! canonical parsers' trees, bounded by no tsv limit) stay on the safe side of any
+//! accepted input. `docs/cli.md` §Recursion Depth states the contract and the margins
+//! `tests/depth_limit.rs` holds.
 //!
 //! The size is a *reservation*, not a commitment: pages are committed lazily on first
 //! touch, so it costs address space and ~0 RSS, and nothing the benchmarks measure

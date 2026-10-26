@@ -683,6 +683,28 @@ fn is_decorator_member_expression(expr: &internal::Expression<'_>) -> bool {
     }
 }
 
+/// Whether the printer writes a pair around a decorator's expression (`@(a!(…))`,
+/// `@(a + b)`) — the parser charges it as a level of the output's nesting where the author
+/// wrote none around the whole expression (`Parser::parse_decorator`).
+///
+/// A wire-only parse keeps the author's grouping parens as nodes (`parse_preserve_parens`),
+/// which the printer never meets; read through them here, a callee's pair (`@(a)(…)`)
+/// answers as the parse the printer reads does.
+pub(crate) fn decorator_takes_pair(expr: &internal::Expression<'_>) -> bool {
+    fn unwrap<'e, 'a>(mut expr: &'e internal::Expression<'a>) -> &'e internal::Expression<'a> {
+        while let internal::ExpressionKind::ParenthesizedExpression(paren) = &expr.kind {
+            expr = paren.expression;
+        }
+        expr
+    }
+    !match &expr.kind {
+        internal::ExpressionKind::CallExpression(call) => {
+            !call.optional && is_decorator_member_expression(unwrap(call.callee))
+        }
+        _ => is_decorator_member_expression(unwrap(expr)),
+    }
+}
+
 /// Whether a decorator expression is valid without parens (see
 /// `Printer::build_decorator_expression_doc`).
 fn can_decorator_expression_unparenthesized(expr: &internal::Expression<'_>) -> bool {

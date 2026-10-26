@@ -44,7 +44,7 @@ import {
 } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { Worker } from 'node:worker_threads';
 
@@ -115,6 +115,91 @@ const repo_root = dirname(dirname(fileURLToPath(import.meta.url)));
 /** Structural equality for plain wire JSON (no cycles, no undefined-vs-missing nuance). */
 const deep_equal_json = (a: unknown, b: unknown): boolean =>
 	JSON.stringify(a) === JSON.stringify(b);
+
+/** The shadow stack a staged small-stack package runs on: a quarter of the shipped 1 MiB,
+ * which an ordinary file fits and the depth-limit-accepted deep file of the trap tests
+ * does not. */
+const SMALL_SHADOW_STACK = 256 << 10;
+
+/**
+ * `wasm` with its shadow stack cut to `size` bytes: the initial value of
+ * `__stack_pointer` — the module's first global, a mutable `i32` initialized by one
+ * `i32.const` (wasm-ld's layout, which places the stack at the bottom of linear memory
+ * and the pointer at its top) — rewritten, the global section's length re-encoded
+ * around it. The stack grows down from that value, so a call deeper than `size` bytes
+ * walks off address 0 and traps (`memory access out of bounds`) exactly as one past the
+ * shipped stack does, only sooner. Throws on any other layout rather than guess.
+ */
+function shrink_shadow_stack(wasm: Uint8Array, size: number): Uint8Array {
+	const read_leb = (at: number, signed: boolean): [number, number] => {
+		let value = 0;
+		let shift = 0;
+		let byte: number;
+		do {
+			byte = wasm[at++];
+			value |= (byte & 0x7f) << shift;
+			shift += 7;
+		} while (byte & 0x80);
+		if (signed && shift < 32 && byte & 0x40) value |= -1 << shift;
+		return [signed ? value : value >>> 0, at];
+	};
+	const leb = (value: number, signed: boolean): Array<number> => {
+		const out = [];
+		for (;;) {
+			let byte = value & 0x7f;
+			value = signed ? value >> 7 : value >>> 7;
+			const done = signed
+				? (value === 0 && !(byte & 0x40)) || (value === -1 && byte & 0x40)
+				: value === 0;
+			if (!done) byte |= 0x80;
+			out.push(byte);
+			if (done) return out;
+		}
+	};
+	let at = 8; // past the magic and version
+	while (at < wasm.length) {
+		const id = wasm[at];
+		const [length, body] = read_leb(at + 1, false);
+		if (id === 6) {
+			const [, first] = read_leb(body, false); // the global count
+			// `i32`, `mut`, `i32.const`
+			if (wasm[first] !== 0x7f || wasm[first + 1] !== 1 || wasm[first + 2] !== 0x41) {
+				throw new Error('the first global is not a mutable i32 stack pointer');
+			}
+			const [, after] = read_leb(first + 3, true);
+			const value = leb(size, true);
+			const section_length = first + 3 - body + value.length + (body + length - after);
+			const parts = [
+				wasm.subarray(0, at),
+				Uint8Array.from([6, ...leb(section_length, false)]),
+				wasm.subarray(body, first + 3),
+				Uint8Array.from(value),
+				wasm.subarray(after)
+			];
+			const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+			let offset = 0;
+			for (const part of parts) {
+				out.set(part, offset);
+				offset += part.length;
+			}
+			return out;
+		}
+		at = body + length;
+	}
+	throw new Error('the module has no global section');
+}
+
+/** A copy of the package at `pkg` (repo-relative) in a fresh temp directory, its WASM
+ * module's shadow stack cut to `SMALL_SHADOW_STACK` (`shrink_shadow_stack`) — the
+ * deterministic trap the recovery tests need, since no input the depth limits accept traps
+ * the shipped stack. The caller removes the directory. */
+function stage_small_stack_package(pkg: string): string {
+	const staged = mkdtempSync(join(tmpdir(), 'tsv-small-stack-'));
+	cpSync(join(repo_root, pkg), staged, { recursive: true });
+	const wasm = join(staged, 'tsv_wasm_bg.wasm');
+	writeFileSync(wasm, shrink_shadow_stack(readFileSync(wasm), SMALL_SHADOW_STACK));
+	return staged;
+}
 
 describe(`package metadata: ${pkg_dir}`, () => {
 	const pkg = JSON.parse(
@@ -341,35 +426,71 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		assert.equal(ok_code(node_entry.format_svelte(once)), once);
 	});
 
-	// The poisoning-trap recovery contract. A stack overflow (input nested past
-	// the ~1 MiB shadow stack) is the one trap the instance does not survive:
-	// `__stack_pointer` is a mutable global the trap never restores, so every
-	// later call throws `memory access out of bounds` — and `init_sync`
-	// short-circuits once initialized, so `reinstantiate` (patched into the glue
-	// by patch_npm_package.ts) is the only recovery. Three claims, in order: the
-	// trap is a `WebAssembly.RuntimeError` (the discriminant cli.js keys
-	// recovery on — an engine that stopped throwing it would silently disable
-	// recovery), the poisoning is real, and the hook clears it. Ends recovered,
-	// so the shared `node_entry` stays healthy for every later test. If the
-	// deep input ever stops trapping, the stack ceiling moved — re-measure and
-	// deepen it, don't delete the test.
+	// The poisoning-trap recovery contract. A stack overflow is the one trap the
+	// instance does not survive: `__stack_pointer` is a mutable global no trap
+	// restores, so a call that dies deep in the engine leaves the shadow stack
+	// pointer where it was — and `init_sync` short-circuits once initialized, so
+	// `reinstantiate` (patched into the glue by patch_npm_package.ts) is the only
+	// recovery. The depth limits keep every accepted input inside a default main
+	// thread's stacks (docs/cli.md §The other surfaces), so the overflow is staged on
+	// a smaller one: a child process with V8's stack cut to a sliver, where an
+	// accepted deep input exhausts V8's native stack first. Four claims, in order:
+	// that overflow is a `RangeError`, and each one strands the instance a little
+	// further down its shadow stack, until a call traps as a `WebAssembly.RuntimeError`
+	// (the two discriminants cli.js keys recovery on — an engine that stopped throwing
+	// them would silently disable recovery); the poisoning is real (an ordinary input
+	// now traps too); the hook clears it; and recovery is repeatable.
 	it('reinstantiate recovers the instance after a poisoning trap', () => {
-		const deep = '('.repeat(10_000) + '1' + ')'.repeat(10_000) + ';';
-		const probe = has_format
-			? () => node_entry.format_typescript(deep)
-			: () => node_entry.parse_typescript_json(deep);
-		const healthy = has_format
-			? () => node_entry.format_typescript('const   x=1')
-			: () => node_entry.parse_typescript_json('const x = 1;');
-		assert.throws(probe, WebAssembly.RuntimeError, 'the deep input must trap');
-		// poisoned: an ordinary input now traps too, on the same instance
-		assert.throws(healthy, WebAssembly.RuntimeError, 'the trap must poison the instance');
-		node_entry.reinstantiate();
-		assert.equal(healthy().ok, true, 'the fresh instance must format/parse again');
-		// recovery must be repeatable — one reinstantiation is not a fuse
-		assert.throws(probe, WebAssembly.RuntimeError);
-		node_entry.reinstantiate();
-		assert.equal(healthy().ok, true);
+		const call = has_format ? 'format_typescript' : 'parse_typescript_json';
+		const source = `
+const tsv = await import(${JSON.stringify(pathToFileURL(join(repo_root, pkg_dir, 'index.js')).href)});
+const deep = 'x = ' + '['.repeat(250) + '1' + ']'.repeat(250) + ';';
+const healthy = () => tsv.${call}('const x = 1;');
+const kinds = [];
+const poison = () => {
+	for (let i = 0; i < 64; i++) {
+		try {
+			tsv.${call}(deep);
+			kinds.push('ok');
+		} catch (error) {
+			kinds.push(error.constructor.name);
+			if (error instanceof WebAssembly.RuntimeError) return;
+		}
+	}
+};
+poison();
+let poisoned;
+try {
+	healthy();
+	poisoned = false;
+} catch (error) {
+	poisoned = error instanceof WebAssembly.RuntimeError;
+}
+tsv.reinstantiate();
+const recovered = healthy().ok;
+poison();
+tsv.reinstantiate();
+console.log(JSON.stringify({ kinds, poisoned, recovered, again: healthy().ok }));
+`;
+		const child = spawnSync(
+			process.execPath,
+			['--stack-size=100', '--input-type=module', '--eval', source],
+			{ encoding: 'utf-8' }
+		);
+		assert.equal(child.status, 0, child.stderr);
+		const report = JSON.parse(child.stdout);
+		assert.equal(report.kinds[0], 'RangeError', `the overflow must be V8's: ${child.stdout}`);
+		// each `poison()` ends in a trap: the first on the instance the overflows stranded,
+		// the second on the reinstantiated one, which the same chain strands again
+		assert.equal(
+			report.kinds.filter((kind: string) => kind === 'RuntimeError').length,
+			2,
+			`each stranded instance must end in a trap: ${child.stdout}`
+		);
+		assert.equal(report.poisoned, true, 'the trap must poison the instance');
+		assert.equal(report.recovered, true, 'the fresh instance must format/parse again');
+		// one reinstantiation is not a fuse
+		assert.equal(report.again, true);
 	});
 
 	// Handles are stamped with the instance generation they were minted under, so
@@ -2409,17 +2530,38 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
-	// The poisoning-trap recovery gate, both paths. One deeply nested file traps
-	// the WASM instance, and before `reinstantiate` the sequential path (the
-	// default under the threshold — every ordinary repo) then reported EVERY
-	// later file as a bogus `memory access out of bounds`; the parallel path was
-	// only saved by whichever files the healthy workers happened to drain first
-	// (measured racy: 4–39 spurious errors on a 41-file tree). The deep file
-	// sorts first so a recovery regression poisons the entire rest of the run —
-	// the loudest possible failure. The gate: exactly one error, naming the deep
-	// file and the reinstantiation, and every other file still formats.
+	// The engine's overflow on the main thread, and its recovery. The depth limits keep
+	// every accepted input inside a default main thread's stacks, so the overflow is
+	// staged on a smaller one: the CLI runs with V8's stack cut to a sliver, where an
+	// accepted deep file exhausts V8's native stack — a `RangeError`, which strands the
+	// instance a little further down its shadow stack each time, so that a few in a row
+	// poison it (the in-process recovery test above shows the chain). Hence the rounds,
+	// each a deep file and four ordinary ones, sequentially (`--jobs 1`): each deep file
+	// overflows the main thread and is retried in a one-worker pool
+	// (`retry_overflowed_files`), whose reserved stack formats it, and every ordinary
+	// file after it formats on the recovered main-thread instance. The gate: no error at
+	// all, and every file reported.
+	const run_cli_small_stack = (args: Array<string>) =>
+		spawnSync(process.execPath, ['--stack-size=100', cli_path, ...args], {
+			encoding: 'utf-8'
+		});
+	const deep_file = `x = ${'['.repeat(250)}1${']'.repeat(250)};\n`;
+
+	// The poisoning-trap recovery gate, both paths. The depth limits keep every accepted
+	// input inside the module's shadow stack, so the trap is staged on a smaller one: a
+	// copy of the package whose shadow stack is cut to a quarter (`stage_small_stack_package`),
+	// where the accepted deep file traps every time — on the main thread and in a pool
+	// worker alike, since the shadow stack is the module's own, whatever thread runs it —
+	// and an ordinary file still formats. Before `reinstantiate`, the sequential path (the
+	// default under the threshold — every ordinary repo) then reported EVERY later file as
+	// a bogus `memory access out of bounds`; the parallel path was only saved by whichever
+	// files the healthy workers happened to drain first (measured racy: 4–39 spurious
+	// errors on a 41-file tree). The deep file sorts first so a recovery regression poisons
+	// the entire rest of the run — the loudest possible failure. The gate: exactly one
+	// error, naming the deep file and the reinstantiation, and every other file still
+	// formats.
 	const trap_tree = (root: string): number => {
-		writeFileSync(join(root, 'a_deep.ts'), `${'('.repeat(10_000)}1${')'.repeat(10_000)};\n`);
+		writeFileSync(join(root, 'a_deep.ts'), deep_file);
 		for (let i = 0; i < 6; i++) writeFileSync(join(root, `f${i}.ts`), `const  x${i}=${i}\n`);
 		return 6;
 	};
@@ -2434,85 +2576,91 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		);
 	};
 
-	it('format contains a poisoning trap to the deep file (sequential path)', () => {
-		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
-		try {
-			const ordinary = trap_tree(dir);
-			assert_trap_contained(run_cli(['format', '--check', dir]), ordinary);
-		} finally {
-			rmSync(dir, { recursive: true, force: true });
-		}
-	});
+	for (const [path, jobs] of [
+		['sequential', '1'],
+		['worker', '2']
+	] as const) {
+		it(`format contains a poisoning trap to the deep file (${path} path)`, () => {
+			const staged = stage_small_stack_package(pkg_dir);
+			const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+			try {
+				const ordinary = trap_tree(dir);
+				const result = spawnSync(
+					process.execPath,
+					[join(staged, 'cli.js'), 'format', '--check', '--jobs', jobs, dir],
+					{ encoding: 'utf-8' }
+				);
+				assert_trap_contained(result, ordinary);
+			} finally {
+				rmSync(dir, { recursive: true, force: true });
+				rmSync(staged, { recursive: true, force: true });
+			}
+		});
+	}
 
-	it('format contains a poisoning trap to the deep file (worker path)', () => {
-		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
-		try {
-			const ordinary = trap_tree(dir);
-			assert_trap_contained(run_cli(['format', '--check', '--jobs', '2', dir]), ordinary);
-		} finally {
-			rmSync(dir, { recursive: true, force: true });
-		}
-	});
+	// The precondition the two tests below rest on, proved rather than assumed: on that
+	// stack the deep file does overflow the main thread, as a `RangeError`. Without it
+	// both would pass vacuously — every file formatting on the main thread, no retry run.
+	const assert_deep_file_overflows_small_stack = (): void => {
+		const index = pathToFileURL(join(repo_root, pkg_dir, 'index.js')).href;
+		const probe = spawnSync(
+			process.execPath,
+			[
+				'--stack-size=100',
+				'--input-type=module',
+				'--eval',
+				`const tsv = await import(${JSON.stringify(index)});
+try {
+	tsv.format_typescript(${JSON.stringify(deep_file)});
+	console.log('formatted');
+} catch (error) {
+	console.log(error.constructor.name);
+}`
+			],
+			{ encoding: 'utf-8' }
+		);
+		assert.equal(probe.status, 0, probe.stderr);
+		assert.equal(
+			probe.stdout.trim(),
+			'RangeError',
+			'the deep file must overflow the main thread on the small stack'
+		);
+	};
 
-	// The engine's OTHER overflow: a long flat chain exhausts V8's own native stack
-	// before the WASM shadow stack on the main thread, which V8 reports as a
-	// `RangeError` (`Maximum call stack size exceeded`) rather than a trap — and the
-	// instance is stranded all the same, so a later innocent file traps with `memory
-	// access out of bounds`, though not in every round. Hence the rounds, each a chain
-	// and four ordinary files, sequentially (`--jobs 1`): the gate is that every error
-	// is a chain's, reinstantiated, and every ordinary file still formats. The chain is
-	// deeper than a pool worker reaches as well (the WASM module's own stack, near 62,600
-	// terms at `WORKER_STACK_SIZE_MB`), because the sequential route retries a main-thread
-	// overflow in a worker (`retry_overflowed_files`): each chain overflows the main thread
-	// and strands its instance there — which the ordinary files after it prove recovered —
-	// then traps in the retry worker, whose error is the one reported.
-	it('format recovers the engine after a RangeError, not only after a trap', () => {
+	it('format recovers the engine after a main-thread overflow', () => {
+		assert_deep_file_overflows_small_stack();
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {
 			const rounds = 12;
-			const chain = `${Array.from({ length: 80_000 }, () => 'a').join('+')};\n`;
 			for (let r = 0; r < rounds; r++) {
 				const round = String(r).padStart(2, '0');
-				writeFileSync(join(dir, `r${round}_a_chain.ts`), chain);
+				writeFileSync(join(dir, `r${round}_a_deep.ts`), deep_file);
 				for (let f = 0; f < 4; f++) {
 					writeFileSync(join(dir, `r${round}_b${f}.ts`), `const  x${f}=${f}\n`);
 				}
 			}
-			const result = run_cli(['format', '--check', '--jobs', '1', dir]);
+			const result = run_cli_small_stack(['format', '--check', '--jobs', '1', dir]);
 			const error_lines = result.stderr.split('\n').filter((l) => l.startsWith('error: '));
-			assert.equal(error_lines.length, rounds, result.stderr);
-			for (const line of error_lines) {
-				// the retry worker's trap, not the main thread's `RangeError` — the proof the
-				// overflow was retried rather than reported where it first happened
-				assert.match(
-					line,
-					/_a_chain\.ts: .*\(WASM engine trapped and was reinstantiated\)$/,
-					result.stderr
-				);
-			}
-			assert.match(
-				result.stderr,
-				new RegExp(`^${rounds * 4} would change, 0 unchanged, ${rounds} errors$`, 'm')
-			);
+			assert.deepEqual(error_lines, [], result.stderr);
+			assert.equal(result.status, 1, result.stderr);
+			assert.match(result.stderr, new RegExp(`^${rounds * 5} would change, 0 unchanged$`, 'm'));
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}
 	});
 
-	// A file deep enough to overflow the main thread's ~1 MiB V8 stack but not a pool
-	// worker's gets one verdict on both routes: the sequential route retries it in a worker
+	// A file deep enough to overflow the main thread's stack but not a pool worker's gets
+	// one verdict on both routes: the sequential route retries it in a worker
 	// (`retry_overflowed_files`), so whether it formats no longer turns on how many OTHER
 	// files its tree holds — which route the default takes.
 	it('format gives a deep file the same verdict on the sequential and worker routes', () => {
+		assert_deep_file_overflows_small_stack();
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {
-			writeFileSync(
-				join(dir, 'deep.ts'),
-				`${Array.from({ length: 12_000 }, () => 'a').join(' + ')};\n`
-			);
+			writeFileSync(join(dir, 'deep.ts'), deep_file);
 			writeFileSync(join(dir, 'small.ts'), 'const  x=1\n');
 			for (const jobs of ['1', '2']) {
-				const result = run_cli(['format', '--check', '--jobs', jobs, dir]);
+				const result = run_cli_small_stack(['format', '--check', '--jobs', jobs, dir]);
 				assert.equal(result.status, 1, `--jobs ${jobs}: ${result.stderr}`);
 				assert.match(result.stderr, /^2 would change, 0 unchanged$/m, `--jobs ${jobs}`);
 			}

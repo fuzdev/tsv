@@ -5,7 +5,7 @@ use crate::lexer::{Lexer, Token, TokenKind};
 use crate::parser::element::tag_name_end;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::{Comment, ParseError, Span};
+use tsv_lang::{Comment, DepthBudget, DepthLimit, ParseError, Span};
 use tsv_ts::Expression;
 use tsv_ts::TSTypeAnnotation;
 use tsv_ts::TopLevelAs;
@@ -79,7 +79,22 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// later rewound can only leave it set for a document that holds none, which costs the
     /// printer the analysis the flag gates and changes no answer.
     pub(crate) holds_nested_raw_text: bool,
+    /// The deepest markup nesting a nested raw-text element was read at — the depth the
+    /// printer's own parse of its body starts from ([`internal::Root::nested_raw_text_nesting`]).
+    pub(crate) nested_raw_text_nesting: u32,
+    /// The document's depth count against `tsv_lang`'s nesting limit ([`DepthBudget`]):
+    /// the markup's own nesting, which every embedded TypeScript or CSS parse starts from
+    /// ([`Self::island_nesting`]), so the budget is document-wide — markup and islands
+    /// share it.
+    pub(crate) depth: DepthBudget,
 }
+
+/// The wire levels between the innermost markup node the parser has counted and an
+/// embedded island's root: a template expression sits under its tag (an `ExpressionTag`,
+/// a block head) or under an attribute and the `ExpressionTag` in its value — two at
+/// most, which every island is charged. A `<script>` sits under its `Script` and a
+/// `<style>` under its `StyleSheet`, within the same two.
+const ISLAND_LEVELS: u32 = 2;
 
 /// A point in the parser's embedded-parse ledgers to rewind to — see
 /// [`SvelteParser::embedded_parse_mark`].
@@ -183,7 +198,41 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             in_shadowroot_template: false,
             root_only_meta_tags_seen: 0,
             holds_nested_raw_text: false,
+            nested_raw_text_nesting: 0,
+            depth: DepthBudget::at(0),
         })
+    }
+
+    /// Run `f` `units` wire levels deeper — the depth limit's count ([`DepthBudget`]),
+    /// refused at the current token where it would pass `tsv_lang::NESTING_LIMIT`, and
+    /// left on every path out.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub(crate) fn nested<T>(
+        &mut self,
+        units: u32,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        if !self.depth.try_enter(units) {
+            return Err(self.too_deep());
+        }
+        let result = f(self);
+        self.depth.leave(units);
+        result
+    }
+
+    /// The nesting an embedded island parse starts from: the markup's, plus the levels
+    /// between the markup and the island's root ([`ISLAND_LEVELS`]).
+    #[inline]
+    pub(crate) fn island_nesting(&self) -> u32 {
+        self.depth.nesting() + ISLAND_LEVELS
+    }
+
+    /// The depth-limit error at the current token.
+    #[cold]
+    #[inline(never)]
+    fn too_deep(&self) -> ParseError {
+        ParseError::too_deep(DepthLimit::Nesting, self.current_start())
     }
 
     /// Allocate a single AST node in the arena, returning a shared `&'arena`
@@ -613,10 +662,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         host_check: impl Fn(&Self, &'arena Expression<'arena>) -> Result<(), ParseError>,
     ) -> Result<&'arena Expression<'arena>, ParseError> {
         let this = &*self;
-        let (expr, comments) =
-            tsv_ts::parse_expression_with_comments(source, base_offset, self.arena, |expr| {
-                host_check(this, expr)
-            })?;
+        let (expr, comments) = tsv_ts::parse_expression_with_comments(
+            source,
+            base_offset,
+            self.island_nesting(),
+            self.arena,
+            |expr| host_check(this, expr),
+        )?;
         self.expression_comments.extend_from_slice(comments);
         Ok(expr)
     }
@@ -649,6 +701,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let (expr, end_pos, comments) = tsv_ts::parse_expression_partial_with_comments(
             source,
             base_offset,
+            self.island_nesting(),
             self.arena,
             top_level_as,
             |expr, end_pos| host_check(this, expr, end_pos),
@@ -673,8 +726,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<TSTypeAnnotation<'arena>, ParseError> {
-        let (ta, comments) =
-            tsv_ts::parse_type_annotation_partial(source, base_offset, self.arena)?;
+        let (ta, comments) = tsv_ts::parse_type_annotation_partial(
+            source,
+            base_offset,
+            self.island_nesting(),
+            self.arena,
+        )?;
         self.expression_comments.extend_from_slice(comments);
         Ok(ta)
     }
@@ -693,8 +750,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<&'arena mut Expression<'arena>, ParseError> {
-        let (pattern, comments) =
-            tsv_ts::parse_pattern_with_comments(source, base_offset, self.arena)?;
+        let (pattern, comments) = tsv_ts::parse_pattern_with_comments(
+            source,
+            base_offset,
+            self.island_nesting(),
+            self.arena,
+        )?;
         debug_assert!(
             tsv_ts::pattern_type_annotation(&pattern).is_none(),
             "a block pattern's `: T` is its own sub-parse (`parse_block_pattern`)"
@@ -738,10 +799,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         host_check: impl Fn(&Self, &tsv_ts::Statement<'arena>) -> Result<(), ParseError>,
     ) -> Result<tsv_ts::Statement<'arena>, ParseError> {
         let this = &*self;
-        let (stmt, comments) =
-            tsv_ts::parse_statement_with_comments(source, base_offset, self.arena, |stmt| {
-                host_check(this, stmt)
-            })?;
+        let (stmt, comments) = tsv_ts::parse_statement_with_comments(
+            source,
+            base_offset,
+            self.island_nesting(),
+            self.arena,
+            |stmt| host_check(this, stmt),
+        )?;
         self.expression_comments.extend_from_slice(comments);
         Ok(stmt)
     }

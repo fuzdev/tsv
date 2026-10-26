@@ -46,6 +46,11 @@ pub struct Root<'arena> {
     /// `module` / `css`. Recorded where the parser already knows it, so the printer can skip
     /// analysis only such an element needs without walking the tree to ask. Not on the wire.
     pub(crate) holds_nested_raw_text: bool,
+    /// The nesting the printer's own parse of a nested `<script>` / `<style>` body starts
+    /// from: the deepest such element's markup nesting plus the island levels, so that
+    /// parse is held to the same document-wide depth budget as every island the parser
+    /// read (`tsv_lang::DepthBudget`). The parser leaves those bodies as raw text.
+    pub(crate) nested_raw_text_nesting: u32,
 }
 
 /// A `{#snippet}` head's parameters as Svelte's parse shapes them: acorn's

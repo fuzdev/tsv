@@ -268,7 +268,7 @@ pub struct ForStatement<'arena> {
 ///
 /// The `Expression` arm stays INLINE, unlike the `Expression`-holding statement heads
 /// above: a for-head's expression comes back from `parse_expression_no_in` (and, for a
-/// for-in/of LHS, through the cover-grammar refinement `to_assignable`) as an owned
+/// for-in/of LHS, through the cover-grammar refinement `refine_assignable`) as an owned
 /// value, not as the `&'arena Expression` the expression spine threads — so naming the
 /// slot by reference would ADD an allocation rather than remove a copy, which is the
 /// reverse of the trade `ExpressionStatement` takes. `ForInit` is itself reached only

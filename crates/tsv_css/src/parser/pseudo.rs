@@ -239,7 +239,9 @@ fn with_pseudo_args<'arena, R>(
 ) -> Result<R, ParseError> {
     let saved = parser.in_pseudo_args;
     parser.in_pseudo_args = true;
-    let result = f(parser);
+    // four wire levels: the argument `SelectorList`, a `ComplexSelector`, a
+    // `RelativeSelector`, and the selector inside it (the depth limit's count)
+    let result = parser.nested(4, f);
     parser.in_pseudo_args = saved;
     result
 }
@@ -426,9 +428,10 @@ fn parse_nth_args<'arena>(
     // selector rather than an unexpected `<number>`/`<dimension>` token.
     let of_selector = if found_of {
         parser.skip_boundary_whitespace_registering_comments()?;
-        Some(with_pseudo_args(parser, |p| {
-            parse_complex_selector_list(p)
-        })?)
+        // four wire levels more than a selector-list argument's: the `Nth` reads its `of`
+        // list inside the argument's own `SelectorList`, `ComplexSelector` and
+        // `RelativeSelector` (the depth limit's count)
+        Some(parser.nested(4, |p| with_pseudo_args(p, parse_complex_selector_list))?)
     } else {
         None
     };
@@ -472,6 +475,8 @@ fn parse_unknown_args<'arena>(
     // Try to parse as a selector list (complex selectors, strict parsing)
     match parse_complex_selector_list(parser) {
         Ok(selector_list) => finish_selector_list_args(parser, args_start, selector_list),
+        // a depth limit is no verdict on the arguments (see `parse_forgiving_selector_list`)
+        Err(error) if error.is_too_deep() => Err(error),
         Err(_) => {
             // Parsing as selector list failed - skip arguments
             // This handles pseudo-classes with non-selector arguments

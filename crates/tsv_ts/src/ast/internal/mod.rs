@@ -98,9 +98,9 @@ pub use expressions::{
 // The two node enums are wide enough that holding one BY VALUE across a recursive
 // call is a stack-depth decision, not a style one: a frame is sized once for its
 // widest arm, so a dispatcher with N arms that each hold one reserves N times these
-// bytes at every recursion level. `docs/cli.md` §Recursion Depth states the byte
-// counts and the per-construct depths they produce, and the parser's expression ladder
-// returns `&'arena Expression` to keep `Expression` out of those frames.
+// bytes at every recursion level, which is the stack the depth limits' margin is made
+// of (`docs/cli.md` §Recursion Depth); the parser's expression ladder returns
+// `&'arena Expression` to keep `Expression` out of those frames.
 //
 // Both enums are also the ELEMENT WIDTH of the containers that hold them, which is
 // the larger cost: an `Expression` slot is paid on every element of every
@@ -148,7 +148,7 @@ pub use expressions::{
 // why both widths hold at 72.
 //
 // Pinned so a variant that widens any of them shows up as a failed build rather
-// than as a silently lower nesting ceiling and a fatter element slot. The counts are
+// than as a silently thinner depth-limit margin and a fatter element slot. The counts are
 // pointer-width-relative and the doc's measurements are x86-64; `Expression` and
 // `Statement` are also pinned on wasm32 (a 4 B pointer; `Expression`'s payload is 8 B
 // aligned, `Statement`'s 4 B), and each one's `Option` must stay niche-packed on both.
@@ -520,6 +520,6 @@ impl<'arena> PrivateIdentifier<'arena> {
 // element but added a pointer-chase on hot format-read paths that cost more than the
 // density win, so the inline form stands. The `size_of` asserts at the top of this
 // file are the OTHER HALF of that trade, not a contradiction of it: the inline form
-// buys read locality and pays a recursion ceiling (`docs/cli.md` §Recursion Depth),
-// and pinning the two widths is what makes a variant that widens either enum fail the
-// build instead of silently lowering that ceiling.
+// buys read locality and pays stack at every recursion level (`docs/cli.md` §Recursion
+// Depth), and pinning the two widths is what makes a variant that widens either enum
+// fail the build instead of silently eating the depth limits' margin.

@@ -15,10 +15,11 @@
 
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
+use smallvec::SmallVec;
 
 use crate::ast::internal::{
-    ArrowFunctionBody, ArrowFunctionExpression, BinaryOperator, BlockStatement, ClassBody,
-    ClassDeclaration, ClassExpression, ClassMember, Decorator, ExportDefaultDeclaration,
+    ArrowFunctionBody, ArrowFunctionExpression, BinaryExpression, BinaryOperator, BlockStatement,
+    ClassBody, ClassDeclaration, ClassExpression, ClassMember, Decorator, ExportDefaultDeclaration,
     ExportDefaultValue, ExportKind, ExportNamedDeclaration, Expression, ExpressionKind,
     ForInOfLeft, ForInit, FunctionDeclaration, FunctionExpression, Identifier, ImportDeclaration,
     ImportKind, ImportSpecifier, MethodDefinition, MethodKind, ObjectPatternProperty,
@@ -633,6 +634,25 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
     }
 
+    /// A binary and the binaries down its left spine, walked without recursing down that
+    /// spine — the chain's length is bounded only by `SPINE_LIMIT`, so a recursion per link
+    /// would spend a frame per operator: the leftmost operand, then each right operand
+    /// innermost first, the source order a recursion visits them in.
+    #[inline(never)]
+    fn binary_chain(&mut self, binary: &BinaryExpression<'_>) {
+        let mut rights: SmallVec<[&Expression<'_>; 8]> = SmallVec::new();
+        rights.push(binary.right);
+        let mut left = binary.left;
+        while let ExpressionKind::BinaryExpression(inner) = &left.kind {
+            rights.push(inner.right);
+            left = inner.left;
+        }
+        self.expr(left);
+        for right in rights.iter().rev() {
+            self.expr(right);
+        }
+    }
+
     /// The full walk of expression `e`, every kind matched; [`Self::expr`] answers the leaves
     /// before reaching it.
     #[inline(never)]
@@ -660,10 +680,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             ExpressionKind::UnaryExpression(unary) => self.expr(unary.argument),
             ExpressionKind::UpdateExpression(update) => self.expr(update.argument),
-            ExpressionKind::BinaryExpression(binary) => {
-                self.expr(binary.left);
-                self.expr(binary.right);
-            }
+            ExpressionKind::BinaryExpression(binary) => self.binary_chain(binary),
             ExpressionKind::CallExpression(call) => {
                 self.expr(call.callee);
                 self.type_arguments(call.type_arguments.as_ref());

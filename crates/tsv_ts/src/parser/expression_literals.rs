@@ -6,6 +6,7 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::Parser;
+use crate::printer::ParenContext;
 
 impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse object literal: `{ prop: value, ... }`
@@ -30,11 +31,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let arena = self.arena;
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
-        self.enter_grouping();
+        self.enter_grouping()?;
 
         let mut properties = self.bvec();
         // Set when a trailing comma follows a final spread property (`{...a,}`):
-        // legal in a literal, rejected by `to_assignable` in pattern context.
+        // legal in a literal, rejected by `refine_assignable` in pattern context.
         let mut spread_trailing_comma = false;
 
         // Handle empty object: `{}`
@@ -51,14 +52,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             ));
         }
 
-        // Parse properties
+        // Parse properties, siblings each (`ListFrame`)
+        let mut frame = self.list_frame();
         loop {
+            frame.element(self, properties.len());
             let prop_start = self.current_pos().0;
 
             // Check for spread: { ...obj }
             if self.eat(TokenKind::DotDotDot)? {
+                let operand_token = self.current_pos().0;
                 // Use assignment_expression because comma separates properties
                 let argument = self.parse_assignment_expression_ref()?;
+                // the pair the printer adds around the argument (`{...(a || b)}`), a level
+                // of the output's nesting
+                self.count_prefix_operand_pairs(
+                    argument,
+                    ParenContext::SpreadArgument,
+                    operand_token,
+                    None,
+                    false,
+                )?;
                 // Use prev_token_end() to include the closing paren when the argument
                 // is parenthesized (`{...(a && b)}`), matching the array-spread and
                 // object-value paths (acorn includes the `)` in the SpreadElement span).
@@ -71,7 +84,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Check for comma or closing brace. A trailing comma right
                 // after this spread (`{...a,}`) is the rest-trailing-comma case:
                 // the separator is consumed before the `}`, so record it for
-                // `to_assignable` (the discarded comma leaves no other trace).
+                // `refine_assignable` (the discarded comma leaves no other trace).
                 let trailing_comma = self.check(&TokenKind::Comma);
                 if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::BraceClose)? {
                     spread_trailing_comma = trailing_comma;
@@ -213,7 +226,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (kind, value, shorthand, method) = if let Some(accessor) = accessor_kind {
                 // Getter/setter: `get x() {}` or `set x(v) {}`
                 // Note: getters/setters cannot be async
-                let func_expr = self.parse_method_body(false, false)?;
+                // one wire level: the method's `FunctionExpression` (the depth limit's count)
+                let func_expr = self.nested(1, |p| p.parse_method_body(false, false))?;
                 // Enforce accessor arity (getter: no params; setter: exactly one
                 // non-rest param) — acorn rejects a violation at parse, tsv matches
                 // (see `check_accessor_param_arity`). An object-literal accessor
@@ -235,7 +249,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 || is_generator
             {
                 // Method shorthand: `{ foo() {} }`, `{ foo<T>() {} }`, `{ async foo() {} }`, or `{ *gen() {} }`
-                let func_expr = self.parse_method_body(is_async_method, is_generator)?;
+                // one wire level: the method's `FunctionExpression` (the depth limit's count)
+                let func_expr =
+                    self.nested(1, |p| p.parse_method_body(is_async_method, is_generator))?;
                 (
                     PropertyKind::Init,
                     &*arena.alloc(Expression::from_function_expression(arena.alloc(func_expr))),
@@ -254,7 +270,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Not `key: value`, a method, or an accessor — so this property is a
                 // bare shorthand `{ key }` or the `{ key = default }` CoverInitializedName
                 // (a destructuring cover, deferred here and converted to an
-                // AssignmentPattern by to_assignable() in pattern context). Both forms
+                // AssignmentPattern by refine_assignable() in pattern context). Both forms
                 // are an `IdentifierReference` (ecma262 §PropertyDefinition), so a
                 // string/number literal, computed key, or non-reference keyword — which
                 // needs the `PropertyName : AssignmentExpression` (`:` value) form — is
@@ -310,6 +326,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 break;
             }
         }
+        frame.close(self);
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?; // consume '}'
@@ -339,11 +356,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<(ArrayExpression<'arena>, Span), ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BracketOpen)?; // consume '['
-        self.enter_grouping();
+        self.enter_grouping()?;
 
         let mut elements = self.bvec();
         // Set when a trailing comma follows a final spread element (`[...a,]`):
-        // legal in a literal, rejected by `to_assignable` in pattern context.
+        // legal in a literal, rejected by `refine_assignable` in pattern context.
         let mut spread_trailing_comma = false;
 
         // Handle empty array: `[]`
@@ -360,8 +377,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             ));
         }
 
-        // Parse elements (including elision/holes)
+        // Parse elements (including elision/holes), siblings each (`ListFrame`)
+        let mut frame = self.list_frame();
         loop {
+            frame.element(self, elements.len());
             // Check for elision (hole): leading comma means empty slot
             if self.eat(TokenKind::Comma)? {
                 elements.push(None); // hole
@@ -387,7 +406,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Check for trailing comma
                 if self.check(&TokenKind::BracketClose) {
                     // A trailing comma after a final spread (`[...a,]`) is the
-                    // rest-trailing-comma case; record it for `to_assignable`
+                    // rest-trailing-comma case; record it for `refine_assignable`
                     // (the discarded comma leaves no other trace).
                     if matches!(
                         elements.last(),
@@ -410,6 +429,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
         }
 
+        frame.close(self);
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BracketClose)?; // consume ']'
         self.exit_grouping();

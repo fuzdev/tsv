@@ -5,7 +5,7 @@ use crate::lexer::KeywordKind;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
-use super::Parser;
+use super::{Parser, RootEnd};
 
 // Sub-modules for different statement categories
 mod class;
@@ -78,7 +78,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.reset_lt_region_for_statement();
 
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Export)) {
-            return self.parse_export_declaration(context);
+            // one wire level: the declaration under its export (the depth limit's count —
+            // a namespace body's `export namespace` nests through it)
+            return self.nested(1, |p| p.parse_export_declaration(context));
         }
         // `import …` declaration (but not the `import(…)` / `import.meta` expressions).
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Import))
@@ -123,6 +125,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a `StatementListItem` — the statement position that admits a
     /// declaration beside a statement (a `Program`, a block, a function body, a
     /// `switch` case).
+    ///
+    /// A statement is one wire level of the depth limit's nesting count, which a list of
+    /// them counts once ([`Parser::statement_list`]) and [`Parser::parse_nested_statement`]
+    /// counts for the one statement it takes.
     pub(crate) fn parse_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         self.parse_statement_at(StatementPosition::List, None)
     }
@@ -137,7 +143,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// production admits, and ASI closes the statement at it. acorn spells the same fork
     /// as the `context` parameter of `parseStatement` / `isLet`.
     pub(super) fn parse_nested_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
-        self.parse_statement_at(StatementPosition::Single, None)
+        // one wire level: the statement (see `Parser::parse_statement`)
+        self.nested(1, |p| p.parse_statement_at(StatementPosition::Single, None))
     }
 
     /// `module_item` is the `ModuleItem` list the statement sits in — `None` everywhere
@@ -438,7 +445,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             TokenKind::BraceOpen => {
                 // Block statement: `{ ... }`
-                let block = self.parse_block_statement()?;
+                let block = self.parse_bare_block_statement()?;
                 Ok(Statement::from_block_statement(block))
             }
             TokenKind::At => {
@@ -455,7 +462,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// surrounding parens: `('hello');` → span starts at `(`, not `'`.
     fn parse_expression_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0 as u32;
-        let expr = self.parse_expression_ref()?;
+        // a bare assignment as the statement prints bare ([`Parser::self_pair`])
+        // (a bare sequence takes a pair, `(a, b);`, counted as it is built)
+        let expr = self.pair_free_root(RootEnd::BeforeAnyButComma, Self::parse_expression_ref)?;
         let end = self.semicolon_end()?;
         Ok(Statement {
             span: Span::new(start, end),

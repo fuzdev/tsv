@@ -53,10 +53,11 @@ fn parse_selector_argument<'arena>(
     arg_start: usize,
     comments_len: usize,
 ) -> Result<Option<SelectorList<'arena>>, ParseError> {
-    if let Ok(list) = parse_complex_selector_list(parser)
-        && parser.check(TokenKind::RightParen)
-    {
-        return Ok(Some(list));
+    match parse_complex_selector_list(parser) {
+        Ok(list) if parser.check(TokenKind::RightParen) => return Ok(Some(list)),
+        // a depth limit is no verdict on the argument (see `parse_forgiving_selector_list`)
+        Err(error) if error.is_too_deep() => return Err(error),
+        Ok(_) | Err(_) => {}
     }
     parser.rewind_to(arg_start, comments_len)?;
     Ok(None)
@@ -1261,10 +1262,12 @@ fn parse_custom_selector_head_and_list<'arena>(
 
     // Strict list (`<selector-list>` — not the forgiving production `:is()` takes): a
     // list the selector parser rejects is not structured, it is kept as authored.
-    let Ok(list) = parse_complex_selector_list(parser) else {
-        return Ok(None);
-    };
-    Ok(Some((name, list)))
+    match parse_complex_selector_list(parser) {
+        Ok(list) => Ok(Some((name, list))),
+        // a depth limit is no verdict on the list (see `parse_forgiving_selector_list`)
+        Err(error) if error.is_too_deep() => Err(error),
+        Err(_) => Ok(None),
+    }
 }
 
 /// Parse an `@import` prelude into structured values.

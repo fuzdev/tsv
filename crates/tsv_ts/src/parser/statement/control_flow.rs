@@ -5,7 +5,7 @@ use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
 use tsv_lang::{ParseError, Span};
 
-use super::super::Parser;
+use super::super::{Parser, RootEnd};
 
 impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse if statement: `if (test) consequent` or `if (test) consequent else alternate`
@@ -191,9 +191,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse expression (could be init or left-hand side)
         // Use parse_expression_no_in to prevent `in` from being parsed as binary operator
-        let expr = self.parse_expression_no_in()?;
+        // a bare assignment as the init prints bare ([`Parser::self_pair`])
+        let expr = self.pair_free_root(RootEnd::ForClause, Self::parse_expression_no_in)?;
 
-        // A no-declaration for-in/of LHS is refined through `to_assignable` (the
+        // A no-declaration for-in/of LHS is refined through `refine_assignable` (the
         // cover-grammar conversion): per the spec an `ObjectLiteral`/`ArrayLiteral` LHS
         // must cover an `AssignmentPattern` (enforcing the rest constraints + producing
         // the deep internal pattern, `ArrayExpression` → `ArrayPattern`), and any other
@@ -222,8 +223,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.error_msg("The left-hand side of a for-of loop may not start with 'let'")
             );
         }
+        // the pair the printer keeps around a `let` heading the clause (`for ((let) in o)`),
+        // a level of the output's nesting
+        if starts_with_let {
+            self.printer_pair()?;
+        }
         self.advance()?;
-        let left = self.to_whole_assignable(expr, AssignableContext::ForHead)?;
+        let left = self.refine_whole_assignable(expr, AssignableContext::ForHead)?;
         let left = self.arena.alloc(ForInOfLeft::Pattern(left));
         match form {
             ForInOf::In => self.parse_for_in(start, await_at, left),
@@ -350,7 +356,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let update = if self.check(&TokenKind::ParenClose) {
             None
         } else {
-            Some(self.parse_expression_ref()?)
+            // a bare assignment as the update prints bare ([`Parser::self_pair`])
+            Some(self.pair_free_root(RootEnd::ForClause, Self::parse_expression_ref)?)
         };
         self.expect(&TokenKind::ParenClose)?;
 
@@ -529,9 +536,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.reset_lt_region_for_statement();
         let mut cases = self.bvec();
 
+        // the cases are siblings (`ListFrame`)
+        let mut frame = self.list_frame();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            cases.push(self.parse_switch_case()?);
+            frame.element(self, cases.len());
+            // one wire level: the `SwitchCase` (the depth limit's count)
+            cases.push(self.nested(1, Self::parse_switch_case)?);
         }
+        frame.close(self);
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
@@ -567,16 +579,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let colon_end = self.prev_token_end();
 
         // Parse consequent statements until next case/default or closing brace
-        let mut consequent = self.bvec();
-        while !matches!(
-            self.current_kind(),
-            TokenKind::Keyword(KeywordKind::Case)
-                | TokenKind::Keyword(KeywordKind::Default)
-                | TokenKind::BraceClose
-                | TokenKind::Eof
-        ) {
-            consequent.push(self.parse_statement()?);
-        }
+        let consequent = self.statement_list(1, |p, frame| {
+            let mut consequent = p.bvec();
+            while !matches!(
+                p.current_kind(),
+                TokenKind::Keyword(KeywordKind::Case)
+                    | TokenKind::Keyword(KeywordKind::Default)
+                    | TokenKind::BraceClose
+                    | TokenKind::Eof
+            ) {
+                consequent.push(p.parse_statement()?);
+                frame.next(p);
+            }
+            Ok(consequent)
+        })?;
         // The next clause's test stands past this clause's statements, whose `<` regions
         // do not reach it. A clause with NO statement ends none: only a `:` and a keyword
         // part its test from the next one, and tsv's own type-argument scan reads through
@@ -613,7 +629,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse optional catch clause
         let handler = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Catch)) {
-            Some(&*self.arena.alloc(self.parse_catch_clause()?))
+            // one wire level: the `CatchClause` over its parameter and block
+            Some(&*self.arena.alloc(self.nested(1, Self::parse_catch_clause)?))
         } else {
             None
         };
@@ -735,7 +752,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Err(self.error_msg("Illegal newline after throw"));
         }
 
+        let argument_token = self.current_pos().0;
         let argument = self.parse_expression_ref()?;
+        self.restricted_argument_pair(argument, argument_token)?;
         let end = self.semicolon_end()?;
 
         Ok(Statement {

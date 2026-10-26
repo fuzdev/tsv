@@ -4,15 +4,16 @@ use crate::Goal;
 use crate::ast::internal::*;
 use crate::lexer::escapes::{LegacyEscape, find_legacy_escape};
 use crate::lexer::{KeywordKind, Lexer, LexerCheckpoint, Token, TokenKind, is_es_line_terminator};
+use crate::printer::ParenContext;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use std::collections::BTreeSet;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{DepthBudget, DepthLimit, ParseError, Span, SpineCount};
 
 // Import parsing implementations
 mod expression;
 mod expression_arrow; // Arrow function predicate scans and builders
-mod expression_assignable; // Cover-grammar expression→pattern conversion (`to_assignable`)
+mod expression_assignable; // Cover-grammar expression→pattern conversion (`refine_assignable`)
 mod expression_braced_operand; // Braced-operand byte-scan lookahead (`{} / 2` vs `if (c) {}⏎/re/`)
 mod expression_literals; // Object and array literal parsing
 mod expression_lookahead; // Arrow function and type argument disambiguation
@@ -227,13 +228,146 @@ pub(super) struct GroupingParen {
     pub(super) open: u32,
 }
 
+/// The counts a statement list ([`Parser::statement_list`]) keeps across its statements:
+/// the enclosing frame's spine count and deepest nesting, restored when the list closes,
+/// and the greatest of the statements' own so far.
+/// How a pair-free root's expression ends ([`Parser::pair_free_root`]) — what tells the
+/// node at its start that it is the whole of it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RootEnd {
+    /// Anywhere: an assignment's right side, which no comma continues.
+    Anywhere,
+    /// At anything but a comma, which would make the expression a sequence: a statement's
+    /// expression.
+    BeforeAnyButComma,
+    /// [`RootEnd::BeforeAnyButComma`] in a `for` header's init or update clause — the one
+    /// position a bare sequence prints bare too (`for (a, b; ; c, d)`), where everywhere
+    /// else it takes a pair ([`Parser::sequence_pair`]).
+    ForClause,
+    /// At the `)` of a grouping paren, whose pair the author wrote.
+    AtParenClose,
+}
+
+pub(super) struct StatementFrame {
+    outer: SpineCount,
+    statements: SpineCount,
+    /// The statements closed so far.
+    closed: usize,
+    outer_peak: u32,
+    peak: u32,
+}
+
+impl StatementFrame {
+    /// Close the statement just parsed and open the next: once the count has run long
+    /// ([`SpineCount::runs_long`]) or the list has passed its first
+    /// [`ListFrame::SUMMED`] statements, it joins the list's greatest and the parser's
+    /// restarts; until then the statements count together, which costs a body of short
+    /// statements nothing and overcounts it by a few dozen units, or a few printer pairs,
+    /// at most. Neither test reads the printer pairs, so a format's output, whose pairs are
+    /// grouping parens, is framed exactly as its input was. The deepest nesting restarts at
+    /// every statement ([`DepthBudget::take_peak`]), so a chain is charged its own
+    /// statement's, whatever came before it.
+    #[inline]
+    pub(super) fn next(&mut self, parser: &mut Parser<'_, '_>) {
+        self.closed += 1;
+        if self.closed > ListFrame::SUMMED || parser.spine.runs_long() {
+            self.statements = self.statements.max(parser.spine.take());
+        }
+        if parser.depth.is_deep() {
+            self.peak = self.peak.max(parser.depth.take_peak(parser.grouping_depth));
+        }
+    }
+}
+
+/// The spine frames of a list whose elements are siblings — an array's or object's
+/// elements, a call's arguments, a sequence, a declarator list, a class or type body's
+/// members, a union's constituents, a switch's cases, an enum's members
+/// ([`Parser::list_frame`]). The first [`ListFrame::SUMMED`] elements count in the
+/// enclosing frame, which costs a short list nothing and overcounts it by at most their
+/// sum; past them each element counts in a frame of its own, the first of which takes what
+/// came before, and the list hands up the greatest — so a long list of short chains (a
+/// data table, a minified sequence) is charged one element's chains, not their total.
+pub(super) struct ListFrame {
+    greatest: SpineCount,
+    peak: u32,
+}
+
+impl ListFrame {
+    /// The elements counted together before each takes a frame of its own.
+    const SUMMED: usize = 8;
+
+    /// Open the frame of element `index` (0-based), closing the one before it — its spine
+    /// count and its deepest nesting ([`DepthBudget::take_peak`]) alike.
+    #[inline]
+    pub(super) fn element(&mut self, parser: &mut Parser<'_, '_>, index: usize) {
+        if index >= Self::SUMMED {
+            self.greatest = self.greatest.max(parser.spine.take());
+            self.peak = self.peak.max(parser.depth.take_peak(parser.grouping_depth));
+        }
+    }
+
+    /// Close the list: the enclosing frame takes the greatest of the elements' frames —
+    /// the first of them holding what the frame counted before the list.
+    #[inline]
+    pub(super) fn close(self, parser: &mut Parser<'_, '_>) {
+        if !self.greatest.is_empty() {
+            parser.spine.fold(self.greatest);
+        }
+        if self.peak > 0 {
+            parser.depth.fold_peak(self.peak);
+        }
+    }
+}
+
+// The spine units a link counts ([`Parser::spine_link`]): one for a binary or logical
+// operator — the cheapest link to walk, since every walk over an operator chain iterates it
+// — and, for the dearer ones, the stack their walks spend per link over an operator's,
+// rounded up over every build the contract covers: the native optimized and debug builds,
+// and the WASM engine's two stacks (its shadow stack in linear memory, and the host
+// engine's own, cold and tiered up). A type suffix's is set by a debug build's frames. The
+// re-entering links' is set by the WASM shadow stack once V8 has tiered the walks up: the
+// smallest weight at which every leg of the gates holds its nine-tenths margin is that
+// stack's (the native builds hold at a lower one), and the weight keeps about a quarter over
+// it, so a printer change that grows a re-entering walk's frame fails the gate before it
+// eats the contract's own margin. Whether a link re-enters is the printer's answer
+// (`printer::binary_left_operand_reenters`, `printer::call_may_print_whole`); the units
+// themselves are graded over every pair of link kinds, a sample of triples and the links
+// with comments in their gaps, natively by `tests/depth_limit.rs` and in the WASM engine by
+// `scripts/depth_wasm.ts`.
+
+/// The spine units of a binary or logical operator, a postfix `++` / `--`, or a qualified
+/// name's `.`.
+pub(super) const LINK_OPERATOR: u32 = 1;
+/// The spine units of a member access, a call, a non-null assertion or an instantiation
+/// that the member-chain printer flattens into its chain.
+pub(super) const LINK_SUBSCRIPT: u32 = 2;
+/// The spine units of a link whose walk re-enters the expression printer for its operand:
+/// a call or a `!` the member-chain printer does not flatten, one on a call (a curried call,
+/// `f()!()`) or on a tagged template ([`Parser::call_link_units`]); a member over a tagged
+/// template; a member or `!` over a call the printer prints
+/// whole, and that call itself ([`Parser::member_link_units`], [`Parser::settle_call_link`]);
+/// and a binary operator whose left operand the binary-chain printer does not flatten into
+/// its chain ([`Parser::binary_link_units`]).
+pub(super) const LINK_REENTRY: u32 = 10;
+/// The spine units of a tagged template, whose tag the printer prints by re-entering the
+/// expression printer; a link over a tagged template counts as a re-entry of its own
+/// ([`Parser::member_link_units`], [`Parser::call_link_units`]).
+pub(super) const LINK_TAG: u32 = 14;
+/// The spine units of an `as` / `satisfies` link.
+pub(super) const LINK_ASSERTION: u32 = 8;
+/// The spine units of a type's `[]` / `[K]` suffix link.
+pub(super) const LINK_TYPE_SUFFIX: u32 = 6;
+
 /// The parser state [`Parser::rewind`] restores after one of the grammar's
 /// speculative parses ([`Parser::parse_arrow_or_rewind`],
 /// [`Parser::parse_type_arguments_or_rewind`], [`Parser::type_arguments_follower_settled`]
-/// and the `export default` value's decorator-list read in `parse_export_declaration`):
+/// the `export default` value's decorator-list read in `parse_export_declaration`, and a
+/// parameter's in `parse_parameter`):
 /// the lexer cursor, the
 /// one-token window with its decoded values and line-terminator flags, `prev_end`,
 /// a peek's stored lexer error, the comment ledger's length, the grouping depth, the
+/// depth-limit counts ([`Parser::depth`] — whose nesting is restored on every path anyway,
+/// but whose deepest level an abandoned parse may have raised — and [`Parser::spine`]), the
 /// open `<` regions that are read against it ([`Parser::lt_regions`]) and the error
 /// kept from an abandoned type-argument list
 /// ([`Parser::abandoned_type_arguments_error`]).
@@ -249,10 +383,10 @@ pub(super) struct GroupingParen {
 /// struct — the destructuring in [`Parser::rewind`] guards only the other
 /// direction — so a field added below `grouping_depth` must be classified here
 /// by hand: carried, combinator-restored, or provably immutable for the parse.
-/// `record_grouping_parens` is combinator-restored. `grouping_parens` is deliberately
-/// not carried: an entry an abandoned parse leaves names a `(`…`)` pair that is in the
-/// source however the rest is read, so it can only ever mark a target the real parse
-/// also sees wrapped. These are deliberately not carried either, each a fact about the
+/// `record_grouping_parens`, `in_for_header` and `pair_free_root` are combinator-restored. `grouping_parens`
+/// is deliberately not carried: an entry an abandoned parse leaves names a `(`…`)` pair
+/// that is in the source however the rest is read, so it can only ever mark a target the
+/// real parse also sees wrapped. These are deliberately not carried either, each a fact about the
 /// source that outlives the reading that found it:
 ///
 /// - `abandoned_type_argument_lists` and `type_argument_lists_kept` — which `<` open no
@@ -264,6 +398,8 @@ pub(super) struct GroupingParen {
 ///   abandoned parse read are the ones its re-read reads.
 /// - `preserved_a_paren` — set by a pair an abandoned parse wrapped; it may over-report,
 ///   which costs its one reader a second parse.
+/// - `decorated_parameter_properties` — which decorator runs belong to a parameter
+///   property, whose re-read it keeps to one ([`Parser::decorated_parameter_properties`]).
 ///
 /// A comment's `owned_by_node` is written through the ledger rather than appended to it,
 /// so truncating the ledger does not undo a claim on a comment drained AHEAD of the
@@ -273,9 +409,10 @@ pub(super) struct GroupingParen {
 /// type grammar claims no comment. The comparison reading it then may try
 /// (`Parser::type_arguments_follower_settled`) reads that token as an expression, which
 /// can claim one, so that speculation puts back the claims it made on the comments
-/// drained ahead of its checkpoint. The `export default` site keeps any claim its
-/// decorator-list read makes across the rewind, and that is safe: the re-read parses the
-/// same decorator list the same way, so every surviving claim is one it makes again.
+/// drained ahead of its checkpoint. The `export default` and parameter sites keep any
+/// claim their decorator-list read makes across the rewind, and that is safe: the re-read
+/// parses the same decorator list the same way, so every surviving claim is one it makes
+/// again.
 #[derive(Clone)]
 pub(super) struct Checkpoint<'arena> {
     lexer: LexerCheckpoint,
@@ -289,6 +426,8 @@ pub(super) struct Checkpoint<'arena> {
     lexer_error: Option<ParseError>,
     comments_len: usize,
     grouping_depth: u32,
+    depth: DepthBudget,
+    spine: SpineCount,
     lt_regions: LtRegions,
     abandoned_type_arguments_error: Option<ParseError>,
 }
@@ -362,6 +501,17 @@ pub struct Parser<'a, 'arena> {
     /// enclosing expression had reached). Copying one gate's baseline to the other
     /// is the bug this split exists to prevent.
     grouping_depth: u32,
+    /// The parse's nesting against `tsv_lang`'s nesting limit, in wire levels, and the
+    /// deepest level reached ([`DepthBudget`]) — every level but the grouping delimiters',
+    /// which [`Parser::grouping_depth`] counts and the limit is tested beside. Seeded by an
+    /// embedded parse with the host markup's nesting, so a Svelte document's budget is
+    /// document-wide. Every level entered is left on every path out ([`Parser::nested`]).
+    pub(crate) depth: DepthBudget,
+    /// The open frame's spine count against `tsv_lang`'s spine limit ([`SpineCount`]):
+    /// added to by every link ([`Parser::spine_link`]), framed where siblings can run long
+    /// ([`Parser::chain`], [`Parser::statement_list`]). A [`Checkpoint`] carries it, so a
+    /// rewind cannot leave what an abandoned branch counted.
+    spine: SpineCount,
     /// When `true`, grouping parens `(expr)` are preserved as an internal
     /// `ParenthesizedExpression` node instead of being discarded. Off by default
     /// (matching acorn/Svelte, whose public AST is paren-free); enabled only for
@@ -419,6 +569,16 @@ pub struct Parser<'a, 'arena> {
     /// parses its header at depth 1 — and take the for-in separator for a
     /// relational `in`.
     no_in_depth: u32,
+    /// Whether the parse is inside a `for` header's expression head or declaration
+    /// initializer, nested functions included — the region over which the printer
+    /// parenthesizes every `in` binary (`Printer::in_for_init`), so that each `in` link
+    /// there is walked by re-entering the expression printer
+    /// ([`Parser::binary_link_units`]). Set (save/restore) by [`Parser::with_no_in`].
+    in_for_header: bool,
+    /// The innermost open position whose bare assignment prints without the pair the
+    /// printer gives an assignment elsewhere ([`Parser::pair_free_root`], save/restore):
+    /// where it starts, and how its expression ends.
+    pair_free_root: Option<(usize, RootEnd)>,
     /// The [`Parser::grouping_depth`] at which the innermost open conditional
     /// **consequent** began, or `None` outside one — tsc's
     /// `allowReturnTypeInArrowFunction` flag, `Some` where tsc passes `false`.
@@ -513,6 +673,17 @@ pub struct Parser<'a, 'arena> {
     /// so a list abandoned inside a parse that is itself abandoned leaves nothing
     /// behind.
     abandoned_type_arguments_error: Option<ParseError>,
+    /// Where each decorated parameter property's decorator run begins (its first `@`),
+    /// once read. A parameter property's decorators sit one wire level deeper than a plain
+    /// parameter's — on the binding inside the `TSParameterProperty` — and a run is parsed
+    /// before the modifier that says which one it is, so the first read of a run that turns
+    /// out to belong to a property is rewound and read again with that level charged
+    /// ([`Parser::nested`]); read again at an offset here, the run is charged up front. A
+    /// fact about the tokens, so it survives every rewind, and it keeps the re-reads to one
+    /// per run however deep such parameters nest. Sorted, so a lookup is a binary search over
+    /// contiguous memory; a run is first read in source order, so an insert is a push except
+    /// past a rewind.
+    decorated_parameter_properties: Vec<u32>,
     /// The syntactic goal symbol (`Script` vs `Module`) this parse runs against.
     /// Fixed for the whole parse — embedders (Svelte) and the standalone
     /// `parse`/`format` default to `Module`; `parse_with_goal` overrides it.
@@ -723,6 +894,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             prev_end: 0,
             top_level_as_is_assertion: true, // Enable by default (TypeScript context)
             grouping_depth: 0,               // Not inside any grouping delimiters
+            depth: DepthBudget::at(0),       // An embedded parse seeds the host's nesting
+            spine: SpineCount::default(),    // No link counted yet
             preserve_parens: false,          // Discard grouping parens (paren-free public AST)
             preserved_a_paren: false,        // No pair wrapped yet
             record_grouping_parens: false,   // Only while a binding pattern is read
@@ -731,16 +904,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             lexer_error: None,               // No stored lexer error
             peek_had_line_terminator: false, // No peek cached yet
             allow_in: true,                  // Allow `in` binary operator by default
-            no_in_depth: 0,                  // Only read while `allow_in` is false
+            in_for_header: false,
+            pair_free_root: None,
+            no_in_depth: 0,                    // Only read while `allow_in` is false
             arrow_return_type_barred_at: None, // Not inside a conditional consequent
-            lt_regions: LtRegions::default(), // No `<` region open
+            lt_regions: LtRegions::default(),  // No `<` region open
             lt_regions_statement_base: LtRegions::default(), // The top level inherits none
             abandoned_type_argument_lists: BTreeSet::new(), // No list tried yet
             type_argument_lists_kept: BTreeSet::new(), // Nor kept past a follower
-            tsc_followers: true,             // tsc's reading, until a failure retries
+            tsc_followers: true,               // tsc's reading, until a failure retries
             gave_up_list_to_tsc_follower: false, // Nothing given up yet
             kept_list_past_tsc_follower: false, // Nor kept
             abandoned_type_arguments_error: None,
+            decorated_parameter_properties: Vec::new(), // No property read yet
             goal,
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
             // level is `[~Await]` (`ScriptBody[~Await]`).
@@ -890,6 +1066,638 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         )
     }
 
+    /// Run `f` `units` wire levels deeper — the nesting half of the depth limit
+    /// ([`DepthBudget`]), refused at the current token where it would pass
+    /// `tsv_lang::NESTING_LIMIT`. `units` is at least the number of wire nodes the step puts
+    /// on the path from the root, which is what the walks over the tree pay stack for. The levels
+    /// are left on every path out, the error path included, since a speculative parse that
+    /// fails is rewound and the parse goes on.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub(super) fn nested<T>(
+        &mut self,
+        units: u32,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        if !self.depth.try_enter_beside(units, self.grouping_depth) {
+            return Err(self.too_deep(DepthLimit::Nesting));
+        }
+        let result = f(self);
+        self.depth.leave(units);
+        result
+    }
+
+    /// Run `f` in a frame of the spine count ([`SpineCount::take`]): the links it adds
+    /// ([`Parser::spine_link`]) count from zero, and the frame's count is handed up as the
+    /// greater of it and its siblings'. Opened where siblings can run long — each element of
+    /// a list after the first, each operand of an operator chain, a qualified name, a
+    /// decorator, a class heritage — so their chains bound one path each rather than adding
+    /// up; within a frame, every link adds up.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub(super) fn chain<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let outer = self.spine.take();
+        let result = f(self);
+        self.spine.fold(outer);
+        result
+    }
+
+    /// Run `f` — a loop over a list of statements — as the list: `levels` wire levels of
+    /// nesting for its statements ([`Parser::nested`]; a statement in a list is counted
+    /// here, once, rather than at each, with any levels its container would enter just
+    /// for it), and a spine frame per statement, `f` handing each finished one
+    /// to [`StatementFrame::next`], the list handing the greatest up. Sibling statements are
+    /// so measured apart, which keeps one long chain from being charged to the statements
+    /// around it.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub(super) fn statement_list<T>(
+        &mut self,
+        levels: u32,
+        f: impl FnOnce(&mut Self, &mut StatementFrame) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        self.nested(levels, |p| {
+            let mut frame = StatementFrame {
+                outer: p.spine.take(),
+                statements: SpineCount::default(),
+                closed: 0,
+                outer_peak: p.depth.take_peak(p.grouping_depth),
+                peak: 0,
+            };
+            let result = f(p, &mut frame);
+            frame.next(p);
+            p.spine.fold(frame.outer.max(frame.statements));
+            p.depth.fold_peak(frame.outer_peak.max(frame.peak));
+            result
+        })
+    }
+
+    /// Open a list's spine frames ([`ListFrame`]): the list calls [`ListFrame::element`] as
+    /// each element starts and [`ListFrame::close`] when it ends — on its success path; a
+    /// failed parse is abandoned or rewound with the count restored from a checkpoint. A
+    /// list of a few elements touches no count at all.
+    #[inline]
+    #[expect(clippy::unused_self)]
+    pub(super) fn list_frame(&self) -> ListFrame {
+        ListFrame {
+            greatest: SpineCount::default(),
+            peak: 0,
+        }
+    }
+
+    /// Count one link of a left-nested chain — a binary operator, a member access, a call,
+    /// an assertion, a type's `[]` — as `units` spine units, refused at the current token
+    /// where the frame's count would pass `tsv_lang::SPINE_LIMIT`
+    /// ([`SpineCount::try_link`]). A link costs [`LINK_OPERATOR`] units unless its walks
+    /// spend more stack than an operator's: [`LINK_SUBSCRIPT`], [`LINK_REENTRY`],
+    /// [`LINK_TAG`], [`LINK_ASSERTION`], [`LINK_TYPE_SUFFIX`].
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub(super) fn spine_link(&mut self, units: u32) -> Result<(), ParseError> {
+        if self.spine.try_link(units, &self.depth) {
+            Ok(())
+        } else {
+            Err(self.too_deep(DepthLimit::Spine))
+        }
+    }
+
+    /// Count a pair the printer will add around a node the parse just built — a level of
+    /// nesting in the format's output ([`SpineCount::try_pair`]), refused at the current
+    /// token where that output would pass `tsv_lang::NESTING_LIMIT`, or its links
+    /// `tsv_lang::SPINE_LIMIT` with the pair charged. Asked of the printer's own
+    /// predicate wherever one can stack along a path
+    /// ([`Parser::count_operand_pairs`], [`Parser::self_pair`]).
+    #[inline]
+    pub(super) fn printer_pair(&mut self) -> Result<(), ParseError> {
+        if self.spine.try_pair(&self.depth) {
+            Ok(())
+        } else {
+            Err(self.too_deep(DepthLimit::Nesting))
+        }
+    }
+
+    /// Run `f` — the parse of an expression starting at the current token — as a pair-free
+    /// root: a position where the printer writes a bare assignment without the pair it gives
+    /// an assignment as a value nearly everywhere else (`f((a = b))`, `x = (a = b)`,
+    /// `() => (a = b)`) — a statement's expression and a `for` header's own clause
+    /// (`end`: [`RootEnd::BeforeAnyButComma`], [`RootEnd::ForClause`]), an assignment's right side
+    /// ([`RootEnd::Anywhere`]) — or one where the author wrote the pair, a grouping paren
+    /// ([`RootEnd::AtParenClose`]), counted as a level of nesting already.
+    #[inline]
+    pub(super) fn pair_free_root<T>(
+        &mut self,
+        end: RootEnd,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let outer = self.pair_free_root.replace((self.current_pos().0, end));
+        let result = f(self);
+        self.pair_free_root = outer;
+        result
+    }
+
+    /// Count the pair the printer writes around a node that takes one wherever it stands
+    /// as a value — an assignment, and an `in` binary inside a `for` header — unless the
+    /// node, starting at `start` and ending at the current token, is the whole of the
+    /// innermost pair-free root ([`Parser::pair_free_root`]). Decided as the node is built,
+    /// with no pair counted and withdrawn: a pair counted at the bottom of a deep path and
+    /// withdrawn above it would refuse a depth the printer's output never reaches.
+    #[inline]
+    pub(super) fn self_pair(&mut self, start: usize) -> Result<(), ParseError> {
+        let whole_root = self.pair_free_root.is_some_and(|(root, end)| {
+            root == start
+                && match end {
+                    RootEnd::Anywhere => true,
+                    RootEnd::BeforeAnyButComma | RootEnd::ForClause => {
+                        self.current.kind != TokenKind::Comma
+                    }
+                    RootEnd::AtParenClose => self.current.kind == TokenKind::ParenClose,
+                }
+        });
+        if whole_root {
+            Ok(())
+        } else {
+            self.printer_pair()
+        }
+    }
+
+    /// Count the pairs the printer adds around a node's operands, each in its position — a
+    /// binary's, an assertion's, a heritage, a `new` callee — where the source wrote none:
+    /// the caller passes an operand only when it is bare, no grouping paren of the author's
+    /// around it. Asked of the printer's own predicate (`printer::printer_adds_operand_pair`);
+    /// an operand that counts a pair for itself ([`Parser::self_pair`]) is not counted again.
+    ///
+    /// Forced inline: it is asked at every operator, and almost every operand is answered by
+    /// its kind alone, so the call site keeps that test and the rule stays out of line.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub(super) fn count_operand_pairs(
+        &mut self,
+        left: Option<(&Expression<'_>, ParenContext)>,
+        right: Option<(&Expression<'_>, ParenContext)>,
+    ) -> Result<(), ParseError> {
+        for (operand, ctx) in [left, right].into_iter().flatten() {
+            if crate::printer::printer_adds_operand_pair(operand, ctx, self.in_for_header) {
+                self.printer_pair()?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Count the pairs the printer adds around a binary's operands where the source wrote
+    /// none ([`Parser::count_operand_pairs`]): a left operand is bare where it starts the
+    /// binary's own extent (`expr_start`), a right one where it ends at the last token
+    /// read. Out of line: most operands take no pair by kind, which the caller asks first
+    /// (`printer::operator_operand_takes_no_pair`).
+    #[inline(never)]
+    pub(super) fn binary_operand_pairs(
+        &mut self,
+        operator: BinaryOperator,
+        left: &Expression<'_>,
+        right: &Expression<'_>,
+        expr_start: usize,
+    ) -> Result<(), ParseError> {
+        let left_bare = expr_start == left.span().start as usize;
+        let right_bare = right.span().end as usize == self.prev_token_end();
+        self.count_operand_pairs(
+            left_bare.then_some((
+                left,
+                ParenContext::BinaryLeft {
+                    parent_op: operator,
+                },
+            )),
+            right_bare.then_some((
+                right,
+                ParenContext::BinaryRight {
+                    parent_op: operator,
+                },
+            )),
+        )
+    }
+
+    /// Count the pair the printer writes around a sequence (`(a, b);`, `return (a, b);`,
+    /// `` `${(a, b)}` ``, `a[(b, c)]`) — every sequence takes one but the whole of a `for`
+    /// header's init or update clause and the whole of a grouping paren the author wrote
+    /// (counted as a level already). `start` is where the sequence starts, the current
+    /// token the one after it.
+    #[inline]
+    pub(super) fn sequence_pair(&mut self, start: usize) -> Result<(), ParseError> {
+        let whole_root = self.pair_free_root.is_some_and(|(root, end)| {
+            root == start
+                && match end {
+                    RootEnd::ForClause => true,
+                    RootEnd::AtParenClose => self.current.kind == TokenKind::ParenClose,
+                    RootEnd::Anywhere | RootEnd::BeforeAnyButComma => false,
+                }
+        });
+        if whole_root {
+            Ok(())
+        } else {
+            self.printer_pair()
+        }
+    }
+
+    /// Count the pairs the printer adds around a prefix operator's `operand` — a unary's,
+    /// a prefix update's, an `await`'s, an angle-bracket assertion's, a spread's — in its
+    /// position `ctx`, each a level of the output's nesting. `operand_token` is the start of
+    /// the operand's first token, an author's `(` included.
+    ///
+    /// The count is the pairs the printer may write there, less the pairs the author wrote:
+    /// what it writes is a function of the tree (and its comments), which formatting keeps,
+    /// so on a format's output — whose authored pairs are the ones it wrote — the count is
+    /// none, and the output's reparse counts no more than the input's parse did. The pairs
+    /// it may write:
+    ///
+    /// - the one the operand's position takes, asked of the printer's predicate
+    ///   (`printer::printer_adds_operand_pair`; `-(-x)`, `<T>(<U>x)`, `...(a || b)`) —
+    ///   for an operand the author parenthesized, an assignment's or a sequence's too, which
+    ///   count their own only where bare ([`Parser::self_pair`], [`Parser::sequence_pair`]);
+    /// - `holder`, the unary operator's comment holder (the operator ending at `holder.0`,
+    ///   the node at `holder.1`): a comment between the operator and the operand, or
+    ///   between the operand and the node's end inside an author's pair, makes the printer
+    ///   wrap the operand in a pair of its own (`!(/* c */ x)`), read over every comment
+    ///   there, owned or not;
+    /// - `shell`, the pair an angle-bracket assertion breaks its operand into
+    ///   (`<T>(⏎\tx⏎)`), counted whether or not the cast breaks.
+    ///
+    /// Inline, it answers the commonest operand: one no operator position pairs by kind
+    /// (`printer::operator_operand_takes_no_pair`), bare or in the author's pairs — less an
+    /// assignment or a sequence, which take one there — with no shell to count and no
+    /// comment past the operator to make a holder.
+    #[inline]
+    pub(super) fn count_prefix_operand_pairs(
+        &mut self,
+        operand: &Expression<'_>,
+        ctx: ParenContext,
+        operand_token: usize,
+        holder: Option<(usize, usize)>,
+        shell: bool,
+    ) -> Result<(), ParseError> {
+        if !shell
+            && ctx.is_operator_position()
+            && !matches!(
+                operand.kind,
+                ExpressionKind::AssignmentExpression(_)
+                    | ExpressionKind::SequenceExpression(_)
+                    | ExpressionKind::ParenthesizedExpression(_)
+            )
+            && crate::printer::operator_operand_takes_no_pair(operand)
+            && holder.is_none_or(|(operator_end, _)| {
+                self.comments
+                    .last()
+                    .is_none_or(|c| (c.span.start as usize) < operator_end)
+            })
+        {
+            return Ok(());
+        }
+        self.count_prefix_operand_pairs_by_rule(operand, ctx, operand_token, holder, shell)
+    }
+
+    /// [`Parser::count_prefix_operand_pairs`] past its inline answer.
+    #[inline(never)]
+    fn count_prefix_operand_pairs_by_rule(
+        &mut self,
+        operand: &Expression<'_>,
+        ctx: ParenContext,
+        operand_token: usize,
+        holder: Option<(usize, usize)>,
+        shell: bool,
+    ) -> Result<(), ParseError> {
+        // a wire-only parse keeps the author's pairs as nodes (`parse_preserve_parens`): they
+        // are counted as the pairs they are, so it charges what the parse the printer reads
+        // charges
+        let mut operand = operand;
+        while let ExpressionKind::ParenthesizedExpression(paren) = &operand.kind {
+            operand = paren.expression;
+        }
+        let span = operand.span();
+        let bare = span.start as usize == operand_token;
+        let commented = holder.is_some_and(|(operator_end, node_end)| {
+            self.has_comment_between(operator_end, span.start as usize)
+                || self.has_comment_between(span.end as usize, node_end)
+        });
+        let position_pair = (!bare
+            && matches!(
+                operand.kind,
+                ExpressionKind::AssignmentExpression(_) | ExpressionKind::SequenceExpression(_)
+            ))
+            || crate::printer::printer_adds_operand_pair(operand, ctx, self.in_for_header);
+        let written = u32::from(position_pair) + u32::from(commented) + u32::from(shell);
+        if written == 0 {
+            return Ok(());
+        }
+        let authored = if bare {
+            0
+        } else {
+            self.authored_pairs(operand_token, span.start as usize)
+        };
+        for _ in authored..written {
+            self.printer_pair()?;
+        }
+        Ok(())
+    }
+
+    /// The grouping parens the author wrote in `[from, to)` (host offsets) — the run of
+    /// `(` ahead of an operand the parser stripped them from, comments between them aside.
+    pub(super) fn authored_pairs(&self, from: usize, to: usize) -> u32 {
+        let bytes = self.source.as_bytes();
+        let mut comment = self
+            .comments
+            .partition_point(|c| (c.span.start as usize) < from);
+        let mut pos = from;
+        let mut pairs = 0;
+        while pos < to {
+            if let Some(c) = self.comments.get(comment)
+                && c.span.start as usize == pos
+            {
+                pos = c.span.end as usize;
+                comment += 1;
+                continue;
+            }
+            pairs += u32::from(bytes[pos - self.base_offset] == b'(');
+            pos += 1;
+        }
+        pairs
+    }
+
+    /// Count the pair the printer writes around a `return` / `throw` argument that is a
+    /// bare binary chain, once the chain breaks (`return (⏎\ta &&⏎\tb⏎);`, prettier's
+    /// `printReturnOrThrowArgument`) — a level of the output's nesting. `argument_token` is
+    /// the start of the argument's first token.
+    #[inline]
+    pub(super) fn restricted_argument_pair(
+        &mut self,
+        argument: &Expression<'_>,
+        argument_token: usize,
+    ) -> Result<(), ParseError> {
+        if matches!(argument.kind, ExpressionKind::BinaryExpression(_))
+            && argument.span().start as usize == argument_token
+        {
+            self.printer_pair()
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Count the pairs the printer adds around a conditional's `test` (the conditional
+    /// starting at `expr_start`) and its `consequent` (its first token at
+    /// `consequent_start`), each a level of the output's nesting: a bare conditional
+    /// consequent's (`a ? (b ? c : d) : e`), and the clarity pairs around a bare test and
+    /// branch (`(a ?? b) ? (c as T) : d`, [`Parser::ternary_branch_pair`]). Out of line,
+    /// off the expression loop.
+    #[inline(never)]
+    pub(super) fn conditional_head_pairs(
+        &mut self,
+        test: &Expression<'_>,
+        expr_start: usize,
+        consequent: &Expression<'_>,
+        consequent_start: usize,
+    ) -> Result<(), ParseError> {
+        if matches!(consequent.kind, ExpressionKind::ConditionalExpression(_))
+            && consequent.span().start as usize == consequent_start
+        {
+            self.printer_pair()?;
+        }
+        if test.span().start as usize == expr_start && crate::printer::ternary_test_takes_pair(test)
+        {
+            self.printer_pair()?;
+        }
+        self.ternary_branch_pair(consequent, consequent_start)
+    }
+
+    /// Count the pair the printer adds around a conditional's bare branch for clarity
+    /// (`a ? (b as T) : (c ?? d)`, `printer::ternary_branch_takes_pair`) — a level of the
+    /// output's nesting. An assignment branch counts its own ([`Parser::self_pair`]).
+    #[inline]
+    pub(super) fn ternary_branch_pair(
+        &mut self,
+        branch: &Expression<'_>,
+        branch_token: usize,
+    ) -> Result<(), ParseError> {
+        if branch.span().start as usize == branch_token
+            && crate::printer::ternary_branch_takes_pair(branch)
+        {
+            self.printer_pair()
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Count the pair the printer writes around a function expression a chain starting at
+    /// `start` calls or tags bare (`(function () {})()`, `` (function () {})`t` ``) — a level
+    /// of the output's nesting, asked of the printer's predicate in `ctx`
+    /// (`printer::printer_adds_operand_pair`). Only a chain's head can be one.
+    #[inline]
+    pub(super) fn function_head_pair(
+        &mut self,
+        head: &Expression<'_>,
+        start: u32,
+        ctx: ParenContext,
+    ) -> Result<(), ParseError> {
+        if matches!(
+            head.kind,
+            ExpressionKind::FunctionExpression(_) | ExpressionKind::ClassExpression(_)
+        ) && head.span().start == start
+            && crate::printer::printer_adds_operand_pair(head, ctx, self.in_for_header)
+        {
+            self.printer_pair()
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Count the pair the printer writes around an arrow's bare function return type
+    /// (`(x): ((y) => T) =>`, whose second `=>` would read as the arrow's own) — a level of
+    /// the output's nesting.
+    #[inline]
+    pub(super) fn arrow_return_pair(
+        &mut self,
+        return_type: Option<&TSTypeAnnotation<'_>>,
+    ) -> Result<(), ParseError> {
+        if return_type.is_some_and(|r| matches!(r.type_annotation, TSType::Function(_))) {
+            self.printer_pair()
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Whether `operand`, read by a chain starting at `start`, is an instantiation the
+    /// author wrote no pair around — one the printer parenthesizes where another type
+    /// argument list follows it (`(f<T>)<U>`, `printer::instantiation_keeps_pair_before_type_args`,
+    /// whose optional-chain exception this reads past: a pair counted the output lacks).
+    #[inline]
+    pub(super) fn is_bare_instantiation(operand: &Expression<'_>, start: u32) -> bool {
+        matches!(operand.kind, ExpressionKind::TSInstantiationExpression(_))
+            && operand.span().start == start
+    }
+
+    /// Count the pair the printer writes around a numeric literal a member access reads
+    /// (`(1).toString()`, `printer::needs_parens`'s chain-base rule), where `object` —
+    /// a chain's head starting at `start` — is one the author wrote bare.
+    #[inline]
+    pub(super) fn chain_base_pair(
+        &mut self,
+        object: &Expression<'_>,
+        start: u32,
+    ) -> Result<(), ParseError> {
+        if matches!(object.kind, ExpressionKind::Literal(_))
+            && object.span().start == start
+            && crate::printer::printer_parenthesizes_chain_base(object)
+        {
+            self.printer_pair()
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Whether a comment starts in `[from, to)` (host offsets). The comments are collected
+    /// in source order.
+    ///
+    /// A comment wholly inside a gap between two tokens is what the callers ask about, so a
+    /// gap too narrow to hold one, or one past the last comment collected, holds none
+    /// without a search.
+    #[inline]
+    fn has_comment_between(&self, from: usize, to: usize) -> bool {
+        if to.saturating_sub(from) < Comment::MIN_SPAN_LEN as usize
+            || self
+                .comments
+                .last()
+                .is_none_or(|c| (c.span.start as usize) < from)
+        {
+            return false;
+        }
+        let i = self
+            .comments
+            .partition_point(|c| (c.span.start as usize) < from);
+        self.comments
+            .get(i)
+            .is_some_and(|c| (c.span.start as usize) < to)
+    }
+
+    /// The spine units of a call, a non-null assertion or an instantiation on `operand`:
+    /// [`LINK_REENTRY`] on a call, seen through any run of `!` and instantiations (`f()()`,
+    /// `f()!()`, `f()!!!()`, `f()<T>()`) — the curried shapes the member-chain printer prints
+    /// apart from the chain below them — or on a tagged template, which the member-chain
+    /// printer takes for its chain's base and prints by re-entering the expression printer
+    /// (`` a`t`() ``) — else [`LINK_SUBSCRIPT`].
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub(super) fn call_link_units(operand: &Expression<'_>) -> u32 {
+        let mut inner = operand;
+        loop {
+            inner = match &inner.kind {
+                ExpressionKind::TSNonNullExpression(n) => n.expression,
+                ExpressionKind::TSInstantiationExpression(i) => i.expression,
+                ExpressionKind::CallExpression(_) | ExpressionKind::TaggedTemplateExpression(_) => {
+                    return LINK_REENTRY;
+                }
+                _ => return LINK_SUBSCRIPT,
+            };
+        }
+    }
+
+    /// The spine units of a member access over `object`: [`LINK_REENTRY`] where `object` is
+    /// a tagged template, the chain base the member-chain printer re-enters the expression
+    /// printer for (`` a`t`.b ``), or where the first call down `object`'s spine may be one
+    /// the printer prints whole, which a member over it prints over whole, re-entering too
+    /// (`printer::call_may_print_whole`) — else [`LINK_SUBSCRIPT`].
+    #[inline]
+    pub(super) fn member_link_units(object: &Expression<'_>) -> u32 {
+        if matches!(object.kind, ExpressionKind::TaggedTemplateExpression(_))
+            || crate::printer::call_may_print_whole(object, true)
+        {
+            LINK_REENTRY
+        } else {
+            LINK_SUBSCRIPT
+        }
+    }
+
+    /// Whether `call` is one the printer may print whole (`printer::call_may_print_whole`),
+    /// answered inline for the commonest call — a callee that is no call (nor a `!` over
+    /// one) and no sole template argument, which no rule there admits.
+    #[inline]
+    fn call_prints_whole(call: &Expression<'_>) -> bool {
+        match &call.kind {
+            ExpressionKind::CallExpression(c) => {
+                (matches!(
+                    c.callee.kind,
+                    ExpressionKind::CallExpression(_) | ExpressionKind::TSNonNullExpression(_)
+                ) || matches!(
+                    c.arguments,
+                    [argument] if matches!(
+                        argument.kind,
+                        ExpressionKind::TemplateLiteral(_)
+                            | ExpressionKind::TaggedTemplateExpression(_)
+                    )
+                )) && crate::printer::call_may_print_whole(call, false)
+            }
+            _ => false,
+        }
+    }
+
+    /// The spine units of a `!` over `operand`: the greater of the two rules a `!` meets —
+    /// a curried call's ([`Parser::call_link_units`]) and a member's
+    /// ([`Parser::member_link_units`]).
+    #[inline]
+    pub(super) fn non_null_link_units(operand: &Expression<'_>) -> u32 {
+        Self::call_link_units(operand).max(Self::member_link_units(operand))
+    }
+
+    /// Top a call link up to [`LINK_REENTRY`] once its arguments are read, where they make
+    /// `call` one the printer may print whole, re-entering the expression printer for its
+    /// callee (a sole multi-line template argument — `printer::call_may_print_whole`). The
+    /// link was charged [`Parser::call_link_units`] of the callee, read again here from the
+    /// call (an instantiation the call lifted its list from is seen through there too)
+    /// rather than carried across the argument list's parse.
+    ///
+    /// Forced inline: it is asked of every call, and almost every one fails the
+    /// [`Parser::call_prints_whole`] test, so the call site keeps only that test.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub(super) fn settle_call_link(&mut self, call: &Expression<'_>) -> Result<(), ParseError> {
+        if Self::call_prints_whole(call)
+            && let ExpressionKind::CallExpression(c) = &call.kind
+        {
+            let charged = Self::call_link_units(c.callee);
+            if charged < LINK_REENTRY {
+                self.spine_link(LINK_REENTRY - charged)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// The spine units of a binary or logical `operator` over `left`: [`LINK_REENTRY`]
+    /// where the binary-chain printer builds `left` as an operand of its own rather than
+    /// flattening it into the chain (`a == b == c`, `a * b / c`, `a + b as T + c`) — asked
+    /// of the printer's own predicate (`printer::binary_left_operand_reenters`), so the
+    /// price follows the walk it prices — else [`LINK_OPERATOR`].
+    #[inline]
+    pub(super) fn binary_link_units(&self, operator: BinaryOperator, left: &Expression<'_>) -> u32 {
+        // the predicate's own first test, inline: every other operand ends the spine
+        if !matches!(
+            left.kind,
+            ExpressionKind::BinaryExpression(_)
+                | ExpressionKind::TSAsExpression(_)
+                | ExpressionKind::TSSatisfiesExpression(_)
+        ) {
+            return LINK_OPERATOR;
+        }
+        if crate::printer::binary_left_operand_reenters(operator, left, self.in_for_header) {
+            LINK_REENTRY
+        } else {
+            LINK_OPERATOR
+        }
+    }
+
+    /// The depth-limit error at the current token.
+    #[cold]
+    #[inline(never)]
+    fn too_deep(&self, limit: DepthLimit) -> ParseError {
+        ParseError::too_deep(limit, self.current_pos().0)
+    }
+
     /// Convert a raw `source`-relative offset into an absolute `Span` coordinate:
     /// `base_offset`-shifted and narrowed to `u32`. Raw offsets index `self.source`
     /// (e.g. `self.current.start as usize`, a captured scan position); `Span` fields
@@ -966,6 +1774,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             span.end - self.base_offset as u32,
         );
         cooked.resolve(local, self.source)
+    }
+
+    /// The source text a host `span` covers (the parser's own slice, `base_offset` taken
+    /// off).
+    pub(super) fn source_slice(&self, span: Span) -> &'a str {
+        &self.source[span.start as usize - self.base_offset..span.end as usize - self.base_offset]
     }
 
     /// The current token's verbatim source text. Returns `&'a str` (borrowing the
@@ -1334,9 +2148,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the one place that abandons a parse and continues, [`Parser::rewind`],
     /// restores the depth itself. Wrapping them in a combinator (so the pair is balanced
     /// by construction) wants body extraction at several sites and is its own change.
+    ///
+    /// The grouping depth is also part of the depth limit's nesting count: a grouping
+    /// delimiter is where most of the expression grammar's recursion passes (a paren, an
+    /// array, an object, a call's arguments, a template's `${`, a computed member), so its
+    /// level is the one this increment already pays for, and the limit is tested against
+    /// it beside [`Parser::depth`] (`DepthBudget::check_beside`) — refused at the current
+    /// token where the two together would pass `tsv_lang::NESTING_LIMIT`.
     #[inline]
-    pub(super) fn enter_grouping(&mut self) {
+    pub(super) fn enter_grouping(&mut self) -> Result<(), ParseError> {
         self.grouping_depth += 1;
+        if !self.depth.check_beside(self.grouping_depth) {
+            return Err(self.too_deep(DepthLimit::Nesting));
+        }
+        Ok(())
     }
 
     /// Leave a grouping delimiter, having just consumed its closer. See
@@ -1495,6 +2320,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             lexer_error: self.lexer_error.clone(),
             comments_len: self.comments.len(),
             grouping_depth: self.grouping_depth,
+            depth: self.depth,
+            spine: self.spine,
             lt_regions: self.lt_regions,
             abandoned_type_arguments_error: self.abandoned_type_arguments_error.clone(),
         }
@@ -1520,6 +2347,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             lexer_error,
             comments_len,
             grouping_depth,
+            depth,
+            spine,
             lt_regions,
             abandoned_type_arguments_error,
         } = checkpoint;
@@ -1534,6 +2363,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.lexer_error = lexer_error;
         self.comments.truncate(comments_len);
         self.grouping_depth = grouping_depth;
+        self.depth = depth;
+        self.spine = spine;
         self.lt_regions = lt_regions;
         self.abandoned_type_arguments_error = abandoned_type_arguments_error;
         // Whatever the abandoned parse's type grammar was handing to itself is not
@@ -2893,16 +3724,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // strict mode on for everything after it, and the flag is restored on the way
         // out so a re-used parser starts from the goal's own seed again.
         let body = self.with_strict_scope(|p| {
-            let mut body = p.bvec();
-            let mut in_prologue = true;
-            while p.current.kind != TokenKind::Eof {
-                let mut item = p.parse_module_item(statement::ModuleItemContext::TopLevel)?;
-                if in_prologue {
-                    in_prologue = p.note_directive(&mut item, &body)?;
+            p.statement_list(1, |p, frame| {
+                let mut body = p.bvec();
+                let mut in_prologue = true;
+                while p.current.kind != TokenKind::Eof {
+                    let mut item = p.parse_module_item(statement::ModuleItemContext::TopLevel)?;
+                    frame.next(p);
+                    if in_prologue {
+                        in_prologue = p.note_directive(&mut item, &body)?;
+                    }
+                    body.push(item);
                 }
-                body.push(item);
-            }
-            Ok(body)
+                Ok(body)
+            })
         })?;
 
         // Use current_pos() to get global position (includes base_offset)
@@ -3006,13 +3840,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// * `Ok(Expression)` - The converted pattern (ObjectPattern, ArrayPattern, etc.)
     /// * `Err(ParseError)` - If the expression cannot be converted to a valid pattern
     pub fn expression_to_svelte_pattern(
-        &self,
+        &mut self,
         expr: Expression<'arena>,
     ) -> Result<Expression<'arena>, ParseError> {
         // Svelte block and `{@const}` patterns, which Svelte reads as assignment
         // targets: a member or parenthesized target is accepted, a type-assertion
         // target still rejects (see `AssignableContext::SveltePattern`).
-        self.to_assignable(
+        self.refine_assignable(
             expr,
             expression_assignable::AssignableContext::SveltePattern,
         )
@@ -3099,9 +3933,17 @@ pub fn parse_typescript<'arena>(
 /// `<V>`. A standalone text has no host to read it as acorn does, and tsc's reading is the
 /// one it is given, so where each failed inside the parse itself the first parse's error
 /// is reported (`a ? f<T, U><V>(x) : ;` stops at tsc's `,`).
+///
+/// `host_nesting` is the nesting the host document has spent where the text sits (`0`
+/// standalone): both parses start their depth count there ([`DepthBudget::at`]), so an
+/// island deep in Svelte markup has only what the markup left of the document's budget.
+// Every argument is a distinct input of the one driver both parses share; bundling two of
+// them into a struct would only move the count.
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     source: &str,
     base_offset: usize,
+    host_nesting: u32,
     goal: Goal,
     arena: &'arena Bump,
     embedded: bool,
@@ -3115,6 +3957,7 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
             .map_err(|error| (error, true))
     };
     let mut parser = Parser::new(source, base_offset, goal, arena);
+    parser.depth = DepthBudget::at(host_nesting);
     parser.prime()?;
     let first = f(&mut parser)
         .map_err(|error| (parser.prefer_abandoned_type_arguments_error(error), false))
@@ -3125,6 +3968,7 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
         return first.map_err(|(error, _)| error);
     }
     let mut retry = Parser::new(source, base_offset, goal, arena);
+    retry.depth = DepthBudget::at(host_nesting);
     retry.tsc_followers = false;
     let second = retry
         .prime()
@@ -3151,6 +3995,7 @@ pub fn parse_typescript_with_goal<'arena>(
     parse_retrying_acorn_followers(
         source,
         0,
+        0,
         goal,
         arena,
         false,
@@ -3170,6 +4015,7 @@ pub fn parse_typescript_preserve_parens<'arena>(
 ) -> Result<Program<'arena>, ParseError> {
     parse_retrying_acorn_followers(
         source,
+        0,
         0,
         Goal::Module,
         arena,

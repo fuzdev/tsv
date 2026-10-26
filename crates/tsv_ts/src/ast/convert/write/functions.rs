@@ -1,9 +1,7 @@
 // Function-related expression writers.
 
 use super::super::super::internal;
-use super::expressions::{
-    ChainState, ExprFlags, write_expression, write_expression_inner, write_expressions,
-};
+use super::expressions::{ChainState, ExprFlags, write_expression, write_expressions};
 use super::statements::write_block_statement;
 use super::{
     Ctx, JsonWriter, close_node, node_header, write_function_flags_fields,
@@ -121,13 +119,29 @@ pub(super) fn write_new_expression(
     close_node(w, "NewExpression", span, ctx);
 }
 
-/// Emits a `CallExpression` node (chain-aware). Field order: `callee`,
-/// `arguments`, `typeArguments?`, `optional?`.
+/// The flags a `CallExpression`'s callee is written with: the chain verdict it inherits,
+/// and `force_optional` for acorn-typescript's `?.<T>(...)` path, which marks the callee
+/// node itself optional; the decorator spine strip walks call → callee.
+pub(super) fn call_callee_flags(
+    call: &internal::CallExpression<'_>,
+    callee_chain: ChainState,
+    strip_optional: bool,
+) -> ExprFlags {
+    ExprFlags {
+        chain: callee_chain,
+        force_optional: call.optional && call.type_arguments.is_some(),
+        strip_optional,
+    }
+}
+
+/// Emits the rest of a `CallExpression` node (chain-aware) once its header and callee are
+/// written — the expression writer's chain walk writes those down the spine
+/// (`write_chain`). Field order: `callee`, `arguments`, `typeArguments?`, `optional?`.
 ///
 /// `force_optional` / `strip_optional` are this node's own `optional` overrides
 /// (see `ExprFlags`): strip omits `optional` entirely (decorator spine) and
 /// wins over force (`true`), which wins over the computed value.
-pub(super) fn write_call_expression(
+pub(super) fn write_call_expression_tail(
     w: &mut JsonWriter,
     call: &internal::CallExpression<'_>,
     span: Span,
@@ -136,21 +150,6 @@ pub(super) fn write_call_expression(
     force_optional: bool,
     strip_optional: bool,
 ) {
-    node_header(w, "CallExpression", span, ctx);
-    w.raw(",\"callee\":");
-    write_expression_inner(
-        w,
-        call.callee,
-        ctx,
-        ExprFlags {
-            chain: callee_chain,
-            // acorn-typescript's `?.<T>(...)` path marks the callee node
-            // itself optional.
-            force_optional: call.optional && call.type_arguments.is_some(),
-            // The decorator spine strip walks call → callee.
-            strip_optional,
-        },
-    );
     w.raw(",\"arguments\":");
     write_expressions(w, call.arguments.iter().copied(), ctx);
     write_type_arguments_field(w, call.type_arguments.as_ref(), ctx);
@@ -180,30 +179,18 @@ pub(super) fn write_call_expression(
     close_node(w, "CallExpression", span, ctx);
 }
 
-/// Emits a `MemberExpression` node (chain-aware). Field order: `object`,
-/// `property`, `computed`, `optional?`. Same strip/force precedence as
-/// `write_call_expression`; the strip walks member → object.
-pub(super) fn write_member_expression(
+/// Emits the rest of a `MemberExpression` node (chain-aware) once its header and object
+/// are written, as [`write_call_expression_tail`] does a call's. Field order: `object`,
+/// `property`, `computed`, `optional?`. Same strip/force precedence as a call's; the strip
+/// walks member → object (its object's flags are the chain walk's).
+pub(super) fn write_member_expression_tail(
     w: &mut JsonWriter,
     member: &internal::MemberExpression<'_>,
     span: Span,
     ctx: &Ctx<'_>,
-    object_chain: ChainState,
     force_optional: bool,
     strip_optional: bool,
 ) {
-    node_header(w, "MemberExpression", span, ctx);
-    w.raw(",\"object\":");
-    write_expression_inner(
-        w,
-        member.object,
-        ctx,
-        ExprFlags {
-            chain: object_chain,
-            force_optional: false,
-            strip_optional,
-        },
-    );
     w.raw(",\"property\":");
     write_expression(w, member.property, ctx);
     // One literal per value, `optional` folded in where it is written: both

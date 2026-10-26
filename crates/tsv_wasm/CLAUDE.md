@@ -214,10 +214,15 @@ restore. So the pointer stays where the deep call left it and **every later call
 that instance throws the same error, in every language and on every entry point** —
 verified across `format_typescript` / `format_css` / `format_svelte` /
 `parse_typescript_json` after one deep `format_typescript`. Only a fresh instance
-recovers. The depth is ~2,510 nested parens at ~0.41 KiB of shadow stack per level, the
-lowest of any tsv surface — though above acorn's 497 and prettier's 805 — and unlike the
-native builds it does not move with the host, since the shadow stack is inside the
-module.
+recovers. The parsers' depth limits are sized for this surface too: the spine units of the
+links whose walks spend the most shadow stack (an `as` / `satisfies` assertion, a tagged
+template, a link that re-enters the expression printer) are set so every accepted input fits
+the 1 MiB shadow stack and a V8 main thread's own stack, cold and with its code tiered up
+under V8's default tiering —
+graded by `deno task test:depth:wasm` over every shape `tests/depth_limit.rs` generates,
+and measured on Node, Deno and Bun, main thread and worker
+([docs/cli.md §Recursion Depth](../../docs/cli.md#recursion-depth)). What still overflows is
+a host stack below those.
 
 **A fresh instance is what the npm packages' `reinstantiate()` export provides.**
 wasm-bindgen's `initSync` short-circuits once initialized, so `scripts/patch_npm_package.ts`
@@ -242,8 +247,10 @@ its receiver through the same compare (`__tsv_live`) and throws on a stale one, 
 would otherwise read the fresh memory's unrelated bytes as the object. Handles minted after the
 swap free and work normally. (A module-level "has any reinstantiation happened" check is the
 wrong shape: a one-way fuse that leaks every handle after the first recovery, fresh ones
-included.) Gated by `scripts/test_npm.ts` (the poison-then-recover API contract + both CLI
-paths) and smoked per variant by `scripts/validate_artifacts.ts`.
+included.) Gated by `scripts/test_npm.ts` (the poison-then-recover API contract, staged on a
+child process with V8's stack cut to a sliver; and both CLI paths, staged on a copy of the
+package whose shadow stack is cut to a quarter — no input the depth limits accept traps the
+shipped stack) and smoked per variant by `scripts/validate_artifacts.ts`.
 
 ## JSON-String Transport
 

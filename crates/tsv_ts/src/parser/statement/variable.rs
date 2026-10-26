@@ -92,15 +92,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         site: DeclaratorSite,
     ) -> Result<(&'arena [VariableDeclarator<'arena>], u32), ParseError> {
-        let first = self.parse_declarator(site)?;
+        // one wire level each: the `VariableDeclarator` over its pattern and initializer
+        let first = self.nested(1, |p| p.parse_declarator(site))?;
         let mut end = first.span.end;
         let mut declarations = self.bvec();
         declarations.push(first);
+        // the declarators are siblings (`ListFrame`); the first is already counted
+        let mut frame = self.list_frame();
         while self.eat(TokenKind::Comma)? {
-            let declarator = self.parse_declarator(site)?;
+            frame.element(self, declarations.len());
+            let declarator = self.nested(1, |p| p.parse_declarator(site))?;
             end = declarator.span.end;
             declarations.push(declarator);
         }
+        frame.close(self);
         Ok((declarations.into_bump_slice(), end))
     }
 

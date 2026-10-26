@@ -170,6 +170,32 @@ pub enum ParenContext {
     AssignmentTarget { operator: AssignmentOperator },
 }
 
+impl ParenContext {
+    /// Whether the position is an operator's operand — a binary's, an assertion's, a
+    /// prefix or postfix operator's, a spread's, a member chain's base — where
+    /// [`fn@needs_parens`] parenthesizes only the operators and the looser forms
+    /// (`printer_adds_operand_pair`'s kind test) — and, as a member chain's base, a
+    /// numeric literal (`(0).x`), which the parser charges at the chain instead
+    /// (`chain_base_pair`).
+    #[inline]
+    #[must_use]
+    pub(crate) const fn is_operator_position(self) -> bool {
+        matches!(
+            self,
+            ParenContext::BinaryLeft { .. }
+                | ParenContext::BinaryRight { .. }
+                | ParenContext::TypeAssertion
+                | ParenContext::AngleBracketAssertion
+                | ParenContext::UnaryArgument { .. }
+                | ParenContext::UpdateArgument { .. }
+                | ParenContext::AwaitArgument
+                | ParenContext::SpreadArgument
+                | ParenContext::NonNull
+                | ParenContext::ChainBase
+        )
+    }
+}
+
 /// Whether `expr` is an `in` binary expression — the operator that must be
 /// parenthesized inside a `for` header init so it isn't read as the `for (x in
 /// y)` separator. Shared by `needs_parens` (the ambient for-init rule) and the
@@ -1447,6 +1473,174 @@ fn needs_parens_binary_operand(
     binary_operand_pair(expr, parent_op, is_right, in_for_init) != OperandPair::None
 }
 
+/// The left operand of a `parent_op` binary as the binary the binary-chain printer
+/// FLATTENS into its chain, if it does: its operator chains with `parent_op`
+/// (`can_flatten_with`) and it takes no pair in this position, asked through
+/// `needs_pair` — `Printer::needs_parens` in the printer, the context-free
+/// [`fn@needs_parens`] in the parser. Any other left operand (a binary that does not
+/// chain, an `as` / `satisfies` assertion, which owes a pair here) the chain printer
+/// builds as an operand of its own, re-entering the expression printer for it.
+///
+/// One predicate, read by both sides of the depth limit: the chain collectors
+/// (`Printer::flattenable_left`), which decide what the walk recurses through, and the
+/// parser's binary link (`Parser::binary_link_units`), which prices that walk against
+/// `SPINE_LIMIT` — so the two cannot drift. The printer's `needs_pair` answers differ
+/// from the context-free one only at a pair the author wrote, which the parser charged
+/// as a nesting level when it read it, or at a clarity pair it withholds, which only
+/// flattens a link the parser priced as a re-entry; the `for`-header `in` rule the parser
+/// reads from its own flag.
+#[inline]
+pub(crate) fn flattened_left_operand<'e>(
+    parent_op: BinaryOperator,
+    left: &'e Expression<'e>,
+    needs_pair: impl FnOnce(&Expression<'_>, ParenContext) -> bool,
+) -> Option<&'e BinaryExpression<'e>> {
+    let ExpressionKind::BinaryExpression(left_binary) = &left.kind else {
+        return None;
+    };
+    let flattens = parent_op.can_flatten_with(left_binary.operator)
+        && !needs_pair(left, ParenContext::BinaryLeft { parent_op });
+    flattens.then_some(left_binary)
+}
+
+/// Whether the binary-chain printer builds `left`, the left operand of a `parent_op`
+/// binary, as an operand of its own rather than flattening it into the chain, where the
+/// operand continues the chain's left spine: a binary [`flattened_left_operand`] does not
+/// flatten, or an `as` / `satisfies` assertion (whose own operand may be the next binary).
+/// Every other operand ends the spine, and is built once per chain whatever it is.
+///
+/// The parser's question at a binary link (`Parser::binary_link_units`), answered with
+/// [`fn@needs_parens`] and the parser's own reading of the `for`-header flag
+/// (`in_for_init`: inside a header's init, where every `in` binary takes a pair).
+pub(crate) fn binary_left_operand_reenters(
+    parent_op: BinaryOperator,
+    left: &Expression<'_>,
+    in_for_init: bool,
+) -> bool {
+    match left.kind {
+        ExpressionKind::BinaryExpression(_) => {
+            flattened_left_operand(parent_op, left, |left, ctx| {
+                needs_parens(left, ctx, in_for_init)
+            })
+            .is_none()
+        }
+        ExpressionKind::TSAsExpression(_) | ExpressionKind::TSSatisfiesExpression(_) => true,
+        _ => false,
+    }
+}
+
+/// Whether the printer writes a pair around `operand` in `ctx` — a binary's operand, an
+/// assertion's operand, a prefix operator's, a spread's, a class heritage, a `new` callee,
+/// an instantiation's operand — the parser's question where the source wrote none
+/// (`Parser::count_operand_pairs`, `Parser::count_prefix_operand_pairs`, which charge each
+/// such pair as a level of the output's nesting, so a format's output parses again).
+/// Answered by [`fn@needs_parens`] with the parser's reading of the `for`-header flag, less
+/// the pairs counted elsewhere: an assignment and an `in` binary inside a `for` header count
+/// their own wherever they stand (`Parser::self_pair`), and a sequence its own
+/// (`Parser::sequence_pair`). The printer's answer differs from the context-free one only
+/// where it withholds a clarity pair, so the parser may charge a pair the output lacks,
+/// never miss one it holds.
+///
+/// Inline, it answers the commonest operands without [`fn@needs_parens`]: a name or a
+/// literal anywhere, a member, call or other primary in an operator's position
+/// ([`operator_operand_takes_no_pair`]), a binary operand of a binary whose two operators
+/// decide its pair, and anything but an object or class as an arrow's concise body; the
+/// rest take [`fn@needs_parens`] out of line.
+#[inline]
+pub(crate) fn printer_adds_operand_pair(
+    operand: &Expression<'_>,
+    ctx: ParenContext,
+    in_for_header: bool,
+) -> bool {
+    match operand.kind {
+        // no context parenthesizes a name, and only a member's object takes a pair around
+        // a literal (`(1).a`), which `Parser::chain_base_pair` asks of [`fn@needs_parens`]
+        ExpressionKind::Identifier(_)
+        | ExpressionKind::Literal(_)
+        | ExpressionKind::AssignmentExpression(_)
+        | ExpressionKind::SequenceExpression(_) => return false,
+        _ if ctx.is_operator_position() && operator_operand_takes_no_pair(operand) => return false,
+        ExpressionKind::BinaryExpression(ref child) => {
+            if let Some(pair) = binary_operand_takes_pair_by_operators(child, ctx, in_for_header) {
+                return pair;
+            }
+        }
+        // an arrow's concise body takes a pair as an object, a decorated class, or an `in`
+        // binary in a `for` header, and as nothing else
+        ExpressionKind::ObjectExpression(_) | ExpressionKind::ClassExpression(_) => {}
+        _ if matches!(ctx, ParenContext::ArrowBody) => return false,
+        _ => {}
+    }
+    printer_adds_operand_pair_by_rule(operand, ctx, in_for_header)
+}
+
+/// [`printer_adds_operand_pair`] for a binary operand of a binary where its two operators
+/// alone decide (`None` elsewhere): a right operand, or a left one under an operator that
+/// joins no `>` it may end on — so neither the instantiation-tail join nor the `>`-over-`<`
+/// region arm of [`binary_operand_pair`] can answer, and an `in` operand inside a `for`
+/// header counts its own pair.
+#[inline]
+fn binary_operand_takes_pair_by_operators(
+    child: &BinaryExpression<'_>,
+    ctx: ParenContext,
+    in_for_header: bool,
+) -> Option<bool> {
+    let (parent_op, is_right) = match ctx {
+        ParenContext::BinaryLeft { parent_op } => (parent_op, false),
+        ParenContext::BinaryRight { parent_op } => (parent_op, true),
+        _ => return None,
+    };
+    if !is_right && joins_a_trailing_angle_bracket(parent_op) {
+        return None;
+    }
+    if in_for_header && child.operator == BinaryOperator::In {
+        return Some(false);
+    }
+    Some(binary_child_pair(parent_op, child.operator, is_right) != OperandPair::None)
+}
+
+/// Whether `operand` is a kind [`printer_adds_operand_pair`] answers `false` for at every
+/// operator position ([`ParenContext::is_operator_position`]): a name, a literal, an
+/// assignment or a sequence (which count their own pair), and a primary or a member-chain
+/// link, which binds tighter than every operator and which no operator position's arm
+/// names (it ends on a token of its own, so no instantiation-tail join reaches it either).
+#[inline]
+#[must_use]
+pub(crate) const fn operator_operand_takes_no_pair(operand: &Expression<'_>) -> bool {
+    matches!(
+        operand.kind,
+        ExpressionKind::Identifier(_)
+            | ExpressionKind::Literal(_)
+            | ExpressionKind::AssignmentExpression(_)
+            | ExpressionKind::SequenceExpression(_)
+            | ExpressionKind::MemberExpression(_)
+            | ExpressionKind::CallExpression(_)
+            | ExpressionKind::ThisExpression(_)
+            | ExpressionKind::TSNonNullExpression(_)
+            | ExpressionKind::ArrayExpression(_)
+            | ExpressionKind::ObjectExpression(_)
+            | ExpressionKind::TemplateLiteral(_)
+            | ExpressionKind::NewExpression(_)
+    )
+}
+
+/// [`printer_adds_operand_pair`] past its kind test.
+#[inline(never)]
+fn printer_adds_operand_pair_by_rule(
+    operand: &Expression<'_>,
+    ctx: ParenContext,
+    in_for_header: bool,
+) -> bool {
+    !(in_for_header && is_in_binary(operand)) && needs_parens(operand, ctx, in_for_header)
+}
+
+/// Whether the printer writes a pair around `object` as a member access's object — a
+/// numeric literal (`(1).toString()`) where it is the head the parser asks about
+/// (`Parser::chain_base_pair`).
+pub(crate) fn printer_parenthesizes_chain_base(object: &Expression<'_>) -> bool {
+    needs_parens(object, ParenContext::ChainBase, false)
+}
+
 /// [`needs_parens_binary_operand`], with the reason the pair is there.
 ///
 /// Every [`OperandPair::Owed`] arm is asked ahead of every [`OperandPair::Clarity`] one,
@@ -1601,8 +1795,18 @@ pub(in crate::printer) fn binary_operand_pair(
     let ExpressionKind::BinaryExpression(child) = &expr.kind else {
         return OperandPair::None;
     };
-    let child_op = child.operator;
+    binary_child_pair(parent_op, child.operator, is_right)
+}
 
+/// [`binary_operand_pair`] for a binary operand once only the two operators decide it:
+/// the pair a `child_op` binary takes as an operand of `parent_op`, on the right where
+/// `is_right`.
+#[inline]
+fn binary_child_pair(
+    parent_op: BinaryOperator,
+    child_op: BinaryOperator,
+    is_right: bool,
+) -> OperandPair {
     // Special case: Logical operators (&&, ||, ??) mixing requires parens
     if parent_op.is_logical() && child_op.is_logical() && parent_op != child_op {
         return OperandPair::Owed;

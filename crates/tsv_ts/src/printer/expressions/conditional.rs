@@ -61,6 +61,21 @@ pub(in crate::printer) fn ternary_test_needs_parens(expr: &internal::Expression<
         )
 }
 
+/// [`ternary_branch_needs_parens`] less an assignment, which counts its own pair: the
+/// parser's question at a bare branch (`Parser::ternary_branch_pair`).
+pub(crate) fn ternary_branch_takes_pair(expr: &internal::Expression<'_>) -> bool {
+    !matches!(expr.kind, internal::ExpressionKind::AssignmentExpression(_))
+        && ternary_branch_needs_parens(expr)
+}
+
+/// [`ternary_test_needs_parens`] less an assignment, which counts its own pair: the
+/// parser's question at a bare test, where only the clarity cases (`??`, `await`, `as`,
+/// `satisfies`) can stand bare.
+pub(crate) fn ternary_test_takes_pair(expr: &internal::Expression<'_>) -> bool {
+    !matches!(expr.kind, internal::ExpressionKind::AssignmentExpression(_))
+        && ternary_test_needs_parens(expr)
+}
+
 /// Check if an expression is a template literal containing newlines
 ///
 /// When a template literal contains embedded newlines in its quasi strings,

@@ -44,7 +44,7 @@ use crate::printer::types::helpers::unwrap_parenthesized;
 use crate::printer::{
     ParenContext, PatternContext, Printer, SecondTypeArgs, chain, class_expr_has_decorators,
 };
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -1657,12 +1657,8 @@ impl<'a> Printer<'a> {
             // retains the shell as a parenthesized base (the same multiline operand
             // layout the required-paren case above uses) rather than flattening the
             // operand into a region whose emitter is block-only.
-            let argument_end = non_null_expr.expression.span().end;
-            let inner_doc = self.build_expression_doc(non_null_expr.expression);
-            let mut parts: DocBuf = smallvec![inner_doc];
-            self.append_trailing_paren_comments(&mut parts, argument_end, span.end);
-            parts.push(d.text("!"));
-            d.concat(&parts)
+            let inner_doc = self.build_commented_non_null_operand_doc(non_null_expr.expression);
+            self.close_commented_non_null_doc(inner_doc, non_null_expr, span)
         } else if let Some(operand_doc) = self.build_with_inline_member_call_tail_forwarded(
             span,
             non_null_expr.expression,
@@ -1724,6 +1720,72 @@ impl<'a> Printer<'a> {
             Some(lead) if !needs_parens => d.concat(&[lead, core]),
             _ => core,
         }
+    }
+
+    /// The operand doc of a non-null whose operand→`!` gap takes the trailing-comment
+    /// branch of [`Printer::build_ts_non_null_doc`] — exactly what
+    /// `self.build_expression_doc(operand)` returns, built without recursing per link.
+    ///
+    /// A run of such non-nulls (`a!/*c*/!/*c*/!`, each `!` with a single-line block in
+    /// its gap) would otherwise re-enter the expression printer once per `!`, a frame of
+    /// the whole dispatch per link — the one chain the parser prices as a member-chain
+    /// link while its print recursed like a re-entry. So the run is peeled iteratively:
+    /// every level that would take the same branch (no required pair, no line-spanning
+    /// comment, a comment to emit in its gap) is collected on the way down, the first
+    /// operand that would not is built once, and the levels close over it on the way up,
+    /// each as [`Printer::build_ts_non_null_doc`] would close it — its stripped-paren
+    /// leading run, its trailing comments and `!` ([`Printer::close_commented_non_null_doc`])
+    /// and the owned leading comment [`Printer::build_expression_doc`] prepends. The
+    /// expression-statement flag needs no restating: every non-null level of the dispatch
+    /// hands it on unchanged.
+    fn build_commented_non_null_operand_doc(&self, operand: &Expression<'_>) -> DocId {
+        let d = self.d();
+        let mut levels: SmallVec<
+            [(
+                &Expression<'_>,
+                &crate::ast::internal::TSNonNullExpression<'_>,
+                Option<DocId>,
+            ); 4],
+        > = SmallVec::new();
+        let mut inner = operand;
+        while let ExpressionKind::TSNonNullExpression(non_null) = &inner.kind {
+            let argument_end = non_null.expression.span().end;
+            if self.needs_parens(non_null.expression, ParenContext::NonNull)
+                || self.has_line_spanning_comments_to_emit_between(argument_end, inner.span.end)
+                || !self.has_comments_to_emit_between(argument_end, inner.span.end)
+            {
+                break;
+            }
+            let leading =
+                self.build_rhs_comments_opt(inner.span.start, non_null.expression.span().start);
+            levels.push((inner, non_null, leading));
+            inner = non_null.expression;
+        }
+        let mut doc = self.build_expression_doc(inner);
+        for &(level, non_null, leading) in levels.iter().rev() {
+            let core = self.close_commented_non_null_doc(doc, non_null, level.span);
+            let level_doc = match leading {
+                Some(lead) => d.concat(&[lead, core]),
+                None => core,
+            };
+            doc = self.prepend_owned_leading_comment(level, level_doc);
+        }
+        doc
+    }
+
+    /// Close a non-null's operand doc in the trailing-comment branch of
+    /// [`Printer::build_ts_non_null_doc`]: the comments of the operand→`!` gap, then `!`.
+    fn close_commented_non_null_doc(
+        &self,
+        operand_doc: DocId,
+        non_null: &crate::ast::internal::TSNonNullExpression<'_>,
+        span: Span,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts: DocBuf = smallvec![operand_doc];
+        self.append_trailing_paren_comments(&mut parts, non_null.expression.span().end, span.end);
+        parts.push(d.text("!"));
+        d.concat(&parts)
     }
 
     /// When `expr` is a non-null assertion sealing a parenthesized optional chain
@@ -1951,32 +2013,39 @@ impl<'a> Printer<'a> {
         operands: &mut DocBuf,
         operators: &mut OperatorBuf,
     ) {
-        self.mark_dividend_tail(expr);
-        self.withhold_clarity_pairs_behind_region_close(expr);
-        // Recursively flatten left side if it can be chained with current operator
-        // (`flattenable_left`, shared with `collect_binary_chain_with_spans`); otherwise
-        // build the operand with parens if needed.
-        if let Some(left_binary) = self.flattenable_left(expr) {
-            self.collect_binary_operands_for_indent(left_binary, operands, operators);
-        } else {
-            operands.push(self.build_binary_operand_doc(expr.left, expr.operator, false));
+        // Down the left side while it flattens (`flattenable_left`, shared with
+        // `collect_binary_chain_with_spans`), without recursing — the walk order
+        // `collect_binary_chain_with_spans` states; otherwise the left operand is built with
+        // parens if needed.
+        let mut spine: SmallVec<[&BinaryExpression<'_>; 8]> = smallvec![expr];
+        let mut node = expr;
+        loop {
+            self.mark_dividend_tail(node);
+            self.withhold_clarity_pairs_behind_region_close(node);
+            let Some(left_binary) = self.flattenable_left(node) else {
+                break;
+            };
+            spine.push(left_binary);
+            node = left_binary;
         }
+        operands.push(self.build_binary_operand_doc(node.left, node.operator, false));
+        for &expr in spine.iter().rev() {
+            // Add current operator
+            operators.push(ChainOperator::of(expr));
 
-        // Add current operator
-        operators.push(ChainOperator::of(expr));
+            // Also flatten the right side where prettier REBALANCES it, removing the
+            // redundant parens ([`BinaryOperator::rebalances_with`] — logical operators
+            // only; arithmetic preserves right-side parens).
+            if let ExpressionKind::BinaryExpression(right_binary) = &expr.right.kind
+                && expr.operator.rebalances_with(right_binary.operator)
+            {
+                self.collect_binary_operands_for_indent(right_binary, operands, operators);
+                continue;
+            }
 
-        // Also flatten the right side where prettier REBALANCES it, removing the redundant
-        // parens ([`BinaryOperator::rebalances_with`] — logical operators only; arithmetic
-        // preserves right-side parens).
-        if let ExpressionKind::BinaryExpression(right_binary) = &expr.right.kind
-            && expr.operator.rebalances_with(right_binary.operator)
-        {
-            self.collect_binary_operands_for_indent(right_binary, operands, operators);
-            return;
+            // Right operand can't be flattened - add as-is
+            operands.push(self.build_binary_operand_doc(expr.right, expr.operator, true));
         }
-
-        // Right operand can't be flattened - add as-is
-        operands.push(self.build_binary_operand_doc(expr.right, expr.operator, true));
     }
 
     /// Build binary chain specifically for parenthesized context in chain printing

@@ -28,7 +28,9 @@
  *                    <level> -->` marker (also required). A fresh wetrun needs
  *                    both, plus a non-empty `## Unreleased` section; a sentinel
  *                    retry runs without either.
- *   --no-check       skip `deno task check`, the Step 3b conformance gates, AND the
+ *   --no-check       skip `deno task check` (with the depth contract's shipped-build
+ *                    and WASM legs, `test:depth:napi` and Step 6's `test:depth:wasm`),
+ *                    the Step 3b conformance gates, AND the
  *                    Step 3c corpus audit (faster retries; also the only way to --wetrun
  *                    on a machine missing the Step 3b/3c oracle checkouts — a missing
  *                    oracle otherwise FAILS a wetrun — or without bun, which Step 6's
@@ -443,6 +445,11 @@ if (no_check) {
 } else {
 	console.log('\n=== Step 3: Check (deno task check) ===');
 	await run('deno task check', 'deno', ['task', 'check']);
+	// The depth-limit stack contract in the shipped optimization: `check`'s `test:depth`
+	// grades the `corpus` world, whose frames are not the shipped builds' (deno.json
+	// `//test:depth:napi`).
+	console.log('\n=== Step 3: Depth contract, shipped build (deno task test:depth:napi) ===');
+	await run('deno task test:depth:napi', 'deno', ['task', 'test:depth:napi']);
 }
 
 // Step 3b: Conformance gates
@@ -594,6 +601,15 @@ for (const { label, dir } of packages) {
 	await run(`artifact tests for ${label}`, 'node', ['--test', 'scripts/test_npm.ts'], {
 		env: { PKG_DIR: dir }
 	});
+}
+// The depth limits' stack contract in the WASM engine, over the `all` package just built:
+// every shape the native gate generates, at its accepted depth, on a Node main thread, cold
+// and tiered up (deno.json `//test:depth:wasm`). A `check`-cadence gate like Step 3's
+// shipped-build leg, so `--no-check` skips it with that one.
+if (no_check) {
+	console.warn('  WARN: skipping deno task test:depth:wasm (--no-check)');
+} else {
+	await run('deno task test:depth:wasm', 'deno', ['task', 'test:depth:wasm']);
 }
 // The parse-failure table under Bun, the one runtime that grades the engines' point
 // properties (deno.json `//test:bun`), over the three wasm packages this script publishes —

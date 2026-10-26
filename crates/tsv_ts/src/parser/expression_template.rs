@@ -236,10 +236,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 quasis.push(element);
 
-                self.enter_grouping();
+                self.enter_grouping()?;
 
-                // Parse expressions and remaining template parts
+                // Parse expressions and remaining template parts; the interpolations are
+                // siblings (`ListFrame`)
+                let mut frame = self.list_frame();
                 loop {
+                    frame.element(self, expressions.len());
                     // Parse the interpolated expression
                     let expr = self.parse_expression_ref()?;
                     expressions.push(expr);
@@ -248,7 +251,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // opened inside it, as the template's end does for the last one
                     // (`LtRegion`).
                     self.exit_grouping();
-                    self.enter_grouping();
+                    self.enter_grouping()?;
 
                     // Expect closing } of the interpolation
                     let (brace_start, _) = self.current_pos();
@@ -297,6 +300,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         }
                     }
                 }
+                frame.close(self);
 
                 self.exit_grouping();
 

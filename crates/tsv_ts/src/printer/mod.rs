@@ -55,6 +55,7 @@ use analysis::{
     is_string_literal, next_printed_stmt, next_printed_stmt_start, object_pattern_should_expand,
     statement_gap_floor, template_literal_has_newlines,
 };
+pub(crate) use calls::call_may_print_whole;
 pub(crate) use comments::leading_regex_start;
 use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, ContinuationValue,
@@ -63,6 +64,7 @@ use comments::{
     next_significant_byte, paren_shell_close_after,
 };
 use decorators::class_expr_has_decorators;
+pub(crate) use decorators::decorator_takes_pair;
 pub use expressions::assignment::should_inline_logical_expression;
 use expressions::assignment::{
     arrow_chain_should_break, is_simple_value, is_type_assertion_call, should_break_after_operator,
@@ -70,10 +72,15 @@ use expressions::assignment::{
 pub(crate) use expressions::assignment::{
     is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
 };
-pub(crate) use needs_parens::ends_with_instantiation_close;
+pub(crate) use expressions::conditional::{ternary_branch_takes_pair, ternary_test_takes_pair};
+pub(crate) use needs_parens::{
+    ParenContext, binary_left_operand_reenters, ends_with_instantiation_close,
+    flattened_left_operand, operator_operand_takes_no_pair, printer_adds_operand_pair,
+    printer_parenthesizes_chain_base,
+};
 use needs_parens::{
-    ParenContext, SecondTypeArgs, clarity_pairs_behind_region_close,
-    instantiation_keeps_pair_before_type_args, is_called_function, is_in_binary, needs_parens,
+    SecondTypeArgs, clarity_pairs_behind_region_close, instantiation_keeps_pair_before_type_args,
+    is_called_function, is_in_binary, needs_parens,
 };
 use types::unwrap_parenthesized;
 

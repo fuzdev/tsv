@@ -9,6 +9,7 @@ use crate::printer::comments::{AsiOperandShell, CommentSpacing};
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::{
     CommentVec, ParenContext, Printer, RunLeadingBlank, class_expr_has_decorators,
+    flattened_left_operand,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -1433,42 +1434,63 @@ impl<'a> Printer<'a> {
         chain_start: u32,
         ends_chain: bool,
     ) {
-        self.mark_dividend_tail(expr);
-        self.withhold_clarity_pairs_behind_region_close(expr);
-        // Recursively flatten left side if it can be chained with current operator
-        match self.flattenable_left(expr) {
-            Some(left_binary) => {
-                self.collect_binary_chain_with_spans(
-                    left_binary,
-                    operands,
-                    operators,
-                    chain_start,
-                    false,
-                );
-            }
-            None => {
-                let left = expr.left;
-                // The LEFTMOST operand — the first one the collector pushes — takes the
-                // erased-paren freeze over the chain's leading region, which the chain itself
-                // emits ([`Self::wrap_chain_with_paren_comments`]). A later operand's shell
-                // keeps the ordinary builder: its erased-paren region belongs to the operator
-                // gap before it, which is a separate question.
-                let doc = self.build_left_spine_operand_doc_if(
-                    operands.is_empty(),
-                    chain_start,
-                    left,
-                    FrozenOperandPair::position(ParenContext::BinaryLeft {
-                        parent_op: expr.operator,
-                    }),
-                    || self.build_binary_operand_doc(left, expr.operator, false),
-                );
-                operands.push(ChainOperand {
-                    doc,
-                    span: left.span(),
-                });
-            }
+        // The flattened left spine, walked down without recursing — the chain's length is
+        // bounded only by `SPINE_LIMIT`, so a recursion per link would spend a frame per
+        // operator: each binary's own marks in spine order, outermost first, then the
+        // leftmost operand, then each binary's operator and right side, innermost first —
+        // the order a recursion down the left visits them in.
+        let mut spine: SmallVec<[&internal::BinaryExpression<'_>; 8]> = smallvec![expr];
+        let mut node = expr;
+        loop {
+            self.mark_dividend_tail(node);
+            self.withhold_clarity_pairs_behind_region_close(node);
+            let Some(left_binary) = self.flattenable_left(node) else {
+                break;
+            };
+            spine.push(left_binary);
+            node = left_binary;
         }
+        let left = node.left;
+        // The LEFTMOST operand — the first one the collector pushes — takes the erased-paren
+        // freeze over the chain's leading region, which the chain itself emits
+        // ([`Self::wrap_chain_with_paren_comments`]). A later operand's shell keeps the
+        // ordinary builder: its erased-paren region belongs to the operator gap before it,
+        // which is a separate question.
+        let doc = self.build_left_spine_operand_doc_if(
+            operands.is_empty(),
+            chain_start,
+            left,
+            FrozenOperandPair::position(ParenContext::BinaryLeft {
+                parent_op: node.operator,
+            }),
+            || self.build_binary_operand_doc(left, node.operator, false),
+        );
+        operands.push(ChainOperand {
+            doc,
+            span: left.span(),
+        });
+        for (depth, &node) in spine.iter().enumerate().rev() {
+            self.collect_binary_chain_link(
+                node,
+                operands,
+                operators,
+                chain_start,
+                ends_chain && depth == 0,
+            );
+        }
+    }
 
+    /// One link of [`Self::collect_binary_chain_with_spans`]'s chain, its left side
+    /// collected: its operator, then its right operand — flattened in turn where prettier
+    /// rebalances it. `ends_chain` as there.
+    fn collect_binary_chain_link(
+        &self,
+        expr: &internal::BinaryExpression<'_>,
+        operands: &mut OperandBuf,
+        operators: &mut OperatorBuf,
+        chain_start: u32,
+        ends_chain: bool,
+    ) {
         // Add current operator
         operators.push(ChainOperator::of(expr));
 
@@ -1654,22 +1676,15 @@ impl<'a> Printer<'a> {
     /// honest about the instantiation-tail rule — `(1 + fn<T>) + 2` ends on a `>` the
     /// `+` would re-lex, so the left stays a parenthesized operand rather than being
     /// printed bare as three operands. Read by both chain collectors, so the two
-    /// spellings cannot drift.
+    /// spellings cannot drift, and spelled by [`flattened_left_operand`], which the
+    /// parser's depth limit prices the walk with.
     pub(in crate::printer) fn flattenable_left<'e>(
         &self,
         expr: &'e internal::BinaryExpression<'e>,
     ) -> Option<&'e internal::BinaryExpression<'e>> {
-        let ExpressionKind::BinaryExpression(left_binary) = &expr.left.kind else {
-            return None;
-        };
-        let flattens = expr.operator.can_flatten_with(left_binary.operator)
-            && !self.needs_parens(
-                expr.left,
-                ParenContext::BinaryLeft {
-                    parent_op: expr.operator,
-                },
-            );
-        flattens.then_some(left_binary)
+        flattened_left_operand(expr.operator, expr.left, |left, ctx| {
+            self.needs_parens(left, ctx)
+        })
     }
 
     /// Record the function or class expression the printed text of a division's left
@@ -2646,7 +2661,7 @@ mod tests {
     /// Run `should_group_binary_continuation` on a parsed binary expression.
     fn group(src: &str) -> bool {
         let arena = bumpalo::Bump::new();
-        let expr = crate::parse_expression_with_comments(src, 0, &arena, |_| Ok(()))
+        let expr = crate::parse_expression_with_comments(src, 0, 0, &arena, |_| Ok(()))
             .expect("expression should parse")
             .0;
         match expr {

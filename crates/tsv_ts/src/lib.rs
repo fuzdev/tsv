@@ -242,6 +242,13 @@ pub fn parse_with_goal<'arena>(
 /// error it shows on such a file is the typo. Pinned by
 /// `tests/format_fallback_error_attribution.rs`.
 ///
+/// **A module attempt the depth limit refused takes no retry** ([`ParseError::is_too_deep`]):
+/// the limit is no verdict on the grammar, and the script grammar reads every construct the
+/// module one accepts as the same tree but `await`, which it reads as a name — so a script
+/// attempt could only succeed by reading the source differently
+/// (`await <T>a` as `await < T > a`) — a reading chosen by the limit rather than by the
+/// source, which the same text one level shallower would never have been given.
+///
 /// [`parse`] and [`parse_with_goal`] have no fallback: a parse hands back an AST
 /// whose `sourceType` is a claim about which grammar produced it, and a retry would
 /// make that claim depend on the input. Formatting exposes neither the AST nor the
@@ -259,6 +266,9 @@ pub fn parse_with_goal_or_fallback<'arena>(
         return parse_with_goal(source, goal, arena);
     }
     parse_with_goal(source, Goal::Module, arena).or_else(|module_error| {
+        if module_error.is_too_deep() {
+            return Err(module_error);
+        }
         parse_with_goal(source, Goal::Script, arena).map_err(|script_error| {
             // A goal gate proves the source a module; past that, the further error is
             // the file's own and a tie keeps the module's. The one positionless error a
@@ -559,6 +569,10 @@ pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
 ///
 /// * `source` - The TypeScript source code to parse
 /// * `base_offset` - Offset in the full source file
+/// * `host_nesting` - The nesting the host document has spent around the island, in
+///   wire levels (`0` for a top-level island). The parse counts its own on top of it
+///   against `tsv_lang::NESTING_LIMIT`, so the document's depth budget is shared with the
+///   markup that holds the island. Every embedded entry point here takes it.
 ///
 /// # Returns
 ///
@@ -585,11 +599,13 @@ pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
 pub fn parse_embedded<'arena>(
     source: &str,
     base_offset: usize,
+    host_nesting: u32,
     arena: &'arena bumpalo::Bump,
 ) -> Result<Program<'arena>> {
     with_embedding_parser(
         source,
         base_offset,
+        host_nesting,
         arena,
         |parser| parser.parse(),
         |_| Ok(()),
@@ -614,6 +630,7 @@ pub fn parse_embedded<'arena>(
 fn with_embedding_parser<'arena, T>(
     source: &str,
     base_offset: usize,
+    host_nesting: u32,
     arena: &'arena bumpalo::Bump,
     f: impl Fn(&mut parser::Parser<'_, 'arena>) -> std::result::Result<T, ParseError>,
     host_check: impl Fn(&T) -> std::result::Result<(), ParseError>,
@@ -621,6 +638,7 @@ fn with_embedding_parser<'arena, T>(
     parser::parse_retrying_acorn_followers(
         source,
         base_offset,
+        host_nesting,
         Goal::Module,
         arena,
         true,
@@ -654,11 +672,13 @@ fn with_embedding_parser<'arena, T>(
 pub fn parse_embedded_preserve_parens<'arena>(
     source: &str,
     base_offset: usize,
+    host_nesting: u32,
     arena: &'arena bumpalo::Bump,
 ) -> Result<(Program<'arena>, bool)> {
     with_embedding_parser(
         source,
         base_offset,
+        host_nesting,
         arena,
         |parser| {
             parser.preserve_parens = true;
@@ -691,12 +711,14 @@ pub fn parse_embedded_preserve_parens<'arena>(
 pub fn parse_expression_with_comments<'arena>(
     source: &str,
     base_offset: usize,
+    host_nesting: u32,
     arena: &'arena bumpalo::Bump,
     host_check: impl Fn(&'arena Expression<'arena>) -> Result<()>,
 ) -> Result<(&'arena Expression<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
+        host_nesting,
         arena,
         |parser| parser.parse_expression_with_comments(),
         |&(expr, _)| host_check(expr),
@@ -738,11 +760,13 @@ pub fn parse_expression_with_comments<'arena>(
 pub fn parse_pattern_with_comments<'arena>(
     source: &str,
     base_offset: usize,
+    host_nesting: u32,
     arena: &'arena bumpalo::Bump,
 ) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
+        host_nesting,
         arena,
         |parser| {
             let expr = parser.parse_expression_unbounded()?;
@@ -889,11 +913,13 @@ pub fn pattern_binding_end(pattern: &Expression<'_>) -> u32 {
 pub fn parse_type_annotation_partial<'arena>(
     source: &str,
     base_offset: usize,
+    host_nesting: u32,
     arena: &'arena bumpalo::Bump,
 ) -> Result<(TSTypeAnnotation<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
+        host_nesting,
         arena,
         |parser| {
             let ta = parser.parse_type_annotation()?;
@@ -930,6 +956,7 @@ pub fn parse_type_annotation_partial<'arena>(
 pub fn parse_expression_partial_with_comments<'arena>(
     source: &str,
     base_offset: usize,
+    host_nesting: u32,
     arena: &'arena bumpalo::Bump,
     top_level_as: TopLevelAs,
     host_check: impl Fn(&'arena Expression<'arena>, usize) -> Result<()>,
@@ -937,6 +964,7 @@ pub fn parse_expression_partial_with_comments<'arena>(
     with_embedding_parser(
         source,
         base_offset,
+        host_nesting,
         arena,
         |parser| {
             let (expr, end_pos) = parser.parse_assignment_expression_partial(top_level_as)?;
@@ -966,10 +994,16 @@ pub fn parse_expression_partial_with_comments<'arena>(
 // The method-path form clippy suggests fails the higher-ranked lifetime check on
 // `with_embedding_parser`'s `f` bound — same reason as [`parse_embedded`]'s closure.
 #[expect(clippy::redundant_closure_for_method_calls)]
-pub fn parse_type_extent(source: &str, base_offset: usize, arena: &bumpalo::Bump) -> Result<usize> {
+pub fn parse_type_extent(
+    source: &str,
+    base_offset: usize,
+    host_nesting: u32,
+    arena: &bumpalo::Bump,
+) -> Result<usize> {
     with_embedding_parser(
         source,
         base_offset,
+        host_nesting,
         arena,
         |parser| parser.type_extent(),
         |_| Ok(()),
@@ -995,12 +1029,14 @@ pub fn parse_type_extent(source: &str, base_offset: usize, arena: &bumpalo::Bump
 pub fn parse_statement_with_comments<'arena>(
     source: &str,
     base_offset: usize,
+    host_nesting: u32,
     arena: &'arena bumpalo::Bump,
     host_check: impl Fn(&Statement<'arena>) -> Result<()>,
 ) -> Result<(Statement<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
+        host_nesting,
         arena,
         |parser| {
             let stmt = parser.parse_statement()?;

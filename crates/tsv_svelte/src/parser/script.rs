@@ -47,7 +47,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Parse content with TypeScript parser (base offset); the embedded
         // program shares this document's arena.
-        let program = tsv_ts::parse_embedded(content, content_start, self.arena)?;
+        let program =
+            tsv_ts::parse_embedded(content, content_start, self.island_nesting(), self.arena)?;
 
         // Reposition the lexer to the closing `</script>` tag (resumes at `<`) and
         // consume it; `find_raw_text_close` already guaranteed it exists.

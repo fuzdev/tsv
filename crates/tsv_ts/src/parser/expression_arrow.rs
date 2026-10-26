@@ -122,6 +122,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // consume too, so rewinding would only trade it for whatever error that
             // reading hits first — and the format fallback reads the gate, not the position
             Err(error) if error.is_goal_gated() => Err(error),
+            // a depth limit is no verdict on the reading: the other one would be taken for
+            // the stack's sake, not the grammar's
+            Err(error) if error.is_too_deep() => Err(error),
             Ok(_) | Err(_) => {
                 self.rewind(checkpoint);
                 Ok(None)
@@ -192,6 +195,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let params = p.parse_parameter_list_no_decorators()?.into_bump_slice();
             // Return type annotation: <T>(): type => ... or type predicate
             let return_type = p.parse_optional_return_type()?;
+            p.arrow_return_pair(return_type.as_ref())?;
             let arrow_token = p.expect_arrow()?; // consume '=>' (no LineTerminator before it)
             let body = p.parse_arrow_body()?;
             Ok((params, return_type, body, arrow_token))
@@ -222,20 +226,37 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse arrow function body: expression or block statement
+    ///
+    /// The body is one wire level below the arrow (the depth limit's count,
+    /// [`Parser::nested`]): the recursion `a => b => c` passes no grouping delimiter. A block
+    /// body enters it with the body's own levels, in one count.
     fn parse_arrow_body(&mut self) -> Result<ArrowFunctionBody<'arena>, ParseError> {
         if self.check(&TokenKind::BraceOpen) {
             // A block body is a `FunctionBody` (`[+In]`) — `in` is the binary
             // operator even when this arrow sits in a for-header init — and a fresh
             // frame for a parenthesized arrow's return type.
-            let block = self.with_body_frame(Self::parse_function_body)?;
+            let block = self.with_body_frame(|p| p.parse_function_body_levels(3))?;
             Ok(ArrowFunctionBody::BlockStatement(block))
         } else {
             // A concise body is `AssignmentExpression[?In]` — it inherits the
             // outer In context, so `for (a = () => x in y;;)` still rejects.
             // Use assignment_expression so comma doesn't consume next object property
-            Ok(ArrowFunctionBody::Expression(
-                self.parse_assignment_expression_ref()?,
-            ))
+            let body_start = self.current_pos().0;
+            let body = self.nested(1, Self::parse_assignment_expression_ref)?;
+            // a bare body the printer parenthesizes — a conditional (`() => (a ? b : c)`),
+            // or one its position takes a pair around (`() => (@dec class {})`, asked of
+            // the printer's predicate) — a level of the output's nesting
+            if body.span().start as usize == body_start
+                && (matches!(body.kind, ExpressionKind::ConditionalExpression(_))
+                    || crate::printer::printer_adds_operand_pair(
+                        body,
+                        crate::printer::ParenContext::ArrowBody,
+                        self.in_for_header,
+                    ))
+            {
+                self.printer_pair()?;
+            }
+            Ok(ArrowFunctionBody::Expression(body))
         }
     }
 
@@ -266,6 +287,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let params = p.parse_parameter_list_no_decorators()?.into_bump_slice();
             // Return type annotation: (): type => ... or type predicate
             let return_type = p.parse_optional_return_type()?;
+            p.arrow_return_pair(return_type.as_ref())?;
             let arrow_token = p.expect_arrow()?; // consume '=>' (no LineTerminator before it)
             let body = p.parse_arrow_body()?;
             Ok((params, return_type, body, arrow_token))
@@ -308,6 +330,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         debug_assert!(self.at_binding_name());
         let (id_start, id_end) = self.current_pos();
         let name = self.current_ident_name_or_await();
+        // the parameter's levels in the format's output, which writes it in a pair
+        // (`(a) => …`): its `Identifier` and the pair's grouping — a step that returns before
+        // the body (the depth limit's count, `Parser::nested`)
+        self.nested(2, |_| Ok(()))?;
         self.advance()?;
 
         let mut params = self.bvec();
@@ -372,6 +398,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // (Not allowed with type parameters)
             let (id_start, id_end) = self.current_pos();
             let name = self.current_ident_name();
+            // its levels in the format's output, `async (x) => …` (the depth limit's count)
+            self.nested(2, |_| Ok(()))?;
             self.advance()?;
             let mut params = self.bvec();
             params.push(Expression::from_identifier(Identifier::simple(
@@ -385,6 +413,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Check for return type annotation or type predicate
         let return_type = self.parse_optional_return_type()?;
+        self.arrow_return_pair(return_type.as_ref())?;
 
         let arrow_token = self.expect_arrow()?; // consume '=>' (no LineTerminator before it)
 

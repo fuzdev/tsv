@@ -51,7 +51,7 @@ pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinate
 /// (caller-owns-`Bump`); the stylesheet borrows from it for `'arena`.
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<CssStyleSheet<'arena>> {
     ParseError::ensure_source_fits(source)?;
-    parser::parse_css(source, 0, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
+    parser::parse_css(source, 0, 0, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
 /// [`parse`] over a document the format path folded
@@ -76,6 +76,8 @@ pub fn parse_folded<'arena>(
 /// # Arguments
 /// * `source` - CSS source code
 /// * `base_offset` - Offset in parent file (for error reporting and span calculation)
+/// * `host_nesting` - The nesting the host document has spent around the stylesheet, in
+///   wire levels: the parse counts its own on top of it against `tsv_lang::NESTING_LIMIT`
 ///
 /// # Returns
 /// * `Ok(CssStyleSheet)` - Parsed AST with nodes and value comments
@@ -93,9 +95,10 @@ pub fn parse_folded<'arena>(
 pub fn parse_embedded<'arena>(
     source: &str,
     base_offset: usize,
+    host_nesting: u32,
     arena: &'arena bumpalo::Bump,
 ) -> Result<CssStyleSheet<'arena>> {
-    parser::parse_css(source, base_offset, arena)
+    parser::parse_css(source, base_offset, host_nesting, arena)
 }
 
 /// Format CSS stylesheet to a formatted string
