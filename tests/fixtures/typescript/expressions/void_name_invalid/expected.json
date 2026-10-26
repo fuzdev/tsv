@@ -1,0 +1,395 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 522,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " `void` is an operator, never a name: parenthesized, its expression is a primary the",
+			"start": 20,
+			"end": 106
+		},
+		{
+			"type": "Line",
+			"value": " `new` callee, a decorator and a heritage clause each take; bare, `void` is a syntax",
+			"start": 108,
+			"end": 194
+		},
+		{
+			"type": "Line",
+			"value": " error at every one of them (see input_invalid_*)",
+			"start": 196,
+			"end": 247
+		},
+		{
+			"type": "Line",
+			"value": " the type keywords that are not reserved words stay names there",
+			"start": 352,
+			"end": 417
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 521,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 512,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 249,
+					"end": 264,
+					"expression": {
+						"type": "NewExpression",
+						"start": 249,
+						"end": 263,
+						"callee": {
+							"type": "UnaryExpression",
+							"start": 254,
+							"end": 260,
+							"operator": "void",
+							"prefix": true,
+							"argument": {
+								"type": "Literal",
+								"start": 259,
+								"end": 260,
+								"value": 0,
+								"raw": "0"
+							}
+						},
+						"arguments": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `void` is an operator, never a name: parenthesized, its expression is a primary the",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " `new` callee, a decorator and a heritage clause each take; bare, `void` is a syntax",
+							"start": 108,
+							"end": 194
+						},
+						{
+							"type": "Line",
+							"value": " error at every one of them (see input_invalid_*)",
+							"start": 196,
+							"end": 247
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 266,
+					"end": 287,
+					"decorators": [
+						{
+							"type": "Decorator",
+							"start": 266,
+							"end": 275,
+							"expression": {
+								"type": "UnaryExpression",
+								"start": 268,
+								"end": 274,
+								"operator": "void",
+								"prefix": true,
+								"argument": {
+									"type": "Literal",
+									"start": 273,
+									"end": 274,
+									"value": 0,
+									"raw": "0"
+								}
+							}
+						}
+					],
+					"id": {
+						"type": "Identifier",
+						"start": 283,
+						"end": 284,
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 285,
+						"end": 287,
+						"body": []
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 289,
+					"end": 320,
+					"id": {
+						"type": "Identifier",
+						"start": 295,
+						"end": 296,
+						"name": "B"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 297,
+						"end": 320,
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 301,
+								"end": 317,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 311,
+									"end": 312,
+									"name": "m"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 312,
+									"end": 317,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 315,
+										"end": 317,
+										"body": []
+									}
+								},
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 301,
+										"end": 310,
+										"expression": {
+											"type": "UnaryExpression",
+											"start": 303,
+											"end": 309,
+											"operator": "void",
+											"prefix": true,
+											"argument": {
+												"type": "Literal",
+												"start": 308,
+												"end": 309,
+												"value": 0,
+												"raw": "0"
+											}
+										}
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 322,
+					"end": 349,
+					"id": {
+						"type": "Identifier",
+						"start": 328,
+						"end": 329,
+						"name": "C"
+					},
+					"superClass": {
+						"type": "UnaryExpression",
+						"start": 339,
+						"end": 345,
+						"operator": "void",
+						"prefix": true,
+						"argument": {
+							"type": "Literal",
+							"start": 344,
+							"end": 345,
+							"value": 0,
+							"raw": "0"
+						}
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 347,
+						"end": 349,
+						"body": []
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 419,
+					"end": 432,
+					"expression": {
+						"type": "NewExpression",
+						"start": 419,
+						"end": 431,
+						"callee": {
+							"type": "Identifier",
+							"start": 423,
+							"end": 429,
+							"name": "number"
+						},
+						"arguments": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the type keywords that are not reserved words stay names there",
+							"start": 352,
+							"end": 417
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 434,
+					"end": 453,
+					"decorators": [
+						{
+							"type": "Decorator",
+							"start": 434,
+							"end": 441,
+							"expression": {
+								"type": "Identifier",
+								"start": 435,
+								"end": 441,
+								"name": "number"
+							}
+						}
+					],
+					"id": {
+						"type": "Identifier",
+						"start": 449,
+						"end": 450,
+						"name": "D"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 451,
+						"end": 453,
+						"body": []
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 455,
+					"end": 484,
+					"id": {
+						"type": "Identifier",
+						"start": 461,
+						"end": 462,
+						"name": "E"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 463,
+						"end": 484,
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 467,
+								"end": 481,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 475,
+									"end": 476,
+									"name": "m"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 476,
+									"end": 481,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 479,
+										"end": 481,
+										"body": []
+									}
+								},
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 467,
+										"end": 474,
+										"expression": {
+											"type": "Identifier",
+											"start": 468,
+											"end": 474,
+											"name": "number"
+										}
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 486,
+					"end": 511,
+					"id": {
+						"type": "Identifier",
+						"start": 492,
+						"end": 493,
+						"name": "F"
+					},
+					"superClass": {
+						"type": "Identifier",
+						"start": 502,
+						"end": 508,
+						"name": "string"
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 509,
+						"end": 511,
+						"body": []
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

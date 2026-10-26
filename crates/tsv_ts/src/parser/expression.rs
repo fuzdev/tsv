@@ -2238,12 +2238,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     },
                 ))
             }
-            // TypeScript type keywords and contextual keywords are valid identifiers in expression context
+            // TypeScript type keywords and contextual keywords are valid identifiers in expression context.
+            // `void` is not one: it is an ECMAScript ReservedWord, the unary operator, so a bare
+            // `void` reaching a primary (a `new` callee, a decorator head, a heritage atom) is a
+            // syntax error, as `typeof` is.
             TokenKind::Keyword(KeywordKind::Number)
             | TokenKind::Keyword(KeywordKind::String)
             | TokenKind::Keyword(KeywordKind::Boolean)
             | TokenKind::Keyword(KeywordKind::Any)
-            | TokenKind::Keyword(KeywordKind::Void)
             | TokenKind::Keyword(KeywordKind::Never)
             | TokenKind::Keyword(KeywordKind::Unknown)
             | TokenKind::Keyword(KeywordKind::Object)

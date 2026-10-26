@@ -380,14 +380,8 @@ fn k290(op: &str, before: &str, inner: &str) -> bool {
 /// that combination nests nothing and is left out.
 fn prefix_sweep(shapes: &mut Vec<Shape>, full: bool) {
     let comment_fits = |op: &str, comment: &str| !(op == "yield " && comment.contains('\n'));
-    // TODO: the parser accepts `new void` (a `new` whose callee is the `void` keyword, a
-    // syntax error to tsc and acorn), so a pair that repeats into one — with a line comment
-    // between, ASI splits it into statements no limit counts — is left out until it rejects
-    let pair_fits = |first: &str, second: &str| {
-        !matches!((first, second), ("new ", "void ") | ("void ", "new "))
-    };
     for &first in PREFIXES {
-        for &second in PREFIXES.iter().filter(|s| pair_fits(first, s)) {
+        for &second in PREFIXES {
             shapes.push(generated_prefix("", [first, second].concat(), "a"));
         }
     }
@@ -395,7 +389,7 @@ fn prefix_sweep(shapes: &mut Vec<Shape>, full: bool) {
         for &comment in PREFIX_COMMENTS.iter().filter(|c| comment_fits(op, c)) {
             shapes.push(generated_prefix("", [op, comment].concat(), "a"));
             if full {
-                for &second in PREFIXES.iter().filter(|s| pair_fits(op, s)) {
+                for &second in PREFIXES {
                     shapes.push(generated_prefix("", [op, comment, second].concat(), "a"));
                 }
             }

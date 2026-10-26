@@ -286,11 +286,16 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202, over
  * (`@dec constructor() {}`, TS1206) left it for reject parity when a decorated
  * constructor implementation became a parse error, as acorn's; every other bucket
  * unmoved.
+ *
+ * 16 → 14 `over_acceptance_parser`: `classExtendingPrimitive.ts` and
+ * `classExtendingPrimitive2.ts` (`class C4a extends void {}`, TS1109) left it for reject
+ * parity when `void` stopped reading as a name at a primary (it is the unary operator,
+ * an ECMAScript ReservedWord); every other bucket unmoved.
  */
 export const TS_REPO_PINS = {
 	scanned: 13708,
 	accept_parity: 12284,
-	over_acceptance_parser: 16,
+	over_acceptance_parser: 14,
 	over_acceptance_checker: 467,
 	units_scanned: 7874,
 	units_accept_parity: 7858
