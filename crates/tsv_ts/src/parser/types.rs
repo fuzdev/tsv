@@ -1158,7 +1158,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.current_kind(),
                 TokenKind::BracketOpen | TokenKind::BraceOpen
             ) {
-                self.parse_binding_pattern()?
+                // one wire level: the pattern under the `RestElement` (the depth limit's
+                // count)
+                self.nested(1, Self::parse_binding_pattern)?
             } else {
                 let (id_start, id_end) = self.current_pos();
                 let name = self

@@ -180,7 +180,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<VariableDeclaration<'arena>, ParseError> {
         let (decl_start, _) = self.current_pos();
         self.eat_declaration_keyword(kind)?;
-        let (declarations, decl_end) = self.parse_declarator_list(DeclaratorSite::ForHead)?;
+        // one wire level: the `VariableDeclaration` under the `for` statement, which a
+        // declaration statement's own level pays for elsewhere (the depth limit's count)
+        let (declarations, decl_end) =
+            self.nested(1, |p| p.parse_declarator_list(DeclaratorSite::ForHead))?;
 
         Ok(VariableDeclaration {
             kind,

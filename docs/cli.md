@@ -298,10 +298,13 @@ counter bounds both shapes a walk recurses through:
   from the root — one for a paren, an array, a call's arguments, a computed member, a
   template's `${` (a tagged template's quasi one more), an operator's operand, an
   assignment's right side, a conditional's branch, a unary operand, a `new`'s callee, a
-  spread, a statement, a class expression, a parameter, a parameter property's binding
-  (its decorators sit on that binding, a level below a plain parameter's), a declarator, a
-  `catch` clause, an enum member, a decorator, a declaration under its `export`, a tuple
-  element (a named one's type one more), a conditional type's extends type and branches,
+  spread, a statement, a class expression, a parameter (a type-member signature's is paid
+  for by its list's level, the signature's own being the member's), a parameter property's
+  binding (its decorators sit on that binding, a level below a plain parameter's), a rest
+  parameter's pattern, a shorthand property's default (`{ a = d }`, the `AssignmentPattern`
+  a pattern reads it as), a declarator, a `for` head's declaration, a `catch` clause, an
+  enum member, a decorator, a declaration under its `export`, a tuple element (a named
+  one's type one more), a conditional type's extends type and branches,
   an arrow's concise body; two for an object literal (the object and its `Property`), a
   type argument (the `TSTypeParameterInstantiation` and the argument), a function type's
   parameter (the function type and the parameter), an index signature's parameter type
@@ -316,7 +319,13 @@ counter bounds both shapes a walk recurses through:
   already counts one, a parameter list's level beside a declaration's — but never fewer:
   `tests/depth_limit.rs` checks, for every shape it generates, that no path through the
   accepted input's wire nests past the limit, and for the calibrated shapes that it sits at
-  it. An optional chain's `ChainExpression` is the one wire node no walk recurses through
+  it. An assignment over a target other than a bare name (`a[k] = x`, `({ [k]: a } = x)`)
+  is one more level, found only once its `=` is read, when the target is already parsed:
+  it is charged then, as a printer's pair is (below) — framed, added up within its frame,
+  and checked against the deepest nesting the frame has reached: the target's, and the
+  right side's too, which the level does not sit above, so a right-nested chain of them
+  (`a.b = c.d = …`, `f(a[k] = f(…))`) is accepted well short of its wire's depth. An
+  optional chain's `ChainExpression` is the one wire node no walk recurses through
   (the wire writer emits it inline, and no other walk's tree holds it), so it is charged
   nothing. A CSS declaration value is a string on the wire but a tree to the
   printer, so its functions and parenthesized groups are counted too, one level each, as

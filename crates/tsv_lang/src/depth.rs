@@ -254,7 +254,9 @@ impl DepthBudget {
 /// nesting; so a pair is charged as one ([`SpineCount::try_pair`]), on top of the frame's
 /// deepest nesting against [`NESTING_LIMIT`] and on top of its charged nesting in every
 /// link's spine check — the reparse of the output then counts no more than the parse of
-/// the input did.
+/// the input did. A parser charges the same way a wire level it finds only above an
+/// operand it has already read (an assignment over its target), which no top-down
+/// [`DepthBudget`] count can reach.
 ///
 /// The two counts share one word, the units in its low half and the pairs in its high
 /// half, so a link's common case — no pair in the frame and the count far from the limit

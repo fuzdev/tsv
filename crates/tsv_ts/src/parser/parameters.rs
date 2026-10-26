@@ -281,7 +281,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_parameter_list(
         &mut self,
     ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
-        self.parse_parameter_list_inner(true)
+        self.parse_parameter_list_inner(true, 1)
     }
 
     /// Parse a parenthesized parameter list that **rejects** parameter decorators.
@@ -291,19 +291,37 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// class decorator — "Leading decorators must be attached to a class declaration")
     /// and type-member signatures (interface / type-literal
     /// method, call, construct, and accessor signatures — "Unexpected character
-    /// '@'"). tsc's parser rejects only the non-generic arrow forms, an artifact of its
-    /// arrow lookahead; it accepts the generic arrows and the type-member signatures,
-    /// raising "Decorators are not valid here" (TS1206) from its checker. So the
-    /// uniform rejection here does not rest on tsc's parser, and the reject-vs-defer
-    /// line (`docs/conformance_tsc.md`) normally defers a checker-raised rule.
+    /// '@'"; those take [`Parser::parse_signature_parameter_list`]). tsc's parser
+    /// rejects only the non-generic arrow forms, an artifact of its arrow lookahead; it
+    /// accepts the generic arrows and the type-member signatures, raising "Decorators
+    /// are not valid here" (TS1206) from its checker. So the uniform rejection here does
+    /// not rest on tsc's parser, and the reject-vs-defer line (`docs/conformance_tsc.md`)
+    /// normally defers a checker-raised rule.
     pub(super) fn parse_parameter_list_no_decorators(
         &mut self,
     ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
-        self.parse_parameter_list_inner(false)
+        self.parse_parameter_list_inner(false, 1)
+    }
+
+    /// [`Parser::parse_parameter_list_no_decorators`] for a type-member signature
+    /// (method, accessor, call and construct signatures), whose own wire level the
+    /// member's count already holds: the list's grouping level is the parameter's, so
+    /// the parameter is charged nothing beside it (the depth limit's count; an arrow's
+    /// grouping level is the arrow's own node instead). Whatever node the parameter is —
+    /// a name, a pattern, a rest element, or the default or parameter property
+    /// `check_signature_params` then rejects — it is that one level, and what nests below
+    /// it is charged where it is parsed: a pattern's own levels, a rest parameter's
+    /// pattern at the rest, a parameter property's binding inside the property.
+    pub(super) fn parse_signature_parameter_list(
+        &mut self,
+    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
+        self.parse_parameter_list_inner(false, 0)
     }
 
     /// Shared parameter-list body. `allow_decorators` gates whether a leading `@` on
-    /// a parameter is parsed as a decorator (`true`) or rejected (`false`).
+    /// a parameter is parsed as a decorator (`true`) or rejected (`false`), and
+    /// `parameter_levels` is what each parameter is charged beside the list's grouping
+    /// level (the depth limit's count, `Parser::nested`).
     ///
     /// The list is a grouping delimiter ([`Parser::enter_grouping`]), so each
     /// parameter default parses as a fresh expression frame, whatever encloses the
@@ -322,6 +340,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_parameter_list_inner(
         &mut self,
         allow_decorators: bool,
+        parameter_levels: u32,
     ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
         self.expect(&TokenKind::ParenOpen)?;
         self.enter_grouping()?;
@@ -333,8 +352,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             loop {
                 frame.element(self, params.len());
                 // one wire level: the parameter, over its decorators, its pattern, its
-                // annotation and its default (the depth limit's count)
-                let param = self.nested(1, |p| p.parse_parameter(allow_decorators))?;
+                // annotation and its default (the depth limit's count) — none where the
+                // list's grouping level is the parameter's (`parameter_levels`)
+                let param =
+                    self.nested(parameter_levels, |p| p.parse_parameter(allow_decorators))?;
 
                 let is_rest = matches!(param.kind, ExpressionKind::RestElement(_));
                 params.push(param);
@@ -534,7 +555,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // so parse the bare pattern and bind the type here
                     // (matching acorn; `parse_destructured_binding` would
                     // wrongly attach it to the pattern).
-                    let pattern = self.parse_binding_pattern()?;
+                    // one wire level: the pattern under the `RestElement` (the depth
+                    // limit's count) — owed where the list charges the parameter nothing
+                    // (`parse_signature_parameter_list`); in a value list the gate's wire
+                    // walk finds no level for it, so there it is a level of surplus
+                    let pattern = self.nested(1, Self::parse_binding_pattern)?;
                     // A trailing `?`/`: T` binds to the rest element (acorn's
                     // shape), never to the inner pattern.
                     let (optional, type_annotation, arg_end) =

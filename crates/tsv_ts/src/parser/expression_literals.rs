@@ -283,8 +283,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     ));
                 }
                 if self.eat(TokenKind::Equals)? {
-                    // `{ a = 1 }`: parsed as an AssignmentExpression.
-                    let default_value = self.parse_assignment_expression_ref()?;
+                    // `{ a = 1 }`: parsed as an AssignmentExpression. One wire level: the
+                    // `AssignmentPattern` the pattern context refines it to, over its
+                    // default (the depth limit's count)
+                    let default_value = self.nested(1, Self::parse_assignment_expression_ref)?;
                     // prev_token_end covers a parenthesized default's closing `)`
                     let assign_end = self.prev_token_end() as u32;
                     (

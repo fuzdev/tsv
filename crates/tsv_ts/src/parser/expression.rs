@@ -1340,6 +1340,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.refine_whole_assignable(left.clone(), AssignableContext::Assignment)?
         };
 
+        // one wire level: the assignment over its target, read before the operator said it
+        // was one (the depth limit's count) — none over a bare name, which nests nothing,
+        // the wire-only tree's grouping pairs looked through so it counts no more than the
+        // paren-free parse
+        let mut target = &left_pattern;
+        while let ExpressionKind::ParenthesizedExpression(paren) = &target.kind {
+            target = paren.expression;
+        }
+        if !matches!(target.kind, ExpressionKind::Identifier(_)) {
+            self.level_above_operand()?;
+        }
+
         let span = Span::new(expr_start as u32, end);
         debug_assert_encloses(span.start, span.end, left, right);
         let assignment = self.arena.alloc(Expression {

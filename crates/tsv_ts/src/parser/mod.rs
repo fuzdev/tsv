@@ -1179,6 +1179,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
+    /// Count a wire level the parse finds only above an operand it has already read — an
+    /// assignment over its target — which no top-down [`Parser::nested`] charge can reach.
+    /// It is carried as a printer pair is ([`SpineCount::try_pair`]): framed, added up
+    /// within the frame, and checked on top of the deepest nesting the frame has reached —
+    /// the operand's own, and the right side's parsed after it, which the level does not
+    /// sit above (an overcharge on a right-nested assignment chain).
+    #[inline]
+    pub(super) fn level_above_operand(&mut self) -> Result<(), ParseError> {
+        self.printer_pair()
+    }
+
     /// Run `f` — the parse of an expression starting at the current token — as a pair-free
     /// root: a position where the printer writes a bare assignment without the pair it gives
     /// an assignment as a value nearly everywhere else (`f((a = b))`, `x = (a = b)`,
