@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 540,
+	"end": 582,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -25,19 +25,19 @@
 		{
 			"type": "Line",
 			"value": " a later declarator inherits it too",
-			"start": 452,
-			"end": 489
+			"start": 494,
+			"end": 531
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 539,
+		"end": 581,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 530,
+			"end": 572,
 			"body": [
 				{
 					"type": "ForStatement",
@@ -435,16 +435,16 @@
 				{
 					"type": "ForStatement",
 					"start": 406,
-					"end": 449,
+					"end": 446,
 					"init": {
 						"type": "VariableDeclaration",
 						"start": 411,
-						"end": 439,
+						"end": 436,
 						"declarations": [
 							{
 								"type": "VariableDeclarator",
 								"start": 415,
-								"end": 439,
+								"end": 436,
 								"id": {
 									"type": "Identifier",
 									"start": 415,
@@ -452,9 +452,88 @@
 									"name": "a"
 								},
 								"init": {
-									"type": "ArrowFunctionExpression",
+									"type": "NewExpression",
 									"start": 419,
-									"end": 439,
+									"end": 436,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 423,
+										"end": 434,
+										"object": {
+											"type": "Identifier",
+											"start": 423,
+											"end": 424,
+											"name": "C"
+										},
+										"property": {
+											"type": "BinaryExpression",
+											"start": 426,
+											"end": 432,
+											"left": {
+												"type": "Identifier",
+												"start": 426,
+												"end": 427,
+												"name": "b"
+											},
+											"operator": "in",
+											"right": {
+												"type": "Identifier",
+												"start": 431,
+												"end": 432,
+												"name": "c"
+											}
+										},
+										"computed": true,
+										"optional": false
+									},
+									"arguments": []
+								}
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 438,
+						"end": 439,
+						"name": "d"
+					},
+					"update": {
+						"type": "Identifier",
+						"start": 441,
+						"end": 442,
+						"name": "e"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 444,
+						"end": 446,
+						"body": []
+					}
+				},
+				{
+					"type": "ForStatement",
+					"start": 448,
+					"end": 491,
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 453,
+						"end": 481,
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 457,
+								"end": 481,
+								"id": {
+									"type": "Identifier",
+									"start": 457,
+									"end": 458,
+									"name": "a"
+								},
+								"init": {
+									"type": "ArrowFunctionExpression",
+									"start": 461,
+									"end": 481,
 									"id": null,
 									"expression": false,
 									"generator": false,
@@ -462,29 +541,29 @@
 									"params": [
 										{
 											"type": "AssignmentPattern",
-											"start": 420,
-											"end": 432,
+											"start": 462,
+											"end": 474,
 											"left": {
 												"type": "Identifier",
-												"start": 420,
-												"end": 421,
+												"start": 462,
+												"end": 463,
 												"name": "x"
 											},
 											"right": {
 												"type": "BinaryExpression",
-												"start": 425,
-												"end": 431,
+												"start": 467,
+												"end": 473,
 												"left": {
 													"type": "Identifier",
-													"start": 425,
-													"end": 426,
+													"start": 467,
+													"end": 468,
 													"name": "b"
 												},
 												"operator": "in",
 												"right": {
 													"type": "Identifier",
-													"start": 430,
-													"end": 431,
+													"start": 472,
+													"end": 473,
 													"name": "c"
 												}
 											}
@@ -492,8 +571,8 @@
 									],
 									"body": {
 										"type": "BlockStatement",
-										"start": 437,
-										"end": 439,
+										"start": 479,
+										"end": 481,
 										"body": []
 									}
 								}
@@ -503,75 +582,75 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 441,
-						"end": 442,
+						"start": 483,
+						"end": 484,
 						"name": "d"
 					},
 					"update": {
 						"type": "Identifier",
-						"start": 444,
-						"end": 445,
+						"start": 486,
+						"end": 487,
 						"name": "e"
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 447,
-						"end": 449,
+						"start": 489,
+						"end": 491,
 						"body": []
 					}
 				},
 				{
 					"type": "ForStatement",
-					"start": 491,
-					"end": 529,
+					"start": 533,
+					"end": 571,
 					"init": {
 						"type": "VariableDeclaration",
-						"start": 496,
-						"end": 519,
+						"start": 538,
+						"end": 561,
 						"declarations": [
 							{
 								"type": "VariableDeclarator",
-								"start": 500,
-								"end": 505,
+								"start": 542,
+								"end": 547,
 								"id": {
 									"type": "Identifier",
-									"start": 500,
-									"end": 501,
+									"start": 542,
+									"end": 543,
 									"name": "a"
 								},
 								"init": {
 									"type": "Literal",
-									"start": 504,
-									"end": 505,
+									"start": 546,
+									"end": 547,
 									"value": 0,
 									"raw": "0"
 								}
 							},
 							{
 								"type": "VariableDeclarator",
-								"start": 507,
-								"end": 519,
+								"start": 549,
+								"end": 561,
 								"id": {
 									"type": "Identifier",
-									"start": 507,
-									"end": 508,
+									"start": 549,
+									"end": 550,
 									"name": "b"
 								},
 								"init": {
 									"type": "BinaryExpression",
-									"start": 512,
-									"end": 518,
+									"start": 554,
+									"end": 560,
 									"left": {
 										"type": "Identifier",
-										"start": 512,
-										"end": 513,
+										"start": 554,
+										"end": 555,
 										"name": "c"
 									},
 									"operator": "in",
 									"right": {
 										"type": "Identifier",
-										"start": 517,
-										"end": 518,
+										"start": 559,
+										"end": 560,
 										"name": "d"
 									}
 								}
@@ -581,28 +660,28 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 521,
-						"end": 522,
+						"start": 563,
+						"end": 564,
 						"name": "e"
 					},
 					"update": {
 						"type": "Identifier",
-						"start": 524,
-						"end": 525,
+						"start": 566,
+						"end": 567,
 						"name": "f"
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 527,
-						"end": 529,
+						"start": 569,
+						"end": 571,
 						"body": []
 					},
 					"leadingComments": [
 						{
 							"type": "Line",
 							"value": " a later declarator inherits it too",
-							"start": 452,
-							"end": 489
+							"start": 494,
+							"end": 531
 						}
 					]
 				}

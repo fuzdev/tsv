@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 387,
+	"end": 459,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,12 +13,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 386,
+		"end": 458,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 377,
+			"end": 449,
 			"body": [
 				{
 					"type": "ForStatement",
@@ -571,11 +571,11 @@
 				{
 					"type": "ForStatement",
 					"start": 337,
-					"end": 376,
+					"end": 373,
 					"init": {
 						"type": "AssignmentExpression",
 						"start": 342,
-						"end": 366,
+						"end": 363,
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
@@ -584,9 +584,141 @@
 							"name": "a"
 						},
 						"right": {
-							"type": "ArrowFunctionExpression",
+							"type": "NewExpression",
 							"start": 346,
-							"end": 366,
+							"end": 363,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 350,
+								"end": 361,
+								"object": {
+									"type": "Identifier",
+									"start": 350,
+									"end": 351,
+									"name": "C"
+								},
+								"property": {
+									"type": "BinaryExpression",
+									"start": 353,
+									"end": 359,
+									"left": {
+										"type": "Identifier",
+										"start": 353,
+										"end": 354,
+										"name": "b"
+									},
+									"operator": "in",
+									"right": {
+										"type": "Identifier",
+										"start": 358,
+										"end": 359,
+										"name": "c"
+									}
+								},
+								"computed": true,
+								"optional": false
+							},
+							"arguments": []
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 365,
+						"end": 366,
+						"name": "d"
+					},
+					"update": {
+						"type": "Identifier",
+						"start": 368,
+						"end": 369,
+						"name": "e"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 371,
+						"end": 373,
+						"body": []
+					}
+				},
+				{
+					"type": "ForStatement",
+					"start": 375,
+					"end": 407,
+					"init": {
+						"type": "NewExpression",
+						"start": 380,
+						"end": 397,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 384,
+							"end": 395,
+							"object": {
+								"type": "Identifier",
+								"start": 384,
+								"end": 385,
+								"name": "C"
+							},
+							"property": {
+								"type": "BinaryExpression",
+								"start": 387,
+								"end": 393,
+								"left": {
+									"type": "Identifier",
+									"start": 387,
+									"end": 388,
+									"name": "a"
+								},
+								"operator": "in",
+								"right": {
+									"type": "Identifier",
+									"start": 392,
+									"end": 393,
+									"name": "b"
+								}
+							},
+							"computed": true,
+							"optional": false
+						},
+						"arguments": []
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 399,
+						"end": 400,
+						"name": "d"
+					},
+					"update": {
+						"type": "Identifier",
+						"start": 402,
+						"end": 403,
+						"name": "e"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 405,
+						"end": 407,
+						"body": []
+					}
+				},
+				{
+					"type": "ForStatement",
+					"start": 409,
+					"end": 448,
+					"init": {
+						"type": "AssignmentExpression",
+						"start": 414,
+						"end": 438,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 414,
+							"end": 415,
+							"name": "a"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 418,
+							"end": 438,
 							"id": null,
 							"expression": false,
 							"generator": false,
@@ -594,29 +726,29 @@
 							"params": [
 								{
 									"type": "AssignmentPattern",
-									"start": 347,
-									"end": 359,
+									"start": 419,
+									"end": 431,
 									"left": {
 										"type": "Identifier",
-										"start": 347,
-										"end": 348,
+										"start": 419,
+										"end": 420,
 										"name": "x"
 									},
 									"right": {
 										"type": "BinaryExpression",
-										"start": 352,
-										"end": 358,
+										"start": 424,
+										"end": 430,
 										"left": {
 											"type": "Identifier",
-											"start": 352,
-											"end": 353,
+											"start": 424,
+											"end": 425,
 											"name": "b"
 										},
 										"operator": "in",
 										"right": {
 											"type": "Identifier",
-											"start": 357,
-											"end": 358,
+											"start": 429,
+											"end": 430,
 											"name": "c"
 										}
 									}
@@ -624,28 +756,28 @@
 							],
 							"body": {
 								"type": "BlockStatement",
-								"start": 364,
-								"end": 366,
+								"start": 436,
+								"end": 438,
 								"body": []
 							}
 						}
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 368,
-						"end": 369,
+						"start": 440,
+						"end": 441,
 						"name": "d"
 					},
 					"update": {
 						"type": "Identifier",
-						"start": 371,
-						"end": 372,
+						"start": 443,
+						"end": 444,
 						"name": "e"
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 374,
-						"end": 376,
+						"start": 446,
+						"end": 448,
 						"body": []
 					}
 				}

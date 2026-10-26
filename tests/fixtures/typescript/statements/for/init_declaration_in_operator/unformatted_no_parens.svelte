@@ -6,6 +6,7 @@
 	for (var a = cond ? b in c : 0; d; e) {}
 	for (let a = function () { z = b in c; }; d; e) {}
 	for (let a = f(b in c); d; e) {}
+	for (let a = new C[b in c](); d; e) {}
 	for (let a = (x = b in c) => {}; d; e) {}
 
 	// a later declarator inherits it too

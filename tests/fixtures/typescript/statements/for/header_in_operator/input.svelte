@@ -19,5 +19,7 @@
 	) {}
 	for (f((a in b)); d; e) {}
 	for (new C((a in b)); d; e) {}
+	for (a = new C[(b in c)](); d; e) {}
+	for (new C[(a in b)](); d; e) {}
 	for (a = (x = (b in c)) => {}; d; e) {}
 </script>
