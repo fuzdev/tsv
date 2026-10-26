@@ -1024,6 +1024,7 @@ mod tests {
     /// a clean unit passes its value through and records nothing.
     #[test]
     fn guarded_records_a_panic_and_the_walk_continues() {
+        let _lock = crate::audit::panic_hook::hook_test_lock();
         let _hook = crate::audit::panic_hook::SuppressedPanicHook::install();
         let mut report = super::Report::default();
         let path = std::path::Path::new("seed.svelte");

@@ -27,12 +27,16 @@
 /// The boxed hook `std::panic::take_hook` hands back — held for the restore on drop.
 type PanicHook = Box<dyn Fn(&std::panic::PanicHookInfo<'_>) + Sync + Send + 'static>;
 
-/// RAII core of both brackets: installs `hook` on construction and restores the hook it
-/// displaced on drop — including on an early-return error path, which a hand-rolled take/set
-/// pair leaks.
+/// RAII core of both brackets: installs `hook` on construction and puts the hook it
+/// displaced back on drop — including on an early-return error path, which a hand-rolled
+/// take/set pair leaks.
 ///
-/// Nesting is safe: each guard restores exactly the hook it displaced, and `Drop` runs in
-/// reverse construction order.
+/// The drop replaces whatever hook is installed by then. Where that is still the guard's
+/// own — guards nested on one thread, whose `Drop` runs in reverse construction order — it
+/// restores the displaced hook itself, the same allocation, so an install/restore cycle
+/// leaves nothing behind. Where it is not (another guard installed over this one and was
+/// not dropped first), the displaced hook may still be held by the hook that replaced it,
+/// and the drop installs a forwarder to it instead.
 struct HookGuard {
     prev: Option<std::sync::Arc<PanicHook>>,
 }
@@ -44,6 +48,11 @@ impl HookGuard {
 
     /// Install the hook `make` builds from the displaced one, which it may forward to.
     fn install_over(make: impl FnOnce(std::sync::Arc<PanicHook>) -> PanicHook) -> Self {
+        #[cfg(test)]
+        assert!(
+            HOLDS_HOOK_TEST_LOCK.get(),
+            "a test that installs a panic hook holds `hook_test_lock` for the whole test"
+        );
         let prev = std::sync::Arc::new(std::panic::take_hook());
         std::panic::set_hook(make(std::sync::Arc::clone(&prev)));
         Self { prev: Some(prev) }
@@ -58,14 +67,55 @@ impl Drop for HookGuard {
         if std::thread::panicking() {
             return;
         }
-        if let Some(hook) = self.prev.take() {
-            std::panic::set_hook(Box::new(move |info| hook(info)));
+        let Some(prev) = self.prev.take() else {
+            return;
+        };
+        // the installed hook goes first: a forwarding one holds the other handle on `prev`
+        drop(std::panic::take_hook());
+        match std::sync::Arc::try_unwrap(prev) {
+            Ok(hook) => std::panic::set_hook(hook),
+            Err(shared) => std::panic::set_hook(Box::new(move |info| shared(info))),
         }
     }
 }
 
-/// RAII: the default panic hook is replaced with a no-op on construction and restored on
-/// drop.
+/// The lock every test that installs a panic hook holds for its whole run — directly, or
+/// through code that installs one ([`SuppressedPanicHook`], [`CapturingPanicHook`]). The
+/// hook is process-global, so two such tests on `cargo test`'s threads would each install
+/// over the other and restore the other's hook. `HookGuard` asserts that its thread
+/// holds the lock.
+#[cfg(test)]
+pub(crate) fn hook_test_lock() -> HookTestLock {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    // a test that failed holding the lock poisoned it, and its failure is reported already
+    let guard = LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    HOLDS_HOOK_TEST_LOCK.set(true);
+    HookTestLock { _guard: guard }
+}
+
+/// [`hook_test_lock`]'s hold, released on drop.
+#[cfg(test)]
+pub(crate) struct HookTestLock {
+    _guard: std::sync::MutexGuard<'static, ()>,
+}
+
+#[cfg(test)]
+impl Drop for HookTestLock {
+    fn drop(&mut self) {
+        HOLDS_HOOK_TEST_LOCK.set(false);
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Whether this thread holds [`hook_test_lock`].
+    static HOLDS_HOOK_TEST_LOCK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// RAII: the installed panic hook is replaced with a no-op on construction and put back on
+/// drop, as `HookGuard` puts a displaced hook back.
 pub(crate) struct SuppressedPanicHook {
     _guard: HookGuard,
 }
@@ -91,8 +141,8 @@ thread_local! {
 }
 
 /// RAII: while alive, a panic's `Display` text is recorded for [`take_last_panic`] instead
-/// of printed — for a caller that reports the panics it triggers with their location. Restores
-/// the displaced hook on drop, like [`SuppressedPanicHook`].
+/// of printed — for a caller that reports the panics it triggers with their location. Puts
+/// the displaced hook back on drop, like [`SuppressedPanicHook`].
 pub(crate) struct CapturingPanicHook {
     _guard: HookGuard,
 }
@@ -208,16 +258,16 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    /// Every property in ONE test, deliberately: the panic hook is
-    /// process-global, so a second test installing its own would race this one
-    /// under `cargo test`'s thread pool. For the same reason the sentinel
-    /// counts only panics carrying this module's marker — an unrelated
-    /// concurrent panic elsewhere in the suite must not be mistaken for ours.
+    /// The panic hook is process-global: every test here, like every other test that
+    /// installs one, holds [`hook_test_lock`]. A test that holds it can still see an
+    /// unrelated test's panic, so the sentinel counts only panics carrying this module's
+    /// marker.
     #[test]
     fn the_hook_is_suppressed_then_restored_and_payloads_still_read() {
         const MARKER: &str = "panic_hook.rs sentinel";
         static SEEN: AtomicUsize = AtomicUsize::new(0);
 
+        let _lock = hook_test_lock();
         let displaced = std::panic::take_hook();
         std::panic::set_hook(Box::new(|info| {
             if panic_message(info.payload()).contains(MARKER) {
@@ -274,11 +324,22 @@ mod tests {
                 "a caught panic is recorded, not printed"
             );
 
+            // the poll's count is back to zero once `catch_panic` returns, so a later panic
+            // on this thread, caught by no `catch_panic`, is not recorded
+            let bare = std::panic::catch_unwind(|| panic!("{MARKER} bare"));
+            assert!(bare.is_err());
+            assert_eq!(
+                SEEN.load(Ordering::SeqCst),
+                2,
+                "a panic on the catching thread after the catch reaches the displaced hook"
+            );
+            assert_eq!(take_last_panic(), None, "and leaves no record");
+
             let elsewhere = std::thread::spawn(|| panic!("{MARKER} elsewhere")).join();
             assert!(elsewhere.is_err());
             assert_eq!(
                 SEEN.load(Ordering::SeqCst),
-                2,
+                3,
                 "a panic outside every catch reaches the displaced hook"
             );
         }
@@ -287,7 +348,7 @@ mod tests {
         assert!(restored.is_err());
         assert_eq!(
             SEEN.load(Ordering::SeqCst),
-            3,
+            4,
             "the hook a forwarding guard displaced must be back after it drops"
         );
 
@@ -303,10 +364,50 @@ mod tests {
         assert!(later.is_err());
         assert_eq!(
             SEEN.load(Ordering::SeqCst),
-            3,
+            4,
             "an unwind-dropped guard leaves its hook installed"
         );
 
+        std::panic::set_hook(displaced);
+    }
+
+    /// A guard's drop puts back the hook it displaced itself, not a wrapper around it:
+    /// after any number of install/restore cycles, of either bracket, the installed hook is
+    /// the original allocation.
+    #[test]
+    fn install_restore_cycles_put_back_the_displaced_hook_itself() {
+        // the address of a hook's closure; a capture keeps it off the zero-size dangling
+        // pointer every capture-free closure shares
+        fn address(hook: &PanicHook) -> *const () {
+            std::ptr::from_ref::<dyn Fn(&std::panic::PanicHookInfo<'_>) + Sync + Send>(&**hook)
+                .cast::<()>()
+        }
+
+        let _lock = hook_test_lock();
+        let displaced = std::panic::take_hook();
+        let tag = 7_u64;
+        let original: PanicHook = Box::new(move |_| {
+            std::hint::black_box(tag);
+        });
+        let at = address(&original);
+        std::panic::set_hook(original);
+
+        for _ in 0..3 {
+            drop(SuppressedPanicHook::install());
+            drop(CapturingPanicHook::install_for_catches());
+            drop(CapturingPanicHook::install());
+        }
+        {
+            let _outer = CapturingPanicHook::install_for_catches();
+            let _inner = SuppressedPanicHook::install();
+        }
+
+        let back = std::panic::take_hook();
+        assert_eq!(
+            address(&back),
+            at,
+            "the restored hook is the one the first guard displaced"
+        );
         std::panic::set_hook(displaced);
     }
 }
