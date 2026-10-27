@@ -2596,7 +2596,7 @@ impl<'a> Printer<'a> {
         node_start: u32,
         target: &internal::Expression<'_>,
         context: ParenContext,
-        build: impl Fn() -> DocId,
+        build: impl FnOnce() -> DocId,
     ) -> DocId {
         let d = self.d();
         let target_start = target.span().start;
@@ -2623,12 +2623,17 @@ impl<'a> Printer<'a> {
         // break never reaches here), a `//` always ends its line, and an own-line
         // block carries its break. This position's pair encloses the operand alone,
         // so it has no trailing gap to yield the shell to.
+        //
+        // The operand is built ONCE for whichever layout takes it: handed to the shell
+        // eagerly and rebuilt for the flat tail when the shell declined, it cost two builds
+        // a level, 2^depth for a commented pair nested in itself (`(/*c*/(…a)<T>)<T>`).
+        let inner = build();
         if needs_parens
             && let Some(shell) = self.build_required_pair_leading_shell_doc(
                 leading_start,
                 target_start,
                 None,
-                build(),
+                inner,
                 ")",
             )
         {
@@ -2639,7 +2644,6 @@ impl<'a> Printer<'a> {
         // stripped run leads the statement (and there a line comment's hardline
         // separator is what keeps the statement after it on its own line).
         let lead = self.build_rhs_comments_opt(leading_start, target_start);
-        let inner = build();
         let core = match lead {
             Some(lead) => d.concat(&[lead, inner]),
             None => inner,

@@ -208,12 +208,17 @@ pub(crate) fn print_node_inner<'a>(
                             *followed_by_non_null,
                             &mut inner,
                         );
-                        // The broken body is the trailing emitter's alone, so the unshaped doc
-                        // is built only where that gap exists — a parenthesized binary base
-                        // would otherwise pay a second full doc build on every comment-free
-                        // chain. With neither gap this is the bare pair the emitter itself
-                        // falls back to.
-                        let broken = if trailing_gap.is_some() {
+                        // The broken body is the trailing emitter's alone, and only its
+                        // line-spanning layout prints it
+                        // ([`Printer::build_paren_operand_comment_doc`]), so the unshaped doc
+                        // is built only where that gap holds such a run — a parenthesized
+                        // binary base would otherwise pay a second full doc build on every
+                        // chain whose `!` bounds a comment-free gap, and a base nesting
+                        // another (`a == (a == (…)!.b)!.b`) compounded it to 2^depth. Without
+                        // one this is the bare pair the emitter itself falls back to.
+                        let broken = if trailing_gap.is_some_and(|(start, end)| {
+                            printer.has_line_spanning_comments_to_emit_between(start, end)
+                        }) {
                             inner()
                         } else {
                             shaped

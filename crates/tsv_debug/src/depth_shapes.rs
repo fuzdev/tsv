@@ -341,24 +341,39 @@ const PREFIX_PAIR_FORMS: &[(&str, &str)] = &[
 /// outside it ([`prefix_pair_sweep`]).
 const PREFIX_PAIR_INNER: &[&str] = &["", "- ", "!", "<T>", "await "];
 
+/// What the prefix pair sweep follows an authored pair with ([`prefix_pair_sweep`]):
+/// nothing, a member after a `!`, and an instantiation — links a printer takes a path of
+/// its own for behind a pair it may keep.
+const PREFIX_PAIR_LINKS: &[&str] = &["", "!.b", "<T>"];
+
 /// The prefix operators nested over their authored pairs ([`PREFIX_PAIR_FORMS`]), bare and
-/// with a second operator inside the pair ([`PREFIX_PAIR_INNER`]):
-/// `x = <op>(<inner>×n a)×n` — the full sweep's alone.
+/// with a second operator inside the pair ([`PREFIX_PAIR_INNER`]), each pair followed by
+/// each of [`PREFIX_PAIR_LINKS`] — and, in an operator's place, the pair as a binary
+/// operator's right operand: `x = <op>(<inner>×n a)<link>×n` — the full sweep's alone.
 ///
-/// TODO: K289 — a link after an authored pair (`a == (…a)!.b`, `(/*c*/(…a)<T>)`) takes the
-/// format's memory or time exponential in the nesting, a printer bug that predates the
-/// depth limit, so no generator follows an authored pair's `!` with a member or puts the
-/// pair in a binary operand, nor follows a commented pair with an instantiation, until it
-/// is fixed.
+/// TODO: K305, K306 — two forms are left out, each a printer bug of its own that no depth
+/// reaches: they format at a single level to a form whose own format differs (F1). A block
+/// comment opening a prefix operator's bare pair before a link (K305: `-(/*c*/a)!.b` →
+/// `-/*c*/ a!.b` → `-(/*c*/ a!.b)`, the same with `<T>`), and one closing a binary operand's
+/// pair (K306: `a == (a /*c*/)` → `a == a /*c*/` → `a == a; /*c*/`).
 fn prefix_pair_sweep(shapes: &mut Vec<Shape>) {
-    for &op in PREFIXES {
+    for &op in PREFIXES.iter().chain(&["a == "]) {
         for &(before, after) in PREFIX_PAIR_FORMS {
             for &inner in PREFIX_PAIR_INNER {
-                shapes.push(Shape {
-                    name: format!("ts_gen_prefix_pair `{op}{before}{inner}…{after}`"),
-                    close: after.to_owned(),
-                    ..generated_prefix("", [op, before, inner].concat(), "a")
-                });
+                for &link in PREFIX_PAIR_LINKS {
+                    let binary = op == "a == ";
+                    let unary_comment_link =
+                        !binary && before == "(/*c*/" && inner.is_empty() && !link.is_empty();
+                    let binary_trailing_comment = binary && after == "/*c*/)" && link.is_empty();
+                    if unary_comment_link || binary_trailing_comment {
+                        continue;
+                    }
+                    shapes.push(Shape {
+                        name: format!("ts_gen_prefix_pair `{op}{before}{inner}…{after}{link}`"),
+                        close: [after, link].concat(),
+                        ..generated_prefix("", [op, before, inner].concat(), "a")
+                    });
+                }
             }
         }
     }
