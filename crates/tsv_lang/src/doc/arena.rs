@@ -1227,7 +1227,8 @@ const PRELUDE: &[(&str, u16)] = &[
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PendingRun {
     /// Columns the flush puts on the line it starts on — through the first `//`, which
-    /// ends that line.
+    /// ends that line — saturated one column past [`crate::config::PRINT_WIDTH`]: a fits
+    /// question asked within the print width answers as it would for the true width.
     pub width: u16,
     /// The run holds a `//`: flushing it ends a line.
     pub has_line_comment: bool,
@@ -1241,7 +1242,7 @@ pub struct PendingRun {
 }
 
 /// Where the walk stands with respect to a deferred run.
-#[derive(Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
 enum RunQueue {
     /// Nothing is queued, or every queued run met a flush point.
     #[default]
@@ -1253,14 +1254,49 @@ enum RunQueue {
     MaybeFlushed,
 }
 
-/// The state [`DocArena::pending_run_at_end`]'s walk threads in emission order.
-#[derive(Clone, Copy, Default)]
+/// The shape of the run the walk is reading — a [`PendingRun`] short of `certain`, which
+/// is not walk state: the walk's join decides it, from the queue, only at the root.
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
+struct RunShape {
+    /// Columns on the run's first line, saturated at [`RUN_WIDTH_CAP`].
+    width: u16,
+    has_line_comment: bool,
+    ends_in_line_comment: bool,
+}
+
+/// Where a run's first-line width saturates, one column past the print width.
+///
+/// A render's fits walk starts from a remaining width of at most its print width (the
+/// render takes the column off it, saturating at zero) and only ever subtracts. So once a
+/// run is wider than the print width, the [`DocNode::EmbedEnd`] that charges it leaves the
+/// walk negative whatever the true width, and the walk answers "does not fit" either way.
+/// Two askers sit outside that argument. One is the flat-measure render, whose width is
+/// unbounded: no width a run can reach makes it overflow, capped or not. The other is a
+/// fits walk started wider than [`crate::config::PRINT_WIDTH`] — `arena_fits` asked for
+/// such a width, or a render under a wider test `RenderConfig` — which no printer does.
+///
+/// The cap is what bounds [`DocArena::pending_run_at_end`]'s memo per node. Alternatives
+/// that queue runs of different widths ahead of a shared subtree reach it in at most this
+/// many widths, not one per subset sum of their widths.
+const RUN_WIDTH_CAP: u16 = crate::config::PRINT_WIDTH as u16 + 1;
+
+impl RunShape {
+    /// Add `columns` to the first line's width.
+    fn widen(&mut self, columns: u16) {
+        self.width = self.width.saturating_add(columns).min(RUN_WIDTH_CAP);
+    }
+}
+
+/// The state [`DocArena::pending_run_at_end`]'s walk threads in emission order — and,
+/// with the node, its memo key: the derived `Hash` and `Eq` read every field, so a field
+/// added here keys the memo without another edit.
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
 struct SuffixWalk {
     queue: RunQueue,
     /// A [`DocNode::FlushBreak`] was passed: the next soft or normal line breaks.
     flush_armed: bool,
     /// The pending run's shape so far.
-    run: PendingRun,
+    run: RunShape,
     /// The run's first line is complete (a `//` ended it): later widths are not on it.
     width_done: bool,
 }
@@ -1287,8 +1323,9 @@ impl SuffixWalk {
     }
 }
 
-/// What [`DocArena::may_end_on_comment_text`]'s walk has seen last.
-#[derive(Clone, Copy, PartialEq, Eq)]
+/// What [`DocArena::may_end_on_comment_text`]'s walk has seen last, ordered so that two
+/// alternative layouts join by `max`: toward [`Self::Comment`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum LastLeaf {
     /// No printed leaf yet.
     Nothing,
@@ -1298,16 +1335,169 @@ enum LastLeaf {
     Comment,
 }
 
-impl LastLeaf {
-    /// Join two alternative layouts from one starting state, toward [`Self::Comment`].
-    fn either(a: Self, b: Self) -> Self {
-        if a == Self::Comment || b == Self::Comment {
-            Self::Comment
-        } else if a == Self::Code || b == Self::Code {
-            Self::Code
-        } else {
-            Self::Nothing
+/// What one doc does to the [`LastLeaf`] reading in front of it — the walk's per-node
+/// transfer, `state ↦ max(found, if passes { state } else { Nothing })`.
+///
+/// Every node's effect has this form: a printed leaf replaces the state, a node that
+/// prints none passes it through, and an alternative's join is `max` of the two results.
+/// So the effect is a function of the node alone, and a shared subtree's is read once
+/// (the walk's memo), however many parents reach it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct LastLeafStep {
+    /// The last leaf the doc prints, worst over its layouts.
+    found: LastLeaf,
+    /// Some layout of the doc prints no leaf: the reading ahead of it shows through.
+    passes: bool,
+}
+
+impl LastLeafStep {
+    /// A doc that prints no leaf.
+    const PASS: Self = Self {
+        found: LastLeaf::Nothing,
+        passes: true,
+    };
+
+    /// A doc that always ends on a leaf of class `found`.
+    const fn leaf(found: LastLeaf) -> Self {
+        Self {
+            found,
+            passes: false,
         }
+    }
+
+    /// `self`, then `next`, in print order.
+    fn then(self, next: Self) -> Self {
+        Self {
+            found: if next.passes {
+                next.found.max(self.found)
+            } else {
+                next.found
+            },
+            passes: self.passes && next.passes,
+        }
+    }
+
+    /// Join two alternative layouts read from one starting state.
+    fn either(self, other: Self) -> Self {
+        Self {
+            found: self.found.max(other.found),
+            passes: self.passes || other.passes,
+        }
+    }
+}
+
+/// Visits a doc walk outside the renderer takes before it starts its memo.
+///
+/// The doc is a DAG — a conditional group's states and an `if_break`'s arms share
+/// subtrees — so a walk that reads every alternative revisits a shared subtree once per
+/// path to it, which nesting compounds exponentially. On real code these walks are
+/// short (a handful of nodes a call), so a call starts unmemoized and allocates nothing;
+/// one that outlives this many visits memoizes the rest of its walk, which bounds it by
+/// the (node, key) pairs it can reach — the nodes alone for a walk keyed on the node, the
+/// nodes times the states that reach each for `suffix_walk`, a constant per node
+/// ([`RUN_WIDTH_CAP`] widths times the state's flags). Unit tests memoize from the first
+/// visit unless they ask for this threshold (`test_memo_after`), so the memo answers
+/// every test that reaches a walk.
+const WALK_MEMO_AFTER: u32 = 256;
+
+/// The threshold a [`WalkMemo::new`] starts from: [`WALK_MEMO_AFTER`], or under test the
+/// one `test_memo_after::with` names (zero by default).
+#[cfg(not(test))]
+#[inline]
+const fn walk_memo_after() -> u32 {
+    WALK_MEMO_AFTER
+}
+
+#[cfg(test)]
+fn walk_memo_after() -> u32 {
+    test_memo_after::get()
+}
+
+/// The walk-memo threshold unit tests run at: per thread, zero (memoize from the first
+/// visit) unless a test sets it to exercise the production switch-over.
+#[cfg(test)]
+pub(super) mod test_memo_after {
+    use std::cell::Cell;
+
+    thread_local! {
+        static AFTER: Cell<u32> = const { Cell::new(0) };
+    }
+
+    pub(super) fn get() -> u32 {
+        AFTER.with(Cell::get)
+    }
+
+    /// Run `f` with every walk memo starting after `visits`, then restore the threshold.
+    pub(in crate::doc) fn with<R>(visits: u32, f: impl FnOnce() -> R) -> R {
+        let prev = AFTER.with(|a| a.replace(visits));
+        let out = f();
+        AFTER.with(|a| a.set(prev));
+        out
+    }
+}
+
+/// The per-call memo of a doc walk: `key → value` for a walk whose answer at a node is a
+/// function of the key alone (the node, plus any state threaded into it). Nodes are
+/// immutable once allocated and one call reads one source, so an entry never goes stale
+/// within the call that wrote it. Unallocated until the walk has taken
+/// [`WALK_MEMO_AFTER`] visits — until then a visit is one counter test, the memo's whole
+/// cost on the short calls real code makes — and an answer computed before then is simply
+/// not stored.
+struct WalkMemo<K, V> {
+    /// Visits left before the memo starts; zero once it has.
+    unmemoized: u32,
+    map: Option<FxHashMap<K, V>>,
+}
+
+impl<K: Copy + Eq + std::hash::Hash, V: Copy> WalkMemo<K, V> {
+    #[inline]
+    fn new() -> Self {
+        Self::starting_after(walk_memo_after())
+    }
+
+    /// A memo that starts once the walk has taken `visits` visits.
+    #[inline]
+    const fn starting_after(visits: u32) -> Self {
+        Self {
+            unmemoized: visits,
+            map: None,
+        }
+    }
+
+    /// Count one visit to `key` and return its memoized value, if any.
+    #[inline]
+    fn visit(&mut self, key: K) -> Option<V> {
+        if self.unmemoized != 0 {
+            self.unmemoized -= 1;
+            return None;
+        }
+        self.memoized_get(key)
+    }
+
+    /// Store `value` as `key`'s answer (once the memo has started) and return it.
+    #[inline]
+    fn record(&mut self, key: K, value: V) -> V {
+        if self.unmemoized == 0 {
+            self.memoized_insert(key, value);
+        }
+        value
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn memoized_get(&mut self, key: K) -> Option<V> {
+        self.map
+            .get_or_insert_with(FxHashMap::default)
+            .get(&key)
+            .copied()
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn memoized_insert(&mut self, key: K, value: V) {
+        self.map
+            .get_or_insert_with(FxHashMap::default)
+            .insert(key, value);
     }
 }
 
@@ -1658,12 +1848,24 @@ struct WalkStore<'a> {
 }
 
 impl WalkStore<'_> {
-    fn suffix_walk(&self, id: DocId, mut state: SuffixWalk) -> SuffixWalk {
+    /// The state a run is in after `id`, read from `state` — memoized per `(id, state)`,
+    /// since an `if_break`'s arms and a conditional group's states each start from one
+    /// state and may share a subtree.
+    fn suffix_walk(
+        &self,
+        id: DocId,
+        mut state: SuffixWalk,
+        memo: &mut WalkMemo<(DocId, SuffixWalk), SuffixWalk>,
+    ) -> SuffixWalk {
         crate::fanout_probe::walk();
+        let key = (id, state);
+        if let Some(known) = memo.visit(key) {
+            return known;
+        }
         match &self.nodes[id.index()] {
             DocNode::LineSuffix(inner) => {
                 if !state.pending() {
-                    state.run = PendingRun::default();
+                    state.run = RunShape::default();
                     state.width_done = false;
                 }
                 state.queue = RunQueue::Pending;
@@ -1685,13 +1887,13 @@ impl WalkStore<'_> {
             }
             DocNode::FlushBreak => state.flush_armed = true,
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
-                state = self.suffix_walk(*inner, state);
+                state = self.suffix_walk(*inner, state, memo);
             }
             DocNode::AlignRoot { contents, .. }
             | DocNode::Align { contents, .. }
             | DocNode::IndentIfBreak { contents, .. }
             | DocNode::GatedState { contents, .. } => {
-                state = self.suffix_walk(*contents, state);
+                state = self.suffix_walk(*contents, state, memo);
             }
             DocNode::Group {
                 contents,
@@ -1699,26 +1901,26 @@ impl WalkStore<'_> {
                 ..
             } => {
                 let start = state;
-                state = self.suffix_walk(*contents, start);
+                state = self.suffix_walk(*contents, start, memo);
                 for &alt in expanded_states.resolve(self.children) {
-                    state = SuffixWalk::either(state, self.suffix_walk(alt, start));
+                    state = SuffixWalk::either(state, self.suffix_walk(alt, start, memo));
                 }
             }
             DocNode::WithContext { doc, .. } => {
-                state = self.suffix_walk(*doc, state);
+                state = self.suffix_walk(*doc, state, memo);
             }
             DocNode::IfBreak {
                 break_doc,
                 flat_doc,
                 ..
             } => {
-                let broken = self.suffix_walk(*break_doc, state);
-                let flat = self.suffix_walk(*flat_doc, state);
+                let broken = self.suffix_walk(*break_doc, state, memo);
+                let flat = self.suffix_walk(*flat_doc, state, memo);
                 state = SuffixWalk::either(flat, broken);
             }
             DocNode::Concat(range) | DocNode::Fill(range) => {
                 for &kid in range.resolve(self.children) {
-                    state = self.suffix_walk(kid, state);
+                    state = self.suffix_walk(kid, state, memo);
                 }
             }
             DocNode::Text(_)
@@ -1726,55 +1928,59 @@ impl WalkStore<'_> {
             | DocNode::BreakParent
             | DocNode::FlowProbeEnd => {}
         }
-        state
+        memo.record(key, state)
     }
 
-    fn last_leaf(&self, id: DocId, state: LastLeaf) -> LastLeaf {
+    /// What `id` does to the last-leaf reading in front of it ([`LastLeafStep`]) —
+    /// memoized per node, since the step is a function of the node alone.
+    fn last_leaf(&self, id: DocId, memo: &mut WalkMemo<DocId, LastLeafStep>) -> LastLeafStep {
         crate::fanout_probe::walk();
-        match &self.nodes[id.index()] {
+        if let Some(known) = memo.visit(id) {
+            return known;
+        }
+        let step = match &self.nodes[id.index()] {
             DocNode::Text(t) => {
                 let text = super::types::resolve_text(t, Some(self.source), self.pool);
                 let text = text.trim_start();
                 if text.is_empty() {
-                    state
+                    LastLeafStep::PASS
                 } else if text.starts_with("/*") || text.starts_with("//") {
-                    LastLeaf::Comment
+                    LastLeafStep::leaf(LastLeaf::Comment)
                 } else {
-                    LastLeaf::Code
+                    LastLeafStep::leaf(LastLeaf::Code)
                 }
             }
-            DocNode::MultilineText { .. } => LastLeaf::Comment,
-            DocNode::Indent(inner) | DocNode::Dedent(inner) => self.last_leaf(*inner, state),
+            DocNode::MultilineText { .. } => LastLeafStep::leaf(LastLeaf::Comment),
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => self.last_leaf(*inner, memo),
             DocNode::AlignRoot { contents, .. }
             | DocNode::Align { contents, .. }
             | DocNode::IndentIfBreak { contents, .. }
-            | DocNode::GatedState { contents, .. } => self.last_leaf(*contents, state),
+            | DocNode::GatedState { contents, .. } => self.last_leaf(*contents, memo),
             DocNode::Group {
                 contents,
                 expanded_states,
                 ..
             } => {
-                let mut out = self.last_leaf(*contents, state);
+                let mut out = self.last_leaf(*contents, memo);
                 for &alt in expanded_states.resolve(self.children) {
-                    out = LastLeaf::either(out, self.last_leaf(alt, state));
+                    out = out.either(self.last_leaf(alt, memo));
                 }
                 out
             }
-            DocNode::WithContext { doc, .. } => self.last_leaf(*doc, state),
+            DocNode::WithContext { doc, .. } => self.last_leaf(*doc, memo),
             DocNode::IfBreak {
                 break_doc,
                 flat_doc,
                 ..
-            } => LastLeaf::either(
-                self.last_leaf(*break_doc, state),
-                self.last_leaf(*flat_doc, state),
-            ),
+            } => self
+                .last_leaf(*break_doc, memo)
+                .either(self.last_leaf(*flat_doc, memo)),
             DocNode::Concat(range) | DocNode::Fill(range) => {
-                let mut state = state;
+                let mut out = LastLeafStep::PASS;
                 for &kid in range.resolve(self.children) {
-                    state = self.last_leaf(kid, state);
+                    out = out.then(self.last_leaf(kid, memo));
                 }
-                state
+                out
             }
             DocNode::LineSuffix(_)
             | DocNode::Line(_)
@@ -1782,8 +1988,9 @@ impl WalkStore<'_> {
             | DocNode::EmbedEnd { .. }
             | DocNode::BreakParent
             | DocNode::FlushBreak
-            | DocNode::FlowProbeEnd => state,
-        }
+            | DocNode::FlowProbeEnd => LastLeafStep::PASS,
+        };
+        memo.record(id, step)
     }
 
     /// Read one suffix payload into the run: its leaves in order, a leading break dropped
@@ -1807,7 +2014,7 @@ impl WalkStore<'_> {
                     }
                     if opening && glues && !state.width_done && !text.starts_with(' ') {
                         // The glued comment's separator, standing in for its dropped break.
-                        state.run.width = state.run.width.saturating_add(1);
+                        state.run.widen(1);
                     }
                     opening = false;
                     let is_line = text.starts_with("//");
@@ -1816,7 +2023,7 @@ impl WalkStore<'_> {
                             CachedWidth::Width(w) => w,
                             CachedWidth::HasNewline { first_width } => first_width,
                         };
-                        state.run.width = state.run.width.saturating_add(w);
+                        state.run.widen(w);
                     }
                     if !text.trim().is_empty() {
                         state.run.ends_in_line_comment = is_line;
@@ -3632,7 +3839,8 @@ impl DocArena {
     /// code. Deferred runs ([`DocNode::LineSuffix`]) are not leaves here: where they flush
     /// is [`Self::pending_run_at_end`]'s question. A static reading, conservative toward
     /// "yes": each alternative (an `if_break` arm, a conditional group's state) is read,
-    /// and one ending on a comment answers for all.
+    /// and one ending on a comment answers for all. Each node's effect on the reading is read
+    /// once a call ([`LastLeafStep`]), however many alternatives share it.
     pub fn may_end_on_comment_text(&self, id: DocId, source: &str) -> bool {
         let nodes = self.nodes.borrow();
         let children = self.children.borrow();
@@ -3643,19 +3851,29 @@ impl DocArena {
             pool: &pool,
             source,
         };
-        store.last_leaf(id, LastLeaf::Nothing) == LastLeaf::Comment
+        // the reading ahead of `id` is `Nothing`, so only what `id` itself prints answers
+        store.last_leaf(id, &mut WalkMemo::new()).found == LastLeaf::Comment
     }
 
     /// Whether `id`'s subtree holds a [`DocNode::LineSuffix`] — a deferred run that may
     /// still be pending when the subtree ends. A plain walk, for a caller that has already
     /// established the subtree holds a comment at all.
+    ///
+    /// The answer is reachability, so a node already expanded need not be again: past
+    /// [`WALK_MEMO_AFTER`] visits the walk keeps the nodes it has expanded and skips them,
+    /// which bounds it by the nodes it can reach however much of the doc is shared.
     pub fn holds_line_suffix(&self, id: DocId) -> bool {
         let nodes = self.nodes.borrow();
         let children = self.children.borrow();
         let mut stack: SmallVec<[DocId; 16]> = SmallVec::new();
+        let mut expanded: WalkMemo<DocId, ()> = WalkMemo::new();
         stack.push(id);
         while let Some(id) = stack.pop() {
             crate::fanout_probe::walk();
+            if expanded.visit(id).is_some() {
+                continue;
+            }
+            expanded.record(id, ());
             match &nodes[id.index()] {
                 DocNode::LineSuffix(_) => return true,
                 DocNode::Indent(inner) | DocNode::Dedent(inner) => stack.push(*inner),
@@ -3707,7 +3925,8 @@ impl DocArena {
     /// run pending in any of them is pending, and `certain` only when pending in all. The run's shape is read as an [`DocNode::EmbedEnd`] flushes
     /// it — each comment behind no `//` glued onto the line (see
     /// [`PendingRun`]) — which is also how a host lays out the same comments written after
-    /// its value, the reason a host asks.
+    /// its value, the reason a host asks. A subtree the alternatives share is read once a
+    /// call per state the walk reaches it in.
     pub fn pending_run_at_end(&self, id: DocId, source: &str) -> Option<PendingRun> {
         let nodes = self.nodes.borrow();
         let children = self.children.borrow();
@@ -3718,10 +3937,17 @@ impl DocArena {
             pool: &pool,
             source,
         };
-        let state = store.suffix_walk(id, SuffixWalk::default());
+        let state = store.suffix_walk(id, SuffixWalk::default(), &mut WalkMemo::new());
+        let RunShape {
+            width,
+            has_line_comment,
+            ends_in_line_comment,
+        } = state.run;
         state.pending().then_some(PendingRun {
+            width,
+            has_line_comment,
+            ends_in_line_comment,
             certain: state.queue == RunQueue::Pending,
-            ..state.run
         })
     }
 
@@ -4544,56 +4770,62 @@ impl DocArena {
     /// walk already holds instead of re-borrowing per call (the threading
     /// idiom of [`Self::subtree_layout_fill`]).
     pub(super) fn can_break_inner(id: DocId, nodes: &[DocNode], children: &[DocId]) -> bool {
+        Self::can_break_walk(id, nodes, children, &mut WalkMemo::new())
+    }
+
+    /// [`Self::can_break_inner`]'s walk, memoized per node ([`WalkMemo`]): the answer is a
+    /// function of the node alone, and a shared subtree is reached once per path to it.
+    fn can_break_walk(
+        id: DocId,
+        nodes: &[DocNode],
+        children: &[DocId],
+        memo: &mut WalkMemo<DocId, bool>,
+    ) -> bool {
         crate::fanout_probe::walk();
-        match &nodes[id.index()] {
+        if let Some(known) = memo.visit(id) {
+            return known;
+        }
+        let answer = match &nodes[id.index()] {
             DocNode::Line(_) => true,
             DocNode::FlowProbeEnd => false,
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
-                Self::can_break_inner(*inner, nodes, children)
+                Self::can_break_walk(*inner, nodes, children, memo)
             }
             DocNode::AlignRoot { contents, .. } | DocNode::Align { contents, .. } => {
-                Self::can_break_inner(*contents, nodes, children)
+                Self::can_break_walk(*contents, nodes, children, memo)
             }
             DocNode::IndentIfBreak { contents, .. } => {
-                Self::can_break_inner(*contents, nodes, children)
+                Self::can_break_walk(*contents, nodes, children, memo)
             }
             DocNode::Group {
                 contents,
                 expanded_states,
                 ..
             } => {
-                if Self::can_break_inner(*contents, nodes, children) {
-                    return true;
-                }
-                if !expanded_states.is_empty() {
-                    let kids = expanded_states.resolve(children);
-                    if kids
-                        .iter()
-                        .any(|&kid| Self::can_break_inner(kid, nodes, children))
-                    {
-                        return true;
-                    }
-                }
-                false
+                Self::can_break_walk(*contents, nodes, children, memo)
+                    || (!expanded_states.is_empty()
+                        && expanded_states
+                            .resolve(children)
+                            .iter()
+                            .any(|&kid| Self::can_break_walk(kid, nodes, children, memo)))
             }
             DocNode::IfBreak {
                 break_doc,
                 flat_doc,
                 ..
             } => {
-                Self::can_break_inner(*break_doc, nodes, children)
-                    || Self::can_break_inner(*flat_doc, nodes, children)
+                Self::can_break_walk(*break_doc, nodes, children, memo)
+                    || Self::can_break_walk(*flat_doc, nodes, children, memo)
             }
-            DocNode::Concat(range) | DocNode::Fill(range) => {
-                let kids = range.resolve(children);
-                kids.iter()
-                    .any(|&kid| Self::can_break_inner(kid, nodes, children))
-            }
-            DocNode::WithContext { doc, .. } => Self::can_break_inner(*doc, nodes, children),
-            DocNode::LineSuffix(inner) => Self::can_break_inner(*inner, nodes, children),
+            DocNode::Concat(range) | DocNode::Fill(range) => range
+                .resolve(children)
+                .iter()
+                .any(|&kid| Self::can_break_walk(kid, nodes, children, memo)),
+            DocNode::WithContext { doc, .. } => Self::can_break_walk(*doc, nodes, children, memo),
+            DocNode::LineSuffix(inner) => Self::can_break_walk(*inner, nodes, children, memo),
             // Transparent to contents (the probe is measure-only).
             DocNode::GatedState { contents, .. } => {
-                Self::can_break_inner(*contents, nodes, children)
+                Self::can_break_walk(*contents, nodes, children, memo)
             }
             DocNode::MultilineText { .. } => true,
             // deliberately newline-blind, unlike `subtree_layout_fill`: canBreak asks
@@ -4604,7 +4836,8 @@ impl DocArena {
             // No line of its own; whether a line follows is positional, which a
             // subtree query cannot see.
             DocNode::FlushBreak => false,
-        }
+        };
+        memo.record(id, answer)
     }
 
     /// Statically flatten a doc's **soft and normal** lines.
@@ -4631,7 +4864,7 @@ impl DocArena {
     /// one line no matter what wants [`Self::atomize`] — a different question,
     /// and now a different name.
     pub fn remove_lines(&self, id: DocId) -> DocId {
-        self.flatten_lines_impl(id, FlattenMode::RemoveLines)
+        self.flatten_lines_impl(id, FlattenMode::RemoveLines, &mut WalkMemo::new())
     }
 
     /// `root` with every occurrence of the node `target` replaced by `replacement` — a
@@ -4851,11 +5084,23 @@ impl DocArena {
     /// Folding the two into one function under prettier's name is how a multi-line comment
     /// in a flattened arrow signature gets its newline deleted. Two questions, two names.
     pub fn atomize(&self, id: DocId) -> DocId {
-        self.flatten_lines_impl(id, FlattenMode::Atomize)
+        self.flatten_lines_impl(id, FlattenMode::Atomize, &mut WalkMemo::new())
     }
 
-    fn flatten_lines_impl(&self, id: DocId, mode: FlattenMode) -> DocId {
+    /// [`Self::remove_lines`] and [`Self::atomize`]'s walk, memoized per node within one
+    /// call: a node's flattened copy is a function of the node and the call's `mode`, and
+    /// render reads a doc by its nodes, never their ids' positions, so a subtree shared
+    /// in the input stays shared in the copy (a copied group is never keyed).
+    fn flatten_lines_impl(
+        &self,
+        id: DocId,
+        mode: FlattenMode,
+        memo: &mut WalkMemo<DocId, DocId>,
+    ) -> DocId {
         crate::fanout_probe::walk();
+        if let Some(known) = memo.visit(id) {
+            return known;
+        }
         // Extract node info while borrowing, then release borrow before allocating.
         // This pattern avoids RefCell conflicts since alloc() needs borrow_mut().
         enum Info {
@@ -4956,19 +5201,19 @@ impl DocArena {
                 },
             },
             Info::Indent(inner) => {
-                let new_inner = self.flatten_lines_impl(inner, mode);
+                let new_inner = self.flatten_lines_impl(inner, mode, memo);
                 self.indent(new_inner)
             }
             Info::Dedent(inner) => {
-                let new_inner = self.flatten_lines_impl(inner, mode);
+                let new_inner = self.flatten_lines_impl(inner, mode, memo);
                 self.dedent(new_inner)
             }
             Info::AlignRoot(n, contents) => {
-                let new_contents = self.flatten_lines_impl(contents, mode);
+                let new_contents = self.flatten_lines_impl(contents, mode, memo);
                 self.align_root(n, new_contents)
             }
             Info::Align(n, contents) => {
-                let new_contents = self.flatten_lines_impl(contents, mode);
+                let new_contents = self.flatten_lines_impl(contents, mode, memo);
                 self.align(n, new_contents)
             }
             Info::Group {
@@ -4976,7 +5221,7 @@ impl DocArena {
                 expanded_states,
                 should_break,
             } => {
-                let flat_contents = self.flatten_lines_impl(contents, mode);
+                let flat_contents = self.flatten_lines_impl(contents, mode, memo);
                 if mode == FlattenMode::Atomize {
                     // Atomize: emulate prettier's re-render at `printWidth: Infinity`, where a
                     // conditional group's *least*-expanded state always fits and is chosen. So
@@ -4988,12 +5233,13 @@ impl DocArena {
                     // real width, falls back to the most-expanded one, and emits its separators
                     // as literal spaces — `xs.map( (i) => fn(i) )` — or, when that state's
                     // separator was a `softline`, deletes a required one: `(i) =>fn(i)`.
-                    return self.alloc(DocNode::Group {
+                    let group = self.alloc(DocNode::Group {
                         contents: flat_contents,
                         expanded_states: ChildRange::EMPTY,
                         keyed: false,
                         should_break,
                     });
+                    return memo.record(id, group);
                 }
                 if should_break {
                     self.alloc(DocNode::Group {
@@ -5012,7 +5258,7 @@ impl DocArena {
                         };
                         let new_kids: DocBuf = kids
                             .into_iter()
-                            .map(|kid| self.flatten_lines_impl(kid, mode))
+                            .map(|kid| self.flatten_lines_impl(kid, mode, memo))
                             .collect();
                         self.alloc_children(&new_kids)
                     };
@@ -5024,15 +5270,15 @@ impl DocArena {
                     })
                 }
             }
-            Info::IfBreakFlat(flat_doc) => self.flatten_lines_impl(flat_doc, mode),
-            Info::IndentIfBreakContents(contents) => self.flatten_lines_impl(contents, mode),
+            Info::IfBreakFlat(flat_doc) => self.flatten_lines_impl(flat_doc, mode, memo),
+            Info::IndentIfBreakContents(contents) => self.flatten_lines_impl(contents, mode, memo),
             Info::Concat(kids) => {
                 // A flattened `softline` is `empty()`; a concat carries no empty child,
                 // since every later walk would visit it for nothing.
                 let empty = self.empty();
                 self.concat_iter(
                     kids.into_iter()
-                        .map(|kid| self.flatten_lines_impl(kid, mode))
+                        .map(|kid| self.flatten_lines_impl(kid, mode, memo))
                         .filter(|&kid| kid != empty),
                 )
             }
@@ -5043,16 +5289,16 @@ impl DocArena {
                 let empty = self.empty();
                 self.concat_iter(
                     kids.into_iter()
-                        .map(|kid| self.flatten_lines_impl(kid, mode))
+                        .map(|kid| self.flatten_lines_impl(kid, mode, memo))
                         .filter(|&kid| kid != empty),
                 )
             }
             Info::WithContext(doc, context) => {
-                let new_doc = self.flatten_lines_impl(doc, mode);
+                let new_doc = self.flatten_lines_impl(doc, mode, memo);
                 self.with_context(new_doc, context)
             }
             Info::LineSuffix(inner) => {
-                let new_inner = self.flatten_lines_impl(inner, mode);
+                let new_inner = self.flatten_lines_impl(inner, mode, memo);
                 self.line_suffix(new_inner)
             }
             Info::BreakParent => self.empty(),
@@ -5061,8 +5307,8 @@ impl DocArena {
             // `atomize` the node is unreachable through a group (states dropped)
             // and the rebuild is inert.
             Info::GatedState(probe, contents, admit) => {
-                let new_probe = self.flatten_lines_impl(probe, mode);
-                let new_contents = self.flatten_lines_impl(contents, mode);
+                let new_probe = self.flatten_lines_impl(probe, mode, memo);
+                let new_contents = self.flatten_lines_impl(contents, mode, memo);
                 self.gated_state_admitting(new_probe, new_contents, admit)
             }
         };
@@ -5077,7 +5323,7 @@ impl DocArena {
             self.retag_comment_doc(new_id, id);
         }
 
-        new_id
+        memo.record(id, new_id)
     }
 
     //
@@ -6485,5 +6731,324 @@ mod leading_comment_break_tests {
             doc = a.concat(&[a.text(" "), doc]);
         }
         assert_eq!(edge(&a, doc).brk, LeadingBreak::Hard);
+    }
+}
+
+#[cfg(test)]
+mod walk_memo_tests {
+    //! The doc walks outside the renderer memoize what they read of a shared subtree
+    //! ([`super::WalkMemo`], which unit tests start from the first visit, and again at the
+    //! production threshold). A memo is exact only if a node's answer cannot depend on how
+    //! the walk reached it, so each walk is graded on a generated family of docs built
+    //! twice: once as a DAG, every repeated subtree one node reached through several
+    //! parents, and once as a tree, every use its own copy, where no memo entry is ever
+    //! read back. The two must answer alike. `may_end_on_comment_text` reads a per-node
+    //! transfer instead of threading its state, so it is also graded against the
+    //! state-threading walk it replaced.
+    use super::{
+        DocArena, DocId, DocNode, LastLeaf, PendingRun, RUN_WIDTH_CAP, SuffixWalk, WALK_MEMO_AFTER,
+        WalkMemo, WalkStore, test_memo_after,
+    };
+    use crate::config::{EmbedContext, PRINT_WIDTH};
+    use crate::doc::{Mode, arena_fits, arena_print_doc};
+
+    /// A deterministic hash of the generator's seed and a node's path.
+    fn mix(seed: u64, path: u64) -> u64 {
+        let mut z = seed
+            .wrapping_mul(0x9e37_79b9_7f4a_7c15)
+            .wrapping_add(path)
+            .wrapping_add(0x9e37_79b9_7f4a_7c15);
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        z ^ (z >> 31)
+    }
+
+    /// A leaf of every kind the walks tell apart: code, comments (inline, multi-line,
+    /// deferred), the four line kinds, a flush break, a boundary, nothing. The deferred
+    /// runs vary in every way the suffix walk's state records — a `//` or a block, glued or
+    /// spaced, a break or a non-text leaf ending the first line, and the width — so two
+    /// arms ahead of one shared subtree reach it in states differing in any one field.
+    fn leaf(a: &DocArena, pick: u64) -> DocId {
+        let wide = |n: u64| "e".repeat(1 + (n % 7) as usize);
+        let block = |n: u64| a.text_pooled(&format!("/* {} */", wide(n)));
+        let line_comment = |n: u64| a.text_pooled(&format!("// {}", wide(n)));
+        let tail = pick >> 5;
+        match pick % 18 {
+            0 => a.text("a"),
+            1 => a.text("/* c */"),
+            2 => a.line_suffix(line_comment(tail)),
+            3 => a.line_suffix(a.concat(&[a.text(" "), block(tail)])),
+            4 => a.line(),
+            5 => a.softline(),
+            6 => a.hardline(),
+            7 => a.flush_break(),
+            8 => a.line_suffix_boundary(),
+            9 => a.multiline_text("/* f\ng */"),
+            10 => a.line_suffix(block(tail)),
+            11 => a.line_suffix(a.concat(&[a.line(), block(tail)])),
+            12 => a.line_suffix(a.concat(&[line_comment(tail), a.line(), block(tail >> 3)])),
+            13 => a.line_suffix(a.concat(&[block(tail), a.if_break(a.text("x"), a.text("y"))])),
+            14 => a.line_suffix(a.concat(&[block(tail), a.line(), block(tail >> 3)])),
+            15 => a.line_suffix(a.concat(&[block(tail), line_comment(tail >> 3)])),
+            16 => a.line_suffix(a.text(" ")),
+            _ => a.empty(),
+        }
+    }
+
+    /// The doc at `path`, `depth` levels deep. Each level uses its child doc twice; with
+    /// `shared` the child is built once and both uses name it, without it each use is a
+    /// copy built from the same path, so the two forms print and read alike.
+    fn build(a: &DocArena, seed: u64, path: u64, depth: u32, shared: bool) -> DocId {
+        let h = mix(seed, path);
+        if depth == 0 {
+            return leaf(a, h);
+        }
+        let child = |a: &DocArena| build(a, seed, path * 4 + 1, depth - 1, shared);
+        let first = child(a);
+        let second = if shared { first } else { child(a) };
+        let l1 = leaf(a, h >> 8);
+        let l2 = leaf(a, h >> 20);
+        match (h >> 32) % 6 {
+            0 => a.conditional_group(&[a.concat(&[l1, first]), a.concat(&[second, l2])]),
+            1 => a.if_break(a.concat(&[first, l1]), a.concat(&[l2, second])),
+            2 => a.group(a.concat(&[l1, first, l2, second])),
+            3 => a.concat(&[first, l1, second]),
+            4 => a.indent(a.if_break(first, second)),
+            _ => a.conditional_group(&[first, a.concat(&[l1, second, l2])]),
+        }
+    }
+
+    /// The state-threading walk `may_end_on_comment_text` took before its transfer form.
+    fn last_leaf_reference(a: &DocArena, id: DocId, state: LastLeaf) -> LastLeaf {
+        let node = a.get(id).clone();
+        match node {
+            DocNode::Text(t) => {
+                let pool = a.text_pool.borrow();
+                let text = super::super::types::resolve_text(&t, Some(""), &pool);
+                let text = text.trim_start();
+                if text.is_empty() {
+                    state
+                } else if text.starts_with("/*") || text.starts_with("//") {
+                    LastLeaf::Comment
+                } else {
+                    LastLeaf::Code
+                }
+            }
+            DocNode::MultilineText { .. } => LastLeaf::Comment,
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => last_leaf_reference(a, inner, state),
+            DocNode::AlignRoot { contents, .. }
+            | DocNode::Align { contents, .. }
+            | DocNode::IndentIfBreak { contents, .. }
+            | DocNode::GatedState { contents, .. } => last_leaf_reference(a, contents, state),
+            DocNode::Group {
+                contents,
+                expanded_states,
+                ..
+            } => {
+                let alts: Vec<DocId> = expanded_states.resolve(&a.borrow_children()).to_vec();
+                let mut out = last_leaf_reference(a, contents, state);
+                for alt in alts {
+                    out = out.max(last_leaf_reference(a, alt, state));
+                }
+                out
+            }
+            DocNode::WithContext { doc, .. } => last_leaf_reference(a, doc, state),
+            DocNode::IfBreak {
+                break_doc,
+                flat_doc,
+                ..
+            } => last_leaf_reference(a, break_doc, state)
+                .max(last_leaf_reference(a, flat_doc, state)),
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                let kids: Vec<DocId> = range.resolve(&a.borrow_children()).to_vec();
+                kids.into_iter()
+                    .fold(state, |state, kid| last_leaf_reference(a, kid, state))
+            }
+            _ => state,
+        }
+    }
+
+    fn render(a: &DocArena, doc: DocId) -> String {
+        arena_print_doc(a, doc, &EmbedContext::default())
+    }
+
+    /// Every seed of the family, at every depth up to `max_depth`, as `(dag, tree)` — once
+    /// with every walk memoized from its first visit, and once at the production threshold
+    /// ([`WALK_MEMO_AFTER`]) over docs deep enough to cross it, so a memo that starts
+    /// mid-walk is graded too: entries computed before it started, recorded after.
+    fn for_each_pair(max_depth: u32, mut check: impl FnMut(&DocArena, DocId, DocId, &str)) {
+        for (after, max_depth) in [(0, max_depth), (WALK_MEMO_AFTER, max_depth + 3)] {
+            test_memo_after::with(after, || {
+                for seed in 0..300 {
+                    for depth in 1..=max_depth {
+                        let a = DocArena::new();
+                        let dag = build(&a, seed, 0, depth, true);
+                        let tree = build(&a, seed, 0, depth, false);
+                        let case = format!("memo after {after}, seed {seed}, depth {depth}");
+                        check(&a, dag, tree, &case);
+                    }
+                }
+            });
+        }
+    }
+
+    #[test]
+    fn holds_line_suffix_answers_a_shared_subtree_as_its_copies() {
+        for_each_pair(6, |a, dag, tree, case| {
+            assert_eq!(
+                a.holds_line_suffix(dag),
+                a.holds_line_suffix(tree),
+                "{case}"
+            );
+        });
+    }
+
+    #[test]
+    fn can_break_answers_a_shared_subtree_as_its_copies() {
+        for_each_pair(6, |a, dag, tree, case| {
+            assert_eq!(a.can_break(dag), a.can_break(tree), "{case}");
+        });
+    }
+
+    #[test]
+    fn pending_run_at_end_answers_a_shared_subtree_as_its_copies() {
+        let mut pending = 0;
+        for_each_pair(6, |a, dag, tree, case| {
+            let run = a.pending_run_at_end(dag, "");
+            pending += usize::from(run.is_some());
+            assert_eq!(run, a.pending_run_at_end(tree, ""), "{case}");
+        });
+        assert!(
+            pending > 0,
+            "the family leaves no run pending: it grades nothing"
+        );
+    }
+
+    /// Alternatives that each queue a block of a different width ahead of a shared
+    /// subtree reach it in one state per subset sum of those widths: `x = if_break(
+    /// suffix(/*…*/) x, x)`, nested, the `i`th block `2^i` wide. The saturated width keeps
+    /// the states per node within [`RUN_WIDTH_CAP`]'s, and the answer is the copies'.
+    #[test]
+    fn pending_run_at_end_states_per_node_stay_within_the_width_cap() {
+        let nest = |a: &DocArena, depth: u32, shared: bool| {
+            fn level(a: &DocArena, i: u32, shared: bool) -> DocId {
+                if i == 0 {
+                    return a.text("a");
+                }
+                let x = level(a, i - 1, shared);
+                let y = if shared { x } else { level(a, i - 1, shared) };
+                let block = a.text_pooled(&format!("/*{}*/", "x".repeat(1 << (i - 1))));
+                a.if_break(a.concat(&[a.line_suffix(block), x]), y)
+            }
+            level(a, depth, shared)
+        };
+        let depth = 16;
+        let a = DocArena::new();
+        let dag = nest(&a, depth, true);
+        let nodes = a.nodes.borrow().len();
+        let tree = nest(&a, depth, false);
+        assert_eq!(
+            a.pending_run_at_end(dag, ""),
+            a.pending_run_at_end(tree, "")
+        );
+        let (nodes_ref, children, pool) =
+            (a.nodes.borrow(), a.children.borrow(), a.text_pool.borrow());
+        let store = WalkStore {
+            nodes: &nodes_ref,
+            children: &children,
+            pool: &pool,
+            source: "",
+        };
+        let mut memo = WalkMemo::starting_after(0);
+        store.suffix_walk(dag, SuffixWalk::default(), &mut memo);
+        let entries = memo.map.map_or(0, |m| m.len());
+        assert!(
+            entries <= nodes * (usize::from(RUN_WIDTH_CAP) + 1),
+            "{entries} memo entries over {nodes} nodes"
+        );
+    }
+
+    /// The saturated width answers every fits question the true width does, for any
+    /// remaining width up to the print width, in either mode, breaking run or not.
+    #[test]
+    fn a_run_wider_than_the_cap_fits_as_the_cap() {
+        let a = DocArena::new();
+        let run = |width: u16, has_line_comment: bool| {
+            let end = a.embed_end(
+                Some(PendingRun {
+                    width,
+                    has_line_comment,
+                    ends_in_line_comment: has_line_comment,
+                    certain: true,
+                }),
+                false,
+            );
+            a.concat(&[a.line_suffix(a.text("/* c */")), end.doc(), a.text("tail")])
+        };
+        for has_line_comment in [false, true] {
+            let capped = run(RUN_WIDTH_CAP, has_line_comment);
+            for wider in [RUN_WIDTH_CAP + 1, RUN_WIDTH_CAP + 50, u16::MAX] {
+                let true_width = run(wider, has_line_comment);
+                for width in 0..=PRINT_WIDTH {
+                    for mode in [Mode::Flat, Mode::Break] {
+                        assert_eq!(
+                            arena_fits(&a, capped, width, mode),
+                            arena_fits(&a, true_width, width, mode),
+                            "{wider} columns, {width} remaining, {mode:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn may_end_on_comment_text_answers_a_shared_subtree_as_its_copies_and_as_the_threaded_walk() {
+        let mut comments = 0;
+        for_each_pair(6, |a, dag, tree, case| {
+            let answer = a.may_end_on_comment_text(dag, "");
+            comments += usize::from(answer);
+            assert_eq!(answer, a.may_end_on_comment_text(tree, ""), "{case}");
+            let reference = last_leaf_reference(a, tree, LastLeaf::Nothing) == LastLeaf::Comment;
+            assert_eq!(answer, reference, "{case}");
+        });
+        assert!(
+            comments > 0,
+            "the family never ends on a comment: it grades nothing"
+        );
+    }
+
+    #[test]
+    fn flattening_a_shared_subtree_prints_as_flattening_its_copies() {
+        for_each_pair(5, |a, dag, tree, case| {
+            assert_eq!(
+                render(a, a.remove_lines(dag)),
+                render(a, a.remove_lines(tree)),
+                "remove_lines, {case}"
+            );
+            assert_eq!(
+                render(a, a.atomize(dag)),
+                render(a, a.atomize(tree)),
+                "atomize, {case}"
+            );
+        });
+    }
+
+    #[test]
+    fn flattening_a_shared_subtree_shares_its_copy() {
+        let a = DocArena::new();
+        let shared = a.group(a.concat(&[a.text("a"), a.line(), a.text("b")]));
+        let doc = a.if_break(
+            a.concat(&[shared, a.text(","), shared]),
+            a.concat(&[shared, shared]),
+        );
+        let flat = a.remove_lines(doc);
+        let DocNode::Concat(range) = a.get(flat).clone() else {
+            panic!("the flat arm of an `if_break` flattens to its concat");
+        };
+        let kids = range.resolve(&a.borrow_children()).to_vec();
+        assert_eq!(kids.len(), 2);
+        assert_eq!(kids[0], kids[1], "one flattened copy, named twice");
+        assert_eq!(render(&a, flat), "a ba b");
     }
 }

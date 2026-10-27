@@ -755,9 +755,9 @@ it; with it, a relaxed load until this audit arms the counters). The counters ar
   dispatch, keyed by the node's dispatch, kind and span, so the count per distinct node is the
   rebuild multiplicity;
 - **walks** — one per node visited by the doc walks outside the renderer (`holds_line_suffix`,
-  `can_break_inner`, `subtree_layout_fill`, `suffix_walk`, `last_leaf`, `leaves`,
-  `flatten_lines_impl`, `replace_subdoc_walk`, `glue_walk`, the leading-edge walk's frames,
-  `edge_emission`);
+  `can_break_walk` (behind `can_break_inner`), `subtree_layout_fill`, `suffix_walk`, `last_leaf`,
+  `leaves`, `flatten_lines_impl`, `replace_subdoc_walk`, `glue_walk`, the leading-edge walk's
+  frames, `edge_emission`);
 - **scans** — one per `source_scan::skip_trivia` call: the parsers' lookaheads and the printers'
   trivia-aware scans alike (the armed run covers the parse); the hopping scans, which skip
   non-opener bytes without asking it, are not counted;
