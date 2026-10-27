@@ -17,6 +17,8 @@ Each `## Unreleased` section must be non-empty and carry a
 
 - fix: deeply nested or very long chained input is refused with a parse error instead of
   overflowing the host's stack
+- fix: formatting deeply nested ternaries, callbacks and member chains no longer takes time
+  and memory exponential in the nesting depth
 - fix: parser and formatter fixes across TypeScript edge cases, comment placement and layout
 
 ## 0.7.1
