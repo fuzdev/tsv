@@ -689,11 +689,6 @@ impl<'a> Printer<'a> {
         // grandparent is ReturnStatement/ThrowStatement/CallExpression/NewExpression,
         // shouldNotIndent = false → binary gets indent(rest) for continuation lines.
         // In assignment/variable contexts, shouldNotIndent = true → flat (no indent).
-        // Bound the consequent's own paren-comment scan at its end — the
-        // consequent-to-`:` comment is emitted by `comments_before_colon` below, so a
-        // wider boundary would double-emit it.
-        let consequent =
-            self.build_ternary_branch_expr_doc(cond.consequent, indent_binary_test, consequent_end);
 
         // Split comments around ? and : operators.
         // Comments before ? go after test, comments after ? go before consequent,
@@ -758,23 +753,29 @@ impl<'a> Printer<'a> {
             let run = question_pos
                 .and_then(|q| self.build_branch_comment_run(q + 1, consequent_start, d.line()))
                 .map(|run| d.indent(run));
-            // Broken version: continue chain without parens. The nested ternary's own
-            // binaries have THIS ternary for a grandparent, so `indent_binary_test` stops
-            // here.
-            let broken_consequent = self.build_conditional_doc_impl(
+            // The nested ternary is built ONCE, as the chain continues it (no group, no parens),
+            // and both layouts print that one doc — prettier's `printTernary` too prints the
+            // consequent once and only wraps it in `ifBreak("", "(")` / `ifBreak("", ")")`.
+            // A second, standalone build for the flat arm rebuilt the whole nested subtree
+            // per level, 2^depth for `a ? a ? … : b : b`. Flat, the chained doc prints what a
+            // standalone one would: the group it lacks and the test's indent are layout only,
+            // and its test-shell run is this gap's (`Self::branch_gap_end`). The nested
+            // ternary's own binaries have THIS ternary for a grandparent, so
+            // `indent_binary_test` stops here.
+            let nested_doc = self.build_conditional_doc_impl(
                 nested,
                 cond.consequent.span,
                 TernaryNesting::Consequent,
                 false,
             );
-            let broken_consequent = self.prepend_opt(run, broken_consequent);
+            let broken_consequent = self.prepend_opt(run, nested_doc);
             // The RUN's break counts too: a multi-line block comment in the gap is a hard
             // break prettier's `propagateBreaks` carries to the enclosing group, but tsv's
             // `if_break` deliberately softens a forced break in its flat arm
             // (`DocArena::subtree_layout_memo`), so asked of the arms alone the group stayed
             // flat around a comment that cannot print flat — parens kept, the comment's
             // closing line at the wrong indent.
-            if d.will_break(consequent) || run.is_some_and(|run| d.will_break(run)) {
+            if d.will_break(nested_doc) || run.is_some_and(|run| d.will_break(run)) {
                 // Consequent forces breaking (e.g., line comments produce hardlines).
                 // Skip if_break and use broken layout directly — the outer group
                 // will break because broken_consequent contains hardlines.
@@ -783,12 +784,20 @@ impl<'a> Printer<'a> {
                 broken_consequent
             } else {
                 // Normal if_break: parens when flat, chain when broken
-                let flat_consequent = self.prepend_opt(run, d.parens(consequent));
+                let flat_consequent = self.prepend_opt(run, d.parens(nested_doc));
                 d.if_break(broken_consequent, flat_consequent)
             }
         } else {
             let run = question_pos
                 .and_then(|q| self.build_branch_comment_run(q + 1, consequent_start, d.line()));
+            // Bound the consequent's own paren-comment scan at its end — the
+            // consequent-to-`:` comment is emitted by `comments_before_colon` above, so a
+            // wider boundary would double-emit it.
+            let consequent = self.build_ternary_branch_expr_doc(
+                cond.consequent,
+                indent_binary_test,
+                consequent_end,
+            );
             let branch =
                 self.parenthesize_ternary_branch(cond.consequent, consequent, Some(consequent_end));
             d.indent(self.prepend_opt(run, branch))

@@ -1822,9 +1822,15 @@ const POSITIONS: &[(Lang, &str, &str, &str, &str, &str, &str)] = &[
         "; }",
         ";\n",
     ),
-    // TODO: K283 — a conditional nested in a consequent (`a ? a ? … : b : b`) takes the
-    // format's memory exponential in its depth, so that position stays out of the gate
-    // until the printer is fixed; its branches are counted as every branch is
+    (
+        Lang::Ts,
+        "pos_conditional_consequent",
+        "x = ",
+        "a ? ",
+        "a",
+        " : b",
+        ";\n",
+    ),
     (
         Lang::Ts,
         "pos_conditional_test",
