@@ -153,6 +153,10 @@ pub(crate) enum ShareTag {
     /// `calls::chain_args::chain_call_head_doc` — a chain call's type arguments, which every
     /// layout candidate of the chain prints in the call's head.
     ChainTypeArgs = 9 * 4,
+    /// `expressions::functions::function_signature_refuses_hug` — a `function` callback's
+    /// parameter list, built only to ask whether it will break, under the asking state
+    /// `Printer::ask_signature_params` sets.
+    SignatureParamsProbe = 10 * 4,
 }
 
 impl ShareTag {
@@ -176,6 +180,7 @@ const _: () = assert!(ShareTag::ExpandLastBreakBody as u8 & ShareTag::STATE_BITS
 const _: () = assert!(ShareTag::ChainBase as u8 & ShareTag::STATE_BITS == 0);
 const _: () = assert!(ShareTag::ChainBreakProbe as u8 & ShareTag::STATE_BITS == 0);
 const _: () = assert!(ShareTag::ChainTypeArgs as u8 & ShareTag::STATE_BITS == 0);
+const _: () = assert!(ShareTag::SignatureParamsProbe as u8 & ShareTag::STATE_BITS == 0);
 
 /// One break a doc build reads as AUTHORED although the source does not hold it — the state
 /// [`Printer::assumed_break`] carries while a convergence state is built.

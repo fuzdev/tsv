@@ -10,6 +10,7 @@ use crate::ast::internal;
 use crate::printer::ArrowChainContext;
 use crate::printer::AssumedBreak;
 use crate::printer::LeadingGlue;
+use crate::printer::ShareTag;
 use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
 use crate::printer::class_expr_has_decorators;
@@ -966,14 +967,17 @@ fn function_signature_refuses_hug(
         .map(|after_paren| after_paren - 1);
     let unforced =
         sole_param_object_type_start(printer, func.params, Some(func.params_start), || close);
+    // The list is built only to be asked, and every layout candidate of a member chain asks
+    // it again, so the build is shared across them ([`ShareTag::SignatureParamsProbe`]).
+    let key = printer.chain_share_key_of(
+        func,
+        Span::new(func.params_start, func.body.span.start),
+        ShareTag::SignatureParamsProbe,
+    );
     printer.ask_signature_params(unforced, || {
-        printer
-            .d()
-            .will_break(printer.build_params_doc_with_comments(
-                func.params,
-                Some(func.params_start),
-                close,
-            ))
+        printer.d().will_break(printer.chain_shared_doc(key, || {
+            printer.build_params_doc_with_comments(func.params, Some(func.params_start), close)
+        }))
     })
 }
 
