@@ -43,7 +43,13 @@ buffer_stats = ["tsv_ts/buffer_stats"]
 # `tsv_debug` perf build must measure production-shaped code, and with the feature off
 # every counter and every call site compiles away to nothing. See tsv_lang/src/census.rs.
 census = ["tsv_lang/census"]
-# Umbrella that compiles both diagnostic seams into one binary and enables all five
+# Opt-in: compiles tsv_lang's fanout work counters (`tsv_lang::fanout_probe` — node builds,
+# doc-walk visits, source-scan steps) into this binary; `build_fanout_audit` grades its build
+# multiplicity and work legs on them and refuses to run without them. Inert until that audit
+# arms them (one relaxed load per site), so the other audits sharing the build pay nothing
+# else.
+fanout_check = ["tsv_lang/fanout_check"]
+# Umbrella that compiles the diagnostic seams into one binary and enables all five
 # gated subcommands: `swallow_audit` plus the ledger-driven `comment_audit` /
 # `gap_audit` / `blank_audit` / `ignore_audit`. EVERY audit deno task passes
 # `--features audits` under `--profile corpus` — including the ones that need neither
@@ -53,8 +59,8 @@ census = ["tsv_lang/census"]
 # The instrumentation is inert unless armed (both seams are `AtomicBool` false by
 # default), so carrying it costs those commands nothing but the compile it saves.
 # Forwards to each member's fan-out (no need to also name `tsv_lang/audits` —
-# `swallow_check`+`comment_check` already cover its members).
-audits = ["swallow_check", "comment_check"]
+# `swallow_check`+`comment_check`+`fanout_check` already cover its members).
+audits = ["swallow_check", "comment_check", "fanout_check"]
 
 [dependencies]
 tsv_cli = { path = "../tsv_cli" }

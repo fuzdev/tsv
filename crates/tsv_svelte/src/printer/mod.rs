@@ -2880,6 +2880,7 @@ impl<'a> Printer<'a> {
         let mut has_content_or_inline = is_content_text(start) || self.is_inline_run_node(start);
 
         for j in (start_idx + 1)..nodes.len() {
+            tsv_lang::fanout_probe::predicate();
             // Must be directly adjacent (no whitespace gap in source).
             if nodes[j - 1].span().end != nodes[j].span().start {
                 break;

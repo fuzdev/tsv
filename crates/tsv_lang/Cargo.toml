@@ -24,11 +24,16 @@ census = []
 # seams. `tsv_ts` / `tsv_css` / `tsv_svelte` / `tsv_debug` each forward it. See
 # src/comment_ledger.rs.
 comment_check = []
+# Opt-in work counters for `tsv_debug build_fanout_audit` (diagnostic): node builds at the
+# printers' build dispatch, doc-walk visits, source-scan steps. Off by default, same reasoning
+# as `swallow_check` — every call site compiles to nothing. `tsv_debug` forwards it. See
+# src/fanout_probe.rs.
+fanout_check = []
 # Umbrella that turns on every diagnostic seam at once (`swallow_check` +
-# `comment_check`). The audit deno tasks build one binary under this feature
+# `comment_check` + `fanout_check`). The audit deno tasks build one binary under this feature
 # instead of one per seam. Off by default, same as its members — production
 # artifacts and default `tsv_debug` profile/perf builds compile all of it out.
-audits = ["swallow_check", "comment_check"]
+audits = ["swallow_check", "comment_check", "fanout_check"]
 # Shared wire-JSON writer substrate (`json_writer`), pulled in transitively by
 # each language crate's `convert` feature. Off in the format-only
 # @fuzdev/tsv-format-wasm build, so `serde_json` never enters that graph.

@@ -26,7 +26,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Comment census](#comment-census-audit-censusaudit) | `census:audit` | a comment interior lost, gained, or rewritten between raw input and raw output — parse-time drops included, which the ledger can't see | `deno task check` (ratchet); `audit:corpus` (real code) |
 | [Print width](#print-width-audit-widthaudit) | `width:audit` | a new KIND of over-width output line — the shape a hard-limit bug takes | `deno task check` (ratchet) |
 | [Ignore honoring](#ignore-directive-honoring-audit-ignoreaudit) | `ignore:audit` | `prettier-ignore` positions that silently reformat an ignored node, misbind a trailing directive, over-freeze, or lose the freeze on pass 2 | `deno task check` (ratchet) |
-| [Build fanout](#build-fanout-audit-fanoutaudit) | `fanout:audit` | exponential doc-node rebuild in nested layout candidates | `deno task check` |
+| [Build fanout](#build-fanout-audit-fanoutaudit) | `fanout:audit` | exponential doc-node rebuild in nested layout candidates; a node built many times, a doc that outgrows its source, or doc-walk / source-scan / printer-predicate work growing faster than quadratic in nesting or than linear in a sibling run — over the depth gate's whole sweep, the known-bug shapes and flat runs | `deno task check` (ratchet) |
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
 | [Self-format](#self-format-audit-formataudit) | `format:audit` | tsv failing to format its OWN TS/JS — a would-change file (non-idempotency) or a parse error (over-rejection) | `deno task check` |
 | [Discovery parity](#corpus-discovery-parity-audit-discoveryaudit) | `discovery:audit` | `tsv format --list` over the `../corpora` snapshot naming a different file set than the snapshot's committed tree holds in tsv's extensions — a discovery prune firing on real code, or an extension drift | `deno task check` (when `../corpora` is present) |
@@ -714,16 +714,20 @@ the anchor rule is `Printer::element_claim_anchor`.
 ## Build-Fanout Audit (`fanout:audit`)
 
 ```bash
-cargo run -p tsv_debug build_fanout_audit
-# Also: --json
+cargo run --profile corpus -p tsv_debug --features audits build_fanout_audit
+# Also: --json, --update (re-pin; refused on a narrowed run), --filter <substr> (diagnostic:
+# only the inputs whose name contains it; the ratchet is not graded)
 ```
 
-Guards the O(1)-doc-builds-per-source-node invariant. A builder that assembles
-`conditional_group` candidates by RE-INVOKING the recursive builder on the same nodes — instead
-of building the subtree once and reusing the DocId — grows the doc-node count exponentially in
-nesting depth (hang/OOM on a deeply-nested but ordinary file). The audit builds synthetic
-nested inputs at increasing depth along one axis per candidate-building construct, failing if
-the doc-node count grows faster than ~depth^3:
+Guards the O(1)-doc-builds-per-source-node invariant, and the work a format does beside its
+builds. Two parts.
+
+**The doc-node growth leg.** A builder that assembles `conditional_group` candidates by
+RE-INVOKING the recursive builder on the same nodes — instead of building the subtree once and
+reusing the DocId — grows the doc-node count exponentially in nesting depth (hang/OOM on a
+deeply-nested but ordinary file). This leg builds synthetic nested inputs at increasing depth
+along one axis per candidate-building construct, failing if the doc-node count grows faster than
+~depth^3:
 
 - **Svelte** — elements, {#if}, {#each}, {#await}, the sibling-`>` dangle, glued inline-element
   runs and element→block dangles nested behind block-holding wrappers (each compact and
@@ -738,22 +742,107 @@ the doc-node count grows faster than ~depth^3:
   run, and as a member chain's curried tail.
 
 An axis earns its place by REACHING a builder no other axis does; the curried axes came from
-real 2^depth regressions that the family as it then stood could not see. Deterministic, pure
-Rust, no Deno; exits 1 on any construct growing past that ~depth^3 bound (or past the
-doc-node cap). Gated in `deno task check` via the `fanout:audit` task.
+real 2^depth regressions that the family as it then stood could not see. This leg is a hard
+gate: it fails past that bound (or past the doc-node cap), and `--update` refuses to pin while it
+does.
 
-**What it is blind to.** The audit measures how the doc-node count *grows with depth*, so it
-sees only violations that **compound**. Two shapes escape it:
+**The counted legs.** The growth leg sees only what compounds in the doc-node count. The other
+legs read deterministic counters instead — `tsv_lang::fanout_probe`, compiled in by the `audits`
+feature and absent from every shipped build (each call site is an empty inline function without
+it; with it, a relaxed load until this audit arms the counters). The counters are:
 
+- **builds** — one per call of the TS printer's expression (non-leaf), type and statement build
+  dispatch, keyed by the node's dispatch, kind and span, so the count per distinct node is the
+  rebuild multiplicity;
+- **walks** — one per node visited by the doc walks outside the renderer (`holds_line_suffix`,
+  `can_break_inner`, `subtree_layout_fill`, `suffix_walk`, `last_leaf`, `leaves`,
+  `flatten_lines_impl`, `replace_subdoc_walk`, `glue_walk`, the leading-edge walk's frames,
+  `edge_emission`);
+- **scans** — one per `source_scan::skip_trivia` call: the parsers' lookaheads and the printers'
+  trivia-aware scans alike (the armed run covers the parse); the hopping scans, which skip
+  non-opener bytes without asking it, are not counted;
+- **predicates** — one per step of a printer predicate where a blowup no other counter saw was
+  found: the type printer's leading-edge shell descents (`head_stripped_paren_shell`,
+  `leading_edge_shell`, `stripped_paren_hang_has_leading_run`), the statement-list comment-run
+  lookahead (`comment_leads_next_item`) and the Svelte root inline-run lookahead
+  (`detect_root_inline_run`);
+- **nodes** — one per doc node the arena allocates (`DocArena::alloc`, the one allocation site),
+  whichever printer asks. Budgeted, not graded: the work leg reads the arena's length instead.
+
+The legs, and the inputs they run over:
+
+| leg | fails when | threshold's basis (the `../corpora` snapshot's TypeScript files) |
+| --- | --- | --- |
+| **multiplicity** | one AST node is built more than 32 times, or the builds exceed 4× the distinct nodes built | the corpus's worst file builds one node 9 times, and 1.73 builds per node (p99 1.51) |
+| **density** | the doc has more than 8 × bytes + 2,000 nodes | the corpus's densest file (≥ 2 KB) builds 0.69 nodes per byte (p99 0.49) |
+| **work** | a counter (doc nodes, builds, walks, scans, predicates) grows faster than n^2 across a nesting sweep's last doubling (n = 8, 16, 32), or than n^1.3 across a flat run's (1,000, 2,000, 4,000) or a chain's links (n = 8, 16, 32, 64, 128) — 0.25 over either exponent tolerated, and a counter under 4,096 at the top point never failing | a walk or scan over each level's subtree from each level is quadratic in nesting; a sibling run's work must stay linear. A quadratic's lower-order terms read 2.02–2.11 over 16→32 (nested templates' walks) and settle at 4.0× per doubling further out; a cubic reads 3. The chain sweep runs to 128 links so a quadratic of under 4 units per link squared clears the floor, and its last doubling sits near the asymptote: the real chains no bug is known in read at most n^1.01 over 64→128 (a chain the parser refuses past 32 or 64 links ends its sweep there, with the floor's coarser reach) |
+
+- the depth-limit gate's **whole** generated catalog (`tsv_debug::depth_shapes`, its full
+  sweep: the named shapes, the grammar POSITIONS, every link pair and the seeded triples behind
+  every head, the commented links, the prefix and decorator sweeps) — the same generator the
+  gate imports, so the two gates grade one catalog. Multiplicity and density at n = 10;
+  the work sweep at 8/16/32 (a depth the parser refuses ends the sweep). A shape a spine limit
+  may end whose repeated unit has no closer is a run of chain links, not nesting, swept to 128
+  links and graded on the flat exponent: each link is a sibling of the one before it to the
+  printer. A
+  combination the parser rejects is skipped and counted;
+- a shape per **known blowup** (`k<N>_*`, in `build_fanout_audit/legs.rs`), which a fix must
+  turn green — a hand-written shape that stops parsing fails the run;
+- **flat runs** no bug is known in (statements, array elements, object members, call arguments,
+  a binary chain, union members, template parts, class members, Svelte elements, blocks,
+  attributes and text, CSS rules, declarations and selectors) — the work leg's linear baseline;
+- each doc-node-growth construct at its deepest depth (multiplicity and density only).
+
+Every format runs under a work budget (`BUDGET` in `legs.rs`): the counter call that takes a run
+past it panics with `fanout_probe::BUDGET_EXCEEDED`, caught here, so an exponential shape stops
+while it is still small — a stopped run fails the leg it was measuring. The node budget
+(`NODE_BUDGET`, also the doc-node growth leg's cap, armed there too) bounds every doc's memory,
+however it is built, well above the largest doc any shape builds; it is the audit's memory
+backstop, and the only one — no allocator cap sits under it. A panic is a finding at the size
+it first appears, the graded point or any deeper one. The whole run takes a few seconds.
+
+**A ratchet over the known failures.** The counted legs grade against
+`fanout_audit_known.txt`: one line per failing (leg, shape), with the bug it reproduces. A key
+pins only with a bug number beside it — `KNOWN_CAUSES` in `legs.rs` names them, by the shape's
+`k<N>_` prefix or its whole name — so a NEW blowup fails as unpinnable until someone names it;
+a panic never pins. A fix turns its lines stale, and re-pinning removes them.
+
+A bug the generated sweep reproduces across many shapes is a **family** (`KNOWN_FAMILIES`),
+pinned as one line whose shape column is the family's label; the report still lists every
+member. A family explains one thing: the work exponent of one counter, on shapes of one growth
+whose names hold one of its needles, up to a ceiling. The one family today is the chain links
+holding a `<` or `<<` (K73: each sends the parser's type-argument lookahead over the rest of the
+chain), its `scans` up to n^2.25. Any other finding on a member — another counter, a steeper
+exponent, a stopped run, a multiplicity, density or panic finding — keys on the shape's own
+name, which no cause names, so it fails as NEW and `--update` refuses to pin it. What a family
+cannot tell apart is a new bug of the same signature: a quadratic in `scans` on a shape the
+needles name reads as the known one — a member whose scans were linear joins the family
+silently, and one already in it shows only where the two compound past the ceiling. A fix of
+the family's bug that leaves one member quadratic keeps the line.
+
+**What it is blind to.**
+
+- **Work no counter sits on.** The renderer and its fits walk are not counted, nor the parsers'
+  work outside `skip_trivia`, the comment lookups, or any printer predicate beyond the three
+  above; a blowup there shows as time alone. The predicate counter exists because two of the known blowups (the type
+  leading-edge descent, the two flat lookaheads) were invisible to the rest — when a time-only
+  blowup is found, put a counter where it lives and add its shape.
+- **Builds no dispatch counts.** Only the TS printer's expression, type and statement dispatch
+  count builds, so a leaf, the internals of a binary or member chain, and every Svelte and CSS
+  builder are invisible to the multiplicity leg, seen only by density and the node budget; the
+  alternate layouts a chain printer assembles do not re-enter the dispatch either.
+- **A shape no input builds.** The legs grade constructed shapes: the depth catalog's positions
+  and link combinations, the known bugs and the flat runs. A rebuild that needs two constructs
+  composed, or a sibling run of a kind not listed, is not reached.
 - **A flat constant factor.** An eager build a later branch discards — `let x = build_…(…)`
   bound before a `match`/`if` whose arms don't all use `x` — costs a fixed 2× at that one site
-  and never compounds, so no depth curve can separate it from the baseline. The tell is
-  syntactic, not empirical; grep the shape rather than waiting for a profile, since a single
-  site sits below the noise floor of a corpus measurement while still being free to remove.
-- **Breadth.** A quadratic over a flat sibling sequence (`[..i].iter().any(…)` inside a child
-  loop) is likewise structurally invisible — it grows with sibling count, not nesting.
-
-Both are guarded by review and grep, not by this audit.
+  and never compounds; it stays under the multiplicity ratio. The tell is syntactic, not
+  empirical; grep the shape rather than waiting for a profile.
+- **A log factor.** The flat exponent's tolerance passes n log n (1.22 over a chain's 64→128,
+  1.13 over a flat run's 2,000→4,000) by design, and n log^2 n too (1.44, 1.25).
+- **Quadratic nesting.** The work leg passes n^2 over nesting by design — each level walking its
+  subtree is ordinary — so a quadratic that matters only at depths past the sweep is not a
+  finding.
 
 ## Raw-Find Scan Audit (`scan:audit`)
 

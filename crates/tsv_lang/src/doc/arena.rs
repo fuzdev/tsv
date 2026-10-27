@@ -1434,6 +1434,7 @@ struct LeadingEdgeWalk<'a> {
 
 impl LeadingEdgeWalk<'_> {
     fn frame(&mut self, node: DocId, group: u32, next: u32) -> u32 {
+        crate::fanout_probe::walk();
         let at = self.frames.len() as u32;
         self.frames.push(EdgeFrame { node, group, next });
         at
@@ -1658,6 +1659,7 @@ struct WalkStore<'a> {
 
 impl WalkStore<'_> {
     fn suffix_walk(&self, id: DocId, mut state: SuffixWalk) -> SuffixWalk {
+        crate::fanout_probe::walk();
         match &self.nodes[id.index()] {
             DocNode::LineSuffix(inner) => {
                 if !state.pending() {
@@ -1728,6 +1730,7 @@ impl WalkStore<'_> {
     }
 
     fn last_leaf(&self, id: DocId, state: LastLeaf) -> LastLeaf {
+        crate::fanout_probe::walk();
         match &self.nodes[id.index()] {
             DocNode::Text(t) => {
                 let text = super::types::resolve_text(t, Some(self.source), self.pool);
@@ -1834,6 +1837,7 @@ impl WalkStore<'_> {
 
     /// The emitted leaves of a suffix payload, in order.
     fn leaves(&self, id: DocId, out: &mut SmallVec<[DocId; 8]>) {
+        crate::fanout_probe::walk();
         match &self.nodes[id.index()] {
             DocNode::Concat(range) | DocNode::Fill(range) => {
                 for &kid in range.resolve(self.children) {
@@ -2441,6 +2445,8 @@ impl DocArena {
     /// Allocate a node and return its DocId.
     #[inline]
     fn alloc(&self, node: DocNode) -> DocId {
+        // the one allocation site, so the fanout budget bounds every printer's doc
+        crate::fanout_probe::node();
         let mut nodes = self.nodes.borrow_mut();
         let id = DocId(nodes.len() as u32);
         nodes.push(node);
@@ -3641,6 +3647,7 @@ impl DocArena {
         let mut stack: SmallVec<[DocId; 16]> = SmallVec::new();
         stack.push(id);
         while let Some(id) = stack.pop() {
+            crate::fanout_probe::walk();
             match &nodes[id.index()] {
                 DocNode::LineSuffix(_) => return true,
                 DocNode::Indent(inner) | DocNode::Dedent(inner) => stack.push(*inner),
@@ -3793,6 +3800,7 @@ impl DocArena {
         depth: u32,
         budget: &mut u32,
     ) -> Option<(DocId, Glue)> {
+        crate::fanout_probe::walk();
         const MAX_DEPTH: u32 = 256;
         if depth > MAX_DEPTH || *budget == 0 {
             return None;
@@ -4394,6 +4402,7 @@ impl DocArena {
         children: &[DocId],
         cache: &mut [u32],
     ) -> u32 {
+        crate::fanout_probe::walk();
         let result: u32 = match &nodes[id.index()] {
             // Reached only from the fits walk's own probe (`arena_fits`'s
             // `flat_width_memo`); `Self::subtree_layout_memo` answers a leaf
@@ -4527,6 +4536,7 @@ impl DocArena {
     /// walk already holds instead of re-borrowing per call (the threading
     /// idiom of [`Self::subtree_layout_fill`]).
     pub(super) fn can_break_inner(id: DocId, nodes: &[DocNode], children: &[DocId]) -> bool {
+        crate::fanout_probe::walk();
         match &nodes[id.index()] {
             DocNode::Line(_) => true,
             DocNode::FlowProbeEnd => false,
@@ -4653,6 +4663,7 @@ impl DocArena {
         replacement: DocId,
         memo: &mut FxHashMap<DocId, Option<DocId>>,
     ) -> Result<Option<DocId>, ()> {
+        crate::fanout_probe::walk();
         if id == target {
             return Ok(Some(replacement));
         }
@@ -4836,6 +4847,7 @@ impl DocArena {
     }
 
     fn flatten_lines_impl(&self, id: DocId, mode: FlattenMode) -> DocId {
+        crate::fanout_probe::walk();
         // Extract node info while borrowing, then release borrow before allocating.
         // This pattern avoids RefCell conflicts since alloc() needs borrow_mut().
         enum Info {

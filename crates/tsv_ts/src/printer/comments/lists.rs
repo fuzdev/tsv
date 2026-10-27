@@ -496,6 +496,7 @@ impl<'a> Printer<'a> {
             .iter()
             .take_while(|c| c.span.end <= next_start)
         {
+            tsv_lang::fanout_probe::predicate();
             if !self.is_same_line(pos, c.span.start) {
                 return false;
             }

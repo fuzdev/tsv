@@ -1,13 +1,22 @@
+use std::panic::{AssertUnwindSafe, catch_unwind};
+
 use argh::FromArgs;
 
+use crate::audit::panic_hook::{SuppressedPanicHook, panic_message};
+use crate::audit::ratchet::{Ratchet, print_ratchet_skipped, refuse_narrowed_update};
 use crate::cli::CliError;
 use crate::cli::commands::profile::lang_token;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::doc::arena::DocArena;
 use tsv_lang::estimated_ast_arena_capacity;
+use tsv_lang::fanout_probe::{self, BUDGET_EXCEEDED, Budget};
+
+mod legs;
+
+use legs::{FanoutKey, Finding, InputResult};
 
 /// Audit for exponential doc-node fanout — the per-layout-candidate rebuild
-/// blowup.
+/// blowup — and for the work a format does beside its builds.
 ///
 /// Builds synthetic nested inputs at increasing depth, formats each into a
 /// fresh `DocArena`, and checks that the doc-node count grows no faster than
@@ -17,19 +26,55 @@ use tsv_lang::estimated_ast_arena_capacity;
 /// once and reusing the `DocId`) makes the count grow exponentially in depth;
 /// this catches that and guards against reintroduction. The doc-node count is
 /// read directly via `format_in` into a caller-owned arena +
-/// `borrow_nodes().len()` — no prod-code instrumentation. Pure Rust, no Deno.
+/// `borrow_nodes().len()`.
+///
+/// The counted legs ([`legs`]) read `tsv_lang::fanout_probe`'s counters (the
+/// `audits` feature) over the depth-limit gate's catalog, the known-bug shapes and
+/// flat runs — builds per AST node, doc nodes per byte, work-counter growth — and
+/// grade against the `fanout_audit_known.txt` ratchet. Pure Rust, no Deno.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "build_fanout_audit")]
 pub struct BuildFanoutAuditCommand {
     /// emit JSON
     #[argh(switch)]
     json: bool,
+
+    /// regenerate the known-failure snapshot (refused on a `--filter` run)
+    #[argh(switch)]
+    update: bool,
+
+    /// grade only the inputs whose name contains this (diagnostic; the ratchet is not
+    /// graded, never with --update)
+    #[argh(option)]
+    filter: Option<String>,
 }
 
-/// Stop deepening a construct once one format exceeds this many doc nodes, so
-/// the audit itself never OOMs on a blowup. Exceeding it is treated as a failure
-/// (clearly super-linear).
-const NODE_CAP: usize = 3_000_000;
+const SNAPSHOT_HEADER: &str = "\
+# Build-fanout work ratchet — every line is a KNOWN BUG, the file shrinking is the goal.
+#
+# One line per failing (leg, shape), TAB-delimited: the leg (`multiplicity` — a node built
+# more than 32 times, or more than 4 builds per built node; `density` — more than
+# 8 doc nodes per byte + 2,000; `work` — a work counter growing faster than n^2 over
+# nesting depths 8/16/32, or n^1.3 over flat runs of 1k/2k/4k or a chain's links at
+# 8/16/32/64/128), the shape's name, and the bug it reproduces. A shape only pins with a bug
+# number beside it (`KNOWN_CAUSES` in build_fanout_audit/legs.rs), so a NEW blowup fails
+# until it is named; a fix removes its lines. A family of generated shapes one bug explains
+# (`KNOWN_FAMILIES`) pins as ONE line, its label in the shape column, and covers one
+# counter's work exponent alone: any other finding on a member fails as NEW.
+#
+# Regenerate with `deno task fanout:audit:update`.
+";
+
+const REPIN_HINT: &str = "deno task fanout:audit:update";
+
+fn snapshot() -> Ratchet {
+    Ratchet::colocated("fanout_audit_known.txt", SNAPSHOT_HEADER, REPIN_HINT)
+}
+
+/// Stop a construct's format once it allocates more than this many doc nodes (the work
+/// legs' node budget, armed here too), so the audit itself never OOMs on a blowup.
+/// Exceeding it is treated as a failure (clearly super-linear).
+const NODE_CAP: u64 = legs::NODE_BUDGET;
 
 /// Tolerated growth: `doc_nodes ~ depth^E`. A linear build is `E ≈ 1`; this
 /// allows up to cubic. The rebuild blowup pushes `E` far past it, so the bound
@@ -606,24 +651,40 @@ fn doc_node_count(source: &str, parser: ParserType) -> Result<usize, String> {
     Ok(doc_arena.borrow_nodes().len())
 }
 
-/// Measure one construct across its depth sweep (ascending, aborting once the
-/// node cap is hit) and decide pass/fail from the growth exponent.
+/// The doc-node growth leg's budget: the node cap alone, every other counter unbounded.
+const GROWTH_BUDGET: Budget = Budget {
+    builds: u64::MAX,
+    walks: u64::MAX,
+    scans: u64::MAX,
+    predicates: u64::MAX,
+    nodes: NODE_CAP,
+};
+
+/// Measure one construct across its depth sweep (ascending, stopping at the format that
+/// allocates past the node cap) and decide pass/fail from the growth exponent. A panic is
+/// the construct's error.
 fn measure(c: &Construct) -> ConstructResult {
     let mut points = Vec::new();
     let mut exceeded_cap = false;
     let mut error = None;
     for &d in c.depths {
         let src = (c.generate)(d);
-        match doc_node_count(&src, c.parser) {
-            Ok(n) => {
-                points.push(Point { depth: d, nodes: n });
-                if n > NODE_CAP {
-                    exceeded_cap = true;
-                    break;
-                }
-            }
-            Err(e) => {
+        fanout_probe::arm(GROWTH_BUDGET);
+        let result = catch_unwind(AssertUnwindSafe(|| doc_node_count(&src, c.parser)));
+        fanout_probe::disarm();
+        match result {
+            Ok(Ok(n)) => points.push(Point { depth: d, nodes: n }),
+            Ok(Err(e)) => {
                 error = Some(e);
+                break;
+            }
+            Err(payload) => {
+                let message = panic_message(&*payload);
+                if message == BUDGET_EXCEEDED {
+                    exceeded_cap = true;
+                } else {
+                    error = Some(format!("panicked: {message}"));
+                }
                 break;
             }
         }
@@ -1082,20 +1143,126 @@ const CONSTRUCTS: &[Construct] = &[
 
 impl BuildFanoutAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
+        if !fanout_probe::ENABLED {
+            eprintln!(
+                "Error: build_fanout_audit needs the work counters: build with `--features \
+                 audits` (or `fanout_check`) — `deno task fanout:audit` does."
+            );
+            return Err(CliError::Failed);
+        }
+        let narrowed: &[&'static str] = if self.filter.is_some() {
+            &["--filter"]
+        } else {
+            &[]
+        };
+        refuse_narrowed_update(
+            self.update,
+            narrowed,
+            "the depth gate's full sweep, the bug shapes and the flat runs",
+            "SUBSET",
+        )?;
+        // every leg records the panics it catches: the growth leg as its construct's error,
+        // the work legs as findings
+        let hook = SuppressedPanicHook::install();
         let results: Vec<ConstructResult> = CONSTRUCTS.iter().map(measure).collect();
         let failed = results.iter().filter(|r| !r.pass).count();
 
+        // The work legs: each construct at its deepest depth, then every input.
+        let mut findings: Vec<Finding> = Vec::new();
+        for c in CONSTRUCTS {
+            if let Some(&depth) = c.depths.last() {
+                let outcome = legs::measure(&(c.generate)(depth), c.parser);
+                legs::grade_point(c.name, depth, &outcome, &mut findings);
+            }
+        }
+        // The full sweep, not `check`'s sample of it: the depth gate samples because it
+        // searches each shape's limit, where this formats each shape a few times at small
+        // sizes (a nest to 32, a chain to 128 links) — the whole sweep is seconds.
+        let inputs: Vec<legs::Input> = legs::depth_inputs(crate::depth_shapes::Scope::Full)
+            .chain(legs::bug_inputs())
+            .chain(legs::flat_inputs())
+            .filter(|input| {
+                self.filter
+                    .as_deref()
+                    .is_none_or(|f| input.shape.name.contains(f))
+            })
+            .collect();
+        let mut input_results: Vec<InputResult> = Vec::with_capacity(inputs.len());
+        for input in &inputs {
+            let result = legs::grade_input(input, &mut findings);
+            if input.required
+                && let Some(reason) = &result.skipped
+            {
+                drop(hook);
+                eprintln!(
+                    "Error: the hand-written shape `{}` no longer parses: {reason}",
+                    input.shape.name
+                );
+                return Err(CliError::Failed);
+            }
+            input_results.push(result);
+        }
+        drop(hook);
+        findings.sort_by(|a, b| a.key.cmp(&b.key));
+        let found = legs::found_keys(&findings);
+
         if self.json {
-            print_json(&results);
+            print_json(&results, &input_results, &findings);
         } else {
             print_human(&results, failed);
+            print_legs_human(&input_results, &findings);
         }
 
-        if failed > 0 {
-            Err(CliError::Failed)
-        } else {
-            Ok(())
+        if self.filter.is_some() {
+            print_ratchet_skipped(narrowed);
+            return if failed > 0 {
+                Err(CliError::Failed)
+            } else {
+                Ok(())
+            };
         }
+        let ratchet = snapshot();
+        if self.update {
+            if failed > 0 {
+                eprintln!("Error: the doc-node growth leg failed; fix it before re-pinning.");
+                return Err(CliError::Failed);
+            }
+            let unpinnable: Vec<&FanoutKey> = found
+                .iter()
+                .filter(|k| !crate::audit::ratchet::SnapshotKey::is_pinnable(*k))
+                .collect();
+            if !unpinnable.is_empty() {
+                for key in unpinnable {
+                    eprintln!(
+                        "✗ cannot pin (no known bug, or a panic): {}",
+                        legs::render_key(key)
+                    );
+                }
+                return Err(CliError::Failed);
+            }
+            ratchet.write_pinned(&found, "shape", self.json)?;
+            return Ok(());
+        }
+        for key in found
+            .iter()
+            .filter(|k| !crate::audit::ratchet::SnapshotKey::is_pinnable(*k))
+        {
+            eprintln!(
+                "✗ unpinnable (no known bug names it, or a panic): {}",
+                legs::render_key(key)
+            );
+        }
+        let ratchet_result = ratchet.grade_and_report(
+            &found,
+            "failing shape",
+            &format!("{} inputs", input_results.len()),
+            self.json,
+            legs::render_key,
+        );
+        if failed > 0 {
+            return Err(CliError::Failed);
+        }
+        ratchet_result
     }
 }
 
@@ -1151,7 +1318,66 @@ fn print_human(results: &[ConstructResult], failed: usize) {
     }
 }
 
-fn print_json(results: &[ConstructResult]) {
+/// The work legs' report: the failing findings, then a census of what was graded.
+fn print_legs_human(inputs: &[InputResult], findings: &[Finding]) {
+    let graded = inputs.iter().filter(|r| r.skipped.is_none()).count();
+    let skipped = inputs.len() - graded;
+    println!(
+        "\nbuild-fanout work legs — {graded} inputs graded ({skipped} the parser rejects, \
+         skipped): build multiplicity and doc nodes per byte at n={} (flat: n={}), work \
+         counter growth over n={:?} (flat: {:?}; chain links: {:?}, graded on the flat \
+         exponent)\n",
+        legs::GRADED_DEPTH,
+        legs::FLAT_SWEEP[0],
+        legs::NESTING_SWEEP,
+        legs::FLAT_SWEEP,
+        legs::CHAIN_SWEEP,
+    );
+    let worst = |f: fn(&legs::Point) -> f64| {
+        inputs
+            .iter()
+            .filter_map(|r| r.graded.as_ref().map(|p| (f(p), r.name.as_str())))
+            .max_by(|a, b| a.0.total_cmp(&b.0))
+    };
+    #[expect(clippy::cast_precision_loss)]
+    let ratio = |p: &legs::Point| p.total_builds as f64 / p.built_nodes.max(1) as f64;
+    #[expect(clippy::cast_precision_loss)]
+    let density = |p: &legs::Point| p.doc_nodes as f64 / p.bytes.max(1) as f64;
+    if let Some((v, name)) = worst(|p| f64::from(p.max_builds)) {
+        println!("  most builds of one node:     {v:>9.0}  {name}");
+    }
+    if let Some((v, name)) = worst(ratio) {
+        println!("  most builds per built node:  {v:>9.2}  {name}");
+    }
+    if let Some((v, name)) = worst(density) {
+        println!("  most doc nodes per byte:     {v:>9.2}  {name}");
+    }
+    for growth in [
+        legs::Growth::Nesting,
+        legs::Growth::Chain,
+        legs::Growth::Flat,
+    ] {
+        if let Some((e, counter, name)) = inputs
+            .iter()
+            .filter(|r| r.growth == growth)
+            .filter_map(|r| r.exponent.map(|(c, e)| (e, c, r.name.as_str())))
+            .max_by(|a, b| a.0.total_cmp(&b.0))
+        {
+            println!(
+                "  steepest {:<7} work growth: n^{e:<6.2} {counter} of {name}",
+                legs::growth_token(growth)
+            );
+        }
+    }
+    if !findings.is_empty() {
+        println!("\n  failing ({}):", findings.len());
+        for f in findings {
+            println!("    {} — {}", legs::render_key(&f.key), f.detail);
+        }
+    }
+}
+
+fn print_json(results: &[ConstructResult], inputs: &[InputResult], findings: &[Finding]) {
     let arr: Vec<serde_json::Value> = results
         .iter()
         .map(|r| {
@@ -1166,10 +1392,49 @@ fn print_json(results: &[ConstructResult]) {
             })
         })
         .collect();
+    let inputs: Vec<serde_json::Value> = inputs
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "name": r.name,
+                "parser": legs::parser_token(r.parser),
+                "growth": legs::growth_token(r.growth),
+                "skipped": r.skipped,
+                "graded": r.graded.as_ref().map(|p| serde_json::json!({
+                    "n": p.size,
+                    "bytes": p.bytes,
+                    "doc_nodes": p.doc_nodes,
+                    "built_nodes": p.built_nodes,
+                    "builds": p.total_builds,
+                    "max_builds": p.max_builds,
+                })),
+                "sweep": r.sweep.iter().map(|(n, counters)| {
+                    let mut point = serde_json::Map::new();
+                    point.insert("n".into(), (*n).into());
+                    for &(name, count) in counters {
+                        point.insert(name.into(), count.into());
+                    }
+                    serde_json::Value::Object(point)
+                }).collect::<Vec<_>>(),
+                "exponent": r.exponent.map(|(counter, e)| serde_json::json!({"counter": counter, "exponent": e})),
+            })
+        })
+        .collect();
+    let findings: Vec<serde_json::Value> = findings
+        .iter()
+        .map(|f| {
+            serde_json::json!({
+                "key": crate::audit::ratchet::SnapshotKey::to_line(&f.key),
+                "detail": f.detail,
+            })
+        })
+        .collect();
     let out = serde_json::json!({
         "max_exponent": MAX_EXPONENT,
         "node_cap": NODE_CAP,
         "constructs": arr,
+        "inputs": inputs,
+        "findings": findings,
         "pass": results.iter().all(|r| r.pass),
     });
     super::print_json_pretty(&out);

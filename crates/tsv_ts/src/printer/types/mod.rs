@@ -316,6 +316,10 @@ impl<'a> Printer<'a> {
     /// (`Promise<LongType | null>` breaks inside the `<>`) — `build_type_arguments_doc` is the
     /// single builder for every type-argument position, so no caller has to opt into that.
     pub(in crate::printer) fn build_type_doc(&self, ts_type: &TSType<'_>) -> DocId {
+        tsv_lang::fanout_probe::build(tsv_lang::fanout_probe::Build::Type, ts_type, || {
+            let span = ts_type.span();
+            (span.start, span.end)
+        });
         let d = self.d();
         match ts_type {
             TSType::Keyword(kw) => d.text(kw.kind.as_str()),
@@ -1337,6 +1341,7 @@ impl<'a> Printer<'a> {
         run: EdgeRun,
         pair: ShellPair,
     ) -> bool {
+        tsv_lang::fanout_probe::predicate();
         outermost_paren(ty).is_some_and(|shell| {
             let (leading, _) = paren_shell_gaps(shell);
             match run {
@@ -1677,6 +1682,7 @@ impl<'a> Printer<'a> {
         ty: &'t TSType<'t>,
         run: EdgeRun,
     ) -> Option<HeadRegion> {
+        tsv_lang::fanout_probe::predicate();
         match ty {
             // The ONE link whose own arm owns a routed shell's run (see the ⚠️ above):
             // `build_array_type_doc` keeps the pair and emits the interior run inside it.
@@ -1950,6 +1956,7 @@ impl<'a> Printer<'a> {
         downstream_owns_run: bool,
         run: EdgeRun,
     ) -> Option<HeadRegion> {
+        tsv_lang::fanout_probe::predicate();
         if downstream_owns_run {
             return None;
         }

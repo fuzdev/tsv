@@ -3,7 +3,7 @@
 //!
 //! For every shape the limits count — the named constructs, the catalog of grammar
 //! positions, and the generated sweeps over link, prefix and decorator combinations
-//! (`depth_limit/shapes.rs`) — generated at its limit:
+//! (`tsv_debug::depth_shapes`) — generated at its limit:
 //!
 //! - **no path through its wire passes either limit**: the parse charges at least what the
 //!   walks recurse through, so a construct it leaves uncounted — a level the wire puts on
@@ -92,8 +92,7 @@ fn knob(name: &str) -> Option<String> {
 /// limit never overflow. Only the parse runs there.
 const SEARCH_STACK: usize = 256 << 20;
 
-#[path = "depth_limit/shapes.rs"]
-mod shapes;
+use tsv_debug::depth_shapes as shapes;
 
 use shapes::{Lang, Limit, Scope, Shape, Wire, rep, shapes};
 

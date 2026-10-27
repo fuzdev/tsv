@@ -17,7 +17,8 @@
 //! the absorb behavior pin `blank_absorb_known.txt` — one consumer, two ratchets),
 //! `ignore_audit` (`ignore_audit_known.txt`), `fabrication_audit`
 //! (`fabrication_audit_known.txt`), `census_audit` (`census_audit_known.txt`),
-//! `width_audit` (`width_audit_known.txt`), `compile_corpus_compare --ratchet`
+//! `width_audit` (`width_audit_known.txt`), `build_fanout_audit`
+//! (`fanout_audit_known.txt`), `compile_corpus_compare --ratchet`
 //! (`compile_validation_known.txt`), and the strip fixture gate
 //! ([`crate::strip_fixtures`], `strip_fixtures_known.txt`) are the consumers. It is written
 //! generic — parameterized on the snapshot **path**, the **key type**

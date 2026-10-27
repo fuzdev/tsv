@@ -106,6 +106,7 @@
 		"ignore:audit:update": "cargo run --profile corpus -p tsv_debug --features audits --quiet ignore_audit --update",
 		"scan:audit": "cargo run --profile corpus -p tsv_debug --features audits --quiet scan_audit",
 		"fanout:audit": "cargo run --profile corpus -p tsv_debug --features audits --quiet build_fanout_audit",
+		"fanout:audit:update": "cargo run --profile corpus -p tsv_debug --features audits --quiet build_fanout_audit --update",
 		"roundtrip:audit": "cargo run --profile corpus -p tsv_debug --features audits --quiet roundtrip_audit --gate",
 		"roundtrip:audit:prettier": "deno run --allow-read --allow-env --allow-run=cargo scripts/roundtrip_audit_prettier.ts",
 		"discovery:audit": "deno task build:check && deno run --allow-read --allow-env --allow-run=target/corpus/tsv,git scripts/discovery_audit.ts",

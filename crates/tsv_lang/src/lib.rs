@@ -15,6 +15,7 @@
 //! - `Comment` - shared comment type
 //! - `census` - opt-in perf census counters (`census` feature)
 //! - `comment_ledger` - print-once comment ledger (`comment_check` feature)
+//! - `fanout_probe` - opt-in work counters for the fanout audit (`fanout_check` feature)
 //! - `doc` - document builder primitives for prettier-compatible formatting
 //! - `printing` - shared printing utilities for printers
 //! - `source_scan` - trivia-aware source scanning between AST nodes
@@ -35,6 +36,7 @@ mod depth;
 pub mod doc;
 mod error;
 mod escapes;
+pub mod fanout_probe;
 mod hash;
 #[cfg(feature = "json")]
 mod json_writer;

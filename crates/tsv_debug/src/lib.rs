@@ -5,6 +5,7 @@ pub mod audit;
 pub mod cli;
 pub mod compile_fixtures;
 pub mod deno;
+pub mod depth_shapes;
 pub mod diff;
 pub mod fixtures;
 pub mod json;

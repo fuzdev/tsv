@@ -345,6 +345,7 @@ impl<'a> DocStore<'a> {
     /// a collapsed soft line, a pure layout marker) — for which the caller's walk keeps
     /// going toward that edge's neighbour.
     fn edge_emission(&self, doc: DocId, mode: Mode, edge: Edge) -> Option<EdgeEmission<'a>> {
+        crate::fanout_probe::walk();
         match &self.nodes[doc.index()] {
             DocNode::Text(t) => match resolve_text(t, self.source, self.pool) {
                 "" => None,

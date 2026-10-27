@@ -1,5 +1,9 @@
 //! The shapes `tests/depth_limit.rs` generates at the parsers' depth limits.
 //!
+//! Here rather than beside that test because `build_fanout_audit` grades the same catalog,
+//! for the work a format does at small depths — one generator, so the two gates cannot come
+//! to grade different catalogs.
+//!
 //! Every shape is a [`Shape`] — fixed text around a unit repeated `n` times, and a closer
 //! repeated as often (`pre + unit×n + mid + close×n + post`) — so the gate searches each
 //! one's accepted `n`, and the WASM leg (`scripts/depth_wasm.ts`) regenerates the same
@@ -35,14 +39,14 @@ use std::sync::LazyLock;
 use tsv_lang::SPINE_LIMIT;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Lang {
+pub enum Lang {
     Ts,
     Css,
     Svelte,
 }
 
 impl Lang {
-    pub(crate) fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             Lang::Ts => "typescript",
             Lang::Css => "css",
@@ -53,7 +57,7 @@ impl Lang {
 
 /// Which limit refuses the shape one level past its accepted depth.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Limit {
+pub enum Limit {
     Nesting,
     Spine,
     /// A generated combination, which either limit may end (a right-associative `**`
@@ -75,7 +79,7 @@ pub(crate) enum Limit {
 /// frame in hand (`check_wire` in `tests/depth_limit.rs`) — the parse charges at least
 /// what the walks recurse through.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Wire {
+pub enum Wire {
     /// Calibrated on the nesting: the wire's depth (left-spine links aside) must also sit
     /// AT the limit, so the count does not overcharge the shape either.
     Nesting,
@@ -89,21 +93,21 @@ pub(crate) enum Wire {
     Bounded,
 }
 
-pub(crate) struct Shape {
-    pub(crate) name: String,
-    pub(crate) lang: Lang,
-    pub(crate) limit: Limit,
-    pub(crate) wire: Wire,
-    pub(crate) pre: String,
-    pub(crate) unit: String,
-    pub(crate) mid: String,
-    pub(crate) close: String,
-    pub(crate) post: String,
+pub struct Shape {
+    pub name: String,
+    pub lang: Lang,
+    pub limit: Limit,
+    pub wire: Wire,
+    pub pre: String,
+    pub unit: String,
+    pub mid: String,
+    pub close: String,
+    pub post: String,
 }
 
 impl Shape {
     /// The source at depth `n`.
-    pub(crate) fn make(&self, n: usize) -> String {
+    pub fn make(&self, n: usize) -> String {
         let mut out = String::with_capacity(
             self.pre.len()
                 + (self.unit.len() + self.close.len()) * n
@@ -123,14 +127,14 @@ impl Shape {
     }
 
     /// Whether the shape belongs to the generated sweep.
-    pub(crate) fn generated(&self) -> bool {
+    pub fn generated(&self) -> bool {
         self.limit == Limit::Either
     }
 }
 
 /// The links the generated sweep combines: every link kind of an expression chain, each in
 /// one spelling, and every binary and logical operator, each with its right operand.
-pub(crate) const SEGMENTS: &[&str] = &[
+pub const SEGMENTS: &[&str] = &[
     // chain links
     ".b",
     "()",
@@ -177,18 +181,18 @@ pub(crate) const SEGMENTS: &[&str] = &[
 /// The heads the generated sweep starts from: a bare name, a member (behind which a call
 /// is a member chain's, and a call on that call the curried call printed apart), a call,
 /// `this`, a parenthesized name, and a `new` (behind which a member is its callee's).
-pub(crate) const HEADS: &[&str] = &["a", "a.b", "a()", "this", "(a)", "new A"];
+pub const HEADS: &[&str] = &["a", "a.b", "a()", "this", "(a)", "new A"];
 
 /// The heads `check`'s sweep starts from ([`Scope::Check`]): a bare name and a call, the two
 /// whose neighbours change a link's walk the most (a call on a call is the curried call
 /// printed apart; a member over a call may print it whole).
-pub(crate) const CHECK_HEADS: &[&str] = &["a", "a()"];
+pub const CHECK_HEADS: &[&str] = &["a", "a()"];
 
 /// The prefix operators the generated sweep nests ([`prefix_sweep`]): every unary and
 /// keyword operator, `await` and `yield` (in an async generator's body), an angle-bracket
 /// assertion, `new` and the prefix updates — each spelled so that it lexes apart from the
 /// one after it.
-pub(crate) const PREFIXES: &[&str] = &[
+pub const PREFIXES: &[&str] = &[
     "- ", "+ ", "!", "~", "typeof ", "void ", "delete ", "await ", "yield ", "<T>", "new ", "++",
     "--",
 ];
@@ -205,17 +209,17 @@ const CHECK_PREFIX_LINKS: &[&str] = &[".b", "()", "!", "`t`", " as T"];
 const CHECK_PREFIX_OPERATORS: &[&str] = &[" + a", " == a", " ** a", " ?? a"];
 
 /// How many triples the full sweep samples, behind seeded heads; the pairs are exhaustive.
-pub(crate) const SAMPLED_TRIPLES: usize = 1_500;
+pub const SAMPLED_TRIPLES: usize = 1_500;
 
 /// How many triples `check`'s sweep samples ([`Scope::Check`]).
-pub(crate) const CHECK_TRIPLES: usize = 300;
+pub const CHECK_TRIPLES: usize = 300;
 
 /// The sample's seed: fixed, so a run grades the same triples every time.
 const TRIPLE_SEED: u64 = 0x7473_765f_6465_7074;
 
 /// How much of the generated sweep a run grades.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Scope {
+pub enum Scope {
     /// Every pair behind [`CHECK_HEADS`], [`CHECK_TRIPLES`] seeded triples, the commented
     /// links and `check`'s sample of the prefix alphabet — what `deno task test:depth`
     /// grades inside `check`.
@@ -229,7 +233,7 @@ pub(crate) enum Scope {
 impl Scope {
     /// The scope a run asks for: `TSV_DEPTH_SWEEP=full` names the full sweep, anything else
     /// `check`'s.
-    pub(crate) fn from_env() -> Scope {
+    pub fn from_env() -> Scope {
         if std::env::var("TSV_DEPTH_SWEEP").is_ok_and(|v| v == "full") {
             Scope::Full
         } else {
@@ -240,7 +244,7 @@ impl Scope {
 
 /// The shapes a scope grades: the named ones, then the generated sweep
 /// (`x = <head><segments>×n;`).
-pub(crate) fn shapes(scope: Scope) -> &'static [Shape] {
+pub fn shapes(scope: Scope) -> &'static [Shape] {
     static CHECK: LazyLock<Vec<Shape>> = LazyLock::new(|| build_shapes(Scope::Check));
     static FULL: LazyLock<Vec<Shape>> = LazyLock::new(|| build_shapes(Scope::Full));
     match scope {
@@ -529,12 +533,12 @@ fn commented_links(shapes: &mut Vec<Shape>) {
 /// `LINK_REENTRY`, restated for the flat shapes whose wire it calibrates.
 const REENTRY: u32 = 10;
 
-pub(crate) fn rep(s: &str, n: usize) -> String {
+pub fn rep(s: &str, n: usize) -> String {
     s.repeat(n)
 }
 
 /// A flat chain of `n` terms joined by `op`.
-pub(crate) fn chain(head: &str, op: &str, n: usize) -> String {
+pub fn chain(head: &str, op: &str, n: usize) -> String {
     let mut out = String::from(head);
     for _ in 1..n {
         out.push_str(op);

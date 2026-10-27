@@ -222,6 +222,7 @@ pub fn skip_trivia(bytes: &[u8], i: usize, end: usize, profile: TriviaProfile) -
     // inlines into — for no functional gain. The const names the set for the
     // *hopping* scans, which cannot ask this function at all;
     // `covers_trivia_openers` is what keeps those honest.
+    crate::fanout_probe::scan(1);
     let b = bytes[i];
     if b != b'"' && b != b'\'' && b != b'`' && b != b'/' {
         return None;

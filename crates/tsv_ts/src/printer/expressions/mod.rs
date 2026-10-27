@@ -317,6 +317,11 @@ impl<'a> Printer<'a> {
     // front answers first.
     #[inline(never)]
     fn build_expression_doc_full_dispatch(&self, expr: &Expression<'_>) -> DocId {
+        tsv_lang::fanout_probe::build(
+            tsv_lang::fanout_probe::Build::Expression,
+            &expr.kind,
+            || (expr.span.start, expr.span.end),
+        );
         let d = self.d();
 
         // Take and clear is_expression_statement so it doesn't leak to sub-expressions.

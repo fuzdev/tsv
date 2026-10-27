@@ -205,6 +205,11 @@ impl<'a> Printer<'a> {
         statement: &Statement<'_>,
         ctx: StatementContext,
     ) -> DocId {
+        tsv_lang::fanout_probe::build(
+            tsv_lang::fanout_probe::Build::Statement,
+            &statement.kind,
+            || (statement.span.start, statement.span.end),
+        );
         // A statement ends its own line, so a run its value deferred out of a stripped
         // pair flushes there, never at an enclosing list's comma.
         self.with_line_ending_construct(|| self.build_statement_doc_uncounted(statement, ctx))

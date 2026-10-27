@@ -220,7 +220,10 @@ deno task pins:audit:checkouts       # checkout ALIGNMENT (an environment fact):
 deno task format:audit               # `tsv format --check .`; fails on a would-change file (exit 1) OR a parse error (exit 2)
 deno task docs:audit                 # rustdoc `[link]`s resolve (doc lints DENIED, private items, `--all-features`); a dead link is a STALE DOC
 deno task scan:audit                 # no new raw find/rfind/match_indices substring scans over source
-deno task fanout:audit               # no exponential doc-node rebuild fanout (per-layout-candidate blowup)
+deno task fanout:audit               # build-fanout RATCHET: doc-node growth over nested constructs (exponential rebuild per
+#                                      layout candidate), plus counted legs over the depth gate's full sweep, the known-bug
+#                                      shapes and flat runs — builds per AST node, doc nodes per byte, work-counter growth
+#                                      (doc walks, source scans, printer predicates); `audits` counters, no wall-clock (:update)
 deno task roundtrip:audit            # format(tests/fixtures) must reparse with its NODE POPULATION conserved (every node by
 #                                      type, minus the shells/separators the formatter rewrites by design, plus every word of
 #                                      template text) — zero-tolerance; names a dropped element where the skeleton compare only
