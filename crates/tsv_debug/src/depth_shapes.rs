@@ -517,13 +517,6 @@ fn commented_links(shapes: &mut Vec<Shape>) {
     };
     for &first in &[".b", "()", "!", "`t`", " + a", " == a", " * a / a"] {
         for &second in SEGMENTS.iter().filter(|s| continues(s)) {
-            // TODO: a tag followed past a line comment by a call whose argument is a
-            // multi-line template (`` a`t` // c⏎.o(`⏎x⏎`) ``) takes the printer memory
-            // exponential in its repetitions, a dozen of them hundreds of MiB — out of the
-            // depth limit's reach, like the nested ternaries' and member-chain callbacks'
-            if first == "`t`" && second.contains('\n') {
-                continue;
-            }
             shapes.push(generated(format!("{first} // c\n{second}"), "a"));
         }
     }

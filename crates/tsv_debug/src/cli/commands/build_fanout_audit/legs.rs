@@ -170,7 +170,6 @@ const NO_CAUSE: &str = "-";
 const KNOWN_CAUSES: &[(&str, &str)] = &[
     ("k282_*", "K282"),
     ("k285_*", "K285"),
-    ("k286_*", "K286"),
     ("k289_*", "K289"),
     ("k293_*", "K293"),
     // the fanout constructs' own deepest points: polynomial, not exponential, so the

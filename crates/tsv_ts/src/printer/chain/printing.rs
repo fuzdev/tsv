@@ -9,7 +9,8 @@ use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::expressions::ChainBaseTernary;
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::{
-    ArrowChainContext, LeadingGlue, ParenContext, Printer, is_curried_arrow_chain, needs_parens,
+    ArrowChainContext, LeadingGlue, ParenContext, Printer, ShareTag, is_curried_arrow_chain,
+    needs_parens,
 };
 use tsv_lang::Span;
 use tsv_lang::doc::{
@@ -244,7 +245,23 @@ pub(crate) fn print_node_inner<'a>(
                     ")",
                 )
             } else {
-                printer.build_expression_doc(expr)
+                // Every layout candidate of the chain prints its base, so it is built once and
+                // shared ([`ShareTag::ChainBase`]): a base that holds a chain of its own (a tag
+                // over a call, `` a`t`.o(…)`t` ``) otherwise rebuilt it per candidate, three
+                // builds a level. A leaf base — most of them — costs less to build than to
+                // record.
+                let leaf = matches!(
+                    expr.kind,
+                    ExpressionKind::Identifier(_)
+                        | ExpressionKind::Literal(_)
+                        | ExpressionKind::ThisExpression(_)
+                );
+                let key = if leaf {
+                    None
+                } else {
+                    printer.chain_share_key(expr, ShareTag::ChainBase)
+                };
+                printer.chain_shared_doc(key, || printer.build_expression_doc(expr))
             }
         }
 
