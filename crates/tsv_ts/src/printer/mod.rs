@@ -647,6 +647,8 @@ pub struct Printer<'a> {
     /// suppress a run nothing else prints, which is a DROP
     /// ([`comments.md`](../../../../docs/comments.md) hazard 1).
     pub(crate) claimed_shell_leading_run: Cell<Option<Span>>,
+    /// The leading-edge descent's per-call memo ([`types::HeadMemo`]), empty between calls.
+    pub(in crate::printer) head_memo: types::HeadMemo,
     /// The left-spine shell REGION one expression claims for every node below it
     /// ([`comments::LeftSpineClaim`]): the stripped grouping shells from the
     /// claimer's own start down to its left spine's leaf, set where a printed pair on
@@ -952,6 +954,7 @@ impl<'a> Printer<'a> {
             inline_member_call_tail: Cell::new(None),
             claimed_owned_comment_start: Cell::new(None),
             claimed_shell_leading_run: Cell::new(None),
+            head_memo: types::HeadMemo::default(),
             claimed_left_spine_run: Cell::new(None),
             frozen_chain_base: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),

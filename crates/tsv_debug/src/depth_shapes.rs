@@ -2805,9 +2805,15 @@ const POSITIONS: &[(Lang, &str, &str, &str, &str, &str, &str)] = &[
         " : D",
         ";\n",
     ),
-    // TODO: K282 — a conditional type nested in a parenthesized check type takes the format
-    // time exponential in its depth, so `(A extends B ? C : D) extends …` stays out of the
-    // gate until the printer is fixed; its check type is counted as a spine link
+    (
+        Lang::Ts,
+        "pos_type_conditional_check",
+        "type X = ",
+        "(",
+        "A",
+        " extends B ? C : D)",
+        ";\n",
+    ),
     (
         Lang::Ts,
         "pos_type_infer_constraint",

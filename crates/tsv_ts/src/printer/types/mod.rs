@@ -19,6 +19,7 @@
 
 mod composite;
 pub(in crate::printer) mod function_types;
+mod head_memo;
 pub(crate) mod helpers;
 mod literal_types;
 mod type_annotation;
@@ -36,6 +37,7 @@ pub use helpers::unwrap_parenthesized;
 // The array-suffix layout verdict, shared with the type-alias `=` gate
 // (`statements/type_declarations.rs`) so the emitter and the gate cannot disagree.
 pub(in crate::printer) use composite::ArraySuffixLayout;
+pub(in crate::printer) use head_memo::HeadMemo;
 
 // The union value doc an operator seam prints — the alias `=`, the annotation `:`, the
 // function-type `=>` and the mapped value — carrying whether it hugs, so the seam's layout
@@ -161,7 +163,7 @@ pub(in crate::printer) fn prefix_operator_shell_pair(
 /// questions asked of [`Printer::head_stripped_paren_shell`]'s descent part on. The LINK
 /// SET is one shape and stays one function; only what counts as a run at the bottom of it
 /// differs, and naming the axis is what keeps the two from being read as one answer.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum EdgeRun {
     /// A run that FORCES A BREAK — a `//`, a block the author isolated on its own line, or
     /// a run they broke after holding a multi-line block
@@ -217,6 +219,12 @@ struct HeadRegion {
 }
 
 impl HeadRegion {
+    /// The region's two ends, for comparing answers under test.
+    #[cfg(test)]
+    fn bounds(self) -> (u32, u32) {
+        (self.region_start, self.region_end)
+    }
+
     /// Open the region at `start` — a transparent composite's own span start, which
     /// always precedes whatever the descent below it found.
     fn opened_at(self, start: u32) -> Self {
@@ -1677,7 +1685,10 @@ impl<'a> Printer<'a> {
     /// print the run with a bare `hardline` at its own indent, the F1 break the ⚠️ above
     /// describes, and the directive landed glued to the enclosing head, where tsv's own
     /// placement floor reads it inert.
-    fn head_stripped_paren_shell<'t>(
+    ///
+    /// Memoized per outermost call ([`head_memo`]): a required-pair link asks its head
+    /// twice, so the uncached descent doubles at every level a link nests in its own head.
+    fn head_stripped_paren_shell_uncached<'t>(
         &self,
         ty: &'t TSType<'t>,
         run: EdgeRun,

@@ -762,7 +762,7 @@ it; with it, a relaxed load until this audit arms the counters). The counters ar
   trivia-aware scans alike (the armed run covers the parse); the hopping scans, which skip
   non-opener bytes without asking it, are not counted;
 - **predicates** — one per step of a printer predicate where a blowup no other counter saw was
-  found: the type printer's leading-edge shell descents (`head_stripped_paren_shell`,
+  found: the type printer's leading-edge shell descents (`head_stripped_paren_shell_uncached`, whose memo hits are not steps,
   `leading_edge_shell`, `stripped_paren_hang_has_leading_run`), the statement-list comment-run
   lookahead (`comment_leads_next_item`) and the Svelte root inline-run lookahead
   (`detect_root_inline_run`);
