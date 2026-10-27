@@ -486,6 +486,38 @@ pub(super) fn bug_inputs() -> Vec<Input> {
                 ";\n",
             ],
         ),
+        // expand-last callbacks behind a commented pair in a template interpolation: the
+        // interpolation asks whether the doc holds a deferred run, and it holds none
+        hand(
+            "k289_commented_callback_template",
+            Ts,
+            Nesting,
+            ["x = `${(/*c*/ ", "f(() => ", "a", ")", ")}`;\n"],
+        ),
+        // expand-last callbacks in a template interpolation, the innermost body and the
+        // interpolation each ending on a line comment: the interpolation reads the run still
+        // pending at its end
+        hand(
+            "k289_line_comment_callback_template",
+            Ts,
+            Nesting,
+            ["x = `${", "f(() => ", "a // c\n", ")", " // d\n}`;\n"],
+        ),
+        // expand-last callbacks as an `{#each}` expression with no `as`, ending on a block
+        // comment: the head asks whether the expression can end on a comment
+        hand(
+            "k289_each_callback_comment",
+            Svelte,
+            Nesting,
+            ["{#each ", "f(() => ", "a /*c*/", ")", "}x{/each}\n"],
+        ),
+        // expand-last callbacks behind a commented pair in an attribute value
+        hand(
+            "k289_attribute_commented_callback",
+            Svelte,
+            Nesting,
+            ["<div a={(/*c*/ ", "f(() => ", "a", ")", ")}></div>\n"],
+        ),
         // the unminimized reproducer: assignments nested in authored pairs, each closing on a
         // `!` or an `|| c` (found in a Svelte template, where it took over a gigabyte)
         hand(
