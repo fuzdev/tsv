@@ -341,14 +341,16 @@ counter bounds both shapes a walk recurses through:
   a level no nesting count can see coming (`((a ? b : c) ? d : e)` nests a conditional per
   paren), so it is counted as a link. Their parse costs no stack, and neither do the walks
   that iterate a spine rather than recurse down it — every walk over an operator chain
-  (the wire writers, the printers' chain collectors, the type strip), and the wire writers
-  over a member, call and non-null chain — but every other walk recurses down the spine,
-  so a flat chain needs a bound of its own; a nesting count never sees one. A link counts
-  the units its walks spend stack for: one for an operator or a qualified name's `.`; two
-  for a member access, a call, a non-null assertion or an instantiation; eight for an
-  assertion; six for a type's `[]` or `[K]`, a conditional type's check type or a tuple
-  element's `?`; fourteen for a tagged template; and ten for a conditional's test, a
-  sequence's first expression, and a link whose walk **re-enters the expression printer**
+  (the wire writers, the printers' chain collectors, the type strip), the wire writers
+  over a member, call and non-null chain, and the type strip over any expression chain
+  (member, call, non-null, tagged-template, instantiation, `as` / `satisfies`) past its
+  first few links — but every other walk recurses down the spine, so a flat chain needs a
+  bound of its own; a nesting count never sees one. A link counts the units its walks
+  spend stack for: one for an operator or a qualified name's `.`; two for a member access,
+  a call, a non-null assertion or an instantiation; eight for an assertion; six for a
+  type's `[]` or `[K]`, a conditional type's check type or a tuple element's `?`;
+  fourteen for a tagged template; and ten for a conditional's test, a sequence's first
+  expression, and a link whose walk **re-enters the expression printer**
   for its operand rather than continuing the chain it is printing. Which links
   re-enter is the printer's own answer, asked of the same predicates the printer decides
   by, so the price follows the walk: an operator whose left operand the binary-chain
@@ -553,10 +555,11 @@ after a warm-up pass has tiered up every function the run makes hot — under V8
 dynamic tiering, which optimizes what runs hot; an engine flagged to compile everything
 optimized up front (`--no-liftoff`) lays out larger frames still, and is outside the
 contract. That is also why the
-walks over a binary operator chain, and the wire writers over a member, call and non-null
-chain, iterate the spine rather than recurse down it: a frame per link of a chain thousands
-of links long spends the optimized engine's main-thread stack whatever the per-link frame,
-where an iteration spends none.
+walks over a binary operator chain, the wire writers over a member, call and non-null
+chain, and the type strip over any expression chain past its first few links, iterate the
+spine rather than recurse down it: a frame per link of a chain thousands of links long
+spends the optimized engine's main-thread stack whatever the per-link frame, where an
+iteration spends none.
 
 The packages' `{locations: true}` reconstruction (`locations.js`) walks the tree with an
 explicit stack rather than recursion, so it adds no depth of its own.

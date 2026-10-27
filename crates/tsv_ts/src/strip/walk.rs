@@ -66,7 +66,15 @@ pub(super) struct Walk<'s, 'b> {
     /// (`blank_signature`, and a member key spelled like an operator), so each is written
     /// only where the program would otherwise change.
     open: Tail,
+    /// The chain-link operands open around the node being walked ([`Walk::link_operand`]).
+    chain_frames: u32,
 }
+
+/// The chain-link operands [`Walk::link_operand`] walks by recursion, a frame each, before
+/// a chain is walked by [`Walk::chain`]'s loop: the common chain is a few links long and
+/// its recursion is the cheaper walk, while a chain past them costs the stack of this many
+/// link frames whatever its length.
+const CHAIN_FRAMES: u32 = 16;
 
 /// How the JS before a blanked range ends, for what a next line could continue.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -100,6 +108,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             statement_end: None,
             terminated_at: None,
             open: Tail::Closed,
+            chain_frames: 0,
         }
     }
 
@@ -653,6 +662,156 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
     }
 
+    /// The operand of a chain link — a member's object, a call's or a `new`'s callee, a tag,
+    /// the operand of a `!`, an instantiation or an assertion — walked as [`Self::expr`]
+    /// walks it, by recursion, while fewer than [`CHAIN_FRAMES`] link operands enclose
+    /// it; past them, a chain is walked by [`Self::chain`]'s loop, so a chain's length
+    /// (bounded only by `SPINE_LIMIT`) costs a bounded stack. Only the operand's walk is
+    /// counted: a link's arguments are a level of nesting, which the nesting limit bounds.
+    #[inline]
+    fn link_operand(&mut self, operand: &Expression<'_>) {
+        match &operand.kind {
+            ExpressionKind::Literal(_)
+            | ExpressionKind::RegexLiteral(_)
+            | ExpressionKind::ThisExpression(_)
+            | ExpressionKind::Super(_)
+            | ExpressionKind::PrivateIdentifier(_)
+            | ExpressionKind::MetaProperty(_) => self.mark(operand.span.end),
+            ExpressionKind::Identifier(id) if id.extra.is_none() && !id.optional => {
+                self.mark(operand.span.end);
+            }
+            _ => self.link_operand_inner(operand),
+        }
+    }
+
+    /// [`Self::link_operand`] past the leaves.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    fn link_operand_inner(&mut self, operand: &Expression<'_>) {
+        if self.chain_frames >= CHAIN_FRAMES && is_link(operand) {
+            self.chain(operand);
+        } else {
+            self.chain_frames += 1;
+            self.expr_inner(operand);
+            self.chain_frames -= 1;
+        }
+    }
+
+    /// A chain of links ([`is_link`]) and the base under them, walked without recursing
+    /// down the chain. The links are collected on the way down, outermost first, each
+    /// assertion's grouping check with them; the base is walked; then each link's work past
+    /// its operand and its mark run innermost first — the order the recursion does each in
+    /// ([`Self::expr_inner`]), so the edits, the refusal and the `;` state do not depend on
+    /// which one walked a link.
+    #[inline(never)]
+    fn chain(&mut self, e: &Expression<'_>) {
+        let mut links: SmallVec<[&Expression<'_>; 16]> = SmallVec::new();
+        let mut node = e;
+        let mut refused = false;
+        loop {
+            let operand = match &node.kind {
+                ExpressionKind::CallExpression(call) => call.callee,
+                ExpressionKind::NewExpression(new) => new.callee,
+                ExpressionKind::MemberExpression(member) => member.object,
+                ExpressionKind::TaggedTemplateExpression(tagged) => tagged.tag,
+                ExpressionKind::TSInstantiationExpression(instantiation) => {
+                    instantiation.expression
+                }
+                ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+                ExpressionKind::TSAsExpression(assertion) => {
+                    refused = self
+                        .assertion_head(
+                            node.span,
+                            assertion.expression,
+                            assertion.type_annotation,
+                            b"as",
+                        )
+                        .is_none();
+                    assertion.expression
+                }
+                ExpressionKind::TSSatisfiesExpression(assertion) => {
+                    refused = self
+                        .assertion_head(
+                            node.span,
+                            assertion.expression,
+                            assertion.type_annotation,
+                            b"satisfies",
+                        )
+                        .is_none();
+                    assertion.expression
+                }
+                _ => break,
+            };
+            links.push(node);
+            // a refused assertion's operand is not walked: the chain ends at it
+            if refused {
+                break;
+            }
+            node = operand;
+        }
+        if !refused {
+            self.expr(node);
+        }
+        for (i, link) in links.iter().rev().enumerate() {
+            // a refused assertion is the innermost link: nothing of it is left to walk
+            if !(refused && i == 0) {
+                self.link_tail(link);
+            }
+            self.mark(link.span.end);
+        }
+    }
+
+    /// A chain link's work past its operand ([`Self::chain`]), as [`Self::expr_inner`]
+    /// does it.
+    fn link_tail(&mut self, link: &Expression<'_>) {
+        match &link.kind {
+            ExpressionKind::CallExpression(call) => {
+                self.type_arguments(call.type_arguments.as_ref());
+                for argument in call.arguments {
+                    self.expr(argument);
+                }
+            }
+            ExpressionKind::NewExpression(new) => {
+                self.type_arguments(new.type_arguments.as_ref());
+                for argument in new.arguments {
+                    self.expr(argument);
+                }
+            }
+            ExpressionKind::MemberExpression(member) => self.expr(member.property),
+            ExpressionKind::TaggedTemplateExpression(tagged) => {
+                self.type_arguments(tagged.type_arguments.as_ref());
+                for expression in tagged.quasi.expressions {
+                    self.expr(expression);
+                }
+            }
+            ExpressionKind::TSInstantiationExpression(instantiation) => {
+                self.blank_span(instantiation.type_arguments.span);
+            }
+            // the `!` is the node's last byte, past any paren around the operand
+            ExpressionKind::TSNonNullExpression(_) => {
+                self.blank(link.span.end - 1, link.span.end);
+            }
+            ExpressionKind::TSAsExpression(assertion) => {
+                let blank_from = self.assertion_blank_start(
+                    assertion.expression,
+                    assertion.type_annotation,
+                    b"as",
+                );
+                self.assertion_tail(link.span, blank_from);
+            }
+            ExpressionKind::TSSatisfiesExpression(assertion) => {
+                let blank_from = self.assertion_blank_start(
+                    assertion.expression,
+                    assertion.type_annotation,
+                    b"satisfies",
+                );
+                self.assertion_tail(link.span, blank_from);
+            }
+            // [`Self::chain`] collects no other kind ([`is_link`])
+            _ => {}
+        }
+    }
+
     /// The full walk of expression `e`, every kind matched; [`Self::expr`] answers the leaves
     /// before reaching it.
     #[inline(never)]
@@ -682,21 +841,21 @@ impl<'s, 'b> Walk<'s, 'b> {
             ExpressionKind::UpdateExpression(update) => self.expr(update.argument),
             ExpressionKind::BinaryExpression(binary) => self.binary_chain(binary),
             ExpressionKind::CallExpression(call) => {
-                self.expr(call.callee);
+                self.link_operand(call.callee);
                 self.type_arguments(call.type_arguments.as_ref());
                 for argument in call.arguments {
                     self.expr(argument);
                 }
             }
             ExpressionKind::NewExpression(new) => {
-                self.expr(new.callee);
+                self.link_operand(new.callee);
                 self.type_arguments(new.type_arguments.as_ref());
                 for argument in new.arguments {
                     self.expr(argument);
                 }
             }
             ExpressionKind::MemberExpression(member) => {
-                self.expr(member.object);
+                self.link_operand(member.object);
                 self.expr(member.property);
             }
             ExpressionKind::ConditionalExpression(conditional) => {
@@ -720,7 +879,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 }
             }
             ExpressionKind::TaggedTemplateExpression(tagged) => {
-                self.expr(tagged.tag);
+                self.link_operand(tagged.tag);
                 self.type_arguments(tagged.type_arguments.as_ref());
                 for expression in tagged.quasi.expressions {
                     self.expr(expression);
@@ -785,11 +944,11 @@ impl<'s, 'b> Walk<'s, 'b> {
                 );
             }
             ExpressionKind::TSInstantiationExpression(instantiation) => {
-                self.expr(instantiation.expression);
+                self.link_operand(instantiation.expression);
                 self.blank_span(instantiation.type_arguments.span);
             }
             ExpressionKind::TSNonNullExpression(non_null) => {
-                self.expr(non_null.expression);
+                self.link_operand(non_null.expression);
                 // the `!` is the node's last byte, past any paren around the operand
                 self.blank(e.span.end - 1, e.span.end);
             }
@@ -881,12 +1040,32 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// follows, the blank starts with a `;`. Refused where blanking would regroup the
     /// expression around it.
     fn assertion(&mut self, span: Span, operand: &Expression<'_>, ty: &TSType<'_>, keyword: &[u8]) {
+        if let Some(blank_from) = self.assertion_head(span, operand, ty, keyword) {
+            self.link_operand(operand);
+            self.assertion_tail(span, blank_from);
+        }
+    }
+
+    /// An assertion ahead of its operand's walk: where its blank starts, or `None` —
+    /// refused — where blanking would regroup the expression around it.
+    fn assertion_head(
+        &mut self,
+        span: Span,
+        operand: &Expression<'_>,
+        ty: &TSType<'_>,
+        keyword: &[u8],
+    ) -> Option<u32> {
         let blank_from = self.assertion_blank_start(operand, ty, keyword);
         if self.assertion_regroups(span, operand, blank_from != operand.span.end) {
             self.refuse(UnsupportedKind::AssertionGrouping, span);
-            return;
+            return None;
         }
-        self.expr(operand);
+        Some(blank_from)
+    }
+
+    /// An assertion past its walked operand ([`Self::assertion`]): the blank from
+    /// `blank_from`, `;`-led where the assertion ends its statement.
+    fn assertion_tail(&mut self, span: Span, blank_from: u32) {
         let mark = if self.statement_end == Some(span.end)
             && self.src.bytes.get(span.end as usize) != Some(&b';')
         {
@@ -1282,6 +1461,23 @@ struct MemberModifiers {
     removed: [Option<&'static [u8]>; 3],
     /// The keywords that stay, those present.
     kept: [Option<&'static [u8]>; 2],
+}
+
+/// Whether `e` is a chain link: a member access, a call, a `new`, a tagged template, a `!`,
+/// an instantiation or an assertion, whose operand ([`Walk::link_operand`]) runs down the
+/// chain.
+fn is_link(e: &Expression<'_>) -> bool {
+    matches!(
+        e.kind,
+        ExpressionKind::CallExpression(_)
+            | ExpressionKind::NewExpression(_)
+            | ExpressionKind::MemberExpression(_)
+            | ExpressionKind::TaggedTemplateExpression(_)
+            | ExpressionKind::TSAsExpression(_)
+            | ExpressionKind::TSSatisfiesExpression(_)
+            | ExpressionKind::TSInstantiationExpression(_)
+            | ExpressionKind::TSNonNullExpression(_)
+    )
 }
 
 fn decorators_end(decorators: Option<&[Decorator<'_>]>, start: u32) -> u32 {

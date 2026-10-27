@@ -402,6 +402,111 @@ mod tests {
         );
     }
 
+    /// A chain of links — members, calls, `new`, tagged templates, `!`, instantiations,
+    /// `as` / `satisfies` — blanks each link's TypeScript, its operand's and its arguments',
+    /// and a statement-final assertion inside one takes its `;`.
+    #[test]
+    fn a_chain_blanks_every_links_typescript() {
+        for (source, code) in [
+            (
+                "x = new a.b<T>(c satisfies D)!.e;\n",
+                "x = new a.b   (c            ) .e;\n",
+            ),
+            ("x = a!.b![\"c\"]!(d!)!;\n", "x = a .b [\"c\"] (d ) ;\n"),
+            (
+                "x = a<T>`q`.b<U>`r${c as D}`;\n",
+                "x = a   `q`.b   `r${c     }`;\n",
+            ),
+            (
+                "x = a.b<T>(c)<U>(d).e as F as G;\n",
+                "x = a.b   (c)   (d).e          ;\n",
+            ),
+            (
+                "x = (a as T).b(c!)?.d<E>?.(f as G);\n",
+                "x = (a     ).b(c )?.d   ?.(f     );\n",
+            ),
+            ("x = f<T>;\n", "x = f   ;\n"),
+            ("y = a.b as T\n[1].c\n", "y = a.b;    \n[1].c\n"),
+            (
+                "class C { p = a.b as T\n[k]: number = 1 }\n",
+                "class C { p = a.b;    \n[k]         = 1 }\n",
+            ),
+        ] {
+            assert_eq!(stripped(source), code, "{source:?}");
+        }
+    }
+
+    /// The same chains under twenty more links, past the links a recursion walks
+    /// (`CHAIN_FRAMES` in `walk.rs`): their links are walked by the chain loop, which blanks
+    /// them as the recursion does.
+    #[test]
+    fn a_chain_past_the_recursion_blanks_as_the_recursion_does() {
+        let links = ".z".repeat(20);
+        for (chain, code) in [
+            (
+                "new a.b<T>(c satisfies D)!.e",
+                "new a.b   (c            ) .e",
+            ),
+            ("a!.b![\"c\"]!(d!)!", "a .b [\"c\"] (d ) "),
+            ("a<T>`q`.b<U>`r${c as D}`", "a   `q`.b   `r${c     }`"),
+            (
+                "(a.b<T>(c)<U>(d).e as F as G)",
+                "(a.b   (c)   (d).e          )",
+            ),
+            (
+                "(a as T).b(c!)?.d<E>?.(f as G)",
+                "(a     ).b(c )?.d   ?.(f     )",
+            ),
+            ("a[b as K]!.c", "a[b     ] .c"),
+            ("(a satisfies T).b", "(a            ).b"),
+        ] {
+            let source = format!("x = {chain}{links};\n");
+            assert_eq!(
+                stripped(&source),
+                format!("x = {code}{links};\n"),
+                "{source:?}"
+            );
+        }
+    }
+
+    /// An assertion's grouping check runs before its operand is walked, so a refusal inside
+    /// the operand starting where the assertion does is not the one reported: the
+    /// assertion's is, over its whole span. On the recursion path: a chain past
+    /// `CHAIN_FRAMES` holds no assertion a binary operator follows, so none of its
+    /// assertions regroups.
+    #[test]
+    fn a_chain_assertion_is_refused_before_its_operand_is_walked() {
+        let source = "x = <T>a + b as U * c;\n";
+        let StripError::Unsupported { kind, span } = strip_error(source) else {
+            panic!("expected a refusal");
+        };
+        assert_eq!(kind, UnsupportedKind::AssertionGrouping);
+        assert_eq!(
+            &source[span.start as usize..span.end as usize],
+            "<T>a + b as U"
+        );
+    }
+
+    /// A chain over a thousand links long strips on a small stack: its links cost heap, not
+    /// a frame each.
+    #[test]
+    fn a_long_chain_strips_without_a_frame_per_link() {
+        let source = format!("x = a{}{};\n", ".b!".repeat(1000), " as T".repeat(100));
+        let stripped = std::thread::Builder::new()
+            .stack_size(256 << 10)
+            .spawn(move || {
+                let arena = bumpalo::Bump::new();
+                strip(&source, &arena)
+                    .map(|stripped| stripped.code.into_owned())
+                    .map_err(|error| error.message(&source))
+            })
+            .expect("spawn")
+            .join()
+            .expect("the strip ran");
+        let expected = format!("x = a{}{};\n", ".b ".repeat(1000), " ".repeat(500));
+        assert_eq!(stripped, Ok(expected));
+    }
+
     #[test]
     fn every_kind_has_a_snake_case_name() {
         for (kind, name) in [
