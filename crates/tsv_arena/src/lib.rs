@@ -125,11 +125,10 @@ pub fn with_ast_arena<R>(f: impl FnOnce(&bumpalo::Bump) -> R) -> R {
 /// of the doc IR), which pulls `tsv_lang` for the `DocArena` type.
 #[cfg(feature = "format")]
 pub fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -> R {
-    // Parked **behind a `Box`**, unlike the AST arena: a `DocArena` is ~48.9 KB
-    // by value (its inline 2048-slot static cache), so parking it directly would
-    // memcpy it in and out on every call — a per-call cost paid to avoid a
-    // per-call allocation, which is the reuse win inverted. Boxed, take/park
-    // moves one pointer and `f` still receives a plain `&DocArena`.
+    // Parked **behind a `Box`**, unlike the AST arena: a `DocArena` is hundreds of
+    // bytes by value (its stores' headers and scratch buffers; the static cache is
+    // already boxed), so parking it directly would copy it in and out on every call.
+    // Boxed, take/park moves one pointer and `f` still receives a plain `&DocArena`.
     thread_local! {
         static DOC_ARENA: Cell<Option<Box<tsv_lang::doc::arena::DocArena>>> =
             const { Cell::new(None) };

@@ -2095,11 +2095,13 @@ pub struct DocArena {
     /// is sized against the *draw* instead: see [`STATIC_CACHE_SLOTS`], which
     /// records what a bad draw costs and why the index is re-rolled on every
     /// exec. `Cell` (no borrow flag) —
-    /// probes never alias the `RefCell` stores. Inline by design: the arena
-    /// lives on the stack or in a thread-local and is only ever borrowed,
-    /// never moved after construction, so the array adds no per-use
-    /// indirection.
-    static_cache: [StaticSlot; STATIC_CACHE_SLOTS],
+    /// probes never alias the `RefCell` stores. **Boxed**, not inline: inline,
+    /// its 48 KB sat in the frame of whatever held the arena — a one-shot
+    /// `format` paid it as a fixed stack floor beneath the whole recursive
+    /// descent, and the constructor's by-value return paid it again in its own
+    /// frame. Behind the box the probe pays one dependent load (the pointer,
+    /// beside the rest of `self`).
+    static_cache: Box<[StaticSlot; STATIC_CACHE_SLOTS]>,
     /// The current document's format generation, keying the validity of the
     /// interned node halves in `static_cache`. Starts
     /// at 1 (0 marks a never-stamped slot) and is bumped by `reset()`, so a
@@ -2228,7 +2230,7 @@ impl StaticSlot {
     }
 }
 
-/// 2048 slots (× 24 B on 64-bit = 48 KB inline). Kept in lockstep with the
+/// 2048 slots (× 24 B on 64-bit = 48 KB, boxed). Kept in lockstep with the
 /// slot-hash shift — see the assert below.
 ///
 /// **Sized against the collision draw, not against the population.** The
@@ -2259,9 +2261,9 @@ impl StaticSlot {
 ///
 /// So the array is sized to make the draw stop mattering: 1024 already
 /// recovers the medians (−0.50…−0.62%) but keeps a 0.15% tail; 2048 removes
-/// the tail; 4096 is worth a further −0.01% and is not worth 96 KB. 48 KB sits
-/// on a 32 MiB format-worker stack (`cli::stack::STACK_SIZE`) and in one
-/// per-thread arena per binding, never per file.
+/// the tail; 4096 is worth a further −0.01% and is not worth 96 KB. The 48 KB
+/// is one heap allocation per arena (the `static_cache` field's box), which a
+/// multi-file driver and a binding's per-thread arena make once.
 const STATIC_CACHE_SLOTS: usize = 2048;
 
 // The slot index is the TOP 11 BITS of the 64-bit multiplicative hash
@@ -2269,6 +2271,21 @@ const STATIC_CACHE_SLOTS: usize = 2048;
 // the array bounds check and hard-couples the shift to the slot count. This
 // assert makes changing one without the other a compile error.
 const _: () = assert!(STATIC_CACHE_SLOTS == 1 << 11);
+
+/// A fresh [`DocArena::static_cache`]: every slot empty, written straight into its heap
+/// allocation. `Box::new` of the array literal would build it on the stack first (48 KB of
+/// frame, then a copy), the floor the box exists to remove.
+fn empty_static_cache() -> Box<[StaticSlot; STATIC_CACHE_SLOTS]> {
+    let mut slots = Vec::with_capacity(STATIC_CACHE_SLOTS);
+    slots.resize_with(STATIC_CACHE_SLOTS, StaticSlot::empty);
+    // the vector holds exactly `STATIC_CACHE_SLOTS` slots, so the conversion cannot fail
+    #[expect(clippy::unreachable)]
+    let cache = slots
+        .into_boxed_slice()
+        .try_into()
+        .unwrap_or_else(|_| unreachable!());
+    cache
+}
 
 /// How one render-stack entry classifies for the flow-boundary look-ahead's welded-unit walk
 /// ([`DocArena::welded_entry`]; consumed by `flow_lookahead` in `arena_render_fill`).
@@ -2288,14 +2305,6 @@ pub(crate) enum WeldedEntry {
 
 impl DocArena {
     /// Create a new empty arena.
-    // `large_stack_arrays`: the 48 KB `static_cache` is inline **by design** —
-    // see [`STATIC_CACHE_SLOTS`] for why it is that size and the field doc for
-    // why it is not behind a pointer (the hot path indexes it off `&self` with
-    // no dependent load). Both constructors are per-thread, never per file, and
-    // the array is `[const { … }; N]`, so the initializer is materialized in
-    // place rather than copied from a temporary. Consumers that park the arena
-    // between calls already box it (`tsv_arena::with_doc_arena`).
-    #[expect(clippy::large_stack_arrays)]
     pub fn new() -> Self {
         let mut arena = Self {
             nodes: RefCell::new(Vec::new()),
@@ -2311,7 +2320,7 @@ impl DocArena {
             docbuf_pool: RefCell::new(Vec::new()),
             chain_share_store: RefCell::new(ChainShareStore::default()),
             layout_cache: RefCell::new(Vec::new()),
-            static_cache: [const { StaticSlot::empty() }; STATIC_CACHE_SLOTS],
+            static_cache: empty_static_cache(),
             format_gen: Cell::new(1),
             flow_probe: RefCell::new(FlowProbeState::default()),
             flow_probe_broke: Cell::new(false),
@@ -2342,8 +2351,6 @@ impl DocArena {
     /// is byte-identical; the win is the fresh-arena / first-file / WASM
     /// reservation, and the multi-file `reset()` reuse high-water is bounded by
     /// actual usage, so it can only drop.
-    // `large_stack_arrays`: see [`Self::new`].
-    #[expect(clippy::large_stack_arrays)]
     pub fn with_source_size_hint(source_len: usize) -> Self {
         let estimated_nodes = source_len * 2;
         let estimated_children = estimated_nodes / 2;
@@ -2370,7 +2377,7 @@ impl DocArena {
             // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
             // to absorb those reallocs. Only capacity changes — never values.
             layout_cache: RefCell::new(Vec::with_capacity(estimated_nodes)),
-            static_cache: [const { StaticSlot::empty() }; STATIC_CACHE_SLOTS],
+            static_cache: empty_static_cache(),
             format_gen: Cell::new(1),
             flow_probe: RefCell::new(FlowProbeState::default()),
             flow_probe_broke: Cell::new(false),
@@ -2420,7 +2427,7 @@ impl DocArena {
             // stamped in the ancient generation with this same value would
             // false-hit and return a dangling id, so hard-clear every node
             // half once per wrap. The width halves stay valid ('static-keyed).
-            for slot in &self.static_cache {
+            for slot in self.static_cache.iter() {
                 slot.node_gen.set(0);
             }
             self.format_gen.set(1);
