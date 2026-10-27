@@ -1,5 +1,5 @@
 //! The member-chain argument share: a per-scope `(AST node address, builder tag) →
-//! built [`DocId`]` table the TS printer consults so a chain's `conditional_group`
+//! recorded build ([`SharedBuild`])` table the TS printer consults so a chain's `conditional_group`
 //! candidates build each argument subtree once (the O(4^depth) rebuild fix), parked in
 //! the [`DocArena`](super::arena::DocArena) so its capacity outlives the scope.
 //!

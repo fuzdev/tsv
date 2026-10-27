@@ -751,9 +751,12 @@ pub struct Printer<'a> {
     /// - [`Self::force_assumed_param_hug`] — **not replayed.** The chain learns that a hug
     ///   state exists BY its request being consumed, so a hit that skipped a consumption
     ///   would drop the state. None can: the chain sets the request around its own last
-    ///   group and the call printer consumes it outside every shared build, a shared node
-    ///   never enclosing the call it names — `chain_shared_doc` asserts in debug builds
-    ///   that no recorded build changed the request.
+    ///   group and the call printer consumes it with no shared build between the two, a
+    ///   shared node never enclosing the call it names — `chain_shared_doc` asserts in debug
+    ///   builds that no recorded build changed the request.
+    /// - `computed_index_breaks` (debug-only) — **not replayed.** The assignment's assert
+    ///   window ORs it across nested builds, and the first build of a shared node sets it
+    ///   inside the same window a hit reads.
     ///
     /// Active only between `enter_chain_arg_share`/`exit_chain_arg_share` (the outermost
     /// `build_chain_doc`); the pointer is stable, the AST arena being immutable during

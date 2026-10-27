@@ -2042,9 +2042,10 @@ pub struct DocArena {
     /// output.
     docbuf_pool: RefCell<Vec<DocBuf>>,
     /// The parked member-chain argument share ([`ChainShareStore`]: an AST-node
-    /// pointer plus a consumer-owned build tag (`(usize, u8)`) → the `DocId` already
-    /// built for it). The tag is what lets one node hold **several** entries — the
-    /// same argument built under different printer state, or by a different builder
+    /// pointer plus a consumer-owned build tag (`(usize, u8)`) → the build already
+    /// recorded for it: its `DocId` and the side effect a hit replays). The tag is what lets
+    /// one node hold **several** entries — the same argument built under different printer
+    /// state, or by a different builder
     /// — so the consumer's "a hit is byte-identical to a rebuild" rule is carried by
     /// the key rather than by refusing to cache. Parked here — on the reused
     /// per-thread arena — so both tiers' capacity warms once instead of a fresh

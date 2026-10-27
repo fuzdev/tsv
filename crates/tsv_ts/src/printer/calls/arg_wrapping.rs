@@ -470,8 +470,8 @@ impl Printer<'_> {
     }
 
     /// [`Self::build_arrow_arg_body_doc`] for the states that build their body unclaimed (the
-    /// member chain's force-expanded and multi-argument states): the
-    /// leftmost pair, else the plain expression doc.
+    /// member chain's force-expanded and multi-argument states): the leftmost pair, else the
+    /// plain expression doc.
     pub(super) fn build_arrow_arg_body_doc_unclaimed(
         &self,
         body_expr: &internal::Expression<'_>,
@@ -2607,8 +2607,8 @@ pub(super) fn build_ternary_arrow_hug_ladder(
 /// page, so skipping it there rebuilt every level twice; the comment positions that need a
 /// different composition never reach this arm (`arrow_hug_refused_by_comments`).
 ///
-/// `body_reuse` is that prebuild, which the caller takes as the last test of its gate — a
-/// call body is exactly what the prebuild takes, so it never declines there. `printed`
+/// `body_reuse` is that prebuild, which the caller takes as the last test of its gate — the
+/// prebuild takes every call body, so it never declines there. `printed`
 /// builds the whole argument as the caller's argument builder prints it.
 pub(super) fn build_arrow_call_body_states(
     printer: &Printer<'_>,
