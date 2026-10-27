@@ -40,7 +40,7 @@ use crate::printer::calls::{
     AssumedHugKind, AssumedParamHug, arrow_body_hugs_call_parens, is_memberish,
 };
 use crate::printer::expressions::functions::{flat_sole_param_literal, function_return_hug_break};
-use crate::printer::{AssumedBreak, Printer};
+use crate::printer::{AssumedBreak, Printer, ShareTag};
 
 use smallvec::SmallVec;
 use smallvec::smallvec;
@@ -1126,7 +1126,10 @@ fn build_breaking_object_chain_doc<'a>(
                 | ExpressionKind::NewExpression(_)
                 | ExpressionKind::CallExpression(_)
         ) || is_arrow_with_paren_object_body(arg))
-            && d.will_break(printer.build_expression_doc(arg))
+            && d.will_break(printer.chain_shared_doc(
+                printer.chain_share_key(arg, ShareTag::ChainBreakProbe),
+                || printer.build_expression_doc(arg),
+            ))
     });
 
     if !last_group_will_break_object {

@@ -13,7 +13,7 @@ use super::super::chain::{
     ChainCall, transparent_callee_sealed_chain, transparent_instantiation_callee,
 };
 use super::super::comments::CommentSpacing;
-use super::super::{Printer, is_curried_arrow_chain, is_multiline_template_expression};
+use super::super::{Printer, ShareTag, is_curried_arrow_chain, is_multiline_template_expression};
 use super::arg_comments::{
     PartitionedComments, any_arg_empty_line, any_comment_forces_expansion, build_arg_gap_docs,
     build_empty_args_parens_doc, emit_last_arg_trailing_comments, first_arg_has_any_comments,
@@ -74,7 +74,7 @@ pub(super) fn chain_call_head_doc(
             ta.span.start,
             CommentSpacing::Trailing,
         ));
-        parts.push(printer.build_type_parameter_instantiation_doc(ta));
+        parts.push(shared_chain_type_args_doc(printer, ta));
         parts.extend(optional_doc);
         return Some(d.concat(&parts));
     }
@@ -92,9 +92,21 @@ pub(super) fn chain_call_head_doc(
             ta.span.start,
             CommentSpacing::Trailing,
         ));
-        parts.push(printer.build_type_parameter_instantiation_doc(ta));
+        parts.push(shared_chain_type_args_doc(printer, ta));
     }
     Some(d.concat(&parts))
+}
+
+/// A chain call's type arguments, built once for every layout candidate of the chain that
+/// prints the call's head ([`ShareTag::ChainTypeArgs`]) — the one-line, expanded and
+/// type-argument hug states and the hug's probe line each print it. Under the hug's assumed
+/// break the key declines, so that printing builds its own.
+fn shared_chain_type_args_doc(
+    printer: &Printer<'_>,
+    ta: &internal::TSTypeParameterInstantiation<'_>,
+) -> DocId {
+    let key = printer.chain_share_key_of(ta, ta.span, ShareTag::ChainTypeArgs);
+    printer.chain_shared_doc(key, || printer.build_type_parameter_instantiation_doc(ta))
 }
 
 /// Where a transparent instantiation callee's expression→`<` window opens: past the `)`

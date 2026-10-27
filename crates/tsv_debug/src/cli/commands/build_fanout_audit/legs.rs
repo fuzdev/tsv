@@ -173,7 +173,6 @@ const KNOWN_CAUSES: &[(&str, &str)] = &[
     ("k289_*", "K289"),
     // the fanout constructs' own deepest points: polynomial, not exponential, so the
     // doc-node growth leg passes them, but a node rebuilt per level
-    ("ts_nested_type_arg_hug_chain", "K303"),
     ("ts_nested_flat_param_literal_chain_return", "K304"),
 ];
 

@@ -11,10 +11,8 @@
 # counter's work exponent alone: any other finding on a member fails as NEW.
 #
 # Regenerate with `deno task fanout:audit:update`.
-# shapes: 8
+# shapes: 6
 multiplicity	ts_nested_flat_param_literal_chain_return	K304
-multiplicity	ts_nested_type_arg_hug_chain	K303
-density	ts_nested_type_arg_hug_chain	K303
 work	chain links holding `<` or `<<` (scans, n^2)	K73
 work	k282_paren_conditional_type	K282
 work	k285_leading_block_comment_run	K285

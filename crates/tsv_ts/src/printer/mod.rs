@@ -146,6 +146,13 @@ pub(crate) enum ShareTag {
     /// `chain::print_node_inner` — a chain's unparenthesized base, which every layout
     /// candidate of the chain prints.
     ChainBase = 7 * 4,
+    /// `chain::builder`'s breaking-object state — the last call's single argument, built to
+    /// ask whether it will break. A chain nested in that argument asks the same of its own,
+    /// so unshared each level rebuilt every chain below it.
+    ChainBreakProbe = 8 * 4,
+    /// `calls::chain_args::chain_call_head_doc` — a chain call's type arguments, which every
+    /// layout candidate of the chain prints in the call's head.
+    ChainTypeArgs = 9 * 4,
 }
 
 impl ShareTag {
@@ -167,6 +174,8 @@ const _: () = assert!(ShareTag::AssumedHugArg as u8 & ShareTag::STATE_BITS == 0)
 const _: () = assert!(ShareTag::AssumedHugProbe as u8 & ShareTag::STATE_BITS == 0);
 const _: () = assert!(ShareTag::ExpandLastBreakBody as u8 & ShareTag::STATE_BITS == 0);
 const _: () = assert!(ShareTag::ChainBase as u8 & ShareTag::STATE_BITS == 0);
+const _: () = assert!(ShareTag::ChainBreakProbe as u8 & ShareTag::STATE_BITS == 0);
+const _: () = assert!(ShareTag::ChainTypeArgs as u8 & ShareTag::STATE_BITS == 0);
 
 /// One break a doc build reads as AUTHORED although the source does not hold it — the state
 /// [`Printer::assumed_break`] carries while a convergence state is built.
@@ -1617,14 +1626,24 @@ impl<'a> Printer<'a> {
         node: &internal::Expression<'_>,
         builder: ShareTag,
     ) -> Option<ShareKey> {
+        self.chain_share_key_of(node, node.span(), builder)
+    }
+
+    /// [`Self::chain_share_key`] for an AST node of any kind, `span` being the source its doc
+    /// prints — the range an [assumed break](Self::assumed_break) is checked against.
+    pub(crate) fn chain_share_key_of<T>(
+        &self,
+        node: &T,
+        span: Span,
+        builder: ShareTag,
+    ) -> Option<ShareKey> {
         if !self.chain_arg_share_active.get() {
             return None;
         }
-        if let Some(assumed) = self.assumed_break.get() {
-            let span = node.span();
-            if (span.start..span.end).contains(&assumed.position()) {
-                return None;
-            }
+        if let Some(assumed) = self.assumed_break.get()
+            && (span.start..span.end).contains(&assumed.position())
+        {
+            return None;
         }
         let mut tag = builder as u8;
         if self.skip_arrow_chain.get() {
