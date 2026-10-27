@@ -11,8 +11,15 @@
 # counter's work exponent alone: any other finding on a member fails as NEW.
 #
 # Regenerate with `deno task fanout:audit:update`.
-# shapes: 4
+# shapes: 11
 work	chain links holding `<` or `<<` (scans, n^2)	K73
+work	k282_array_conditional_type	K282
+work	k282_conditional_intersection_check	K282
+work	k282_double_paren_conditional_type	K282
+work	k282_indexed_conditional_type	K282
+work	k282_intersection_conditional_type	K282
 work	k282_paren_conditional_type	K282
+work	k282_paren_conditional_type_block_comment	K282
+work	k282_paren_conditional_type_line_comment	K282
 work	k285_leading_block_comment_run	K285
 work	k285_svelte_tag_run	K285

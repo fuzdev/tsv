@@ -424,6 +424,58 @@ pub(super) fn bug_inputs() -> Vec<Input> {
             Nesting,
             ["type T = ", "(", "A", " extends B ? C : D)", ";\n"],
         ),
+        // the same nest behind a doubled shell
+        hand(
+            "k282_double_paren_conditional_type",
+            Ts,
+            Nesting,
+            ["type T = ", "((", "A", " extends B ? C : D))", ";\n"],
+        ),
+        // the same nest with a block comment trailing the innermost check type
+        hand(
+            "k282_paren_conditional_type_block_comment",
+            Ts,
+            Nesting,
+            ["type T = ", "(", "A /*c*/", " extends B ? C : D)", ";\n"],
+        ),
+        // the same nest with a line comment leading the innermost check type
+        hand(
+            "k282_paren_conditional_type_line_comment",
+            Ts,
+            Nesting,
+            ["type T = ", "(", "// c\nA", " extends B ? C : D)", ";\n"],
+        ),
+        // a parenthesized conditional as an array element, nested in its own check type
+        hand(
+            "k282_array_conditional_type",
+            Ts,
+            Nesting,
+            ["type T = ", "(", "A", " extends B ? C : D)[]", ";\n"],
+        ),
+        // a parenthesized conditional as an indexed access object, nested in its own check
+        // type
+        hand(
+            "k282_indexed_conditional_type",
+            Ts,
+            Nesting,
+            ["type T = ", "(", "A", " extends B ? C : D)[K]", ";\n"],
+        ),
+        // a parenthesized conditional as an intersection's first member, nested in its own
+        // check type
+        hand(
+            "k282_intersection_conditional_type",
+            Ts,
+            Nesting,
+            ["type T = ", "(", "A", " extends B ? C : D) & E", ";\n"],
+        ),
+        // an intersection as a parenthesized conditional's check type, nested in its own
+        // first member
+        hand(
+            "k282_conditional_intersection_check",
+            Ts,
+            Nesting,
+            ["type T = ", "(", "A", " & E extends B ? C : D)", ";\n"],
+        ),
         // a conditional nested in a consequent
         hand(
             "k283_consequent_ternary",
