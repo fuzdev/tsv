@@ -1575,14 +1575,7 @@ impl<'a> AssumedParamHug<'a> {
             _ => return None,
         };
         let is_arrow = flat.as_ref().is_some_and(|flat| flat.is_arrow);
-        let key = printer.chain_share_key(arg, ShareTag::AssumedHugBody);
-        let body_doc = printer.chain_shared_doc(key, || {
-            if is_arrow {
-                printer.arrow_block_body_doc(body)
-            } else {
-                printer.build_block_statement_doc(body)
-            }
-        });
+        let body_doc = shared_callback_body_doc(printer, arg, body, is_arrow);
         Some(Self {
             arg,
             literal: flat.as_ref().map(|flat| flat.literal),
@@ -2239,6 +2232,47 @@ pub(super) fn build_expand_last_obj_array_doc(
     opener.inline_hug_or_expand_all(d, head_parts, expanded, all_args_broken)
 }
 
+/// A block-bodied callback argument's body, built for every printing of the callback to
+/// share ([`ShareTag::AssumedHugBody`] across a member chain's candidates): the arrow's own
+/// body build ([`Printer::arrow_block_body_doc`]) or the `function`'s block.
+fn shared_callback_body_doc(
+    printer: &Printer<'_>,
+    arg: &internal::Expression<'_>,
+    body: &internal::BlockStatement<'_>,
+    is_arrow: bool,
+) -> DocId {
+    let key = printer.chain_share_key(arg, ShareTag::AssumedHugBody);
+    printer.chain_shared_doc(key, || {
+        if is_arrow {
+            printer.arrow_block_body_doc(body)
+        } else {
+            printer.build_block_statement_doc(body)
+        }
+    })
+}
+
+/// The block body of a callback argument — an arrow's or a `function`'s — built once and
+/// returned as the body injection ([`Printer::inject_arrow_body`]) its printings are built
+/// under, so a layout that prints the callback twice costs a second signature and not a
+/// second subtree. `None` for any other argument.
+fn prebuild_callback_block_body(
+    printer: &Printer<'_>,
+    arg: &internal::Expression<'_>,
+) -> Option<(u32, DocId)> {
+    let (body, is_arrow) = match &arg.kind {
+        internal::ExpressionKind::ArrowFunctionExpression(arrow) => match &arrow.body {
+            internal::ArrowFunctionBody::BlockStatement(block) => (block, true),
+            internal::ArrowFunctionBody::Expression(_) => return None,
+        },
+        internal::ExpressionKind::FunctionExpression(func) => (&func.body, false),
+        _ => return None,
+    };
+    Some((
+        body.span.start,
+        shared_callback_body_doc(printer, arg, body, is_arrow),
+    ))
+}
+
 /// Prettier's expand-FIRST layout: a block-function first argument hugs and the tail stays
 /// inline past its `}` (`setTimeout(() => { tick(); }, 100)`).
 ///
@@ -2294,7 +2328,15 @@ pub(super) fn build_expand_first_arg_doc(
         }
     };
     let assumed = AssumedParamHug::new(printer, arguments[0]);
-    let first_arg_doc = AssumedParamHug::sharing(assumed.as_ref(), printer, build_first);
+    // The callback's body is built ONCE and injected into both of its printings — the hug's
+    // and the broken-out state's, which differ in the parameters alone. Built in each, a
+    // callback first argument nested in its own body (`f(() => { f(() => { … }, a) }, a)`)
+    // doubled per level. The state above already shares it where it has one.
+    let inject = assumed.as_ref().map_or_else(
+        || prebuild_callback_block_body(printer, arguments[0]),
+        |hug| Some(hug.body_inject()),
+    );
+    let first_arg_doc = printer.with_arrow_body_inject(inject, build_first);
 
     let mut tail_parts = DocBuf::new();
     let mut prev_end = arguments[0].span().end;
@@ -2319,14 +2361,14 @@ pub(super) fn build_expand_first_arg_doc(
     }
 
     if tail_parts.iter().any(|&id| d.will_break(id)) {
-        return AssumedParamHug::sharing(assumed.as_ref(), printer, || {
+        return printer.with_arrow_body_inject(inject, || {
             build_call_args_expanded(printer, opener, arguments, paren_open, call_end)
         });
     }
 
     // The first argument can expand internally; the tail stays on its closing line — and
     // when even that does not fit, every argument breaks out.
-    let all_args_broken = AssumedParamHug::sharing(assumed.as_ref(), printer, || {
+    let all_args_broken = printer.with_arrow_body_inject(inject, || {
         build_call_args_expanded(printer, opener.args_only(), arguments, paren_open, call_end)
     });
     if let Some(first) = assumed

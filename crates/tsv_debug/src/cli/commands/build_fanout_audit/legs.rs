@@ -76,9 +76,9 @@ const BUDGET: Budget = Budget {
 /// the bound on a doc's memory whatever printer builds it (a `DocNode` is 24 bytes, so this
 /// many is under a hundred megabytes of node store). The largest doc a shape no bug is known
 /// in builds is about 52,000 nodes (a flat Svelte block run at 4,000); the largest a known
-/// bug's sweep reaches without being stopped is about 31,000 (K293 at n = 10). A real file at
-/// the corpus's densest (0.69 nodes per byte) reaches it only past 5 MB, ten times the
-/// snapshot's largest file.
+/// bug's sweep reaches without being stopped is about 8,000 (K285's tag run at 4,000). A real
+/// file at the corpus's densest (0.69 nodes per byte) reaches it only past 5 MB, ten times
+/// the snapshot's largest file.
 pub(super) const NODE_BUDGET: u64 = 4_000_000;
 
 /// How a shape's input grows: nested `n` deep, `n` links of one chain, `n` siblings in a
@@ -171,7 +171,6 @@ const KNOWN_CAUSES: &[(&str, &str)] = &[
     ("k282_*", "K282"),
     ("k285_*", "K285"),
     ("k289_*", "K289"),
-    ("k293_*", "K293"),
     // the fanout constructs' own deepest points: polynomial, not exponential, so the
     // doc-node growth leg passes them, but a node rebuilt per level
     ("ts_nested_type_arg_hug_chain", "K303"),
