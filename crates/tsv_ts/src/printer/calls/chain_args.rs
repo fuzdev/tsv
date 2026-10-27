@@ -900,10 +900,21 @@ fn build_chain_args_single(
         // keep the comment: a state set that is only conditionally lossless is one width away
         // from dropping it.
         && !(has_any_comment_text && arrow_hug_refused_by_comments(printer, arrow, arg.span, body_expr))
+        // The body is built ONCE, injected into the whole-arrow argument doc and reused by
+        // the break-body state — as the multi-argument arm and the plain-call spelling do.
+        // Built in both places, each chain level built its callback's body twice and a
+        // chain nested in that body (`a.b().c(() => a.b().c(() => …))`) compounded to
+        // 2^depth. Last in the chain because it builds, and never refused: a call body is
+        // exactly what the prebuild takes. The break-body state therefore prints the body
+        // as the whole arrow does, a multi-line comment the body owns outside the body's
+        // group (`Printer::build_arrow_arg_body_doc`), so `(x) =>⏎/* c⏎c */ a.b().c(…)`
+        // keeps its chain on the comment's last line as prettier does.
+        && let Some(body_reuse) = prebuild_expand_last_break_body(printer, Some(arg))
     {
-        let arrow_doc = printer.build_arg_expression_doc(arg);
+        let arrow_doc = printer
+            .with_arrow_body_inject(Some(body_reuse), || printer.build_arg_expression_doc(arg));
         let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
-        let body_doc = printer.build_arrow_arg_body_doc_unclaimed(body_expr);
+        let (_, body_doc) = body_reuse;
         let body_doc =
             prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
         let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, arg.span)

@@ -19,7 +19,9 @@
 //! (the consumer clears at entry and exit).
 //!
 //! Only ever affects allocation and time, never output: a hit is byte-identical to a
-//! rebuild by construction of the consumer's key, and the store is never iterated.
+//! rebuild by construction of the consumer's key, and the store is never iterated. A hit
+//! skips the build, so an entry also carries what the build did to the consumer's state
+//! beyond its doc ([`SharedBuild`]), and the consumer replays that on a hit.
 
 use crate::hash::FxHashMap;
 
@@ -35,11 +37,41 @@ pub type ShareKey = (usize, u8);
 /// but ~0.2 % of scopes on real TS code (see the module docs).
 const LINEAR_CAPACITY: usize = 16;
 
+/// One recorded build: its doc, and the side effect a hit replays because skipping the
+/// build would otherwise drop it.
+///
+/// `deferred_runs` is how far the build raised the TS printer's deferred-run count — the
+/// trailing runs it deferred out of stripped grouping pairs and left to an enclosing list
+/// element to flush. Saturated at `u16::MAX`, which keeps an entry at sixteen bytes: the
+/// count's readers ask only whether it moved, never by how much.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SharedBuild {
+    /// The built doc a hit returns.
+    pub doc: DocId,
+    /// The deferred runs the build added, which a hit adds again.
+    pub deferred_runs: u16,
+}
+
+/// A linear-tier entry: the key and the [`SharedBuild`], flattened so the replayed count
+/// rides in the padding the key and doc leave.
 #[derive(Clone, Copy)]
 struct ShareEntry {
     node: usize,
-    tag: u8,
     doc: DocId,
+    deferred_runs: u16,
+    tag: u8,
+}
+
+const _: () = assert!(size_of::<ShareEntry>() <= 16);
+
+impl ShareEntry {
+    #[inline]
+    fn build(self) -> SharedBuild {
+        SharedBuild {
+            doc: self.doc,
+            deferred_runs: self.deferred_runs,
+        }
+    }
 }
 
 /// The two-tier share table (see the module docs).
@@ -49,39 +81,40 @@ pub struct ChainShareStore {
     linear: Vec<ShareEntry>,
     /// The hashed tier, populated only once a scope's entry past [`LINEAR_CAPACITY`]
     /// arrives ([`Self::promote`]); while it is empty the linear tier is the table.
-    hashed: FxHashMap<ShareKey, DocId>,
+    hashed: FxHashMap<ShareKey, SharedBuild>,
 }
 
 impl ChainShareStore {
-    /// The doc recorded for `key` in the current scope, if any.
+    /// The build recorded for `key` in the current scope, if any.
     #[inline]
-    pub fn get(&self, key: ShareKey) -> Option<DocId> {
+    pub fn get(&self, key: ShareKey) -> Option<SharedBuild> {
         if self.hashed.is_empty() {
             self.linear
                 .iter()
                 .find(|e| e.node == key.0 && e.tag == key.1)
-                .map(|e| e.doc)
+                .map(|e| e.build())
         } else {
             self.hashed.get(&key).copied()
         }
     }
 
-    /// Record `doc` for `key`. The consumer records only after a miss, so a key is never
+    /// Record `build` for `key`. The consumer records only after a miss, so a key is never
     /// recorded twice within a scope.
     #[inline]
-    pub fn insert(&mut self, key: ShareKey, doc: DocId) {
+    pub fn insert(&mut self, key: ShareKey, build: SharedBuild) {
         if self.hashed.is_empty() {
             if self.linear.len() < LINEAR_CAPACITY {
                 self.linear.push(ShareEntry {
                     node: key.0,
+                    doc: build.doc,
+                    deferred_runs: build.deferred_runs,
                     tag: key.1,
-                    doc,
                 });
                 return;
             }
             self.promote();
         }
-        self.hashed.insert(key, doc);
+        self.hashed.insert(key, build);
     }
 
     /// Hand the scope over to the hashed tier: move the linear entries across. Out of
@@ -90,7 +123,7 @@ impl ChainShareStore {
     #[inline(never)]
     fn promote(&mut self) {
         self.hashed
-            .extend(self.linear.drain(..).map(|e| ((e.node, e.tag), e.doc)));
+            .extend(self.linear.drain(..).map(|e| ((e.node, e.tag), e.build())));
     }
 
     /// Forget every entry, keeping both tiers' capacity. A length store, plus the
@@ -113,13 +146,17 @@ mod tests {
     use super::super::arena::DocArena;
     use super::*;
 
-    /// `n` distinct docs — each `indent` mints a fresh node.
-    fn docs(arena: &DocArena, n: usize) -> Vec<DocId> {
+    /// `n` distinct builds — each `indent` mints a fresh node, and each build records a
+    /// distinct deferred-run count, so a lookup returning the wrong entry's count fails too.
+    fn docs(arena: &DocArena, n: usize) -> Vec<SharedBuild> {
         let mut out = Vec::with_capacity(n);
         let mut cur = arena.text("x");
-        for _ in 0..n {
+        for i in 0..n {
             cur = arena.indent(cur);
-            out.push(cur);
+            out.push(SharedBuild {
+                doc: cur,
+                deferred_runs: u16::try_from(i).unwrap(),
+            });
         }
         out
     }

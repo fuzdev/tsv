@@ -11,8 +11,7 @@
 # counter's work exponent alone: any other finding on a member fails as NEW.
 #
 # Regenerate with `deno task fanout:audit:update`.
-# shapes: 25
-multiplicity	k284_member_chain_callback	K284
+# shapes: 22
 multiplicity	k286_tag_comment_template_call	K286
 multiplicity	k289_assign_or_nonnull_repro	K289
 multiplicity	k289_commented_instantiation	K289
@@ -20,7 +19,6 @@ multiplicity	k289_nonnull_member_operand	K289
 multiplicity	k293_callback_first_arg	K293
 multiplicity	ts_nested_flat_param_literal_chain_return	K304
 multiplicity	ts_nested_type_arg_hug_chain	K303
-density	k284_member_chain_callback	K284
 density	k286_tag_comment_template_call	K286
 density	k289_assign_or_nonnull_repro	K289
 density	k289_commented_instantiation	K289
@@ -29,7 +27,6 @@ density	k293_callback_first_arg	K293
 density	ts_nested_type_arg_hug_chain	K303
 work	chain links holding `<` or `<<` (scans, n^2)	K73
 work	k282_paren_conditional_type	K282
-work	k284_member_chain_callback	K284
 work	k285_leading_block_comment_run	K285
 work	k285_svelte_tag_run	K285
 work	k286_tag_comment_template_call	K286

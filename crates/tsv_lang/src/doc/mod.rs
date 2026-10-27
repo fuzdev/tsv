@@ -135,7 +135,7 @@ pub use arena_render_flat::arena_try_print_flat_into;
 
 // Arena fits
 pub use arena_fits::arena_fits;
-pub use chain_share::{ChainShareStore, ShareKey};
+pub use chain_share::{ChainShareStore, ShareKey, SharedBuild};
 
 #[cfg(test)]
 mod arena_tests {

@@ -18,8 +18,9 @@ use super::arg_wrapping::{
     build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
     build_expand_first_arg_doc, build_printed_argument_doc, build_single_arrow_hug_doc,
     build_single_container_arg_doc, build_ternary_arrow_hug_ladder, could_expand_arrow_chain,
-    first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break, should_expand_first_arg,
-    try_hook_deps_args_doc, try_hug_multiline_template_arg, wrap_call_with_hard_breaks_paren_line,
+    first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break,
+    prebuild_expand_last_break_body, should_expand_first_arg, try_hook_deps_args_doc,
+    try_hug_multiline_template_arg, wrap_call_with_hard_breaks_paren_line,
     wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
@@ -507,9 +508,11 @@ impl<'a> Printer<'a> {
                             // Same refusal pair as the ternary arm above.
                             && !(new_has_comments
                                 && arrow_hug_refused_by_comments(self, arrow, new_expr.arguments[0].span, body_expr))
-                        {
                             // The body is built once and shared by every state (see the
-                            // ladder's doc).
+                            // ladder's doc) — last, because it builds.
+                            && let Some(body_reuse) =
+                                prebuild_expand_last_break_body(self, Some(new_expr.arguments[0]))
+                        {
                             let arg0 = new_expr.arguments[0];
                             return build_arrow_call_body_states(
                                 self,
@@ -517,6 +520,7 @@ impl<'a> Printer<'a> {
                                 arg0,
                                 arrow,
                                 body_expr,
+                                body_reuse,
                                 || self.build_expression_doc(arg0),
                             );
                         }

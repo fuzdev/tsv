@@ -169,7 +169,6 @@ const NO_CAUSE: &str = "-";
 /// entries (and the ratchet's lines with them).
 const KNOWN_CAUSES: &[(&str, &str)] = &[
     ("k282_*", "K282"),
-    ("k284_*", "K284"),
     ("k285_*", "K285"),
     ("k286_*", "K286"),
     ("k289_*", "K289"),

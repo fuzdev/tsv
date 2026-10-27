@@ -90,7 +90,7 @@ use std::cell::{Cell, RefCell};
 use tsv_lang::{
     CommentFreeWindow, EmbedContext, FxHashSet, OutputBuffer, Span, TAB_WIDTH,
     doc::{
-        self, ShareKey,
+        self, ShareKey, SharedBuild,
         arena::{DocArena, DocId},
     },
     has_comments_on_page_from, has_comments_to_emit_from, has_line_comments_from,
@@ -111,25 +111,38 @@ use tsv_lang::{
 /// builder never does. Keying them apart is what lets both cache instead of one of them
 /// poisoning the other.
 ///
-/// ⚠️ A new variant must claim a bit **outside** [`ShareTag::SKIP_ARROW_CHAIN_BIT`] /
-/// [`ShareTag::FLAT_PARAMS_BIT`] — a collision there silently merges a builder with a state,
-/// which is a cache hit that is not byte-identical to a rebuild.
+/// ⚠️ A new variant takes the next multiple of four — a value whose two low bits, the
+/// [`ShareTag::SKIP_ARROW_CHAIN_BIT`] / [`ShareTag::FLAT_PARAMS_BIT`] states, are clear. A
+/// collision there silently merges a builder with a state, which is a cache hit that is not
+/// byte-identical to a rebuild. Two builders sharing a value cannot compile (an enum's
+/// explicit discriminants must be distinct), and neither can a value past a `u8`: the
+/// `#[repr(u8)]` types each discriminant, so the 64th variant's `64 * 4` overflows at
+/// compile time instead of truncating through `as u8`. Written as a product rather than a
+/// shift, because `64 << 2` drops its high bit to 0 unchecked.
 #[derive(Clone, Copy)]
+#[repr(u8)]
 pub(crate) enum ShareTag {
     /// [`Printer::build_arg_expression_doc`] — a call argument.
-    ArgExpression = 0b0000_0100,
+    #[expect(
+        clippy::identity_op,
+        reason = "every builder is written as its multiple of four"
+    )]
+    ArgExpression = 1 * 4,
     /// `calls::prebuild_expand_last_obj_array_body` — an arrow's object/array terminal body,
     /// parens included, as the arrow's own body build would produce it.
-    ExpandLastBody = 0b0000_1000,
+    ExpandLastBody = 2 * 4,
     /// `calls::AssumedParamHug::new` — a block-bodied callback argument's body, built once
     /// for both of the callback's printings.
-    AssumedHugBody = 0b0001_0000,
+    AssumedHugBody = 3 * 4,
     /// `calls::AssumedParamHug::build` — the callback argument printed with its sole
     /// parameter's object type assumed expanded.
-    AssumedHugArg = 0b0010_0000,
+    AssumedHugArg = 4 * 4,
     /// `calls::AssumedParamHug::build` — a `function` callback argument printed with its
     /// return type's `{` assumed broken, the line its hug state's gate measures.
-    AssumedHugProbe = 0b0100_0000,
+    AssumedHugProbe = 5 * 4,
+    /// `calls::prebuild_expand_last_break_body` — an expand-last arrow's call or ternary
+    /// body, as the arrow's own body build would produce it.
+    ExpandLastBreakBody = 6 * 4,
 }
 
 impl ShareTag {
@@ -148,17 +161,8 @@ const _: () = assert!(ShareTag::ArgExpression as u8 & ShareTag::STATE_BITS == 0)
 const _: () = assert!(ShareTag::ExpandLastBody as u8 & ShareTag::STATE_BITS == 0);
 const _: () = assert!(ShareTag::AssumedHugBody as u8 & ShareTag::STATE_BITS == 0);
 const _: () = assert!(ShareTag::AssumedHugArg as u8 & ShareTag::STATE_BITS == 0);
-const _: () = assert!(ShareTag::ArgExpression as u8 != ShareTag::ExpandLastBody as u8);
-const _: () = assert!(ShareTag::AssumedHugBody as u8 != ShareTag::ArgExpression as u8);
-const _: () = assert!(ShareTag::AssumedHugBody as u8 != ShareTag::ExpandLastBody as u8);
-const _: () = assert!(ShareTag::AssumedHugArg as u8 != ShareTag::ArgExpression as u8);
-const _: () = assert!(ShareTag::AssumedHugArg as u8 != ShareTag::ExpandLastBody as u8);
-const _: () = assert!(ShareTag::AssumedHugArg as u8 != ShareTag::AssumedHugBody as u8);
 const _: () = assert!(ShareTag::AssumedHugProbe as u8 & ShareTag::STATE_BITS == 0);
-const _: () = assert!(ShareTag::AssumedHugProbe as u8 != ShareTag::ArgExpression as u8);
-const _: () = assert!(ShareTag::AssumedHugProbe as u8 != ShareTag::ExpandLastBody as u8);
-const _: () = assert!(ShareTag::AssumedHugProbe as u8 != ShareTag::AssumedHugBody as u8);
-const _: () = assert!(ShareTag::AssumedHugProbe as u8 != ShareTag::AssumedHugArg as u8);
+const _: () = assert!(ShareTag::ExpandLastBreakBody as u8 & ShareTag::STATE_BITS == 0);
 
 /// One break a doc build reads as AUTHORED although the source does not hold it — the state
 /// [`Printer::assumed_break`] carries while a convergence state is built.
@@ -698,12 +702,38 @@ pub struct Printer<'a> {
     /// identical Printer state in both candidates *except* for `skip_arrow_chain` /
     /// `expand_last_arg_flat_params` (prettier's `expandLastArg`, which
     /// `calls/chain_args.rs` sets to build the hugged printing of an argument beside its
-    /// `printedArguments` one), and except for which *builder* is asking — the argument
-    /// builder or the expand-last body prebuild, which wraps an object body in the
-    /// grammar's parens. Both distinctions ride in the tag, so each variant caches
-    /// separately instead of the cache being refused for the whole node. Every other
-    /// flag is statement-constant during a chain or set identically by the shared AST
-    /// traversal.
+    /// `printedArguments` one), and except for which *builder* is asking — the chain-share
+    /// builders [`ShareTag`] names, whose docs for one node are not interchangeable (the
+    /// expand-last object/array body prebuild wraps an object body in the grammar's parens,
+    /// which the argument builder never does). Both distinctions ride in the tag, so each
+    /// variant caches separately instead of the cache being refused for the whole node.
+    /// Every other flag is statement-constant during a chain or set identically by the
+    /// shared AST traversal.
+    ///
+    /// **A hit must leave the printer as a rebuild would**, so every entry records, beside
+    /// its doc, the side effects of its build that skipping the build would lose, and
+    /// [`Self::chain_shared_doc`] replays them on a hit. The rule, per piece of state a
+    /// build touches:
+    ///
+    /// - [`Self::deferred_paren_runs`] — **replayed.** A build that defers a run out of a
+    ///   stripped pair raises the count and leaves the run for the ENCLOSING list element
+    ///   to flush ([`Self::build_list_element_doc`]). That element — a parameter default,
+    ///   an array or object pattern element — may be rebuilt in another state while the
+    ///   entry inside it hits, and without the replay it would see no run, print flat, and
+    ///   carry the comment out of its own construct. An argument entry records its doc
+    ///   with its own list-element wrapping included (`build_list_element_doc` runs inside
+    ///   the share), which restores the count, so its replay adds nothing; an entry whose
+    ///   build ends unwrapped is the one that needs it.
+    /// - [`Self::forced_list_elements`] / [`Self::nullable_union_type_args`] — **not
+    ///   replayed.** Both are append-only for the whole document and only searched: the
+    ///   first build's entries stay, naming the very element starts and docs a hit returns,
+    ///   and a rebuild would only push duplicates.
+    /// - [`Self::force_assumed_param_hug`] — **not replayed.** The chain learns that a hug
+    ///   state exists BY its request being consumed, so a hit that skipped a consumption
+    ///   would drop the state. None can: the chain sets the request around its own last
+    ///   group and the call printer consumes it outside every shared build, a shared node
+    ///   never enclosing the call it names — `chain_shared_doc` asserts in debug builds
+    ///   that no recorded build changed the request.
     ///
     /// Active only between `enter_chain_arg_share`/`exit_chain_arg_share` (the outermost
     /// `build_chain_doc`); the pointer is stable, the AST arena being immutable during
@@ -1601,6 +1631,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Look up `key` in the chain share store, or build and record it.
+    ///
+    /// A hit replays what the recorded build did to the deferred-run count, so the
+    /// enclosing list element sees the run whether its doc was built or found (see the
+    /// `chain_arg_share_active` field doc for the replay rule).
     pub(crate) fn chain_shared_doc(
         &self,
         key: Option<ShareKey>,
@@ -1610,11 +1644,33 @@ impl<'a> Printer<'a> {
             return build();
         };
         let store = self.arena.chain_share_store();
-        if let Some(doc) = store.borrow().get(key) {
-            return doc;
+        if let Some(shared) = store.borrow().get(key) {
+            self.deferred_paren_runs
+                .set(self.deferred_paren_runs.get() + u32::from(shared.deferred_runs));
+            return shared.doc;
         }
+        let runs_before = self.deferred_paren_runs.get();
+        #[cfg(debug_assertions)]
+        let hug_request = self.force_assumed_param_hug.get();
         let doc = build();
-        store.borrow_mut().insert(key, doc);
+        #[cfg(debug_assertions)]
+        debug_assert!(
+            self.force_assumed_param_hug.get() == hug_request,
+            "a shared build neither consumes nor leaves a hug request, so a hit needs no replay of one"
+        );
+        let runs_after = self.deferred_paren_runs.get();
+        debug_assert!(
+            runs_after >= runs_before,
+            "a build only restores the count it found"
+        );
+        let added = runs_after.saturating_sub(runs_before);
+        store.borrow_mut().insert(
+            key,
+            SharedBuild {
+                doc,
+                deferred_runs: u16::try_from(added).unwrap_or(u16::MAX),
+            },
+        );
         doc
     }
 

@@ -23,8 +23,8 @@ use super::arg_wrapping::{
     build_expand_first_arg_doc, build_joined_argument_doc, build_printed_argument_doc,
     build_single_arrow_hug_doc, build_single_container_arg_doc, build_ternary_arrow_hug_ladder,
     could_expand_arrow_chain, first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break,
-    should_expand_first_arg, try_hook_deps_args_doc, try_hug_multiline_template_arg,
-    wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
+    prebuild_expand_last_break_body, should_expand_first_arg, try_hook_deps_args_doc,
+    try_hug_multiline_template_arg, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
 use super::module_paths::{get_module_path_chain_break, is_module_path_no_break};
@@ -988,14 +988,17 @@ fn try_single_arg_hug(
                 // does a comment on the body's own tail, which the states this builds
                 // reassemble past (`arrow_hug_refused_by_comments`).
                 && !arrow_hug_refused_by_comments(printer, arrow, arg.span, body_expr)
+                // The body is built once and shared by every state (see the ladder's doc) —
+                // last, because it builds.
+                && let Some(body_reuse) = prebuild_expand_last_break_body(printer, Some(arg))
             {
-                // The body is built once and shared by every state (see the ladder's doc).
                 return Some(build_arrow_call_body_states(
                     printer,
                     ArgOpener::callee(d, callee),
                     arg,
                     arrow,
                     body_expr,
+                    body_reuse,
                     || printer.build_expression_doc(arg),
                 ));
             }

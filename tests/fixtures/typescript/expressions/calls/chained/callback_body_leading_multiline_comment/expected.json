@@ -1,0 +1,896 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 812,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A multi-line block comment before a lone callback's call body keeps the body on its last line",
+			"start": 10,
+			"end": 106
+		},
+		{
+			"type": "Block",
+			"value": " c\nc ",
+			"start": 125,
+			"end": 136
+		},
+		{
+			"type": "Block",
+			"value": " c\nc ",
+			"start": 222,
+			"end": 233
+		},
+		{
+			"type": "Block",
+			"value": " c\nc ",
+			"start": 310,
+			"end": 321
+		},
+		{
+			"type": "Block",
+			"value": " c\nc ",
+			"start": 397,
+			"end": 408
+		},
+		{
+			"type": "Line",
+			"value": " The same with a JSDoc-shaped comment",
+			"start": 473,
+			"end": 512
+		},
+		{
+			"type": "Block",
+			"value": "* c\n * c ",
+			"start": 531,
+			"end": 546
+		},
+		{
+			"type": "Block",
+			"value": "* c\n * c ",
+			"start": 632,
+			"end": 647
+		},
+		{
+			"type": "Block",
+			"value": "* c\n * c ",
+			"start": 724,
+			"end": 739
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 811,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 802,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 108,
+					"end": 198,
+					"expression": {
+						"type": "CallExpression",
+						"start": 108,
+						"end": 197,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 108,
+							"end": 115,
+							"object": {
+								"type": "CallExpression",
+								"start": 108,
+								"end": 113,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 108,
+									"end": 111,
+									"object": {
+										"type": "Identifier",
+										"start": 108,
+										"end": 109,
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 110,
+										"end": 111,
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 114,
+								"end": 115,
+								"name": "c"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 116,
+								"end": 194,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 117,
+										"end": 118,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 137,
+									"end": 194,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 137,
+										"end": 144,
+										"object": {
+											"type": "CallExpression",
+											"start": 137,
+											"end": 142,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 137,
+												"end": 140,
+												"object": {
+													"type": "Identifier",
+													"start": 137,
+													"end": 138,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 139,
+													"end": 140,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 143,
+											"end": 144,
+											"name": "c"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 145,
+											"end": 193,
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c\nc ",
+											"start": 125,
+											"end": 136
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line block comment before a lone callback's call body keeps the body on its last line",
+							"start": 10,
+							"end": 106
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 200,
+					"end": 295,
+					"expression": {
+						"type": "CallExpression",
+						"start": 200,
+						"end": 294,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 200,
+							"end": 212,
+							"object": {
+								"type": "Identifier",
+								"start": 200,
+								"end": 207,
+								"name": "promise"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 208,
+								"end": 212,
+								"name": "then"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 213,
+								"end": 291,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 214,
+										"end": 215,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 234,
+									"end": 291,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 234,
+										"end": 241,
+										"object": {
+											"type": "CallExpression",
+											"start": 234,
+											"end": 239,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 234,
+												"end": 237,
+												"object": {
+													"type": "Identifier",
+													"start": 234,
+													"end": 235,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 236,
+													"end": 237,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 240,
+											"end": 241,
+											"name": "c"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 242,
+											"end": 290,
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c\nc ",
+											"start": 222,
+											"end": 233
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 297,
+					"end": 383,
+					"expression": {
+						"type": "CallExpression",
+						"start": 297,
+						"end": 382,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 297,
+							"end": 300,
+							"object": {
+								"type": "Identifier",
+								"start": 297,
+								"end": 298,
+								"name": "x"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 299,
+								"end": 300,
+								"name": "y"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 301,
+								"end": 379,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 302,
+										"end": 303,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 322,
+									"end": 379,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 322,
+										"end": 329,
+										"object": {
+											"type": "CallExpression",
+											"start": 322,
+											"end": 327,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 322,
+												"end": 325,
+												"object": {
+													"type": "Identifier",
+													"start": 322,
+													"end": 323,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 324,
+													"end": 325,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 328,
+											"end": 329,
+											"name": "c"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 330,
+											"end": 378,
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c\nc ",
+											"start": 310,
+											"end": 321
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 385,
+					"end": 470,
+					"expression": {
+						"type": "CallExpression",
+						"start": 385,
+						"end": 469,
+						"callee": {
+							"type": "Identifier",
+							"start": 385,
+							"end": 387,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 388,
+								"end": 466,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 389,
+										"end": 390,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 409,
+									"end": 466,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 409,
+										"end": 416,
+										"object": {
+											"type": "CallExpression",
+											"start": 409,
+											"end": 414,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 409,
+												"end": 412,
+												"object": {
+													"type": "Identifier",
+													"start": 409,
+													"end": 410,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 411,
+													"end": 412,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 415,
+											"end": 416,
+											"name": "c"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 417,
+											"end": 465,
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c\nc ",
+											"start": 397,
+											"end": 408
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 514,
+					"end": 608,
+					"expression": {
+						"type": "CallExpression",
+						"start": 514,
+						"end": 607,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 514,
+							"end": 521,
+							"object": {
+								"type": "CallExpression",
+								"start": 514,
+								"end": 519,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 514,
+									"end": 517,
+									"object": {
+										"type": "Identifier",
+										"start": 514,
+										"end": 515,
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 516,
+										"end": 517,
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 520,
+								"end": 521,
+								"name": "c"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 522,
+								"end": 604,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 523,
+										"end": 524,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 547,
+									"end": 604,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 547,
+										"end": 554,
+										"object": {
+											"type": "CallExpression",
+											"start": 547,
+											"end": 552,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 547,
+												"end": 550,
+												"object": {
+													"type": "Identifier",
+													"start": 547,
+													"end": 548,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 549,
+													"end": 550,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 553,
+											"end": 554,
+											"name": "c"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 555,
+											"end": 603,
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "* c\n * c ",
+											"start": 531,
+											"end": 546
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same with a JSDoc-shaped comment",
+							"start": 473,
+							"end": 512
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 610,
+					"end": 709,
+					"expression": {
+						"type": "CallExpression",
+						"start": 610,
+						"end": 708,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 610,
+							"end": 622,
+							"object": {
+								"type": "Identifier",
+								"start": 610,
+								"end": 617,
+								"name": "promise"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 618,
+								"end": 622,
+								"name": "then"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 623,
+								"end": 705,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 624,
+										"end": 625,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 648,
+									"end": 705,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 648,
+										"end": 655,
+										"object": {
+											"type": "CallExpression",
+											"start": 648,
+											"end": 653,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 648,
+												"end": 651,
+												"object": {
+													"type": "Identifier",
+													"start": 648,
+													"end": 649,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 650,
+													"end": 651,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 654,
+											"end": 655,
+											"name": "c"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 656,
+											"end": 704,
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "* c\n * c ",
+											"start": 632,
+											"end": 647
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 711,
+					"end": 801,
+					"expression": {
+						"type": "CallExpression",
+						"start": 711,
+						"end": 800,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 711,
+							"end": 714,
+							"object": {
+								"type": "Identifier",
+								"start": 711,
+								"end": 712,
+								"name": "x"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 713,
+								"end": 714,
+								"name": "y"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 715,
+								"end": 797,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 716,
+										"end": 717,
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 740,
+									"end": 797,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 740,
+										"end": 747,
+										"object": {
+											"type": "CallExpression",
+											"start": 740,
+											"end": 745,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 740,
+												"end": 743,
+												"object": {
+													"type": "Identifier",
+													"start": 740,
+													"end": 741,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 742,
+													"end": 743,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 746,
+											"end": 747,
+											"name": "c"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 748,
+											"end": 796,
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "* c\n * c ",
+											"start": 724,
+											"end": 739
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

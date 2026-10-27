@@ -470,7 +470,7 @@ impl Printer<'_> {
     }
 
     /// [`Self::build_arrow_arg_body_doc`] for the states that build their body unclaimed (the
-    /// member chain's force-expanded and multi-argument states, a lone call body): the
+    /// member chain's force-expanded and multi-argument states): the
     /// leftmost pair, else the plain expression doc.
     pub(super) fn build_arrow_arg_body_doc_unclaimed(
         &self,
@@ -517,7 +517,14 @@ pub(super) fn prebuild_expand_last_break_body(
                 internal::ExpressionKind::ConditionalExpression(_)
             ))
     {
-        let body_doc = build_arrow_body_like_arrow(printer, body_expr);
+        // Shared across a member chain's `conditional_group` candidates, as the object/array
+        // twin's is ([`prebuild_expand_last_obj_array_body`]): this prebuild runs per
+        // candidate, and without the share the second candidate rebuilds the whole body.
+        // Outside a chain the key is `None` and it builds as before.
+        let share_key = printer.chain_share_key(body_expr, ShareTag::ExpandLastBreakBody);
+        let body_doc = printer.chain_shared_doc(share_key, || {
+            build_arrow_body_like_arrow(printer, body_expr)
+        });
         return Some((body_expr.span().start, body_doc));
     }
     None
@@ -2558,22 +2565,21 @@ pub(super) fn build_ternary_arrow_hug_ladder(
 /// page, so skipping it there rebuilt every level twice; the comment positions that need a
 /// different composition never reach this arm (`arrow_hug_refused_by_comments`).
 ///
-/// `printed` builds the whole argument as the caller's argument builder prints it.
+/// `body_reuse` is that prebuild, which the caller takes as the last test of its gate — a
+/// call body is exactly what the prebuild takes, so it never declines there. `printed`
+/// builds the whole argument as the caller's argument builder prints it.
 pub(super) fn build_arrow_call_body_states(
     printer: &Printer<'_>,
     opener: ArgOpener,
     arg: &internal::Expression<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
     body_expr: &internal::Expression<'_>,
+    body_reuse: (u32, DocId),
     printed: impl FnOnce() -> DocId,
 ) -> DocId {
     let d = printer.d();
-    let body_reuse = prebuild_expand_last_break_body(printer, Some(arg));
-    let arrow_doc = printer.with_arrow_body_inject(body_reuse, printed);
-    let body_doc = body_reuse.map_or_else(
-        || printer.build_arrow_arg_body_doc_unclaimed(body_expr),
-        |(_, doc)| doc,
-    );
+    let arrow_doc = printer.with_arrow_body_inject(Some(body_reuse), printed);
+    let (_, body_doc) = body_reuse;
     let body_doc = prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
     let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, arg.span);
     build_break_body_ladder(
