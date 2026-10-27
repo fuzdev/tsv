@@ -33,3 +33,8 @@ as item}
 		a.b
 	}
 ></div>
+{#if // c
+	a.b++
+}
+	x
+{/if}

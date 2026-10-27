@@ -38,6 +38,10 @@ by a different route:
 - the **`{@const}` init**, which reaches the shape through its break-after-operator layout
   rather than through a head indent.
 
+One more case reaches the head through a node whose operand prints **first and bare** — a
+postfix update (`{#if ((// c⏎a).b)++}`): the operand's own spine hoists the run, which then
+leads the whole value, so the head answers it as above.
+
 `{@debug}` is absent by construction: its head takes an identifier list, and an identifier has
 no left spine for a shell to sit on.
 

@@ -20,14 +20,15 @@ pub(super) use super::{Printer, build_entity_name_doc};
 
 use crate::ast::internal;
 use crate::printer::calls::PartitionedComments;
+use crate::printer::comments::left_spine_shell_is_comment_free;
 use crate::printer::needs_parens::{LeftmostText, export_default_needs_parens};
 use crate::printer::statements::StatementContext;
 use crate::printer::{ParenContext, needs_parens};
 use smallvec::SmallVec;
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, LeadingBreak};
 
 /// Byte length of the leading `import`/`export` keyword (both 6 chars). Added to
 /// a declaration's span start to reach the position just past the keyword.
@@ -417,22 +418,38 @@ impl<'a> Printer<'a> {
         // value gap preserving an unforced break, disagreeing with its own twin
         // `export =`. Prettier keeps the break at both; tsv reflows at both.
         //
-        // The same comment one shell deeper — an own-line run inside the grouping parens
-        // of the value's LEFTMOST node (`export default (⏎// c⏎a as any).b`) — takes the
-        // same hang: the value's printer hoists that run to the head of its doc, so the
-        // doc opens with the run and a hardline, and this seam's continuation indent is
-        // what lands both under the keyword. Left on the keyword line, the run rendered
-        // flush and the reparse — reading it as the keyword→value gap's — indented it,
-        // a second fixed point one pass away.
-        let left_spine_run = matches!(&decl.declaration,
+        // The same comment one shell deeper — a run hoisted to the head of the value's doc
+        // from the grouping parens of its LEFTMOST node (`export default (⏎// c⏎a as any).b`)
+        // — is read off the built doc ([`Self::export_default_leading_edge`]), since which
+        // emitter prints it, and inside which group, is the value printer's business. A
+        // run that ends its line there in every layout, or behind a line in no group of
+        // the value, hangs under the keyword; left on the keyword line it rendered flush,
+        // and the reparse — reading it as the keyword→value gap's — indented it, a second
+        // fixed point one pass away. A run behind a line the value's own group may break
+        // takes this gap's own separator instead, glued.
+        let (value_doc, left_spine_run) = match &decl.declaration {
             internal::ExportDefaultValue::Expression(expr)
-                if self.left_spine_shell_has_own_line_comment(expr));
+                if !left_spine_shell_is_comment_free(self.source, expr.span().start) =>
+            {
+                self.export_default_leading_edge(expr, value_doc)
+            }
+            _ => (value_doc, false),
+        };
         // A run the author broke after whose break is FORCED hangs too — by a multi-line comment
         // glued to the value (`export default /* x */⏎/* y⏎*/ v`), which cannot share the line of
         // one that broke before it, or by the value's own hard break. The inline continuation
         // below would weld the run onto one line, and the paren spelling's first pass already
         // lands here, so the two spellings had two fixed points one pass apart.
+        //
+        // And the own-line JSDoc cast every value gap owes a hang
+        // ([`Printer::is_own_line_jsdoc_cast`]): the cast prints a hardline between its comment
+        // and its `(`, which left flush below the keyword the next pass collapses
+        // (`export default⏎/** @type {T} */⏎(x).b + q` joined on pass 2). Not under a
+        // sequence, which prints its own `(` ahead of the cast.
         if left_spine_run
+            || matches!(&decl.declaration, internal::ExportDefaultValue::Expression(expr)
+                if !matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_))
+                    && self.is_own_line_jsdoc_cast(expr))
             || self
                 .keyword_value_hang_doc(keyword_end, decl_start, || value_doc)
                 .is_some()
@@ -447,6 +464,44 @@ impl<'a> Printer<'a> {
             keyword_doc,
             self.build_keyword_to_name_continuation(keyword_end, decl_start, value_doc),
         ])
+    }
+
+    /// What the `export default` value's doc prints ahead of its first token, read for the
+    /// keyword→value seam: the value doc to print, and whether it hangs under the keyword.
+    ///
+    /// A comment there that ends its line in every layout hangs the value, as one in the
+    /// gap itself does, and so does one behind a breakable line in no group of the value,
+    /// which takes the statement's broken mode. One behind a line the value's own group
+    /// may break is the gap's glued single-line block one shell deeper: the gap prints that
+    /// block glued to what follows (`export default /* d */⏎a.b` prints `export default
+    /// /* d */ a.b`), so its line becomes the same space
+    /// ([`tsv_lang::doc::arena::DocArena::glue_leading_comment_lines`]); where the doc cannot be
+    /// glued in every layout it is left to its group. A JSDoc cast the parser built
+    /// ([`Printer::left_spine_cast_owns`]) is the value's own syntax, printed with its own
+    /// glue, and is no run; cast-shaped text it read as an ordinary comment — glued to an
+    /// arrow's parameter `(`, or to anything else — is an ordinary block.
+    fn export_default_leading_edge(
+        &self,
+        value: &internal::Expression<'_>,
+        value_doc: DocId,
+    ) -> (DocId, bool) {
+        let d = self.d();
+        let edge = d.leading_comment_break(value_doc, self.source);
+        if edge
+            .first_comment
+            .is_some_and(|span| self.left_spine_cast_owns(value, span))
+        {
+            return (value_doc, false);
+        }
+        match edge.brk {
+            LeadingBreak::None => (value_doc, false),
+            LeadingBreak::Soft if !edge.ungrouped => (
+                d.glue_leading_comment_lines(value_doc, self.source)
+                    .unwrap_or(value_doc),
+                false,
+            ),
+            LeadingBreak::Soft | LeadingBreak::Hard => (value_doc, true),
+        }
     }
 
     /// The `export default` value's own doc, built from `keyword_end` — the start of the

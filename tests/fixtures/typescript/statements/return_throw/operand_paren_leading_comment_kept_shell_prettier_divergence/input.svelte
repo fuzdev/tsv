@@ -32,4 +32,9 @@
 			a
 		) as B;
 	}
+	// a JSDoc cast in the shell of the cast's operand is the operand's own syntax, printed with
+	// its own glue on the keyword's line
+	function fn6() {
+		return /** @type {T} */ (x).b as U;
+	}
 </script>

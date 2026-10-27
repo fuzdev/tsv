@@ -42,9 +42,15 @@ See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../..
 
 Ternary alternate / consequent / test (clarity parens around `??`); `??` mixed with
 `||`; member base; callee; `new` callee; `**` operand; value-position sequence; the
-`#__PURE__` spelling; an annotated `new`. `unformatted_ours_clarity.svelte` authors
+`#__PURE__` spelling; an annotated `new`; an `await` operand's pair, in both the
+`/* @__PURE__ */` and the JSDoc-style `/** @__PURE__ */` spelling. `unformatted_ours_clarity.svelte` authors
 the ternary operands *without* the optional clarity parens (the same AST) — tsv adds
-them around the annotation, prettier adds them after it.
+them around the annotation, prettier adds them after it. `unformatted_ours_nested.svelte`
+authors the `await` operands with the annotated call deep in redundant pairs
+(`await ((/* @__PURE__ */ (f())) || d)`): tsv still prints the annotation against its call
+in one pass, though a comment in such a shell otherwise leads the whole operand
+([left_spine_shell_comment_nested_pair](../left_spine_shell_comment_nested_pair_prettier_divergence/));
+prettier's chain is pinned by `audit_signature_nested.txt`.
 
 ## Related fixtures
 

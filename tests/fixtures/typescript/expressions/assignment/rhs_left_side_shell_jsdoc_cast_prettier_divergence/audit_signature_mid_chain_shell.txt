@@ -1,0 +1,46 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script>
+	// A JSDoc cast the author gave a line of its own, at the head of a member chain, hangs
+	// the value under the operator at every assignment seam — however the cast was reached:
+	// written there, or inside a grouping shell the chain prints mid-chain
+	// (`unformatted_ours_mid_chain_shell`), where the cast's leaf still prints its comment
+	// ahead of the chain's head.
+	x = (f)/** @type {T} */
+	.b
+		.c(zz);
+	const y = (f)/** @type {T} */
+	[0]
+		.c(zz);
+	o.p = (f).b/** @type {T} */
+	.d
+		.c(zz);
+	o = {
+		k: (f)/** @type {T} */
+		.b
+			.c(zz)
+	};
+</script>
+
+%%PASS=2 (fixed point)%%
+<script>
+	// A JSDoc cast the author gave a line of its own, at the head of a member chain, hangs
+	// the value under the operator at every assignment seam — however the cast was reached:
+	// written there, or inside a grouping shell the chain prints mid-chain
+	// (`unformatted_ours_mid_chain_shell`), where the cast's leaf still prints its comment
+	// ahead of the chain's head.
+	x = f./** @type {T} */ b.c(zz);
+	const y = f[/** @type {T} */ 0].c(zz);
+	o.p = f.b./** @type {T} */ d.c(zz);
+	o = {
+		k: f./** @type {T} */ b.c(zz)
+	};
+</script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 555,
+	"end": 747,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -57,17 +57,35 @@
 			"value": " c",
 			"start": 522,
 			"end": 526
+		},
+		{
+			"type": "Line",
+			"value": " a JSDoc cast in the shell of the cast's operand is the operand's own syntax, printed with",
+			"start": 546,
+			"end": 638
+		},
+		{
+			"type": "Line",
+			"value": " its own glue on the keyword's line",
+			"start": 640,
+			"end": 677
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 705,
+			"end": 721
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 554,
+		"end": 746,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 545,
+			"end": 737,
 			"body": [
 				{
 					"type": "FunctionDeclaration",
@@ -370,6 +388,90 @@
 							}
 						]
 					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 679,
+					"end": 736,
+					"id": {
+						"type": "Identifier",
+						"start": 688,
+						"end": 691,
+						"name": "fn6"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 694,
+						"end": 736,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 698,
+								"end": 733,
+								"argument": {
+									"type": "TSAsExpression",
+									"start": 722,
+									"end": 732,
+									"expression": {
+										"type": "MemberExpression",
+										"start": 722,
+										"end": 727,
+										"object": {
+											"type": "Identifier",
+											"start": 723,
+											"end": 724,
+											"name": "x"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 726,
+											"end": 727,
+											"name": "b"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 731,
+										"end": 732,
+										"typeName": {
+											"type": "Identifier",
+											"start": 731,
+											"end": 732,
+											"name": "U"
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "* @type {T} ",
+											"start": 705,
+											"end": 721
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a JSDoc cast in the shell of the cast's operand is the operand's own syntax, printed with",
+							"start": 546,
+							"end": 638
+						},
+						{
+							"type": "Line",
+							"value": " its own glue on the keyword's line",
+							"start": 640,
+							"end": 677
+						}
+					]
 				}
 			],
 			"sourceType": "module"

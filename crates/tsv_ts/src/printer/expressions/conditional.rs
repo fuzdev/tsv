@@ -563,6 +563,33 @@ impl<'a> Printer<'a> {
         nesting: TernaryNesting,
         indent_binary_test: bool,
     ) -> DocId {
+        // A comment in a shell below a pair the test's left spine prints leads a ROOT
+        // conditional's whole doc, its `root_run` below (`Printer::left_spine_run_claim`).
+        // The test prints inside the conditional's GROUP, which holds a run that takes a
+        // line of its own the way a pair holds any run: its hardline would break the `?` /
+        // `:` lines for a comment the reparse reads as leading the whole conditional
+        // (`((⏎// c⏎a).b ? y : z)`), so such a run is claimed with no pair below it.
+        let claim = (!nesting.is_chained())
+            .then(|| {
+                self.left_spine_run_claim(cond_span, cond_span.start, cond.test, || {
+                    ternary_test_needs_parens(cond.test)
+                        || self.left_spine_shell_has_own_line_comment(cond.test)
+                })
+            })
+            .flatten();
+        self.with_left_spine_claim(claim, || {
+            self.build_conditional_doc_claimed(cond, cond_span, nesting, indent_binary_test)
+        })
+    }
+
+    /// [`Self::build_conditional_doc_impl`] under its left-spine claim.
+    fn build_conditional_doc_claimed(
+        &self,
+        cond: &internal::ConditionalExpression<'_>,
+        cond_span: Span,
+        nesting: TernaryNesting,
+        indent_binary_test: bool,
+    ) -> DocId {
         let d = self.d();
         let is_chained = nesting.is_chained();
         let test_end = cond.test.span().end;
@@ -615,7 +642,9 @@ impl<'a> Printer<'a> {
         // drifting.) A CHAINED conditional's shell is its parent's branch gap
         // ([`Self::branch_gap_end`]): the parent's run prints it, and the nested emits none.
         let root_run = (!is_chained)
-            .then(|| self.removed_paren_comments_opt(cond_span.start, cond.test.span().start))
+            .then(|| {
+                self.removed_paren_comments_opt(cond_span, cond_span.start, cond.test.span().start)
+            })
             .flatten();
 
         // If there are line comments, a blank-separated branch comment, or multiline

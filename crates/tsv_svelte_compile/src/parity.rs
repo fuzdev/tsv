@@ -147,12 +147,11 @@ fn without_comment_bound_pairs<'arena>(
 /// A bundler annotation whose placement is semantic (moving it changes
 /// tree-shaking / bundling), so it must never be treated as position-neutral. The
 /// tree-shaking hints (`@__PURE__`, `@__NO_SIDE_EFFECTS__`, and the `#`-spelled
-/// variants) plus the webpack/vite magic-comment markers. Conservative by design —
-/// a false positive only costs this one comparison its position tolerance.
+/// variants — [`tsv_lang::is_tree_shaking_annotation`], the formatter's own reading)
+/// plus the webpack/vite magic-comment markers. Conservative by design — a false
+/// positive only costs this one comparison its position tolerance.
 fn is_bundler_annotation(content: &str) -> bool {
-    let content = content.trim();
-    content.contains("__PURE__")
-        || content.contains("__NO_SIDE_EFFECTS__")
+    tsv_lang::is_tree_shaking_annotation(content)
         || content.contains("@vite-")
         || content.contains("webpack")
 }

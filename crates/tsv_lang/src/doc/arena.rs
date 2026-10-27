@@ -1311,6 +1311,343 @@ impl LastLeaf {
     }
 }
 
+/// What a doc can print between where it starts and its first code token — the break
+/// half of [`DocArena::leading_comment_break`]'s answer, ordered so the worse layout is the
+/// greater.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum LeadingBreak {
+    /// Nothing ends a line there, in any layout.
+    None,
+    /// A breakable line ends one in some layout: its group may break, or the line sits in
+    /// no group of the doc and takes the enclosing mode.
+    Soft,
+    /// A line is ended in every layout: a `//`, a hard line, or a breakable line in a group
+    /// already forced broken.
+    Hard,
+}
+
+/// [`DocArena::leading_comment_break`]'s reading of a doc's leading edge — everything it
+/// prints ahead of its first code token.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LeadingEdge {
+    /// The worst line break behind a comment there.
+    pub brk: LeadingBreak,
+    /// The worst line break ahead of any comment there — a line the doc opens with.
+    pub bare: LeadingBreak,
+    /// A block comment there spans lines: its interior holds a line terminator — any of
+    /// ECMAScript's, `<LS>` / `<PS>` included — which is one for ASI by itself (ecma262
+    /// sec-comments), whatever follows it.
+    pub multiline: bool,
+    /// A breakable line behind a comment there sits in no group of the doc, so it takes
+    /// the mode of whatever encloses the doc — broken, at a statement.
+    pub ungrouped: bool,
+    /// The first comment there, when it prints as a verbatim source slice.
+    pub first_comment: Option<Span>,
+}
+
+impl LeadingEdge {
+    /// The edge of a doc that opens on code.
+    pub const NONE: Self = Self {
+        brk: LeadingBreak::None,
+        bare: LeadingBreak::None,
+        multiline: false,
+        ungrouped: false,
+        first_comment: None,
+    };
+
+    /// The ASI reading: the worst line terminator anywhere ahead of the first token —
+    /// a line after a comment or ahead of all of them, or a multi-line block's interior.
+    #[must_use]
+    pub fn asi(self) -> LeadingBreak {
+        if self.multiline {
+            LeadingBreak::Hard
+        } else {
+            self.brk.max(self.bare)
+        }
+    }
+}
+
+/// How many nodes [`DocArena::leading_comment_break`] visits, across all of its layouts,
+/// before it stops and answers [`LeadingBreak::Hard`] — the safe reading of an edge it
+/// could not finish. A leading edge is a handful of nodes; the bound is for a doc whose
+/// alternatives multiply ahead of its first token.
+const LEADING_EDGE_BUDGET: u32 = 4096;
+
+/// No frame, no mode record: the end of a [`LeadingEdgeWalk`] list.
+const EDGE_NIL: u32 = u32::MAX;
+
+/// The group enclosing the walked doc itself, whose mode the doc cannot know — the key a
+/// breakable line or an `if_break` outside every group of the doc reads.
+const EDGE_OUTSIDE: u32 = u32::MAX;
+
+/// One pending node of a [`LeadingEdgeWalk`] layout: the node, the nearest group it prints
+/// in (a group node's id, or [`EDGE_OUTSIDE`]), and the frame printed after it.
+#[derive(Clone, Copy)]
+struct EdgeFrame {
+    node: DocId,
+    group: u32,
+    next: u32,
+}
+
+/// A group's mode as one layout of a [`LeadingEdgeWalk`] has settled it, and the record
+/// settled before it.
+#[derive(Clone, Copy)]
+struct EdgeMode {
+    group: u32,
+    broken: bool,
+    prev: u32,
+}
+
+/// One layout of a [`LeadingEdgeWalk`]: what is left to print (a frame list) and what this
+/// layout has settled (a mode list). Both lists are shared tails in the walk's stores, so a
+/// fork copies two indices.
+#[derive(Clone, Copy)]
+struct EdgeLayout {
+    next: u32,
+    modes: u32,
+    /// A comment printed ahead of everything so far, a deferred one included.
+    comment: bool,
+    /// A deferred run is pending: a boundary flushes it with a hard line.
+    suffix: bool,
+    /// A [`DocNode::FlushBreak`] was passed: the next breakable line breaks.
+    flush: bool,
+}
+
+/// [`DocArena::leading_comment_break`]'s walk: every layout of the doc's leading edge, in
+/// print order, each followed to its first code token.
+///
+/// Iterative, over persistent lists: frames and mode records are appended and never
+/// rewritten, and a layout names the head of each, so forking at an `if_break` or a
+/// conditional group's states is two index copies rather than a copy of a stack.
+struct LeadingEdgeWalk<'a> {
+    arena: &'a DocArena,
+    nodes: &'a [DocNode],
+    children: &'a [DocId],
+    pool: &'a str,
+    source: &'a str,
+    frames: SmallVec<[EdgeFrame; 32]>,
+    modes: SmallVec<[EdgeMode; 8]>,
+    layouts: SmallVec<[EdgeLayout; 4]>,
+    edge: LeadingEdge,
+    budget: u32,
+}
+
+impl LeadingEdgeWalk<'_> {
+    fn frame(&mut self, node: DocId, group: u32, next: u32) -> u32 {
+        let at = self.frames.len() as u32;
+        self.frames.push(EdgeFrame { node, group, next });
+        at
+    }
+
+    fn settle(&mut self, group: u32, broken: bool, prev: u32) -> u32 {
+        let at = self.modes.len() as u32;
+        self.modes.push(EdgeMode {
+            group,
+            broken,
+            prev,
+        });
+        at
+    }
+
+    /// `group`'s mode in a layout whose mode list starts at `modes`: `Some(broken)` once
+    /// the layout has settled it, `None` while either mode is still open.
+    fn mode(&self, mut modes: u32, group: u32) -> Option<bool> {
+        while modes != EDGE_NIL {
+            let record = self.modes[modes as usize];
+            if record.group == group {
+                return Some(record.broken);
+            }
+            modes = record.prev;
+        }
+        None
+    }
+
+    /// Walk every layout; `false` when one ended a line in every layout (the answer is
+    /// [`LeadingBreak::Hard`] and nothing can raise it), or the budget ran out.
+    fn run(&mut self) -> bool {
+        while let Some(layout) = self.layouts.pop() {
+            if !self.follow(layout) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Follow one layout to its first code token, forking the open alternatives onto
+    /// [`Self::layouts`]. `false` to stop the whole walk.
+    fn follow(&mut self, mut at: EdgeLayout) -> bool {
+        while at.next != EDGE_NIL {
+            if self.budget == 0 {
+                self.edge.brk = LeadingBreak::Hard;
+                return false;
+            }
+            self.budget -= 1;
+            let EdgeFrame { node, group, next } = self.frames[at.next as usize];
+            at.next = next;
+            match &self.nodes[node.index()] {
+                DocNode::Text(t) => {
+                    let s = super::types::resolve_text(t, Some(self.source), self.pool)
+                        .trim_start_matches([' ', '\t']);
+                    if s.is_empty() {
+                        continue;
+                    }
+                    if s.starts_with("//") {
+                        // A line comment ends its line in every layout.
+                        self.edge.brk = LeadingBreak::Hard;
+                        return false;
+                    }
+                    if !s.starts_with("/*") {
+                        return true;
+                    }
+                    if self.edge.first_comment.is_none()
+                        && let DocText::SourceSpan(span, _) | DocText::VerbatimSpan(span, _) = t
+                    {
+                        self.edge.first_comment = Some(*span);
+                    }
+                    // Every ECMAScript line terminator, not the `\n` the comment's own
+                    // `multiline` flag reads (Svelte's wire gate): a `<LS>` / `<PS>` inside a
+                    // block ends a line for ASI just the same.
+                    self.edge.multiline |= crate::printing::contains_line_terminator(s);
+                    at.comment = true;
+                }
+                DocNode::MultilineText { span, .. } => {
+                    if !span
+                        .slice(self.pool)
+                        .trim_start_matches([' ', '\t'])
+                        .starts_with("/*")
+                    {
+                        return true;
+                    }
+                    self.edge.multiline = true;
+                    at.comment = true;
+                }
+                DocNode::Line(kind) => {
+                    let broken = match kind {
+                        LineKind::Hard | LineKind::Literal => Some(true),
+                        LineKind::Normal | LineKind::Soft if at.flush => Some(true),
+                        LineKind::Normal | LineKind::Soft => self.mode(at.modes, group),
+                    };
+                    at.flush = false;
+                    match broken {
+                        Some(false) => {}
+                        Some(true) => {
+                            if at.comment {
+                                self.edge.brk = LeadingBreak::Hard;
+                                return false;
+                            }
+                            self.edge.bare = LeadingBreak::Hard;
+                        }
+                        None => {
+                            // The layout where the line breaks ends here; the one where it
+                            // stays flat goes on, its group settled flat.
+                            if at.comment {
+                                self.edge.brk = self.edge.brk.max(LeadingBreak::Soft);
+                                self.edge.ungrouped |= group == EDGE_OUTSIDE;
+                            } else {
+                                self.edge.bare = self.edge.bare.max(LeadingBreak::Soft);
+                            }
+                            at.modes = self.settle(group, false, at.modes);
+                        }
+                    }
+                }
+                DocNode::Indent(inner) | DocNode::Dedent(inner) => {
+                    at.next = self.frame(*inner, group, at.next);
+                }
+                DocNode::AlignRoot { contents, .. }
+                | DocNode::Align { contents, .. }
+                | DocNode::IndentIfBreak { contents, .. }
+                | DocNode::GatedState { contents, .. } => {
+                    at.next = self.frame(*contents, group, at.next);
+                }
+                DocNode::WithContext { doc, .. } => {
+                    at.next = self.frame(*doc, group, at.next);
+                }
+                DocNode::Concat(range) | DocNode::Fill(range) => {
+                    // A `Fill`'s separators are read as plain lines in its group, not with
+                    // its pairwise fit rule — theoretical for a TS leading edge: TS's one fill
+                    // (a number array's elements) sits behind its `[`.
+                    for &child in range.resolve(self.children).iter().rev() {
+                        at.next = self.frame(child, group, at.next);
+                    }
+                }
+                DocNode::Group {
+                    contents,
+                    expanded_states,
+                    should_break,
+                    ..
+                } => {
+                    let id = node.0;
+                    // A group printed in a flat one prints flat, unless its own content
+                    // forces it open.
+                    let parent_flat = self.mode(at.modes, group) == Some(false);
+                    let states = expanded_states.resolve(self.children);
+                    if states.is_empty() || parent_flat {
+                        let forced = *should_break || self.arena.will_break(*contents);
+                        if forced || parent_flat {
+                            at.modes = self.settle(id, forced, at.modes);
+                        }
+                        at.next = self.frame(*contents, id, at.next);
+                    } else {
+                        // A conditional group: each state is a layout of its own.
+                        for &state in std::iter::once(contents).chain(states) {
+                            let mut fork = at;
+                            if *should_break || self.arena.will_break(state) {
+                                fork.modes = self.settle(id, true, fork.modes);
+                            }
+                            fork.next = self.frame(state, id, fork.next);
+                            self.layouts.push(fork);
+                        }
+                        return true;
+                    }
+                }
+                DocNode::IfBreak {
+                    break_doc,
+                    flat_doc,
+                    group_id,
+                } => {
+                    let key = group_id.map_or(group, |id| id.doc().0);
+                    match self.mode(at.modes, key) {
+                        Some(true) => at.next = self.frame(*break_doc, group, at.next),
+                        Some(false) => at.next = self.frame(*flat_doc, group, at.next),
+                        None => {
+                            let mut flat = at;
+                            flat.modes = self.settle(key, false, flat.modes);
+                            flat.next = self.frame(*flat_doc, group, flat.next);
+                            self.layouts.push(flat);
+                            at.modes = self.settle(key, true, at.modes);
+                            at.next = self.frame(*break_doc, group, at.next);
+                        }
+                    }
+                }
+                // A deferred run prints at the line's end, behind the first token — but a
+                // line that breaks before it leaves the run ahead of that line's end.
+                DocNode::LineSuffix(_) => {
+                    at.comment = true;
+                    at.suffix = true;
+                }
+                DocNode::LineSuffixBoundary | DocNode::EmbedEnd { .. } => {
+                    if at.suffix {
+                        self.edge.brk = LeadingBreak::Hard;
+                        return false;
+                    }
+                }
+                DocNode::FlushBreak => at.flush = true,
+                DocNode::BreakParent | DocNode::FlowProbeEnd => {}
+            }
+        }
+        true
+    }
+}
+
+/// Where [`DocArena::glue_leading_comment_lines`]'s walk leaves a doc's leading edge.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Glue {
+    /// The first code token printed inside: nothing after it is the edge.
+    Code,
+    /// No code yet; `comment` when a comment printed ahead of everything so far.
+    Open { comment: bool },
+}
+
 /// The arena storage [`DocArena::pending_run_at_end`] reads.
 struct WalkStore<'a> {
     nodes: &'a [DocNode],
@@ -3371,6 +3708,238 @@ impl DocArena {
             certain: state.queue == RunQueue::Pending,
             ..state.run
         })
+    }
+
+    /// What `id` prints ahead of its first code token, in any layout — the reading a
+    /// restricted production needs of its argument (`return [no LineTerminator here]
+    /// Expression`) and a keyword→value seam of its value, taken from the doc as built
+    /// rather than re-derived from the source, so every emitter that can put a comment
+    /// there answers alike.
+    ///
+    /// A comment is recognized by its text: a `/*` or `//` opens no code token. The walk
+    /// follows each layout in print order up to the first other text: an `if_break` forks
+    /// unless its group's mode is settled (forced broken by its content, flat inside a
+    /// flat group, or chosen by an earlier fork of the same layout), and a conditional
+    /// group's states each fork. A breakable line whose group is still open ends one
+    /// layout as [`LeadingBreak::Soft`] while the flat one goes on. The answer is the worst
+    /// over the layouts; a walk that outruns [`LEADING_EDGE_BUDGET`] answers
+    /// [`LeadingBreak::Hard`].
+    ///
+    /// A deferred run ([`DocNode::LineSuffix`]) counts as a comment printed ahead: it
+    /// lands before the line end a following line makes.
+    pub fn leading_comment_break(&self, id: DocId, source: &str) -> LeadingEdge {
+        let nodes = self.nodes.borrow();
+        let children = self.children.borrow();
+        let pool = self.text_pool.borrow();
+        let mut walk = LeadingEdgeWalk {
+            arena: self,
+            nodes: &nodes,
+            children: &children,
+            pool: &pool,
+            source,
+            frames: SmallVec::new(),
+            modes: SmallVec::new(),
+            layouts: SmallVec::new(),
+            edge: LeadingEdge::NONE,
+            budget: LEADING_EDGE_BUDGET,
+        };
+        let next = walk.frame(id, EDGE_OUTSIDE, EDGE_NIL);
+        walk.layouts.push(EdgeLayout {
+            next,
+            modes: EDGE_NIL,
+            comment: false,
+            suffix: false,
+            flush: false,
+        });
+        walk.run();
+        walk.edge
+    }
+
+    /// `id` with every breakable line its leading edge prints BEHIND A COMMENT replaced by
+    /// a space, in every layout it reaches — the separator a keyword→value gap gives a glued
+    /// single-line block (`export default /* d */⏎v` prints `export default /* d */ v`),
+    /// for a run a value's own printer hoisted to its head and separated by a line inside
+    /// the value's group. Only the path down to each replaced line is copied, every subtree
+    /// off it shared.
+    ///
+    /// The layouts it reaches are each `if_break`'s two arms and a group's contents; a
+    /// conditional group is walked through its first state alone (`contents`), so a line
+    /// only a later state prints is neither replaced nor read.
+    ///
+    /// `None` — the caller keeps its other layout — when the edge cannot be glued that way:
+    /// a hard line, a `//` or a multi-line text ahead of the first token, a
+    /// [`DocNode::FlushBreak`], [`DocNode::LineSuffixBoundary`] or [`DocNode::EmbedEnd`] (each
+    /// can break or flush where a space would not), a [`DocNode::GatedState`] (its state is
+    /// the renderer's to pick), a line to replace inside a keyed or a conditional group (a
+    /// copy would be a new [`GroupId`], or keep a state choice the swap made wrong — see
+    /// [`Self::replace_subdoc`]), alternatives that reach the first token at different
+    /// places, nothing to replace at all, or an edge deeper than the walk follows.
+    pub fn glue_leading_comment_lines(&self, id: DocId, source: &str) -> Option<DocId> {
+        let mut budget = LEADING_EDGE_BUDGET;
+        match self.glue_walk(id, source, false, 0, &mut budget)? {
+            (copy, Glue::Code | Glue::Open { .. }) if copy != id => Some(copy),
+            _ => None,
+        }
+    }
+
+    /// [`Self::glue_leading_comment_lines`] over `id`, entered behind a comment when
+    /// `comment`: its copy (`id` itself when nothing in it changed) and where it leaves the
+    /// edge. `None` declines.
+    fn glue_walk(
+        &self,
+        id: DocId,
+        source: &str,
+        comment: bool,
+        depth: u32,
+        budget: &mut u32,
+    ) -> Option<(DocId, Glue)> {
+        const MAX_DEPTH: u32 = 256;
+        if depth > MAX_DEPTH || *budget == 0 {
+            return None;
+        }
+        *budget -= 1;
+        let node = self.nodes.borrow()[id.index()].clone();
+        let open = Glue::Open { comment };
+        let mut one = |inner: DocId, rebuild: &dyn Fn(DocId) -> DocNode| {
+            let (copy, glue) = self.glue_walk(inner, source, comment, depth + 1, budget)?;
+            Some((
+                if copy == inner {
+                    id
+                } else {
+                    self.alloc(rebuild(copy))
+                },
+                glue,
+            ))
+        };
+        match node {
+            DocNode::Text(t) => {
+                let s = {
+                    let pool = self.text_pool.borrow();
+                    let s = super::types::resolve_text(&t, Some(source), &pool);
+                    let s = s.trim_start_matches([' ', '\t']);
+                    if s.is_empty() {
+                        None
+                    } else if s.starts_with("//") || (s.starts_with("/*") && s.contains('\n')) {
+                        return None;
+                    } else {
+                        Some(s.starts_with("/*"))
+                    }
+                };
+                Some(match s {
+                    None => (id, open),
+                    Some(true) => (id, Glue::Open { comment: true }),
+                    Some(false) => (id, Glue::Code),
+                })
+            }
+            DocNode::MultilineText { .. } => None,
+            DocNode::Line(LineKind::Normal | LineKind::Soft) if comment => {
+                Some((self.text(" "), open))
+            }
+            DocNode::Line(LineKind::Normal | LineKind::Soft) => Some((id, open)),
+            DocNode::Line(LineKind::Hard | LineKind::Literal) => None,
+            DocNode::LineSuffix(_) => Some((id, Glue::Open { comment: true })),
+            DocNode::LineSuffixBoundary | DocNode::EmbedEnd { .. } | DocNode::FlushBreak => None,
+            DocNode::BreakParent | DocNode::FlowProbeEnd => Some((id, open)),
+            DocNode::Indent(inner) => one(inner, &DocNode::Indent),
+            DocNode::Dedent(inner) => one(inner, &DocNode::Dedent),
+            DocNode::AlignRoot { n, contents } => {
+                one(contents, &|contents| DocNode::AlignRoot { n, contents })
+            }
+            DocNode::Align { n, contents } => {
+                one(contents, &|contents| DocNode::Align { n, contents })
+            }
+            DocNode::IndentIfBreak { contents, group_id } => one(contents, &|contents| {
+                DocNode::IndentIfBreak { contents, group_id }
+            }),
+            DocNode::WithContext { doc, context } => one(doc, &|doc| DocNode::WithContext {
+                doc,
+                context: context.clone(),
+            }),
+            DocNode::GatedState { .. } => None,
+            DocNode::Group {
+                contents,
+                expanded_states,
+                keyed,
+                should_break,
+            } => {
+                let (copy, glue) = self.glue_walk(contents, source, comment, depth + 1, budget)?;
+                if copy == contents {
+                    return Some((id, glue));
+                }
+                if keyed || !expanded_states.is_empty() {
+                    return None;
+                }
+                Some((
+                    self.alloc(DocNode::Group {
+                        contents: copy,
+                        expanded_states,
+                        keyed,
+                        should_break,
+                    }),
+                    glue,
+                ))
+            }
+            DocNode::IfBreak {
+                break_doc,
+                flat_doc,
+                group_id,
+            } => {
+                let (break_copy, break_glue) =
+                    self.glue_walk(break_doc, source, comment, depth + 1, budget)?;
+                let (flat_copy, flat_glue) =
+                    self.glue_walk(flat_doc, source, comment, depth + 1, budget)?;
+                if break_glue != flat_glue {
+                    return None;
+                }
+                Some((
+                    if break_copy == break_doc && flat_copy == flat_doc {
+                        id
+                    } else {
+                        self.alloc(DocNode::IfBreak {
+                            break_doc: break_copy,
+                            flat_doc: flat_copy,
+                            group_id,
+                        })
+                    },
+                    break_glue,
+                ))
+            }
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                let kids: DocBuf = range
+                    .resolve(&self.children.borrow())
+                    .iter()
+                    .copied()
+                    .collect();
+                let mut glue = open;
+                let mut copies = DocBuf::new();
+                let mut changed = false;
+                for kid in kids {
+                    let copy = match glue {
+                        Glue::Code => kid,
+                        Glue::Open { comment } => {
+                            let (copy, next) =
+                                self.glue_walk(kid, source, comment, depth + 1, budget)?;
+                            glue = next;
+                            copy
+                        }
+                    };
+                    changed |= copy != kid;
+                    copies.push(copy);
+                }
+                if !changed {
+                    return Some((id, glue));
+                }
+                let range = self.alloc_children(&copies);
+                Some((
+                    self.alloc(if matches!(node, DocNode::Concat(_)) {
+                        DocNode::Concat(range)
+                    } else {
+                        DocNode::Fill(range)
+                    }),
+                    glue,
+                ))
+            }
+        }
     }
 
     /// Force parent group to break — a prelude singleton (stateless, like
@@ -5748,5 +6317,153 @@ mod as_source_span_text_tests {
         );
         let pair = a.concat(&[a.source_span_plain(span), a.text(";")]);
         assert_eq!(a.as_source_span_text(pair), None);
+    }
+}
+
+#[cfg(test)]
+mod leading_comment_break_tests {
+    //! [`super::DocArena::leading_comment_break`] reads a built doc's leading edge, and a
+    //! restricted production's ASI safety rests on it: each layout the doc can take is
+    //! followed to its first code token. These pin the readings a caller branches on.
+    use super::{DocArena, LeadingBreak, LeadingEdge};
+    use crate::Span;
+
+    const SOURCE: &str = "/* c */ a /*\n*/ // d";
+
+    fn comment(a: &DocArena) -> super::DocId {
+        a.source_span(Span { start: 0, end: 7 }, SOURCE)
+    }
+
+    fn code(a: &DocArena) -> super::DocId {
+        a.text("a")
+    }
+
+    fn edge(a: &DocArena, doc: super::DocId) -> LeadingEdge {
+        a.leading_comment_break(doc, SOURCE)
+    }
+
+    #[test]
+    fn code_first_reads_nothing() {
+        let a = DocArena::new();
+        let doc = a.concat(&[code(&a), comment(&a), a.hardline(), code(&a)]);
+        assert_eq!(edge(&a, doc), LeadingEdge::NONE);
+    }
+
+    #[test]
+    fn a_line_after_a_comment_is_soft_in_an_open_group_and_ungrouped_outside_one() {
+        let a = DocArena::new();
+        let run = a.concat(&[comment(&a), a.line(), code(&a)]);
+        let outside = edge(&a, run);
+        assert_eq!(outside.brk, LeadingBreak::Soft);
+        assert!(outside.ungrouped);
+        assert_eq!(outside.first_comment, Some(Span { start: 0, end: 7 }));
+
+        let grouped = edge(&a, a.group(run));
+        assert_eq!(grouped.brk, LeadingBreak::Soft);
+        assert!(!grouped.ungrouped);
+    }
+
+    #[test]
+    fn a_forced_group_or_a_hard_line_or_a_line_comment_is_hard() {
+        let a = DocArena::new();
+        let soft = a.concat(&[comment(&a), a.line(), code(&a)]);
+        let forced = a.group(a.concat(&[soft, a.break_parent()]));
+        assert_eq!(edge(&a, forced).brk, LeadingBreak::Hard);
+        assert_eq!(edge(&a, a.group_break(soft)).brk, LeadingBreak::Hard);
+
+        let hard = a.concat(&[comment(&a), a.hardline(), code(&a)]);
+        assert_eq!(edge(&a, hard).brk, LeadingBreak::Hard);
+
+        let line_comment = a.source_span(Span { start: 16, end: 20 }, SOURCE);
+        assert_eq!(
+            edge(&a, a.concat(&[line_comment, code(&a)])).brk,
+            LeadingBreak::Hard
+        );
+    }
+
+    #[test]
+    fn a_multiline_block_is_an_asi_terminator_however_it_is_followed() {
+        let a = DocArena::new();
+        let block = a.source_span(Span { start: 10, end: 15 }, SOURCE);
+        let e = edge(&a, a.concat(&[block, a.text(" "), code(&a)]));
+        assert_eq!(e.brk, LeadingBreak::None);
+        assert!(e.multiline);
+        assert_eq!(e.asi(), LeadingBreak::Hard);
+
+        let pooled = a.multiline_text("/*\n*/");
+        assert_eq!(
+            edge(&a, a.concat(&[pooled, code(&a)])).asi(),
+            LeadingBreak::Hard
+        );
+    }
+
+    #[test]
+    fn a_line_ahead_of_every_comment_is_read_apart() {
+        let a = DocArena::new();
+        let e = edge(&a, a.group(a.concat(&[a.softline(), code(&a)])));
+        assert_eq!(e.brk, LeadingBreak::None);
+        assert_eq!(e.bare, LeadingBreak::Soft);
+        assert_eq!(e.asi(), LeadingBreak::Soft);
+    }
+
+    /// The conditional pair a soft leading edge takes: its `(` opens the broken layout, and
+    /// the flat one prints every line of the group flat, so neither ends a line ahead of
+    /// the first token.
+    #[test]
+    fn the_conditional_pair_holds_its_soft_edge() {
+        let a = DocArena::new();
+        let inner = a.group(a.concat(&[comment(&a), a.line(), code(&a)]));
+        let pair = a.group(a.concat(&[
+            a.if_break(a.text("("), a.empty()),
+            a.indent(a.concat(&[a.softline(), inner])),
+            a.softline(),
+            a.if_break(a.text(")"), a.empty()),
+        ]));
+        assert_eq!(edge(&a, pair).asi(), LeadingBreak::None);
+
+        // A broken-arm `if_break` keyed on a forced group never takes its flat arm.
+        let held = a.group_break(a.concat(&[
+            a.if_break(a.text("("), a.empty()),
+            comment(&a),
+            a.line(),
+            code(&a),
+        ]));
+        assert_eq!(edge(&a, held).asi(), LeadingBreak::None);
+    }
+
+    #[test]
+    fn every_conditional_group_state_is_read() {
+        let a = DocArena::new();
+        let flat = a.concat(&[comment(&a), a.text(" "), code(&a)]);
+        let broken = a.concat(&[comment(&a), a.hardline(), code(&a)]);
+        assert_eq!(
+            edge(&a, a.conditional_group(&[flat, broken])).brk,
+            LeadingBreak::Hard
+        );
+        assert_eq!(
+            edge(&a, a.conditional_group(&[flat, flat])).brk,
+            LeadingBreak::None
+        );
+    }
+
+    #[test]
+    fn a_deferred_run_ahead_of_a_breakable_line_is_a_leading_comment() {
+        let a = DocArena::new();
+        let suffix = a.line_suffix(comment(&a));
+        let doc = a.group(a.concat(&[suffix, a.line(), code(&a)]));
+        assert_eq!(edge(&a, doc).brk, LeadingBreak::Soft);
+        let flushed = a.concat(&[suffix, a.line_suffix_boundary(), code(&a)]);
+        assert_eq!(edge(&a, flushed).brk, LeadingBreak::Hard);
+    }
+
+    /// An edge the walk cannot finish within its budget is read as the unsafe one.
+    #[test]
+    fn an_unfinished_walk_answers_hard() {
+        let a = DocArena::new();
+        let mut doc = code(&a);
+        for _ in 0..5000 {
+            doc = a.concat(&[a.text(" "), doc]);
+        }
+        assert_eq!(edge(&a, doc).brk, LeadingBreak::Hard);
     }
 }

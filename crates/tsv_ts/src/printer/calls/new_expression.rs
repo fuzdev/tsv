@@ -62,22 +62,40 @@ impl<'a> Printer<'a> {
         // directive in the gap freezes the CALLEE alone — the type arguments and the argument
         // list follow the callee's span and stay parent-owned, so they keep normalizing.
         let frozen = self.value_head_frozen_span(keyword_end, new_expr.callee.span());
-        // The keyword→value gap, shared with `await`→operand: the tail hangs whole below the
-        // run ([`Printer::keyword_value_hang_doc`]), and otherwise the run trails `new` inline.
-        // A resolved freeze always hangs — an honored directive is a comment that forces its own
-        // line — so the inline arm, where the directive would be inert, never meets one.
-        if let Some(tail) = self.keyword_value_hang_doc(keyword_end, callee_start, || {
-            self.build_new_doc_after_keyword(new_expr, new_expr_span, d.empty(), frozen)
-        }) {
-            return self.build_keyword_hang_doc("new", keyword_end, callee_start, tail);
-        }
-        let keyword = match self
-            .build_inline_comments_between_doc_trailing_space_opt(keyword_end, callee_start)
-        {
-            Some(run) => d.concat(&[d.text("new "), run]),
-            None => d.text("new "),
-        };
-        self.build_new_doc_after_keyword(new_expr, new_expr_span, keyword, frozen)
+        // A comment in a shell below the pair the callee prints in leads the whole callee
+        // from the keyword gap, ahead of that pair, which is where the reparse reads it
+        // (`Printer::left_spine_run_claim`): the gap runs to the claimed region's end. So
+        // does a run the callee's doc would OPEN with on a line of its own, pair or no pair —
+        // the `await`→operand rule (`Printer::build_await_doc`).
+        let claim = self.left_spine_run_claim(new_expr_span, keyword_end, new_expr.callee, || {
+            let new_list = new_expr
+                .type_arguments
+                .as_ref()
+                .map(|_| SecondTypeArgs::Expression);
+            super::CalleeParens::of(self, new_expr.callee, ParenContext::NewCallee, new_list)
+                .is_some()
+                || self.left_spine_shell_has_own_line_comment(new_expr.callee)
+        });
+        let gap_end = claim.map_or(callee_start, |claim| claim.region.end.max(callee_start));
+        self.with_left_spine_claim(claim, || {
+            // The keyword→value gap, shared with `await`→operand: the tail hangs whole below
+            // the run ([`Printer::keyword_value_hang_doc`]), and otherwise the run trails `new`
+            // inline. A resolved freeze always hangs — an honored directive is a comment that
+            // forces its own line — so the inline arm, where the directive would be inert,
+            // never meets one.
+            if let Some(tail) = self.keyword_value_hang_doc(keyword_end, gap_end, || {
+                self.build_new_doc_after_keyword(new_expr, new_expr_span, d.empty(), frozen)
+            }) {
+                return self.build_keyword_hang_doc("new", keyword_end, gap_end, tail);
+            }
+            let keyword = match self
+                .build_inline_comments_between_doc_trailing_space_opt(keyword_end, gap_end)
+            {
+                Some(run) => d.concat(&[d.text("new "), run]),
+                None => d.text("new "),
+            };
+            self.build_new_doc_after_keyword(new_expr, new_expr_span, keyword, frozen)
+        })
     }
 
     /// The frozen `new`→callee doc: the position's own pair

@@ -625,6 +625,18 @@ pub struct Printer<'a> {
     /// suppress a run nothing else prints, which is a DROP
     /// ([`comments.md`](../../../../docs/comments.md) hazard 1).
     pub(crate) claimed_shell_leading_run: Cell<Option<Span>>,
+    /// The left-spine shell REGION one expression claims for every node below it
+    /// ([`comments::LeftSpineClaim`]): the stripped grouping shells from the
+    /// claimer's own start down to its left spine's leaf, set where a printed pair on
+    /// that spine holds a comment below it. The claimer prints the whole region's run
+    /// ahead of its doc, and every hoist site below it declines the part of its gap the
+    /// region covers ([`Printer::removed_paren_comments_opt`]).
+    ///
+    /// Save/restored around the claimer's build like
+    /// [`Printer::claimed_shell_leading_run`], and keyed on the claimer's span rather
+    /// than consumed on read, so a conditional group that builds the claimer more than
+    /// once prints the run in every candidate.
+    pub(crate) claimed_left_spine_run: Cell<Option<comments::LeftSpineClaim>>,
     /// The span a linearized chain's BASE freezes — an alone-on-line format-ignore directive
     /// in the grouping parens the parser erased ahead of it
     /// ([`Printer::left_spine_operand_frozen_span`]).
@@ -887,6 +899,7 @@ impl<'a> Printer<'a> {
             inline_member_call_tail: Cell::new(None),
             claimed_owned_comment_start: Cell::new(None),
             claimed_shell_leading_run: Cell::new(None),
+            claimed_left_spine_run: Cell::new(None),
             frozen_chain_base: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
@@ -2335,6 +2348,11 @@ impl<'a> Printer<'a> {
     ///   binding default and an enum member ask it alone). Indentability never enters
     ///   there, which is why the two cannot be folded into one test.
     ///
+    /// The first half is asked once more one shell deeper, of a block the value's printer
+    /// hoists out of a stripped shell on its left spine
+    /// ([`Self::left_spine_indentable_leads_value`]): the gap's range ends at the value's
+    /// span, which opens at that shell's `(`.
+    ///
     /// ⚠️ **No layout arm may sit ahead of this.** Prettier hangs under every layout the
     /// value or the binding would otherwise take — a never-break `1`, a short key, a
     /// complex destructuring pattern, a curried arrow chain — so a shape-keyed arm placed
@@ -2347,7 +2365,9 @@ impl<'a> Printer<'a> {
         indentable_leads_value: bool,
         value: &internal::Expression<'_>,
     ) -> bool {
-        indentable_leads_value || self.is_own_line_jsdoc_cast(value)
+        indentable_leads_value
+            || self.is_own_line_jsdoc_cast(value)
+            || self.left_spine_indentable_leads_value(value)
     }
 
     /// Whether a comment in `(start, end)` is separated from what follows it (the

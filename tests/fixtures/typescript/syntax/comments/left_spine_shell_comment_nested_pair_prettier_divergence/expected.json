@@ -1,0 +1,1342 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1576,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a block comment glued inside a discarded grouping pair on a left spine leads the",
+			"start": 10,
+			"end": 93
+		},
+		{
+			"type": "Line",
+			"value": " whole value, ahead of every pair the spine prints",
+			"start": 95,
+			"end": 147
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 153,
+			"end": 158
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 186,
+			"end": 191
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 218,
+			"end": 223
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 261,
+			"end": 266
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 287,
+			"end": 292
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 312,
+			"end": 317
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 359,
+			"end": 364
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 391,
+			"end": 396
+		},
+		{
+			"type": "Line",
+			"value": " except one the chain widens a member over, which stays mid-chain",
+			"start": 419,
+			"end": 486
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 495,
+			"end": 500
+		},
+		{
+			"type": "Line",
+			"value": " a prefix unary prints the run its operand's spine holds inside its own pair",
+			"start": 520,
+			"end": 598
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 606,
+			"end": 613
+		},
+		{
+			"type": "Line",
+			"value": " a single-line block glued inside a binary's leftmost shell stays on the keyword's line",
+			"start": 629,
+			"end": 718
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 744,
+			"end": 751
+		},
+		{
+			"type": "Line",
+			"value": " at the print width the line after it is glued to a space too, so the comment rides the chain's",
+			"start": 765,
+			"end": 862
+		},
+		{
+			"type": "Line",
+			"value": " line whether it fits (100 columns) or breaks inside the pair (101)",
+			"start": 864,
+			"end": 933
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 964,
+			"end": 971
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 1083,
+			"end": 1090
+		},
+		{
+			"type": "Line",
+			"value": " at `yield`, the claimed run takes the hanging pair where it keeps a line of its own, and",
+			"start": 1197,
+			"end": 1288
+		},
+		{
+			"type": "Line",
+			"value": " the binary's conditional pair where its line breaks only with the chain",
+			"start": 1290,
+			"end": 1364
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 1395,
+			"end": 1402
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 1442,
+			"end": 1449
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1575,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 1566,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 149,
+					"end": 180,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 149,
+						"end": 179,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 149,
+							"end": 150,
+							"name": "x"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 159,
+							"end": 179,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 160,
+								"end": 173,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 161,
+									"end": 167,
+									"left": {
+										"type": "Identifier",
+										"start": 161,
+										"end": 162,
+										"name": "a"
+									},
+									"operator": "**",
+									"right": {
+										"type": "Literal",
+										"start": 166,
+										"end": 167,
+										"value": 2,
+										"raw": "2"
+									}
+								},
+								"operator": "**",
+								"right": {
+									"type": "Literal",
+									"start": 172,
+									"end": 173,
+									"value": 2,
+									"raw": "2"
+								}
+							},
+							"operator": "**",
+							"right": {
+								"type": "Literal",
+								"start": 178,
+								"end": 179,
+								"value": 2,
+								"raw": "2"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "c",
+									"start": 153,
+									"end": 158
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment glued inside a discarded grouping pair on a left spine leads the",
+							"start": 10,
+							"end": 93
+						},
+						{
+							"type": "Line",
+							"value": " whole value, ahead of every pair the spine prints",
+							"start": 95,
+							"end": 147
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 182,
+					"end": 212,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 182,
+						"end": 211,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 182,
+							"end": 183,
+							"name": "x"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 192,
+							"end": 211,
+							"object": {
+								"type": "BinaryExpression",
+								"start": 193,
+								"end": 208,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 193,
+									"end": 204,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 194,
+										"end": 199,
+										"left": {
+											"type": "Identifier",
+											"start": 194,
+											"end": 195,
+											"name": "a"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Literal",
+											"start": 198,
+											"end": 199,
+											"value": 2,
+											"raw": "2"
+										}
+									},
+									"operator": "*",
+									"right": {
+										"type": "Literal",
+										"start": 203,
+										"end": 204,
+										"value": 2,
+										"raw": "2"
+									}
+								},
+								"operator": "*",
+								"right": {
+									"type": "Literal",
+									"start": 207,
+									"end": 208,
+									"value": 2,
+									"raw": "2"
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 210,
+								"end": 211,
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "c",
+									"start": 186,
+									"end": 191
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 214,
+					"end": 255,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 214,
+						"end": 254,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 214,
+							"end": 215,
+							"name": "x"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 224,
+							"end": 254,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 225,
+								"end": 248,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 226,
+									"end": 242,
+									"left": {
+										"type": "ConditionalExpression",
+										"start": 227,
+										"end": 236,
+										"test": {
+											"type": "Identifier",
+											"start": 227,
+											"end": 228,
+											"name": "a"
+										},
+										"consequent": {
+											"type": "Identifier",
+											"start": 231,
+											"end": 232,
+											"name": "b"
+										},
+										"alternate": {
+											"type": "Identifier",
+											"start": 235,
+											"end": 236,
+											"name": "c"
+										}
+									},
+									"operator": "**",
+									"right": {
+										"type": "Literal",
+										"start": 241,
+										"end": 242,
+										"value": 2,
+										"raw": "2"
+									}
+								},
+								"operator": "**",
+								"right": {
+									"type": "Literal",
+									"start": 247,
+									"end": 248,
+									"value": 2,
+									"raw": "2"
+								}
+							},
+							"operator": "**",
+							"right": {
+								"type": "Literal",
+								"start": 253,
+								"end": 254,
+								"value": 2,
+								"raw": "2"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "c",
+									"start": 218,
+									"end": 223
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 257,
+					"end": 281,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 257,
+						"end": 280,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 257,
+							"end": 258,
+							"name": "x"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 267,
+							"end": 280,
+							"object": {
+								"type": "BinaryExpression",
+								"start": 268,
+								"end": 277,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 268,
+									"end": 273,
+									"left": {
+										"type": "Identifier",
+										"start": 268,
+										"end": 269,
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 272,
+										"end": 273,
+										"value": 2,
+										"raw": "2"
+									}
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 276,
+									"end": 277,
+									"value": 2,
+									"raw": "2"
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 279,
+								"end": 280,
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "c",
+									"start": 261,
+									"end": 266
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 283,
+					"end": 302,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 283,
+						"end": 301,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 283,
+							"end": 284,
+							"name": "x"
+						},
+						"right": {
+							"type": "SequenceExpression",
+							"start": 294,
+							"end": 300,
+							"expressions": [
+								{
+									"type": "MemberExpression",
+									"start": 294,
+									"end": 297,
+									"object": {
+										"type": "Identifier",
+										"start": 294,
+										"end": 295,
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 296,
+										"end": 297,
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								},
+								{
+									"type": "Literal",
+									"start": 299,
+									"end": 300,
+									"value": 1,
+									"raw": "1"
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "c",
+									"start": 287,
+									"end": 292
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 304,
+					"end": 335,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 304,
+						"end": 334,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 304,
+							"end": 305,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrayExpression",
+							"start": 308,
+							"end": 334,
+							"elements": [
+								{
+									"type": "SpreadElement",
+									"start": 309,
+									"end": 333,
+									"argument": {
+										"type": "LogicalExpression",
+										"start": 319,
+										"end": 332,
+										"left": {
+											"type": "LogicalExpression",
+											"start": 320,
+											"end": 326,
+											"left": {
+												"type": "Identifier",
+												"start": 320,
+												"end": 321,
+												"name": "a"
+											},
+											"operator": "||",
+											"right": {
+												"type": "Identifier",
+												"start": 325,
+												"end": 326,
+												"name": "d"
+											}
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 331,
+											"end": 332,
+											"name": "d"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": "c",
+												"start": 312,
+												"end": 317
+											}
+										]
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 337,
+					"end": 381,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 337,
+						"end": 380,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 337,
+							"end": 338,
+							"name": "f"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 341,
+							"end": 380,
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": true,
+							"params": [],
+							"body": {
+								"type": "AwaitExpression",
+								"start": 353,
+								"end": 380,
+								"argument": {
+									"type": "LogicalExpression",
+									"start": 366,
+									"end": 379,
+									"left": {
+										"type": "LogicalExpression",
+										"start": 367,
+										"end": 373,
+										"left": {
+											"type": "Identifier",
+											"start": 367,
+											"end": 368,
+											"name": "a"
+										},
+										"operator": "||",
+										"right": {
+											"type": "Identifier",
+											"start": 372,
+											"end": 373,
+											"name": "b"
+										}
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 378,
+										"end": 379,
+										"name": "c"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "c",
+											"start": 359,
+											"end": 364
+										}
+									]
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 383,
+					"end": 417,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 383,
+						"end": 416,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 383,
+							"end": 384,
+							"name": "x"
+						},
+						"right": {
+							"type": "NewExpression",
+							"start": 387,
+							"end": 416,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 397,
+								"end": 414,
+								"object": {
+									"type": "LogicalExpression",
+									"start": 398,
+									"end": 411,
+									"left": {
+										"type": "LogicalExpression",
+										"start": 399,
+										"end": 405,
+										"left": {
+											"type": "Identifier",
+											"start": 399,
+											"end": 400,
+											"name": "a"
+										},
+										"operator": "||",
+										"right": {
+											"type": "Identifier",
+											"start": 404,
+											"end": 405,
+											"name": "d"
+										}
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 410,
+										"end": 411,
+										"name": "f"
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 413,
+									"end": 414,
+									"name": "e"
+								},
+								"computed": false,
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "c",
+										"start": 391,
+										"end": 396
+									}
+								]
+							},
+							"arguments": []
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 488,
+					"end": 518,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 488,
+						"end": 517,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 488,
+							"end": 489,
+							"name": "x"
+						},
+						"right": {
+							"type": "TaggedTemplateExpression",
+							"start": 492,
+							"end": 517,
+							"tag": {
+								"type": "BinaryExpression",
+								"start": 493,
+								"end": 513,
+								"left": {
+									"type": "CallExpression",
+									"start": 493,
+									"end": 509,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 493,
+										"end": 507,
+										"object": {
+											"type": "MemberExpression",
+											"start": 493,
+											"end": 502,
+											"object": {
+												"type": "Identifier",
+												"start": 493,
+												"end": 494,
+												"name": "a",
+												"trailingComments": [
+													{
+														"type": "Block",
+														"value": "c",
+														"start": 495,
+														"end": 500
+													}
+												]
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 501,
+												"end": 502,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 506,
+											"end": 507,
+											"name": "m"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 512,
+									"end": 513,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							"quasi": {
+								"type": "TemplateLiteral",
+								"start": 514,
+								"end": 517,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 515,
+										"end": 516,
+										"value": {
+											"raw": "t",
+											"cooked": "t"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " except one the chain widens a member over, which stays mid-chain",
+							"start": 419,
+							"end": 486
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 600,
+					"end": 627,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 600,
+						"end": 626,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 600,
+							"end": 601,
+							"name": "x"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 604,
+							"end": 626,
+							"operator": "!",
+							"prefix": true,
+							"argument": {
+								"type": "MemberExpression",
+								"start": 614,
+								"end": 625,
+								"object": {
+									"type": "BinaryExpression",
+									"start": 615,
+									"end": 622,
+									"left": {
+										"type": "MemberExpression",
+										"start": 615,
+										"end": 618,
+										"object": {
+											"type": "Identifier",
+											"start": 615,
+											"end": 616,
+											"name": "a"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 617,
+											"end": 618,
+											"name": "b"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 621,
+										"end": 622,
+										"value": 1,
+										"raw": "1"
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 624,
+									"end": 625,
+									"name": "c"
+								},
+								"computed": false,
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " d ",
+										"start": 606,
+										"end": 613
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a prefix unary prints the run its operand's spine holds inside its own pair",
+							"start": 520,
+							"end": 598
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 720,
+					"end": 763,
+					"id": {
+						"type": "Identifier",
+						"start": 729,
+						"end": 730,
+						"name": "f"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 733,
+						"end": 763,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 737,
+								"end": 760,
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 752,
+									"end": 759,
+									"left": {
+										"type": "MemberExpression",
+										"start": 752,
+										"end": 755,
+										"object": {
+											"type": "Identifier",
+											"start": 752,
+											"end": 753,
+											"name": "a"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 754,
+											"end": 755,
+											"name": "b"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 758,
+										"end": 759,
+										"value": 1,
+										"raw": "1"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " d ",
+											"start": 744,
+											"end": 751
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a single-line block glued inside a binary's leftmost shell stays on the keyword's line",
+							"start": 629,
+							"end": 718
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 935,
+					"end": 1195,
+					"id": {
+						"type": "Identifier",
+						"start": 944,
+						"end": 945,
+						"name": "h"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 948,
+						"end": 1195,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 952,
+								"end": 1068,
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 972,
+									"end": 1063,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 973,
+										"end": 1054,
+										"left": {
+											"type": "MemberExpression",
+											"start": 973,
+											"end": 976,
+											"object": {
+												"type": "Identifier",
+												"start": 973,
+												"end": 974,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 975,
+												"end": 976,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"operator": "**",
+										"right": {
+											"type": "Identifier",
+											"start": 980,
+											"end": 1054,
+											"name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+										}
+									},
+									"operator": "**",
+									"right": {
+										"type": "Identifier",
+										"start": 1062,
+										"end": 1063,
+										"name": "q"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " d ",
+											"start": 964,
+											"end": 971
+										}
+									]
+								}
+							},
+							{
+								"type": "ReturnStatement",
+								"start": 1071,
+								"end": 1192,
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 1091,
+									"end": 1187,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1092,
+										"end": 1178,
+										"left": {
+											"type": "MemberExpression",
+											"start": 1092,
+											"end": 1095,
+											"object": {
+												"type": "Identifier",
+												"start": 1092,
+												"end": 1093,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1094,
+												"end": 1095,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"operator": "**",
+										"right": {
+											"type": "Identifier",
+											"start": 1103,
+											"end": 1178,
+											"name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+										}
+									},
+									"operator": "**",
+									"right": {
+										"type": "Identifier",
+										"start": 1186,
+										"end": 1187,
+										"name": "q"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " d ",
+											"start": 1083,
+											"end": 1090
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " at the print width the line after it is glued to a space too, so the comment rides the chain's",
+							"start": 765,
+							"end": 862
+						},
+						{
+							"type": "Line",
+							"value": " line whether it fits (100 columns) or breaks inside the pair (101)",
+							"start": 864,
+							"end": 933
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1366,
+					"end": 1565,
+					"id": {
+						"type": "Identifier",
+						"start": 1376,
+						"end": 1377,
+						"name": "g"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 1380,
+						"end": 1565,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 1384,
+								"end": 1428,
+								"expression": {
+									"type": "YieldExpression",
+									"start": 1384,
+									"end": 1427,
+									"delegate": false,
+									"argument": {
+										"type": "BinaryExpression",
+										"start": 1407,
+										"end": 1423,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 1408,
+											"end": 1417,
+											"left": {
+												"type": "MemberExpression",
+												"start": 1408,
+												"end": 1411,
+												"object": {
+													"type": "Identifier",
+													"start": 1408,
+													"end": 1409,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 1410,
+													"end": 1411,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"operator": "**",
+											"right": {
+												"type": "Identifier",
+												"start": 1415,
+												"end": 1417,
+												"name": "zz"
+											}
+										},
+										"operator": "**",
+										"right": {
+											"type": "Identifier",
+											"start": 1422,
+											"end": 1423,
+											"name": "q"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " d ",
+												"start": 1395,
+												"end": 1402
+											}
+										]
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 1431,
+								"end": 1562,
+								"expression": {
+									"type": "YieldExpression",
+									"start": 1431,
+									"end": 1561,
+									"delegate": false,
+									"argument": {
+										"type": "BinaryExpression",
+										"start": 1453,
+										"end": 1557,
+										"left": {
+											"type": "BinaryExpression",
+											"start": 1454,
+											"end": 1548,
+											"left": {
+												"type": "MemberExpression",
+												"start": 1454,
+												"end": 1457,
+												"object": {
+													"type": "Identifier",
+													"start": 1454,
+													"end": 1455,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 1456,
+													"end": 1457,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"operator": "**",
+											"right": {
+												"type": "Identifier",
+												"start": 1465,
+												"end": 1548,
+												"name": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+											}
+										},
+										"operator": "**",
+										"right": {
+											"type": "Identifier",
+											"start": 1556,
+											"end": 1557,
+											"name": "q"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " d ",
+												"start": 1442,
+												"end": 1449
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " at `yield`, the claimed run takes the hanging pair where it keeps a line of its own, and",
+							"start": 1197,
+							"end": 1288
+						},
+						{
+							"type": "Line",
+							"value": " the binary's conditional pair where its line breaks only with the chain",
+							"start": 1290,
+							"end": 1364
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

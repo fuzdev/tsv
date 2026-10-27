@@ -520,72 +520,84 @@ impl<'a> Printer<'a> {
             ]);
         }
 
-        // A binaryish spread argument indents its continuation when it breaks
-        // (`...(a &&\n\tb && {…})`), matching Prettier — a `SpreadElement` parent is
-        // not in binaryish.js's `shouldNotIndent` set, so the logical/binary chain
-        // gets the continuation indent. Non-binary arguments are unaffected.
-        let arg_doc = self.build_expression_doc_with_indent_on_break(spread.argument);
+        // A comment in a shell below the pair the argument prints in leads the whole
+        // argument from the `...` gap, ahead of that pair, which is where the reparse reads
+        // it (`Printer::left_spine_run_claim`): the gap runs to the claimed region's end.
+        let claim = needs_parens
+            .then(|| self.left_spine_run_claim(spread.span, dots_end, spread.argument, || true))
+            .flatten();
+        let gap_end = claim.map_or(arg_start, |claim| claim.region.end.max(arg_start));
+        self.with_left_spine_claim(claim, || {
+            // A binaryish spread argument indents its continuation when it breaks
+            // (`...(a &&\n\tb && {…})`), matching Prettier — a `SpreadElement` parent is
+            // not in binaryish.js's `shouldNotIndent` set, so the logical/binary chain
+            // gets the continuation indent. Non-binary arguments are unaffected.
+            let arg_doc = self.build_expression_doc_with_indent_on_break(spread.argument);
 
-        // A block run the author broke AFTER, before an argument that WILL BREAK or holding a
-        // multi-line comment, keeps its break — prettier's `printLeadingComment` newline-after
-        // `line`, materialized by that forced break (`.../*#__PURE__*/⏎fn({…})` stays
-        // broken, the argument opening un-indented at the `...`'s level). The gate is
-        // the shared `breaking_value_leading_run` (geometry + the forced-break question + the
-        // owned-comment decline); an argument that FITS behind single-line comments declines
-        // into the glued path
-        // below, whose flat render is the same bytes prettier's collapsed `line`
-        // produces. An argument that NEEDS parens keeps the glued path too — the compound
-        // is unprobed, and the hug is that path's existing answer there (the run is emitted
-        // outside the pair on both paths, so only the break survives as the difference).
-        if !needs_parens
-            && let Some((run, arg_doc)) =
-                self.breaking_value_leading_run(dots_end, arg_start, || arg_doc)
-        {
+            // A block run the author broke AFTER, before an argument that WILL BREAK or holding a
+            // multi-line comment, keeps its break — prettier's `printLeadingComment` newline-after
+            // `line`, materialized by that forced break (`.../*#__PURE__*/⏎fn({…})` stays
+            // broken, the argument opening un-indented at the `...`'s level). The gate is
+            // the shared `breaking_value_leading_run` (geometry + the forced-break question + the
+            // owned-comment decline); an argument that FITS behind single-line comments declines
+            // into the glued path
+            // below, whose flat render is the same bytes prettier's collapsed `line`
+            // produces. An argument that NEEDS parens keeps the glued path too — the compound
+            // is unprobed, and the hug is that path's existing answer there (the run is emitted
+            // outside the pair on both paths, so only the break survives as the difference).
+            if !needs_parens
+                && let Some((run, arg_doc)) =
+                    self.breaking_value_leading_run(dots_end, arg_start, || arg_doc)
+            {
+                let mut parts = smallvec![d.text("...")];
+                self.push_leading_run_before_breaking_value(&mut parts, &run, arg_start);
+                parts.push(arg_doc);
+                if has_trailing_comments {
+                    self.append_paren_interior_trailing_comments(
+                        &mut parts,
+                        spread.paren_interior(),
+                    );
+                }
+                return d.concat(&parts);
+            }
+
+            // Use trailing_space variant: `.../* comment */ arg` (space after comment, not before).
+            // A single-line block glued to `...` hugs the argument even across a source
+            // newline (`.../* c */⏎arg` → `.../* c */ arg`), matching prettier — the
+            // argument that would BREAK took the gate above; only the fits case reaches
+            // this hug.
+            let comment_doc = self.build_rhs_comments_glued_opt(dots_end, gap_end);
+
+            // The run is emitted OUTSIDE any parens the argument needs — the gap belongs to the
+            // `...`, not to a pair the printer must emit, so it answers one way whether or not
+            // the argument's precedence happens to require one. That is `await`→operand's rule
+            // verbatim, and opening the shell first breaks it: it moves a comment
+            // the author wrote BEFORE the `(` to after it (`.../* c */ (a ?? b)` →
+            // `...(/* c */ a ?? b)`), re-associating it from the spread to the operand. A comment
+            // the author wrote INSIDE those parens is glued to the argument and therefore owned,
+            // so it never reaches this axis and keeps its place (the `grouped_operand_comment`
+            // divergence).
             let mut parts = smallvec![d.text("...")];
-            self.push_leading_run_before_breaking_value(&mut parts, &run, arg_start);
+            if let Some(c) = comment_doc {
+                parts.push(c);
+            }
+            if needs_parens {
+                parts.push(d.text("("));
+            }
             parts.push(arg_doc);
             if has_trailing_comments {
+                // Handle same-line block comments and line comments here.
+                // Own-line block comments are skipped — they're handled by the parent
+                // (array/call) which places them as siblings after the spread's comma.
+                // Using line_suffix for own-line block comments in spread causes them to
+                // escape past the enclosing array/call brackets entirely.
                 self.append_paren_interior_trailing_comments(&mut parts, spread.paren_interior());
             }
-            return d.concat(&parts);
-        }
-
-        // Use trailing_space variant: `.../* comment */ arg` (space after comment, not before).
-        // A single-line block glued to `...` hugs the argument even across a source
-        // newline (`.../* c */⏎arg` → `.../* c */ arg`), matching prettier — the
-        // argument that would BREAK took the gate above; only the fits case reaches
-        // this hug.
-        let comment_doc = self.build_rhs_comments_glued_opt(dots_end, arg_start);
-
-        // The run is emitted OUTSIDE any parens the argument needs — the gap belongs to the
-        // `...`, not to a pair the printer must emit, so it answers one way whether or not
-        // the argument's precedence happens to require one. That is `await`→operand's rule
-        // verbatim, and opening the shell first breaks it: it moves a comment
-        // the author wrote BEFORE the `(` to after it (`.../* c */ (a ?? b)` →
-        // `...(/* c */ a ?? b)`), re-associating it from the spread to the operand. A comment
-        // the author wrote INSIDE those parens is glued to the argument and therefore owned,
-        // so it never reaches this axis and keeps its place (the `grouped_operand_comment`
-        // divergence).
-        let mut parts = smallvec![d.text("...")];
-        if let Some(c) = comment_doc {
-            parts.push(c);
-        }
-        if needs_parens {
-            parts.push(d.text("("));
-        }
-        parts.push(arg_doc);
-        if has_trailing_comments {
-            // Handle same-line block comments and line comments here.
-            // Own-line block comments are skipped — they're handled by the parent
-            // (array/call) which places them as siblings after the spread's comma.
-            // Using line_suffix for own-line block comments in spread causes them to
-            // escape past the enclosing array/call brackets entirely.
-            self.append_paren_interior_trailing_comments(&mut parts, spread.paren_interior());
-        }
-        if needs_parens {
-            parts.push(d.text(")"));
-        }
-        d.concat(&parts)
+            if needs_parens {
+                parts.push(d.text(")"));
+            }
+            d.concat(&parts)
+        })
     }
 }
 

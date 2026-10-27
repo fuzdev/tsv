@@ -9,19 +9,22 @@
 use super::{CommentSpacing, CommentVec, LeadingGlue, Printer, RunLeadingBlank, ShareSite};
 use crate::ast::internal;
 use crate::printer::ParenContext;
-use crate::printer::chain::chain_paren_leading_gap;
+use crate::printer::chain::{
+    chain_mid_chain_paren_gaps, chain_paren_leading_gap, tag_paren_leading_start,
+};
 use crate::printer::expressions::conditional::ternary_test_needs_parens;
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::needs_parens::needs_parens;
 use crate::printer::statements::TerminatorGap;
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::range_too_narrow_for_a_comment;
 use tsv_lang::source_scan::{
-    TriviaProfile, find_char_skipping_comments, has_newline_after_position, skip_trivia,
+    TriviaProfile, find_char_skipping_comments, has_newline_after_position,
+    has_newline_before_position, skip_trivia,
 };
 
 /// What follows a stripped grouping shell, and so whether a trailing block comment has a
@@ -94,8 +97,9 @@ pub(crate) struct ParenLeadingValue {
 /// purpose. Those two positions answer a shell whose leading gap holds a comment
 /// themselves ([`Printer::build_asi_operand_shell_doc`] — RETAINED, the cataloged "a
 /// leading comment alone still keeps the shell that holds it", or printed inline ahead of
-/// the operand, [`AsiOperandShell::Bare`]) and never hoist it, so they have no hoisted left
-/// side at all and are excluded here rather than at the pair gate.
+/// the operand, [`AsiOperandShell::Bare`]) and never hoist it, so the hoisting walk takes
+/// their operand only where it prints first and bare — a question about the printed form,
+/// answered by `Printer::bare_cast_operand`, not by this structural table.
 fn left_side_child<'e>(expr: &'e internal::Expression<'e>) -> Option<&'e internal::Expression<'e>> {
     use internal::ExpressionKind;
     Some(match &expr.kind {
@@ -334,6 +338,140 @@ pub(crate) fn paren_shell_close_after(source: &str, operand_end: u32) -> Option<
     (bytes[pos] == b')').then_some(pos as u32 + 1)
 }
 
+/// Whether the left-spine shell region opening at `start` holds no comment, read off the
+/// source bytes rather than the spine: the region runs to the leftmost leaf and holds
+/// nothing but stripped grouping `(`s, whitespace and the comments among them, so past the
+/// whitespace and `(`s at `start` the first other byte is a comment's `/` or the leaf's own.
+/// `false` at a `/` (a comment, or a regex leaf) and at a non-ASCII byte (whitespace this
+/// step does not read), so `true` is exact and `false` only sends the asker to its walk.
+///
+/// The zero-comment gate ahead of every left-spine walk that asks about a shell's comments
+/// ([`Printer::left_spine_shell_has_own_line_comment`], [`Printer::left_spine_run_claim`]),
+/// and ahead of the leading-edge reads of a built doc at a restricted production and at
+/// `export default` (`DocArena::leading_comment_break`): almost every expression opens on
+/// its leaf, so the walk is skipped after one byte. A SOURCE reading on purpose — a comment
+/// the leaf owns is invisible to the gaps' emit axis and still prints ahead of it.
+pub(crate) fn left_spine_shell_is_comment_free(source: &str, start: u32) -> bool {
+    let bytes = source.as_bytes();
+    let mut i = start as usize;
+    while let Some(&byte) = bytes.get(i) {
+        match byte {
+            b'(' | b' ' | b'\t' | b'\n' | b'\r' | 0x0B | 0x0C => i += 1,
+            _ => return byte != b'/' && byte.is_ascii(),
+        }
+    }
+    true
+}
+
+/// Whether `expr`'s left spine has no stripped shell at all: its first byte is not a `(`,
+/// so every node down the spine starts where `expr` does and the leaf is the first thing
+/// printed. Exact — a span opens on a token — so the structural left-spine walks skip
+/// themselves on it ([`Printer::left_spine_printed_start`],
+/// [`Printer::build_value_with_left_spine_owned_comment`]).
+pub(super) fn left_spine_has_no_shell(source: &str, expr: &internal::Expression<'_>) -> bool {
+    source.as_bytes().get(expr.span().start as usize) != Some(&b'(')
+}
+
+/// A left-spine shell region one expression CLAIMS for every node below it — the claim
+/// [`Printer::left_spine_run_claim`] makes and [`Printer::with_left_spine_claim`] arms.
+///
+/// `claimer` is the span of the node whose hoist site prints the whole region's run;
+/// `region` runs from that node's start to the start of the leaf its hoisted left spine
+/// reaches, and holds nothing but stripped grouping `(`s and the comments among them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct LeftSpineClaim {
+    pub(crate) claimer: Span,
+    pub(crate) region: Span,
+}
+
+/// The steps down an expression's left spine whose shell runs the printer HOISTS
+/// ([`Printer::hoisted_left_spine`]): each a `(node, child)` pair of
+/// [`Printer::hoisted_left_side_child`], ending where that does — or at a step whose shell
+/// the chain the walk is inside prints MID-CHAIN ([`LeftSpineStep::mid_chain`]), since no
+/// run is hoisted out of such a shell: its comment prints after the chain's first link
+/// (`(/*c*/ (a).b).m()` prints `a /*c*/.b.m()`).
+pub(crate) struct HoistedLeftSpine<'p, 'a, 'e>(Option<LeftSpineSteps<'p, 'a, 'e>>);
+
+impl<'e> Iterator for HoistedLeftSpine<'_, '_, 'e> {
+    type Item = (&'e internal::Expression<'e>, &'e internal::Expression<'e>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let step = self.0.as_mut()?.next();
+        match step {
+            Some(step) if !step.mid_chain => Some((step.node, step.child)),
+            _ => {
+                self.0 = None;
+                None
+            }
+        }
+    }
+}
+
+/// One step of [`LeftSpineSteps`]: `node`, its [`Printer::hoisted_left_side_child`], and
+/// whether the chain the step sits in prints the shell between them MID-CHAIN
+/// ([`chain_mid_chain_paren_gaps`], the linearizer's own answer) rather than hoisting
+/// its run ahead of the chain's head.
+#[derive(Clone, Copy)]
+pub(crate) struct LeftSpineStep<'e> {
+    pub(crate) node: &'e internal::Expression<'e>,
+    pub(crate) child: &'e internal::Expression<'e>,
+    pub(crate) mid_chain: bool,
+}
+
+/// Every step down an expression's left spine through [`Printer::hoisted_left_side_child`],
+/// each flagged with whether its shell prints mid-chain ([`LeftSpineStep`]) — the walk
+/// [`HoistedLeftSpine`] ends at the first such step, and the readers that ask what the
+/// chain's HEAD prints step over it ([`Printer::left_spine_steps`]).
+///
+/// A chain is linearized at most once per run of member / call steps, rooted at the first
+/// of the run (a non-chain step, a non-null link included, ends the run), and only when a
+/// step inside it has a comment in its shell to ask about.
+pub(crate) struct LeftSpineSteps<'p, 'a, 'e> {
+    printer: &'p Printer<'a>,
+    node: Option<&'e internal::Expression<'e>>,
+    chain_root: Option<&'e internal::Expression<'e>>,
+    mid_chain_gaps: Option<SmallVec<[(u32, u32); 2]>>,
+}
+
+impl<'e> Iterator for LeftSpineSteps<'_, '_, 'e> {
+    type Item = LeftSpineStep<'e>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let node = self.node.take()?;
+        let child = self.printer.hoisted_left_side_child(node)?;
+        let mut mid_chain = false;
+        if matches!(
+            node.kind,
+            internal::ExpressionKind::MemberExpression(_)
+                | internal::ExpressionKind::CallExpression(_)
+        ) {
+            let root = *self.chain_root.get_or_insert(node);
+            let (shell_start, child_start) = (node.span().start, child.span().start);
+            mid_chain = shell_start < child_start
+                && self
+                    .printer
+                    .comments_in_source_between(shell_start, child_start)
+                    .next()
+                    .is_some()
+                && self
+                    .mid_chain_gaps
+                    .get_or_insert_with(|| {
+                        chain_mid_chain_paren_gaps(root, self.printer.linearize_input())
+                    })
+                    .contains(&(shell_start, child_start));
+        } else {
+            self.chain_root = None;
+            self.mid_chain_gaps = None;
+        }
+        self.node = Some(child);
+        Some(LeftSpineStep {
+            node,
+            child,
+            mid_chain,
+        })
+    }
+}
+
 /// What an ASI-sensitive operand's grouping-paren shell comes to
 /// ([`Printer::build_asi_operand_shell_doc`]).
 pub(crate) enum AsiOperandShell {
@@ -384,9 +522,18 @@ impl<'a> Printer<'a> {
     /// - a member, call or non-null whose base pair keeps the run
     ///   ([`chain_paren_leading_gap`] — the sealed optional chain, the IIFE callee, the
     ///   non-null operand that needs its parens or carries a trailing `//`);
-    /// - a tagged template whose tag pair keeps it ([`paren_pair_keeps_leading_run`]);
+    /// - a tagged template whose tag pair keeps it — a function tag or a sealed optional
+    ///   chain ([`tag_paren_leading_start`]);
     /// - an assignment whose target needs its parens (a type-assertion target — the
     ///   cataloged "Assignment-target shell, leading comment").
+    ///
+    /// And plus the two steps the PRINTED form takes past [`left_side_child`]'s shape: a
+    /// chain link steps over a non-null the chain flattens
+    /// ([`Self::chain_flattened_non_null_operand`]), and a cast or a postfix update steps
+    /// to its operand where that prints first and bare ([`Self::bare_cast_operand`]).
+    ///
+    /// Askers that walk the whole spine take [`Self::hoisted_left_spine`], which also
+    /// stops at a shell the chain prints mid-chain.
     ///
     /// Two askers, one definition: a restricted production must hold a hoisted run inside a
     /// hanging pair ([`Printer::build_restricted_production_paren_doc`]) — and must NOT wrap
@@ -401,10 +548,20 @@ impl<'a> Printer<'a> {
         expr: &'e internal::Expression<'e>,
     ) -> Option<&'e internal::Expression<'e>> {
         use internal::ExpressionKind;
+        if let Some(operand) = self.bare_cast_operand(expr) {
+            return Some(operand);
+        }
         let child = left_side_child(expr)?;
-        let retains = match &expr.kind {
+        // A chain link's step lands past a non-null the chain flattens.
+        let link_step = || {
+            self.chain_flattened_non_null_operand(child)
+                .unwrap_or(child)
+        };
+        match &expr.kind {
             ExpressionKind::MemberExpression(_) | ExpressionKind::CallExpression(_) => {
-                chain_paren_leading_gap(expr, self.comments).is_some()
+                chain_paren_leading_gap(expr, self.comments)
+                    .is_none()
+                    .then(link_step)
             }
             // The chain's base-pair answer covers the sealed optional chain and the
             // shell a trailing `//` retains; the non-null's own builder ALSO keeps the
@@ -412,22 +569,83 @@ impl<'a> Printer<'a> {
             // needs its parens (`( // c⏎x + y⏎)!`), and that pair the linearizer never
             // sees.
             ExpressionKind::TSNonNullExpression(non_null) => {
-                chain_paren_leading_gap(expr, self.comments).is_some()
-                    || self.needs_parens(non_null.expression, ParenContext::NonNull)
+                (chain_paren_leading_gap(expr, self.comments).is_none()
+                    && !self.needs_parens(non_null.expression, ParenContext::NonNull))
+                .then(link_step)
             }
+            // The tag's required pair keeps its run at the call's two shapes — a function
+            // tag and a sealed optional chain (`` ( // c⏎a?.b())`x` ``).
             ExpressionKind::TaggedTemplateExpression(tagged) => {
-                expr.span.start < tagged.tag.span().start
-                    && paren_pair_keeps_leading_run(tagged.tag)
+                tag_paren_leading_start(tagged, expr.span)
+                    .is_none()
+                    .then_some(child)
             }
-            ExpressionKind::AssignmentExpression(assign) => self.needs_parens(
+            ExpressionKind::AssignmentExpression(assign) => (!self.needs_parens(
                 assign.left,
                 ParenContext::AssignmentTarget {
                     operator: assign.operator,
                 },
-            ),
-            _ => false,
+            ))
+            .then_some(child),
+            _ => Some(child),
+        }
+    }
+
+    /// The operand of a non-null `child` that a chain link above it FLATTENS: one whose
+    /// operand needs its parens, so the linearizer prints that operand as the chain's
+    /// parenthesized base with the `!` after it, and the run in the non-null's shell
+    /// leads the chain's head, outside the pair (`((// c⏎(a) * 2)!).b` prints
+    /// `// c⏎(a * 2)!.b`) — where the standalone non-null builder keeps it inside. Asked
+    /// by [`Self::hoisted_left_side_child`] at a member, a call and a non-null parent
+    /// (the three chain links), whose step then lands on the operand, its gap the chain
+    /// head's whole window. `None` for any other `child`, and for a non-null whose own
+    /// pair keeps the run ([`chain_paren_leading_gap`]).
+    fn chain_flattened_non_null_operand<'e>(
+        &self,
+        child: &'e internal::Expression<'e>,
+    ) -> Option<&'e internal::Expression<'e>> {
+        let internal::ExpressionKind::TSNonNullExpression(non_null) = &child.kind else {
+            return None;
         };
-        (!retains).then_some(child)
+        (chain_paren_leading_gap(child, self.comments).is_none()
+            && self.needs_parens(non_null.expression, ParenContext::NonNull))
+        .then_some(non_null.expression)
+    }
+
+    /// The operand of a cast (`as` / `satisfies`) or a postfix update when it prints
+    /// FIRST and BARE in that node's doc: no pair of its own there
+    /// ([`printed_left_spine_step`]), and no comment in the operand's stripped shell or
+    /// between it and the keyword, so the node keeps no shell
+    /// ([`Printer::build_asi_operand_shell_doc`] is never reached with anything to hold).
+    /// The run the operand's own spine hoists then leads the node's whole doc, which is
+    /// why [`Self::hoisted_left_side_child`] descends it (`((// c⏎(a)).b) as T` prints
+    /// `// c⏎a.b as T`). `None` for any other node, and wherever the shell or a pair
+    /// stands — the operand's run is then held inside it.
+    fn bare_cast_operand<'e>(
+        &self,
+        expr: &'e internal::Expression<'e>,
+    ) -> Option<&'e internal::Expression<'e>> {
+        use internal::ExpressionKind;
+        let (operand, boundary) = match &expr.kind {
+            ExpressionKind::TSAsExpression(cast) => {
+                (cast.expression, cast.type_annotation.span().start)
+            }
+            ExpressionKind::TSSatisfiesExpression(cast) => {
+                (cast.expression, cast.type_annotation.span().start)
+            }
+            ExpressionKind::UpdateExpression(update) if !update.prefix => {
+                (update.argument, expr.span().end)
+            }
+            _ => return None,
+        };
+        let (_, parenthesized) = printed_left_spine_step(expr, self.in_for_init.get())?;
+        let shell_free = |start: u32, end: u32| {
+            start >= end || self.comments_in_source_between(start, end).next().is_none()
+        };
+        (!parenthesized
+            && shell_free(expr.span().start, operand.span().start)
+            && shell_free(operand.span().end, boundary))
+        .then_some(operand)
     }
 
     /// Whether the grouping shell the parser erased between `expr` and its left-spine
@@ -459,6 +677,72 @@ impl<'a> Printer<'a> {
         // caller wants only the re-emitted ones.
         expr.span().start != child.span().start
             && left_side_child_is_parenthesized(expr, child, self.in_for_init.get())
+    }
+
+    /// The walk down `expr`'s left spine through every shell whose run the printer hoists
+    /// ([`HoistedLeftSpine`]) — the one walk each "what does the hoist print ahead of this
+    /// expression" asker takes, so none of them reads a shell the chain prints mid-chain.
+    pub(crate) fn hoisted_left_spine<'p, 'e>(
+        &'p self,
+        expr: &'e internal::Expression<'e>,
+    ) -> HoistedLeftSpine<'p, 'a, 'e> {
+        HoistedLeftSpine(Some(self.left_spine_steps(expr)))
+    }
+
+    /// Every step down `expr`'s left spine, a shell the chain prints mid-chain included and
+    /// flagged ([`LeftSpineSteps`]) — the walk for "what does the doc open with", which a
+    /// mid-chain shell's run does not answer but a shell below it still can: the chain's
+    /// head is printed first, so the head's own shell run leads the doc even under a
+    /// mid-chain shell (`(// d⏎ (// d⏎ a).b).m()` opens with the inner `// d`), and so
+    /// does a comment the head's leaf OWNS, wherever on the spine it sits.
+    pub(crate) fn left_spine_steps<'p, 'e>(
+        &'p self,
+        expr: &'e internal::Expression<'e>,
+    ) -> LeftSpineSteps<'p, 'a, 'e> {
+        LeftSpineSteps {
+            printer: self,
+            node: Some(expr),
+            chain_root: None,
+            mid_chain_gaps: None,
+        }
+    }
+
+    /// Where the shells below a left-spine step start printing INSIDE a group that `node`
+    /// wraps its left side in, or `None` when the step opens no such group.
+    ///
+    /// A binary chain prepends its own leading region outside its group, and that region
+    /// runs to its LEFTMOST operand, past every link it flattens; the operand's doc, and
+    /// every shell run hoisted inside it, prints inside the group. A glued block's soft
+    /// `line` there collapses while the group fits (`return (/* d */⏎ a).b + 1` prints
+    /// `return /* d */ a.b + 1`), so it does not give the run a line of its own
+    /// ([`Self::comment_takes_line_in_group`]) — except a run an enclosing node CLAIMS
+    /// ([`Self::left_spine_run_claim`]): an outer binary's claim prints the region ahead
+    /// of its own chain, outside the inner group, so the run's line breaks with whatever
+    /// the outer chain prints in (`return ((/* d */⏎ a) + 1) * 2` keeps `/* d */` on the
+    /// keyword's line while it fits, and on a line of its own inside the return's pair
+    /// once that breaks).
+    pub(crate) fn left_spine_group_start(&self, node: &internal::Expression<'_>) -> Option<u32> {
+        match &node.kind {
+            internal::ExpressionKind::BinaryExpression(binary) => {
+                let mut link = binary;
+                while let Some(left) = self.flattenable_left(link) {
+                    link = left;
+                }
+                Some(link.left.span().start)
+            }
+            _ => None,
+        }
+    }
+
+    /// Whether a comment followed by a newline in a shell gap INSIDE a group
+    /// ([`Self::left_spine_group_start`]) still breaks its line there: a `//`, a block the
+    /// source opens a line for (the leading emitter's hardline), or a multi-line block,
+    /// whose interior forces the group open. A glued single-line block takes the soft
+    /// `line`, which the fitting group keeps flat.
+    pub(crate) fn comment_takes_line_in_group(&self, comment: &internal::Comment) -> bool {
+        !comment.is_block
+            || comment.multiline
+            || has_newline_before_position(self.source, comment.span.start)
     }
 
     /// [`Self::hoisted_left_side_child`] stopped at the first shell the printer re-emits —
@@ -498,35 +782,93 @@ impl<'a> Printer<'a> {
     /// expression's doc opens with that run and a hardline
     /// (`(⏎// c⏎a as any) ? b : c` prints as `// c⏎(a as any) ? b : c`).
     ///
-    /// Walks [`Self::hoisted_left_side_child`] to the leaf, reading each node→child gap in
-    /// source. A comment in such a gap always LEADS the child (the gap holds nothing that
-    /// could own a trailing comment), so the one question is whether a newline follows it —
-    /// prettier's `hasLeadingOwnLineComment`, asked of every node on the way down exactly as
-    /// `returnArgumentHasLeadingComment` asks it. The member object→property gap is not
-    /// this walk's: a comment there is the chain's own business
+    /// Walks [`Self::left_spine_steps`] to the leaf, reading each node→child gap in source.
+    /// A shell the chain prints mid-chain counts only the comment the head's leaf OWNS —
+    /// the leaf prints it ahead of the head, so it leads the doc
+    /// (`x = (⏎/** @type {T} */⏎(f).b).c(zz)` opens with the cast's comment on its own
+    /// line) — while the rest of its run does not; a shell below it still does. A comment in such a gap always LEADS the child
+    /// (the gap holds nothing that could own a trailing comment), so the question is
+    /// whether a newline follows it — prettier's `hasLeadingOwnLineComment`, asked of every
+    /// node on the way down exactly as `returnArgumentHasLeadingComment` asks it — and,
+    /// inside a group a step above opened ([`Self::left_spine_group_start`]), whether the
+    /// comment breaks its line there at all. The member object→property gap is not this
+    /// walk's: a comment there is the chain's own business
     /// (`Printer::has_line_comments_in_member_chain`).
     pub(crate) fn left_spine_shell_has_own_line_comment(
         &self,
         expr: &internal::Expression<'_>,
     ) -> bool {
-        let mut node = expr;
-        while let Some(child) = self.hoisted_left_side_child(node) {
-            let shell_start = node.span().start;
-            let child_start = child.span().start;
-            if shell_start < child_start
+        if left_spine_shell_is_comment_free(self.source, expr.span().start) {
+            return false;
+        }
+        let mut group_start = None;
+        self.left_spine_steps(expr).any(
+            |LeftSpineStep {
+                 node,
+                 child,
+                 mid_chain,
+             }| {
+                let shell_start = node.span().start;
+                let child_start = child.span().start;
+                let in_group = group_start.is_some_and(|start| shell_start >= start);
+                if group_start.is_none() && !mid_chain {
+                    group_start = self.left_spine_group_start(node);
+                }
+                shell_start < child_start
+                    && self
+                        .comments_in_source_between(shell_start, child_start)
+                        .any(|c| {
+                            (!mid_chain || c.owned_by_node)
+                                && has_newline_after_position(self.source, c.span.end)
+                                && (!in_group || self.comment_takes_line_in_group(c))
+                        })
+            },
+        )
+    }
+
+    /// Whether an INDENTABLE block in a stripped shell on `value`'s left spine leads its
+    /// doc — prettier's `chooseLayout` fourth disjunct one shell deeper than the operator
+    /// gap the seam scans ([`Self::indentable_block_leads_value`]). The value's printer
+    /// strips the shell and prints the comment ahead of its head, so the reparse finds it
+    /// in the operator gap and hangs the value; the first pass must hang it too
+    /// (`x = (/*⏎ */ a.b).m(1)`).
+    ///
+    /// Walks [`Self::left_spine_steps`]: every hoisted shell's comments count, and in a
+    /// shell the chain prints mid-chain only the comment the head's leaf OWNS, which is
+    /// printed from the leaf, ahead of the head (`x = (// c⏎/*⏎ */ a.b).m(1).n(2)` prints
+    /// the block first and `// c` after `a`).
+    ///
+    /// Asked at every operator→value seam, so the common answer is one byte: a value that
+    /// does not open on a `(` has no shell ([`left_spine_has_no_shell`]).
+    #[inline]
+    pub(crate) fn left_spine_indentable_leads_value(
+        &self,
+        value: &internal::Expression<'_>,
+    ) -> bool {
+        !left_spine_has_no_shell(self.source, value)
+            && self.left_spine_indentable_leads_value_walk(value)
+    }
+
+    /// [`Self::left_spine_indentable_leads_value`] past its one-byte gate.
+    #[inline(never)]
+    fn left_spine_indentable_leads_value_walk(&self, value: &internal::Expression<'_>) -> bool {
+        if left_spine_shell_is_comment_free(self.source, value.span().start) {
+            return false;
+        }
+        self.left_spine_steps(value).any(|step| {
+            let shell_start = step.node.span().start;
+            let child_start = step.child.span().start;
+            shell_start < child_start
                 && self
                     .comments_in_source_between(shell_start, child_start)
-                    .any(|c| has_newline_after_position(self.source, c.span.end))
-            {
-                return true;
-            }
-            node = child;
-        }
-        false
+                    .any(|c| {
+                        (!step.mid_chain || c.owned_by_node) && self.block_comment_is_indentable(c)
+                    })
+        })
     }
 
     /// Where this expression's doc STARTS PRINTING: past every stripped grouping paren on
-    /// its left spine, which is the leftmost leaf [`Self::hoisted_left_side_child`] reaches.
+    /// its left spine, which is the leftmost leaf [`Self::hoisted_left_spine`] reaches.
     ///
     /// The start twin of [`internal::Expression::printed_end`], and the same difference read
     /// from the other end — a region holding nothing but the `(`s the printer erases,
@@ -545,11 +887,167 @@ impl<'a> Printer<'a> {
     /// emitter must keep bounding its scan at `span().start`, since the node's own doc prints
     /// the hoisted run and claiming it again DOUBLE-PRINTS it.
     pub(crate) fn left_spine_printed_start(&self, expr: &internal::Expression<'_>) -> u32 {
-        let mut node = expr;
-        while let Some(child) = self.hoisted_left_side_child(node) {
-            node = child;
+        if left_spine_has_no_shell(self.source, expr) {
+            return expr.span().start;
         }
-        node.span().start
+        self.hoisted_left_spine(expr)
+            .last()
+            .map_or(expr, |(_, leaf)| leaf)
+            .span()
+            .start
+    }
+
+    /// The claim a hoist site at `node` makes over its left spine's shells, when a pair the
+    /// printer prints on that spine holds a comment below it — `x = ((/*c*/ (a) ** 2) ** 2)
+    /// ** 2`, whose `/*c*/` sits in the shell of the `**` operand that prints inside the
+    /// outer chain's pair. `child` is `node`'s hoisted left-side child, and `child_in_pair`
+    /// answers whether `node` prints it inside a pair — each site's own builder's
+    /// question, asked only past the comment gate; the root conditional, `await` and `new`
+    /// also answer yes for a child whose doc opens with a run on a line of its own
+    /// ([`Self::left_spine_shell_has_own_line_comment`]), which they claim pair or no pair.
+    /// `start` is where the region opens: `node`'s own start, past the keyword at a value
+    /// head (`...`, `await`, `new`), and at the operand for the chain a non-null seals (the
+    /// non-null's own shell is its builder's to print).
+    ///
+    /// Without the claim each hoist site prints only its OWN gap, ahead of its own doc —
+    /// so a run in a shell below a printed pair lands just inside that pair, where the
+    /// reparse reads it as the enclosing node's gap and hoists it one pair further, one
+    /// pair per pass. The fixed point is the run leading `node`'s whole doc, which is
+    /// where [`Self::left_spine_shell_has_own_line_comment`] and
+    /// [`Self::left_spine_printed_start`] already tell the seams above it the run comes
+    /// from: so `node` prints the whole region, and every site below declines it.
+    ///
+    /// `None` — each site prints its own gap, as before — when `node` lies inside a region
+    /// an enclosing node already claims, when no printed pair has a comment below it, and
+    /// when the region holds a comment that must stay with its own site
+    /// ([`Self::left_spine_region_stays_per_site`]). The walk is
+    /// [`Self::hoisted_left_spine`] — so it ends before a shell the chain prints
+    /// mid-chain, and at every pair a construct keeps for its run — through the kinds
+    /// whose hoist site honors the claim: a binary, a member, a call, a tagged template, a
+    /// conditional, a sequence head, a cast's or postfix update's bare operand, and a
+    /// non-null that is a link of the member / call chain above it, whose head window
+    /// holds the operand's shell. It stops at an assignment target, whose shell keeps its
+    /// own emitter, and at a standalone non-null, which prints its operand's run itself.
+    ///
+    /// Asked at every hoist site, so the common answer is one byte: a claim needs a shell
+    /// INSIDE `child` (the comment must sit below a printed pair, and the shallowest such
+    /// pair is `child`'s own), and a `child` that does not open on a `(` has none
+    /// ([`left_spine_has_no_shell`]). Only a `child` that does reaches the walk.
+    #[inline]
+    pub(crate) fn left_spine_run_claim(
+        &self,
+        node: Span,
+        start: u32,
+        child: &internal::Expression<'_>,
+        child_in_pair: impl FnOnce() -> bool,
+    ) -> Option<LeftSpineClaim> {
+        if left_spine_has_no_shell(self.source, child) {
+            return None;
+        }
+        self.left_spine_run_claim_walk(node, start, child, child_in_pair)
+    }
+
+    /// [`Self::left_spine_run_claim`] past its one-byte gate.
+    #[inline(never)]
+    fn left_spine_run_claim_walk(
+        &self,
+        node: Span,
+        start: u32,
+        child: &internal::Expression<'_>,
+        child_in_pair: impl FnOnce() -> bool,
+    ) -> Option<LeftSpineClaim> {
+        if left_spine_shell_is_comment_free(self.source, child.span().start)
+            || self
+                .claimed_left_spine_run
+                .get()
+                .is_some_and(|claim| claim.region.start <= start && start < claim.region.end)
+            || !self.has_comments_to_emit_between(start, child.span().end)
+        {
+            return None;
+        }
+        let mut below_pair = child_in_pair().then(|| child.span().start);
+        let mut leaf = child;
+        let mut in_chain = false;
+        for (node, next) in self.hoisted_left_spine(child) {
+            // A non-null the walk steps through under a member or call is a link of that
+            // chain, its operand's shell inside the chain's head window; a standalone one
+            // prints its own operand's run.
+            let link = matches!(
+                node.kind,
+                internal::ExpressionKind::MemberExpression(_)
+                    | internal::ExpressionKind::CallExpression(_)
+            ) || (in_chain
+                && matches!(node.kind, internal::ExpressionKind::TSNonNullExpression(_)));
+            if !link
+                && !matches!(
+                    node.kind,
+                    internal::ExpressionKind::BinaryExpression(_)
+                        | internal::ExpressionKind::TaggedTemplateExpression(_)
+                        | internal::ExpressionKind::ConditionalExpression(_)
+                        | internal::ExpressionKind::SequenceExpression(_)
+                        | internal::ExpressionKind::TSAsExpression(_)
+                        | internal::ExpressionKind::TSSatisfiesExpression(_)
+                        | internal::ExpressionKind::UpdateExpression(_)
+                )
+            {
+                break;
+            }
+            in_chain = link;
+            if below_pair.is_none()
+                && left_side_child_is_parenthesized(node, next, self.in_for_init.get())
+            {
+                below_pair = Some(next.span().start);
+            }
+            leaf = next;
+        }
+        let leaf_start = leaf.span().start;
+        let below_pair = below_pair?;
+        (below_pair < leaf_start
+            && self.has_comments_to_emit_between(below_pair, leaf_start)
+            && !self.left_spine_region_stays_per_site(start, leaf_start))
+        .then(|| LeftSpineClaim {
+            claimer: node,
+            region: Span::new(start, leaf_start),
+        })
+    }
+
+    /// Whether a left-spine region holds a comment whose own site must keep printing it, so
+    /// no claim is made over it ([`Self::left_spine_run_claim`]):
+    ///
+    /// - an honored format-ignore directive — each construct freezes its own child
+    ///   (`Printer::left_spine_operand_frozen_span`), so a directive cannot move;
+    /// - a bundler annotation (`/* @__PURE__ */`, [`tsv_lang::is_tree_shaking_annotation`],
+    ///   matched anywhere in the comment, so `/** @__PURE__ */` too) — it marks the
+    ///   call or function it is printed in front of, and the claim would print it in front
+    ///   of the whole region's pairs instead, where it marks nothing.
+    fn left_spine_region_stays_per_site(&self, start: u32, end: u32) -> bool {
+        self.comments_in_source_between(start, end).any(|c| {
+            self.is_honored_directive(c)
+                || (c.is_block && tsv_lang::is_tree_shaking_annotation(c.content(self.source)))
+        })
+    }
+
+    /// Run `build` with `claim` armed ([`Printer::claimed_left_spine_run`]); a plain call
+    /// when there is none. The claimer's hoist site must sit INSIDE `build`, since it
+    /// reads the armed claim to print the region.
+    ///
+    /// `build` is called from one place, so it inlines into the site whole: every hoist
+    /// site wraps its builder in this, and almost none arms a claim. Forced: under a plain
+    /// `#[inline]` the release build retired 0.50% more TS format instructions (0.25%
+    /// Svelte) for a 656 B smaller binary.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub(crate) fn with_left_spine_claim<T>(
+        &self,
+        claim: Option<LeftSpineClaim>,
+        build: impl FnOnce() -> T,
+    ) -> T {
+        let saved = claim.map(|claim| self.claimed_left_spine_run.replace(Some(claim)));
+        let out = build();
+        if let Some(saved) = saved {
+            self.claimed_left_spine_run.set(saved);
+        }
+        out
     }
 
     pub(crate) fn build_paren_leading_value_doc(
@@ -2976,15 +3474,19 @@ impl<'a> Printer<'a> {
     /// `outer_start` (the paren) and `inner_start` (the expression) need to be preserved.
     ///
     /// Returns the original doc unchanged if no comments or if `outer_start >= inner_start`.
+    ///
+    /// `node` is the span of the expression whose hoist site this is — the key an armed
+    /// left-spine claim names its claimer by ([`Self::removed_paren_comments_opt`]).
     #[inline]
     pub(crate) fn prepend_removed_paren_comments(
         &self,
+        node: Span,
         outer_start: u32,
         inner_start: u32,
         doc: DocId,
     ) -> DocId {
         self.prepend_opt(
-            self.removed_paren_comments_opt(outer_start, inner_start),
+            self.removed_paren_comments_opt(node, outer_start, inner_start),
             doc,
         )
     }
@@ -2994,11 +3496,26 @@ impl<'a> Printer<'a> {
     /// conditional, whose run goes OUTSIDE the group it wraps its test in: `docs/comments.md`
     /// §The left-spine shell run). `None` when the gap is empty or inverted, so the two
     /// spellings of the guard cannot drift.
+    ///
+    /// Under an armed left-spine claim ([`Printer::claimed_left_spine_run`]) the claimer's
+    /// site — `node` is its span — prints the claim's whole region, and any other site
+    /// prints only the part of its gap past the region, which the claimer already took.
     pub(crate) fn removed_paren_comments_opt(
         &self,
+        node: Span,
         outer_start: u32,
         inner_start: u32,
     ) -> Option<DocId> {
+        let mut outer_start = outer_start;
+        if let Some(claim) = self.claimed_left_spine_run.get() {
+            if claim.claimer == node {
+                return self
+                    .build_rhs_comments_opt(claim.region.start, claim.region.end.max(inner_start));
+            }
+            if claim.region.start <= outer_start && outer_start < claim.region.end {
+                outer_start = claim.region.end;
+            }
+        }
         (outer_start < inner_start)
             .then(|| self.build_rhs_comments_opt(outer_start, inner_start))
             .flatten()

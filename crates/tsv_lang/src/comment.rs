@@ -54,8 +54,11 @@ pub struct Comment {
     /// - the general glued comment (plain or annotation) has no node of its own, so the
     ///   innermost node its token begins prints it (via `build_expression_doc`);
     /// - the JSDoc cast is printed by its `CommentBoundPair` node, which carries its own copy.
-    ///   `is_jsdoc_type_cast_comment` (the only surviving content sniff) decides cast
-    ///   *paren-retention*, i.e. whether that node is built — never ownership itself.
+    ///   `is_jsdoc_type_cast_comment` (one of two surviving content checks besides the
+    ///   format-ignore directives) decides cast *paren-retention*, i.e. whether that node
+    ///   is built — never ownership itself. The other, [`is_tree_shaking_annotation`],
+    ///   decides only whether `tsv_ts`'s printer claims a left-spine shell region holding
+    ///   the comment — never ownership either.
     ///
     /// **Ownership is a fact about who PRINTS a comment, never about whether it EXISTS.**
     /// The lookups below make a caller name which of the three questions it is asking, and
@@ -428,6 +431,22 @@ pub fn directive_alone_on_line(source: &str, comment: &Comment, doc_start: u32) 
     opens_line
         && (comment.span.end as usize == source.len()
             || has_newline_after_position(source, comment.span.end))
+}
+
+/// Whether a block comment's content (delimiters excluded) carries a bundler's
+/// tree-shaking annotation — `@__PURE__` / `#__PURE__` (the call or `new` after it is
+/// side-effect-free) or `@__NO_SIDE_EFFECTS__` / `#__NO_SIDE_EFFECTS__` (the function
+/// after it is) — ANYWHERE in it, as Rollup, esbuild and Terser read it
+/// (`/** @__PURE__ */` and `/* #__PURE__ - why */` mark too). Such a comment's placement
+/// is semantic: it marks the token it is printed in front of.
+pub fn is_tree_shaking_annotation(content: &str) -> bool {
+    let bytes = content.as_bytes();
+    bytes.iter().enumerate().any(|(i, &byte)| {
+        matches!(byte, b'@' | b'#') && {
+            let mark = &bytes[i + 1..];
+            mark.starts_with(b"__PURE__") || mark.starts_with(b"__NO_SIDE_EFFECTS__")
+        }
+    })
 }
 
 /// Whether `content` opens an ignore range (`format-ignore-start` /
@@ -1398,6 +1417,23 @@ mod tests {
         assert!(is_format_ignore_range_end("prettier-ignore-end"));
         assert!(!is_format_ignore_range_end("format-ignore"));
         assert!(!is_format_ignore_range_end("format-ignore-start"));
+    }
+
+    #[test]
+    fn tree_shaking_annotations_match_anywhere_in_the_content() {
+        // block contents arrive with their spacing and any JSDoc `*`
+        assert!(is_tree_shaking_annotation(" @__PURE__ "));
+        assert!(is_tree_shaking_annotation("#__PURE__"));
+        assert!(is_tree_shaking_annotation("* @__PURE__ "));
+        assert!(is_tree_shaking_annotation(
+            " #__PURE__ - the factory is pure "
+        ));
+        assert!(is_tree_shaking_annotation(" @__NO_SIDE_EFFECTS__ "));
+        assert!(is_tree_shaking_annotation("#__NO_SIDE_EFFECTS__"));
+        // the mark needs its `@` / `#`
+        assert!(!is_tree_shaking_annotation(" __PURE__ "));
+        assert!(!is_tree_shaking_annotation(" pure "));
+        assert!(!is_tree_shaking_annotation(" @__PURE "));
     }
 
     #[test]

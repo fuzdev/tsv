@@ -15,6 +15,7 @@ use crate::printer::{
     ParenContext, Printer, SecondTypeArgs, SpanMarks, instantiation_keeps_pair_before_type_args,
     is_called_function, is_multiline_template_expression, needs_parens,
 };
+use smallvec::SmallVec;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::has_newline_before_position;
 use tsv_lang::{Comment, Span, TAB_WIDTH, has_line_spanning_comments_to_emit_in_range};
@@ -205,6 +206,39 @@ fn apply_paren_gaps(nodes: &mut [ChainNode<'_>], paren_gaps: &[ParenGap]) {
 
 /// A deferred paren gap extension: (node_index, gap_start, object_start)
 type ParenGap = (usize, u32, u32);
+
+/// The left-spine steps of the chain rooted at `root` whose stripped grouping shell the
+/// chain prints MID-CHAIN: each a `(member start, object start)` pair — the member whose
+/// object the parser stripped a `(` from, and that object — whose comments
+/// [`apply_paren_gaps`] hands to an earlier member's widened gap
+/// ([`ChainNode::paren_gap_skip`]) rather than to the head. Empty for a root that is not
+/// a member or a call, and for a chain that widens nothing.
+///
+/// The answer IS the linearizer's: the chain is linearized here exactly as its printer
+/// will linearize it. Asked by a walk that must not hand such a comment to a site above
+/// the chain ([`crate::printer::Printer::left_spine_run_claim`]), where it would print
+/// twice.
+pub(crate) fn chain_mid_chain_paren_gaps(
+    root: &Expression<'_>,
+    input: LinearizeInput<'_>,
+) -> SmallVec<[(u32, u32); 2]> {
+    let mut nodes = ChainNodeVec::new();
+    match &root.kind {
+        ExpressionKind::CallExpression(call) => {
+            let _ = linearize_chain_from_call_into(call, root.span, input, &mut nodes);
+        }
+        ExpressionKind::MemberExpression(member) => {
+            let _ = linearize_chain_from_member_into(member, root.span, input, &mut nodes);
+        }
+        _ => return SmallVec::new(),
+    }
+    // A widened node's `object_end` is the stripped `(` (the member's start), and its skip
+    // opens at that member's object.
+    nodes
+        .iter()
+        .filter_map(|node| Some((node.comment_range()?.0, node.paren_gap_skip()?.start)))
+        .collect()
+}
 
 /// Finalize a freshly-linearized chain: apply deferred comment paren-gap
 /// extensions, then re-evaluate the base node's parens for the callee case.
@@ -1146,10 +1180,28 @@ pub fn build_linearized_chain_doc(
         .chain_ungroups_args
         .replace(long_curried && mark_long_curried_calls(nodes, printer));
     let groups = group_chain_nodes(nodes, printer);
-    let chain_doc =
-        printer.with_frozen_chain_base(frozen_base, || build_chain_doc(&groups, span, printer));
-    printer.chain_ungroups_args.set(outer_ungroups);
-    printer.prepend_removed_paren_comments(head_start, head_end, chain_doc)
+    // A comment in a shell below a pair the head's left spine prints — the base's own
+    // pair or one deeper (`((/*c*/ (a + 2) * 2) * 2).b`) — leads the whole chain
+    // (`Printer::left_spine_run_claim`). Only where the head takes the whole region down
+    // to the base: a widened member's prefix is placed mid-chain, which is the
+    // linearizer's answer, and a base that owns its leading gap keeps the run inside it.
+    let claim = match nodes.first() {
+        Some(ChainNode::Base {
+            expr: base,
+            needs_parens,
+            paren_leading_start: None,
+            ..
+        }) if head_start == chain_start => {
+            printer.left_spine_run_claim(span, chain_start, base, || *needs_parens)
+        }
+        _ => None,
+    };
+    printer.with_left_spine_claim(claim, || {
+        let chain_doc =
+            printer.with_frozen_chain_base(frozen_base, || build_chain_doc(&groups, span, printer));
+        printer.chain_ungroups_args.set(outer_ungroups);
+        printer.prepend_removed_paren_comments(span, head_start, head_end, chain_doc)
+    })
 }
 
 /// The window `prepend_removed_paren_comments` claims at a chain's head: the leading

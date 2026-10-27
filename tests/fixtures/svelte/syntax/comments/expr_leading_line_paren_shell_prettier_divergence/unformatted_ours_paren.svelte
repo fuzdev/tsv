@@ -23,3 +23,7 @@ a).b}
 {/if}
 <div data-attr={( // c
 a).b}></div>
+{#if ((// c
+a).b)++}
+x
+{/if}

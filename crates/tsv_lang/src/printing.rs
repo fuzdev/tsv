@@ -603,7 +603,7 @@ pub(crate) fn line_bounds_at(source: &str, position: usize) -> (usize, usize, us
 /// paying its per-call setup for nothing here. Re-measure before changing it —
 /// the reason this stays scalar is the gap LENGTH, not the codegen.
 #[inline]
-fn contains_line_terminator(text: &str) -> bool {
+pub(crate) fn contains_line_terminator(text: &str) -> bool {
     let bytes = text.as_bytes();
     (0..bytes.len()).any(|i| line_terminator_len(bytes, i).is_some())
 }

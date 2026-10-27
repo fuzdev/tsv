@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 402,
+	"end": 429,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -43,19 +43,25 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 367,
-			"end": 371
+			"start": 353,
+			"end": 357
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 394,
+			"end": 398
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 401,
+		"end": 428,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 392,
+			"end": 419,
 			"body": [
 				{
 					"type": "ExpressionStatement",
@@ -138,46 +144,53 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 320,
-					"end": 346,
+					"end": 345,
 					"expression": {
 						"type": "AssignmentExpression",
 						"start": 320,
-						"end": 345,
+						"end": 344,
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
 							"start": 320,
 							"end": 321,
-							"name": "y"
+							"name": "w"
 						},
 						"right": {
-							"type": "MemberExpression",
+							"type": "ConditionalExpression",
 							"start": 333,
-							"end": 345,
-							"object": {
-								"type": "TSAsExpression",
-								"start": 334,
-								"end": 342,
-								"expression": {
+							"end": 344,
+							"test": {
+								"type": "MemberExpression",
+								"start": 333,
+								"end": 336,
+								"object": {
 									"type": "Identifier",
-									"start": 334,
-									"end": 335,
+									"start": 333,
+									"end": 334,
 									"name": "a"
 								},
-								"typeAnnotation": {
-									"type": "TSAnyKeyword",
-									"start": 339,
-									"end": 342
-								}
+								"property": {
+									"type": "Identifier",
+									"start": 335,
+									"end": 336,
+									"name": "b"
+								},
+								"computed": false,
+								"optional": false
 							},
-							"property": {
+							"consequent": {
 								"type": "Identifier",
-								"start": 344,
-								"end": 345,
-								"name": "p"
+								"start": 339,
+								"end": 340,
+								"name": "b"
 							},
-							"computed": false,
-							"optional": false,
+							"alternate": {
+								"type": "Identifier",
+								"start": 343,
+								"end": 344,
+								"name": "c"
+							},
 							"leadingComments": [
 								{
 									"type": "Line",
@@ -190,57 +203,111 @@
 					}
 				},
 				{
+					"type": "ExpressionStatement",
+					"start": 347,
+					"end": 373,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 347,
+						"end": 372,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 347,
+							"end": 348,
+							"name": "y"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 360,
+							"end": 372,
+							"object": {
+								"type": "TSAsExpression",
+								"start": 361,
+								"end": 369,
+								"expression": {
+									"type": "Identifier",
+									"start": 361,
+									"end": 362,
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSAnyKeyword",
+									"start": 366,
+									"end": 369
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 371,
+								"end": 372,
+								"name": "p"
+							},
+							"computed": false,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 353,
+									"end": 357
+								}
+							]
+						}
+					}
+				},
+				{
 					"type": "ClassDeclaration",
-					"start": 348,
-					"end": 391,
+					"start": 375,
+					"end": 418,
 					"id": {
 						"type": "Identifier",
-						"start": 354,
-						"end": 355,
+						"start": 381,
+						"end": 382,
 						"name": "K"
 					},
 					"superClass": null,
 					"body": {
 						"type": "ClassBody",
-						"start": 356,
-						"end": 391,
+						"start": 383,
+						"end": 418,
 						"body": [
 							{
 								"type": "PropertyDefinition",
-								"start": 360,
-								"end": 388,
+								"start": 387,
+								"end": 415,
 								"static": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 360,
-									"end": 361,
+									"start": 387,
+									"end": 388,
 									"name": "p"
 								},
 								"value": {
 									"type": "MemberExpression",
-									"start": 375,
-									"end": 387,
+									"start": 402,
+									"end": 414,
 									"object": {
 										"type": "TSAsExpression",
-										"start": 376,
-										"end": 384,
+										"start": 403,
+										"end": 411,
 										"expression": {
 											"type": "Identifier",
-											"start": 376,
-											"end": 377,
+											"start": 403,
+											"end": 404,
 											"name": "a"
 										},
 										"typeAnnotation": {
 											"type": "TSAnyKeyword",
-											"start": 381,
-											"end": 384
+											"start": 408,
+											"end": 411
 										}
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 386,
-										"end": 387,
+										"start": 413,
+										"end": 414,
 										"name": "q"
 									},
 									"computed": false,
@@ -249,8 +316,8 @@
 										{
 											"type": "Line",
 											"value": " c",
-											"start": 367,
-											"end": 371
+											"start": 394,
+											"end": 398
 										}
 									]
 								}

@@ -5,7 +5,7 @@
 // - Clarity-based parens (mixing logical operators, etc.)
 
 use crate::ast::internal::{self, BinaryOperator, Expression, ExpressionKind};
-use crate::printer::comments::{AsiOperandShell, CommentSpacing};
+use crate::printer::comments::{AsiOperandShell, CommentSpacing, left_spine_shell_is_comment_free};
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::{
     CommentVec, ParenContext, Printer, RunLeadingBlank, class_expr_has_decorators,
@@ -13,7 +13,7 @@ use crate::printer::{
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
-use tsv_lang::doc::{DocBuf, arena::DocId};
+use tsv_lang::doc::{DocBuf, LeadingBreak, arena::DocId};
 
 /// Holds information about an operand in a binary expression chain
 /// Used to track position information for comment placement
@@ -297,10 +297,30 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build a Doc for a unary expression
+    /// Build a Doc for a unary expression.
+    ///
+    /// A hoist site like the value heads: a comment in a shell below a pair the operand's
+    /// left spine prints is claimed ([`Printer::left_spine_run_claim`]) and printed in the
+    /// operator→operand gap, which runs to the region's end — inside the comment-holder
+    /// pair the comment earns, ahead of the operand's own pairs, where the reparse reads
+    /// it (`!((/* d */⏎ a.b) + 1).c` prints `!(/* d */ (a.b + 1).c)`).
     pub(in crate::printer) fn build_unary_doc(
         &self,
         unary: &internal::UnaryExpression<'_>,
+    ) -> DocId {
+        let operator_end = unary.span.start + unary.operator.as_str().len() as u32;
+        let argument_start = unary.argument.span().start;
+        let claim = self.left_spine_run_claim(unary.span, operator_end, unary.argument, || true);
+        let gap_end = claim.map_or(argument_start, |claim| claim.region.end.max(argument_start));
+        self.with_left_spine_claim(claim, || self.build_unary_doc_gap(unary, gap_end))
+    }
+
+    /// [`Self::build_unary_doc`] under its claim, the operator→operand gap ending at
+    /// `argument_start`.
+    fn build_unary_doc_gap(
+        &self,
+        unary: &internal::UnaryExpression<'_>,
+        argument_start: u32,
     ) -> DocId {
         let d = self.d();
 
@@ -309,7 +329,6 @@ impl<'a> Printer<'a> {
         // the comment ends up in the gap between operator and argument span.
         // Re-add parens to preserve the comment: `!(/** @type {T} */ expr.prop)`
         let operator_end = unary.span.start + unary.operator.as_str().len() as u32;
-        let argument_start = unary.argument.span().start;
         let argument_end = unary.argument.span().end;
         // Unary argument — an `ancestorNameMap` value position. A BARE ternary operand
         // records nothing (prettier's `child === node` guard), which is why `!(c ? a : b)`
@@ -748,6 +767,29 @@ impl<'a> Printer<'a> {
         span: Span,
         style: BinaryChainStyle,
     ) -> DocId {
+        // A comment in a shell below a pair this chain's left spine prints leads the whole
+        // chain: the claim hands it to `wrap_chain_with_paren_comments` here
+        // (`Printer::left_spine_run_claim`).
+        let claim = self.left_spine_run_claim(span, span.start, binary.left, || {
+            self.needs_parens(
+                binary.left,
+                ParenContext::BinaryLeft {
+                    parent_op: binary.operator,
+                },
+            )
+        });
+        self.with_left_spine_claim(claim, || {
+            self.build_binary_chain_doc_claimed(binary, span, style)
+        })
+    }
+
+    /// [`Self::build_binary_chain_doc_core`] under its left-spine claim.
+    fn build_binary_chain_doc_claimed(
+        &self,
+        binary: &internal::BinaryExpression<'_>,
+        span: Span,
+        style: BinaryChainStyle,
+    ) -> DocId {
         // Collect all operands (with spans) and operators in the chain
         let mut operands: OperandBuf = OperandBuf::new();
         let mut operators: OperatorBuf = OperatorBuf::new();
@@ -883,7 +925,8 @@ impl<'a> Printer<'a> {
             return chain;
         };
 
-        let with_leading = self.prepend_removed_paren_comments(span.start, leftmost_start, chain);
+        let with_leading =
+            self.prepend_removed_paren_comments(span, span.start, leftmost_start, chain);
 
         if rightmost_end >= span.end {
             return with_leading;
@@ -1907,40 +1950,53 @@ impl<'a> Printer<'a> {
             )
         };
 
-        // `await` binds tighter than a binary / ternary operand (`await x + y` is
-        // `(await x) + y`), so those take the precedence pair; a trailing comment retains a
-        // redundant one. Mirrors `build_spread_doc`.
-        let argument_doc = self.build_keyword_operand_pair_doc(
-            await_expr.argument,
-            ParenContext::AwaitArgument,
-            await_expr_span.end,
-            operand_doc,
-        );
+        // A comment in a shell below the pair `await` gives its operand leads the whole
+        // operand from the keyword gap, ahead of that pair, which is where the reparse reads
+        // it (`Printer::left_spine_run_claim`): the gap runs to the claimed region's end. So
+        // does a run the operand's doc would OPEN with on a line of its own, pair or no
+        // pair: printed by the operand, it lands below `await` flush, where the reparse
+        // reads it as the keyword gap's and hangs the operand (`await ((// c⏎(a) || d).e)`).
+        let claim =
+            self.left_spine_run_claim(await_expr_span, keyword_end, await_expr.argument, || {
+                self.needs_parens(await_expr.argument, ParenContext::AwaitArgument)
+                    || self.left_spine_shell_has_own_line_comment(await_expr.argument)
+            });
+        let gap_end = claim.map_or(argument_start, |claim| claim.region.end.max(argument_start));
+        self.with_left_spine_claim(claim, || {
+            // `await` binds tighter than a binary / ternary operand (`await x + y` is
+            // `(await x) + y`), so those take the precedence pair; a trailing comment retains a
+            // redundant one. Mirrors `build_spread_doc`.
+            let argument_doc = self.build_keyword_operand_pair_doc(
+                await_expr.argument,
+                ParenContext::AwaitArgument,
+                await_expr_span.end,
+                operand_doc,
+            );
 
-        // The keyword→operand gap, shared with `new`→callee. The run is emitted OUTSIDE
-        // any parens the operand needs — the gap belongs to the keyword, not to a pair
-        // the printer must emit — so it answers one way whether or not the operand's
-        // precedence happens to require one. A comment the author wrote INSIDE those
-        // parens is glued to the operand and therefore owned, so it never reaches this
-        // axis and keeps its place (the `grouped_operand_comment` divergence).
-        //
-        // The argument hangs whole below the run when the gap hangs
-        // ([`Printer::keyword_value_hang_doc`]) — `await /* c */⏎fn({…})` stays broken, and
-        // `await` is not a restricted production, so the break is layout, not ASI (contrast
-        // `yield`). A resolved freeze always hangs, since an honored directive hangs what
-        // follows it; the inline arm glues the run to the keyword, where a directive would be
-        // inert and the freeze lost on the next pass.
-        if let Some(argument_doc) =
-            self.keyword_value_hang_doc(keyword_end, argument_start, || argument_doc)
-        {
-            return self.build_keyword_hang_doc("await", keyword_end, argument_start, argument_doc);
-        }
-        debug_assert!(frozen.is_none(), "an await→operand freeze must hang");
-        match self.build_inline_comments_between_doc_trailing_space_opt(keyword_end, argument_start)
-        {
-            Some(run) => d.concat(&[d.text("await "), run, argument_doc]),
-            None => d.concat(&[d.text("await "), argument_doc]),
-        }
+            // The keyword→operand gap, shared with `new`→callee. The run is emitted OUTSIDE
+            // any parens the operand needs — the gap belongs to the keyword, not to a pair
+            // the printer must emit — so it answers one way whether or not the operand's
+            // precedence happens to require one. A comment the author wrote INSIDE those
+            // parens is glued to the operand and therefore owned, so it never reaches this
+            // axis and keeps its place (the `grouped_operand_comment` divergence).
+            //
+            // The argument hangs whole below the run when the gap hangs
+            // ([`Printer::keyword_value_hang_doc`]) — `await /* c */⏎fn({…})` stays broken, and
+            // `await` is not a restricted production, so the break is layout, not ASI (contrast
+            // `yield`). A resolved freeze always hangs, since an honored directive hangs what
+            // follows it; the inline arm glues the run to the keyword, where a directive would be
+            // inert and the freeze lost on the next pass.
+            if let Some(argument_doc) =
+                self.keyword_value_hang_doc(keyword_end, gap_end, || argument_doc)
+            {
+                return self.build_keyword_hang_doc("await", keyword_end, gap_end, argument_doc);
+            }
+            debug_assert!(frozen.is_none(), "an await→operand freeze must hang");
+            match self.build_inline_comments_between_doc_trailing_space_opt(keyword_end, gap_end) {
+                Some(run) => d.concat(&[d.text("await "), run, argument_doc]),
+                None => d.concat(&[d.text("await "), argument_doc]),
+            }
+        })
     }
 
     /// Build a Doc for a yield expression
@@ -2012,12 +2068,83 @@ impl<'a> Printer<'a> {
         // The keyword→operand run prints OUTSIDE the operand's pair, as at `await`: the gap
         // belongs to the keyword, and the author wrote it ahead of any `(` there. Asking the
         // pair of the gap's comment is how `yield /* c */ (a = b)` lost its parens.
-        if let Some(comments) = leading_comments_opt {
-            parts.push(comments);
-        }
-        parts.push(argument_doc);
+        let tail = self.prepend_opt(leading_comments_opt, argument_doc);
 
-        d.concat(&parts)
+        // The built operand is the authority on ASI, as at `return` / `throw`
+        // (`Printer::argument_leading_break`): a line it ends ahead of its first token in
+        // every layout takes the hanging pair, and one it ends only when a group breaks
+        // takes a pair printed with that break. Gated on page, since a comment the operand
+        // owns is invisible to the gap's emit axis and still prints there (in the gap's own
+        // stripped `(` or the operand's left-spine shell).
+        let edge = if self.has_comments_on_page_between(keyword_end, argument_start)
+            || !left_spine_shell_is_comment_free(self.source, argument_start)
+        {
+            self.argument_leading_break(tail)
+        } else {
+            LeadingBreak::None
+        };
+        match edge {
+            LeadingBreak::Hard => {
+                let (hanging, _boundary) = self.build_restricted_production_paren_doc(
+                    keyword,
+                    keyword_end,
+                    arg,
+                    yield_expr_span.end,
+                );
+                hanging
+            }
+            LeadingBreak::Soft => {
+                if let ExpressionKind::BinaryExpression(binary) = &arg.kind {
+                    // The binary arm's pair, as at `return`
+                    // (`Printer::build_binary_paren_doc`): the ungrouped chain, grouped
+                    // inside the broken pair and flat in the keyword's group.
+                    //
+                    // TODO: a width window here is not F1: `yield ((/* d */⏎a).b ** Z) ** q`
+                    // with `Z` a run of 68–80 `z`s at a two-tab depth (`yield*`: 67–80; the
+                    // window moves with the indentation) breaks the chain on the
+                    // first pass and prints a different form on the second. `return` / `throw`
+                    // close the same window by gluing the comment's line
+                    // (`DocArena::glue_leading_comment_lines`), which measured worse here, so
+                    // the boundary the `left_spine_shell_comment_nested_pair` fixture pins
+                    // (83 `z`s) sits past the window rather than in it.
+                    let expr_doc = self.prepend_opt(
+                        leading_comments_opt,
+                        self.build_binary_chain_doc_ungrouped(binary, arg.span),
+                    );
+                    let broken = d.concat(&[
+                        d.text("("),
+                        d.indent(d.concat(&[d.softline(), d.group(expr_doc)])),
+                        d.softline(),
+                        d.text(")"),
+                    ]);
+                    let pair = d.if_break(broken, expr_doc);
+                    let force_break = d.will_break(expr_doc);
+                    if cfg!(debug_assertions) {
+                        self.debug_assert_argument_edge_holds(if force_break {
+                            d.group_break(pair)
+                        } else {
+                            d.group(pair)
+                        });
+                    }
+                    parts.push(pair);
+                    let inner = d.concat(&parts);
+                    return if force_break {
+                        d.group_break(inner)
+                    } else {
+                        d.group(inner)
+                    };
+                }
+                let pair = self.build_asi_soft_pair(tail);
+                self.debug_assert_argument_edge_holds(pair);
+                parts.push(pair);
+                d.concat(&parts)
+            }
+            LeadingBreak::None => {
+                self.debug_assert_argument_edge_holds(tail);
+                parts.push(tail);
+                d.concat(&parts)
+            }
+        }
     }
 
     /// Build a Doc for a sequence expression
@@ -2222,7 +2349,19 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let (run_start, run_end) = sequence_operand_run(seq);
         let mut parts = DocBuf::with_capacity(4);
-        self.append_floated_leading_comments(&mut parts, span.start, run_start);
+        // Under its own left-spine claim the envelope floats the whole claimed region;
+        // under an enclosing one it floats only what lies past that region, which the
+        // enclosing claimer prints.
+        let (float_start, float_end) = match self.claimed_left_spine_run.get() {
+            Some(claim) if claim.claimer == span => (span.start, claim.region.end.max(run_start)),
+            Some(claim) if claim.region.start <= span.start && span.start < claim.region.end => {
+                (claim.region.end, run_start)
+            }
+            _ => (span.start, run_start),
+        };
+        if float_start < float_end {
+            self.append_floated_leading_comments(&mut parts, float_start, float_end);
+        }
         parts.push(d.text("("));
         parts.push(body);
         parts.push(d.text(")"));
@@ -2244,6 +2383,28 @@ impl<'a> Printer<'a> {
         parens: SeqParens,
         layout: SeqLayout,
     ) -> DocId {
+        // The envelope is a pair the first operand prints inside, so a comment in a shell
+        // on that operand's left spine leads the whole sequence, floated out ahead of the
+        // `(` with the edge (`Printer::left_spine_run_claim`). `Bare` prints no envelope:
+        // the enclosing construct owns the edge.
+        let claim = match (parens, seq.expressions.first()) {
+            (SeqParens::Bare, _) | (_, None) => None,
+            (_, Some(first)) => self.left_spine_run_claim(seq_span, seq_span.start, first, || true),
+        };
+        self.with_left_spine_claim(claim, || {
+            self.build_sequence_doc_claimed(seq, seq_span, trailing_end, parens, layout)
+        })
+    }
+
+    /// [`Self::build_sequence_doc_inner`] under its left-spine claim.
+    fn build_sequence_doc_claimed(
+        &self,
+        seq: &internal::SequenceExpression<'_>,
+        seq_span: Span,
+        trailing_end: u32,
+        parens: SeqParens,
+        layout: SeqLayout,
+    ) -> DocId {
         self.mark_relational_sibling_authored_pairs(seq.expressions.iter().copied().map(Some));
         let keep_trailing_inside = matches!(parens, SeqParens::KeepInside);
         // Where this builder's comment scans open: the FIRST OPERAND, never `seq_span.start`.
@@ -2258,6 +2419,18 @@ impl<'a> Printer<'a> {
         // reparse — the comment now ahead of the statement — printed flat (F1);
         // `return (⏎// c⏎a), b` settles on `a, b` the same way.
         let (interior_start, last_operand_end) = sequence_operand_run(seq);
+        // A claimed left-spine region is the envelope's to float — or the enclosing
+        // claimer's to print — so it no more breaks the operands than the edge does.
+        let scan_start = match self.claimed_left_spine_run.get() {
+            Some(claim)
+                if claim.claimer == seq_span
+                    || (claim.region.start <= interior_start
+                        && interior_start < claim.region.end) =>
+            {
+                claim.region.end.max(interior_start)
+            }
+            _ => interior_start,
+        };
         // Line comments anywhere up to `trailing_end` (incl. the last operand's
         // trailing comment, which lives outside `seq_span` in value positions) need
         // break handling so the comment isn't swallowed by the following comma/operand
@@ -2269,7 +2442,7 @@ impl<'a> Printer<'a> {
         // own-line block directive onto the operand's line — an inert placement, so the
         // freeze would be lost on the second pass.
         if self
-            .comments_to_emit_between(interior_start, trailing_end)
+            .comments_to_emit_between(scan_start, trailing_end)
             .any(|c| !c.is_block || self.is_honored_directive(c))
         {
             return self.build_sequence_doc_with_line_comments(

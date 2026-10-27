@@ -6,7 +6,9 @@ An own-line comment inside the grouping parens of a parameter default's **leftmo
 the `=`'s own gap
 ([param_default_line_comment](../param_default_line_comment_prettier_divergence/)) — the
 one-pass fixed point: left at the parameter's level, the run rendered flush and the reparse
-indented it.
+indented it. A shell below one the member chain prints mid-chain still leads the chain's
+head, so its run hangs the value too (`fn3`: `x = (// d⏎ (// d⏎ a).b).m() ? 1 : 2`, whose
+outer `// d` prints after `a`).
 
 tsv (`input.svelte`):
 

@@ -34,7 +34,7 @@ pub mod swallow;
 mod types;
 
 // Types
-pub use arena::{GroupId, PendingRun};
+pub use arena::{GroupId, LeadingBreak, LeadingEdge, PendingRun};
 pub use types::{CachedWidth, DocContext, DocText, LineKind, Mode, PoolSpan};
 
 /// Run `$copy` under a `match` on `$len` that names each short length in

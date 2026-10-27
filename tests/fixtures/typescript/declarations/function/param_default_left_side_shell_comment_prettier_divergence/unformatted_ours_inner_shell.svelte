@@ -14,4 +14,9 @@
 			a as any
 		) ? b : c
 	) {}
+	function fn3(
+		x = (// d
+		(// d
+		a).b).m() ? 1 : 2
+	) {}
 </script>

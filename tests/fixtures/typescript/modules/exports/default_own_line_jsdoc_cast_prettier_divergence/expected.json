@@ -1,0 +1,105 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 184,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a JSDoc cast the author gave a line of its own hangs the value under `export default`,",
+			"start": 10,
+			"end": 99
+		},
+		{
+			"type": "Line",
+			"value": " as at every value gap",
+			"start": 101,
+			"end": 125
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 144,
+			"end": 160
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 183,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 174,
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 127,
+					"end": 173,
+					"declaration": {
+						"type": "BinaryExpression",
+						"start": 163,
+						"end": 172,
+						"left": {
+							"type": "MemberExpression",
+							"start": 163,
+							"end": 168,
+							"object": {
+								"type": "Identifier",
+								"start": 164,
+								"end": 165,
+								"name": "x"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 167,
+								"end": 168,
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 171,
+							"end": 172,
+							"name": "q"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": "* @type {T} ",
+								"start": 144,
+								"end": 160
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a JSDoc cast the author gave a line of its own hangs the value under `export default`,",
+							"start": 10,
+							"end": 99
+						},
+						{
+							"type": "Line",
+							"value": " as at every value gap",
+							"start": 101,
+							"end": 125
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

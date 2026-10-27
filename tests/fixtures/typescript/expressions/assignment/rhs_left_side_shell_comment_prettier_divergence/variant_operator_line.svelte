@@ -4,6 +4,8 @@
 	// initializer. The run inside the value's leftmost shell hangs the value under the operator.
 	x = // c
 		(a as any) ? b : c;
+	w = // c
+		a.b ? b : c;
 	y = // c
 		(a as any).p;
 	class K {

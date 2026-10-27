@@ -32,6 +32,12 @@ return (
 ```
 
 Both are ASI-safe and both are fixed points; the difference is which pair holds the
-comment. The shell-retention rule is the sanctioned one, stated at the cast and update
+comment.
+
+A JSDoc cast in the shell of the cast's operand (`unformatted_ours_cast.svelte`,
+`return (/** @type {T} */⏎(x)).b as U`) is the operand's own syntax: the cast prints its
+comment glued to its pair, so the argument opens with no line break and takes no hanging
+pair (`return /** @type {T} */ (x).b as U;`). Prettier hangs the argument and drops the
+cast's pair (`return (⏎/** @type {T} */⏎x.b as U⏎);`), so the comment no longer casts. The shell-retention rule is the sanctioned one, stated at the cast and update
 entries in
 [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

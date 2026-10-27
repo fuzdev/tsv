@@ -45,12 +45,12 @@ pub(crate) use declarations::{ClassMemberModifiers, ContinuationValue, HeritageK
 pub(super) use element_comma::{block_is_before_comma, next_real_element_start, run_defers_line};
 pub(crate) use lists::{BlankRule, MemberGap, StandaloneGlue};
 pub(crate) use member_body::{MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam};
-pub(crate) use paren::leading_regex_start;
 pub(in crate::printer) use paren::printed_left_spine_step;
 pub(crate) use paren::{
-    AsiOperandShell, ParenLeadingValue, next_significant_byte, paren_pair_keeps_leading_run,
-    paren_shell_close_after,
+    AsiOperandShell, LeftSpineClaim, ParenLeadingValue, next_significant_byte,
+    paren_pair_keeps_leading_run, paren_shell_close_after,
 };
+pub(crate) use paren::{leading_regex_start, left_spine_shell_is_comment_free};
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
 pub(super) use super::{Printer, calls};

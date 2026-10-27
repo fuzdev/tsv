@@ -23,4 +23,19 @@
 			(a as any) ? b : c
 		);
 	}
+
+	// a comment below a pair the argument's left spine prints, below a non-null operand pair a
+	// member chain flattens and a cast operand, still leads the argument inside the hanging parens
+	function fn4() {
+		return (
+			// c
+			(a * 2)!.b
+		);
+	}
+	function fn5() {
+		return (
+			// c
+			(a * 2).b satisfies T
+		);
+	}
 </script>

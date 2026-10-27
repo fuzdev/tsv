@@ -1,0 +1,123 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 191,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a single-line block glued inside the exported value's leftmost shell, its binary group",
+			"start": 20,
+			"end": 109
+		},
+		{
+			"type": "Line",
+			"value": " flat, stays on the keyword's line",
+			"start": 111,
+			"end": 147
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 164,
+			"end": 171
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 190,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 181,
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 149,
+					"end": 180,
+					"exportKind": "value",
+					"declaration": {
+						"type": "BinaryExpression",
+						"start": 172,
+						"end": 179,
+						"left": {
+							"type": "MemberExpression",
+							"start": 172,
+							"end": 175,
+							"object": {
+								"type": "Identifier",
+								"start": 172,
+								"end": 173,
+								"name": "a"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 174,
+								"end": 175,
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"operator": "+",
+						"right": {
+							"type": "Literal",
+							"start": 178,
+							"end": 179,
+							"value": 1,
+							"raw": "1"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " d ",
+								"start": 164,
+								"end": 171
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a single-line block glued inside the exported value's leftmost shell, its binary group",
+							"start": 20,
+							"end": 109
+						},
+						{
+							"type": "Line",
+							"value": " flat, stays on the keyword's line",
+							"start": 111,
+							"end": 147
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

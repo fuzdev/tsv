@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 393,
+	"end": 462,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -39,17 +39,29 @@
 			"value": " c",
 			"start": 350,
 			"end": 354
+		},
+		{
+			"type": "Line",
+			"value": " d",
+			"start": 404,
+			"end": 408
+		},
+		{
+			"type": "Line",
+			"value": " d",
+			"start": 414,
+			"end": 418
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 392,
+		"end": 461,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 383,
+			"end": 452,
 			"body": [
 				{
 					"type": "FunctionDeclaration",
@@ -212,6 +224,113 @@
 						"type": "BlockStatement",
 						"start": 380,
 						"end": 382,
+						"body": []
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 384,
+					"end": 451,
+					"id": {
+						"type": "Identifier",
+						"start": 393,
+						"end": 396,
+						"name": "fn3"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 400,
+							"end": 445,
+							"left": {
+								"type": "Identifier",
+								"start": 400,
+								"end": 401,
+								"name": "x"
+							},
+							"right": {
+								"type": "ConditionalExpression",
+								"start": 412,
+								"end": 445,
+								"test": {
+									"type": "CallExpression",
+									"start": 412,
+									"end": 429,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 412,
+										"end": 427,
+										"object": {
+											"type": "MemberExpression",
+											"start": 412,
+											"end": 425,
+											"object": {
+												"type": "Identifier",
+												"start": 412,
+												"end": 413,
+												"name": "a",
+												"trailingComments": [
+													{
+														"type": "Line",
+														"value": " d",
+														"start": 414,
+														"end": 418
+													}
+												]
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 424,
+												"end": 425,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 426,
+											"end": 427,
+											"name": "m"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"consequent": {
+									"type": "Literal",
+									"start": 436,
+									"end": 437,
+									"value": 1,
+									"raw": "1"
+								},
+								"alternate": {
+									"type": "Literal",
+									"start": 444,
+									"end": 445,
+									"value": 2,
+									"raw": "2"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " d",
+										"start": 404,
+										"end": 408
+									}
+								]
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 449,
+						"end": 451,
 						"body": []
 					}
 				}

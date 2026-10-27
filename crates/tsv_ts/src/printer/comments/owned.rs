@@ -12,6 +12,7 @@
 // stripped `(`. Either way the comment ends up leading a paren it was never written
 // against — inert for an annotation the next token was carrying (`/* @__PURE__ */`).
 
+use super::paren::left_spine_has_no_shell;
 use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::Printer;
 use crate::printer::expressions::assignment::is_curried_arrow_chain_owning_break;
@@ -148,6 +149,35 @@ impl<'a> Printer<'a> {
             return None;
         }
         leading_comment_bound_pair_walk(value)
+    }
+
+    /// Whether `comment` is the comment of a JSDoc cast the parser BUILT on `value`'s left
+    /// spine — a [`internal::CommentBoundPairKind::Cast`] pair that owns it — rather than
+    /// cast-shaped text the parser read as an ordinary comment (`/** @type {T} */⏎(x) => y`
+    /// glues to an arrow's parameter `(`, which is no cast). The question a doc-edge reader
+    /// asks of the first comment it met, where the pair itself is no longer in hand.
+    ///
+    /// The walk takes every left-spine step, a shell's later-starting child included: the
+    /// doc's first comment is printed by a node on that spine wherever it starts.
+    pub(crate) fn left_spine_cast_owns(&self, value: &Expression<'_>, comment: Span) -> bool {
+        if !self.has_owned_comments {
+            return false;
+        }
+        let mut node = value;
+        loop {
+            if let ExpressionKind::CommentBoundPair(pair) = &node.kind {
+                if pair.kind == internal::CommentBoundPairKind::Cast && pair.comment.span == comment
+                {
+                    return true;
+                }
+                node = pair.inner;
+                continue;
+            }
+            match left_spine_child(node) {
+                Some(child) => node = child,
+                None => return false,
+            }
+        }
     }
 
     /// Record that `value` sits in a gap that answers a leading cast's break by rule and
@@ -542,6 +572,9 @@ impl<'a> Printer<'a> {
         value: &Expression<'_>,
         build: impl FnOnce() -> DocId,
     ) -> DocId {
+        if left_spine_has_no_shell(self.source, value) {
+            return self.build_value_with_outermost_owned_comment(value, build);
+        }
         let anchor = self.stripped_left_spine_leaf(value);
         if anchor.span().start == value.span().start {
             return self.build_value_with_outermost_owned_comment(value, build);

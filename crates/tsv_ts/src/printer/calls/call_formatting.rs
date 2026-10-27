@@ -183,31 +183,42 @@ fn build_call_head(
             .long_curried_target
             .replace(Some(call.callee.span()))
     });
-    let callee_doc = printer.build_left_spine_operand_doc_if(
-        callee_freezes,
-        span.start,
-        call.callee,
-        FrozenOperandPair::position(ParenContext::Callee),
-        || {
-            test_call_flat
-                .then(|| build_test_callee_flat_doc(call.callee, printer))
-                .flatten()
-                .unwrap_or_else(|| {
-                    callee_parens.as_ref().map_or_else(
-                        || printer.build_expression_doc(call.callee),
-                        |parens| {
-                            parens.build_body_doc(
-                                printer,
-                                printer.pair_gaps_are_comment_free(
-                                    (span.start, call.callee.span().start),
-                                    trailing_gap,
-                                ),
-                            )
-                        },
-                    )
-                })
-        },
-    );
+    // A comment in a shell below a pair the callee's left spine prints leads the whole
+    // call (`Printer::left_spine_run_claim`); an owned pair keeps its run inside it. Armed
+    // over the callee's build, where the sites below decline the region, and again over
+    // this site's own prepend, which prints it.
+    let claim = (!owned_pair)
+        .then(|| {
+            printer.left_spine_run_claim(span, span.start, call.callee, || callee_parens.is_some())
+        })
+        .flatten();
+    let callee_doc = printer.with_left_spine_claim(claim, || {
+        printer.build_left_spine_operand_doc_if(
+            callee_freezes,
+            span.start,
+            call.callee,
+            FrozenOperandPair::position(ParenContext::Callee),
+            || {
+                test_call_flat
+                    .then(|| build_test_callee_flat_doc(call.callee, printer))
+                    .flatten()
+                    .unwrap_or_else(|| {
+                        callee_parens.as_ref().map_or_else(
+                            || printer.build_expression_doc(call.callee),
+                            |parens| {
+                                parens.build_body_doc(
+                                    printer,
+                                    printer.pair_gaps_are_comment_free(
+                                        (span.start, call.callee.span().start),
+                                        trailing_gap,
+                                    ),
+                                )
+                            },
+                        )
+                    })
+            },
+        )
+    });
     if let Some(outer) = outer_target {
         printer.long_curried_target.set(outer);
     }
@@ -230,7 +241,14 @@ fn build_call_head(
         // e.g., (/* comment */ foo)() has span.start at '(' and callee.span.start at 'foo'
         // The comment is in the range [span.start, callee.span.start) and needs to be preserved
         // Note: This happens AFTER parens wrapping so `(/* c */ (a ? b : c))()` -> `/* c */ (a ? b : c)()`
-        printer.prepend_removed_paren_comments(span.start, call.callee.span().start, callee_doc)
+        printer.with_left_spine_claim(claim, || {
+            printer.prepend_removed_paren_comments(
+                span,
+                span.start,
+                call.callee.span().start,
+                callee_doc,
+            )
+        })
     };
 
     // Handle optional chaining. With an empty argument list and no explicit type arguments

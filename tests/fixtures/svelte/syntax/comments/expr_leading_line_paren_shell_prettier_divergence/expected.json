@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 241,
+	"end": 269,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -467,6 +467,66 @@
 					"type": "Fragment",
 					"nodes": []
 				}
+			},
+			{
+				"type": "Text",
+				"start": 240,
+				"end": 241,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 241,
+				"end": 268,
+				"test": {
+					"type": "UpdateExpression",
+					"start": 252,
+					"end": 257,
+					"operator": "++",
+					"prefix": false,
+					"argument": {
+						"type": "MemberExpression",
+						"start": 252,
+						"end": 255,
+						"object": {
+							"type": "Identifier",
+							"start": 252,
+							"end": 253,
+							"name": "a"
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 254,
+							"end": 255,
+							"name": "b"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 246,
+							"end": 250
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 259,
+							"end": 263,
+							"raw": "\n\tx\n",
+							"data": "\n\tx\n"
+						}
+					]
+				},
+				"alternate": null
 			}
 		]
 	},
@@ -519,6 +579,12 @@
 			"value": " c",
 			"start": 219,
 			"end": 223
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 246,
+			"end": 250
 		}
 	]
 }

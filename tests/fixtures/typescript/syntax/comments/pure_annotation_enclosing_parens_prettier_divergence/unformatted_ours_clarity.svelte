@@ -31,6 +31,12 @@
 	// an annotated `new` follows the same rule
 	const l = cond ? p : /* @__PURE__ */ new F() ?? y;
 
+	// an `await` operand's pair goes outside it too, however deep the author's own
+	// parens held the annotated call (`unformatted_ours_nested`), and the JSDoc-style
+	// `/** @__PURE__ */` is the same mark
+	const s = async () => await (/* @__PURE__ */ f() || d);
+	const t = async () => await (/** @__PURE__ */ f() || d);
+
 	// no enclosing paren: the annotation already sits against its call
 	const m = /* @__PURE__ */ f() ?? y;
 </script>

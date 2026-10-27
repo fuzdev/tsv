@@ -5,6 +5,9 @@
 	x =
 		// c
 		(a as any) ? b : c;
+	w =
+		// c
+		a.b ? b : c;
 	y =
 		// c
 		(a as any).p;

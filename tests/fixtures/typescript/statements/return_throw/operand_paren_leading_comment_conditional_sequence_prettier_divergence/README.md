@@ -33,5 +33,12 @@ conditional's group — so the hardline the comment carries breaks the condition
 the group fit flat. The same at a sequence head (`a,⏎b` → `a, b`). tsv lifts the comment
 out of the left side when it wraps, so the authored form converges in one pass.
 
+The walk reaches a comment the argument's left spine prints ahead of a pair, too: below
+a non-null's operand pair that a member chain flattens (`return (((⏎// c⏎a) * 2)!).b` prints
+`return (⏎// c⏎(a * 2)!.b⏎)`) and through a cast's operand (`(a * 2).b satisfies T`), where
+prettier's first pass leaves the comment inside the inner pair. `unformatted_single_shell`
+authors the comment one shell further out, which both formatters bring to `input` in one
+pass.
+
 Not a placement difference — the fixed point is shared. See
 [conformance_prettier_ts_comments.md §Comment normalization (stable quirks)](../../../../../../docs/conformance_prettier_ts_comments.md#comment-normalization-stable-quirks).

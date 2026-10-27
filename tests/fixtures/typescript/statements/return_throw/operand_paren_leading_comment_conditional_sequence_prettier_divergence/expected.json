@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 620,
+	"end": 940,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -57,17 +57,41 @@
 			"value": " c",
 			"start": 575,
 			"end": 579
+		},
+		{
+			"type": "Line",
+			"value": " a comment below a pair the argument's left spine prints, below a non-null operand pair a",
+			"start": 612,
+			"end": 703
+		},
+		{
+			"type": "Line",
+			"value": " member chain flattens and a cast operand, still leads the argument inside the hanging parens",
+			"start": 705,
+			"end": 800
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 833,
+			"end": 837
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 892,
+			"end": 896
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 619,
+		"end": 939,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 610,
+			"end": 930,
 			"body": [
 				{
 					"type": "FunctionDeclaration",
@@ -292,6 +316,175 @@
 							"end": 543
 						}
 					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 802,
+					"end": 859,
+					"id": {
+						"type": "Identifier",
+						"start": 811,
+						"end": 814,
+						"name": "fn4"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 817,
+						"end": 859,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 821,
+								"end": 856,
+								"argument": {
+									"type": "MemberExpression",
+									"start": 841,
+									"end": 851,
+									"object": {
+										"type": "TSNonNullExpression",
+										"start": 841,
+										"end": 849,
+										"expression": {
+											"type": "BinaryExpression",
+											"start": 842,
+											"end": 847,
+											"left": {
+												"type": "Identifier",
+												"start": 842,
+												"end": 843,
+												"name": "a"
+											},
+											"operator": "*",
+											"right": {
+												"type": "Literal",
+												"start": 846,
+												"end": 847,
+												"value": 2,
+												"raw": "2"
+											}
+										}
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 850,
+										"end": 851,
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 833,
+											"end": 837
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment below a pair the argument's left spine prints, below a non-null operand pair a",
+							"start": 612,
+							"end": 703
+						},
+						{
+							"type": "Line",
+							"value": " member chain flattens and a cast operand, still leads the argument inside the hanging parens",
+							"start": 705,
+							"end": 800
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 861,
+					"end": 929,
+					"id": {
+						"type": "Identifier",
+						"start": 870,
+						"end": 873,
+						"name": "fn5"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 876,
+						"end": 929,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 880,
+								"end": 926,
+								"argument": {
+									"type": "TSSatisfiesExpression",
+									"start": 900,
+									"end": 921,
+									"expression": {
+										"type": "MemberExpression",
+										"start": 900,
+										"end": 909,
+										"object": {
+											"type": "BinaryExpression",
+											"start": 901,
+											"end": 906,
+											"left": {
+												"type": "Identifier",
+												"start": 901,
+												"end": 902,
+												"name": "a"
+											},
+											"operator": "*",
+											"right": {
+												"type": "Literal",
+												"start": 905,
+												"end": 906,
+												"value": 2,
+												"raw": "2"
+											}
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 908,
+											"end": 909,
+											"name": "b"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 920,
+										"end": 921,
+										"typeName": {
+											"type": "Identifier",
+											"start": 920,
+											"end": 921,
+											"name": "T"
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 892,
+											"end": 896
+										}
+									]
+								}
+							}
+						]
+					}
 				}
 			],
 			"sourceType": "module"

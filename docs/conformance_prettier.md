@@ -401,7 +401,10 @@ its tail:
   pair is **retained** hoists nothing and is correctly outside the gap — its comment stays
   inside the parens, which supply their own indent
   ([expr_leading_line_paren_shell](../tests/fixtures/svelte/syntax/comments/expr_leading_line_paren_shell_prettier_divergence/),
-  the shell sweep across all three of the family's resolving seams).
+  the shell sweep across all three of the family's resolving seams). A cast's operand, which
+  prints first and bare, carries the run to the head the same way (`title={((// c⏎a).b as T)}`
+  prints `title={ // c⏎\t\ta.b as T⏎\t}`)
+  ([expr_leading_line_paren_shell_cast](../tests/fixtures/svelte/syntax/comments/expr_leading_line_paren_shell_cast_prettier_divergence/)).
 
 **At a keyword→value gap the rule reads any forced break, not only a `//` one.** A block
 run the author broke after forces its break too when a comment in it spans lines or the value

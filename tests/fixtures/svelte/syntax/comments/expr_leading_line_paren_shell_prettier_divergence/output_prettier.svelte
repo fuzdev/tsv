@@ -26,3 +26,7 @@ a.b}
 	data-attr={// c
 	a.b}
 ></div>
+{#if // c
+a.b++}
+	x
+{/if}

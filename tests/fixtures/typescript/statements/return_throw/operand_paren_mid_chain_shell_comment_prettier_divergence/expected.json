@@ -1,0 +1,733 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 877,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a comment glued to a mid-chain shell's `(` trails the chain's head on the keyword's line",
+			"start": 20,
+			"end": 111
+		},
+		{
+			"type": "Line",
+			"value": " d",
+			"start": 141,
+			"end": 145
+		},
+		{
+			"type": "Line",
+			"value": " one on a line of its own below the `(` hangs the argument",
+			"start": 170,
+			"end": 230
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 269,
+			"end": 273
+		},
+		{
+			"type": "Line",
+			"value": " nested shells, each `//` glued to its own `(`: the second prints below the first",
+			"start": 296,
+			"end": 379
+		},
+		{
+			"type": "Line",
+			"value": " d",
+			"start": 414,
+			"end": 418
+		},
+		{
+			"type": "Line",
+			"value": " e",
+			"start": 423,
+			"end": 427
+		},
+		{
+			"type": "Line",
+			"value": " a line the source opens before a `(`, ended by a `//` below it, hangs the argument",
+			"start": 449,
+			"end": 534
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 569,
+			"end": 576
+		},
+		{
+			"type": "Line",
+			"value": " e",
+			"start": 581,
+			"end": 585
+		},
+		{
+			"type": "Line",
+			"value": " a comment on a multi-line block's closing line in a called member's gap hangs the argument",
+			"start": 607,
+			"end": 700
+		},
+		{
+			"type": "Block",
+			"value": " e ",
+			"start": 733,
+			"end": 740
+		},
+		{
+			"type": "Block",
+			"value": "\n ",
+			"start": 743,
+			"end": 752
+		},
+		{
+			"type": "Block",
+			"value": "\n\t\t\t\t ",
+			"start": 757,
+			"end": 767
+		},
+		{
+			"type": "Block",
+			"value": " e ",
+			"start": 768,
+			"end": 775
+		},
+		{
+			"type": "Block",
+			"value": "\n\t ",
+			"start": 831,
+			"end": 841
+		},
+		{
+			"type": "Block",
+			"value": " e ",
+			"start": 842,
+			"end": 849
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 876,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 867,
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 113,
+					"end": 167,
+					"id": {
+						"type": "Identifier",
+						"start": 122,
+						"end": 125,
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 128,
+						"end": 167,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 132,
+								"end": 164,
+								"argument": {
+									"type": "CallExpression",
+									"start": 139,
+									"end": 163,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 139,
+										"end": 161,
+										"object": {
+											"type": "MemberExpression",
+											"start": 139,
+											"end": 159,
+											"object": {
+												"type": "CallExpression",
+												"start": 139,
+												"end": 153,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 139,
+													"end": 151,
+													"object": {
+														"type": "Identifier",
+														"start": 139,
+														"end": 140,
+														"name": "a",
+														"trailingComments": [
+															{
+																"type": "Line",
+																"value": " d",
+																"start": 141,
+																"end": 145
+															}
+														]
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 150,
+														"end": 151,
+														"name": "b"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 158,
+												"end": 159,
+												"name": "c"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 160,
+											"end": 161,
+											"name": "m"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment glued to a mid-chain shell's `(` trails the chain's head on the keyword's line",
+							"start": 20,
+							"end": 111
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 232,
+					"end": 293,
+					"id": {
+						"type": "Identifier",
+						"start": 241,
+						"end": 244,
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 247,
+						"end": 293,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 251,
+								"end": 290,
+								"argument": {
+									"type": "CallExpression",
+									"start": 263,
+									"end": 285,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 263,
+										"end": 282,
+										"object": {
+											"type": "MemberExpression",
+											"start": 263,
+											"end": 280,
+											"object": {
+												"type": "Identifier",
+												"start": 263,
+												"end": 264,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 279,
+												"end": 280,
+												"name": "b",
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " c",
+														"start": 269,
+														"end": 273
+													}
+												]
+											},
+											"computed": false,
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 281,
+											"end": 282,
+											"name": "m"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "Literal",
+											"start": 283,
+											"end": 284,
+											"value": 1,
+											"raw": "1"
+										}
+									],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " one on a line of its own below the `(` hangs the argument",
+							"start": 170,
+							"end": 230
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 381,
+					"end": 446,
+					"id": {
+						"type": "Identifier",
+						"start": 390,
+						"end": 393,
+						"name": "fn3"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 396,
+						"end": 446,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 400,
+								"end": 443,
+								"argument": {
+									"type": "CallExpression",
+									"start": 412,
+									"end": 438,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 412,
+										"end": 436,
+										"object": {
+											"type": "MemberExpression",
+											"start": 412,
+											"end": 434,
+											"object": {
+												"type": "Identifier",
+												"start": 412,
+												"end": 413,
+												"name": "a",
+												"trailingComments": [
+													{
+														"type": "Line",
+														"value": " d",
+														"start": 414,
+														"end": 418
+													}
+												]
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 433,
+												"end": 434,
+												"name": "b",
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " e",
+														"start": 423,
+														"end": 427
+													}
+												]
+											},
+											"computed": false,
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 435,
+											"end": 436,
+											"name": "m"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " nested shells, each `//` glued to its own `(`: the second prints below the first",
+							"start": 296,
+							"end": 379
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 536,
+					"end": 604,
+					"id": {
+						"type": "Identifier",
+						"start": 545,
+						"end": 548,
+						"name": "fn4"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 551,
+						"end": 604,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 555,
+								"end": 601,
+								"argument": {
+									"type": "CallExpression",
+									"start": 567,
+									"end": 596,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 567,
+										"end": 594,
+										"object": {
+											"type": "MemberExpression",
+											"start": 567,
+											"end": 592,
+											"object": {
+												"type": "Identifier",
+												"start": 567,
+												"end": 568,
+												"name": "a",
+												"trailingComments": [
+													{
+														"type": "Block",
+														"value": " d ",
+														"start": 569,
+														"end": 576
+													}
+												]
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 591,
+												"end": 592,
+												"name": "b",
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " e",
+														"start": 581,
+														"end": 585
+													}
+												]
+											},
+											"computed": false,
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 593,
+											"end": 594,
+											"name": "m"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line the source opens before a `(`, ended by a `//` below it, hangs the argument",
+							"start": 449,
+							"end": 534
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 702,
+					"end": 792,
+					"id": {
+						"type": "Identifier",
+						"start": 711,
+						"end": 714,
+						"name": "fn5"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 717,
+						"end": 792,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 721,
+								"end": 789,
+								"argument": {
+									"type": "CallExpression",
+									"start": 741,
+									"end": 784,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 741,
+										"end": 782,
+										"object": {
+											"type": "MemberExpression",
+											"start": 741,
+											"end": 756,
+											"object": {
+												"type": "MemberExpression",
+												"start": 741,
+												"end": 754,
+												"object": {
+													"type": "Identifier",
+													"start": 741,
+													"end": 742,
+													"name": "a",
+													"trailingComments": [
+														{
+															"type": "Block",
+															"value": "\n ",
+															"start": 743,
+															"end": 752
+														}
+													]
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 753,
+													"end": 754,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 755,
+												"end": 756,
+												"name": "c"
+											},
+											"computed": false,
+											"optional": false,
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": "\n\t\t\t\t ",
+													"start": 757,
+													"end": 767
+												}
+											]
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 781,
+											"end": 782,
+											"name": "m",
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " e ",
+													"start": 768,
+													"end": 775
+												}
+											]
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " e ",
+											"start": 733,
+											"end": 740
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment on a multi-line block's closing line in a called member's gap hangs the argument",
+							"start": 607,
+							"end": 700
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 794,
+					"end": 866,
+					"id": {
+						"type": "Identifier",
+						"start": 803,
+						"end": 806,
+						"name": "fn6"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 809,
+						"end": 866,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 813,
+								"end": 863,
+								"argument": {
+									"type": "CallExpression",
+									"start": 825,
+									"end": 858,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 825,
+										"end": 856,
+										"object": {
+											"type": "MemberExpression",
+											"start": 825,
+											"end": 830,
+											"object": {
+												"type": "MemberExpression",
+												"start": 825,
+												"end": 828,
+												"object": {
+													"type": "Identifier",
+													"start": 825,
+													"end": 826,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 827,
+													"end": 828,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 829,
+												"end": 830,
+												"name": "c"
+											},
+											"computed": false,
+											"optional": false,
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": "\n\t ",
+													"start": 831,
+													"end": 841
+												}
+											]
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 855,
+											"end": 856,
+											"name": "m",
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " e ",
+													"start": 842,
+													"end": 849
+												}
+											]
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -242,13 +242,16 @@ enum Payload {
     /// A line comment — never owned (`owned ⇒ is_block`), and rides the `line_suffix`
     /// hoist-to-EOL path instead.
     Line,
-    /// A JSDoc type cast — the **one** remaining content sniff
-    /// (`is_jsdoc_type_cast_comment`), which governs paren retention by building a
-    /// `CommentBoundPair` node that prints the comment itself.
+    /// A JSDoc type cast — one of the **two** remaining content checks besides the
+    /// format-ignore directives (`is_jsdoc_type_cast_comment`), which governs paren
+    /// retention by building a `CommentBoundPair` node that prints the comment itself (and,
+    /// read in place, keeps the printer's `export default` edge from taking a cast for a
+    /// left-spine run).
     JsdocCast,
-    /// A bundler annotation — owned exactly like any other glued block comment (no sniff).
-    /// Called out because losing one is silently *semantic*: the marked call stops being
-    /// droppable.
+    /// A bundler annotation — owned exactly like any other glued block comment (no sniff
+    /// for ownership; the other remaining content check, `tsv_lang::is_tree_shaking_annotation`,
+    /// only keeps the printer from claiming a left-spine region that holds one). Called out
+    /// because losing one is silently *semantic*: the marked call stops being droppable.
     Annotation,
     /// A multi-line block comment — sets `Comment::multiline`, the precomputed flag every
     /// multi-line-block expansion gate reads.

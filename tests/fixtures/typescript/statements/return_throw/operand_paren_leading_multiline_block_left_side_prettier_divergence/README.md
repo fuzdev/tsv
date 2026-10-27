@@ -49,6 +49,14 @@ door, by
 [operand_paren_leading_multiline_block_kept_shell](../operand_paren_leading_multiline_block_kept_shell_prettier_divergence/)'s
 `prettier_nonconvergent.txt`.
 
+`fn11` puts the shell one link further down (`return (/* a⏎b */ a.b).m(1)`), where the member
+chain prints the shell's run mid-chain. The block is glued to `a`, so it is the head's own
+comment and prints ahead of the chain, and tsv gives it the same pair. Prettier keeps it
+behind the head instead (`return a /* a⏎b */.b⏎	.m(1)`, two passes, pinned in
+`audit_signature_left_shell.txt`): a relocation rather than an ASI split. The rest of a
+mid-chain shell's run is
+[operand_paren_mid_chain_shell_comment](../operand_paren_mid_chain_shell_comment_prettier_divergence/).
+
 Every cell of `input.svelte` is a form **prettier reproduces byte for byte** — the
 divergence is which authorings reach it, so the whole claim lives in the variant and the
 fixture carries no `output_prettier.*`. The walk's stop condition (a leftmost node whose own

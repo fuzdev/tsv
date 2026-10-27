@@ -44,4 +44,11 @@ b */ a) + b;
 b */ a.b
 		);
 	}
+
+	// a block glued to the head of a chain whose shell sits further down is the head's own
+	// comment, so it prints ahead of the chain and takes the same pair
+	function fn11() {
+		return (/* a
+b */ a.b).m(1);
+	}
 </script>

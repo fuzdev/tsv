@@ -1,0 +1,94 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// A `return` / `throw` / `yield` argument whose LEFTMOST node is a cast's or a postfix
+	// update's operand keeps that operand's shell: the pair holds the comment, so nothing
+	// reaches the keyword's line and no hanging pair is added around it.
+	function fn1() {
+		return (
+			// c
+			a satisfies B
+		);
+	}
+	function fn2() {
+		return (
+			// c
+			a++
+		);
+	}
+	function fn3() {
+		return (
+			// c
+			a as B
+		);
+	}
+	function fn4() {
+		throw (
+			// c
+			a as B
+		);
+	}
+	function* fn5() {
+		yield // c
+		a as B;
+	}
+	// a JSDoc cast in the shell of the cast's operand is the operand's own syntax, printed with
+	// its own glue on the keyword's line
+	function fn6() {
+		return (
+			/** @type {T} */
+			x.b as U
+		);
+	}
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// A `return` / `throw` / `yield` argument whose LEFTMOST node is a cast's or a postfix
+	// update's operand keeps that operand's shell: the pair holds the comment, so nothing
+	// reaches the keyword's line and no hanging pair is added around it.
+	function fn1() {
+		return (
+			// c
+			a satisfies B
+		);
+	}
+	function fn2() {
+		return (
+			// c
+			a++
+		);
+	}
+	function fn3() {
+		return (
+			// c
+			a as B
+		);
+	}
+	function fn4() {
+		throw (
+			// c
+			a as B
+		);
+	}
+	function* fn5() {
+		yield; // c
+		a as B;
+	}
+	// a JSDoc cast in the shell of the cast's operand is the operand's own syntax, printed with
+	// its own glue on the keyword's line
+	function fn6() {
+		return (
+			/** @type {T} */
+			x.b as U
+		);
+	}
+</script>

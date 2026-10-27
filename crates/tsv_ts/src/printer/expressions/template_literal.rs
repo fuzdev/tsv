@@ -484,27 +484,42 @@ impl<'a> Printer<'a> {
             // The TAG's own erased-paren freeze — the region this arm's
             // `prepend_removed_paren_comments` below already emits
             // ([`Printer::build_left_spine_operand_doc`]).
-            let tag_doc = self.build_left_spine_operand_doc(
-                span.start,
-                tagged.tag,
-                FrozenOperandPair::position(ParenContext::TaggedTemplateTag),
-                || {
-                    if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
-                        sealed
-                    } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
-                        || tagged.type_arguments.as_ref().is_some_and(|_| {
-                            self.instantiation_keeps_pair(tagged.tag, SecondTypeArgs::Expression)
-                        })
-                    {
-                        d.parens(self.build_expression_doc(tagged.tag))
-                    } else {
-                        self.build_expression_doc(tagged.tag)
-                    }
-                },
-            );
-            // Check for comments between removed parentheses and tag
-            // e.g., (/* comment */ tag)`template` has span.start at '(' and tag.span.start at 'tag'
-            self.prepend_removed_paren_comments(span.start, tagged.tag.span().start, tag_doc)
+            // A comment in a shell below a pair the tag's left spine prints leads the
+            // whole tagged template (`Printer::left_spine_run_claim`).
+            let claim = self.left_spine_run_claim(span, span.start, tagged.tag, || {
+                self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
+            });
+            self.with_left_spine_claim(claim, || {
+                let tag_doc = self.build_left_spine_operand_doc(
+                    span.start,
+                    tagged.tag,
+                    FrozenOperandPair::position(ParenContext::TaggedTemplateTag),
+                    || {
+                        if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
+                            sealed
+                        } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
+                            || tagged.type_arguments.as_ref().is_some_and(|_| {
+                                self.instantiation_keeps_pair(
+                                    tagged.tag,
+                                    SecondTypeArgs::Expression,
+                                )
+                            })
+                        {
+                            d.parens(self.build_expression_doc(tagged.tag))
+                        } else {
+                            self.build_expression_doc(tagged.tag)
+                        }
+                    },
+                );
+                // Check for comments between removed parentheses and tag
+                // e.g., (/* comment */ tag)`template` has span.start at '(' and tag.span.start at 'tag'
+                self.prepend_removed_paren_comments(
+                    span,
+                    span.start,
+                    tagged.tag.span().start,
+                    tag_doc,
+                )
+            })
         };
 
         let mut parts: DocBuf = smallvec![tag_doc];

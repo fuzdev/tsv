@@ -1,0 +1,145 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 459,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " JSDoc cast text glued to an arrow's parameter `(` is no cast — the parser reads that",
+			"start": 10,
+			"end": 97
+		},
+		{
+			"type": "Line",
+			"value": " `(` as the parameter list's — so inside the exported value's leftmost shell it is an",
+			"start": 99,
+			"end": 186
+		},
+		{
+			"type": "Line",
+			"value": " ordinary block that ends its line, and the value hangs under `export default`. Its",
+			"start": 188,
+			"end": 273
+		},
+		{
+			"type": "Line",
+			"value": " output wraps the arrow in a pair, which makes a real cast the author gave a line of",
+			"start": 275,
+			"end": 361
+		},
+		{
+			"type": "Line",
+			"value": " its own, and that hangs too.",
+			"start": 363,
+			"end": 394
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 413,
+			"end": 429
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 458,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 449,
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 396,
+					"end": 448,
+					"declaration": {
+						"type": "BinaryExpression",
+						"start": 432,
+						"end": 447,
+						"left": {
+							"type": "ArrowFunctionExpression",
+							"start": 433,
+							"end": 442,
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 434,
+									"end": 435,
+									"name": "x"
+								}
+							],
+							"body": {
+								"type": "Identifier",
+								"start": 440,
+								"end": 442,
+								"name": "zz"
+							}
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 446,
+							"end": 447,
+							"name": "q"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": "* @type {T} ",
+								"start": 413,
+								"end": 429
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " JSDoc cast text glued to an arrow's parameter `(` is no cast — the parser reads that",
+							"start": 10,
+							"end": 97
+						},
+						{
+							"type": "Line",
+							"value": " `(` as the parameter list's — so inside the exported value's leftmost shell it is an",
+							"start": 99,
+							"end": 186
+						},
+						{
+							"type": "Line",
+							"value": " ordinary block that ends its line, and the value hangs under `export default`. Its",
+							"start": 188,
+							"end": 273
+						},
+						{
+							"type": "Line",
+							"value": " output wraps the arrow in a pair, which makes a real cast the author gave a line of",
+							"start": 275,
+							"end": 361
+						},
+						{
+							"type": "Line",
+							"value": " its own, and that hangs too.",
+							"start": 363,
+							"end": 394
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

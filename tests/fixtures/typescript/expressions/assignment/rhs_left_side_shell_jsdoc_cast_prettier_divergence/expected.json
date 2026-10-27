@@ -1,0 +1,450 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 570,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A JSDoc cast the author gave a line of its own, at the head of a member chain, hangs",
+			"start": 10,
+			"end": 97
+		},
+		{
+			"type": "Line",
+			"value": " the value under the operator at every assignment seam — however the cast was reached:",
+			"start": 99,
+			"end": 187
+		},
+		{
+			"type": "Line",
+			"value": " written there, or inside a grouping shell the chain prints mid-chain",
+			"start": 189,
+			"end": 260
+		},
+		{
+			"type": "Line",
+			"value": " (`unformatted_ours_mid_chain_shell`), where the cast's leaf still prints its comment",
+			"start": 262,
+			"end": 349
+		},
+		{
+			"type": "Line",
+			"value": " ahead of the chain's head.",
+			"start": 351,
+			"end": 380
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 388,
+			"end": 404
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 433,
+			"end": 449
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 475,
+			"end": 491
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 524,
+			"end": 540
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 569,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 560,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 382,
+					"end": 419,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 382,
+						"end": 418,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 382,
+							"end": 383,
+							"name": "x"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 407,
+							"end": 418,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 407,
+								"end": 414,
+								"object": {
+									"type": "MemberExpression",
+									"start": 407,
+									"end": 412,
+									"object": {
+										"type": "Identifier",
+										"start": 408,
+										"end": 409,
+										"name": "f"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 411,
+										"end": 412,
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 413,
+									"end": 414,
+									"name": "c"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 415,
+									"end": 417,
+									"name": "zz"
+								}
+							],
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "* @type {T} ",
+									"start": 388,
+									"end": 404
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A JSDoc cast the author gave a line of its own, at the head of a member chain, hangs",
+							"start": 10,
+							"end": 97
+						},
+						{
+							"type": "Line",
+							"value": " the value under the operator at every assignment seam — however the cast was reached:",
+							"start": 99,
+							"end": 187
+						},
+						{
+							"type": "Line",
+							"value": " written there, or inside a grouping shell the chain prints mid-chain",
+							"start": 189,
+							"end": 260
+						},
+						{
+							"type": "Line",
+							"value": " (`unformatted_ours_mid_chain_shell`), where the cast's leaf still prints its comment",
+							"start": 262,
+							"end": 349
+						},
+						{
+							"type": "Line",
+							"value": " ahead of the chain's head.",
+							"start": 351,
+							"end": 380
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 421,
+					"end": 465,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 427,
+							"end": 464,
+							"id": {
+								"type": "Identifier",
+								"start": 427,
+								"end": 428,
+								"name": "y"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 452,
+								"end": 464,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 452,
+									"end": 460,
+									"object": {
+										"type": "MemberExpression",
+										"start": 452,
+										"end": 458,
+										"object": {
+											"type": "Identifier",
+											"start": 453,
+											"end": 454,
+											"name": "f"
+										},
+										"property": {
+											"type": "Literal",
+											"start": 456,
+											"end": 457,
+											"value": 0,
+											"raw": "0"
+										},
+										"computed": true,
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 459,
+										"end": 460,
+										"name": "c"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 461,
+										"end": 463,
+										"name": "zz"
+									}
+								],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 433,
+										"end": 449
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 467,
+					"end": 508,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 467,
+						"end": 507,
+						"operator": "=",
+						"left": {
+							"type": "MemberExpression",
+							"start": 467,
+							"end": 470,
+							"object": {
+								"type": "Identifier",
+								"start": 467,
+								"end": 468,
+								"name": "o"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 469,
+								"end": 470,
+								"name": "p"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 494,
+							"end": 507,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 494,
+								"end": 503,
+								"object": {
+									"type": "MemberExpression",
+									"start": 494,
+									"end": 501,
+									"object": {
+										"type": "MemberExpression",
+										"start": 494,
+										"end": 499,
+										"object": {
+											"type": "Identifier",
+											"start": 495,
+											"end": 496,
+											"name": "f"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 498,
+											"end": 499,
+											"name": "b"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 500,
+										"end": 501,
+										"name": "d"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 502,
+									"end": 503,
+									"name": "c"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 504,
+									"end": 506,
+									"name": "zz"
+								}
+							],
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "* @type {T} ",
+									"start": 475,
+									"end": 491
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 510,
+					"end": 559,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 510,
+						"end": 558,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 510,
+							"end": 511,
+							"name": "o"
+						},
+						"right": {
+							"type": "ObjectExpression",
+							"start": 514,
+							"end": 558,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 518,
+									"end": 555,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 518,
+										"end": 519,
+										"name": "k"
+									},
+									"value": {
+										"type": "CallExpression",
+										"start": 544,
+										"end": 555,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 544,
+											"end": 551,
+											"object": {
+												"type": "MemberExpression",
+												"start": 544,
+												"end": 549,
+												"object": {
+													"type": "Identifier",
+													"start": 545,
+													"end": 546,
+													"name": "f"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 548,
+													"end": 549,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 550,
+												"end": 551,
+												"name": "c"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 552,
+												"end": 554,
+												"name": "zz"
+											}
+										],
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": "* @type {T} ",
+												"start": 524,
+												"end": 540
+											}
+										]
+									},
+									"kind": "init"
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

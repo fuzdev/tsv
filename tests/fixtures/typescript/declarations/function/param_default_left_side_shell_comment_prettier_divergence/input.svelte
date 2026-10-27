@@ -10,4 +10,11 @@
 		x = // c
 			(a as any) ? b : c
 	) {}
+	function fn3(
+		x = // d
+			a // d
+				.b.m()
+				? 1
+				: 2
+	) {}
 </script>

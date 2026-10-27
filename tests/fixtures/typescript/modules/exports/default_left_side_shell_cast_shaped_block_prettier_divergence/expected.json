@@ -1,0 +1,152 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 338,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " JSDoc cast text inside the exported value's LEFTMOST shell, glued to a name rather than a",
+			"start": 20,
+			"end": 112
+		},
+		{
+			"type": "Line",
+			"value": " `(`, is no cast: an ordinary block that ends its line, so the value hangs under",
+			"start": 114,
+			"end": 196
+		},
+		{
+			"type": "Line",
+			"value": " `export default` as it does for any run that ends its line there.",
+			"start": 198,
+			"end": 266
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 285,
+			"end": 301
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 337,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 328,
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 268,
+					"end": 327,
+					"exportKind": "value",
+					"declaration": {
+						"type": "CallExpression",
+						"start": 304,
+						"end": 326,
+						"callee": {
+							"type": "Identifier",
+							"start": 304,
+							"end": 305,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 306,
+								"end": 325,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 312,
+									"end": 325,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 317,
+											"end": 321,
+											"expression": {
+												"type": "CallExpression",
+												"start": 317,
+												"end": 320,
+												"callee": {
+													"type": "Identifier",
+													"start": 317,
+													"end": 318,
+													"name": "q"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false,
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": "* @type {T} ",
+								"start": 285,
+								"end": 301
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " JSDoc cast text inside the exported value's LEFTMOST shell, glued to a name rather than a",
+							"start": 20,
+							"end": 112
+						},
+						{
+							"type": "Line",
+							"value": " `(`, is no cast: an ordinary block that ends its line, so the value hangs under",
+							"start": 114,
+							"end": 196
+						},
+						{
+							"type": "Line",
+							"value": " `export default` as it does for any run that ends its line there.",
+							"start": 198,
+							"end": 266
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
