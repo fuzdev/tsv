@@ -1,0 +1,699 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 510,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment inside stripped grouping parens around a TAGGED TEMPLATE's tag, where the tagged",
+			"start": 20,
+			"end": 113
+		},
+		{
+			"type": "Line",
+			"value": " template is a chain's base. The run leads the chain from ahead of the whole chain doc, so",
+			"start": 115,
+			"end": 207
+		},
+		{
+			"type": "Line",
+			"value": " the chain keeps the layout the same document gets with the parens left out.",
+			"start": 209,
+			"end": 287
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 290,
+			"end": 295
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 313,
+			"end": 318
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 344,
+			"end": 349
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 375,
+			"end": 383
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 434,
+			"end": 439
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 478,
+			"end": 483
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 509,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 500,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 297,
+					"end": 310,
+					"expression": {
+						"type": "CallExpression",
+						"start": 297,
+						"end": 309,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 297,
+							"end": 307,
+							"object": {
+								"type": "CallExpression",
+								"start": 297,
+								"end": 305,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 297,
+									"end": 303,
+									"object": {
+										"type": "TaggedTemplateExpression",
+										"start": 297,
+										"end": 301,
+										"tag": {
+											"type": "Identifier",
+											"start": 297,
+											"end": 298,
+											"name": "a"
+										},
+										"quasi": {
+											"type": "TemplateLiteral",
+											"start": 298,
+											"end": 301,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 299,
+													"end": 300,
+													"value": {
+														"raw": "t",
+														"cooked": "t"
+													},
+													"tail": true
+												}
+											]
+										}
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 302,
+										"end": 303,
+										"name": "g"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 306,
+								"end": 307,
+								"name": "h"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment inside stripped grouping parens around a TAGGED TEMPLATE's tag, where the tagged",
+							"start": 20,
+							"end": 113
+						},
+						{
+							"type": "Line",
+							"value": " template is a chain's base. The run leads the chain from ahead of the whole chain doc, so",
+							"start": 115,
+							"end": 207
+						},
+						{
+							"type": "Line",
+							"value": " the chain keeps the layout the same document gets with the parens left out.",
+							"start": 209,
+							"end": 287
+						},
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 290,
+							"end": 295
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 320,
+					"end": 335,
+					"expression": {
+						"type": "CallExpression",
+						"start": 320,
+						"end": 334,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 320,
+							"end": 332,
+							"object": {
+								"type": "CallExpression",
+								"start": 320,
+								"end": 330,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 320,
+									"end": 328,
+									"object": {
+										"type": "TaggedTemplateExpression",
+										"start": 320,
+										"end": 326,
+										"tag": {
+											"type": "CallExpression",
+											"start": 320,
+											"end": 323,
+											"callee": {
+												"type": "Identifier",
+												"start": 320,
+												"end": 321,
+												"name": "a"
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"quasi": {
+											"type": "TemplateLiteral",
+											"start": 323,
+											"end": 326,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 324,
+													"end": 325,
+													"value": {
+														"raw": "t",
+														"cooked": "t"
+													},
+													"tail": true
+												}
+											]
+										}
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 327,
+										"end": 328,
+										"name": "g"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 331,
+								"end": 332,
+								"name": "h"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 313,
+							"end": 318
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 338,
+					"end": 367,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 338,
+						"end": 366,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 338,
+							"end": 339,
+							"name": "x"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 352,
+							"end": 366,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 352,
+								"end": 364,
+								"object": {
+									"type": "CallExpression",
+									"start": 352,
+									"end": 362,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 352,
+										"end": 360,
+										"object": {
+											"type": "TaggedTemplateExpression",
+											"start": 352,
+											"end": 358,
+											"tag": {
+												"type": "MemberExpression",
+												"start": 352,
+												"end": 355,
+												"object": {
+													"type": "Identifier",
+													"start": 352,
+													"end": 353,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 354,
+													"end": 355,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"quasi": {
+												"type": "TemplateLiteral",
+												"start": 355,
+												"end": 358,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 356,
+														"end": 357,
+														"value": {
+															"raw": "t",
+															"cooked": "t"
+														},
+														"tail": true
+													}
+												]
+											}
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 359,
+											"end": 360,
+											"name": "g"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 363,
+									"end": 364,
+									"name": "h"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [],
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c3",
+									"start": 344,
+									"end": 349
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 370,
+					"end": 402,
+					"expression": {
+						"type": "CallExpression",
+						"start": 370,
+						"end": 401,
+						"callee": {
+							"type": "Identifier",
+							"start": 370,
+							"end": 371,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "CallExpression",
+								"start": 386,
+								"end": 398,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 386,
+									"end": 396,
+									"object": {
+										"type": "CallExpression",
+										"start": 386,
+										"end": 394,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 386,
+											"end": 392,
+											"object": {
+												"type": "TaggedTemplateExpression",
+												"start": 386,
+												"end": 390,
+												"tag": {
+													"type": "Identifier",
+													"start": 386,
+													"end": 387,
+													"name": "a"
+												},
+												"quasi": {
+													"type": "TemplateLiteral",
+													"start": 387,
+													"end": 390,
+													"expressions": [],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 388,
+															"end": 389,
+															"value": {
+																"raw": "t",
+																"cooked": "t"
+															},
+															"tail": true
+														}
+													]
+												}
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 391,
+												"end": 392,
+												"name": "g"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 395,
+										"end": 396,
+										"name": "h"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c4 ",
+										"start": 375,
+										"end": 383
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 405,
+					"end": 463,
+					"id": {
+						"type": "Identifier",
+						"start": 414,
+						"end": 415,
+						"name": "g"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 418,
+						"end": 463,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 422,
+								"end": 460,
+								"argument": {
+									"type": "CallExpression",
+									"start": 443,
+									"end": 455,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 443,
+										"end": 453,
+										"object": {
+											"type": "CallExpression",
+											"start": 443,
+											"end": 451,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 443,
+												"end": 449,
+												"object": {
+													"type": "TaggedTemplateExpression",
+													"start": 443,
+													"end": 447,
+													"tag": {
+														"type": "Identifier",
+														"start": 443,
+														"end": 444,
+														"name": "a"
+													},
+													"quasi": {
+														"type": "TemplateLiteral",
+														"start": 444,
+														"end": 447,
+														"expressions": [],
+														"quasis": [
+															{
+																"type": "TemplateElement",
+																"start": 445,
+																"end": 446,
+																"value": {
+																	"raw": "t",
+																	"cooked": "t"
+																},
+																"tail": true
+															}
+														]
+													}
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 448,
+													"end": 449,
+													"name": "g"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 452,
+											"end": 453,
+											"name": "h"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c5",
+											"start": 434,
+											"end": 439
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 466,
+					"end": 499,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 466,
+						"end": 498,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 466,
+							"end": 467,
+							"name": "h"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 470,
+							"end": 498,
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [],
+							"body": {
+								"type": "CallExpression",
+								"start": 486,
+								"end": 498,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 486,
+									"end": 496,
+									"object": {
+										"type": "CallExpression",
+										"start": 486,
+										"end": 494,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 486,
+											"end": 492,
+											"object": {
+												"type": "TaggedTemplateExpression",
+												"start": 486,
+												"end": 490,
+												"tag": {
+													"type": "Identifier",
+													"start": 486,
+													"end": 487,
+													"name": "a"
+												},
+												"quasi": {
+													"type": "TemplateLiteral",
+													"start": 487,
+													"end": 490,
+													"expressions": [],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 488,
+															"end": 489,
+															"value": {
+																"raw": "t",
+																"cooked": "t"
+															},
+															"tail": true
+														}
+													]
+												}
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 491,
+												"end": 492,
+												"name": "g"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 495,
+										"end": 496,
+										"name": "h"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c6",
+										"start": 478,
+										"end": 483
+									}
+								]
+							}
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

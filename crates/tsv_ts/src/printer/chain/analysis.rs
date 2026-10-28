@@ -1529,6 +1529,11 @@ pub fn build_linearized_chain_doc(
     // (`Printer::left_spine_run_claim`). Only where the head takes the whole region down
     // to the base: a widened member's prefix is placed mid-chain, which is the
     // linearizer's answer, and a base that owns its leading gap keeps the run inside it.
+    // So does a run the base's doc OPENS with on a line of its own, pair or no pair (the
+    // `await` / `new` clause): a tagged-template base prints its tag's run inside its own
+    // doc, which is the chain's first group, so the head claims it and prints it ahead of
+    // the chain, where its hardline leaves the chain's layout alone (`(// c⏎a)`t`.g().h()`
+    // stays flat, as the reparse with the comment ahead of the statement does).
     let claim = match nodes.first() {
         Some(ChainNode::Base {
             expr: base,
@@ -1536,7 +1541,9 @@ pub fn build_linearized_chain_doc(
             paren_leading_start: None,
             ..
         }) if head_start == chain_start => {
-            printer.left_spine_run_claim(span, chain_start, base, || *needs_parens)
+            printer.left_spine_run_claim(span, chain_start, base, || {
+                *needs_parens || printer.left_spine_shell_has_own_line_comment(base)
+            })
         }
         _ => None,
     };
