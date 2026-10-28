@@ -1192,9 +1192,14 @@ impl<'a> Printer<'a> {
         // hangs it whatever its chain holds — prettier hangs it too, and the chain
         // then breaks at its own comment one level further in — and the declarator's
         // twin answers the same way (`chain_value_glued_multiline_block_comment`).
-        if self.has_line_comments_in_member_chain(right_expr)
+        //
+        // Not where the value's printer hoists an own-line run out of its leftmost shell:
+        // the left-spine override above hung the value for that run, and the run, not the
+        // chain's comment, is what the value's doc opens with (`= (// c⏎x.a() // c⏎)[x]`).
+        if (self.has_line_comments_in_member_chain(right_expr)
             || (layout == AssignmentLayout::BreakAfterOperator
-                && self.has_line_comments_in_call_chain(right_expr))
+                && self.has_line_comments_in_call_chain(right_expr)))
+            && !self.left_spine_shell_has_own_line_comment(right_expr)
         {
             layout = AssignmentLayout::NeverBreakAfterOperator;
         }

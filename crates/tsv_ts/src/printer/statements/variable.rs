@@ -352,8 +352,15 @@ impl<'a> Printer<'a> {
         // internally at the comment location, so keep the chain with `=`
         // (otherwise it breaks after `=` too → double indent). E.g.
         // `const a = items // comment\n  .foo()` and `const b = foo.bar // c\n  .baz`.
-        let has_line_comments_in_chain = self.has_line_comments_in_call_chain(init)
-            || self.has_line_comments_in_member_chain(init);
+        //
+        // Not where the initializer's printer hoists an own-line run out of its leftmost
+        // shell (`= (// c⏎x.a() // c⏎)[x]`): the doc then opens with that run, the shape
+        // the `=`→init gap's own `//` produces, and takes the gap's hang below
+        // (`left_spine_shell_has_own_line_comment`) — kept with `=` it printed FLUSH under
+        // the operator and the reparse, reading the comment as the gap's, indented it.
+        let has_line_comments_in_chain = (self.has_line_comments_in_call_chain(init)
+            || self.has_line_comments_in_member_chain(init))
+            && !self.left_spine_shell_has_own_line_comment(init);
 
         // Combined flag for expressions with trailing comments that expand internally
         let has_trailing_comment_expansion =

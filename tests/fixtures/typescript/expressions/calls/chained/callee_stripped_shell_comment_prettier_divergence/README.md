@@ -11,10 +11,12 @@ of its own. The `unformatted_ours_stripped_shell` variant holds those authorings
   ([block_comment_chain](../block_comment_chain_prettier_divergence/), whose
   comment lands mid-chain). It holds for a call (c1, c2), a `!` (c3, c4), a sealed
   base (c5), a line comment (c6), and a callee shell with no shell inside it
-  (c10, the control). Nested with object shells (c7–c9), an object shell's
-  comment lands mid-chain while a callee shell's leads, so the two kinds can
-  swap authored order (`/* c7 */ /* c9 */ x.y /* c8 */`); prettier swaps them
-  too (`x.y⏎\t/* c9 */ .p /* c8 */⏎\t()⏎\t/* c7 */ .q();`).
+  (c10, the control). Nested with object shells (c7–c9), the object shells'
+  comments lead the chain too, so all three keep the authored order
+  (`/* c7 */ /* c8 */ /* c9 */ x.y.p().q();`): an object shell's comment lands
+  mid-chain only while that keeps the order
+  ([stripped_shell_comment_source_order](../stripped_shell_comment_source_order_prettier_divergence/)).
+  Prettier swaps them (`x.y⏎\t/* c9 */ .p /* c8 */⏎\t()⏎\t/* c7 */ .q();`).
 - **prettier**: attaches the comment to the callee member and prints it mid-chain
   on its own line (`x.y⏎\t/* c1 */ .p();`), and on its second pass moves c5 into
   the brackets (`(x?.y).s[/* c5 */ 0]();`). At the `!` (c3) it leads the chain,

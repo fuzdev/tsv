@@ -1,0 +1,58 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// A comment in grouping parens the parser strips from around a member's object, in a member
+	// chain, prints in front of that member only while that keeps the authored order. Where the
+	// object or the member's own gap holds a comment too, it leads the chain instead, where the
+	// spelling without the parens prints it.
+	x /* c2 */()
+		/* c1 */ .h[x]();
+	/* c4 */ q/* c3 */ .p[x]
+		.p();
+	x /* c6 */// c5
+	.b
+		.g();
+	x /* c8 *//* c7 */
+	.b
+		.g();
+
+	// Alone in the member's gap, it prints in front of the member.
+	x.y/* c9 */ .p
+		.t();
+
+	// A comment in a computed lookup's brackets prints after the run either way.
+	x/* c10 */ [/* c11 */ i]
+		.q();
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// A comment in grouping parens the parser strips from around a member's object, in a member
+	// chain, prints in front of that member only while that keeps the authored order. Where the
+	// object or the member's own gap holds a comment too, it leads the chain instead, where the
+	// spelling without the parens prints it.
+	x /* c2 */()
+		/* c1 */ .h[x]();
+	/* c4 */ q /* c3 */.p[x]
+		.p();
+	x /* c6 */.b // c5
+		.g();
+	x /* c8 */ /* c7 */.b
+		.g();
+
+	// Alone in the member's gap, it prints in front of the member.
+	x.y /* c9 */.p
+		.t();
+
+	// A comment in a computed lookup's brackets prints after the run either way.
+	x /* c10 */[/* c11 */ i]
+		.q();
+</script>

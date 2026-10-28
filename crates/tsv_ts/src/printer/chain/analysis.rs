@@ -53,10 +53,10 @@ pub struct LinearizeInput<'i> {
 /// Example: `a().b().c!.d` produces:
 /// [Base(a), Call(), Member(.b), Call(), NonNull(!), Member(.d)]
 ///
-/// For call chains with stripped grouping parens, extends member comment ranges
-/// to cover paren gaps where block comments may live (mid-chain comment placement).
-/// This only applies to call chains — prettier keeps comments at the chain start
-/// for member-only chains.
+/// With stripped grouping parens, extends member comment ranges to cover paren gaps
+/// where block comments may live (mid-chain comment placement), where prettier's member
+/// chain reaches the member and the order allows it ([`apply_paren_gaps`]) — elsewhere
+/// prettier keeps comments at the chain start.
 /// General-purpose entry point (used by tests; production code uses typed entry points)
 #[cfg(test)]
 fn linearize_chain<'a>(expr: &'a Expression<'_>, input: LinearizeInput<'_>) -> ChainNodeVec<'a> {
@@ -166,46 +166,135 @@ pub fn linearize_chain_from_non_null_into<'a>(
 
 /// Apply deferred paren gap extensions to member nodes.
 ///
-/// Only extends ranges for call chains — prettier places comments mid-chain
-/// only when the chain contains calls.
+/// Only extends a range where prettier prints the shell's comment MID-CHAIN. Prettier
+/// attaches a comment written just inside a stripped `(` to the object the parens held,
+/// and prints a chain node's comments at its own lookup — but only inside
+/// `printMemberChain`, which reaches a node only from a call rooting it
+/// ([`in_member_chain_scope`]). An object outside that walk is printed by the member
+/// printer, which prints its comments around the whole object, ahead of the chain:
+/// `((/* a */ (x) /* b */ ().h)[x])` keeps `/* a */ x /* b */().h[x]` (no call follows
+/// the `.h` that holds the shell), and so does `((/* a */ (x).h).t!())` (the call's callee
+/// is a `!`, so no member chain starts there). Widening such a gap printed the shell's
+/// comment after every comment of the object it leads, out of source order
+/// (`x /* b */() /* a */.h[x]`), and where an enclosing construct claimed the same run
+/// from the left spine (`typeof ((/* a */ (x).h).t!())`), twice. Left unwidened, the
+/// stretch is the head's ([`HeadWindow::outer`]).
 ///
 /// The widened range runs from the stripped `(` all the way to this node's property,
 /// which sweeps up the object subtree sitting in between — whose own member accesses
 /// already claim their comments. So the node also records that subtree as the region
 /// its EMITTERS must skip ([`ChainNode::paren_gap_skip`]); the widened range itself
 /// stays whole for the layout predicates.
-fn apply_paren_gaps(nodes: &mut [ChainNode<'_>], paren_gaps: &[ParenGap]) {
-    if !paren_gaps.is_empty() && nodes.iter().any(ChainNode::is_call) {
-        for &(node_index, gap_start, object_start) in paren_gaps {
-            if let Some(
-                ChainNode::Member {
-                    object_end,
-                    paren_gap_skip,
-                    ..
-                }
-                | ChainNode::PrivateMember {
-                    object_end,
-                    paren_gap_skip,
-                    ..
-                }
-                | ChainNode::ComputedMember {
-                    object_end,
-                    paren_gap_skip,
-                    ..
-                },
-            ) = nodes.get_mut(node_index)
-            {
-                // `object_end` is still the natural one: the linearizer pushes a fresh
-                // member node per call, so each index is targeted at most once.
-                *paren_gap_skip = Some(Span::new(object_start, *object_end));
-                *object_end = gap_start;
+fn apply_paren_gaps(nodes: &mut [ChainNode<'_>], paren_gaps: &[ParenGap], printer: &Printer<'_>) {
+    for &(node_index, outer_index, gap_start, object_start) in paren_gaps {
+        // The object the shell held is the node just ahead of its parent member.
+        if !in_member_chain_scope(nodes, outer_index - 1) {
+            continue;
+        }
+        // The relocation is taken only while it keeps the authored ORDER: it declines
+        // where a comment in the skipped object subtree or in the member's own gap, up to
+        // the lookup's opening token, would print between the shell's run and the member.
+        // Everything in the object prints ahead of this member, so a comment there would
+        // print before the shell's run, which the author wrote first
+        // (`((/* a */ (/* b */ q).p)[x]).p()` printing `/* b */ q /* a */.p`, as prettier
+        // does); and the member's gap buckets its comments by kind rather than by source
+        // position (`(// a⏎x /* b */.p).m()` printing `x /* b */ // a`). A comment inside a
+        // computed lookup's brackets prints after the run either way, so it does not count
+        // (`(/* a */ (x)[/* b */ i]).m()` keeps `x /* a */[/* b */ i]`). Left unwidened, the
+        // shell's run is the head's, ahead of the whole chain and so in source order, where
+        // the spelling without the shell prints it (`// a⏎x /* b */.p.m()`).
+        //
+        // TODO: a comment in the run that the object OWNS (glued to its first token) still
+        // prints at the head while the rest of the run widens, out of order
+        // (`(/* a */ /* b */ x.y.p).q()` prints `/* b */ x.y /* a */.p`). Declining the
+        // relocation there leaves an owned multi-line block printed inside the chain's first
+        // group, which force-expands the chain on the first pass only
+        // (`y = (// c⏎/*⏎ */ a.b).m(1).n(2).o(3)`, the same instability as
+        // `y = (// c⏎(/*⏎ */ a).b.m(1).n(2).o(3))`), so it waits on that fix.
+        let Some((natural_object_end, property_start)) = nodes[node_index].comment_range() else {
+            continue;
+        };
+        let check_end = if nodes[node_index].is_computed() {
+            super::printing::find_computed_bracket(
+                printer.source,
+                natural_object_end,
+                property_start,
+            )
+            .open
+        } else {
+            property_start
+        };
+        if printer.has_comments_on_page_between(object_start, check_end) {
+            continue;
+        }
+        if let Some(
+            ChainNode::Member {
+                object_end,
+                paren_gap_skip,
+                ..
             }
+            | ChainNode::PrivateMember {
+                object_end,
+                paren_gap_skip,
+                ..
+            }
+            | ChainNode::ComputedMember {
+                object_end,
+                paren_gap_skip,
+                ..
+            },
+        ) = nodes.get_mut(node_index)
+        {
+            // `object_end` is still the natural one: the linearizer pushes a fresh
+            // member node per call, so each index is targeted at most once.
+            *paren_gap_skip = Some(Span::new(object_start, *object_end));
+            *object_end = gap_start;
         }
     }
 }
 
-/// A deferred paren gap extension: (node_index, gap_start, object_start)
-type ParenGap = (usize, u32, u32);
+/// Whether prettier's `printMemberChain` prints the chain node at `index` as one of its
+/// LINKS — the walk inside which a node's comments print at the node's own lookup rather
+/// than ahead of the chain.
+///
+/// The walk starts at a call whose callee is a member (`printCallExpression`'s
+/// `isMemberish(node.callee)`; the root's own comments print outside it), and descends
+/// through members, `!`s, and calls whose callee is a member or a call, stopping at
+/// anything else — the base, or a call whose callee is a `!`, which it prints whole. So a
+/// node is a link when some call to its right roots a walk that reaches it.
+fn in_member_chain_scope(nodes: &[ChainNode<'_>], index: usize) -> bool {
+    // A call whose callee is a member or a call keeps a walk going through it.
+    let continues =
+        |call: usize| call > 0 && (nodes[call - 1].is_member() || nodes[call - 1].is_call());
+    let mut active = false;
+    for j in (index..nodes.len()).rev() {
+        let node = &nodes[j];
+        if active {
+            active = match node {
+                ChainNode::Member { .. }
+                | ChainNode::PrivateMember { .. }
+                | ChainNode::ComputedMember { .. }
+                | ChainNode::NonNull { .. } => true,
+                ChainNode::Call { .. } => continues(j),
+                ChainNode::Base { .. } => false,
+            };
+            if j == index {
+                return active;
+            }
+        }
+        // A call with a member callee roots a walk of its own (below it, not at it).
+        if !active && node.is_call() && j > 0 && nodes[j - 1].is_member() {
+            active = true;
+        }
+    }
+    false
+}
+
+/// A deferred paren gap extension: (node_index, outer_index, gap_start, object_start) —
+/// the member to widen, the member whose object the parser stripped the `(` from (the
+/// shell's parent, which prettier must reach inside `printMemberChain` for the shell's
+/// comment to print mid-chain), the stripped `(`, and that object's start.
+type ParenGap = (usize, usize, u32, u32);
 
 /// The left-spine steps of the chain rooted at `root` whose stripped grouping shell the
 /// chain prints MID-CHAIN: each a `(member start, object start)` pair — the member whose
@@ -252,7 +341,7 @@ fn finalize_chain_nodes(
     paren_gaps: &[ParenGap],
     input: LinearizeInput<'_>,
 ) -> bool {
-    apply_paren_gaps(nodes, paren_gaps);
+    apply_paren_gaps(nodes, paren_gaps, input.printer);
     fix_callee_base_parens(nodes, input);
     let long_curried = mark_own_call_layout(nodes, input.printer.source);
     #[cfg(feature = "buffer_stats")]
@@ -1022,7 +1111,7 @@ fn linearize_member_node<'a>(
     // When grouping parens are stripped (e.g., `/* comment */ (a).b` → `/* comment */ a.b`),
     // the MemberExpression span extends earlier than its object span, creating a gap
     // where comments from the stripped parens live. Record the gap so we can extend
-    // the last member node's comment range (only applied for call chains).
+    // the last member node's comment range (where `apply_paren_gaps` allows it).
     let member_start = member_span.start;
     let object_start = member.object.span().start;
     if member_start < object_start {
@@ -1032,7 +1121,8 @@ fn linearize_member_node<'a>(
                 ChainNode::Member { .. }
                 | ChainNode::PrivateMember { .. }
                 | ChainNode::ComputedMember { .. } => {
-                    paren_gaps.push((i, member_start, object_start));
+                    // This member is pushed next, at `nodes.len()`: the shell's parent.
+                    paren_gaps.push((i, nodes.len(), member_start, object_start));
                     break;
                 }
                 ChainNode::Base { .. } => break,
@@ -1504,8 +1594,9 @@ pub fn build_linearized_chain_doc(
 /// comment twice, once ahead of the chain and once ahead of `.p`. And the stretches
 /// outside the claims are the head's as well, or `(/* c */ (x.y).p)()` drops it.
 ///
-/// Only call chains widen at all — prettier places comments mid-chain only when the
-/// chain has calls — so a member-only chain keeps the whole region at the head.
+/// Only a member a call's member chain reaches widens at all, and only while the shell's
+/// comment keeps its authored order ([`apply_paren_gaps`]) — so a member-only chain, and
+/// every shell that does not widen, keeps its region at the head.
 ///
 /// Not called directly: [`build_linearized_chain_doc`] is the seam, and it exists so this
 /// claim cannot be forgotten at a fourth door. It was forgotten at the third —

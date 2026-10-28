@@ -1,0 +1,352 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 400,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An own-line comment in the grouping parens of a value's leftmost node hangs the value under",
+			"start": 20,
+			"end": 114
+		},
+		{
+			"type": "Line",
+			"value": " the operator, as the comment does in the operator's own gap, also where the value's chain",
+			"start": 116,
+			"end": 208
+		},
+		{
+			"type": "Line",
+			"value": " carries a line comment of its own.",
+			"start": 210,
+			"end": 247
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 255,
+			"end": 260
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 273,
+			"end": 278
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 300,
+			"end": 305
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 318,
+			"end": 323
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 352,
+			"end": 357
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 372,
+			"end": 377
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 399,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 390,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 249,
+					"end": 286,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 249,
+						"end": 285,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 249,
+							"end": 250,
+							"name": "x"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 263,
+							"end": 285,
+							"object": {
+								"type": "CallExpression",
+								"start": 263,
+								"end": 272,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 263,
+									"end": 270,
+									"object": {
+										"type": "Identifier",
+										"start": 263,
+										"end": 264,
+										"name": "x"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 269,
+										"end": 270,
+										"name": "a"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false,
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 273,
+										"end": 278
+									}
+								]
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 283,
+								"end": 284,
+								"name": "x"
+							},
+							"computed": true,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c1",
+									"start": 255,
+									"end": 260
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line comment in the grouping parens of a value's leftmost node hangs the value under",
+							"start": 20,
+							"end": 114
+						},
+						{
+							"type": "Line",
+							"value": " the operator, as the comment does in the operator's own gap, also where the value's chain",
+							"start": 116,
+							"end": 208
+						},
+						{
+							"type": "Line",
+							"value": " carries a line comment of its own.",
+							"start": 210,
+							"end": 247
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 288,
+					"end": 331,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 294,
+							"end": 330,
+							"id": {
+								"type": "Identifier",
+								"start": 294,
+								"end": 295,
+								"name": "y"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 308,
+								"end": 330,
+								"object": {
+									"type": "CallExpression",
+									"start": 308,
+									"end": 317,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 308,
+										"end": 315,
+										"object": {
+											"type": "Identifier",
+											"start": 308,
+											"end": 309,
+											"name": "x"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 314,
+											"end": 315,
+											"name": "a"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false,
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c4",
+											"start": 318,
+											"end": 323
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 328,
+									"end": 329,
+									"name": "x"
+								},
+								"computed": true,
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c3",
+										"start": 300,
+										"end": 305
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 333,
+					"end": 389,
+					"id": {
+						"type": "Identifier",
+						"start": 339,
+						"end": 340,
+						"name": "K"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 341,
+						"end": 389,
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 345,
+								"end": 386,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 345,
+									"end": 346,
+									"name": "p"
+								},
+								"value": {
+									"type": "MemberExpression",
+									"start": 361,
+									"end": 385,
+									"object": {
+										"type": "CallExpression",
+										"start": 361,
+										"end": 371,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 361,
+											"end": 369,
+											"object": {
+												"type": "Identifier",
+												"start": 361,
+												"end": 362,
+												"name": "x"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 368,
+												"end": 369,
+												"name": "a"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false,
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c6",
+												"start": 372,
+												"end": 377
+											}
+										]
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 383,
+										"end": 384,
+										"name": "x"
+									},
+									"computed": true,
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c5",
+											"start": 352,
+											"end": 357
+										}
+									]
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

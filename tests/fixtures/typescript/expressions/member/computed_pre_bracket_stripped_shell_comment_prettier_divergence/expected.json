@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 324,
+	"end": 332,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -18,85 +18,85 @@
 		},
 		{
 			"type": "Line",
-			"value": " access in a call chain keeps its own line before that access's `[`, beside the",
+			"value": " access in a call chain leads the chain, ahead of the block the author trailed",
 			"start": 102,
-			"end": 183
+			"end": 182
 		},
 		{
 			"type": "Line",
-			"value": " block the author trailed after the object.",
-			"start": 185,
-			"end": 230
-		},
-		{
-			"type": "Block",
-			"value": " t1 ",
-			"start": 236,
-			"end": 244
+			"value": " after the object, which keeps its place before the `[`.",
+			"start": 184,
+			"end": 242
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 246,
-			"end": 254
+			"start": 244,
+			"end": 252
 		},
 		{
 			"type": "Block",
-			"value": " t2 ",
-			"start": 279,
-			"end": 287
+			"value": " t1 ",
+			"start": 258,
+			"end": 266
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 289,
-			"end": 297
+			"start": 282,
+			"end": 290
+		},
+		{
+			"type": "Block",
+			"value": " t2 ",
+			"start": 299,
+			"end": 307
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 323,
+		"end": 331,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 314,
+			"end": 322,
 			"body": [
 				{
 					"type": "ExpressionStatement",
-					"start": 232,
-					"end": 270,
+					"start": 254,
+					"end": 280,
 					"expression": {
 						"type": "CallExpression",
-						"start": 232,
-						"end": 269,
+						"start": 254,
+						"end": 279,
 						"callee": {
 							"type": "MemberExpression",
-							"start": 232,
-							"end": 267,
+							"start": 254,
+							"end": 277,
 							"object": {
 								"type": "MemberExpression",
-								"start": 232,
-								"end": 262,
+								"start": 254,
+								"end": 272,
 								"object": {
 									"type": "MemberExpression",
-									"start": 232,
-									"end": 259,
+									"start": 254,
+									"end": 269,
 									"object": {
 										"type": "MemberExpression",
-										"start": 232,
-										"end": 235,
+										"start": 254,
+										"end": 257,
 										"object": {
 											"type": "Identifier",
-											"start": 232,
-											"end": 233,
+											"start": 254,
+											"end": 255,
 											"name": "x"
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 234,
-											"end": 235,
+											"start": 256,
+											"end": 257,
 											"name": "y"
 										},
 										"computed": false,
@@ -105,32 +105,24 @@
 											{
 												"type": "Block",
 												"value": " t1 ",
-												"start": 236,
-												"end": 244
+												"start": 258,
+												"end": 266
 											}
 										]
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 257,
-										"end": 258,
-										"name": "i",
-										"leadingComments": [
-											{
-												"type": "Block",
-												"value": " c1 ",
-												"start": 246,
-												"end": 254
-											}
-										]
+										"start": 267,
+										"end": 268,
+										"name": "i"
 									},
 									"computed": true,
 									"optional": false
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 260,
-									"end": 261,
+									"start": 270,
+									"end": 271,
 									"name": "j"
 								},
 								"computed": true,
@@ -138,8 +130,8 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 266,
-								"end": 267,
+								"start": 276,
+								"end": 277,
 								"name": "u"
 							},
 							"computed": false,
@@ -157,56 +149,62 @@
 						},
 						{
 							"type": "Line",
-							"value": " access in a call chain keeps its own line before that access's `[`, beside the",
+							"value": " access in a call chain leads the chain, ahead of the block the author trailed",
 							"start": 102,
-							"end": 183
+							"end": 182
 						},
 						{
 							"type": "Line",
-							"value": " block the author trailed after the object.",
-							"start": 185,
-							"end": 230
+							"value": " after the object, which keeps its place before the `[`.",
+							"start": 184,
+							"end": 242
+						},
+						{
+							"type": "Block",
+							"value": " c1 ",
+							"start": 244,
+							"end": 252
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 272,
-					"end": 313,
+					"start": 292,
+					"end": 321,
 					"expression": {
 						"type": "CallExpression",
-						"start": 272,
-						"end": 312,
+						"start": 292,
+						"end": 320,
 						"callee": {
 							"type": "MemberExpression",
-							"start": 272,
-							"end": 310,
+							"start": 292,
+							"end": 318,
 							"object": {
 								"type": "MemberExpression",
-								"start": 272,
-								"end": 305,
+								"start": 292,
+								"end": 313,
 								"object": {
 									"type": "MemberExpression",
-									"start": 272,
-									"end": 302,
+									"start": 292,
+									"end": 310,
 									"object": {
 										"type": "ChainExpression",
-										"start": 273,
-										"end": 277,
+										"start": 293,
+										"end": 297,
 										"expression": {
 											"type": "MemberExpression",
-											"start": 273,
-											"end": 277,
+											"start": 293,
+											"end": 297,
 											"object": {
 												"type": "Identifier",
-												"start": 273,
-												"end": 274,
+												"start": 293,
+												"end": 294,
 												"name": "x"
 											},
 											"property": {
 												"type": "Identifier",
-												"start": 276,
-												"end": 277,
+												"start": 296,
+												"end": 297,
 												"name": "y"
 											},
 											"computed": false,
@@ -216,32 +214,24 @@
 											{
 												"type": "Block",
 												"value": " t2 ",
-												"start": 279,
-												"end": 287
+												"start": 299,
+												"end": 307
 											}
 										]
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 300,
-										"end": 301,
-										"name": "i",
-										"leadingComments": [
-											{
-												"type": "Block",
-												"value": " c2 ",
-												"start": 289,
-												"end": 297
-											}
-										]
+										"start": 308,
+										"end": 309,
+										"name": "i"
 									},
 									"computed": true,
 									"optional": false
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 303,
-									"end": 304,
+									"start": 311,
+									"end": 312,
 									"name": "j"
 								},
 								"computed": true,
@@ -249,8 +239,8 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 309,
-								"end": 310,
+								"start": 317,
+								"end": 318,
 								"name": "u"
 							},
 							"computed": false,
@@ -258,7 +248,15 @@
 						},
 						"arguments": [],
 						"optional": false
-					}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c2 ",
+							"start": 282,
+							"end": 290
+						}
+					]
 				}
 			],
 			"sourceType": "module"

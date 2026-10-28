@@ -2,22 +2,22 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1329,
+	"end": 1342,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
 		"nodes": [
 			{
 				"type": "Text",
-				"start": 1289,
-				"end": 1291,
+				"start": 1302,
+				"end": 1304,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1291,
-				"end": 1328,
+				"start": 1304,
+				"end": 1341,
 				"name": "p",
 				"attributes": [],
 				"fragment": {
@@ -25,45 +25,45 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1294,
-							"end": 1296,
+							"start": 1307,
+							"end": 1309,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 1296,
-							"end": 1323,
+							"start": 1309,
+							"end": 1336,
 							"expression": {
 								"type": "CallExpression",
-								"start": 1297,
-								"end": 1322,
+								"start": 1310,
+								"end": 1335,
 								"callee": {
 									"type": "MemberExpression",
-									"start": 1297,
-									"end": 1320,
+									"start": 1310,
+									"end": 1333,
 									"object": {
 										"type": "MemberExpression",
-										"start": 1297,
-										"end": 1315,
+										"start": 1310,
+										"end": 1328,
 										"object": {
 											"type": "ChainExpression",
-											"start": 1298,
-											"end": 1302,
+											"start": 1311,
+											"end": 1315,
 											"expression": {
 												"type": "MemberExpression",
-												"start": 1298,
-												"end": 1302,
+												"start": 1311,
+												"end": 1315,
 												"object": {
 													"type": "Identifier",
-													"start": 1298,
-													"end": 1299,
+													"start": 1311,
+													"end": 1312,
 													"name": "x"
 												},
 												"property": {
 													"type": "Identifier",
-													"start": 1301,
-													"end": 1302,
+													"start": 1314,
+													"end": 1315,
 													"name": "y"
 												},
 												"computed": false,
@@ -73,15 +73,15 @@
 												{
 													"type": "Block",
 													"value": " c15 ",
-													"start": 1304,
-													"end": 1313
+													"start": 1317,
+													"end": 1326
 												}
 											]
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 1314,
-											"end": 1315,
+											"start": 1327,
+											"end": 1328,
 											"name": "p"
 										},
 										"computed": false,
@@ -89,8 +89,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 1319,
-										"end": 1320,
+										"start": 1332,
+										"end": 1333,
 										"name": "t"
 									},
 									"computed": false,
@@ -102,8 +102,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1323,
-							"end": 1324,
+							"start": 1336,
+							"end": 1337,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -237,79 +237,79 @@
 		{
 			"type": "Block",
 			"value": " c22 ",
-			"start": 913,
-			"end": 922
+			"start": 906,
+			"end": 915
 		},
 		{
 			"type": "Line",
-			"value": " Nested shells each land in front of their own member.",
-			"start": 936,
-			"end": 992
-		},
-		{
-			"type": "Block",
-			"value": " c9 ",
-			"start": 1001,
-			"end": 1009
+			"value": " Nested shells keep the authored order: the outer one leads the chain.",
+			"start": 933,
+			"end": 1005
 		},
 		{
 			"type": "Block",
 			"value": " c10 ",
-			"start": 1012,
-			"end": 1021
+			"start": 1007,
+			"end": 1016
+		},
+		{
+			"type": "Block",
+			"value": " c9 ",
+			"start": 1024,
+			"end": 1032
 		},
 		{
 			"type": "Line",
 			"value": " A line comment glued to the `(`, and one on its own line.",
-			"start": 1034,
-			"end": 1094
+			"start": 1047,
+			"end": 1107
 		},
 		{
 			"type": "Line",
 			"value": " c11",
-			"start": 1103,
-			"end": 1109
+			"start": 1116,
+			"end": 1122
 		},
 		{
 			"type": "Line",
 			"value": " c12",
-			"start": 1130,
-			"end": 1136
+			"start": 1143,
+			"end": 1149
 		},
 		{
 			"type": "Line",
 			"value": " Controls: with no member below the shell (no lookup, or a call), the comment leads.",
-			"start": 1149,
-			"end": 1235
+			"start": 1162,
+			"end": 1248
 		},
 		{
 			"type": "Block",
 			"value": " c13 ",
-			"start": 1237,
-			"end": 1246
+			"start": 1250,
+			"end": 1259
 		},
 		{
 			"type": "Block",
 			"value": " c14 ",
-			"start": 1259,
-			"end": 1268
+			"start": 1272,
+			"end": 1281
 		},
 		{
 			"type": "Block",
 			"value": " c15 ",
-			"start": 1304,
-			"end": 1313
+			"start": 1317,
+			"end": 1326
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1289,
+		"end": 1302,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 1280,
+			"end": 1293,
 			"body": [
 				{
 					"type": "ExpressionStatement",
@@ -1434,55 +1434,47 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 906,
-					"end": 933,
+					"start": 916,
+					"end": 930,
 					"expression": {
 						"type": "CallExpression",
-						"start": 906,
-						"end": 932,
+						"start": 916,
+						"end": 929,
 						"callee": {
 							"type": "TSNonNullExpression",
-							"start": 906,
-							"end": 930,
+							"start": 916,
+							"end": 927,
 							"expression": {
 								"type": "MemberExpression",
-								"start": 906,
-								"end": 929,
+								"start": 916,
+								"end": 926,
 								"object": {
 									"type": "MemberExpression",
-									"start": 906,
+									"start": 916,
 									"end": 924,
 									"object": {
 										"type": "ChainExpression",
-										"start": 907,
-										"end": 911,
+										"start": 917,
+										"end": 921,
 										"expression": {
 											"type": "MemberExpression",
-											"start": 907,
-											"end": 911,
+											"start": 917,
+											"end": 921,
 											"object": {
 												"type": "Identifier",
-												"start": 907,
-												"end": 908,
+												"start": 917,
+												"end": 918,
 												"name": "x"
 											},
 											"property": {
 												"type": "Identifier",
-												"start": 910,
-												"end": 911,
+												"start": 920,
+												"end": 921,
 												"name": "y"
 											},
 											"computed": false,
 											"optional": true
-										},
-										"trailingComments": [
-											{
-												"type": "Block",
-												"value": " c22 ",
-												"start": 913,
-												"end": 922
-											}
-										]
+										}
 									},
 									"property": {
 										"type": "Identifier",
@@ -1495,8 +1487,8 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 928,
-									"end": 929,
+									"start": 925,
+									"end": 926,
 									"name": "t"
 								},
 								"computed": false,
@@ -1505,46 +1497,54 @@
 						},
 						"arguments": [],
 						"optional": false
-					}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c22 ",
+							"start": 906,
+							"end": 915
+						}
+					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 994,
-					"end": 1031,
+					"start": 1017,
+					"end": 1044,
 					"expression": {
 						"type": "CallExpression",
-						"start": 994,
-						"end": 1030,
+						"start": 1017,
+						"end": 1043,
 						"callee": {
 							"type": "MemberExpression",
-							"start": 994,
-							"end": 1028,
+							"start": 1017,
+							"end": 1041,
 							"object": {
 								"type": "MemberExpression",
-								"start": 994,
-								"end": 1023,
+								"start": 1017,
+								"end": 1036,
 								"object": {
 									"type": "MemberExpression",
-									"start": 994,
-									"end": 1011,
+									"start": 1017,
+									"end": 1034,
 									"object": {
 										"type": "ChainExpression",
-										"start": 995,
-										"end": 999,
+										"start": 1018,
+										"end": 1022,
 										"expression": {
 											"type": "MemberExpression",
-											"start": 995,
-											"end": 999,
+											"start": 1018,
+											"end": 1022,
 											"object": {
 												"type": "Identifier",
-												"start": 995,
-												"end": 996,
+												"start": 1018,
+												"end": 1019,
 												"name": "x"
 											},
 											"property": {
 												"type": "Identifier",
-												"start": 998,
-												"end": 999,
+												"start": 1021,
+												"end": 1022,
 												"name": "y"
 											},
 											"computed": false,
@@ -1554,32 +1554,24 @@
 											{
 												"type": "Block",
 												"value": " c9 ",
-												"start": 1001,
-												"end": 1009
+												"start": 1024,
+												"end": 1032
 											}
 										]
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 1010,
-										"end": 1011,
+										"start": 1033,
+										"end": 1034,
 										"name": "p"
 									},
 									"computed": false,
-									"optional": false,
-									"trailingComments": [
-										{
-											"type": "Block",
-											"value": " c10 ",
-											"start": 1012,
-											"end": 1021
-										}
-									]
+									"optional": false
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 1022,
-									"end": 1023,
+									"start": 1035,
+									"end": 1036,
 									"name": "q"
 								},
 								"computed": false,
@@ -1587,8 +1579,8 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 1027,
-								"end": 1028,
+								"start": 1040,
+								"end": 1041,
 								"name": "t"
 							},
 							"computed": false,
@@ -1600,46 +1592,52 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Nested shells each land in front of their own member.",
-							"start": 936,
-							"end": 992
+							"value": " Nested shells keep the authored order: the outer one leads the chain.",
+							"start": 933,
+							"end": 1005
+						},
+						{
+							"type": "Block",
+							"value": " c10 ",
+							"start": 1007,
+							"end": 1016
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1096,
-					"end": 1119,
+					"start": 1109,
+					"end": 1132,
 					"expression": {
 						"type": "CallExpression",
-						"start": 1096,
-						"end": 1118,
+						"start": 1109,
+						"end": 1131,
 						"callee": {
 							"type": "MemberExpression",
-							"start": 1096,
-							"end": 1116,
+							"start": 1109,
+							"end": 1129,
 							"object": {
 								"type": "MemberExpression",
-								"start": 1096,
-								"end": 1114,
+								"start": 1109,
+								"end": 1127,
 								"object": {
 									"type": "ChainExpression",
-									"start": 1097,
-									"end": 1101,
+									"start": 1110,
+									"end": 1114,
 									"expression": {
 										"type": "MemberExpression",
-										"start": 1097,
-										"end": 1101,
+										"start": 1110,
+										"end": 1114,
 										"object": {
 											"type": "Identifier",
-											"start": 1097,
-											"end": 1098,
+											"start": 1110,
+											"end": 1111,
 											"name": "x"
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 1100,
-											"end": 1101,
+											"start": 1113,
+											"end": 1114,
 											"name": "y"
 										},
 										"computed": false,
@@ -1649,15 +1647,15 @@
 										{
 											"type": "Line",
 											"value": " c11",
-											"start": 1103,
-											"end": 1109
+											"start": 1116,
+											"end": 1122
 										}
 									]
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 1113,
-									"end": 1114,
+									"start": 1126,
+									"end": 1127,
 									"name": "p"
 								},
 								"computed": false,
@@ -1665,8 +1663,8 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 1115,
-								"end": 1116,
+								"start": 1128,
+								"end": 1129,
 								"name": "t"
 							},
 							"computed": false,
@@ -1679,45 +1677,45 @@
 						{
 							"type": "Line",
 							"value": " A line comment glued to the `(`, and one on its own line.",
-							"start": 1034,
-							"end": 1094
+							"start": 1047,
+							"end": 1107
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1121,
-					"end": 1146,
+					"start": 1134,
+					"end": 1159,
 					"expression": {
 						"type": "CallExpression",
-						"start": 1121,
-						"end": 1145,
+						"start": 1134,
+						"end": 1158,
 						"callee": {
 							"type": "MemberExpression",
-							"start": 1121,
-							"end": 1143,
+							"start": 1134,
+							"end": 1156,
 							"object": {
 								"type": "MemberExpression",
-								"start": 1121,
-								"end": 1141,
+								"start": 1134,
+								"end": 1154,
 								"object": {
 									"type": "ChainExpression",
-									"start": 1122,
-									"end": 1126,
+									"start": 1135,
+									"end": 1139,
 									"expression": {
 										"type": "MemberExpression",
-										"start": 1122,
-										"end": 1126,
+										"start": 1135,
+										"end": 1139,
 										"object": {
 											"type": "Identifier",
-											"start": 1122,
-											"end": 1123,
+											"start": 1135,
+											"end": 1136,
 											"name": "x"
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 1125,
-											"end": 1126,
+											"start": 1138,
+											"end": 1139,
 											"name": "y"
 										},
 										"computed": false,
@@ -1726,15 +1724,15 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 1140,
-									"end": 1141,
+									"start": 1153,
+									"end": 1154,
 									"name": "p",
 									"leadingComments": [
 										{
 											"type": "Line",
 											"value": " c12",
-											"start": 1130,
-											"end": 1136
+											"start": 1143,
+											"end": 1149
 										}
 									]
 								},
@@ -1743,8 +1741,8 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 1142,
-								"end": 1143,
+								"start": 1155,
+								"end": 1156,
 								"name": "t"
 							},
 							"computed": false,
@@ -1756,30 +1754,30 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1247,
-					"end": 1256,
+					"start": 1260,
+					"end": 1269,
 					"expression": {
 						"type": "MemberExpression",
-						"start": 1247,
-						"end": 1255,
+						"start": 1260,
+						"end": 1268,
 						"object": {
 							"type": "ChainExpression",
-							"start": 1248,
-							"end": 1252,
+							"start": 1261,
+							"end": 1265,
 							"expression": {
 								"type": "MemberExpression",
-								"start": 1248,
-								"end": 1252,
+								"start": 1261,
+								"end": 1265,
 								"object": {
 									"type": "Identifier",
-									"start": 1248,
-									"end": 1249,
+									"start": 1261,
+									"end": 1262,
 									"name": "x"
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 1251,
-									"end": 1252,
+									"start": 1264,
+									"end": 1265,
 									"name": "y"
 								},
 								"computed": false,
@@ -1788,8 +1786,8 @@
 						},
 						"property": {
 							"type": "Identifier",
-							"start": 1254,
-							"end": 1255,
+							"start": 1267,
+							"end": 1268,
 							"name": "p"
 						},
 						"computed": false,
@@ -1799,47 +1797,47 @@
 						{
 							"type": "Line",
 							"value": " Controls: with no member below the shell (no lookup, or a call), the comment leads.",
-							"start": 1149,
-							"end": 1235
+							"start": 1162,
+							"end": 1248
 						},
 						{
 							"type": "Block",
 							"value": " c13 ",
-							"start": 1237,
-							"end": 1246
+							"start": 1250,
+							"end": 1259
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1258,
-					"end": 1279,
+					"start": 1271,
+					"end": 1292,
 					"expression": {
 						"type": "CallExpression",
-						"start": 1258,
-						"end": 1278,
+						"start": 1271,
+						"end": 1291,
 						"callee": {
 							"type": "MemberExpression",
-							"start": 1258,
-							"end": 1276,
+							"start": 1271,
+							"end": 1289,
 							"object": {
 								"type": "ChainExpression",
-								"start": 1269,
-								"end": 1273,
+								"start": 1282,
+								"end": 1286,
 								"expression": {
 									"type": "MemberExpression",
-									"start": 1269,
-									"end": 1273,
+									"start": 1282,
+									"end": 1286,
 									"object": {
 										"type": "Identifier",
-										"start": 1269,
-										"end": 1270,
+										"start": 1282,
+										"end": 1283,
 										"name": "x"
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 1272,
-										"end": 1273,
+										"start": 1285,
+										"end": 1286,
 										"name": "y"
 									},
 									"computed": false,
@@ -1849,15 +1847,15 @@
 									{
 										"type": "Block",
 										"value": " c14 ",
-										"start": 1259,
-										"end": 1268
+										"start": 1272,
+										"end": 1281
 									}
 								]
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 1275,
-								"end": 1276,
+								"start": 1288,
+								"end": 1289,
 								"name": "t"
 							},
 							"computed": false,

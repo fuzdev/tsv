@@ -25,7 +25,7 @@
 	(/* c21 */ (x?.y).p).t<T>();
 	(/* c22 */ (x?.y).p).t!();
 
-	// Nested shells each land in front of their own member.
+	// Nested shells keep the authored order: the outer one leads the chain.
 	(/* c10 */ (/* c9 */ (x?.y).p).q).t();
 
 	// A line comment glued to the `(`, and one on its own line.

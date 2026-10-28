@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 462,
+	"end": 454,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -42,26 +42,26 @@
 		},
 		{
 			"type": "Line",
-			"value": " d",
+			"value": " d1",
 			"start": 404,
-			"end": 408
+			"end": 409
 		},
 		{
 			"type": "Line",
-			"value": " d",
-			"start": 414,
+			"value": " d2",
+			"start": 413,
 			"end": 418
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 461,
+		"end": 453,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 452,
+			"end": 444,
 			"body": [
 				{
 					"type": "FunctionDeclaration",
@@ -230,7 +230,7 @@
 				{
 					"type": "FunctionDeclaration",
 					"start": 384,
-					"end": 451,
+					"end": 443,
 					"id": {
 						"type": "Identifier",
 						"start": 393,
@@ -244,7 +244,7 @@
 						{
 							"type": "AssignmentPattern",
 							"start": 400,
-							"end": 445,
+							"end": 437,
 							"left": {
 								"type": "Identifier",
 								"start": 400,
@@ -253,33 +253,25 @@
 							},
 							"right": {
 								"type": "ConditionalExpression",
-								"start": 412,
-								"end": 445,
+								"start": 422,
+								"end": 437,
 								"test": {
 									"type": "CallExpression",
-									"start": 412,
+									"start": 422,
 									"end": 429,
 									"callee": {
 										"type": "MemberExpression",
-										"start": 412,
+										"start": 422,
 										"end": 427,
 										"object": {
 											"type": "MemberExpression",
-											"start": 412,
+											"start": 422,
 											"end": 425,
 											"object": {
 												"type": "Identifier",
-												"start": 412,
-												"end": 413,
-												"name": "a",
-												"trailingComments": [
-													{
-														"type": "Line",
-														"value": " d",
-														"start": 414,
-														"end": 418
-													}
-												]
+												"start": 422,
+												"end": 423,
+												"name": "a"
 											},
 											"property": {
 												"type": "Identifier",
@@ -304,24 +296,30 @@
 								},
 								"consequent": {
 									"type": "Literal",
-									"start": 436,
-									"end": 437,
+									"start": 432,
+									"end": 433,
 									"value": 1,
 									"raw": "1"
 								},
 								"alternate": {
 									"type": "Literal",
-									"start": 444,
-									"end": 445,
+									"start": 436,
+									"end": 437,
 									"value": 2,
 									"raw": "2"
 								},
 								"leadingComments": [
 									{
 										"type": "Line",
-										"value": " d",
+										"value": " d1",
 										"start": 404,
-										"end": 408
+										"end": 409
+									},
+									{
+										"type": "Line",
+										"value": " d2",
+										"start": 413,
+										"end": 418
 									}
 								]
 							}
@@ -329,8 +327,8 @@
 					],
 					"body": {
 						"type": "BlockStatement",
-						"start": 449,
-						"end": 451,
+						"start": 441,
+						"end": 443,
 						"body": []
 					}
 				}

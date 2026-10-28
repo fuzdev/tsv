@@ -40,11 +40,10 @@
 		.t();
 	(x?.y) /* c21 */.p
 		.t<T>();
-	(x?.y) /* c22 */.p
-		.t!();
+	/* c22 */ (x?.y).p.t!();
 
-	// Nested shells each land in front of their own member.
-	(x?.y) /* c9 */.p /* c10 */.q
+	// Nested shells keep the authored order: the outer one leads the chain.
+	/* c10 */ (x?.y) /* c9 */.p.q
 		.t();
 
 	// A line comment glued to the `(`, and one on its own line.

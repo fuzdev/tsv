@@ -15,8 +15,8 @@
 		) ? b : c
 	) {}
 	function fn3(
-		x = (// d
-		(// d
+		x = (// d1
+		(// d2
 		a).b).m() ? 1 : 2
 	) {}
 </script>

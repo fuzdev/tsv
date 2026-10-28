@@ -12,19 +12,23 @@ is where tsv prints them, in one pass.
   It sits *after* the `)` that seals the chain, so it stays outside the pair, as
   an authored `(x?.y) /* c */.p` does. The same answer holds for a `!` seal (c5),
   a computed lookup (c6), a deeper member (c7), an IIFE callee (c8), the other
-  base that prints its own pair, a chain a `!` ends (c16), nested shells (c9,
-  c10), both line-comment placements (c11, c12), an optional continuation (c17),
-  the other sealed bases (c18, c19), a multi-line block (c20), the call
-  spellings (c21, c22) and a template expression (c15). With no member below the
-  shell the comment still leads the chain (c13, c14, the controls).
+  base that prints its own pair, a chain a `!` ends (c16), both line-comment
+  placements (c11, c12), an optional continuation (c17), the other sealed bases
+  (c18, c19), a multi-line block (c20), a call with type arguments (c21) and a
+  template expression (c15). It takes that place only inside a member chain a
+  call roots and only in authored order
+  ([stripped_shell_comment_source_order](../../calls/chained/stripped_shell_comment_source_order_prettier_divergence/)),
+  so it leads the chain where the call's callee is a `!` (c22), for the outer of
+  two nested shells (c10, ahead of c9), and with no member below the shell (c13,
+  c14, the controls).
 - **prettier** (its fixed point, reached on the second pass):
-  - c1–c4, c6, c9, c16–c22: it places the comment in front of the member on the
+  - c1–c4, c6, c9, c16–c21: it places the comment in front of the member on the
     first pass (`(x?.y)/* c1 */ .p`), then pulls the block back inside the
     sealing pair (`(x?.y /* c1 */).p.t();`) — the `)`-boundary collapse
     [optional_paren_sealed_line_comment](../optional_paren_sealed_line_comment_prettier_divergence/)
     catalogs for the authored `(a?.b) /* c */.ccc`.
-  - c5, c7, c10, c15: its fixed point is tsv's output; only the normalization
-    differs.
+  - c5, c7, c15, c22: its fixed point is tsv's output; only the normalization
+    differs. c10 too, while it pulls c9 inside the pair.
   - c8: same position, different break (`(() => 1)() /* c8 */⏎\t.p.t();`).
   - c11, c12: it relocates the `//` to the end of the statement
     (`(x?.y).p.t(); // c11`).

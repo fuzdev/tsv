@@ -52,7 +52,7 @@
 		.t<T>();
 	/* c22 */ (x?.y).p.t!();
 
-	// Nested shells each land in front of their own member.
+	// Nested shells keep the authored order: the outer one leads the chain.
 	(x?.y)/* c9 */ .p/* c10 */ .q
 		.t();
 
@@ -105,7 +105,7 @@
 	(x?.y /* c21 */).p.t<T>();
 	/* c22 */ (x?.y).p.t!();
 
-	// Nested shells each land in front of their own member.
+	// Nested shells keep the authored order: the outer one leads the chain.
 	(x?.y /* c9 */).p /* c10 */.q
 		.t();
 

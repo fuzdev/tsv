@@ -11,10 +11,8 @@
 			(a as any) ? b : c
 	) {}
 	function fn3(
-		x = // d
-			a // d
-				.b.m()
-				? 1
-				: 2
+		x = // d1
+			// d2
+			a.b.m() ? 1 : 2
 	) {}
 </script>

@@ -1,0 +1,31 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// An own-line block in grouping parens the parser strips from around a computed
+	// access in a call chain leads the chain, ahead of the block the author trailed
+	// after the object, which keeps its place before the `[`.
+	x.y /* t1 *//* c1 */
+	[i][j]
+		.u();
+	(x?.y /* t2 */)/* c2 */
+	[i][j]
+		.u();
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// An own-line block in grouping parens the parser strips from around a computed
+	// access in a call chain leads the chain, ahead of the block the author trailed
+	// after the object, which keeps its place before the `[`.
+	x.y /* t1 */ /* c1 */[i][j]
+		.u();
+	(x?.y /* t2 */ /* c2 */)[i][j].u();
+</script>
