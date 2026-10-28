@@ -1,0 +1,284 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 324,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An own-line block in grouping parens the parser strips from around a computed",
+			"start": 20,
+			"end": 100
+		},
+		{
+			"type": "Line",
+			"value": " access in a call chain keeps its own line before that access's `[`, beside the",
+			"start": 102,
+			"end": 183
+		},
+		{
+			"type": "Line",
+			"value": " block the author trailed after the object.",
+			"start": 185,
+			"end": 230
+		},
+		{
+			"type": "Block",
+			"value": " t1 ",
+			"start": 236,
+			"end": 244
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 246,
+			"end": 254
+		},
+		{
+			"type": "Block",
+			"value": " t2 ",
+			"start": 279,
+			"end": 287
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 289,
+			"end": 297
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 323,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 314,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 232,
+					"end": 270,
+					"expression": {
+						"type": "CallExpression",
+						"start": 232,
+						"end": 269,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 232,
+							"end": 267,
+							"object": {
+								"type": "MemberExpression",
+								"start": 232,
+								"end": 262,
+								"object": {
+									"type": "MemberExpression",
+									"start": 232,
+									"end": 259,
+									"object": {
+										"type": "MemberExpression",
+										"start": 232,
+										"end": 235,
+										"object": {
+											"type": "Identifier",
+											"start": 232,
+											"end": 233,
+											"name": "x"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 234,
+											"end": 235,
+											"name": "y"
+										},
+										"computed": false,
+										"optional": false,
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " t1 ",
+												"start": 236,
+												"end": 244
+											}
+										]
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 257,
+										"end": 258,
+										"name": "i",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 246,
+												"end": 254
+											}
+										]
+									},
+									"computed": true,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 260,
+									"end": 261,
+									"name": "j"
+								},
+								"computed": true,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 266,
+								"end": 267,
+								"name": "u"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line block in grouping parens the parser strips from around a computed",
+							"start": 20,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " access in a call chain keeps its own line before that access's `[`, beside the",
+							"start": 102,
+							"end": 183
+						},
+						{
+							"type": "Line",
+							"value": " block the author trailed after the object.",
+							"start": 185,
+							"end": 230
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 272,
+					"end": 313,
+					"expression": {
+						"type": "CallExpression",
+						"start": 272,
+						"end": 312,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 272,
+							"end": 310,
+							"object": {
+								"type": "MemberExpression",
+								"start": 272,
+								"end": 305,
+								"object": {
+									"type": "MemberExpression",
+									"start": 272,
+									"end": 302,
+									"object": {
+										"type": "ChainExpression",
+										"start": 273,
+										"end": 277,
+										"expression": {
+											"type": "MemberExpression",
+											"start": 273,
+											"end": 277,
+											"object": {
+												"type": "Identifier",
+												"start": 273,
+												"end": 274,
+												"name": "x"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 276,
+												"end": 277,
+												"name": "y"
+											},
+											"computed": false,
+											"optional": true
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " t2 ",
+												"start": 279,
+												"end": 287
+											}
+										]
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 300,
+										"end": 301,
+										"name": "i",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c2 ",
+												"start": 289,
+												"end": 297
+											}
+										]
+									},
+									"computed": true,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 303,
+									"end": 304,
+									"name": "j"
+								},
+								"computed": true,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 309,
+								"end": 310,
+								"name": "u"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

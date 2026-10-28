@@ -1389,7 +1389,11 @@ pub fn build_linearized_chain_doc(
     span: Span,
     printer: &Printer<'_>,
 ) -> DocId {
-    let (head_start, head_end) = chain_head_comment_window(nodes, head_expr, chain_start);
+    let HeadWindow {
+        outer: head_outer,
+        start: head_start,
+        end: head_end,
+    } = chain_head_comment_window(nodes, head_expr, chain_start);
     // The BASE's erased-paren freeze, over the very region the prepend below emits: an
     // alone-on-line format-ignore directive the author wrote inside grouping parens the
     // parser dropped ahead of the base (`(⏎// prettier-ignore⏎{b:  1}⏎).k`) sits INSIDE the
@@ -1435,7 +1439,14 @@ pub fn build_linearized_chain_doc(
         let chain_doc =
             printer.with_frozen_chain_base(frozen_base, || build_chain_doc(&groups, span, printer));
         printer.chain_ungroups_args.set(outer_ungroups);
-        printer.prepend_removed_paren_comments(span, head_start, head_end, chain_doc)
+        let chain_doc =
+            printer.prepend_removed_paren_comments(span, head_start, head_end, chain_doc);
+        head_outer
+            .iter()
+            .rev()
+            .fold(chain_doc, |doc, &(start, end)| {
+                printer.prepend_removed_paren_comments(span, start, end, doc)
+            })
     })
 }
 
@@ -1449,15 +1460,21 @@ pub fn build_linearized_chain_doc(
 /// - A member whose gap linearization widened back over a stripped `(` claims that
 ///   paren's own prefix, `[member start, its object's start)` — prettier relocates a
 ///   comment written just inside such a `(` to just before that member.
-/// - The head takes the REST, which is everything from the innermost widened paren's
-///   object inward.
+/// - The head takes the REST: everything from the innermost widened paren's object
+///   inward, plus any stretch outside the widened claims that none of them covers — a
+///   stripped shell around a call's callee or a `!`'s operand, which widens nothing
+///   ([`HeadWindow::outer`]).
 ///
 /// So the window's `start` is the innermost widened claim's END (the largest
 /// [`ChainNode::paren_gap_skip`] start, since the parens nest), not the chain's own
 /// start — reading it as the chain's start hands the head a region a member already
 /// claimed, and stopping the head at the widened claim's START (what this returned
 /// before, as a single bound) handed it NOTHING while the member skipped the same
-/// region: `((⟨⟩a).b).c(x)` had no emitter at all and DROPPED every comment there.
+/// region: `((⟨⟩a).b).c(x)` had no emitter at all and DROPPED every comment there. The
+/// same holds where the base prints a pair of its own and the window ends at that `(`:
+/// the start is still the widened claim's end, or `(/* c */ (x?.y).p).t()` prints the
+/// comment twice, once ahead of the chain and once ahead of `.p`. And the stretches
+/// outside the claims are the head's as well, or `(/* c */ (x.y).p)()` drops it.
 ///
 /// Only call chains widen at all — prettier places comments mid-chain only when the
 /// chain has calls — so a member-only chain keeps the whole region at the head.
@@ -1472,38 +1489,90 @@ fn chain_head_comment_window(
     nodes: &[ChainNode<'_>],
     expr: &Expression<'_>,
     chain_start: u32,
-) -> (u32, u32) {
-    // A base that OWNS its leading gap (a sealed optional chain, an IIFE callee —
-    // `ChainNode::Base::paren_leading_start`) emits it INSIDE the pair it prints, so
-    // the claim stops at that `(` and this prepend has nothing left to take. Claiming
-    // it here would hoist the run out in front of a pair that survives.
-    if let Some(ChainNode::Base {
-        paren_leading_start: Some(start),
-        ..
-    }) = nodes.first()
-    {
-        return (chain_start, *start);
-    }
-    // The linearizer has already walked to the innermost base: it is `nodes[0]`, and its
-    // span starts where the walk over member / call / non-null spans would stop (each of
-    // those spans opens at its leftmost child). Reading it there spares one dispatch per
-    // chain level; the walk stays as the debug oracle.
-    let base_start = match nodes.first() {
-        Some(ChainNode::Base { expr: base, .. }) => base.span().start,
-        _ => get_chain_base_start(expr),
-    };
-    debug_assert_eq!(base_start, get_chain_base_start(expr));
+) -> HeadWindow {
     // The innermost widened claim's end. `paren_gap_skip` is `Some` exactly on a node
     // linearization widened, and its start is that node's object's own span start —
-    // never past the base, since the object contains it — so the max is a position in
-    // `[chain_start, base_start]` and the window can't invert.
+    // never past the base, nor past the `(` of a pair the base prints, since the object
+    // contains both — so the max is a position in `[chain_start, end]` for either end
+    // below and the window can't invert.
     let start = nodes
         .iter()
         .filter_map(ChainNode::paren_gap_skip)
         .map(|skip| skip.start)
         .max()
         .unwrap_or(chain_start);
-    (start, base_start)
+    let end = match nodes.first() {
+        // A base that OWNS its leading gap (a sealed optional chain, an IIFE callee —
+        // `ChainNode::Base::paren_leading_start`) emits it INSIDE the pair it prints, so
+        // the claim stops at that `(`. Claiming past it would hoist the run out in front
+        // of a pair that survives.
+        Some(ChainNode::Base {
+            paren_leading_start: Some(pair_start),
+            ..
+        }) => *pair_start,
+        // The linearizer has already walked to the innermost base: it is `nodes[0]`, and
+        // its span starts where the walk over member / call / non-null spans would stop
+        // (each of those spans opens at its leftmost child). Reading it there spares one
+        // dispatch per chain level; the walk stays as the debug oracle.
+        Some(ChainNode::Base { expr: base, .. }) => {
+            let base_start = base.span().start;
+            debug_assert_eq!(base_start, get_chain_base_start(expr));
+            base_start
+        }
+        _ => get_chain_base_start(expr),
+    };
+    debug_assert!(start <= end, "a widened claim opens past the head's end");
+    HeadWindow {
+        outer: widened_claim_holes(nodes, chain_start, start),
+        start,
+        end,
+    }
+}
+
+/// The head claim [`chain_head_comment_window`] returns: `[start, end)`, the region
+/// inside every widened member claim, plus `outer`, the stretches of the leading region
+/// OUTSIDE those claims that no member claims either ([`widened_claim_holes`]), in
+/// source order.
+struct HeadWindow {
+    outer: SmallVec<[(u32, u32); 1]>,
+    start: u32,
+    end: u32,
+}
+
+/// The stretches of `[chain_start, inner_start)` that no widened member claims.
+///
+/// Each widened member claims `[its gap start, its skip start)` — one stripped shell's
+/// prefix ([`apply_paren_gaps`]). The prefixes of member links tile the region, since
+/// every outer member link finds a member to widen once an inner one has; but a stripped
+/// shell around a CALL link's callee or a `!` link's operand widens nothing, so it is a
+/// stretch of the region outside the claims, and the head is its emitter. The claims
+/// are disjoint (each is one link's prefix), so a sweep in source order finds the gaps.
+fn widened_claim_holes(
+    nodes: &[ChainNode<'_>],
+    chain_start: u32,
+    inner_start: u32,
+) -> SmallVec<[(u32, u32); 1]> {
+    let mut holes = SmallVec::new();
+    if inner_start == chain_start {
+        return holes;
+    }
+    let mut claims: SmallVec<[(u32, u32); 4]> = nodes
+        .iter()
+        .filter_map(|node| Some((node.comment_range()?.0, node.paren_gap_skip()?.start)))
+        .collect();
+    claims.sort_unstable();
+    let mut cursor = chain_start;
+    for (claim_start, claim_end) in claims {
+        if cursor < claim_start {
+            holes.push((cursor, claim_start));
+        }
+        cursor = cursor.max(claim_end);
+    }
+    debug_assert_eq!(
+        cursor, inner_start,
+        "the innermost claim ends where the head resumes"
+    );
+    holes
 }
 
 /// Get the start position of the innermost base expression in a chain.

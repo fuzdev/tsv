@@ -13,12 +13,12 @@ use crate::printer::{
     needs_parens,
 };
 use std::cell::Cell;
-use tsv_lang::Span;
 use tsv_lang::doc::{
     DocBuf,
     arena::{DocArena, DocId},
 };
 use tsv_lang::printing::has_blank_line_between_strict;
+use tsv_lang::{Comment, Span};
 
 //
 // Node Printing
@@ -539,8 +539,17 @@ pub(crate) fn print_node_inner<'a>(
                     .map_or(*object_end, |c| c.span.end);
                 let mut parts = DocBuf::new();
                 parts.push(glued_doc);
-                // Past the trailing run, so the paren-prefix half is already emitted.
-                push_gap_comments_and_break(&mut parts, printer, anchor, bracket.open, None);
+                // The own-line remainder is the classification's own leading run, not a
+                // rescan from the anchor: a widened gap's stripped-paren prefix holds
+                // comments AHEAD of the trailing run in source, which a scan starting
+                // past it never reaches.
+                push_break_and_leading_run(
+                    &mut parts,
+                    printer,
+                    anchor,
+                    bracket.open,
+                    &pre_bracket.leading_in_source_order(),
+                );
                 parts.push(bracket_doc);
                 return d.concat(&parts);
             }
@@ -976,6 +985,31 @@ pub(crate) fn push_gap_comments_and_break(
     // at minimum) and flushes the suffix itself. A boundary would flush AND end the
     // line, so the break that follows would land a blank line after the comment.
     parts.push(printer.build_deferred_line_comments_doc(&classified.trailing_line));
+    push_break_and_leading_run(
+        parts,
+        printer,
+        object_end,
+        property_start,
+        &classified.leading_in_source_order(),
+    );
+}
+
+/// The half of [`push_gap_comments_and_break`] after the gap's trailing run: the line
+/// break toward the property (`object_end` is where the break's blank scan starts), then
+/// the gap's own-line run `leading`, in authored order.
+///
+/// Its own entry for the caller that has already emitted the trailing run and holds the
+/// leading one from the same classification — the computed member's own-line remainder.
+/// Re-classifying from past the trailing run there would lose every own-line comment
+/// sitting AHEAD of it in source, which is where a widened gap's stripped-paren prefix
+/// sits ([`ChainNode::paren_gap_skip`]).
+fn push_break_and_leading_run(
+    parts: &mut DocBuf,
+    printer: &Printer<'_>,
+    object_end: u32,
+    property_start: u32,
+    leading: &[&Comment],
+) {
     // Line break with blank line preservation
     parts.push(build_chain_line_break(printer, object_end, property_start));
 
@@ -986,7 +1020,6 @@ pub(crate) fn push_gap_comments_and_break(
     // (`/* d */ // e`, `/* d */ .member`) and dropped the author blank between two
     // comments — all separator questions `push_leading_comment_run` owns, including
     // the blank-preserving break toward the property.
-    let leading = classified.leading_in_source_order();
     if let Some(first) = leading.first() {
         // The blank ABOVE the run's first comment is NOT the leading-run rule
         // (`RunLeadingBlank::Drop` — prettier's `printLeadingComment` has no emitter

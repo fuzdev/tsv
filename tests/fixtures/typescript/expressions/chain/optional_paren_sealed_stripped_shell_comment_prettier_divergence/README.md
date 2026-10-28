@@ -1,0 +1,39 @@
+# Sealed chain base, comment in a stripped shell around its member
+
+A comment in grouping parens the parser strips from around a sealed chain's
+member (`(/* c */ (x?.y).p).t()`), in a chain that holds a call. The
+`unformatted_ours_stripped_shell` variant holds those authorings; `input.svelte`
+is where tsv prints them, in one pass.
+
+- **tsv**: the comment prints once, in front of the member the shell wrapped —
+  `(x?.y) /* c1 */.p⏎\t.t();` — exactly where it lands without the seal
+  (`(/* c */ (x.y).p).t()` prints `x.y /* c */.p⏎\t.t();`, prettier's own fixed
+  point, [block_comment_chain](../../calls/chained/block_comment_chain_prettier_divergence/)).
+  It sits *after* the `)` that seals the chain, so it stays outside the pair, as
+  an authored `(x?.y) /* c */.p` does. The same answer holds for a `!` seal (c5),
+  a computed lookup (c6), a deeper member (c7), an IIFE callee (c8), the other
+  base that prints its own pair, a chain a `!` ends (c16), nested shells (c9,
+  c10), both line-comment placements (c11, c12), an optional continuation (c17),
+  the other sealed bases (c18, c19), a multi-line block (c20), the call
+  spellings (c21, c22) and a template expression (c15). With no member below the
+  shell the comment still leads the chain (c13, c14, the controls).
+- **prettier** (its fixed point, reached on the second pass):
+  - c1–c4, c6, c9, c16–c22: it places the comment in front of the member on the
+    first pass (`(x?.y)/* c1 */ .p`), then pulls the block back inside the
+    sealing pair (`(x?.y /* c1 */).p.t();`) — the `)`-boundary collapse
+    [optional_paren_sealed_line_comment](../optional_paren_sealed_line_comment_prettier_divergence/)
+    catalogs for the authored `(a?.b) /* c */.ccc`.
+  - c5, c7, c10, c15: its fixed point is tsv's output; only the normalization
+    differs.
+  - c8: same position, different break (`(() => 1)() /* c8 */⏎\t.p.t();`).
+  - c11, c12: it relocates the `//` to the end of the statement
+    (`(x?.y).p.t(); // c11`).
+
+```
+(x?.y) /* c1 */.p       (x?.y /* c1 */).p.t();
+	.t();
+```
+
+See
+[conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
+and [conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy).
