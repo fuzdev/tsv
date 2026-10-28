@@ -115,6 +115,34 @@
 		throw (() => p.q) /* c47 */ // c48
 			.h();
 	}
+	// a multi-line block in a stripped shell, then a block after a `)` that opens its line
+	function mlb() {
+		return (x + a) /** c52
+		 */ /** c53
+		 */
+			.h();
+	}
+
+	// in a call-argument callback, a block after the `)` keeps the line the `//` before it
+	// ended: the comment written before the `)`, and one in a shell around the head
+	foo(function () {
+		return (
+			/* c55 */
+			(
+				a + b
+			) // c54
+			.h
+		);
+	});
+	foo(function () {
+		return (
+			/* c57 */
+			(
+				a + b
+			) // c56
+			.h
+		);
+	});
 
 	// a cast broken by width alone, as a declarator's value
 	const t = (

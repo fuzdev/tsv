@@ -1034,7 +1034,7 @@ fn push_break_and_leading_run(
             parts,
             leading.iter().copied(),
             property_start,
-            LeadingGlue::Adjacent,
+            LeadingGlue::AdjacentOwnLine,
         );
     }
 }

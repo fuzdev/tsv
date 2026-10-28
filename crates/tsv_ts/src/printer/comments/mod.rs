@@ -280,6 +280,16 @@ pub(crate) enum LeadingGlue {
     ///
     /// [docs]: ../../../../../docs/comments.md
     AdjacentAnchorLine,
+    /// `Adjacent`, but the run's **first** comment opens a line of its own by
+    /// construction (the caller pushes a hard break ahead of it): a chain member gap's
+    /// own-line run, which the gap's trail scan sends there past a `//` that ended the
+    /// line even where the author wrote it behind a `)` (`a // c⏎) /* d */⏎.h`). Read from
+    /// the source, `is_own_line_comment` calls it glued and takes the soft `line`, so what
+    /// follows pulls up whenever the enclosing group stays flat — onto a line the next
+    /// pass reads as the comment's own and glued. So the first comment answers
+    /// "own-line" as **true**; every later comment keeps the source reading. The mirror of
+    /// [`Self::AdjacentAnchorLine`].
+    AdjacentOwnLine,
 }
 
 impl LeadingGlue {
@@ -293,6 +303,12 @@ impl LeadingGlue {
     /// erases the newline the author wrote before it — see [`Self::AdjacentAnchorLine`].
     fn first_shares_anchor_line(self) -> bool {
         matches!(self, Self::AdjacentAnchorLine)
+    }
+
+    /// Whether the run's FIRST comment opens its own line in the output — see
+    /// [`Self::AdjacentOwnLine`].
+    fn first_opens_own_line(self) -> bool {
+        matches!(self, Self::AdjacentOwnLine)
     }
 }
 
@@ -2660,6 +2676,7 @@ impl<'a> Printer<'a> {
             // See `LeadingGlue::AdjacentAnchorLine`: only the run's first comment can have
             // its authored newline-before erased, and only at that one site.
             let first_shares_anchor_line = is_first && glue.first_shares_anchor_line();
+            let first_opens_own_line = is_first && glue.first_opens_own_line();
             is_first = false;
             parts.push(self.build_comment_doc(comment));
             // The next thing after this comment — the following comment, or the
@@ -2689,7 +2706,8 @@ impl<'a> Printer<'a> {
                     // below it), so it must not become an unconditional space.
                     LeadingGlue::Adjacent
                     | LeadingGlue::AdjacentValueGap
-                    | LeadingGlue::AdjacentAnchorLine => self.comment_hugs_next(comment),
+                    | LeadingGlue::AdjacentAnchorLine
+                    | LeadingGlue::AdjacentOwnLine => self.comment_hugs_next(comment),
                     // A glued (not own-line) single-line block hugs across a source
                     // newline; the hugs-what-follows case still hugs as in `Adjacent`.
                     // ⚠️ That first half asks the comment's own neighbours, never the
@@ -2722,7 +2740,8 @@ impl<'a> Printer<'a> {
                 && comment.is_block
                 // `first_shares_anchor_line ||` reads as "this comment HAS no own line to
                 // keep, so don't ask" — and short-circuits the source scan when so.
-                && (first_shares_anchor_line || !self.is_own_line_comment(comment))
+                && (first_shares_anchor_line
+                    || !(first_opens_own_line || self.is_own_line_comment(comment)))
                 && !(glue.blank_forces_own_line()
                     && self.has_blank_line_between_strict(comment.span.end, next))
             {

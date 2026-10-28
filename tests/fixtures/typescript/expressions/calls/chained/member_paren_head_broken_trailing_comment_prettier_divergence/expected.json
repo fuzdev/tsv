@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 2954,
+	"end": 3462,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -306,98 +306,152 @@
 		},
 		{
 			"type": "Line",
+			"value": " a multi-line block in a stripped shell, then a block after a `)` that opens its line",
+			"start": 2036,
+			"end": 2123
+		},
+		{
+			"type": "Block",
+			"value": "* c52\n\t ",
+			"start": 2164,
+			"end": 2179
+		},
+		{
+			"type": "Block",
+			"value": "* c53\n",
+			"start": 2180,
+			"end": 2195
+		},
+		{
+			"type": "Line",
+			"value": " in a call-argument callback, a block after the `)` keeps the line the `//` before it",
+			"start": 2215,
+			"end": 2302
+		},
+		{
+			"type": "Line",
+			"value": " ended: the comment written before the `)`, and one in a shell around the head",
+			"start": 2304,
+			"end": 2384
+		},
+		{
+			"type": "Line",
+			"value": " c54",
+			"start": 2426,
+			"end": 2432
+		},
+		{
+			"type": "Block",
+			"value": " c55 ",
+			"start": 2437,
+			"end": 2446
+		},
+		{
+			"type": "Line",
+			"value": " c56",
+			"start": 2505,
+			"end": 2511
+		},
+		{
+			"type": "Block",
+			"value": " c57 ",
+			"start": 2516,
+			"end": 2525
+		},
+		{
+			"type": "Line",
 			"value": " a cast broken by width alone, as a declarator's value",
-			"start": 2037,
-			"end": 2093
+			"start": 2545,
+			"end": 2601
 		},
 		{
 			"type": "Line",
 			"value": " c38",
-			"start": 2203,
-			"end": 2209
+			"start": 2711,
+			"end": 2717
 		},
 		{
 			"type": "Line",
 			"value": " a stripped shell (the authored variant puts its `)` on a line of its own): the",
-			"start": 2218,
-			"end": 2299
+			"start": 2726,
+			"end": 2807
 		},
 		{
 			"type": "Line",
 			"value": " comment after it trails the head, in both spellings",
-			"start": 2301,
-			"end": 2355
+			"start": 2809,
+			"end": 2863
 		},
 		{
 			"type": "Line",
 			"value": " c27",
-			"start": 2361,
-			"end": 2367
+			"start": 2869,
+			"end": 2875
 		},
 		{
 			"type": "Block",
 			"value": " c39 ",
-			"start": 2379,
-			"end": 2388
+			"start": 2887,
+			"end": 2896
 		},
 		{
 			"type": "Line",
 			"value": " a stripped shell over a call takes the bare call's trailing-member collapse",
-			"start": 2399,
-			"end": 2477
+			"start": 2907,
+			"end": 2985
 		},
 		{
 			"type": "Line",
 			"value": " c44",
-			"start": 2487,
-			"end": 2493
+			"start": 2995,
+			"end": 3001
 		},
 		{
 			"type": "Line",
 			"value": " a second comment after the `)` never joins a trailing `//` before it (no weld), and",
-			"start": 2496,
-			"end": 2582
+			"start": 3004,
+			"end": 3090
 		},
 		{
 			"type": "Line",
 			"value": " never prints ahead of an own-line comment before it (no reorder)",
-			"start": 2584,
-			"end": 2651
+			"start": 3092,
+			"end": 3159
 		},
 		{
 			"type": "Line",
 			"value": " c40",
-			"start": 2775,
-			"end": 2781
+			"start": 3283,
+			"end": 3289
 		},
 		{
 			"type": "Line",
 			"value": " c41",
-			"start": 2784,
-			"end": 2790
+			"start": 3292,
+			"end": 3298
 		},
 		{
 			"type": "Line",
 			"value": " c42",
-			"start": 2922,
-			"end": 2928
+			"start": 3430,
+			"end": 3436
 		},
 		{
 			"type": "Line",
 			"value": " c43",
-			"start": 2931,
-			"end": 2937
+			"start": 3439,
+			"end": 3445
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 2953,
+		"end": 3461,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 2944,
+			"end": 3452,
 			"body": [
 				{
 					"type": "ExpressionStatement",
@@ -1948,57 +2002,336 @@
 					}
 				},
 				{
+					"type": "FunctionDeclaration",
+					"start": 2125,
+					"end": 2212,
+					"id": {
+						"type": "Identifier",
+						"start": 2134,
+						"end": 2137,
+						"name": "mlb"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 2140,
+						"end": 2212,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 2144,
+								"end": 2209,
+								"argument": {
+									"type": "CallExpression",
+									"start": 2156,
+									"end": 2204,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 2156,
+										"end": 2202,
+										"object": {
+											"type": "BinaryExpression",
+											"start": 2157,
+											"end": 2162,
+											"left": {
+												"type": "Identifier",
+												"start": 2157,
+												"end": 2158,
+												"name": "x"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 2161,
+												"end": 2162,
+												"name": "a"
+											},
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": "* c52\n\t ",
+													"start": 2164,
+													"end": 2179
+												}
+											]
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 2201,
+											"end": 2202,
+											"name": "h",
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": "* c53\n",
+													"start": 2180,
+													"end": 2195
+												}
+											]
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multi-line block in a stripped shell, then a block after a `)` that opens its line",
+							"start": 2036,
+							"end": 2123
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2386,
+					"end": 2463,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2386,
+						"end": 2462,
+						"callee": {
+							"type": "Identifier",
+							"start": 2386,
+							"end": 2389,
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "FunctionExpression",
+								"start": 2390,
+								"end": 2461,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 2402,
+									"end": 2461,
+									"body": [
+										{
+											"type": "ReturnStatement",
+											"start": 2406,
+											"end": 2458,
+											"argument": {
+												"type": "MemberExpression",
+												"start": 2418,
+												"end": 2453,
+												"object": {
+													"type": "BinaryExpression",
+													"start": 2419,
+													"end": 2424,
+													"left": {
+														"type": "Identifier",
+														"start": 2419,
+														"end": 2420,
+														"name": "a"
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 2423,
+														"end": 2424,
+														"name": "b"
+													},
+													"trailingComments": [
+														{
+															"type": "Line",
+															"value": " c54",
+															"start": 2426,
+															"end": 2432
+														}
+													]
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 2452,
+													"end": 2453,
+													"name": "h",
+													"leadingComments": [
+														{
+															"type": "Block",
+															"value": " c55 ",
+															"start": 2437,
+															"end": 2446
+														}
+													]
+												},
+												"computed": false,
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " in a call-argument callback, a block after the `)` keeps the line the `//` before it",
+							"start": 2215,
+							"end": 2302
+						},
+						{
+							"type": "Line",
+							"value": " ended: the comment written before the `)`, and one in a shell around the head",
+							"start": 2304,
+							"end": 2384
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2465,
+					"end": 2542,
+					"expression": {
+						"type": "CallExpression",
+						"start": 2465,
+						"end": 2541,
+						"callee": {
+							"type": "Identifier",
+							"start": 2465,
+							"end": 2468,
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "FunctionExpression",
+								"start": 2469,
+								"end": 2540,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 2481,
+									"end": 2540,
+									"body": [
+										{
+											"type": "ReturnStatement",
+											"start": 2485,
+											"end": 2537,
+											"argument": {
+												"type": "MemberExpression",
+												"start": 2497,
+												"end": 2532,
+												"object": {
+													"type": "BinaryExpression",
+													"start": 2498,
+													"end": 2503,
+													"left": {
+														"type": "Identifier",
+														"start": 2498,
+														"end": 2499,
+														"name": "a"
+													},
+													"operator": "+",
+													"right": {
+														"type": "Identifier",
+														"start": 2502,
+														"end": 2503,
+														"name": "b"
+													},
+													"trailingComments": [
+														{
+															"type": "Line",
+															"value": " c56",
+															"start": 2505,
+															"end": 2511
+														}
+													]
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 2531,
+													"end": 2532,
+													"name": "h",
+													"leadingComments": [
+														{
+															"type": "Block",
+															"value": " c57 ",
+															"start": 2516,
+															"end": 2525
+														}
+													]
+												},
+												"computed": false,
+												"optional": false
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
 					"type": "VariableDeclaration",
-					"start": 2095,
-					"end": 2215,
+					"start": 2603,
+					"end": 2723,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 2101,
-							"end": 2214,
+							"start": 2609,
+							"end": 2722,
 							"id": {
 								"type": "Identifier",
-								"start": 2101,
-								"end": 2102,
+								"start": 2609,
+								"end": 2610,
 								"name": "t"
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 2105,
-								"end": 2214,
+								"start": 2613,
+								"end": 2722,
 								"object": {
 									"type": "TSAsExpression",
-									"start": 2109,
-									"end": 2199,
+									"start": 2617,
+									"end": 2707,
 									"expression": {
 										"type": "Identifier",
-										"start": 2109,
-										"end": 2157,
+										"start": 2617,
+										"end": 2665,
 										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 									},
 									"typeAnnotation": {
 										"type": "TSTypeReference",
-										"start": 2161,
-										"end": 2199,
+										"start": 2669,
+										"end": 2707,
 										"typeName": {
 											"type": "Identifier",
-											"start": 2161,
-											"end": 2199,
+											"start": 2669,
+											"end": 2707,
 											"name": "Tttttttttttttttttttttttttttttttttttttt"
 										}
 									}
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 2213,
-									"end": 2214,
+									"start": 2721,
+									"end": 2722,
 									"name": "h",
 									"leadingComments": [
 										{
 											"type": "Line",
 											"value": " c38",
-											"start": 2203,
-											"end": 2209
+											"start": 2711,
+											"end": 2717
 										}
 									]
 								},
@@ -2012,37 +2345,37 @@
 						{
 							"type": "Line",
 							"value": " a cast broken by width alone, as a declarator's value",
-							"start": 2037,
-							"end": 2093
+							"start": 2545,
+							"end": 2601
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 2357,
-					"end": 2373,
+					"start": 2865,
+					"end": 2881,
 					"expression": {
 						"type": "MemberExpression",
-						"start": 2357,
-						"end": 2372,
+						"start": 2865,
+						"end": 2880,
 						"object": {
 							"type": "Identifier",
-							"start": 2357,
-							"end": 2360,
+							"start": 2865,
+							"end": 2868,
 							"name": "aaa",
 							"trailingComments": [
 								{
 									"type": "Line",
 									"value": " c27",
-									"start": 2361,
-									"end": 2367
+									"start": 2869,
+									"end": 2875
 								}
 							]
 						},
 						"property": {
 							"type": "Identifier",
-							"start": 2371,
-							"end": 2372,
+							"start": 2879,
+							"end": 2880,
 							"name": "h"
 						},
 						"computed": false,
@@ -2052,47 +2385,47 @@
 						{
 							"type": "Line",
 							"value": " a stripped shell (the authored variant puts its `)` on a line of its own): the",
-							"start": 2218,
-							"end": 2299
+							"start": 2726,
+							"end": 2807
 						},
 						{
 							"type": "Line",
 							"value": " comment after it trails the head, in both spellings",
-							"start": 2301,
-							"end": 2355
+							"start": 2809,
+							"end": 2863
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 2375,
-					"end": 2396,
+					"start": 2883,
+					"end": 2904,
 					"expression": {
 						"type": "CallExpression",
-						"start": 2375,
-						"end": 2395,
+						"start": 2883,
+						"end": 2903,
 						"callee": {
 							"type": "MemberExpression",
-							"start": 2375,
-							"end": 2393,
+							"start": 2883,
+							"end": 2901,
 							"object": {
 								"type": "Identifier",
-								"start": 2375,
-								"end": 2378,
+								"start": 2883,
+								"end": 2886,
 								"name": "aaa",
 								"trailingComments": [
 									{
 										"type": "Block",
 										"value": " c39 ",
-										"start": 2379,
-										"end": 2388
+										"start": 2887,
+										"end": 2896
 									}
 								]
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 2392,
-								"end": 2393,
+								"start": 2900,
+								"end": 2901,
 								"name": "h"
 							},
 							"computed": false,
@@ -2104,20 +2437,20 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 2479,
-					"end": 2486,
+					"start": 2987,
+					"end": 2994,
 					"expression": {
 						"type": "MemberExpression",
-						"start": 2479,
-						"end": 2485,
+						"start": 2987,
+						"end": 2993,
 						"object": {
 							"type": "CallExpression",
-							"start": 2479,
-							"end": 2483,
+							"start": 2987,
+							"end": 2991,
 							"callee": {
 								"type": "Identifier",
-								"start": 2479,
-								"end": 2481,
+								"start": 2987,
+								"end": 2989,
 								"name": "yy"
 							},
 							"arguments": [],
@@ -2125,8 +2458,8 @@
 						},
 						"property": {
 							"type": "Identifier",
-							"start": 2484,
-							"end": 2485,
+							"start": 2992,
+							"end": 2993,
 							"name": "h"
 						},
 						"computed": false,
@@ -2136,67 +2469,67 @@
 						{
 							"type": "Line",
 							"value": " a stripped shell over a call takes the bare call's trailing-member collapse",
-							"start": 2399,
-							"end": 2477
+							"start": 2907,
+							"end": 2985
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Line",
 							"value": " c44",
-							"start": 2487,
-							"end": 2493
+							"start": 2995,
+							"end": 3001
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 2653,
-					"end": 2796,
+					"start": 3161,
+					"end": 3304,
 					"expression": {
 						"type": "MemberExpression",
-						"start": 2653,
-						"end": 2795,
+						"start": 3161,
+						"end": 3303,
 						"object": {
 							"type": "ConditionalExpression",
-							"start": 2654,
-							"end": 2771,
+							"start": 3162,
+							"end": 3279,
 							"test": {
 								"type": "Identifier",
-								"start": 2654,
-								"end": 2697,
+								"start": 3162,
+								"end": 3205,
 								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 							},
 							"consequent": {
 								"type": "Identifier",
-								"start": 2702,
-								"end": 2742,
+								"start": 3210,
+								"end": 3250,
 								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 							},
 							"alternate": {
 								"type": "Identifier",
-								"start": 2747,
-								"end": 2771,
+								"start": 3255,
+								"end": 3279,
 								"name": "cccccccccccccccccccccccc"
 							}
 						},
 						"property": {
 							"type": "Identifier",
-							"start": 2794,
-							"end": 2795,
+							"start": 3302,
+							"end": 3303,
 							"name": "d",
 							"leadingComments": [
 								{
 									"type": "Line",
 									"value": " c40",
-									"start": 2775,
-									"end": 2781
+									"start": 3283,
+									"end": 3289
 								},
 								{
 									"type": "Line",
 									"value": " c41",
-									"start": 2784,
-									"end": 2790
+									"start": 3292,
+									"end": 3298
 								}
 							]
 						},
@@ -2207,65 +2540,65 @@
 						{
 							"type": "Line",
 							"value": " a second comment after the `)` never joins a trailing `//` before it (no weld), and",
-							"start": 2496,
-							"end": 2582
+							"start": 3004,
+							"end": 3090
 						},
 						{
 							"type": "Line",
 							"value": " never prints ahead of an own-line comment before it (no reorder)",
-							"start": 2584,
-							"end": 2651
+							"start": 3092,
+							"end": 3159
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 2798,
-					"end": 2943,
+					"start": 3306,
+					"end": 3451,
 					"expression": {
 						"type": "MemberExpression",
-						"start": 2798,
-						"end": 2942,
+						"start": 3306,
+						"end": 3450,
 						"object": {
 							"type": "ConditionalExpression",
-							"start": 2799,
-							"end": 2916,
+							"start": 3307,
+							"end": 3424,
 							"test": {
 								"type": "Identifier",
-								"start": 2799,
-								"end": 2842,
+								"start": 3307,
+								"end": 3350,
 								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 							},
 							"consequent": {
 								"type": "Identifier",
-								"start": 2847,
-								"end": 2887,
+								"start": 3355,
+								"end": 3395,
 								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 							},
 							"alternate": {
 								"type": "Identifier",
-								"start": 2892,
-								"end": 2916,
+								"start": 3400,
+								"end": 3424,
 								"name": "cccccccccccccccccccccccc"
 							}
 						},
 						"property": {
 							"type": "Identifier",
-							"start": 2941,
-							"end": 2942,
+							"start": 3449,
+							"end": 3450,
 							"name": "d",
 							"leadingComments": [
 								{
 									"type": "Line",
 									"value": " c42",
-									"start": 2922,
-									"end": 2928
+									"start": 3430,
+									"end": 3436
 								},
 								{
 									"type": "Line",
 									"value": " c43",
-									"start": 2931,
-									"end": 2937
+									"start": 3439,
+									"end": 3445
 								}
 							]
 						},

@@ -544,10 +544,19 @@ impl<'a> Printer<'a> {
     /// newline after it yet, so the first pass must ask for the hanging pair itself.
     fn callee_gap_ends_line_after_multiline_block(&self, obj_end: u32, prop_start: u32) -> bool {
         let mut block_end = None;
+        // The gap emitter's own run, which also prints a comment after a `)` that opens
+        // its line on the closing line of a trailing block before it
+        // (`(a /** b⏎ */⏎) /* e */.m()` prints `a /** b⏎ */ /* e */`).
+        let mut scan = self.chain_gap_trail_scan(obj_end);
         self.comments_in_source_between(obj_end, prop_start)
             .any(|c| {
+                let after_paren = matches!(
+                    self.chain_gap_trail(&mut scan, c),
+                    tsv_lang::GapTrail::AfterParen
+                );
                 let on_block_line = block_end.is_some_and(|end| {
-                    !tsv_lang::printing::has_newline_between(self.source, end, c.span.start)
+                    after_paren
+                        || !tsv_lang::printing::has_newline_between(self.source, end, c.span.start)
                 });
                 block_end = (c.is_block && c.multiline).then_some(c.span.end);
                 on_block_line

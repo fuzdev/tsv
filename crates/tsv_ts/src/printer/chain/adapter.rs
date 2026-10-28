@@ -160,6 +160,12 @@ impl<'a> Printer<'a> {
         tsv_lang::GapTrailScan::fixed(start)
     }
 
+    /// A chain gap's trail scan opening at `start` in the emitter's own reading
+    /// ([`tsv_lang::GapTrailScan::new`], the scan [`Self::classify_comments`] walks).
+    pub(crate) const fn chain_gap_trail_scan(&self, start: u32) -> tsv_lang::GapTrailScan {
+        tsv_lang::GapTrailScan::new(start)
+    }
+
     /// How `comment`, the next comment of the gap `scan` walks, stands — see
     /// [`tsv_lang::GapTrailScan`].
     pub(crate) fn chain_gap_trail(

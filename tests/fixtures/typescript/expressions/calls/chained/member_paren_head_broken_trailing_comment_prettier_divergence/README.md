@@ -51,7 +51,16 @@ The restricted productions read the same gap to decide their hanging pair, and t
 where the `)` rule stops. A `)` must open its line: one behind a multi-line block's `*/`
 (`yield ([p.q] /** c45⏎ */) // c46`) leaves the comment on the block's closing line once the
 shell strips, which the next pass reads as own-line. A block taken after the `)`
-(`throw ((…)⏎) /* c47 */ // c48`) carries the `//` glued behind it along.
+(`throw ((…)⏎) /* c47 */ // c48`) carries the `//` glued behind it along. A `)` that does
+open its line after a multi-line block the stripped shell's `)` sat behind
+(`return ((x + a /** c52⏎ */)⏎) /** c53⏎ */.h()`) takes the comment after it onto the block's
+closing line, where the next pass reads it as own-line, so `return` hangs on the first pass too.
+
+In a call-argument callback, a block after the `)` keeps the line the `//` before it ended
+(`(a + b) // c54⏎\t\t/* c55 */⏎\t\t.h`, and `c56`/`c57` in a shell around the head), as it does
+outside one: the `//` ends the line, so the block opens the next one, and the member stays below
+it as the author wrote it. Glued to the member there, the block read as hugging it on the next
+pass, and the hanging pair at `return` came undone.
 
 Reason: Comment relocation. See
 [conformance_prettier.md §Comment Position Philosophy](../../../../../../../docs/conformance_prettier.md#comment-position-philosophy)
