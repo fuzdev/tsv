@@ -342,13 +342,13 @@ counter bounds both shapes a walk recurses through:
   paren), so it is counted as a link. Their parse costs no stack, and neither do the walks
   that iterate a spine rather than recurse down it — every walk over an operator chain
   (the wire writers, the printers' chain collectors, the type strip), the wire writers
-  over a member, call and non-null chain, the member-chain printer's flattening of one
-  past its first few links, and the type strip over any expression chain
+  over a member, call and non-null chain, the printer's questions about one and its
+  member-chain flattening of one past its first few links, and the type strip over any expression chain
   (member, call, non-null, tagged-template, instantiation, `as` / `satisfies`) past its
   first few links — but every other walk recurses down the spine, so a flat chain needs a
   bound of its own; a nesting count never sees one. A link counts the units its walks
-  spend stack for: one for an operator or a qualified name's `.`; two for a member access,
-  a call, a non-null assertion or an instantiation; eight for an assertion; six for a
+  spend stack for: one for an operator, a qualified name's `.`, a member access, a call or
+  an instantiation; two for a non-null assertion; eight for an assertion; six for a
   type's `[]` or `[K]`, a conditional type's check type or a tuple element's `?`;
   fourteen for a tagged template; and ten for a conditional's test, a sequence's first
   expression, and a link whose walk **re-enters the expression printer**

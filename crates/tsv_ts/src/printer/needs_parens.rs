@@ -988,74 +988,72 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
     expr: &'a Expression<'a>,
     text: LeftmostText,
 ) -> (&'a Expression<'a>, bool) {
+    // A loop down the leftmost spine, not a recursion: a chain is as long as the spine
+    // limit lets it be, and a frame per link is what the stack contract prices
     fn walk<'a>(
-        expr: &'a Expression<'a>,
+        mut expr: &'a Expression<'a>,
         text: LeftmostText,
-        computed_member_object: bool,
+        mut computed_member_object: bool,
     ) -> (&'a Expression<'a>, bool) {
-        match &expr.kind {
-            // Binary and logical share `BinaryExpression` here — recurse into `.left`, except
-            // into a function or class dividend that opens on its own pair
-            // ([`dividend_opens_on_its_pair`]).
-            ExpressionKind::BinaryExpression(b) => {
-                if dividend_opens_on_its_pair(expr, b, text) {
-                    (expr, computed_member_object)
-                } else {
-                    walk(b.left, text, false)
+        loop {
+            (expr, computed_member_object) = match &expr.kind {
+                // Binary and logical share `BinaryExpression` here — recurse into `.left`, except
+                // into a function or class dividend that opens on its own pair
+                // ([`dividend_opens_on_its_pair`]).
+                ExpressionKind::BinaryExpression(b) => {
+                    if dividend_opens_on_its_pair(expr, b, text) {
+                        return (expr, computed_member_object);
+                    }
+                    (b.left, false)
                 }
-            }
-            // A non-LHS target that takes its own pair (`(function () {}) = 1`, `(a + b)
-            // = 1`) already prints `(` first, so the walk stops there, as at an IIFE
-            // callee — descending would wrap a leading function a second time. A cast
-            // target's pair is older and prettier's: prettier still descends through it
-            // and wraps the leftmost node inside (`(({}).x as T) = 1`), so for the three
-            // cast kinds the walk goes on, matching it.
-            ExpressionKind::AssignmentExpression(a) => {
-                if !is_type_assertion(a.left)
-                    && needs_parens(
-                        a.left,
-                        ParenContext::AssignmentTarget {
-                            operator: a.operator,
-                        },
-                        false,
-                    )
-                {
-                    (expr, computed_member_object)
-                } else {
-                    walk(a.left, text, false)
+                // A non-LHS target that takes its own pair (`(function () {}) = 1`, `(a + b)
+                // = 1`) already prints `(` first, so the walk stops there, as at an IIFE
+                // callee — descending would wrap a leading function a second time. A cast
+                // target's pair is older and prettier's: prettier still descends through it
+                // and wraps the leftmost node inside (`(({}).x as T) = 1`), so for the three
+                // cast kinds the walk goes on, matching it.
+                ExpressionKind::AssignmentExpression(a) => {
+                    if !is_type_assertion(a.left)
+                        && needs_parens(
+                            a.left,
+                            ParenContext::AssignmentTarget {
+                                operator: a.operator,
+                            },
+                            false,
+                        )
+                    {
+                        return (expr, computed_member_object);
+                    }
+                    (a.left, false)
                 }
-            }
-            ExpressionKind::MemberExpression(m) => walk(m.object, text, m.computed && !m.optional),
-            ExpressionKind::ConditionalExpression(c) => walk(c.test, text, false),
-            ExpressionKind::SequenceExpression(s) => s
-                .expressions
-                .first()
-                .map_or((expr, computed_member_object), |first| {
-                    walk(first, text, false)
-                }),
-            // IIFEs (`(function () {})()` / `` (function () {})`x` ``) are already
-            // parenthesized by their callee/tag, so prettier stops the walk there.
-            ExpressionKind::CallExpression(call) => {
-                if matches!(call.callee.kind, ExpressionKind::FunctionExpression(_)) {
-                    (expr, computed_member_object)
-                } else {
-                    walk(call.callee, text, false)
+                ExpressionKind::MemberExpression(m) => (m.object, m.computed && !m.optional),
+                ExpressionKind::ConditionalExpression(c) => (c.test, false),
+                ExpressionKind::SequenceExpression(s) => match s.expressions.first() {
+                    Some(&first) => (first, false),
+                    None => return (expr, computed_member_object),
+                },
+                // IIFEs (`(function () {})()` / `` (function () {})`x` ``) are already
+                // parenthesized by their callee/tag, so prettier stops the walk there.
+                ExpressionKind::CallExpression(call) => {
+                    if matches!(call.callee.kind, ExpressionKind::FunctionExpression(_)) {
+                        return (expr, computed_member_object);
+                    }
+                    (call.callee, false)
                 }
-            }
-            ExpressionKind::TaggedTemplateExpression(t) => {
-                if matches!(t.tag.kind, ExpressionKind::FunctionExpression(_)) {
-                    (expr, computed_member_object)
-                } else {
-                    walk(t.tag, text, false)
+                ExpressionKind::TaggedTemplateExpression(t) => {
+                    if matches!(t.tag.kind, ExpressionKind::FunctionExpression(_)) {
+                        return (expr, computed_member_object);
+                    }
+                    (t.tag, false)
                 }
-            }
-            // Postfix update (`x++`) prints its argument first; prefix (`++x`) does not.
-            ExpressionKind::UpdateExpression(u) if !u.prefix => walk(u.argument, text, false),
-            ExpressionKind::TSAsExpression(e) => walk(e.expression, text, false),
-            ExpressionKind::TSSatisfiesExpression(e) => walk(e.expression, text, false),
-            ExpressionKind::TSNonNullExpression(e) => walk(e.expression, text, false),
-            ExpressionKind::TSInstantiationExpression(e) => walk(e.expression, text, false),
-            _ => (expr, computed_member_object),
+                // Postfix update (`x++`) prints its argument first; prefix (`++x`) does not.
+                ExpressionKind::UpdateExpression(u) if !u.prefix => (u.argument, false),
+                ExpressionKind::TSAsExpression(e) => (e.expression, false),
+                ExpressionKind::TSSatisfiesExpression(e) => (e.expression, false),
+                ExpressionKind::TSNonNullExpression(e) => (e.expression, false),
+                ExpressionKind::TSInstantiationExpression(e) => (e.expression, false),
+                _ => return (expr, computed_member_object),
+            };
         }
     }
     walk(expr, text, false)
@@ -1115,45 +1113,52 @@ fn assignment_value_needs_parens(expr: &Expression<'_>) -> bool {
     matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
 }
 
-fn export_default_leftmost<'a>(expr: &'a Expression<'a>, text: LeftmostText) -> &'a Expression<'a> {
-    match &expr.kind {
-        // A division whose function or class dividend opens on its own pair starts with
-        // that `(`, like the paren-aware descents below: the walk stops at the division.
-        ExpressionKind::BinaryExpression(b) if dividend_opens_on_its_pair(expr, b, text) => expr,
-        ExpressionKind::BinaryExpression(b) => export_default_leftmost(b.left, text),
-        ExpressionKind::AssignmentExpression(a) => export_default_leftmost(a.left, text),
-        ExpressionKind::ConditionalExpression(c) => export_default_leftmost(c.test, text),
-        // A `SequenceExpression` self-parenthesizes in `build_sequence_doc` (its printed
-        // form always starts with `(`), so — like the paren-aware member/call/tag descents
-        // below — the walk stops here instead of recursing to the leftmost operand.
-        // Recursing would double-wrap a class/function-leftmost sequence:
-        // `export default ((class {}, x))` instead of prettier's `(class {}, x)`.
-        ExpressionKind::SequenceExpression(_) => expr,
-        ExpressionKind::UpdateExpression(u) if !u.prefix => {
-            export_default_leftmost(u.argument, text)
-        }
-        ExpressionKind::TSAsExpression(e) => export_default_leftmost(e.expression, text),
-        ExpressionKind::TSSatisfiesExpression(e) => export_default_leftmost(e.expression, text),
-        ExpressionKind::TSNonNullExpression(e) => export_default_leftmost(e.expression, text),
-        ExpressionKind::TSInstantiationExpression(e) => export_default_leftmost(e.expression, text),
-        // Descents that cross a would-be-parenthesized child: stop there, since its
-        // leading `(` already guards any inner keyword.
-        ExpressionKind::MemberExpression(m)
-            if !needs_parens(m.object, ParenContext::ChainBase, false) =>
-        {
-            export_default_leftmost(m.object, text)
-        }
-        ExpressionKind::CallExpression(call)
-            if !needs_parens(call.callee, ParenContext::Callee, false) =>
-        {
-            export_default_leftmost(call.callee, text)
-        }
-        ExpressionKind::TaggedTemplateExpression(t)
-            if !needs_parens(t.tag, ParenContext::TaggedTemplateTag, false) =>
-        {
-            export_default_leftmost(t.tag, text)
-        }
-        _ => expr,
+fn export_default_leftmost<'a>(
+    mut expr: &'a Expression<'a>,
+    text: LeftmostText,
+) -> &'a Expression<'a> {
+    // A loop down the leftmost spine, not a recursion: a chain is as long as the spine limit
+    // lets it be, and a frame per link is what the stack contract prices
+    loop {
+        expr = match &expr.kind {
+            // A division whose function or class dividend opens on its own pair starts with
+            // that `(`, like the paren-aware descents below: the walk stops at the division.
+            ExpressionKind::BinaryExpression(b) if dividend_opens_on_its_pair(expr, b, text) => {
+                return expr;
+            }
+            ExpressionKind::BinaryExpression(b) => b.left,
+            ExpressionKind::AssignmentExpression(a) => a.left,
+            ExpressionKind::ConditionalExpression(c) => c.test,
+            // A `SequenceExpression` self-parenthesizes in `build_sequence_doc` (its printed
+            // form always starts with `(`), so — like the paren-aware member/call/tag descents
+            // below — the walk stops here instead of recursing to the leftmost operand.
+            // Recursing would double-wrap a class/function-leftmost sequence:
+            // `export default ((class {}, x))` instead of prettier's `(class {}, x)`.
+            ExpressionKind::SequenceExpression(_) => return expr,
+            ExpressionKind::UpdateExpression(u) if !u.prefix => u.argument,
+            ExpressionKind::TSAsExpression(e) => e.expression,
+            ExpressionKind::TSSatisfiesExpression(e) => e.expression,
+            ExpressionKind::TSNonNullExpression(e) => e.expression,
+            ExpressionKind::TSInstantiationExpression(e) => e.expression,
+            // Descents that cross a would-be-parenthesized child: stop there, since its
+            // leading `(` already guards any inner keyword.
+            ExpressionKind::MemberExpression(m)
+                if !needs_parens(m.object, ParenContext::ChainBase, false) =>
+            {
+                m.object
+            }
+            ExpressionKind::CallExpression(call)
+                if !needs_parens(call.callee, ParenContext::Callee, false) =>
+            {
+                call.callee
+            }
+            ExpressionKind::TaggedTemplateExpression(t)
+                if !needs_parens(t.tag, ParenContext::TaggedTemplateTag, false) =>
+            {
+                t.tag
+            }
+            _ => return expr,
+        };
     }
 }
 
@@ -1320,34 +1325,36 @@ fn shell_content_may_read_as_a_type(expr: &Expression<'_>) -> bool {
 /// the lookahead's reading: a name or qualified name, `this`, a literal, an object or
 /// array, a group, a member of one, or one of those under `typeof` / `!` or ahead of a
 /// non-null `!`.
-fn ends_like_a_type_operand(expr: &Expression<'_>) -> bool {
-    match &expr.kind {
-        ExpressionKind::Identifier(_)
-        | ExpressionKind::ThisExpression(_)
-        | ExpressionKind::Literal(_)
-        | ExpressionKind::ObjectExpression(_)
-        | ExpressionKind::ArrayExpression(_)
-        | ExpressionKind::SequenceExpression(_)
-        | ExpressionKind::ImportExpression(_) => true,
-        ExpressionKind::MemberExpression(member) => {
-            !member.optional && ends_like_a_type_operand(member.object)
-        }
-        ExpressionKind::TSNonNullExpression(non_null) => {
-            ends_like_a_type_operand(non_null.expression)
-        }
-        ExpressionKind::UnaryExpression(unary) => match unary.operator {
-            UnaryOperator::Typeof | UnaryOperator::Bang => ends_like_a_type_operand(unary.argument),
-            UnaryOperator::Minus => is_numeral(unary.argument),
-            _ => false,
-        },
-        ExpressionKind::BinaryExpression(binary) => {
-            matches!(
-                binary.operator,
-                BinaryOperator::Pipe | BinaryOperator::Ampersand
-            ) && ends_like_a_type_operand(binary.left)
-                && ends_like_a_type_operand(binary.right)
-        }
-        _ => false,
+fn ends_like_a_type_operand(mut expr: &Expression<'_>) -> bool {
+    // A loop down the spine, not a recursion: a chain is as long as the spine limit lets it
+    // be, and a frame per link is what the stack contract prices. Each link's own conditions
+    // are pure, so asking them before the rest of the spine answers what a recursion would.
+    loop {
+        expr = match &expr.kind {
+            ExpressionKind::Identifier(_)
+            | ExpressionKind::ThisExpression(_)
+            | ExpressionKind::Literal(_)
+            | ExpressionKind::ObjectExpression(_)
+            | ExpressionKind::ArrayExpression(_)
+            | ExpressionKind::SequenceExpression(_)
+            | ExpressionKind::ImportExpression(_) => return true,
+            ExpressionKind::MemberExpression(member) if !member.optional => member.object,
+            ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+            ExpressionKind::UnaryExpression(unary) => match unary.operator {
+                UnaryOperator::Typeof | UnaryOperator::Bang => unary.argument,
+                UnaryOperator::Minus => return is_numeral(unary.argument),
+                _ => return false,
+            },
+            ExpressionKind::BinaryExpression(binary)
+                if matches!(
+                    binary.operator,
+                    BinaryOperator::Pipe | BinaryOperator::Ampersand
+                ) && ends_like_a_type_operand(binary.right) =>
+            {
+                binary.left
+            }
+            _ => return false,
+        };
     }
 }
 

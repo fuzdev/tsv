@@ -448,82 +448,87 @@ impl<'a> Printer<'a> {
     /// operand down print inside ([`Printer::left_spine_group_start`]).
     fn chain_has_own_line_comment_below<'e>(
         &self,
-        expr: &'e Expression<'e>,
-        chain_root: Option<&'e Expression<'e>>,
-        group: Option<&'e Expression<'e>>,
+        mut expr: &'e Expression<'e>,
+        mut chain_root: Option<&'e Expression<'e>>,
+        mut group: Option<&'e Expression<'e>>,
     ) -> bool {
-        if let ExpressionKind::MemberExpression(member) = &expr.kind {
-            // Leading own-line comment between object and property.
-            let obj_end = member.object.span().end;
-            let prop_start = member.property.span().start;
-            if self.has_leading_own_line_comment_in_range(GapStart::Node(obj_end), prop_start) {
+        // A loop down the left spine, not a recursion: a chain is as long as the spine limit
+        // lets it be, and a frame per link is what the stack contract prices
+        loop {
+            if let ExpressionKind::MemberExpression(member) = &expr.kind {
+                // Leading own-line comment between object and property.
+                let obj_end = member.object.span().end;
+                let prop_start = member.property.span().start;
+                if self.has_leading_own_line_comment_in_range(GapStart::Node(obj_end), prop_start) {
+                    return true;
+                }
+            }
+            if let ExpressionKind::CallExpression(call) = &expr.kind
+                && let ExpressionKind::MemberExpression(member) = &call.callee.kind
+                && !range_too_narrow_for_a_comment(
+                    member.object.span().end,
+                    member.property.span().start,
+                )
+                && self.callee_gap_ends_line_after_multiline_block(
+                    member.object.span().end,
+                    member.property.span().start,
+                )
+            {
                 return true;
             }
-        }
-        if let ExpressionKind::CallExpression(call) = &expr.kind
-            && let ExpressionKind::MemberExpression(member) = &call.callee.kind
-            && !range_too_narrow_for_a_comment(
-                member.object.span().end,
-                member.property.span().start,
-            )
-            && self.callee_gap_ends_line_after_multiline_block(
-                member.object.span().end,
-                member.property.span().start,
-            )
-        {
-            return true;
-        }
-        // No descent through a cast's or a postfix update's bare operand: whether a run
-        // hoisted out of it ends a line ahead of the argument is the built doc's to say
-        // ([`Self::argument_leading_break`]), and this walk only chooses the arm.
-        if matches!(
-            expr.kind,
-            ExpressionKind::TSAsExpression(_)
-                | ExpressionKind::TSSatisfiesExpression(_)
-                | ExpressionKind::UpdateExpression(_)
-        ) {
-            return false;
-        }
-        let Some(left) = self.hoisted_left_side_child(expr) else {
-            return false;
-        };
-        let chain_root = match &expr.kind {
-            ExpressionKind::MemberExpression(_) | ExpressionKind::CallExpression(_) => {
-                Some(chain_root.unwrap_or(expr))
+            // No descent through a cast's or a postfix update's bare operand: whether a run
+            // hoisted out of it ends a line ahead of the argument is the built doc's to say
+            // ([`Self::argument_leading_break`]), and this walk only chooses the arm.
+            if matches!(
+                expr.kind,
+                ExpressionKind::TSAsExpression(_)
+                    | ExpressionKind::TSSatisfiesExpression(_)
+                    | ExpressionKind::UpdateExpression(_)
+            ) {
+                return false;
             }
-            _ => None,
-        };
-        // The stripped-shell gap ahead of the left child: empty when the child was
-        // written bare (the two starts coincide). Inside a group a step above opened, a
-        // glued block's soft `line` stays flat, so only a comment that breaks its line
-        // there hangs ([`Printer::comment_takes_line_in_group`]); the binary arm's own
-        // `ifBreak` pair holds the run if the group breaks after all.
-        let shell_start = expr.span().start;
-        let left_start = left.span().start;
-        let in_group = || {
-            group
-                .and_then(|group| self.left_spine_group_start(group))
-                .is_some_and(|start| shell_start >= start)
-        };
-        if shell_start < left_start
-            && self.has_leading_own_line_comment_in_range_where(
-                GapStart::Shell {
-                    position: shell_start,
-                    pair_emitted: self.left_shell_paren_is_emitted(expr, left),
-                },
-                left_start,
-                |c| self.comment_takes_line_in_group(c) || !in_group(),
-            )
-            && (!chain_root.is_some_and(|root| {
-                chain_mid_chain_paren_gaps(root, self.linearize_input())
-                    .contains(&(shell_start, left_start))
-            }) || self.mid_chain_shell_gap_hangs(shell_start, left_start))
-        {
-            return true;
+            let Some(left) = self.hoisted_left_side_child(expr) else {
+                return false;
+            };
+            chain_root = match &expr.kind {
+                ExpressionKind::MemberExpression(_) | ExpressionKind::CallExpression(_) => {
+                    Some(chain_root.unwrap_or(expr))
+                }
+                _ => None,
+            };
+            // The stripped-shell gap ahead of the left child: empty when the child was
+            // written bare (the two starts coincide). Inside a group a step above opened, a
+            // glued block's soft `line` stays flat, so only a comment that breaks its line
+            // there hangs ([`Printer::comment_takes_line_in_group`]); the binary arm's own
+            // `ifBreak` pair holds the run if the group breaks after all.
+            let shell_start = expr.span().start;
+            let left_start = left.span().start;
+            let in_group = || {
+                group
+                    .and_then(|group| self.left_spine_group_start(group))
+                    .is_some_and(|start| shell_start >= start)
+            };
+            if shell_start < left_start
+                && self.has_leading_own_line_comment_in_range_where(
+                    GapStart::Shell {
+                        position: shell_start,
+                        pair_emitted: self.left_shell_paren_is_emitted(expr, left),
+                    },
+                    left_start,
+                    |c| self.comment_takes_line_in_group(c) || !in_group(),
+                )
+                && (!chain_root.is_some_and(|root| {
+                    chain_mid_chain_paren_gaps(root, self.linearize_input())
+                        .contains(&(shell_start, left_start))
+                }) || self.mid_chain_shell_gap_hangs(shell_start, left_start))
+            {
+                return true;
+            }
+            group = group.or_else(|| {
+                matches!(expr.kind, ExpressionKind::BinaryExpression(_)).then_some(expr)
+            });
+            expr = left;
         }
-        let group = group
-            .or_else(|| matches!(expr.kind, ExpressionKind::BinaryExpression(_)).then_some(expr));
-        self.chain_has_own_line_comment_below(left, chain_root, group)
     }
 
     /// Whether a called member's object→property gap holds a comment on the closing line

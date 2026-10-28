@@ -269,20 +269,25 @@ impl<'arena> Expression<'arena> {
     /// node is quadratic in chain depth. The wire writer therefore hands the
     /// answer down instead of re-deriving it — see the convert layer's
     /// `ChainState`.
+    ///
+    /// A loop down the spine, not a recursion: a chain is as long as the spine limit lets
+    /// it be, and a frame per link is what the stack contract prices.
     pub fn has_optional_in_chain(&self) -> bool {
-        match &self.kind {
-            ExpressionKind::MemberExpression(m) => {
-                m.optional
-                    || (self.span.start >= m.object.span.start && m.object.has_optional_in_chain())
+        let mut expr = self;
+        loop {
+            let (optional, child) = match &expr.kind {
+                ExpressionKind::MemberExpression(m) => (m.optional, m.object),
+                ExpressionKind::CallExpression(c) => (c.optional, c.callee),
+                ExpressionKind::TSNonNullExpression(n) => (false, n.expression),
+                _ => return false,
+            };
+            if optional {
+                return true;
             }
-            ExpressionKind::CallExpression(c) => {
-                c.optional
-                    || (self.span.start >= c.callee.span.start && c.callee.has_optional_in_chain())
+            if expr.span.start < child.span.start {
+                return false;
             }
-            ExpressionKind::TSNonNullExpression(n) => {
-                self.span.start >= n.expression.span.start && n.expression.has_optional_in_chain()
-            }
-            _ => false,
+            expr = child;
         }
     }
 

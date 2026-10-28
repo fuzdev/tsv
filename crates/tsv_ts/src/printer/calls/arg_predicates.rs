@@ -532,21 +532,49 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
     // force-expands a 3+ call member chain
     // (`call_has_complex_args`) and what refuses the expand-first hug through
     // `is_hopefully_short_arg`.
-    let expr = strip_non_null_wrappers(expr);
+    //
+    // The spine — a call-like node's callee, a member's object — is walked in a loop, not a
+    // recursion: both stay at THIS depth, so a chain is as long as the spine limit lets it be,
+    // and a frame per link is what the stack contract prices. Each link's own conditions are
+    // pure, so asking them before the rest of the spine answers what the recursion answered.
+    let mut expr = expr;
+    let expr = loop {
+        expr = strip_non_null_wrappers(expr);
 
-    // Call-like nodes: the callee must be simple at THIS depth, the arguments must fit within
-    // the remaining depth, and each must be simple one level shallower. Prettier skips the
-    // callee arm for a dynamic `import(…)`
-    // (`node.type === "ImportExpression" || isSimpleCallArgument(node.callee, depth)`) rather
-    // than failing on it — it has no callee. Answered ahead of the match because a match guard
-    // cannot bind; the family is disjoint from every arm below.
-    if let Some(arguments) = CallLikeArguments::of(expr) {
-        return arguments
-            .callee()
-            .is_none_or(|callee| is_simple_call_argument(callee, depth))
-            && arguments.len() <= depth
-            && arguments.all(|argument| is_simple_call_argument(argument, depth - 1));
-    }
+        // Call-like nodes: the callee must be simple at THIS depth, the arguments must fit
+        // within the remaining depth, and each must be simple one level shallower. Prettier
+        // skips the callee arm for a dynamic `import(…)`
+        // (`node.type === "ImportExpression" || isSimpleCallArgument(node.callee, depth)`)
+        // rather than failing on it — it has no callee. Answered ahead of the match because a
+        // match guard cannot bind; the family is disjoint from every arm below.
+        if let Some(arguments) = CallLikeArguments::of(expr) {
+            if !(arguments.len() <= depth
+                && arguments.all(|argument| is_simple_call_argument(argument, depth - 1)))
+            {
+                return false;
+            }
+            match arguments.callee() {
+                Some(callee) => {
+                    expr = callee;
+                    continue;
+                }
+                None => return true,
+            }
+        }
+
+        // Member expressions: object must be simple, property is simple if not computed
+        // (or if computed with a simple expression)
+        if let ExpressionKind::MemberExpression(member) = &expr.kind {
+            // Non-computed properties (identifiers) are always simple; computed properties
+            // must have a simple expression
+            if member.computed && !is_simple_call_argument(member.property, depth) {
+                return false;
+            }
+            expr = member.object;
+            continue;
+        }
+        break expr;
+    };
 
     match &expr.kind {
         // Simple literals are always simple (Prettier: isLiteral)
@@ -601,18 +629,6 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
             elem.as_ref()
                 .is_none_or(|e| is_simple_call_argument(e, depth - 1))
         }),
-
-        // Member expressions: object must be simple, property is simple if not computed
-        // (or if computed with a simple expression)
-        ExpressionKind::MemberExpression(member) => {
-            is_simple_call_argument(member.object, depth)
-                && (
-                    // Non-computed properties (identifiers) are always simple
-                    !member.computed
-                    // Computed properties must have a simple expression
-                    || is_simple_call_argument(member.property, depth)
-                )
-        }
 
         // Unary expressions with simple operands. Prettier's
         // `simpleCallArgumentUnaryOperators` is exactly these four — `typeof`, `void` and

@@ -103,11 +103,15 @@ fn ends_at_base_closer(expr: &tsv_ts::Expression<'_>) -> bool {
     use tsv_ts::ast::internal::ArrowFunctionBody;
     // A callee with no nested call means the only `(` belongs to this call, so its
     // `)` lands at the tag base when the args wrap (vs. a chain, whose segments indent).
-    fn callee_has_no_call(e: &tsv_ts::Expression<'_>) -> bool {
-        match &e.kind {
-            E::Identifier(_) | E::ThisExpression(_) | E::Super(_) => true,
-            E::MemberExpression(m) => callee_has_no_call(m.object),
-            _ => false,
+    fn callee_has_no_call(mut e: &tsv_ts::Expression<'_>) -> bool {
+        // A loop down the spine, not a recursion: a frame per link is what the stack
+        // contract prices
+        loop {
+            match &e.kind {
+                E::Identifier(_) | E::ThisExpression(_) | E::Super(_) => return true,
+                E::MemberExpression(m) => e = m.object,
+                _ => return false,
+            }
         }
     }
     match &expr.kind {

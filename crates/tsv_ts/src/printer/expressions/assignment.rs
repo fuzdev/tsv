@@ -402,19 +402,18 @@ pub fn should_break_after_operator(expr: &Expression<'_>, printer: &Printer<'_>)
 }
 
 /// Unwrap wrapper expressions (TSNonNullExpression, await, unary, yield, parenthesized)
-fn unwrap_expression<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
-    match &expr.kind {
-        ExpressionKind::TSNonNullExpression(non_null) => unwrap_expression(non_null.expression),
-        ExpressionKind::AwaitExpression(await_expr) => unwrap_expression(await_expr.argument),
-        ExpressionKind::UnaryExpression(unary) => unwrap_expression(unary.argument),
-        ExpressionKind::YieldExpression(yield_expr) => {
-            if let Some(arg) = yield_expr.argument {
-                unwrap_expression(arg)
-            } else {
-                expr
-            }
-        }
-        _ => expr,
+fn unwrap_expression<'a>(mut expr: &'a Expression<'a>) -> &'a Expression<'a> {
+    loop {
+        expr = match &expr.kind {
+            ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+            ExpressionKind::AwaitExpression(await_expr) => await_expr.argument,
+            ExpressionKind::UnaryExpression(unary) => unary.argument,
+            ExpressionKind::YieldExpression(yield_expr) => match yield_expr.argument {
+                Some(arg) => arg,
+                None => return expr,
+            },
+            _ => return expr,
+        };
     }
 }
 
@@ -632,11 +631,11 @@ pub fn is_poorly_breakable_chain(expr: &Expression<'_>, printer: &Printer<'_>) -
         // `MemberExpression` arm.
         chain_has_calls: chain_has_calls(expr),
     };
-    is_poorly_breakable_chain_recursive(expr, false, &walk)
+    is_poorly_breakable_chain_walk(expr, false, &walk)
 }
 
 /// Everything one [`is_poorly_breakable_chain`] walk holds fixed while it descends, so the
-/// six recursive call sites carry one reference instead of a widening argument list.
+/// walk carries one reference instead of a widening argument list.
 struct PoorlyBreakableWalk<'a, 'src> {
     printer: &'a Printer<'src>,
     /// Whether the chain holds a call anywhere. Scopes the member-gap comment gate, whose
@@ -645,143 +644,150 @@ struct PoorlyBreakableWalk<'a, 'src> {
     chain_has_calls: bool,
 }
 
-fn is_poorly_breakable_chain_recursive(
-    expr: &Expression<'_>,
-    deep: bool,
+fn is_poorly_breakable_chain_walk(
+    mut expr: &Expression<'_>,
+    mut deep: bool,
     walk: &PoorlyBreakableWalk<'_, '_>,
 ) -> bool {
     let printer = walk.printer;
-    match &expr.kind {
-        // TSNonNullExpression is transparent - continue checking
-        ExpressionKind::TSNonNullExpression(non_null) => {
-            is_poorly_breakable_chain_recursive(non_null.expression, deep, walk)
-        }
-        // Note: TSAsExpression and TSSatisfiesExpression are NOT included here.
-        // They have breakable type annotations, so they're not "poorly breakable".
-
-        // CallExpression: prettier's arm is three refusals and a descent — a chain the
-        // member-chain printer LABELS (it prints past the cutoff and breaks itself), a
-        // non-trivial argument list, complex type arguments — then `goDeeper` on the
-        // callee. The label is asked last here because it is the one that walks the chain.
-        ExpressionKind::CallExpression(call) => {
-            // Check if this call has trivial args (empty or single short arg without comments)
-            // Matches Prettier: args.length === 0 || (args.length === 1 && isLoneShortArgument)
-            // Arrow functions, objects, arrays are NOT "lone short arguments" - they should
-            // be allowed to break internally via the call's conditional_group states.
-            //
-            // Prettier's isLoneShortArgument returns false when the argument has any comment
-            // (the `hasComment` guard in `utilities/is-lone-short-argument.js`). Arguments
-            // with comments are not
-            // "short" because the comment changes formatting behavior — the call should be
-            // allowed to expand args instead of breaking at the assignment operator.
-            let is_trivial_call = call.arguments.is_empty()
-                || (call.arguments.len() == 1
-                    && is_short_arg(call.arguments[0], printer.source)
-                    && !call_arg_has_comments(call, expr.span, printer));
-
-            if !is_trivial_call {
-                return false;
+    // A loop down the chain's spine, not a recursion: a chain is as long as the spine
+    // limit lets it be, and a frame per link is what the stack contract prices
+    loop {
+        match &expr.kind {
+            // TSNonNullExpression is transparent - continue checking
+            ExpressionKind::TSNonNullExpression(non_null) => {
+                expr = non_null.expression;
             }
+            // Note: TSAsExpression and TSSatisfiesExpression are NOT included here.
+            // They have breakable type annotations, so they're not "poorly breakable".
 
-            // Calls with complex type arguments (object/union/intersection types,
-            // multiple type args, or a `<…>` whose doc will break) are NOT poorly
-            // breakable - they have internal break points via the type arguments.
-            // Matches Prettier's `isCallExpressionWithComplexTypeArguments` (`print/assignment.js`)
-            if is_call_with_complex_type_arguments(call, printer) {
-                return false;
-            }
+            // CallExpression: prettier's arm is three refusals and a descent — a chain the
+            // member-chain printer LABELS (it prints past the cutoff and breaks itself), a
+            // non-trivial argument list, complex type arguments — then `goDeeper` on the
+            // callee. The label is asked last here because it is the one that walks the chain.
+            ExpressionKind::CallExpression(call) => {
+                // Check if this call has trivial args (empty or single short arg without comments)
+                // Matches Prettier: args.length === 0 || (args.length === 1 && isLoneShortArgument)
+                // Arrow functions, objects, arrays are NOT "lone short arguments" - they should
+                // be allowed to break internally via the call's conditional_group states.
+                //
+                // Prettier's isLoneShortArgument returns false when the argument has any comment
+                // (the `hasComment` guard in `utilities/is-lone-short-argument.js`). Arguments
+                // with comments are not
+                // "short" because the comment changes formatting behavior — the call should be
+                // allowed to expand args instead of breaking at the assignment operator.
+                let is_trivial_call = call.arguments.is_empty()
+                    || (call.arguments.len() == 1
+                        && is_short_arg(call.arguments[0], printer.source)
+                        && !call_arg_has_comments(call, expr.span, printer));
 
-            // `doc.label?.memberChain`: a memberish callee prints through
-            // `printMemberChain`, and the label is on every result but the short chain's.
-            // The count is the chain's own grouping (`call_prints_as_member_chain`), not a
-            // call count — `this.x.y()?.a.b('s')` is three groups with no merge and so
-            // labelled, while `fn(a).b.then('s')` is two (the base's call joins the first
-            // group) and so poorly breakable. A `TSNonNullExpression` callee is grouped
-            // the way tsv's chain printer groups it; prettier's `isMemberish` does not
-            // name it and prints such a call as an opaque base instead.
-            // TODO: mirror that opaque-base grouping for a `!`-wrapped callee (`a.b!().c()`).
-            if matches!(
-                call.callee.kind,
-                ExpressionKind::MemberExpression(_) | ExpressionKind::TSNonNullExpression(_)
-            ) && crate::printer::chain::call_prints_as_member_chain(call, expr.span, printer)
-            {
-                return false;
-            }
+                if !is_trivial_call {
+                    return false;
+                }
 
-            // `goDeeper` on the callee: every call above the root must be trivial too.
-            is_poorly_breakable_chain_recursive(call.callee, true, walk)
-        }
+                // Calls with complex type arguments (object/union/intersection types,
+                // multiple type args, or a `<…>` whose doc will break) are NOT poorly
+                // breakable - they have internal break points via the type arguments.
+                // Matches Prettier's `isCallExpressionWithComplexTypeArguments`
+                // (`print/assignment.js`)
+                if is_call_with_complex_type_arguments(call, printer) {
+                    return false;
+                }
 
-        // MemberExpression: a TRAILING comment in the member's own gap — glued to the
-        // line the object (or a previous comment) ends on, in the object→`.` gap or a
-        // computed member's object→`[` gap (bracket-INTERIOR comments render inline
-        // and don't count) — makes the chain printer break the chain there while the
-        // chain's HEAD still fits the operator line, so the chain is not poorly
-        // breakable and the operator break is withheld (`const c = foo /* c */⏎.b();`).
-        // Prettier lands the same way: the comment-carrying chain skips
-        // printMemberChain's unlabeled short-chain return, the labeled doc opts out of
-        // isPoorlyBreakableMemberOrCallChain (member-chain.js `nodeHasComment`), and
-        // fluid keeps the fittable head on the operator line. An OWN-LINE gap comment
-        // is deliberately not counted: it makes the head multi-line from its first
-        // token, and there prettier's operator break stands
-        // (`member/prettier_ignore_base_comment` pins that side). **On page**, because
-        // this is a layout gate. Otherwise continue down.
-        //
-        // ⚠️ Scoped to a chain that HOLDS A CALL, because that is the only chain the
-        // modelled prettier path can reach: the `memberChain` label lives on a CALL's
-        // doc, so a call-free `a /* c */.b` never opts out and stays poorly breakable
-        // (`member/computed_pre_bracket_block_comment_prettier_divergence`). The scope
-        // belongs HERE, not in a caller: a second predicate that answers `true` for the
-        // call-free chain and is OR-ed in from outside cancels this gate only where it is
-        // spelled — and carries a second copy of the chain-root test, which then drifts.
-        ExpressionKind::MemberExpression(member) => {
-            if walk.chain_has_calls {
-                let object_end = member.object.span().end;
-                let gap_end = if member.computed {
-                    crate::printer::chain::find_bracket_position(
-                        printer.source,
-                        object_end,
-                        member.property.span().start,
-                    )
-                } else {
-                    member.property.span().start
-                };
-                if printer
-                    .comments_on_page_between(object_end, gap_end)
-                    .any(|c| {
-                        !tsv_lang::source_scan::has_newline_before_position(
-                            printer.source,
-                            c.span.start,
-                        )
-                    })
+                // `doc.label?.memberChain`: a memberish callee prints through
+                // `printMemberChain`, and the label is on every result but the short chain's.
+                // The count is the chain's own grouping (`call_prints_as_member_chain`), not a
+                // call count — `this.x.y()?.a.b('s')` is three groups with no merge and so
+                // labelled, while `fn(a).b.then('s')` is two (the base's call joins the first
+                // group) and so poorly breakable. A `TSNonNullExpression` callee is grouped
+                // the way tsv's chain printer groups it; prettier's `isMemberish` does not
+                // name it and prints such a call as an opaque base instead.
+                // TODO: mirror that opaque-base grouping for a `!`-wrapped callee (`a.b!().c()`).
+                if matches!(
+                    call.callee.kind,
+                    ExpressionKind::MemberExpression(_) | ExpressionKind::TSNonNullExpression(_)
+                ) && crate::printer::chain::call_prints_as_member_chain(call, expr.span, printer)
                 {
                     return false;
                 }
+
+                // `goDeeper` on the callee: every call above the root must be trivial too.
+                expr = call.callee;
+                deep = true;
             }
-            is_poorly_breakable_chain_recursive(member.object, true, walk)
+
+            // MemberExpression: a TRAILING comment in the member's own gap — glued to the
+            // line the object (or a previous comment) ends on, in the object→`.` gap or a
+            // computed member's object→`[` gap (bracket-INTERIOR comments render inline
+            // and don't count) — makes the chain printer break the chain there while the
+            // chain's HEAD still fits the operator line, so the chain is not poorly
+            // breakable and the operator break is withheld (`const c = foo /* c */⏎.b();`).
+            // Prettier lands the same way: the comment-carrying chain skips
+            // printMemberChain's unlabeled short-chain return, the labeled doc opts out of
+            // isPoorlyBreakableMemberOrCallChain (member-chain.js `nodeHasComment`), and
+            // fluid keeps the fittable head on the operator line. An OWN-LINE gap comment
+            // is deliberately not counted: it makes the head multi-line from its first
+            // token, and there prettier's operator break stands
+            // (`member/prettier_ignore_base_comment` pins that side). **On page**, because
+            // this is a layout gate. Otherwise continue down.
+            //
+            // ⚠️ Scoped to a chain that HOLDS A CALL, because that is the only chain the
+            // modelled prettier path can reach: the `memberChain` label lives on a CALL's
+            // doc, so a call-free `a /* c */.b` never opts out and stays poorly breakable
+            // (`member/computed_pre_bracket_block_comment_prettier_divergence`). The scope
+            // belongs HERE, not in a caller: a second predicate that answers `true` for the
+            // call-free chain and is OR-ed in from outside cancels this gate only where it is
+            // spelled — and carries a second copy of the chain-root test, which then drifts.
+            ExpressionKind::MemberExpression(member) => {
+                if walk.chain_has_calls {
+                    let object_end = member.object.span().end;
+                    let gap_end = if member.computed {
+                        crate::printer::chain::find_bracket_position(
+                            printer.source,
+                            object_end,
+                            member.property.span().start,
+                        )
+                    } else {
+                        member.property.span().start
+                    };
+                    if printer
+                        .comments_on_page_between(object_end, gap_end)
+                        .any(|c| {
+                            !tsv_lang::source_scan::has_newline_before_position(
+                                printer.source,
+                                c.span.start,
+                            )
+                        })
+                    {
+                        return false;
+                    }
+                }
+                expr = member.object;
+                deep = true;
+            }
+
+            // Base case: prettier's own last line, `deep && (node.type === "Identifier" ||
+            // node.type === "ThisExpression")`.
+            //
+            // ⚠️ **`super` is not on that list**, and the omission is load-bearing rather than
+            // an oversight of prettier's: a `super.p` initializer past width takes the FLUID
+            // layout, so the `=` holds its line and the lookup takes the break
+            // (`assignment/poorly_breakable_chain_root`). Do not widen it to match the
+            // neighbouring root tests in this file — their `Super` arms are NOT precedent.
+            // `is_short_arg` names a prettier function that stops at `Identifier` /
+            // `ThisExpression` exactly as this one does (`isLoneShortArgument`), so its `Super`
+            // is tsv's own widening — inert, since a bare `super` argument is only reachable
+            // on tsv's over-accept surface. `is_member_only_chain` mirrors no prettier
+            // function at all: it is the structural "this chain holds no call" test, the same
+            // axis as [`chain_has_calls`] above, and `super` genuinely is a chain root there.
+            // (The chain grouping's `should_not_wrap` merges on a lone `super` head as it does
+            // on `this` — that is prettier's `printMemberChain`, a different function, and a
+            // `Super`-rooted chain bottoms out false here regardless.)
+            ExpressionKind::Identifier(_) | ExpressionKind::ThisExpression(_) => return deep,
+
+            // Everything else breaks the chain
+            _ => return false,
         }
-
-        // Base case: prettier's own last line, `deep && (node.type === "Identifier" ||
-        // node.type === "ThisExpression")`.
-        //
-        // ⚠️ **`super` is not on that list**, and the omission is load-bearing rather than
-        // an oversight of prettier's: a `super.p` initializer past width takes the FLUID
-        // layout, so the `=` holds its line and the lookup takes the break
-        // (`assignment/poorly_breakable_chain_root`). Do not widen it to match the
-        // neighbouring root tests in this file — their `Super` arms are NOT precedent.
-        // `is_short_arg` names a prettier function that stops at `Identifier` /
-        // `ThisExpression` exactly as this one does (`isLoneShortArgument`), so its `Super`
-        // is tsv's own widening — inert, since a bare `super` argument is only reachable
-        // on tsv's over-accept surface. `is_member_only_chain` mirrors no prettier
-        // function at all: it is the structural "this chain holds no call" test, the same
-        // axis as [`chain_has_calls`] above, and `super` genuinely is a chain root there.
-        // (The chain grouping's `should_not_wrap` merges on a lone `super` head as it does
-        // on `this` — that is prettier's `printMemberChain`, a different function, and a
-        // `Super`-rooted chain bottoms out false here regardless.)
-        ExpressionKind::Identifier(_) | ExpressionKind::ThisExpression(_) => deep,
-
-        // Everything else breaks the chain
-        _ => false,
     }
 }
 
@@ -856,21 +862,23 @@ fn is_short_arg(expr: &Expression<'_>, source: &str) -> bool {
 /// for the `is_poorly_breakable_chain` debug_assert below, and deliberately NOT the shared
 /// `is_multiline_string_literal` (a *layout* predicate, continuation-only — widening that
 /// one would change fluid-layout behavior for the over-accepted raw form).
-fn chain_has_multiline_string_arg(expr: &Expression<'_>, source: &str) -> bool {
-    match &expr.kind {
-        ExpressionKind::CallExpression(call) => {
-            call.arguments
-                .iter()
-                .any(|arg| arg_is_multiline_string(arg, source))
-                || chain_has_multiline_string_arg(call.callee, source)
-        }
-        ExpressionKind::MemberExpression(member) => {
-            chain_has_multiline_string_arg(member.object, source)
-        }
-        ExpressionKind::TSNonNullExpression(non_null) => {
-            chain_has_multiline_string_arg(non_null.expression, source)
-        }
-        _ => false,
+fn chain_has_multiline_string_arg(mut expr: &Expression<'_>, source: &str) -> bool {
+    loop {
+        expr = match &expr.kind {
+            ExpressionKind::CallExpression(call) => {
+                if call
+                    .arguments
+                    .iter()
+                    .any(|arg| arg_is_multiline_string(arg, source))
+                {
+                    return true;
+                }
+                call.callee
+            }
+            ExpressionKind::MemberExpression(member) => member.object,
+            ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+            _ => return false,
+        };
     }
 }
 
@@ -941,14 +949,16 @@ pub fn is_type_assertion_call(expr: &Expression<'_>, source: &str) -> bool {
 }
 
 /// Check if an expression is a member-only chain (no calls).
-fn is_member_only_chain(expr: &Expression<'_>) -> bool {
-    match &expr.kind {
-        ExpressionKind::MemberExpression(member) => is_member_only_chain(member.object),
-        ExpressionKind::TSNonNullExpression(non_null) => is_member_only_chain(non_null.expression),
-        ExpressionKind::Identifier(_)
-        | ExpressionKind::ThisExpression(_)
-        | ExpressionKind::Super(_) => true,
-        _ => false,
+fn is_member_only_chain(mut expr: &Expression<'_>) -> bool {
+    loop {
+        expr = match &expr.kind {
+            ExpressionKind::MemberExpression(member) => member.object,
+            ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+            ExpressionKind::Identifier(_)
+            | ExpressionKind::ThisExpression(_)
+            | ExpressionKind::Super(_) => return true,
+            _ => return false,
+        };
     }
 }
 
@@ -1603,99 +1613,105 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Recursively check for line comments in a chain (calls, members, non-null).
-    fn has_line_comments_in_chain(&self, expr: &Expression<'_>) -> bool {
-        // The base's own LEADING gap, where the pair the base prints keeps the run
-        // inside it (`const m = ( // c⏎\ta?.b⏎)!.ccc`, `const z = ( // c⏎\t() => {}⏎)().p`).
-        // That run breaks the chain internally exactly as one in a member or
-        // operand→`!` gap does, so the `=` hugs the shell rather than also breaking.
-        // The gap is asked through the one predicate the linearizer and the chain
-        // head read (`chain_paren_leading_gap`); a run the pair does NOT keep — a
-        // cast, a sequence, a ternary base — leads the whole value instead and is
-        // deliberately not a chain break.
-        if let Some((start, base_start)) = chain_paren_leading_gap(expr, self.comments)
-            && self.has_line_comments_between(start, base_start)
-        {
-            return true;
-        }
-        match &expr.kind {
-            ExpressionKind::CallExpression(call) => {
-                // A line comment between the callee (or its type arguments) and the `(`
-                // forces the break too: the `//` must end its line before the `(`, so the
-                // argument list drops to an indented continuation
-                // (`build_empty_args_parens_doc`). That break is the comment's, not a chain
-                // break point the static analysis missed.
-                //
-                // The window ends at the `(`. A `//` past it — leading the first argument
-                // (`f(⏎// c⏎x)`) or dangling in empty parens (`f(⏎// c⏎)`) — breaks the
-                // argument list around itself while the `(` stays on the callee's line, so
-                // it is no chain break point, and the `=` lays out as prettier's does: by
-                // width for a led first argument, after the operator for empty parens.
-                //
-                // The window up to the first argument is asked first, as the cheap gate;
-                // the `(` is located only when a line comment lies in it. A call always has
-                // its `(` there.
-                let args_gap_start = call
-                    .type_arguments
-                    .as_ref()
-                    .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
-                let args_gap_end = call
-                    .arguments
-                    .first()
-                    .map_or(expr.span.end, |arg| arg.span().start);
-                let callee_gap_breaks = self
-                    .has_line_comments_between(args_gap_start, args_gap_end)
-                    && tsv_lang::source_scan::find_char_skipping_comments(
-                        self.source.as_bytes(),
-                        args_gap_start as usize,
-                        args_gap_end as usize,
-                        b'(',
-                    )
-                    .is_some_and(|paren| {
-                        self.has_line_comments_between(args_gap_start, paren as u32)
-                    });
-                callee_gap_breaks || self.has_line_comments_in_chain(call.callee)
+    /// Check for line comments in a chain (calls, members, non-null) — a loop down the
+    /// spine, not a recursion, since a frame per link is what the stack contract prices.
+    fn has_line_comments_in_chain(&self, mut expr: &Expression<'_>) -> bool {
+        loop {
+            // The base's own LEADING gap, where the pair the base prints keeps the run
+            // inside it (`const m = ( // c⏎\ta?.b⏎)!.ccc`, `const z = ( // c⏎\t() => {}⏎)().p`).
+            // That run breaks the chain internally exactly as one in a member or
+            // operand→`!` gap does, so the `=` hugs the shell rather than also breaking.
+            // The gap is asked through the one predicate the linearizer and the chain
+            // head read (`chain_paren_leading_gap`); a run the pair does NOT keep — a
+            // cast, a sequence, a ternary base — leads the whole value instead and is
+            // deliberately not a chain break.
+            if let Some((start, base_start)) = chain_paren_leading_gap(expr, self.comments)
+                && self.has_line_comments_between(start, base_start)
+            {
+                return true;
             }
-            ExpressionKind::MemberExpression(member) => {
-                // Check for line comments between object and property. For a computed
-                // member this range deliberately includes the bracket INTERIOR: a
-                // comment inside `[...]` makes the brackets break around it, so the
-                // chain still breaks internally and the layout answer is the same —
-                // keep the RHS on the operator line rather than also breaking after
-                // `=` (`const a = obj[ // force⏎…`).
-                //
-                // ⚠️ A **frozen** gap is the one exception, and for the reason the rule
-                // is stated on: there is no chain to break. The `//` there is the
-                // format-ignore directive itself, and what follows is a verbatim slice
-                // the chain formatter never lays out — so the `=` owes it nothing, and
-                // the RHS takes the same layout its unfrozen twin takes. Reading the
-                // directive as a chain break instead pinned the RHS to the `=` line
-                // where the identical unfrozen source hangs it
-                // (`const a = /* line1⏎line2 */ obj⏎// prettier-ignore⏎.prop`), a
-                // divergence only an owned multi-line comment ahead of the base makes
-                // visible — see `build_frozen_opaque_node_doc`.
-                let obj_end = member.object.span().end;
-                let prop_start = member.property.span().start;
-                if !self.member_gap_frozen(obj_end, prop_start)
-                    && self.has_line_comments_between(obj_end, prop_start)
-                {
-                    return true;
+            expr = match &expr.kind {
+                ExpressionKind::CallExpression(call) => {
+                    // A line comment between the callee (or its type arguments) and the `(`
+                    // forces the break too: the `//` must end its line before the `(`, so the
+                    // argument list drops to an indented continuation
+                    // (`build_empty_args_parens_doc`). That break is the comment's, not a chain
+                    // break point the static analysis missed.
+                    //
+                    // The window ends at the `(`. A `//` past it — leading the first argument
+                    // (`f(⏎// c⏎x)`) or dangling in empty parens (`f(⏎// c⏎)`) — breaks the
+                    // argument list around itself while the `(` stays on the callee's line, so
+                    // it is no chain break point, and the `=` lays out as prettier's does: by
+                    // width for a led first argument, after the operator for empty parens.
+                    //
+                    // The window up to the first argument is asked first, as the cheap gate;
+                    // the `(` is located only when a line comment lies in it. A call always has
+                    // its `(` there.
+                    let args_gap_start = call
+                        .type_arguments
+                        .as_ref()
+                        .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
+                    let args_gap_end = call
+                        .arguments
+                        .first()
+                        .map_or(expr.span.end, |arg| arg.span().start);
+                    let callee_gap_breaks = self
+                        .has_line_comments_between(args_gap_start, args_gap_end)
+                        && tsv_lang::source_scan::find_char_skipping_comments(
+                            self.source.as_bytes(),
+                            args_gap_start as usize,
+                            args_gap_end as usize,
+                            b'(',
+                        )
+                        .is_some_and(|paren| {
+                            self.has_line_comments_between(args_gap_start, paren as u32)
+                        });
+                    if callee_gap_breaks {
+                        return true;
+                    }
+                    call.callee
                 }
-                self.has_line_comments_in_chain(member.object)
-            }
-            ExpressionKind::TSNonNullExpression(non_null) => {
-                // The operand→`!` gap: a comment that spans a line in a retained paren
-                // shell (`(a?.b // c⏎)!`, `(a?.b /* c⏎d */)!`) opens the shell — the chain
-                // breaks at the comment like any other chain gap, so the `=` hugs it. The
-                // same reading the non-null's retain gate takes (`build_ts_non_null_doc`),
-                // so the layout and the emitter cannot disagree about which shell opens.
-                let operand_end = non_null.expression.span().end;
-                if self.has_line_spanning_comments_to_emit_between(operand_end, expr.span.end) {
-                    return true;
+                ExpressionKind::MemberExpression(member) => {
+                    // Check for line comments between object and property. For a computed
+                    // member this range deliberately includes the bracket INTERIOR: a
+                    // comment inside `[...]` makes the brackets break around it, so the
+                    // chain still breaks internally and the layout answer is the same —
+                    // keep the RHS on the operator line rather than also breaking after
+                    // `=` (`const a = obj[ // force⏎…`).
+                    //
+                    // ⚠️ A **frozen** gap is the one exception, and for the reason the rule
+                    // is stated on: there is no chain to break. The `//` there is the
+                    // format-ignore directive itself, and what follows is a verbatim slice
+                    // the chain formatter never lays out — so the `=` owes it nothing, and
+                    // the RHS takes the same layout its unfrozen twin takes. Reading the
+                    // directive as a chain break instead pinned the RHS to the `=` line
+                    // where the identical unfrozen source hangs it
+                    // (`const a = /* line1⏎line2 */ obj⏎// prettier-ignore⏎.prop`), a
+                    // divergence only an owned multi-line comment ahead of the base makes
+                    // visible — see `build_frozen_opaque_node_doc`.
+                    let obj_end = member.object.span().end;
+                    let prop_start = member.property.span().start;
+                    if !self.member_gap_frozen(obj_end, prop_start)
+                        && self.has_line_comments_between(obj_end, prop_start)
+                    {
+                        return true;
+                    }
+                    member.object
                 }
-                self.has_line_comments_in_chain(non_null.expression)
-            }
-            _ => false,
+                ExpressionKind::TSNonNullExpression(non_null) => {
+                    // The operand→`!` gap: a comment that spans a line in a retained paren
+                    // shell (`(a?.b // c⏎)!`, `(a?.b /* c⏎d */)!`) opens the shell — the chain
+                    // breaks at the comment like any other chain gap, so the `=` hugs it. The
+                    // same reading the non-null's retain gate takes (`build_ts_non_null_doc`),
+                    // so the layout and the emitter cannot disagree about which shell opens.
+                    let operand_end = non_null.expression.span().end;
+                    if self.has_line_spanning_comments_to_emit_between(operand_end, expr.span.end) {
+                        return true;
+                    }
+                    non_null.expression
+                }
+                _ => return false,
+            };
         }
     }
 }

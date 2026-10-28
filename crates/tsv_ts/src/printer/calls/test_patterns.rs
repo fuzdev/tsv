@@ -105,33 +105,35 @@ pub(super) fn build_test_callee_flat_doc(
 
 /// Get the member chain parts from an expression
 /// Returns parts reversed, e.g. `["skip", "test"]` for `test.skip`.
+///
+/// Out of line: its parts buffer is a large frame, and inlined into the call printer it
+/// would ride every call the printer re-enters for (a curried call, `f()()`), which the
+/// stack contract prices per link.
+#[inline(never)]
 fn get_member_chain_parts<'a>(
     expr: &internal::Expression<'a>,
 ) -> Option<SmallVec<[(IdentName<'a>, u32, u32); 8]>> {
     let mut parts: SmallVec<[(IdentName<'a>, u32, u32); 8]> = SmallVec::new();
 
-    match &expr.kind {
-        internal::ExpressionKind::Identifier(id) => {
-            parts.push((id.ident_name(), id.span.start, id.span.end));
-            Some(parts)
-        }
-        internal::ExpressionKind::MemberExpression(member) => {
-            // Don't match computed or optional chains (a[b] or a?.b)
-            if member.computed || member.optional {
-                return None;
+    // Property names outermost first, then the base — a loop down the spine, not a
+    // recursion, since a frame per link is what the stack contract prices
+    let mut expr = expr;
+    loop {
+        match &expr.kind {
+            internal::ExpressionKind::Identifier(id) => {
+                parts.push((id.ident_name(), id.span.start, id.span.end));
+                return Some(parts);
             }
-
-            // Get property name
-            let prop_name = get_identifier_name(member.property)?;
-            parts.push(prop_name);
-
-            // Recursively get object parts
-            let mut object_parts = get_member_chain_parts(member.object)?;
-            parts.append(&mut object_parts);
-
-            Some(parts)
+            internal::ExpressionKind::MemberExpression(member) => {
+                // Don't match computed or optional chains (a[b] or a?.b)
+                if member.computed || member.optional {
+                    return None;
+                }
+                parts.push(get_identifier_name(member.property)?);
+                expr = member.object;
+            }
+            _ => return None,
         }
-        _ => None,
     }
 }
 

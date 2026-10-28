@@ -1510,16 +1510,18 @@ fn chain_head_comment_window(
 ///
 /// [`chain_head_comment_window`] reads this off the linearized base node instead and
 /// keeps the walk as its debug oracle (and the fallback for a node list without one).
-fn get_chain_base_start(expr: &Expression<'_>) -> u32 {
-    match &expr.kind {
-        ExpressionKind::MemberExpression(member) => get_chain_base_start(member.object),
-        ExpressionKind::CallExpression(call) => get_chain_base_start(
-            transparent_instantiation_callee(call).map_or(call.callee, |inst| inst.expression),
-        ),
-        ExpressionKind::TSNonNullExpression(non_null) => get_chain_base_start(non_null.expression),
-        // Note: TaggedTemplateExpression is NOT traversed here because its own
-        // build_tagged_template_doc handles comments from removed parentheses
-        _ => expr.span().start,
+fn get_chain_base_start<'a>(mut expr: &'a Expression<'a>) -> u32 {
+    loop {
+        expr = match &expr.kind {
+            ExpressionKind::MemberExpression(member) => member.object,
+            ExpressionKind::CallExpression(call) => {
+                transparent_instantiation_callee(call).map_or(call.callee, |inst| inst.expression)
+            }
+            ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+            // Note: TaggedTemplateExpression is NOT traversed here because its own
+            // build_tagged_template_doc handles comments from removed parentheses
+            _ => return expr.span().start,
+        };
     }
 }
 

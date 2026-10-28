@@ -880,38 +880,57 @@ impl<'a> Printer<'a> {
         value: &'v internal::Expression<'v>,
     ) -> Option<&'v internal::TSTypeParameterInstantiation<'v>> {
         use internal::ExpressionKind as Kind;
-        match &value.kind {
-            Kind::CallExpression(call) => {
-                Self::chain_head_type_arguments(call.callee).or(call.type_arguments.as_ref())
-            }
-            Kind::NewExpression(new) => new.type_arguments.as_ref(),
-            Kind::MemberExpression(member) => Self::chain_head_type_arguments(member.object),
-            Kind::AwaitExpression(await_expr) => Self::value_type_arguments(await_expr.argument),
-            Kind::TSAsExpression(cast) => Self::value_type_arguments(cast.expression),
-            Kind::TSSatisfiesExpression(cast) => Self::value_type_arguments(cast.expression),
-            Kind::TSNonNullExpression(non_null) => Self::value_type_arguments(non_null.expression),
-            Kind::ArrowFunctionExpression(arrow) => {
-                match arrow.return_type.as_ref()?.type_annotation {
-                    TSType::TypeReference(reference) => reference.type_arguments.as_ref(),
-                    _ => None,
+        // A loop down the chain, not a recursion: a chain is as long as the spine limit lets
+        // it be, and a frame per link is what the stack contract prices. The innermost list
+        // wins — the head's own, else the innermost call's on the way down — so `found`
+        // keeps the innermost call list seen, and the head's answer is taken over it.
+        let mut found = None;
+        // Whether `value` is a member chain's object or a call's callee, where only the
+        // chain's own kinds go on (`chain_head`)
+        let mut chain_head = false;
+        let mut value = value;
+        loop {
+            let head = match &value.kind {
+                Kind::CallExpression(call) => {
+                    found = call.type_arguments.as_ref().or(found);
+                    value = call.callee;
+                    chain_head = true;
+                    continue;
                 }
-            }
-            _ => None,
-        }
-    }
-
-    /// [`Self::value_type_arguments`] of a member chain's object or a call's callee: the
-    /// type arguments of the call or `new` at the chain's head, if any.
-    fn chain_head_type_arguments<'v>(
-        object: &'v internal::Expression<'v>,
-    ) -> Option<&'v internal::TSTypeParameterInstantiation<'v>> {
-        use internal::ExpressionKind as Kind;
-        match &object.kind {
-            Kind::CallExpression(_)
-            | Kind::NewExpression(_)
-            | Kind::MemberExpression(_)
-            | Kind::TSNonNullExpression(_) => Self::value_type_arguments(object),
-            _ => None,
+                Kind::MemberExpression(member) => {
+                    value = member.object;
+                    chain_head = true;
+                    continue;
+                }
+                Kind::TSNonNullExpression(non_null) => {
+                    value = non_null.expression;
+                    chain_head = false;
+                    continue;
+                }
+                Kind::NewExpression(new) => new.type_arguments.as_ref(),
+                _ if chain_head => None,
+                Kind::AwaitExpression(await_expr) => {
+                    value = await_expr.argument;
+                    continue;
+                }
+                Kind::TSAsExpression(cast) => {
+                    value = cast.expression;
+                    continue;
+                }
+                Kind::TSSatisfiesExpression(cast) => {
+                    value = cast.expression;
+                    continue;
+                }
+                Kind::ArrowFunctionExpression(arrow) => match arrow.return_type.as_ref() {
+                    Some(return_type) => match return_type.type_annotation {
+                        TSType::TypeReference(reference) => reference.type_arguments.as_ref(),
+                        _ => None,
+                    },
+                    None => None,
+                },
+                _ => None,
+            };
+            return head.or(found);
         }
     }
 

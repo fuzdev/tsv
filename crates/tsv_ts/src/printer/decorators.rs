@@ -667,19 +667,22 @@ pub(in crate::printer) fn class_expr_has_decorators(c: &internal::ClassExpressio
 
 /// Whether `expr` is a bare-decorator member chain: an identifier, or a
 /// non-computed, non-optional member chain of identifiers down to one.
-fn is_decorator_member_expression(expr: &internal::Expression<'_>) -> bool {
-    match &expr.kind {
-        internal::ExpressionKind::Identifier(_) => true,
-        internal::ExpressionKind::MemberExpression(member) => {
-            !member.computed
-                && !member.optional
-                && matches!(
-                    member.property.kind,
-                    internal::ExpressionKind::Identifier(_)
-                )
-                && is_decorator_member_expression(member.object)
+fn is_decorator_member_expression(mut expr: &internal::Expression<'_>) -> bool {
+    loop {
+        match &expr.kind {
+            internal::ExpressionKind::Identifier(_) => return true,
+            internal::ExpressionKind::MemberExpression(member)
+                if !member.computed
+                    && !member.optional
+                    && matches!(
+                        member.property.kind,
+                        internal::ExpressionKind::Identifier(_)
+                    ) =>
+            {
+                expr = member.object;
+            }
+            _ => return false,
         }
-        _ => false,
     }
 }
 

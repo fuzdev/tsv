@@ -27,8 +27,8 @@ use super::scan::{
     skip_whitespace_and_comments,
 };
 use super::{
-    Checkpoint, GroupingParen, LINK_ASSERTION, LINK_OPERATOR, LINK_REENTRY, LINK_SUBSCRIPT,
-    LINK_TAG, Parser, RootEnd,
+    Checkpoint, GroupingParen, LINK_ASSERTION, LINK_NON_NULL, LINK_OPERATOR, LINK_REENTRY,
+    LINK_SUBSCRIPT, LINK_TAG, Parser, RootEnd,
 };
 
 //
@@ -1158,7 +1158,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // same ASI gate as every other `wrap_non_null_assertion` caller:
                     // a line terminator before `!` makes it a prefix `!`, not ours
                     TokenKind::Bang if !self.had_line_terminator => {
-                        self.spine_link(LINK_SUBSCRIPT)?;
+                        self.spine_link(LINK_NON_NULL)?;
                         expr = self.wrap_non_null_assertion(expr, head_start as u32)?;
                     }
                     _ => break,

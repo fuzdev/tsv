@@ -320,27 +320,34 @@ impl ListFrame {
 }
 
 // The spine units a link counts ([`Parser::spine_link`]): one for a binary or logical
-// operator — the cheapest link to walk, since every walk over an operator chain iterates it
-// — and, for the dearer ones, the stack their walks spend per link over an operator's,
-// rounded up over every build the contract covers: the native optimized and debug builds,
-// and the WASM engine's two stacks (its shadow stack in linear memory, and the host
-// engine's own, cold and tiered up). A type suffix's is set by a debug build's frames. The
-// re-entering links' is set by the WASM shadow stack once V8 has tiered the walks up: the
-// smallest weight at which every leg of the gates holds its nine-tenths margin is that
-// stack's (the native builds hold at a lower one), and the weight keeps about a quarter over
-// it, so a printer change that grows a re-entering walk's frame fails the gate before it
-// eats the contract's own margin. Whether a link re-enters is the printer's answer
-// (`printer::binary_left_operand_reenters`, `printer::call_may_print_whole`); the units
-// themselves are graded over every pair of link kinds, a sample of triples and the links
-// with comments in their gaps, natively by `tests/depth_limit.rs` and in the WASM engine by
+// operator and for a member access, call or instantiation the member-chain printer
+// flattens — the cheapest links to walk, since every walk over an operator chain iterates
+// it, and every walk over a member and call chain iterates it too, but for the member-chain
+// linearizer and the type strip, each of which recurses through only its first few links — and, for
+// the dearer ones, the stack their walks spend per link over an operator's, rounded up over every
+// build the contract covers: the native optimized and debug builds, and the WASM engine's two
+// stacks (its shadow stack in linear memory, and the host engine's own, cold and tiered up). A type
+// suffix's and a non-null's are set by a debug build's frames. The re-entering links' is set by the
+// WASM shadow stack once V8 has tiered the walks up: the smallest weight at which every leg of the
+// gates holds its nine-tenths margin is that stack's (the native builds hold at a lower one), and
+// the weight keeps about a quarter over it, so a printer change that grows a re-entering walk's
+// frame fails the gate before it eats the contract's own margin. Whether a link re-enters is the
+// printer's answer (`printer::binary_left_operand_reenters`, `printer::call_may_print_whole`); the
+// units themselves are graded over every pair of link kinds, a sample of triples and the links with
+// comments in their gaps, natively by `tests/depth_limit.rs` and in the WASM engine by
 // `scripts/depth_wasm.ts`.
 
 /// The spine units of a binary or logical operator, a postfix `++` / `--`, or a qualified
 /// name's `.`.
 pub(super) const LINK_OPERATOR: u32 = 1;
-/// The spine units of a member access, a call, a non-null assertion or an instantiation
-/// that the member-chain printer flattens into its chain.
-pub(super) const LINK_SUBSCRIPT: u32 = 2;
+/// The spine units of a member access, a call or an instantiation that the member-chain
+/// printer flattens into its chain.
+pub(super) const LINK_SUBSCRIPT: u32 = 1;
+/// The spine units of a non-null assertion the member-chain printer flattens: a run of
+/// `!` with a comment in each gap is printed as a doc that nests a level per `!`
+/// (`Printer::build_commented_non_null_operand_doc`), whose walks a debug build's frames
+/// price above a subscript's.
+pub(super) const LINK_NON_NULL: u32 = 2;
 /// The spine units of a link whose walk re-enters the expression printer for its operand:
 /// a call or a `!` the member-chain printer does not flatten, one on a call (a curried call,
 /// `f()!()`) or on a tagged template ([`Parser::call_link_units`]); a member over a tagged
@@ -1152,8 +1159,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// an assertion, a type's `[]` — as `units` spine units, refused at the current token
     /// where the frame's count would pass `tsv_lang::SPINE_LIMIT`
     /// ([`SpineCount::try_link`]). A link costs [`LINK_OPERATOR`] units unless its walks
-    /// spend more stack than an operator's: [`LINK_SUBSCRIPT`], [`LINK_REENTRY`],
-    /// [`LINK_TAG`], [`LINK_ASSERTION`], [`LINK_TYPE_SUFFIX`].
+    /// spend more stack than an operator's: [`LINK_NON_NULL`], [`LINK_REENTRY`], [`LINK_TAG`],
+    /// [`LINK_ASSERTION`], [`LINK_TYPE_SUFFIX`].
     #[expect(clippy::inline_always)]
     #[inline(always)]
     pub(super) fn spine_link(&mut self, units: u32) -> Result<(), ParseError> {
@@ -1587,7 +1594,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .is_some_and(|c| (c.span.start as usize) < to)
     }
 
-    /// The spine units of a call, a non-null assertion or an instantiation on `operand`:
+    /// The spine units of a call or an instantiation on `operand`, and the call rule a `!`
+    /// on it meets ([`Parser::non_null_link_units`]):
     /// [`LINK_REENTRY`] on a call, seen through any run of `!` and instantiations (`f()()`,
     /// `f()!()`, `f()!!!()`, `f()<T>()`) — the curried shapes the member-chain printer prints
     /// apart from the chain below them — or on a tagged template, which the member-chain
@@ -1648,12 +1656,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// The spine units of a `!` over `operand`: the greater of the two rules a `!` meets —
-    /// a curried call's ([`Parser::call_link_units`]) and a member's
-    /// ([`Parser::member_link_units`]).
+    /// The spine units of a `!` over `operand`: the greatest of the rules a `!` meets —
+    /// a curried call's ([`Parser::call_link_units`]), a member's
+    /// ([`Parser::member_link_units`]) and its own ([`LINK_NON_NULL`]).
     #[inline]
     pub(super) fn non_null_link_units(operand: &Expression<'_>) -> u32 {
-        Self::call_link_units(operand).max(Self::member_link_units(operand))
+        Self::call_link_units(operand)
+            .max(Self::member_link_units(operand))
+            .max(LINK_NON_NULL)
     }
 
     /// Top a call link up to [`LINK_REENTRY`] once its arguments are read, where they make

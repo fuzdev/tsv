@@ -845,54 +845,65 @@ impl<'a> Printer<'a> {
     /// harmless redundancy.
     pub(in crate::printer) fn new_callee_holds_bare_call(
         &self,
-        callee: &internal::Expression<'_>,
+        mut callee: &internal::Expression<'_>,
     ) -> bool {
         use internal::ExpressionKind as E;
-        match &callee.kind {
-            E::CallExpression(_) => true,
-            E::MemberExpression(member) => {
-                !self.needs_parens(member.object, ParenContext::ChainBase)
-                    && !child_stops_optional_chain(
-                        callee.span.start,
-                        member.optional,
-                        member.object,
+        // A loop down the spine, not a recursion: a chain is as long as the spine limit lets
+        // it be, and a frame per link is what the stack contract prices
+        loop {
+            let (holds, next) = match &callee.kind {
+                E::CallExpression(_) => return true,
+                E::MemberExpression(member) => (
+                    !self.needs_parens(member.object, ParenContext::ChainBase)
+                        && !child_stops_optional_chain(
+                            callee.span.start,
+                            member.optional,
+                            member.object,
+                        ),
+                    member.object,
+                ),
+                E::TSNonNullExpression(non_null) => (
+                    !self.needs_parens(non_null.expression, ParenContext::NonNull)
+                        && !non_null.seals_optional_chain(callee.span),
+                    non_null.expression,
+                ),
+                E::TaggedTemplateExpression(tagged) => {
+                    let list = tagged.type_arguments.as_ref();
+                    let keeps_pair = self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
+                        || tag_paren_leading_start(tagged, callee.span).is_some()
+                        || tagged.tag.is_sealing_non_null()
+                        || list.is_some_and(|_| {
+                            instantiation_keeps_pair_before_type_args(
+                                self.source,
+                                tagged.tag,
+                                SecondTypeArgs::Expression,
+                            )
+                        });
+                    (!keeps_pair, tagged.tag)
+                }
+                E::TSInstantiationExpression(inst) => {
+                    let operand = inst.expression;
+                    let second_list_pair = instantiation_keeps_pair_before_type_args(
+                        self.source,
+                        operand,
+                        SecondTypeArgs::Expression,
+                    );
+                    let source_pair = second_list_pair
+                        || instantiation_operand_is_sealed_chain(callee.span.start, operand);
+                    (
+                        !self.needs_parens(
+                            operand,
+                            ParenContext::InstantiationExpression { source_pair },
+                        ),
+                        operand,
                     )
-                    && self.new_callee_holds_bare_call(member.object)
+                }
+                _ => return false,
+            };
+            if !holds {
+                return false;
             }
-            E::TSNonNullExpression(non_null) => {
-                !self.needs_parens(non_null.expression, ParenContext::NonNull)
-                    && !non_null.seals_optional_chain(callee.span)
-                    && self.new_callee_holds_bare_call(non_null.expression)
-            }
-            E::TaggedTemplateExpression(tagged) => {
-                let list = tagged.type_arguments.as_ref();
-                let keeps_pair = self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
-                    || tag_paren_leading_start(tagged, callee.span).is_some()
-                    || tagged.tag.is_sealing_non_null()
-                    || list.is_some_and(|_| {
-                        instantiation_keeps_pair_before_type_args(
-                            self.source,
-                            tagged.tag,
-                            SecondTypeArgs::Expression,
-                        )
-                    });
-                !keeps_pair && self.new_callee_holds_bare_call(tagged.tag)
-            }
-            E::TSInstantiationExpression(inst) => {
-                let operand = inst.expression;
-                let second_list_pair = instantiation_keeps_pair_before_type_args(
-                    self.source,
-                    operand,
-                    SecondTypeArgs::Expression,
-                );
-                let source_pair = second_list_pair
-                    || instantiation_operand_is_sealed_chain(callee.span.start, operand);
-                !self.needs_parens(
-                    operand,
-                    ParenContext::InstantiationExpression { source_pair },
-                ) && self.new_callee_holds_bare_call(operand)
-            }
-            _ => false,
+            callee = next;
         }
     }
 }

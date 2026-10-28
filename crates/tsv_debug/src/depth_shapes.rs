@@ -541,6 +541,15 @@ fn commented_links(shapes: &mut Vec<Shape>) {
 /// `LINK_REENTRY`, restated for the flat shapes whose wire it calibrates.
 const REENTRY: u32 = 10;
 
+/// The spine units of a member access, a call or an instantiation the member-chain
+/// printer flattens — the parser's `LINK_SUBSCRIPT`, restated for the
+/// flat shapes whose wire it calibrates.
+const SUBSCRIPT: u32 = 1;
+
+/// The spine units of a non-null assertion the member-chain printer flattens — the
+/// parser's `LINK_NON_NULL`, restated for the flat shapes whose wire it calibrates.
+const NON_NULL: u32 = 2;
+
 pub fn rep(s: &str, n: usize) -> String {
     s.repeat(n)
 }
@@ -1004,31 +1013,31 @@ fn construct_shapes() -> Vec<Shape> {
         // TypeScript: left spines
         ts_flat("ts_binary_flat", 1, "x = 1", " + 1", ";\n"),
         ts_flat("ts_logical_flat", 1, "x = a", " || a", ";\n"),
-        ts_flat("ts_call_chain_flat", 2, "x = a", ".b()", ";\n"),
-        ts_flat("ts_member_flat", 2, "x = a", ".b", ";\n"),
-        ts_flat("ts_computed_flat", 2, "x = a", "[0]", ";\n"),
+        ts_flat("ts_call_chain_flat", SUBSCRIPT, "x = a", ".b()", ";\n"),
+        ts_flat("ts_member_flat", SUBSCRIPT, "x = a", ".b", ";\n"),
+        ts_flat("ts_computed_flat", SUBSCRIPT, "x = a", "[0]", ";\n"),
         ts_flat("ts_call_flat", REENTRY, "x = a", "()", ";\n"),
         ts_flat("ts_optional_call_flat", REENTRY, "x = a", "?.()", ";\n"),
-        ts_flat("ts_non_null_flat", 2, "x = a", "!", ";\n"),
+        ts_flat("ts_non_null_flat", NON_NULL, "x = a", "!", ";\n"),
         // a block comment in each `!`'s gap, which the printer takes on a path of its own
         ts_flat(
             "ts_non_null_block_comment_flat",
-            2,
+            NON_NULL,
             "x = a",
             "!/*c*/",
             ";\n",
         ),
         ts_flat(
             "ts_new_callee_non_null_comment",
-            2,
+            NON_NULL,
             "x = new a",
             "!/*c*/",
             "();\n",
         ),
         ts_flat("ts_as_flat", 8, "x = a", " as T", ";\n"),
         ts_flat("ts_tagged_flat", 14, "x = a", "``", ";\n"),
-        ts_flat("ts_new_callee_flat", 2, "x = new a", ".b", "();\n"),
-        ts_flat("ts_decorator_flat", 2, "@a", ".b", "\nclass A {}\n"),
+        ts_flat("ts_new_callee_flat", SUBSCRIPT, "x = new a", ".b", "();\n"),
+        ts_flat("ts_decorator_flat", SUBSCRIPT, "@a", ".b", "\nclass A {}\n"),
         ts_flat("ts_type_array_flat", 6, "type T = A", "[]", ";\n"),
         ts_flat("ts_type_indexed_flat", 6, "type T = A", "[K]", ";\n"),
         ts_flat("ts_qualified_flat", 1, "type T = A", ".B", ";\n"),
