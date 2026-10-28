@@ -457,13 +457,12 @@ impl<'a> Printer<'a> {
         // lets it be, and a frame per link is what the stack contract prices
         loop {
             if let ExpressionKind::MemberExpression(member) = &expr.kind {
-                // Leading own-line comment between object and property.
-                let obj_end = member.object.span().end;
+                // Leading own-line comment between object and property — the gap as the
+                // chain prints it, opening at the head's printed end, so a comment a stripped
+                // shell there holds ends the `)`'s line ahead of the rest of the gap
+                // ([`Printer::member_gap_start`]).
+                let obj_end = self.member_gap_start(member.object);
                 let prop_start = member.property.span().start;
-                // TODO: K324 — a `//` the object's printer defers out of a stripped shell to
-                // the object's end leaves no room after the `)` for another `//`, which this
-                // reading still trails, so pass 1 skips the hang the next pass takes
-                // (`return (a + (b // L1⏎)⏎) // L3⏎.h;`).
                 if self.has_leading_own_line_comment_in_range(GapStart::Node(obj_end), prop_start) {
                     return true;
                 }
@@ -475,7 +474,7 @@ impl<'a> Printer<'a> {
                     member.property.span().start,
                 )
                 && self.callee_gap_ends_line_after_multiline_block(
-                    member.object.span().end,
+                    self.member_gap_start(member.object),
                     member.property.span().start,
                 )
             {

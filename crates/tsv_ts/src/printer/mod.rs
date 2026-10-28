@@ -669,6 +669,12 @@ pub struct Printer<'a> {
     /// than consumed on read, so a conditional group that builds the claimer more than
     /// once prints the run in every candidate.
     pub(crate) claimed_left_spine_run: Cell<Option<comments::LeftSpineClaim>>,
+    /// The stripped trailing shell REGION a chain's first member gap claims from its
+    /// parenthesized base ([`Printer::member_gap_start`]): from the base's printed end to
+    /// its span's end. The base's own trailing emitters decline it
+    /// ([`Printer::wrap_chain_with_paren_comments`]) and the gap prints it after the `)`.
+    /// Save/restored around the chain's build.
+    pub(crate) claimed_right_spine_run: Cell<Option<Span>>,
     /// The span a linearized chain's BASE freezes — an alone-on-line format-ignore directive
     /// in the grouping parens the parser erased ahead of it
     /// ([`Printer::left_spine_operand_frozen_span`]).
@@ -965,6 +971,7 @@ impl<'a> Printer<'a> {
             claimed_shell_leading_run: Cell::new(None),
             head_memo: types::HeadMemo::default(),
             claimed_left_spine_run: Cell::new(None),
+            claimed_right_spine_run: Cell::new(None),
             frozen_chain_base: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
@@ -2161,13 +2168,94 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// What the chain linearizer reads — the source, the comment table and the withheld
-    /// clarity pairs as one value, so no call site can hand one over without the others.
+    /// Where the gap between a member's object and its property OPENS: the object's end,
+    /// or — when the object's right spine ends in a binary whose last operand sits in
+    /// stripped grouping shells holding a comment — the end of what the object prints, so
+    /// the gap claims the shells' run and prints it after the object's `)`, exactly as it
+    /// prints a comment written directly before that `)` (`(a + (b // c⏎)).h` reads as
+    /// `(a + b // c⏎).h`). Left to the binary, the run deferred past the `)` to the line's
+    /// end, behind anything the gap printed first, and out of reach of every predicate that
+    /// reads the gap ([`Printer::claimed_right_spine_run`]). Every reader of a member gap
+    /// opens it here.
+    #[inline]
+    pub(crate) fn member_gap_start(&self, object: &internal::Expression<'_>) -> u32 {
+        use internal::ExpressionKind as K;
+        // Only the walk's own heads can end in a binary's shells: most member objects are
+        // none of them, and every member linearization asks.
+        if matches!(
+            object.kind,
+            K::BinaryExpression(_)
+                | K::ArrowFunctionExpression(_)
+                | K::ConditionalExpression(_)
+                | K::AssignmentExpression(_)
+                | K::YieldExpression(_)
+        ) {
+            self.member_gap_start_after_spine(object)
+        } else {
+            object.span().end
+        }
+    }
+
+    /// [`Self::member_gap_start`] for an object the walk can descend, out of line.
+    #[inline(never)]
+    fn member_gap_start_after_spine(&self, object: &internal::Expression<'_>) -> u32 {
+        let end = object.span().end;
+        // Only a comment inside the object can be claimed, and most objects hold none.
+        if !self.has_comments_to_emit_between(object.span().start, end) {
+            return end;
+        }
+        let start = self.right_spine_printed_end(object);
+        if start < end && self.has_comments_to_emit_between(start, end) {
+            start
+        } else {
+            end
+        }
+    }
+
+    /// Where `expr`'s printed content ends ahead of the stripped grouping shells a binary
+    /// on its right spine prints after it: down the last child that ends where its parent
+    /// does — an arrow's expression body, a conditional's alternate, an assignment's or a
+    /// `yield`'s operand — and through a binary's bare last operand
+    /// ([`Self::binary_printed_last_operand`]). A child that sits behind a grouping shell
+    /// (`yield (x)`, `() => (x)`, `x = (y = …)`) ends the walk at the parent's end — whether
+    /// that shell prints is its parent printer's decision, not re-derived here — so a comment
+    /// in a shell below it still defers (a known gap); a kept pair ends it at the pair's `)`.
+    fn right_spine_printed_end(&self, expr: &internal::Expression<'_>) -> u32 {
+        use internal::ExpressionKind as K;
+        let mut expr = expr;
+        loop {
+            let next = match &expr.kind {
+                K::BinaryExpression(binary) => match self.binary_printed_last_operand(binary) {
+                    Ok(operand) => {
+                        expr = operand;
+                        continue;
+                    }
+                    Err(close) => return close,
+                },
+                K::ArrowFunctionExpression(arrow) => match arrow.body {
+                    internal::ArrowFunctionBody::Expression(body) => body,
+                    internal::ArrowFunctionBody::BlockStatement(_) => return expr.span().end,
+                },
+                K::ConditionalExpression(conditional) => conditional.alternate,
+                K::AssignmentExpression(assignment) => assignment.right,
+                K::YieldExpression(internal::YieldExpression {
+                    argument: Some(argument),
+                    ..
+                }) => argument,
+                _ => return expr.span().end,
+            };
+            if next.span().end != expr.span().end {
+                return expr.span().end;
+            }
+            expr = next;
+        }
+    }
+
+    /// What the chain linearizer reads — the printer itself, and the region marks when the
+    /// document has any — as one value, so no call site can hand one over without the other.
     pub(crate) fn linearize_input(&self) -> chain::LinearizeInput<'_> {
         chain::LinearizeInput {
-            source: self.source,
-            comments: self.comments,
-            withheld_clarity_pairs: &self.withheld_clarity_pair_targets,
+            printer: self,
             region_kept_shells: self
                 .has_region_source_marks
                 .get()

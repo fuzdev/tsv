@@ -1977,7 +1977,14 @@ impl<'a> Printer<'a> {
         span: Span,
         build_commented: impl FnOnce(&Self) -> DocId,
     ) -> BinaryChainLayout {
-        if self.has_comments_to_emit_between(span.start, span.end) {
+        // The trailing shells a member gap claims print after the chain base's `)`
+        // ([`Printer::member_gap_start`]), so they leave the chain comment-free.
+        let end = self
+            .claimed_right_spine_run
+            .get()
+            .filter(|claim| span.start <= claim.start && span.end <= claim.end)
+            .map_or(span.end, |claim| claim.start);
+        if self.has_comments_to_emit_between(span.start, end) {
             return BinaryChainLayout::Built(build_commented(self));
         }
 

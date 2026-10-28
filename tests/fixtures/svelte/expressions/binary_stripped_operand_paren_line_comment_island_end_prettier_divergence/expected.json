@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 951,
+	"end": 828,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -1277,96 +1277,6 @@
 					"type": "Fragment",
 					"nodes": []
 				}
-			},
-			{
-				"type": "Text",
-				"start": 827,
-				"end": 829,
-				"raw": "\n\n",
-				"data": "\n\n"
-			},
-			{
-				"type": "Comment",
-				"start": 829,
-				"end": 908,
-				"data": " the run reaches the value's end only while the member chain stays flat "
-			},
-			{
-				"type": "Text",
-				"start": 908,
-				"end": 909,
-				"raw": "\n",
-				"data": "\n"
-			},
-			{
-				"type": "RegularElement",
-				"start": 909,
-				"end": 950,
-				"name": "p",
-				"attributes": [
-					{
-						"type": "Attribute",
-						"start": 913,
-						"end": 940,
-						"name": "class",
-						"value": {
-							"type": "ExpressionTag",
-							"start": 919,
-							"end": 940,
-							"expression": {
-								"type": "MemberExpression",
-								"start": 920,
-								"end": 930,
-								"object": {
-									"type": "LogicalExpression",
-									"start": 921,
-									"end": 927,
-									"left": {
-										"type": "Identifier",
-										"start": 921,
-										"end": 922,
-										"name": "a"
-									},
-									"operator": "||",
-									"right": {
-										"type": "Identifier",
-										"start": 926,
-										"end": 927,
-										"name": "b"
-									}
-								},
-								"property": {
-									"type": "Identifier",
-									"start": 929,
-									"end": 930,
-									"name": "m"
-								},
-								"computed": false,
-								"optional": false,
-								"trailingComments": [
-									{
-										"type": "Line",
-										"value": " c15",
-										"start": 931,
-										"end": 937
-									}
-								]
-							}
-						}
-					}
-				],
-				"fragment": {
-					"type": "Fragment",
-					"nodes": [
-						{
-							"type": "Text",
-							"start": 942,
-							"end": 946,
-							"raw": "\n\tt\n",
-							"data": "\n\tt\n"
-						}
-					]
-				}
 			}
 		]
 	},
@@ -1485,12 +1395,6 @@
 			"value": " d14",
 			"start": 798,
 			"end": 804
-		},
-		{
-			"type": "Line",
-			"value": " c15",
-			"start": 931,
-			"end": 937
 		}
 	],
 	"instance": {

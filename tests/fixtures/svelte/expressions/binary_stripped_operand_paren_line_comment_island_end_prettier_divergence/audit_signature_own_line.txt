@@ -113,17 +113,6 @@
 	}
 />
 
-<!-- the run reaches the value's end only while the member chain stays flat -->
-<p
-	class={(
-		a ||
-		b
-		// c15
-	).m}
->
-	t
-</p>
-
 %%PASS=2 (fixed point)%%
 <script>
 	// the same pair in a `<script>`: the statement's own line end takes the comment
@@ -202,11 +191,3 @@
 		(w) => (x = w)
 	}
 />
-
-<!-- the run reaches the value's end only while the member chain stays flat -->
-<p
-	class={// c15
-	(a || b).m}
->
-	t
-</p>

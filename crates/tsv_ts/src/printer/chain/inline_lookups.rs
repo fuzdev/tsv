@@ -130,7 +130,7 @@ pub fn build_lookup_after_operand_doc(
     object_doc: DocId,
     printer: &Printer<'_>,
 ) -> DocId {
-    let node = member_lookup_node(member, span, printer.get_source());
+    let node = member_lookup_node(member, span, printer.linearize_input());
     let lookup = print_node(&node, printer);
     let marked = |mark: &Cell<Option<Span>>| mark.get() == Some(span);
     let inline = !node.is_dot_lookup()

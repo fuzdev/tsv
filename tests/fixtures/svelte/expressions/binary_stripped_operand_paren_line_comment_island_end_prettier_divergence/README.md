@@ -21,8 +21,10 @@ argument the call keeps hugged.
   by more of the value strips as it does in a `<script>`, its comma ending the line
   (`c12`) — and ahead of a comment the author wrote at that comma, which follows on the
   next line (`c14`). A run that reaches the value's end only in some layouts leaves the
-  host's layout alone and lets the render settle it (`c15`: the member chain stays on the
-  value's line).
+  host's layout alone and lets the render settle it (`c8`, `c10`: the hugged arrow, whose
+  call could still break and flush the run inside it). A pair at the end of a member chain's
+  parenthesized head is not such a run: the head's member gap takes its comment, after the `)`
+  ([member_paren_head_stripped_shell_comment](../../../typescript/expressions/calls/chained/member_paren_head_stripped_shell_comment_prettier_divergence/)).
 - The **hugged arrow** cells (`c8`, `c10`) are the `<script>` rule's own exception: the
   sole arrow's run trails past the call's `)`, so the island flushes it after the call —
   where the paren-free authoring (`{f(() => x + y // c⏎)}`) keeps the comment inside the

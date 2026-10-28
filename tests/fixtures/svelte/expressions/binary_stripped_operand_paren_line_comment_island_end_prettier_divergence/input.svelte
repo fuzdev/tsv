@@ -79,11 +79,3 @@ as item}
 		(w) => (x = w)
 	}
 />
-
-<!-- the run reaches the value's end only while the member chain stays flat -->
-<p
-	class={(a || b).m // c15
-	}
->
-	t
-</p>

@@ -22,6 +22,17 @@ struct ChainOperand {
     span: Span,
 }
 
+/// How a binary chain's LAST operand prints ([`Printer::build_chain_end_operand`]).
+#[derive(Clone, Copy)]
+enum ChainEndShape {
+    /// Through the ordinary operand builder, reporting the operand's own span.
+    Bare,
+    /// Inside the author's pair kept for the value's end, a same-line block run inline.
+    Inline { open: u32, close: u32 },
+    /// Inside a required or kept pair opened around a run that would defer.
+    Opened { open: u32, close: u32 },
+}
+
 /// Stack buffers for a flattened binary chain's operands / operators, collected
 /// once per binary expression. The common 2–3 operand chain stays inline
 /// (`ChainOperand` is 12 bytes, `BinaryOperator` 1 byte); longer chains spill.
@@ -930,6 +941,20 @@ impl<'a> Printer<'a> {
         if rightmost_end >= span.end {
             return with_leading;
         }
+        // A member gap that opens at the chain base's printed end prints this region
+        // itself, after the base's `)` ([`Printer::member_gap_start`]).
+        if let Some(claim) = self.claimed_right_spine_run.get()
+            && claim.start <= rightmost_end
+            && span.end <= claim.end
+        {
+            return with_leading;
+        }
+        debug_assert!(
+            self.claimed_right_spine_run
+                .get()
+                .is_none_or(|claim| span.end <= claim.start || claim.end <= rightmost_end),
+            "a claimed right-spine region covers a binary's whole trailing region or none of it"
+        );
         let mut parts = smallvec![with_leading];
         self.append_trailing_paren_comments(&mut parts, rightmost_end, span.end);
         // `concat` short-circuits the no-trailing-comment case (`[with_leading]`).
@@ -1536,14 +1561,8 @@ impl<'a> Printer<'a> {
         // Add current operator
         operators.push(ChainOperator::of(expr));
 
-        // Also flatten the right side where prettier REBALANCES it, which removes the
-        // redundant parens: `a && (b && c)` becomes `a && b && c`
-        // ([`BinaryOperator::rebalances_with`] — logical operators only; arithmetic
-        // preserves right-side parens).
-        if let ExpressionKind::BinaryExpression(right_binary) = &expr.right.kind
-            && expr.operator.rebalances_with(right_binary.operator)
-            && !(ends_chain && self.value_end_kept_pair(expr.right).is_some())
-        {
+        // Also flatten the right side where prettier rebalances it ([`Self::rebalanced_right`]).
+        if let Some(right_binary) = self.rebalanced_right(expr, ends_chain) {
             self.collect_binary_chain_with_spans(
                 right_binary,
                 operands,
@@ -1593,6 +1612,58 @@ impl<'a> Printer<'a> {
         parent_op: BinaryOperator,
     ) -> ChainOperand {
         let span = operand.span();
+        match self.chain_end_operand_shape(operand, parent_op) {
+            ChainEndShape::Bare => ChainOperand {
+                doc: self.build_binary_operand_doc(operand, parent_op, true),
+                span,
+            },
+            ChainEndShape::Inline { open, close } => {
+                // A run of same-line blocks stays inline, inside the kept pair.
+                let d = self.d();
+                let mut body: DocBuf = smallvec![d.text("(")];
+                body.push(self.build_value_with_outermost_owned_comment(operand, || {
+                    self.build_chain_aware_operand_doc(operand)
+                }));
+                self.push_anchored_trailing_run(&mut body, span.end, close, RunLeadingBlank::Keep);
+                body.push(d.text(")"));
+                ChainOperand {
+                    doc: d.concat(&body),
+                    span: Span::new(open, close),
+                }
+            }
+            ChainEndShape::Opened { open, close } => {
+                // The opened pair owns BOTH its gaps, as every required pair in the family
+                // does: a `//` the author glued to the `(` keeps the `(` line (the
+                // opening-delimiter rule), and the rest of the `(`→operand run leads the
+                // operand inside the pair. Left to the operator→operand gap, that run printed
+                // AHEAD of the `(` (`x - // c⏎(⏎y - z …`), so the span reported to the chain
+                // opens at the `(` — the operator gap ends there.
+                let (paren_trailing, run_start) =
+                    self.split_open_delimiter_glued_run(open + 1, span.start);
+                let mut body = DocBuf::new();
+                if let Some(run) = self.build_rhs_comments_opt(run_start, span.start) {
+                    body.push(run);
+                }
+                body.push(self.build_value_with_outermost_owned_comment(operand, || {
+                    self.build_chain_aware_operand_doc(operand)
+                }));
+                self.push_anchored_trailing_run(&mut body, span.end, close, RunLeadingBlank::Keep);
+                ChainOperand {
+                    doc: self.compose_expanded_shell_doc(paren_trailing, &body, ")"),
+                    span: Span::new(open, close),
+                }
+            }
+        }
+    }
+
+    /// How [`Self::build_chain_end_operand`] prints the chain's last operand, decided
+    /// apart from the build so [`Self::binary_printed_last_operand`] reads the same answer.
+    fn chain_end_operand_shape(
+        &self,
+        operand: &Expression<'_>,
+        parent_op: BinaryOperator,
+    ) -> ChainEndShape {
+        let span = operand.span();
         let ctx = ParenContext::BinaryRight { parent_op };
         // The pair must be the AUTHOR's, around this operand: a `(` right before it and a
         // `)` right after. A pair the printer mints for clarity (`p && q || r && s`) has no
@@ -1600,7 +1671,7 @@ impl<'a> Printer<'a> {
         // (`void(… r && s // c⏎)`) whose own trailing emitter prints that run.
         let kept_for_value_end = self.value_end_kept_pair(operand);
         let keeps_for_value_end = kept_for_value_end.is_some();
-        if let Some((open, close)) = kept_for_value_end.or_else(|| {
+        let Some((open, close)) = kept_for_value_end.or_else(|| {
             if !self.needs_parens_at_operand_end(operand, ctx) {
                 return None;
             }
@@ -1608,60 +1679,58 @@ impl<'a> Printer<'a> {
                 .prev_significant_pos(span.start)
                 .filter(|&at| self.source.as_bytes()[at as usize] == b'(')?;
             Some((open, self.paren_shell_close_after(span.end)?))
-        }) {
-            // A kept pair whose `(`→operand gap holds a comment takes the opened shape
-            // below, which owns that gap too.
-            let leading_run =
-                keeps_for_value_end && self.has_comments_to_emit_between(open + 1, span.start);
-            if !leading_run && !self.pair_trailing_run_defers(span.end, close) {
-                if keeps_for_value_end {
-                    // A run of same-line blocks stays inline, inside the kept pair.
-                    let d = self.d();
-                    let mut body: DocBuf = smallvec![d.text("(")];
-                    body.push(self.build_value_with_outermost_owned_comment(operand, || {
-                        self.build_chain_aware_operand_doc(operand)
-                    }));
-                    self.push_anchored_trailing_run(
-                        &mut body,
-                        span.end,
-                        close,
-                        RunLeadingBlank::Keep,
-                    );
-                    body.push(d.text(")"));
-                    return ChainOperand {
-                        doc: d.concat(&body),
-                        span: Span::new(open, close),
-                    };
-                }
-                return ChainOperand {
-                    doc: self.build_binary_operand_doc(operand, parent_op, true),
-                    span,
-                };
-            }
-            // The opened pair owns BOTH its gaps, as every required pair in the family
-            // does: a `//` the author glued to the `(` keeps the `(` line (the
-            // opening-delimiter rule), and the rest of the `(`→operand run leads the
-            // operand inside the pair. Left to the operator→operand gap, that run printed
-            // AHEAD of the `(` (`x - // c⏎(⏎y - z …`), so the span reported to the chain
-            // opens at the `(` — the operator gap ends there.
-            let (paren_trailing, run_start) =
-                self.split_open_delimiter_glued_run(open + 1, span.start);
-            let mut body = DocBuf::new();
-            if let Some(run) = self.build_rhs_comments_opt(run_start, span.start) {
-                body.push(run);
-            }
-            body.push(self.build_value_with_outermost_owned_comment(operand, || {
-                self.build_chain_aware_operand_doc(operand)
-            }));
-            self.push_anchored_trailing_run(&mut body, span.end, close, RunLeadingBlank::Keep);
-            return ChainOperand {
-                doc: self.compose_expanded_shell_doc(paren_trailing, &body, ")"),
-                span: Span::new(open, close),
+        }) else {
+            return ChainEndShape::Bare;
+        };
+        // A kept pair whose `(`→operand gap holds a comment takes the opened shape, which
+        // owns that gap too.
+        let leading_run =
+            keeps_for_value_end && self.has_comments_to_emit_between(open + 1, span.start);
+        if !leading_run && !self.pair_trailing_run_defers(span.end, close) {
+            return if keeps_for_value_end {
+                ChainEndShape::Inline { open, close }
+            } else {
+                ChainEndShape::Bare
             };
         }
-        ChainOperand {
-            doc: self.build_binary_operand_doc(operand, parent_op, true),
-            span,
+        ChainEndShape::Opened { open, close }
+    }
+
+    /// The right side of `expr` as the binary [`Self::collect_binary_chain_link`] flattens
+    /// into, if it does: prettier REBALANCES it, which removes the redundant parens
+    /// (`a && (b && c)` becomes `a && b && c`, [`BinaryOperator::rebalances_with`] —
+    /// logical operators only; arithmetic preserves right-side parens), unless it is the
+    /// chain's last operand and its pair is kept for the value's end.
+    fn rebalanced_right<'e>(
+        &self,
+        expr: &'e internal::BinaryExpression<'e>,
+        ends_chain: bool,
+    ) -> Option<&'e internal::BinaryExpression<'e>> {
+        if let ExpressionKind::BinaryExpression(right_binary) = &expr.right.kind
+            && expr.operator.rebalances_with(right_binary.operator)
+            && !(ends_chain && self.value_end_kept_pair(expr.right).is_some())
+        {
+            return Some(right_binary);
+        }
+        None
+    }
+
+    /// `binary`'s last operand as its chain prints it ([`Self::collect_binary_chain_link`]
+    /// rebalancing into a right side, [`Self::build_chain_end_operand`] deciding its pair):
+    /// `Ok(operand)` when the operand prints bare, so the stripped shells between its end and
+    /// `binary`'s are the region [`Self::wrap_chain_with_paren_comments`] emits, or
+    /// `Err(close)` when a kept pair prints them, ending at its `)`.
+    pub(in crate::printer) fn binary_printed_last_operand<'e>(
+        &self,
+        binary: &'e internal::BinaryExpression<'e>,
+    ) -> Result<&'e Expression<'e>, u32> {
+        let mut node = binary;
+        while let Some(right) = self.rebalanced_right(node, true) {
+            node = right;
+        }
+        match self.chain_end_operand_shape(node.right, node.operator) {
+            ChainEndShape::Bare => Ok(node.right),
+            ChainEndShape::Inline { close, .. } | ChainEndShape::Opened { close, .. } => Err(close),
         }
     }
 

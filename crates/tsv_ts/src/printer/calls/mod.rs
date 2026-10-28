@@ -1091,7 +1091,10 @@ impl<'a> Printer<'a> {
         // expression verbatim from source — preserving inner call args (numbers,
         // etc.) that the chain formatter would otherwise reformat. Mirrors
         // prettier's `hasPrettierIgnore` → verbatim-print behavior.
-        if self.member_gap_frozen(member.object.span().end, member.property.span().start) {
+        if self.member_gap_frozen(
+            self.member_gap_start(member.object),
+            member.property.span().start,
+        ) {
             return self.build_frozen_opaque_node_doc(span);
         }
 

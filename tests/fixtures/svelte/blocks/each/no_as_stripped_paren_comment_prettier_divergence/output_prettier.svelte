@@ -27,7 +27,7 @@
 	<p>x</p>
 {/each}
 
-<!-- whatever follows the pair in the value: a member, an index -->
+<!-- a member after the pair takes the comment into the chain head's gap, after the `)`; a pair inside an index keeps it -->
 {#each (a || b) // c7
 .m}
 	<p>x</p>

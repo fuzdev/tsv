@@ -740,7 +740,7 @@ fn is_poorly_breakable_chain_walk(
             // spelled — and carries a second copy of the chain-root test, which then drifts.
             ExpressionKind::MemberExpression(member) => {
                 if walk.chain_has_calls {
-                    let object_end = member.object.span().end;
+                    let object_end = printer.member_gap_start(member.object);
                     let gap_end = if member.computed {
                         crate::printer::chain::find_bracket_position(
                             printer.source,
@@ -1689,7 +1689,7 @@ impl<'a> Printer<'a> {
                     // (`const a = /* line1⏎line2 */ obj⏎// prettier-ignore⏎.prop`), a
                     // divergence only an owned multi-line comment ahead of the base makes
                     // visible — see `build_frozen_opaque_node_doc`.
-                    let obj_end = member.object.span().end;
+                    let obj_end = self.member_gap_start(member.object);
                     let prop_start = member.property.span().start;
                     if !self.member_gap_frozen(obj_end, prop_start)
                         && self.has_line_comments_between(obj_end, prop_start)

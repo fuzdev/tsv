@@ -24,21 +24,21 @@ use tsv_lang::{Comment, Span, TAB_WIDTH, has_line_spanning_comments_to_emit_in_r
 // Linearization
 //
 
-/// What the linearizer reads beyond the AST it walks: the source (to locate the `)` of a
-/// pair a base owns), the comment table (for the gates asking whether a gap holds a
-/// `//`), the printer's withheld clarity pairs (for a base that is a called function
-/// expression, whose pair is one — `Printer::withheld_clarity_pair_targets`), and the heads
-/// that keep an authored shell behind `typeof` or a unary `-` in a comma-list region
-/// (`Printer::region_kept_shell_targets`): a base, a member object, a callee or a non-null
-/// operand, each printed as one parenthesized base.
+/// What the linearizer reads beyond the AST it walks: the printer — its source (to locate the
+/// `)` of a pair a base owns), its comment table (for the gates asking whether a gap holds a
+/// `//`), its withheld clarity pairs (for a base that is a called function expression, whose
+/// pair is one — `Printer::withheld_clarity_pair_targets`), and where a member's gap opens
+/// ([`Printer::member_gap_start`]) — and the heads that keep an authored shell behind
+/// `typeof` or a unary `-` in a comma-list region (`Printer::region_kept_shell_targets`): a
+/// base, a member object, a callee or a non-null operand, each printed as one parenthesized
+/// base.
 ///
-/// A struct rather than separate parameters because every step of the walk needs the first
-/// two and none is ever passed alone — the same reason `ParenLeadingValue` travels as one.
+/// A struct rather than separate parameters because every step of the walk needs the
+/// printer and none is ever passed alone — the same reason `ParenLeadingValue` travels as
+/// one. Two words: it is copied down every step of the walk.
 #[derive(Clone, Copy)]
 pub struct LinearizeInput<'i> {
-    pub source: &'i str,
-    pub comments: &'i [Comment],
-    pub(crate) withheld_clarity_pairs: &'i SpanMarks,
+    pub(crate) printer: &'i Printer<'i>,
     /// The heads that keep the author's shell behind a `typeof` or a unary `-` in a
     /// comma-list region (`Printer::region_kept_shell_targets`), `None` in the document
     /// with no region marks, so an ordinary chain probes no set.
@@ -135,7 +135,7 @@ pub fn linearize_chain_from_member_into<'a>(
     );
     let mut paren_gaps = Vec::new();
     linearize_member_object(member, span, input, nodes, &mut paren_gaps);
-    linearize_member_node(member, span, input.source, nodes, &mut paren_gaps);
+    linearize_member_node(member, span, input, nodes, &mut paren_gaps);
     finalize_chain_nodes(nodes, &paren_gaps, input)
 }
 
@@ -254,7 +254,7 @@ fn finalize_chain_nodes(
 ) -> bool {
     apply_paren_gaps(nodes, paren_gaps);
     fix_callee_base_parens(nodes, input);
-    let long_curried = mark_own_call_layout(nodes, input.source);
+    let long_curried = mark_own_call_layout(nodes, input.printer.source);
     #[cfg(feature = "buffer_stats")]
     crate::printer::buffer_stats::record_chain_nodes(nodes.len());
     long_curried
@@ -344,7 +344,7 @@ fn template_preempts_chain_redirect(call: &internal::CallExpression<'_>, source:
 /// (`Printer::withhold_clarity_pairs_behind_region_close`) — read here off the same
 /// marks the bare-callee path reads, so the two paths print one callee one way.
 fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>], input: LinearizeInput<'_>) {
-    let source = input.source;
+    let source = input.printer.source;
     if let [
         ChainNode::Base {
             expr,
@@ -371,7 +371,11 @@ fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>], input: LinearizeInput<'_>
         let second_list = call.type_arguments.is_some()
             && instantiation_keeps_pair_before_type_args(source, expr, SecondTypeArgs::Expression);
         let callee_pair = needs_parens(expr, ParenContext::Callee, false)
-            && !(is_called_function(expr) && input.withheld_clarity_pairs.is_marked(expr.span()));
+            && !(is_called_function(expr)
+                && input
+                    .printer
+                    .withheld_clarity_pair_targets
+                    .is_marked(expr.span()));
         *np = callee_pair
             || second_list
             || input
@@ -598,7 +602,7 @@ fn linearize_link<'a>(
             if let Some(object) = member_object_step(member, expr.span, input, nodes) {
                 linearize_link(object, input, nodes, paren_gaps, frames);
             }
-            linearize_member_node(member, expr.span, input.source, nodes, paren_gaps);
+            linearize_member_node(member, expr.span, input, nodes, paren_gaps);
         }
         ExpressionKind::TSNonNullExpression(non_null) => {
             match non_null_step(non_null, expr.span, input, nodes) {
@@ -697,7 +701,7 @@ fn linearize_spine_loop<'a>(
                 nodes.push(ChainNode::call(call, span));
             }
             PendingLink::Member { member, span } => {
-                linearize_member_node(member, span, input.source, nodes, paren_gaps);
+                linearize_member_node(member, span, input, nodes, paren_gaps);
             }
             PendingLink::NonNull { non_null, span } => finish_non_null(non_null, span, nodes),
         }
@@ -758,7 +762,9 @@ fn non_null_step<'a>(
     //   would be dropped and the block inlined into a dead output, with nothing
     //   left to parenthesize at print time.
     let inner = non_null.expression;
-    if let Some(start) = non_null_operand_paren_leading_start(non_null, span, input.comments) {
+    if let Some(start) =
+        non_null_operand_paren_leading_start(non_null, span, input.printer.comments)
+    {
         nodes.push(ChainNode::paren_base_before_non_null(
             inner, start, span.end,
         ));
@@ -988,11 +994,11 @@ fn finish_call_callee(
 pub(super) fn member_lookup_node<'a>(
     member: &'a internal::MemberExpression<'_>,
     member_span: Span,
-    source: &str,
+    input: LinearizeInput<'_>,
 ) -> ChainNode<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
-    linearize_member_node(member, member_span, source, &mut nodes, &mut paren_gaps);
+    linearize_member_node(member, member_span, input, &mut nodes, &mut paren_gaps);
     debug_assert!(paren_gaps.is_empty() && nodes.len() == 1);
     #[expect(clippy::unreachable)] // `linearize_member_node` always pushes the member's node
     let Some(node) = nodes.pop() else {
@@ -1008,10 +1014,11 @@ pub(super) fn member_lookup_node<'a>(
 fn linearize_member_node<'a>(
     member: &'a internal::MemberExpression<'_>,
     member_span: Span,
-    source: &str,
+    input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
+    let source = input.printer.source;
     // When grouping parens are stripped (e.g., `/* comment */ (a).b` → `/* comment */ a.b`),
     // the MemberExpression span extends earlier than its object span, creating a gap
     // where comments from the stripped parens live. Record the gap so we can extend
@@ -1047,6 +1054,14 @@ fn linearize_member_node<'a>(
             .and_then(|_| paren_shell_close_after(source, operand_end))
             .map(|close| (operand_end, close)),
     );
+    // A gap the object's own pair does not end opens at the object's printed end, claiming
+    // the run of stripped shells a binary on its right spine prints after its last operand
+    // ([`Printer::member_gap_start`]).
+    let object_end = if object_end == operand_end {
+        input.printer.member_gap_start(member.object)
+    } else {
+        object_end
+    };
     let property_start = member.property.span().start;
     if member.computed {
         nodes.push(ChainNode::computed_member(
@@ -1435,7 +1450,18 @@ pub fn build_linearized_chain_doc(
         }
         _ => None,
     };
-    printer.with_left_spine_claim(claim, || {
+    // The first member gap's claim on the base's stripped trailing shells
+    // ([`Printer::member_gap_start`]), which the base's own emitters decline.
+    let right_claim = match &*nodes {
+        [ChainNode::Base { expr: base, .. }, link, ..] => link
+            .comment_range()
+            .map(|(gap_start, _)| gap_start)
+            .filter(|&gap_start| gap_start < base.span().end)
+            .map(|gap_start| Span::new(gap_start, base.span().end)),
+        _ => None,
+    };
+    let outer_right_claim = printer.claimed_right_spine_run.replace(right_claim);
+    let doc = printer.with_left_spine_claim(claim, || {
         let chain_doc =
             printer.with_frozen_chain_base(frozen_base, || build_chain_doc(&groups, span, printer));
         printer.chain_ungroups_args.set(outer_ungroups);
@@ -1447,7 +1473,9 @@ pub fn build_linearized_chain_doc(
             .fold(chain_doc, |doc, &(start, end)| {
                 printer.prepend_removed_paren_comments(span, start, end, doc)
             })
-    })
+    });
+    printer.claimed_right_spine_run.set(outer_right_claim);
+    doc
 }
 
 /// The window `prepend_removed_paren_comments` claims at a chain's head: the leading
@@ -1687,15 +1715,10 @@ mod tests {
     fn test_linearize_simple_identifier() {
         let expr = make_identifier("foo");
 
-        let nodes = linearize_chain(
-            &expr,
-            LinearizeInput {
-                source: "",
-                comments: &[],
-                withheld_clarity_pairs: &SpanMarks::default(),
-                region_kept_shells: None,
-            },
-        );
+        let docs = DocArena::new();
+        let lines = LineBreaks::new("", Vec::new());
+        let printer = make_printer(&docs, &lines, &[]);
+        let nodes = linearize_chain(&expr, printer.linearize_input());
 
         assert_eq!(nodes.len(), 1);
         assert!(matches!(
@@ -1715,15 +1738,10 @@ mod tests {
         let ab = make_member(&arena, a, "b", 1);
         let abc = make_member(&arena, ab, "c", 3);
 
-        let nodes = linearize_chain(
-            &abc,
-            LinearizeInput {
-                source: "",
-                comments: &[],
-                withheld_clarity_pairs: &SpanMarks::default(),
-                region_kept_shells: None,
-            },
-        );
+        let docs = DocArena::new();
+        let lines = LineBreaks::new("", Vec::new());
+        let printer = make_printer(&docs, &lines, &[]);
+        let nodes = linearize_chain(&abc, printer.linearize_input());
 
         // Should produce: [Base(a), Member(.b), Member(.c)]
         assert_eq!(nodes.len(), 3);
@@ -1741,15 +1759,10 @@ mod tests {
         let ab = make_member(&arena, a_call, "b", 3);
         let ab_call = make_call(&arena, ab, 5);
 
-        let nodes = linearize_chain(
-            &ab_call,
-            LinearizeInput {
-                source: "",
-                comments: &[],
-                withheld_clarity_pairs: &SpanMarks::default(),
-                region_kept_shells: None,
-            },
-        );
+        let docs = DocArena::new();
+        let lines = LineBreaks::new("", Vec::new());
+        let printer = make_printer(&docs, &lines, &[]);
+        let nodes = linearize_chain(&ab_call, printer.linearize_input());
 
         // Should produce: [Base(a), Call(), Member(.b), Call()]
         assert_eq!(nodes.len(), 4);
@@ -1768,18 +1781,10 @@ mod tests {
         let abc = make_member(&arena, ab, "c", 3);
         let abcd = make_member(&arena, abc, "d", 5);
 
-        let nodes = linearize_chain(
-            &abcd,
-            LinearizeInput {
-                source: "",
-                comments: &[],
-                withheld_clarity_pairs: &SpanMarks::default(),
-                region_kept_shells: None,
-            },
-        );
-        let arena_docs = DocArena::new();
+        let docs = DocArena::new();
         let lines = LineBreaks::new("", Vec::new());
-        let printer = make_printer(&arena_docs, &lines, &[]);
+        let printer = make_printer(&docs, &lines, &[]);
+        let nodes = linearize_chain(&abcd, printer.linearize_input());
         let groups = group_chain_nodes(&nodes, &printer);
 
         // For member-only chains, Prettier puts almost everything in first group
@@ -1805,18 +1810,10 @@ mod tests {
         let ab_call = make_call(&arena, ab, 5);
         let abc = make_member(&arena, ab_call, "c", 7);
 
-        let nodes = linearize_chain(
-            &abc,
-            LinearizeInput {
-                source: "",
-                comments: &[],
-                withheld_clarity_pairs: &SpanMarks::default(),
-                region_kept_shells: None,
-            },
-        );
-        let arena_docs = DocArena::new();
+        let docs = DocArena::new();
         let lines = LineBreaks::new("", Vec::new());
-        let printer = make_printer(&arena_docs, &lines, &[]);
+        let printer = make_printer(&docs, &lines, &[]);
+        let nodes = linearize_chain(&abc, printer.linearize_input());
         let groups = group_chain_nodes(&nodes, &printer);
 
         // Grouping should break at member after call
@@ -2035,12 +2032,20 @@ mod tests {
                     alternate.mark(root.span);
                 }
             }
-            let withheld = SpanMarks::default();
+            let docs = DocArena::new();
+            let lines = LineBreaks::new(source, Vec::new());
+            let inputs = PrinterInputs {
+                source,
+                comments: program.comments,
+                line_table: lines.table(),
+                has_owned_comments: false,
+                has_format_ignore: false,
+                comment_free_window: None,
+            };
+            let printer = Printer::with_context(&docs, &inputs, EmbedContext::line_owning(), 0);
             for marks in [None, Some(&every), Some(&alternate)] {
                 let input = LinearizeInput {
-                    source,
-                    comments: program.comments,
-                    withheld_clarity_pairs: &withheld,
+                    printer: &printer,
                     region_kept_shells: marks,
                 };
                 for root in &roots {

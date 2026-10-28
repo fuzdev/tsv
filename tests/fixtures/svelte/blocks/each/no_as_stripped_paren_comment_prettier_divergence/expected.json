@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1118,
+	"end": 1166,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -599,54 +599,54 @@
 			{
 				"type": "Comment",
 				"start": 638,
-				"end": 705,
-				"data": " whatever follows the pair in the value: a member, an index "
+				"end": 762,
+				"data": " a member after the pair takes the comment into the chain head's gap, after the `)`; a pair inside an index keeps it "
 			},
 			{
 				"type": "Text",
-				"start": 705,
-				"end": 706,
+				"start": 762,
+				"end": 763,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "EachBlock",
-				"start": 706,
-				"end": 760,
+				"start": 763,
+				"end": 808,
 				"expression": {
 					"type": "MemberExpression",
-					"start": 713,
-					"end": 740,
+					"start": 770,
+					"end": 788,
 					"object": {
 						"type": "LogicalExpression",
-						"start": 716,
-						"end": 736,
+						"start": 771,
+						"end": 777,
 						"left": {
 							"type": "Identifier",
-							"start": 716,
-							"end": 717,
+							"start": 771,
+							"end": 772,
 							"name": "a"
 						},
 						"operator": "||",
 						"right": {
 							"type": "Identifier",
-							"start": 726,
-							"end": 727,
-							"name": "b",
-							"trailingComments": [
-								{
-									"type": "Line",
-									"value": " c7",
-									"start": 728,
-									"end": 733
-								}
-							]
-						}
+							"start": 776,
+							"end": 777,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c7",
+								"start": 779,
+								"end": 784
+							}
+						]
 					},
 					"property": {
 						"type": "Identifier",
-						"start": 739,
-						"end": 740,
+						"start": 787,
+						"end": 788,
 						"name": "m"
 					},
 					"computed": false,
@@ -657,15 +657,15 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 742,
-							"end": 744,
+							"start": 790,
+							"end": 792,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 744,
-							"end": 752,
+							"start": 792,
+							"end": 800,
 							"name": "p",
 							"attributes": [],
 							"fragment": {
@@ -673,8 +673,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 747,
-										"end": 748,
+										"start": 795,
+										"end": 796,
 										"raw": "x",
 										"data": "x"
 									}
@@ -683,8 +683,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 752,
-							"end": 753,
+							"start": 800,
+							"end": 801,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -694,47 +694,47 @@
 			},
 			{
 				"type": "Text",
-				"start": 760,
-				"end": 762,
+				"start": 808,
+				"end": 810,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "EachBlock",
-				"start": 762,
-				"end": 823,
+				"start": 810,
+				"end": 871,
 				"expression": {
 					"type": "MemberExpression",
-					"start": 769,
-					"end": 798,
+					"start": 817,
+					"end": 846,
 					"object": {
 						"type": "Identifier",
-						"start": 769,
-						"end": 770,
+						"start": 817,
+						"end": 818,
 						"name": "x"
 					},
 					"property": {
 						"type": "LogicalExpression",
-						"start": 773,
-						"end": 796,
+						"start": 821,
+						"end": 844,
 						"left": {
 							"type": "Identifier",
-							"start": 773,
-							"end": 774,
+							"start": 821,
+							"end": 822,
 							"name": "a"
 						},
 						"operator": "||",
 						"right": {
 							"type": "Identifier",
-							"start": 785,
-							"end": 786,
+							"start": 833,
+							"end": 834,
 							"name": "b",
 							"trailingComments": [
 								{
 									"type": "Line",
 									"value": " c8",
-									"start": 787,
-									"end": 792
+									"start": 835,
+									"end": 840
 								}
 							]
 						}
@@ -747,15 +747,15 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 803,
-							"end": 805,
+							"start": 851,
+							"end": 853,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 805,
-							"end": 815,
+							"start": 853,
+							"end": 863,
 							"name": "p",
 							"attributes": [],
 							"fragment": {
@@ -763,12 +763,12 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 808,
-										"end": 811,
+										"start": 856,
+										"end": 859,
 										"expression": {
 											"type": "Identifier",
-											"start": 809,
-											"end": 810,
+											"start": 857,
+											"end": 858,
 											"name": "i"
 										}
 									}
@@ -777,8 +777,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 815,
-							"end": 816,
+							"start": 863,
+							"end": 864,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -789,50 +789,50 @@
 			},
 			{
 				"type": "Text",
-				"start": 823,
-				"end": 825,
+				"start": 871,
+				"end": 873,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 825,
-				"end": 898,
+				"start": 873,
+				"end": 946,
 				"data": " nested redundant pairs keep the outermost, holding both comments "
 			},
 			{
 				"type": "Text",
-				"start": 898,
-				"end": 899,
+				"start": 946,
+				"end": 947,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "EachBlock",
-				"start": 899,
-				"end": 955,
+				"start": 947,
+				"end": 1003,
 				"expression": {
 					"type": "LogicalExpression",
-					"start": 906,
-					"end": 935,
+					"start": 954,
+					"end": 983,
 					"left": {
 						"type": "Identifier",
-						"start": 906,
-						"end": 907,
+						"start": 954,
+						"end": 955,
 						"name": "a"
 					},
 					"operator": "||",
 					"right": {
 						"type": "Identifier",
-						"start": 916,
-						"end": 917,
+						"start": 964,
+						"end": 965,
 						"name": "b",
 						"trailingComments": [
 							{
 								"type": "Line",
 								"value": " c9",
-								"start": 918,
-								"end": 923
+								"start": 966,
+								"end": 971
 							}
 						]
 					}
@@ -842,15 +842,15 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 937,
-							"end": 939,
+							"start": 985,
+							"end": 987,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 939,
-							"end": 947,
+							"start": 987,
+							"end": 995,
 							"name": "p",
 							"attributes": [],
 							"fragment": {
@@ -858,8 +858,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 942,
-										"end": 943,
+										"start": 990,
+										"end": 991,
 										"raw": "x",
 										"data": "x"
 									}
@@ -868,8 +868,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 947,
-							"end": 948,
+							"start": 995,
+							"end": 996,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -879,47 +879,47 @@
 			},
 			{
 				"type": "Text",
-				"start": 955,
-				"end": 957,
+				"start": 1003,
+				"end": 1005,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 957,
-				"end": 1054,
+				"start": 1005,
+				"end": 1102,
 				"data": " only a pair holding the comment is kept: a redundant pair ending an earlier chain strips "
 			},
 			{
 				"type": "Text",
-				"start": 1054,
-				"end": 1055,
+				"start": 1102,
+				"end": 1103,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "EachBlock",
-				"start": 1055,
-				"end": 1117,
+				"start": 1103,
+				"end": 1165,
 				"expression": {
 					"type": "LogicalExpression",
-					"start": 1062,
-					"end": 1097,
+					"start": 1110,
+					"end": 1145,
 					"left": {
 						"type": "CallExpression",
-						"start": 1062,
-						"end": 1077,
+						"start": 1110,
+						"end": 1125,
 						"callee": {
 							"type": "Identifier",
-							"start": 1062,
-							"end": 1063,
+							"start": 1110,
+							"end": 1111,
 							"name": "f"
 						},
 						"arguments": [
 							{
 								"type": "ArrowFunctionExpression",
-								"start": 1064,
-								"end": 1076,
+								"start": 1112,
+								"end": 1124,
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -927,19 +927,19 @@
 								"params": [],
 								"body": {
 									"type": "LogicalExpression",
-									"start": 1070,
-									"end": 1076,
+									"start": 1118,
+									"end": 1124,
 									"left": {
 										"type": "Identifier",
-										"start": 1070,
-										"end": 1071,
+										"start": 1118,
+										"end": 1119,
 										"name": "x"
 									},
 									"operator": "||",
 									"right": {
 										"type": "Identifier",
-										"start": 1075,
-										"end": 1076,
+										"start": 1123,
+										"end": 1124,
 										"name": "b"
 									}
 								}
@@ -950,15 +950,15 @@
 					"operator": "||",
 					"right": {
 						"type": "Identifier",
-						"start": 1086,
-						"end": 1087,
+						"start": 1134,
+						"end": 1135,
 						"name": "c",
 						"trailingComments": [
 							{
 								"type": "Line",
 								"value": " c11",
-								"start": 1088,
-								"end": 1094
+								"start": 1136,
+								"end": 1142
 							}
 						]
 					}
@@ -968,15 +968,15 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1099,
-							"end": 1101,
+							"start": 1147,
+							"end": 1149,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 1101,
-							"end": 1109,
+							"start": 1149,
+							"end": 1157,
 							"name": "p",
 							"attributes": [],
 							"fragment": {
@@ -984,8 +984,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 1104,
-										"end": 1105,
+										"start": 1152,
+										"end": 1153,
 										"raw": "x",
 										"data": "x"
 									}
@@ -994,8 +994,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1109,
-							"end": 1110,
+							"start": 1157,
+							"end": 1158,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -1046,32 +1046,32 @@
 		{
 			"type": "Line",
 			"value": " c7",
-			"start": 728,
-			"end": 733
+			"start": 779,
+			"end": 784
 		},
 		{
 			"type": "Line",
 			"value": " c8",
-			"start": 787,
-			"end": 792
+			"start": 835,
+			"end": 840
 		},
 		{
 			"type": "Line",
 			"value": " c9",
-			"start": 918,
-			"end": 923
+			"start": 966,
+			"end": 971
 		},
 		{
 			"type": "Line",
 			"value": " c10",
-			"start": 926,
-			"end": 932
+			"start": 974,
+			"end": 980
 		},
 		{
 			"type": "Line",
 			"value": " c11",
-			"start": 1088,
-			"end": 1094
+			"start": 1136,
+			"end": 1142
 		}
 	]
 }

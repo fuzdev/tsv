@@ -11,9 +11,14 @@ the body of a sole hugged arrow — has nowhere to go but that pair.
   (`c1`–`c4`), as it opens a pair the chain's last operand REQUIRES
   (`{#if x - (⏎\t\ty - z // c⏎\t)⏎}`); a same-line block stays inline inside it (`c5`).
   Stripped, the comment would end the value — `{#each a || b // c1⏎}`, which Svelte
-  rejects. The pair is kept whatever follows it in the value — a member (`c7`), an index
-  (`c8`) — and of nested redundant pairs the outermost is kept, holding both comments
-  (`c9`, `c10`), while a pair holding no comment strips even when it ends a chain (`c11`).
+  rejects. The pair is kept wherever it sits inside the value — inside an index (`c8`) — and
+  of nested redundant pairs the outermost is kept, holding both comments (`c9`, `c10`),
+  while a pair holding no comment strips even when it ends a chain (`c11`). A member after
+  the pair is the one follower that takes the comment out of it: the pair ends a member
+  chain's parenthesized head, whose member gap prints the comment after the head's `)` and
+  breaks the member below it (`c7`, as the pair-free `{#each (a || b // c7⏎).m}` prints), so
+  the value no longer ends on it
+  ([member_paren_head_stripped_shell_comment](../../../../typescript/expressions/calls/chained/member_paren_head_stripped_shell_comment_prettier_divergence/)).
   A pair followed by an argument strips as anywhere else, its comma ending
   the line (`c6`). The stripped-pair authoring (`unformatted_ours_inside_pair`) reaches
   `input.svelte` in one pass.

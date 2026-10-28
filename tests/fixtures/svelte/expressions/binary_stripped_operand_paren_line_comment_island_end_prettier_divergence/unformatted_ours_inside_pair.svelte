@@ -60,7 +60,3 @@
 <input bind:value={() => x || (y // c14
 ) // d14
 , (w) => (x = w)} />
-
-<!-- the run reaches the value's end only while the member chain stays flat -->
-<p class={(a || (b // c15
-)).m}>t</p>
