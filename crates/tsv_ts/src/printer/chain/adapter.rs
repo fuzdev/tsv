@@ -148,6 +148,28 @@ impl<'a> Printer<'a> {
         )
     }
 
+    /// A chain gap's trail scan opening at `start` in its next-pass reading
+    /// ([`tsv_lang::GapTrailScan::fixed`]) — for a predicate that walks the gap itself (a
+    /// different axis, an early exit) and reads it as the NEXT pass will, where a comment
+    /// on a multi-line block's closing line stands on a line the block's own newline
+    /// began. It shares the emitter's `)` arm ([`Self::classify_comments`] walks
+    /// [`tsv_lang::GapTrailScan::new`]), so neither can read a comment printed after a
+    /// kept pair's `)` as own-line. Feed it the gap's comments in source order through
+    /// [`Self::chain_gap_trail`].
+    pub(crate) const fn chain_gap_trail_scan_fixed(&self, start: u32) -> tsv_lang::GapTrailScan {
+        tsv_lang::GapTrailScan::fixed(start)
+    }
+
+    /// How `comment`, the next comment of the gap `scan` walks, stands — see
+    /// [`tsv_lang::GapTrailScan`].
+    pub(crate) fn chain_gap_trail(
+        &self,
+        scan: &mut tsv_lang::GapTrailScan,
+        comment: &Comment,
+    ) -> tsv_lang::GapTrail {
+        scan.read(comment, self.source.as_bytes(), self.comment_line_breaks)
+    }
+
     /// A chain node's gap classification, honoring the node's own
     /// [`super::ChainNode::paren_gap_skip`] hole.
     ///

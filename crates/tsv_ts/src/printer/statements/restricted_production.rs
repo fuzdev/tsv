@@ -40,7 +40,8 @@ enum GapStart {
     /// reading that counts a comment's *own* line terminator — see
     /// [`Printer::has_leading_own_line_comment_in_range`].
     Keyword(u32),
-    /// A node ends here. A comment sharing its line trails *it*, not the node at the far end.
+    /// A node ends here. A comment sharing its line trails *it*, not the node at the far end
+    /// — and so does one after a `)` that opens its line ([`tsv_lang::GapTrail::AfterParen`]).
     Node(u32),
     /// A node's own span start, ahead of its left-side child — the gap holds only the
     /// grouping `(`s the parser stripped from that child (`(⏎// c⏎a as any).b` opens the
@@ -459,6 +460,10 @@ impl<'a> Printer<'a> {
                 // Leading own-line comment between object and property.
                 let obj_end = member.object.span().end;
                 let prop_start = member.property.span().start;
+                // TODO: K324 — a `//` the object's printer defers out of a stripped shell to
+                // the object's end leaves no room after the `)` for another `//`, which this
+                // reading still trails, so pass 1 skips the hang the next pass takes
+                // (`return (a + (b // L1⏎)⏎) // L3⏎.h;`).
                 if self.has_leading_own_line_comment_in_range(GapStart::Node(obj_end), prop_start) {
                     return true;
                 }
@@ -667,13 +672,23 @@ impl<'a> Printer<'a> {
         end: u32,
         counts: impl Fn(&internal::Comment) -> bool,
     ) -> bool {
+        // At a node, a comment leads exactly when the gap's trail scan does not take it
+        // (`tsv_lang::GapTrailScan`, the chain gap emitter's reading), so a comment the
+        // emitter prints right after a kept pair's `)` never reads as own-line here. The
+        // scan takes the next-pass reading: a comment on a multi-line block's closing line
+        // is one the NEXT pass's object→property reading hangs
+        // (`callee_gap_ends_line_after_multiline_block`).
+        let mut scan = self.chain_gap_trail_scan_fixed(gap_start.position());
         self.comments_in_source_between(gap_start.position(), end)
-            .filter(|c| counts(c))
-            .any(|c| {
+            .map(|c| {
                 let leads = match gap_start {
                     GapStart::Keyword(_) | GapStart::Shell { .. } => true,
-                    GapStart::Node(prev_end) => !self.is_same_line(prev_end, c.span.start),
+                    GapStart::Node(_) => !self.chain_gap_trail(&mut scan, c).trails(),
                 };
+                (c, leads)
+            })
+            .filter(|(c, _)| counts(c))
+            .any(|(c, leads)| {
                 let carries_line_terminator = (gap_start.counts_interior_line_terminator()
                     && c.multiline)
                     || has_newline_after_position(self.source, c.span.end);

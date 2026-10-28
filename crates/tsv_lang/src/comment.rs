@@ -583,6 +583,115 @@ pub fn classify_comment_scan(
     CommentPosition::LeadingOwnLine
 }
 
+/// How a chain gap's comment stands to what precedes the gap — [`GapTrailScan::read`]'s
+/// answer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GapTrail {
+    /// It begins a line of its own: the gap's leading run takes it.
+    OwnLine,
+    /// It begins on the scan's anchor line: it trails what precedes the gap.
+    SameLine,
+    /// It follows a `)` that opens its line ([`source_scan::closing_parens_open_line_before`]):
+    /// it trails that `)`, which the printer emits right before it. Where the head's printer
+    /// carries a `//` deferred out of a stripped shell to its end, a line comment cannot
+    /// share that line; a block prints inline ahead of the deferred run.
+    AfterParen,
+}
+
+impl GapTrail {
+    /// Whether the comment trails rather than leads.
+    #[must_use]
+    pub const fn trails(self) -> bool {
+        !matches!(self, Self::OwnLine)
+    }
+}
+
+/// A chain member gap's trailing run, read one comment at a time in source order — the one
+/// definition of "does this comment still trail what precedes the gap" that the gap's
+/// emitter ([`ClassifiedComments::from_index_advancing`]) and every predicate asked about
+/// the same gap share, so a layout gate cannot read a comment as own-line that the emitter
+/// prints trailing (or the reverse).
+///
+/// **Precondition:** the scanned range is a chain MEMBER gap — `[object end, property
+/// start)` — which holds only whitespace, comments, the closing parens of the object's
+/// kept pair and stripped shells, and the link's own punctuation (`.`, `?.`, `!`, `[`).
+/// No string, template or regex can stand in it, so a byte-level read of a `)` there is
+/// token-correct; outside such a gap it is not.
+///
+/// A comment trails while it begins on the anchor's line, the anchor ADVANCING over each
+/// comment the run takes — so `prev /* m1⏎m2 */ /* c6 */` keeps `c6` trailing. And it
+/// trails when its line holds nothing but `)`s before it ([`GapTrail::AfterParen`]): the
+/// gap opens at the object's end, BEFORE every `)` the gap holds (a kept pair's, a stripped
+/// shell's), so once the pair's interior breaks, the `)` stands on a later line than the
+/// anchor and the comment the author put after it — which the emitter prints right after
+/// that `)` — would otherwise read as own-line on the next pass.
+///
+/// The `)` arm holds only while nothing has ended the anchor's line: past a trailing `//`
+/// the comment would weld onto it, and past an own-line comment it would print AHEAD of
+/// that comment, since the trailing run emits first. Once one comment reads own-line,
+/// every later one does (lines only grow), so the run's leading half stays a suffix.
+///
+/// [`Self::fixed`] is the reading of a predicate that models the NEXT pass's view of the
+/// gap (the restricted production's hang, the trailing-member expansion), where a comment
+/// on a multi-line block's closing line stands on a line the block's own newline began. So
+/// a multi-line block it takes leaves the anchor where it was and closes the `)` arm; a
+/// single-line comment advances the anchor as in the emitter's run, or a comment glued
+/// behind it would read own-line here alone.
+#[derive(Clone, Copy, Debug)]
+pub struct GapTrailScan {
+    anchor: u32,
+    line_open: bool,
+    advance: bool,
+}
+
+impl GapTrailScan {
+    /// A scan opening at `start`, the end of what precedes the gap, its anchor advancing
+    /// over each comment it takes — the emitter's reading.
+    #[must_use]
+    pub const fn new(start: u32) -> Self {
+        Self {
+            anchor: start,
+            line_open: true,
+            advance: true,
+        }
+    }
+
+    /// The next-pass reading: a multi-line block holds the anchor at `start`'s line.
+    #[must_use]
+    pub const fn fixed(start: u32) -> Self {
+        Self {
+            anchor: start,
+            line_open: true,
+            advance: false,
+        }
+    }
+
+    /// How `comment` — the next comment of the gap in source order — stands, advancing
+    /// the scan past it.
+    pub fn read(&mut self, comment: &Comment, source: &[u8], table: LineTable<'_>) -> GapTrail {
+        let trail = if printing::is_same_line_scan(source, table, self.anchor, comment.span.start) {
+            GapTrail::SameLine
+        } else if self.line_open
+            && source_scan::closing_parens_open_line_before(source, self.anchor, comment.span.start)
+        {
+            GapTrail::AfterParen
+        } else {
+            GapTrail::OwnLine
+        };
+        let advances = trail.trails() && (self.advance || !comment.multiline);
+        if advances {
+            self.anchor = comment.span.end;
+        }
+        self.line_open &= advances && comment.is_block;
+        trail
+    }
+
+    /// [`Self::read`] for a caller that needs only whether the comment trails.
+    pub fn trails(&mut self, comment: &Comment, source: &[u8], table: LineTable<'_>) -> bool {
+        self.read(comment, source, table).trails()
+    }
+}
+
 /// Comments classified by position and type in a single pass.
 ///
 /// Used by chain printers to avoid multiple binary searches per chain segment.
@@ -642,6 +751,10 @@ impl<'a> ClassifiedComments<'a> {
     /// classification often feeds a PARTITION — two emitters splitting one gap — and
     /// moving the trailing/leading bound moves comments between them: an emitter pair
     /// where only one side adopts the advance double-prints every re-homed comment.
+    /// The per-comment reading is [`GapTrailScan`]'s — which also reads a comment that
+    /// follows a `)` on its own line as trailing — so a predicate asked about the same gap
+    /// walks the same run rather than re-spelling it.
+    ///
     /// The chain gaps' consumers all classify through one seam
     /// (`Printer::classify_comments`) and take the advance together; a consumer set
     /// that partitions against an independently-spelled partner (the call-argument
@@ -669,12 +782,13 @@ impl<'a> ClassifiedComments<'a> {
     ) -> Self {
         let mut result = Self::default();
 
-        let mut anchor = start;
+        let mut run = GapTrailScan::new(start);
         for comment in comments_to_emit_from(comments, first_idx, end) {
-            let same_line = printing::is_same_line_scan(source, table, anchor, comment.span.start);
-            if same_line && advance {
-                anchor = comment.span.end;
-            }
+            let same_line = if advance {
+                run.trails(comment, source, table)
+            } else {
+                printing::is_same_line_scan(source, table, start, comment.span.start)
+            };
             match (comment.is_block, same_line) {
                 (true, true) => result.trailing_block.push(comment),
                 (false, true) => result.trailing_line.push(comment),
@@ -1318,6 +1432,89 @@ pub fn owned_leading_comment_at<'c>(
 mod tests {
     use super::*;
     use crate::printing::LineBreaks;
+
+    /// Every comment of `src`, in order, read by `scan` over a gap opening at `start`.
+    fn gap_trails(src: &str, start: u32, mut scan: GapTrailScan) -> Vec<GapTrail> {
+        let line_breaks = LineBreaks::new(src, Vec::new());
+        let table = line_breaks.table();
+        let mut comments = Vec::new();
+        let bytes = src.as_bytes();
+        let mut i = start as usize;
+        while i + 1 < bytes.len() {
+            if bytes[i] == b'/' && bytes[i + 1] == b'/' {
+                let end = src[i..].find('\n').map_or(src.len(), |n| i + n);
+                comments.push(comment(i as u32, end as u32, false, &src[i + 2..end]));
+                i = end;
+            } else if bytes[i] == b'/' && bytes[i + 1] == b'*' {
+                let end = i + src[i..].find("*/").unwrap() + 2;
+                comments.push(comment(i as u32, end as u32, true, &src[i + 2..end - 2]));
+                i = end;
+            } else {
+                i += 1;
+            }
+        }
+        comments
+            .iter()
+            .map(|c| scan.read(c, bytes, table))
+            .collect()
+    }
+
+    use GapTrail::{AfterParen, OwnLine, SameLine};
+
+    /// The `)` arm: a comment after a `)` that opens its line trails it, in both readings.
+    #[test]
+    fn gap_trail_scan_reads_a_comment_after_a_line_opening_paren_as_trailing() {
+        let src = "(x\n) // c\n.h";
+        assert_eq!(gap_trails(src, 2, GapTrailScan::new(2)), [AfterParen]);
+        assert_eq!(gap_trails(src, 2, GapTrailScan::fixed(2)), [AfterParen]);
+        // own-line below the `)` stays own-line
+        assert_eq!(
+            gap_trails("(x\n)\n// c\n.h", 2, GapTrailScan::new(2)),
+            [OwnLine]
+        );
+    }
+
+    /// The two holds: no `)`-arm comment after a trailing `//` (it would weld onto it), and
+    /// none after an own-line comment (the trailing run emits first, so it would reorder).
+    #[test]
+    fn gap_trail_scan_closes_the_paren_arm_once_the_line_has_ended() {
+        let weld = "(x // t1\n) // t2\n.h";
+        assert_eq!(
+            gap_trails(weld, 2, GapTrailScan::new(2)),
+            [SameLine, OwnLine]
+        );
+        let reorder = "(x\n// t1\n) // t2\n.h";
+        assert_eq!(
+            gap_trails(reorder, 2, GapTrailScan::new(2)),
+            [OwnLine, OwnLine]
+        );
+        // a block on the `)`'s line keeps the arm open for a comment glued behind it
+        let glued = "(x\n) /* b */ // l\n.h";
+        assert_eq!(
+            gap_trails(glued, 2, GapTrailScan::new(2)),
+            [AfterParen, SameLine]
+        );
+        assert_eq!(
+            gap_trails(glued, 2, GapTrailScan::fixed(2)),
+            [AfterParen, SameLine]
+        );
+    }
+
+    /// The fixed reading's premise: a comment on a multi-line block's closing line is the
+    /// next pass's own-line one, so the block holds the anchor and closes the `)` arm — a
+    /// `)` behind its `*/` is no line-opening `)` in either reading.
+    #[test]
+    fn gap_trail_scan_fixed_stops_at_a_multiline_block() {
+        let src = "x /* a\n */) // l\n.h";
+        assert_eq!(
+            gap_trails(src, 1, GapTrailScan::new(1)),
+            [SameLine, SameLine]
+        );
+        assert_eq!(
+            gap_trails(src, 1, GapTrailScan::fixed(1)),
+            [SameLine, OwnLine]
+        );
+    }
 
     fn comment(start: u32, end: u32, is_block: bool, content: &str) -> Comment {
         Comment {

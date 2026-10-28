@@ -50,19 +50,20 @@ pub mod swar;
 mod whitespace;
 
 pub use comment::{
-    ClassifiedComments, Comment, CommentFreeWindow, CommentPosition, classify_comment,
-    classify_comment_scan, comments_in_source_after, comments_in_source_after_comment,
-    comments_in_source_from, comments_in_source_range, comments_on_page_from,
-    comments_on_page_in_range, comments_to_emit_after, comments_to_emit_from,
-    comments_to_emit_in_range, directive_alone_on_line, find_first_comment_from,
-    has_comments_on_page_from, has_comments_on_page_in_range, has_comments_to_emit_from,
-    has_comments_to_emit_in_range, has_line_comments_from, has_line_comments_in_range,
-    has_line_spanning_comments_to_emit_from, has_line_spanning_comments_to_emit_in_range,
-    has_multiline_block_comments_on_page_from, has_multiline_block_comments_on_page_in_range,
-    is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
-    is_honored_format_ignore, is_indentable_block, is_region_end_marker,
-    is_tree_shaking_annotation, merge_nestled_block_comments, nestled_run_start,
-    owned_leading_comment_at, range_too_narrow_for_a_comment,
+    ClassifiedComments, Comment, CommentFreeWindow, CommentPosition, GapTrail, GapTrailScan,
+    classify_comment, classify_comment_scan, comments_in_source_after,
+    comments_in_source_after_comment, comments_in_source_from, comments_in_source_range,
+    comments_on_page_from, comments_on_page_in_range, comments_to_emit_after,
+    comments_to_emit_from, comments_to_emit_in_range, directive_alone_on_line,
+    find_first_comment_from, has_comments_on_page_from, has_comments_on_page_in_range,
+    has_comments_to_emit_from, has_comments_to_emit_in_range, has_line_comments_from,
+    has_line_comments_in_range, has_line_spanning_comments_to_emit_from,
+    has_line_spanning_comments_to_emit_in_range, has_multiline_block_comments_on_page_from,
+    has_multiline_block_comments_on_page_in_range, is_format_ignore_directive,
+    is_format_ignore_range_end, is_format_ignore_range_start, is_honored_format_ignore,
+    is_indentable_block, is_region_end_marker, is_tree_shaking_annotation,
+    merge_nestled_block_comments, nestled_run_start, owned_leading_comment_at,
+    range_too_narrow_for_a_comment,
 };
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
 pub use depth::{

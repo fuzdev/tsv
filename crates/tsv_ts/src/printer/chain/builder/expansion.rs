@@ -161,7 +161,12 @@ fn trailing_member_gap_line_comment<'a>(
     // as an emitted one — it is merely printed by the member's own doc instead of by
     // this gap, which does not spare it from landing ahead of the deferred `//`.
     let mut deferred_line_seen = false;
+    // Own-line-ness is the gap's trail scan, walked comment by comment, so a `//` the
+    // emitter prints right after a kept pair's `)` reads same-line here too. The scan
+    // takes the next-pass reading (`GapTrailScan::fixed`), as this gate reads the gap.
+    let mut scan = printer.chain_gap_trail_scan_fixed(start);
     for c in printer.comments_on_page_between(start, end) {
+        let trails = printer.chain_gap_trail(&mut scan, c).trails();
         // Anything at all BEHIND a same-line `//` in this gap: the flat path emits the
         // follower inline while the `//` is deferred to the line end, so the run comes
         // out REORDERED and the follower loses its authored line. The line-comment
@@ -172,7 +177,7 @@ fn trailing_member_gap_line_comment<'a>(
         if c.is_block {
             continue;
         }
-        if printer.has_newline_between(start, c.span.start) {
+        if !trails {
             return true;
         }
         deferred_line_seen = true;

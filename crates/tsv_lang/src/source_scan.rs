@@ -1529,6 +1529,31 @@ pub fn has_newline_before_position(source: &str, pos: u32) -> bool {
         .is_some_and(|b| matches!(b, b'\n' | b'\r'))
 }
 
+/// Whether `pos`'s line holds nothing but closing parens (at least one) and blanks before
+/// `pos`, back to the line's start or to `floor` — the `)` run a comment at `pos` trails.
+///
+/// **Precondition:** `floor..pos` is a chain member gap (see `comment::GapTrailScan`):
+/// whitespace, comments, closing parens and link punctuation only, so a `)` byte there is
+/// a closing-paren token. Reaching `floor` means the comment shares the anchor's line,
+/// which its caller has already answered.
+///
+/// The `)`s must OPEN the line: a `)` behind a multi-line block's `*/` on that block's
+/// closing line is not one, since a stripped shell's `)` vanishes and leaves the comment
+/// on the block's line, which a next-pass reading counts as own-line.
+#[must_use]
+pub fn closing_parens_open_line_before(bytes: &[u8], floor: u32, pos: u32) -> bool {
+    let mut saw_paren = false;
+    for &b in bytes[floor as usize..pos as usize].iter().rev() {
+        match b {
+            b' ' | b'\t' => {}
+            b')' => saw_paren = true,
+            b'\n' => return saw_paren,
+            _ => return false,
+        }
+    }
+    saw_paren
+}
+
 /// Whether a newline sits immediately after `pos`, skipping horizontal whitespace.
 ///
 /// The forward twin of [`has_newline_before_position`]; end-of-source is likewise not
@@ -1546,6 +1571,32 @@ pub fn has_newline_after_position(source: &str, pos: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The `)` run a chain-gap comment trails: closing parens and blanks back to the line's
+    /// start (or the anchor), at least one `)`, nothing else on the line before the comment.
+    #[test]
+    fn closing_parens_open_line_before_reads_only_the_comments_line() {
+        let at = |src: &str, floor: usize| {
+            let pos = src.rfind("//").or_else(|| src.rfind("/*")).unwrap();
+            closing_parens_open_line_before(src.as_bytes(), floor as u32, pos as u32)
+        };
+        // a lone `)`, a `))` run, with blanks and tabs, opening the comment's line
+        assert!(at("x\n) // c", 1));
+        assert!(at("x\n\t)) /* c */", 1));
+        assert!(at("x\n ) ) // c", 1));
+        // a line with no `)` before the comment is an own-line comment's
+        assert!(!at("x\n// c", 1));
+        assert!(!at("x\n\t  // c", 1));
+        // anything else on the line refuses: a link's `.`, a `*/` ahead of the `)` (a
+        // multi-line block's closing line), another token
+        assert!(!at("x\n. // c", 1));
+        assert!(!at("x /* a\n*/) // c", 1));
+        assert!(!at("x\na) // c", 1));
+        // the anchor bounds the read like a line start: `)`s between it and the comment,
+        // on the anchor's own line, are a run (the caller has answered same-line first)
+        assert!(at("x)) // c", 1));
+        assert!(!at("x // c", 1));
+    }
 
     fn find(src: &str, target: u8, profile: TriviaProfile) -> Option<usize> {
         find_char(src.as_bytes(), 0, src.len(), target, profile)

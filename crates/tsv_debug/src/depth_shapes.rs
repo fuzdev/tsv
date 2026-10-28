@@ -357,12 +357,6 @@ const PREFIX_PAIR_LINKS: &[&str] = &["", "!.b", "<T>", ".b().c()"];
 /// comment opening a prefix operator's bare pair before a link (K305: `-(/*c*/a)!.b` →
 /// `-/*c*/ a!.b` → `-(/*c*/ a!.b)`, the same with `<T>` and a member chain), and one closing a binary operand's
 /// pair (K306: `a == (a /*c*/)` → `a == a /*c*/` → `a == a; /*c*/`).
-///
-/// TODO: K313 — a block comment closing an authored pair that a member chain
-/// of calls follows, nested two levels — `!(!(a /*c*/).b().c() /*c*/).b().c()` prints the
-/// outer comment after the pair's `)`, and its own format moves it to a line of its own
-/// ahead of `.b()` (F1). So `.b().c()` skips the pair's trailing-comment form (not after
-/// `new `, whose pair is a callee and formats stably).
 fn prefix_pair_sweep(shapes: &mut Vec<Shape>) {
     for &op in PREFIXES.iter().chain(&["a == "]) {
         for &(before, after) in PREFIX_PAIR_FORMS {
@@ -372,9 +366,7 @@ fn prefix_pair_sweep(shapes: &mut Vec<Shape>) {
                     let unary_comment_link =
                         !binary && before == "(/*c*/" && inner.is_empty() && !link.is_empty();
                     let binary_trailing_comment = binary && after == "/*c*/)" && link.is_empty();
-                    let chain_trailing_comment =
-                        op != "new " && after == "/*c*/)" && link == ".b().c()";
-                    if unary_comment_link || binary_trailing_comment || chain_trailing_comment {
+                    if unary_comment_link || binary_trailing_comment {
                         continue;
                     }
                     shapes.push(Shape {
