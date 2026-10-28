@@ -1584,8 +1584,13 @@ impl<'a> Printer<'a> {
         // relocates it out front — a cataloged divergence). The expanded arm below
         // re-emits the range itself, with the `(`-glued split, and reads only this
         // doc's presence.
+        //
+        // A hoist site like every other on the left spine: under a left-spine claim it
+        // declines the claimed region ([`Printer::removed_paren_comments_opt`]), which the
+        // claimer prints ahead of the pair it found the run below
+        // (`((/* c */ (x).a())! + 1).b` prints `/* c */ (x.a()! + 1).b`).
         let argument_start = non_null_expr.expression.span().start;
-        let leading = self.build_rhs_comments_opt(span.start, argument_start);
+        let leading = self.removed_paren_comments_opt(span, span.start, argument_start);
 
         let core = if needs_parens {
             // For expressions that need parens, use a special doc structure
@@ -1751,8 +1756,11 @@ impl<'a> Printer<'a> {
             {
                 break;
             }
-            let leading =
-                self.build_rhs_comments_opt(inner.span.start, non_null.expression.span().start);
+            let leading = self.removed_paren_comments_opt(
+                inner.span,
+                inner.span.start,
+                non_null.expression.span().start,
+            );
             levels.push((inner, non_null, leading));
             inner = non_null.expression;
         }

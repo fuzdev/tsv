@@ -469,7 +469,14 @@ impl<'e> Iterator for LeftSpineSteps<'_, '_, 'e> {
                         chain_mid_chain_paren_gaps(root, self.printer.linearize_input())
                     })
                     .contains(&(shell_start, child_start));
-        } else {
+        } else if !(self.chain_root.is_some()
+            && matches!(node.kind, internal::ExpressionKind::TSNonNullExpression(_)))
+        {
+            // A `!` under a member or call is a link of the same chain (the linearizer
+            // takes it as a `ChainNode::NonNull`), so the links below it are still read
+            // against that chain's root: re-rooting at the next member linearized a
+            // sub-chain without the calls above the `!`, whose scope decides what the
+            // chain prints mid-chain (`(((// c⏎a[x])?.r!?.u() < p))[x]`).
             self.chain_root = None;
             self.mid_chain_gaps = None;
         }
@@ -935,9 +942,10 @@ impl<'a> Printer<'a> {
     /// mid-chain, and at every pair a construct keeps for its run — through the kinds
     /// whose hoist site honors the claim: a binary, a member, a call, a tagged template, a
     /// conditional, a sequence head, a cast's or postfix update's bare operand, and a
-    /// non-null that is a link of the member / call chain above it, whose head window
-    /// holds the operand's shell. It stops at an assignment target, whose shell keeps its
-    /// own emitter, and at a standalone non-null, which prints its operand's run itself.
+    /// non-null — a link of the member / call chain above it, whose head window holds the
+    /// operand's shell, or a standalone one, whose leading run declines the claimed region
+    /// like every other site's (`((/* c */ (x).a())! + 1).b` prints `/* c */ (x.a()! + 1).b`).
+    /// It stops at an assignment target, whose shell keeps its own emitter.
     ///
     /// Asked at every hoist site, so the common answer is one byte: a claim needs a shell
     /// INSIDE `child` (the comment must sit below a printed pair, and the shallowest such
@@ -977,32 +985,26 @@ impl<'a> Printer<'a> {
         }
         let mut below_pair = child_in_pair().then(|| child.span().start);
         let mut leaf = child;
-        let mut in_chain = false;
         for (node, next) in self.hoisted_left_spine(child) {
-            // A non-null the walk steps through under a member or call is a link of that
-            // chain, its operand's shell inside the chain's head window; a standalone one
-            // prints its own operand's run.
-            let link = matches!(
+            // A non-null is a hoist site either way: a link of the member / call chain
+            // above it, its operand's shell inside that chain's head window, or a
+            // standalone one, whose own leading run declines the claimed region
+            // (`Printer::build_ts_non_null_doc`).
+            if !matches!(
                 node.kind,
                 internal::ExpressionKind::MemberExpression(_)
                     | internal::ExpressionKind::CallExpression(_)
-            ) || (in_chain
-                && matches!(node.kind, internal::ExpressionKind::TSNonNullExpression(_)));
-            if !link
-                && !matches!(
-                    node.kind,
-                    internal::ExpressionKind::BinaryExpression(_)
-                        | internal::ExpressionKind::TaggedTemplateExpression(_)
-                        | internal::ExpressionKind::ConditionalExpression(_)
-                        | internal::ExpressionKind::SequenceExpression(_)
-                        | internal::ExpressionKind::TSAsExpression(_)
-                        | internal::ExpressionKind::TSSatisfiesExpression(_)
-                        | internal::ExpressionKind::UpdateExpression(_)
-                )
-            {
+                    | internal::ExpressionKind::TSNonNullExpression(_)
+                    | internal::ExpressionKind::BinaryExpression(_)
+                    | internal::ExpressionKind::TaggedTemplateExpression(_)
+                    | internal::ExpressionKind::ConditionalExpression(_)
+                    | internal::ExpressionKind::SequenceExpression(_)
+                    | internal::ExpressionKind::TSAsExpression(_)
+                    | internal::ExpressionKind::TSSatisfiesExpression(_)
+                    | internal::ExpressionKind::UpdateExpression(_)
+            ) {
                 break;
             }
-            in_chain = link;
             if below_pair.is_none()
                 && left_side_child_is_parenthesized(node, next, self.in_for_init.get())
             {

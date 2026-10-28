@@ -1,0 +1,844 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 667,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment glued inside a discarded grouping pair below a non-null, standalone or a",
+			"start": 20,
+			"end": 111
+		},
+		{
+			"type": "Line",
+			"value": " link of the chain above it, leads the whole value, ahead of every pair the spine prints.",
+			"start": 113,
+			"end": 204
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 210,
+			"end": 215
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 237,
+			"end": 242
+		},
+		{
+			"type": "Line",
+			"value": " a run of commented `!`s, and a `!` link with calls above it",
+			"start": 262,
+			"end": 324
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 330,
+			"end": 338
+		},
+		{
+			"type": "Block",
+			"value": " t1 ",
+			"start": 344,
+			"end": 352
+		},
+		{
+			"type": "Block",
+			"value": " t2 ",
+			"start": 354,
+			"end": 362
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 383,
+			"end": 391
+		},
+		{
+			"type": "Line",
+			"value": " the same under a prefix unary, inside the pair the comment earns there",
+			"start": 418,
+			"end": 491
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 505,
+			"end": 510
+		},
+		{
+			"type": "Block",
+			"value": "c",
+			"start": 529,
+			"end": 534
+		},
+		{
+			"type": "Line",
+			"value": " a line comment takes a line of its own ahead of the pair",
+			"start": 547,
+			"end": 606
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 608,
+			"end": 612
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 632,
+			"end": 636
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 666,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 657,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 206,
+					"end": 231,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 206,
+						"end": 230,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 206,
+							"end": 207,
+							"name": "x"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 216,
+							"end": 230,
+							"object": {
+								"type": "BinaryExpression",
+								"start": 217,
+								"end": 227,
+								"left": {
+									"type": "TSNonNullExpression",
+									"start": 217,
+									"end": 223,
+									"expression": {
+										"type": "CallExpression",
+										"start": 217,
+										"end": 222,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 217,
+											"end": 220,
+											"object": {
+												"type": "Identifier",
+												"start": 217,
+												"end": 218,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 219,
+												"end": 220,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									}
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 226,
+									"end": 227,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 229,
+								"end": 230,
+								"name": "c"
+							},
+							"computed": false,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "c",
+									"start": 210,
+									"end": 215
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment glued inside a discarded grouping pair below a non-null, standalone or a",
+							"start": 20,
+							"end": 111
+						},
+						{
+							"type": "Line",
+							"value": " link of the chain above it, leads the whole value, ahead of every pair the spine prints.",
+							"start": 113,
+							"end": 204
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 233,
+					"end": 260,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 233,
+						"end": 259,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 233,
+							"end": 234,
+							"name": "x"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 243,
+							"end": 259,
+							"object": {
+								"type": "BinaryExpression",
+								"start": 244,
+								"end": 256,
+								"left": {
+									"type": "CallExpression",
+									"start": 244,
+									"end": 252,
+									"callee": {
+										"type": "TSNonNullExpression",
+										"start": 244,
+										"end": 250,
+										"expression": {
+											"type": "CallExpression",
+											"start": 244,
+											"end": 249,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 244,
+												"end": 247,
+												"object": {
+													"type": "Identifier",
+													"start": 244,
+													"end": 245,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 246,
+													"end": 247,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										}
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 255,
+									"end": 256,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 258,
+								"end": 259,
+								"name": "c"
+							},
+							"computed": false,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "c",
+									"start": 237,
+									"end": 242
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 326,
+					"end": 371,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 326,
+						"end": 370,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 326,
+							"end": 327,
+							"name": "x"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 339,
+							"end": 370,
+							"object": {
+								"type": "BinaryExpression",
+								"start": 340,
+								"end": 367,
+								"left": {
+									"type": "TSNonNullExpression",
+									"start": 340,
+									"end": 363,
+									"expression": {
+										"type": "TSNonNullExpression",
+										"start": 340,
+										"end": 353,
+										"expression": {
+											"type": "MemberExpression",
+											"start": 340,
+											"end": 343,
+											"object": {
+												"type": "Identifier",
+												"start": 340,
+												"end": 341,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 342,
+												"end": 343,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false,
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " t1 ",
+													"start": 344,
+													"end": 352
+												}
+											]
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " t2 ",
+												"start": 354,
+												"end": 362
+											}
+										]
+									}
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 366,
+									"end": 367,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 369,
+								"end": 370,
+								"name": "c"
+							},
+							"computed": false,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 330,
+									"end": 338
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a run of commented `!`s, and a `!` link with calls above it",
+							"start": 262,
+							"end": 324
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 373,
+					"end": 416,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 373,
+						"end": 415,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 373,
+							"end": 374,
+							"name": "x"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 377,
+							"end": 415,
+							"object": {
+								"type": "BinaryExpression",
+								"start": 381,
+								"end": 410,
+								"left": {
+									"type": "ChainExpression",
+									"start": 381,
+									"end": 406,
+									"expression": {
+										"type": "CallExpression",
+										"start": 381,
+										"end": 406,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 381,
+											"end": 404,
+											"object": {
+												"type": "TSNonNullExpression",
+												"start": 381,
+												"end": 402,
+												"expression": {
+													"type": "MemberExpression",
+													"start": 381,
+													"end": 401,
+													"object": {
+														"type": "MemberExpression",
+														"start": 381,
+														"end": 394,
+														"object": {
+															"type": "Identifier",
+															"start": 381,
+															"end": 382,
+															"name": "a",
+															"trailingComments": [
+																{
+																	"type": "Block",
+																	"value": " c1 ",
+																	"start": 383,
+																	"end": 391
+																}
+															]
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 392,
+															"end": 393,
+															"name": "x"
+														},
+														"computed": true,
+														"optional": false
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 400,
+														"end": 401,
+														"name": "r"
+													},
+													"computed": false,
+													"optional": true
+												}
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 403,
+												"end": 404,
+												"name": "u"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									}
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 409,
+									"end": 410,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 414,
+								"end": 415,
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 493,
+					"end": 521,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 493,
+						"end": 520,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 493,
+							"end": 494,
+							"name": "x"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 497,
+							"end": 520,
+							"operator": "typeof",
+							"prefix": true,
+							"argument": {
+								"type": "CallExpression",
+								"start": 511,
+								"end": 519,
+								"callee": {
+									"type": "TSNonNullExpression",
+									"start": 511,
+									"end": 517,
+									"expression": {
+										"type": "MemberExpression",
+										"start": 511,
+										"end": 516,
+										"object": {
+											"type": "MemberExpression",
+											"start": 511,
+											"end": 514,
+											"object": {
+												"type": "Identifier",
+												"start": 511,
+												"end": 512,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 513,
+												"end": 514,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 515,
+											"end": 516,
+											"name": "c"
+										},
+										"computed": false,
+										"optional": false
+									}
+								},
+								"arguments": [],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "c",
+										"start": 505,
+										"end": 510
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same under a prefix unary, inside the pair the comment earns there",
+							"start": 418,
+							"end": 491
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 523,
+					"end": 545,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 523,
+						"end": 544,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 523,
+							"end": 524,
+							"name": "x"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 527,
+							"end": 544,
+							"operator": "!",
+							"prefix": true,
+							"argument": {
+								"type": "CallExpression",
+								"start": 535,
+								"end": 543,
+								"callee": {
+									"type": "TSNonNullExpression",
+									"start": 535,
+									"end": 541,
+									"expression": {
+										"type": "MemberExpression",
+										"start": 535,
+										"end": 540,
+										"object": {
+											"type": "MemberExpression",
+											"start": 535,
+											"end": 538,
+											"object": {
+												"type": "Identifier",
+												"start": 535,
+												"end": 536,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 537,
+												"end": 538,
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 539,
+											"end": 540,
+											"name": "c"
+										},
+										"computed": false,
+										"optional": false
+									}
+								},
+								"arguments": [],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "c",
+										"start": 529,
+										"end": 534
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 614,
+					"end": 630,
+					"expression": {
+						"type": "CallExpression",
+						"start": 614,
+						"end": 629,
+						"callee": {
+							"type": "TSAsExpression",
+							"start": 615,
+							"end": 626,
+							"expression": {
+								"type": "TSNonNullExpression",
+								"start": 615,
+								"end": 621,
+								"expression": {
+									"type": "CallExpression",
+									"start": 615,
+									"end": 620,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 615,
+										"end": 618,
+										"object": {
+											"type": "Identifier",
+											"start": 615,
+											"end": 616,
+											"name": "a"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 617,
+											"end": 618,
+											"name": "f"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 625,
+								"end": 626,
+								"typeName": {
+									"type": "Identifier",
+									"start": 625,
+									"end": 626,
+									"name": "T"
+								}
+							}
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment takes a line of its own ahead of the pair",
+							"start": 547,
+							"end": 606
+						},
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 608,
+							"end": 612
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 638,
+					"end": 656,
+					"expression": {
+						"type": "CallExpression",
+						"start": 638,
+						"end": 655,
+						"callee": {
+							"type": "TSAsExpression",
+							"start": 639,
+							"end": 652,
+							"expression": {
+								"type": "CallExpression",
+								"start": 639,
+								"end": 647,
+								"callee": {
+									"type": "TSNonNullExpression",
+									"start": 639,
+									"end": 645,
+									"expression": {
+										"type": "CallExpression",
+										"start": 639,
+										"end": 644,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 639,
+											"end": 642,
+											"object": {
+												"type": "Identifier",
+												"start": 639,
+												"end": 640,
+												"name": "a"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 641,
+												"end": 642,
+												"name": "f"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									}
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 651,
+								"end": 652,
+								"typeName": {
+									"type": "Identifier",
+									"start": 651,
+									"end": 652,
+									"name": "T"
+								}
+							}
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 632,
+							"end": 636
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
