@@ -276,7 +276,6 @@ impl<'a> Printer<'a> {
                     update.argument.span().end,
                     update_span.end,
                     inner_doc,
-                    inner_doc,
                     ")",
                 )
                 .unwrap_or(argument_doc),
@@ -1910,7 +1909,7 @@ impl<'a> Printer<'a> {
         };
         let operand_end = operand.span().end;
         let retained = if self.has_comments_to_emit_between(operand_end, shell_end) {
-            self.build_paren_operand_comment_doc(operand_end, shell_end, inner, inner, ")")
+            self.build_paren_operand_comment_doc(operand_end, shell_end, inner, ")")
         } else {
             None
         };

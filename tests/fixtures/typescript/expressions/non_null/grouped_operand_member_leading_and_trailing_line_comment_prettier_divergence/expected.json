@@ -1,0 +1,314 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 336,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `//` in both gaps of a retained `)!` shell: one shell, the leading comment on",
+			"start": 20,
+			"end": 102
+		},
+		{
+			"type": "Line",
+			"value": " the `(` line, the trailing one beside the operand, and an operand that breaks",
+			"start": 104,
+			"end": 184
+		},
+		{
+			"type": "Line",
+			"value": " inside it keeps its own continuation.",
+			"start": 186,
+			"end": 226
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 230,
+			"end": 235
+		},
+		{
+			"type": "Line",
+			"value": " t1",
+			"start": 271,
+			"end": 276
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 289,
+			"end": 294
+		},
+		{
+			"type": "Line",
+			"value": " m",
+			"start": 301,
+			"end": 305
+		},
+		{
+			"type": "Line",
+			"value": " t2",
+			"start": 311,
+			"end": 316
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 335,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 326,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 228,
+					"end": 285,
+					"expression": {
+						"type": "CallExpression",
+						"start": 228,
+						"end": 284,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 228,
+							"end": 282,
+							"object": {
+								"type": "TSNonNullExpression",
+								"start": 228,
+								"end": 280,
+								"expression": {
+									"type": "CallExpression",
+									"start": 238,
+									"end": 270,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 238,
+										"end": 261,
+										"object": {
+											"type": "CallExpression",
+											"start": 238,
+											"end": 255,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 238,
+												"end": 253,
+												"object": {
+													"type": "CallExpression",
+													"start": 238,
+													"end": 247,
+													"callee": {
+														"type": "MemberExpression",
+														"start": 238,
+														"end": 245,
+														"object": {
+															"type": "Identifier",
+															"start": 238,
+															"end": 239,
+															"name": "x"
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 244,
+															"end": 245,
+															"name": "m"
+														},
+														"computed": false,
+														"optional": false
+													},
+													"arguments": [],
+													"optional": false
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 252,
+													"end": 253,
+													"name": "m"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 260,
+											"end": 261,
+											"name": "c"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 262,
+											"end": 269,
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [],
+											"body": {
+												"type": "Identifier",
+												"start": 268,
+												"end": 269,
+												"name": "d"
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " t1",
+													"start": 271,
+													"end": 276
+												}
+											]
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 230,
+											"end": 235
+										}
+									]
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 281,
+								"end": 282,
+								"name": "f"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `//` in both gaps of a retained `)!` shell: one shell, the leading comment on",
+							"start": 20,
+							"end": 102
+						},
+						{
+							"type": "Line",
+							"value": " the `(` line, the trailing one beside the operand, and an operand that breaks",
+							"start": 104,
+							"end": 184
+						},
+						{
+							"type": "Line",
+							"value": " inside it keeps its own continuation.",
+							"start": 186,
+							"end": 226
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 287,
+					"end": 325,
+					"expression": {
+						"type": "CallExpression",
+						"start": 287,
+						"end": 324,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 287,
+							"end": 322,
+							"object": {
+								"type": "TSNonNullExpression",
+								"start": 287,
+								"end": 320,
+								"expression": {
+									"type": "BinaryExpression",
+									"start": 297,
+									"end": 310,
+									"left": {
+										"type": "Identifier",
+										"start": 297,
+										"end": 298,
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 309,
+										"end": 310,
+										"name": "b",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " m",
+												"start": 301,
+												"end": 305
+											}
+										]
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 289,
+											"end": 294
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " t2",
+											"start": 311,
+											"end": 316
+										}
+									]
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 321,
+								"end": 322,
+								"name": "f"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

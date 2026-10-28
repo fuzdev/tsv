@@ -236,7 +236,7 @@ impl<'a> Printer<'a> {
     /// **Which to reach for is a question about who emits the `(` / `)`, not about layout.**
     /// Use this one where the pair is the doc's own. Every caller of the other has its parens
     /// emitted by a *different* seam and so has only a body to wrap — a chain base's
-    /// `build_owned_required_pair_doc` (whose bare outside parens also let the chain's
+    /// `build_shaped_owned_required_pair_doc` (whose bare outside parens also let the chain's
     /// `conditional_group` drive the break), a non-null's `)!` closer, a ternary operand's
     /// own pair, a sequence's own pair.
     ///
@@ -1044,7 +1044,6 @@ impl<'a> Printer<'a> {
                     operand_gap_start,
                     operand_gap_end,
                     inner_expr,
-                    inner_expr,
                     ")",
                 )
                 .unwrap_or(expr_doc);
@@ -1073,13 +1072,9 @@ impl<'a> Printer<'a> {
         if retains_shell {
             // The operand has one rendering here, so both layouts take the same body.
             let body = d.concat(&[after_close_doc, inner_expr]);
-            if let Some(shell) = self.build_paren_operand_comment_doc(
-                operand_gap_start,
-                operand_gap_end,
-                body,
-                body,
-                ")",
-            ) {
+            if let Some(shell) =
+                self.build_paren_operand_comment_doc(operand_gap_start, operand_gap_end, body, ")")
+            {
                 return d.concat(&[cast_doc, shell]);
             }
         }
@@ -1620,36 +1615,26 @@ impl<'a> Printer<'a> {
             // the family's expanded shell: `( // c` glue, the operand one indent in,
             // the `)!` back out (prettier glues the comment to the `(` and keeps the
             // continuation flush — a rendering-only divergence, the run stays inside
-            // the pair in both). A shell whose TRAILING gap also holds comments keeps
-            // the anchored-run layout below, the leading run folded above the operand.
-            // The shell is hard-expanded, so the ternary's width-driven expanding
-            // parens have nothing left to decide and stay out of the body.
-            if let Some(shell) = self.build_required_pair_leading_shell_doc(
-                span.start,
-                argument_start,
-                Some((argument_end, span.end)),
-                inner_doc,
-                ")!",
-            ) {
-                return shell;
-            }
-            let inner_doc = if expands {
-                self.build_expanding_parens_body_doc(inner_doc)
-            } else {
-                inner_doc
-            };
-            // Keep comments from the stripped grouping parens INSIDE them, where the
+            // the pair in both); a commented TRAILING gap rides the same shell. The shells
+            // are hard-expanded, so the ternary's width-driven expanding parens have
+            // nothing left to decide and stay out of their body; the fold keeps them,
+            // outside both runs.
+            // Comments from the stripped grouping parens stay INSIDE them, where the
             // author wrote them — leading before the operand (`(/* b */ x + y)!`),
             // trailing before the `)` (`(x + y /* c */)!`). Prettier relocates them
             // outside (before `(` / between `)` and `!`); tsv preserves the position.
-            // The operand has one rendering here, so both layouts take the same body —
-            // the folded form only, since the shell above already declined and wants the
-            // pre-`expands` body it was given.
-            self.build_folded_required_pair_doc(
+            self.build_shaped_owned_required_pair_doc(
                 (span.start, argument_start),
                 Some((argument_end, span.end)),
-                inner_doc,
-                inner_doc,
+                || inner_doc,
+                |lead, trailing| {
+                    let folded = self.concat_pair_runs(lead, inner_doc, trailing);
+                    if expands {
+                        self.build_expanding_parens_body_doc(folded)
+                    } else {
+                        folded
+                    }
+                },
                 ")!",
             )
         } else if self.has_comments_to_emit_between(non_null_expr.expression.span().end, span.end) {
@@ -1834,7 +1819,6 @@ impl<'a> Printer<'a> {
             Some(self.build_owned_required_pair_doc(
                 (expr.span.start, expr_start),
                 Some((inner_start, expr.span.end)),
-                inner_doc,
                 inner_doc,
                 ")!",
             ))

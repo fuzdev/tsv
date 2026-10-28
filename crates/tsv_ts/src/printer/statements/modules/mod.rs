@@ -73,7 +73,7 @@ impl<'a> Printer<'a> {
         };
         let value = match shell_close {
             Some(close) => self
-                .build_paren_operand_comment_doc(argument_end, close, value, value, ")")
+                .build_paren_operand_comment_doc(argument_end, close, value, ")")
                 .unwrap_or(value),
             None => value,
         };

@@ -12,6 +12,7 @@ use crate::printer::{
     ArrowChainContext, LeadingGlue, ParenContext, Printer, ShareTag, is_curried_arrow_chain,
     needs_parens,
 };
+use std::cell::Cell;
 use tsv_lang::Span;
 use tsv_lang::doc::{
     DocBuf,
@@ -23,62 +24,66 @@ use tsv_lang::printing::has_blank_line_between_strict;
 // Node Printing
 //
 
-/// A parenthesized chain base's SHAPED rendering — the one the pair emitter uses flat.
-///
-/// Extracted so the owned-comment claim at the call site wraps a named call rather than the
-/// whole kind match: the claim needs both this and the unshaped `inner()` under one
-/// suppression, and nesting the match inside that closure buried its arms three levels in.
-///
-/// `inner` is the caller's memoized plain doc, threaded rather than rebuilt — every arm but
-/// the binary one consumes it, and the caller consumes it again for the broken body.
-fn shaped_base_doc<'a>(
-    printer: &Printer<'_>,
-    expr: &Expression<'a>,
-    base_ternary: Option<ChainBaseTernary>,
-    followed_by_non_null: bool,
-    inner: &mut impl FnMut() -> DocId,
-) -> DocId {
-    let d = printer.arena();
-    // The parens stay bare outside so the chain's conditionalGroup drives breaking;
-    // `build_expanding_parens_body_doc` is the shape every base kind below takes — await,
-    // binary, and everything else alike.
-    let hang = |content: DocId| printer.build_expanding_parens_body_doc(content);
-    // A ternary base is decided before the kind match: it can never be an arrow / function /
-    // binary, and its three shapes read better as one question than as a guard clause wedged
-    // among the kind arms.
-    if let Some(ternary) = base_ternary.filter(|t| !t.expands) {
-        // Not one of prettier's `ancestorNameMap` value positions
-        // (`shouldExtraIndentForConditionalExpression`) — a call argument, an array element,
-        // a property value — so the `?`/`:` arms hang under the `(` as the bare ternary does.
-        // Only when the member is the ternary's DIRECT parent does the `)` additionally drop
-        // to its own line (prettier's `breakClosingParen`); a `!` in between is the parent
-        // instead, and there the `)` stays welded to the last arm.
-        let body = inner();
-        if ternary.direct && !followed_by_non_null {
-            return d.group(d.concat(&[body, d.softline()]));
+/// The layout a parenthesized chain base's pair gives its operand where the pair FOLDS —
+/// the shell arms print the operand unshaped
+/// ([`Printer::build_shaped_owned_required_pair_doc`]).
+#[derive(Clone, Copy)]
+enum BaseShape {
+    /// The parens hug the operand — a function / arrow (its own body drives breaking,
+    /// prettier never breaks after the `(` there), a ternary that does not expand and is not
+    /// the member's direct operand, and a base that would hang but is led by a MULTI-LINE block.
+    Hug,
+    /// The parens stay bare outside and the operand hangs inside them
+    /// ([`Printer::build_expanding_parens_body_doc`]), so the chain's conditionalGroup
+    /// drives the break — every other base kind.
+    Hang,
+    /// A non-expanding ternary that is the member's DIRECT operand: its `?`/`:` arms hang
+    /// under the `(` as the bare ternary does, and the `)` drops to its own line.
+    TernaryDirect,
+}
+
+impl BaseShape {
+    fn of(
+        expr: &Expression<'_>,
+        base_ternary: Option<ChainBaseTernary>,
+        followed_by_non_null: bool,
+    ) -> Self {
+        // A ternary base is decided before the kind match: it can never be an arrow /
+        // function / binary, and its three shapes read better as one question than as a
+        // guard clause wedged among the kind arms.
+        if let Some(ternary) = base_ternary.filter(|t| !t.expands) {
+            // Not one of prettier's `ancestorNameMap` value positions
+            // (`shouldExtraIndentForConditionalExpression`) — a call argument, an array
+            // element, a property value — so the `?`/`:` arms hang under the `(` as the bare
+            // ternary does. Only when the member is the ternary's DIRECT parent does the `)`
+            // additionally drop to its own line (prettier's `breakClosingParen`); a `!` in
+            // between is the parent instead, and there the `)` stays welded to the last arm.
+            return if ternary.direct && !followed_by_non_null {
+                Self::TernaryDirect
+            } else {
+                Self::Hug
+            };
         }
-        return body;
+        match &expr.kind {
+            // IIFE / function callee or arrow member-object: `(() => {...})().catch()`,
+            // `(function () {})().p`. Matches the bare-callee path (`call_formatting.rs`),
+            // which wraps with hugging parens.
+            ExpressionKind::ArrowFunctionExpression(_) | ExpressionKind::FunctionExpression(_) => {
+                Self::Hug
+            }
+            // Every other base kind — a binary of every operator family included, and a
+            // ternary base that DOES expand.
+            _ => Self::Hang,
+        }
     }
-    match &expr.kind {
-        ExpressionKind::ArrowFunctionExpression(_) | ExpressionKind::FunctionExpression(_) => {
-            // IIFE / function callee or arrow member-object: the parens hug the function —
-            // its own body drives breaking, prettier never breaks after the `(` here.
-            // `(() => {...})().catch()`, `(function () {})().p`. Matches the bare-callee path
-            // (`call_formatting.rs`), which wraps with hugging parens.
-            inner()
+
+    fn apply(self, printer: &Printer<'_>, content: DocId) -> DocId {
+        let d = printer.arena();
+        match self {
+            Self::Hug => content,
+            Self::Hang => printer.build_expanding_parens_body_doc(content),
+            Self::TernaryDirect => d.group(d.concat(&[content, d.softline()])),
         }
-        ExpressionKind::BinaryExpression(binary) => {
-            // The chain-for-parens operand doc, so the whole operand chain is what stays
-            // flat. Every operator family — arithmetic, logical (`&&`/`||`), and nullish
-            // (`??`) — is laid out identically. A logical base skipping this wrapper would
-            // break at its own operators instead, welding the closing `).member` onto the
-            // last operand — a third layout matching neither tsv's arithmetic shape nor
-            // prettier's. See conformance_prettier_ts.md §TypeScript (Parenthesized binary
-            // member base).
-            hang(printer.build_binary_chain_for_parens(binary, expr.span))
-        }
-        // Every other base kind, and a ternary base that DOES expand.
-        _ => hang(inner()),
     }
 }
 
@@ -133,7 +138,6 @@ pub(crate) fn print_node_inner<'a>(
                         (paren_start, base_start),
                         trailing_gap(),
                         slice,
-                        slice,
                         ")",
                     );
                 }
@@ -180,9 +184,9 @@ pub(crate) fn print_node_inner<'a>(
                 };
                 let key = printer.chain_share_key(expr, tag);
                 printer.chain_shared_doc(key, || {
-                    // Resolved BEFORE the bodies, because the claim below takes both and this is
-                    // what says whether there are two. The window it opens is documented at the
-                    // emitter call below, with the rest of the pair's gap reading.
+                    // Resolved once, for the callee-chain gate below and the emitter. The window
+                    // it opens is documented at the emitter call below, with the rest of the
+                    // pair's gap reading.
                     let trailing_gap = trailing_gap();
                     // A curried arrow chain that IS a callee (`paren_leading_start`, as below)
                     // takes prettier's callee shape, exactly as the bare-callee path gives it
@@ -193,61 +197,63 @@ pub(crate) fn print_node_inner<'a>(
                         && paren_leading_start.is_some_and(|start| {
                             printer.pair_gaps_are_comment_free((start, base_start), trailing_gap)
                         });
-                    // The plain expression doc, memoized lazily: every arm consumes it EXCEPT
-                    // a binary base's common path, which builds the chain-for-parens operand
-                    // doc instead — eager, a parenthesized binary base paid two full doc
-                    // builds for one rendered doc. The rare trailing-gap branch still
-                    // consumes it (the line-comment layout's broken body), which is why it is
-                    // a memo rather than moved into the arms that use it.
-                    let mut inner_memo = None;
-                    let mut inner = || -> DocId {
-                        *inner_memo.get_or_insert_with(|| {
-                            if callee_chain {
-                                printer.build_with_arrow_chain_context(
-                                    ArrowChainContext::Callee,
-                                    || printer.build_expression_doc(expr),
-                                )
-                            } else {
-                                printer.build_expression_doc(expr)
-                            }
-                        })
+                    // The plain expression doc, memoized lazily: the expanded shells print it,
+                    // and so does the fold for every base but a binary one, whose fold builds
+                    // the chain-for-parens operand doc instead — eager, a parenthesized binary
+                    // base paid two full doc builds for one rendered doc, and a base nesting
+                    // another (`a == (a == (…)!.b)!.b`) compounded it to 2^depth.
+                    let inner_memo = Cell::new(None);
+                    let inner = || -> DocId {
+                        if let Some(doc) = inner_memo.get() {
+                            return doc;
+                        }
+                        let doc = if callee_chain {
+                            printer
+                                .build_with_arrow_chain_context(ArrowChainContext::Callee, || {
+                                    printer.build_expression_doc(expr)
+                                })
+                        } else {
+                            printer.build_expression_doc(expr)
+                        };
+                        inner_memo.set(Some(doc));
+                        doc
                     };
                     // A MULTI-LINE block the base OWNS prints just inside the pair's `(`,
                     // outside the base's own group
-                    // ([`Printer::build_value_pair_with_outermost_owned_comment`]) — the pair's
-                    // leading run below is built on the **to emit** axis, which skips an owned
+                    // ([`Printer::build_value_with_outermost_owned_comment`]) — the pair's
+                    // leading run is built on the **to emit** axis, which skips an owned
                     // comment, so the two partition the gap rather than competing for it.
                     //
-                    // ⚠️ The TWO-BODY form, because the trailing emitter prints the broken one:
-                    // claiming around the shaped body alone left the broken one built under the
-                    // suppression with nothing printing the comment, and `inner`'s memo made
-                    // that invisible from here (`gaps:audit` found it as a DROP).
-                    let (inner_group, broken_body) = printer
-                        .build_value_pair_with_outermost_owned_comment(expr, || {
-                            let shaped = shaped_base_doc(
-                                printer,
-                                expr,
-                                base_ternary,
-                                *followed_by_non_null,
-                                &mut inner,
-                            );
-                            // The broken body is the trailing emitter's alone, and only its
-                            // line-spanning layout prints it
-                            // ([`Printer::build_paren_operand_comment_doc`]), so the unshaped doc
-                            // is built only where that gap holds such a run — a parenthesized
-                            // binary base would otherwise pay a second full doc build on every
-                            // chain whose `!` bounds a comment-free gap, and a base nesting
-                            // another (`a == (a == (…)!.b)!.b`) compounded it to 2^depth. Without
-                            // one this is the bare pair the emitter itself falls back to.
-                            let broken = if trailing_gap.is_some_and(|(start, end)| {
-                                printer.has_line_spanning_comments_to_emit_between(start, end)
-                            }) {
-                                inner()
-                            } else {
-                                shaped
-                            };
-                            (shaped, broken)
-                        });
+                    // ⚠️ EVERY body the emitter can print takes the claim, each built inside
+                    // its own claim scope (`docs/comments.md` hazard 1): the emitter builds
+                    // whichever its arm needs, lazily, and a body built outside the scope
+                    // would hold the suppressed doc `inner`'s memo already caches, with
+                    // nothing printing the comment.
+                    let claimed = |build: &dyn Fn() -> DocId| {
+                        printer.build_value_with_outermost_owned_comment(expr, build)
+                    };
+                    let leading_gap = (paren_leading_start.unwrap_or(base_start), base_start);
+                    // A base whose folded content OPENS with a multi-line block — the
+                    // claim's, or a lone glued one the fold leads with — hugs where it would
+                    // hang: the block's body cannot print flat, so inside the hang it would
+                    // break the parens open even where the operand fits, and an operand that
+                    // breaks below it keeps the block on the `(` line, as the bare callee does
+                    // and prettier does at both. Read from the source, so the reparse — which
+                    // finds the same block glued to the operand — answers it the same way.
+                    // The `)`-dropping ternary keeps its shape: it has no indent of its own
+                    // after the `(`, so the block simply rides outside its group (below).
+                    //
+                    // TODO: a keyword-led base (`await`, a unary, `<T>x`) has no left-spine
+                    // child at its start, so the claim misses its owned block, which the node
+                    // prints inside the hang — such a base still hangs, even where it fits.
+                    let multiline_lead = printer.value_claims_outermost_owned_comment(expr)
+                        || printer
+                            .comments_to_emit_between(leading_gap.0, leading_gap.1)
+                            .any(|comment| comment.multiline);
+                    let shape = match BaseShape::of(expr, base_ternary, *followed_by_non_null) {
+                        BaseShape::Hang if multiline_lead => BaseShape::Hug,
+                        shape => shape,
+                    };
                     // A base that OWNS its leading gap emits it here, inside the pair —
                     // nothing else can reach between a surviving `(` and the base
                     // (`prepend_removed_paren_comments` at the chain's own head hoists the
@@ -265,11 +271,43 @@ pub(crate) fn print_node_inner<'a>(
                     // arrow that is merely a member OBJECT (`(() => 1 /* c */).p`) prints
                     // the same pair but its trailing gap belongs to the member seam, and
                     // claiming it here double-printed the comment.
-                    printer.build_owned_required_pair_doc(
-                        (paren_leading_start.unwrap_or(base_start), base_start),
+                    printer.build_shaped_owned_required_pair_doc(
+                        leading_gap,
                         trailing_gap,
-                        inner_group,
-                        broken_body,
+                        || claimed(&inner),
+                        |lead, trailing| {
+                            // The `)`-dropping group is the ternary's own layout, so both the
+                            // lead and the claimed block ride OUTSIDE it, where a multi-line
+                            // one's forced break cannot reach the `)`'s softline — inside, it
+                            // dropped the `)` even where the ternary fits. (A ternary base never
+                            // keeps a leading run inside its pair — that run hoists in front — so
+                            // `lead` is empty here and only the claimed block moves.)
+                            if let BaseShape::TernaryDirect = shape {
+                                let body = claimed(&|| {
+                                    shape.apply(
+                                        printer,
+                                        printer.concat_pair_runs(None, inner(), trailing),
+                                    )
+                                });
+                                return printer.concat_pair_runs(lead, body, None);
+                            }
+                            // The chain-for-parens operand doc for a binary base, so the whole
+                            // operand chain is what stays flat. Every operator family —
+                            // arithmetic, logical (`&&`/`||`), and nullish (`??`) — is laid
+                            // out identically: a logical base skipping it would break at its
+                            // own operators instead, welding the closing `).member` onto the
+                            // last operand. See conformance_prettier_ts.md §TypeScript
+                            // (Parenthesized binary member base).
+                            // Hugged, nothing wraps it in the hang it is built for, so a
+                            // hugged binary takes its plain doc.
+                            let content = claimed(&|| match (&expr.kind, shape) {
+                                (ExpressionKind::BinaryExpression(binary), BaseShape::Hang) => {
+                                    printer.build_binary_chain_for_parens(binary, expr.span)
+                                }
+                                _ => inner(),
+                            });
+                            shape.apply(printer, printer.concat_pair_runs(lead, content, trailing))
+                        },
                         ")",
                     )
                 })

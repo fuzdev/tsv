@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 183,
+	"end": 529,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -33,17 +33,41 @@
 			"value": " c ",
 			"start": 162,
 			"end": 169
+		},
+		{
+			"type": "Line",
+			"value": " a long operand hangs inside the parens, the block beside its last line and counted in",
+			"start": 175,
+			"end": 263
+		},
+		{
+			"type": "Line",
+			"value": " its width",
+			"start": 265,
+			"end": 277
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 382,
+			"end": 389
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 506,
+			"end": 513
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 182,
+		"end": 528,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 173,
+			"end": 519,
 			"body": [
 				{
 					"type": "VariableDeclaration",
@@ -165,6 +189,130 @@
 							"end": 139
 						}
 					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 279,
+					"end": 394,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 285,
+							"end": 393,
+							"id": {
+								"type": "Identifier",
+								"start": 285,
+								"end": 286,
+								"name": "c"
+							},
+							"init": {
+								"type": "TSNonNullExpression",
+								"start": 289,
+								"end": 393,
+								"expression": {
+									"type": "ConditionalExpression",
+									"start": 293,
+									"end": 381,
+									"test": {
+										"type": "Identifier",
+										"start": 293,
+										"end": 317,
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 320,
+										"end": 360,
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 363,
+										"end": 381,
+										"name": "cccccccccccccccccc"
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 382,
+											"end": 389
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a long operand hangs inside the parens, the block beside its last line and counted in",
+							"start": 175,
+							"end": 263
+						},
+						{
+							"type": "Line",
+							"value": " its width",
+							"start": 265,
+							"end": 277
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 396,
+					"end": 518,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 402,
+							"end": 517,
+							"id": {
+								"type": "Identifier",
+								"start": 402,
+								"end": 403,
+								"name": "d"
+							},
+							"init": {
+								"type": "TSNonNullExpression",
+								"start": 406,
+								"end": 517,
+								"expression": {
+									"type": "ConditionalExpression",
+									"start": 410,
+									"end": 505,
+									"test": {
+										"type": "Identifier",
+										"start": 410,
+										"end": 434,
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 440,
+										"end": 480,
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 486,
+										"end": 505,
+										"name": "ccccccccccccccccccc"
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 506,
+											"end": 513
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
 				}
 			],
 			"sourceType": "module"

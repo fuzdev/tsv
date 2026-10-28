@@ -1,0 +1,299 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 344,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A multi-line block in a sealed base's leading gap leads the operand inside the",
+			"start": 20,
+			"end": 101
+		},
+		{
+			"type": "Line",
+			"value": " pair, glued through any stripped parens.",
+			"start": 103,
+			"end": 146
+		},
+		{
+			"type": "Block",
+			"value": " c1\n ",
+			"start": 149,
+			"end": 159
+		},
+		{
+			"type": "Line",
+			"value": " A chain that breaks under it hugs the pair: the block keeps the `(` line and the",
+			"start": 173,
+			"end": 256
+		},
+		{
+			"type": "Line",
+			"value": " links take one indent.",
+			"start": 258,
+			"end": 283
+		},
+		{
+			"type": "Block",
+			"value": " c2\n ",
+			"start": 286,
+			"end": 296
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 343,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 334,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 148,
+					"end": 170,
+					"expression": {
+						"type": "MemberExpression",
+						"start": 148,
+						"end": 169,
+						"object": {
+							"type": "ChainExpression",
+							"start": 160,
+							"end": 166,
+							"expression": {
+								"type": "MemberExpression",
+								"start": 160,
+								"end": 166,
+								"object": {
+									"type": "MemberExpression",
+									"start": 160,
+									"end": 163,
+									"object": {
+										"type": "Identifier",
+										"start": 160,
+										"end": 161,
+										"name": "x"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 162,
+										"end": 163,
+										"name": "s"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 165,
+									"end": 166,
+									"name": "q"
+								},
+								"computed": false,
+								"optional": true
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c1\n ",
+									"start": 149,
+									"end": 159
+								}
+							]
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 168,
+							"end": 169,
+							"name": "c"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line block in a sealed base's leading gap leads the operand inside the",
+							"start": 20,
+							"end": 101
+						},
+						{
+							"type": "Line",
+							"value": " pair, glued through any stripped parens.",
+							"start": 103,
+							"end": 146
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 285,
+					"end": 333,
+					"expression": {
+						"type": "MemberExpression",
+						"start": 285,
+						"end": 332,
+						"object": {
+							"type": "ChainExpression",
+							"start": 297,
+							"end": 329,
+							"expression": {
+								"type": "CallExpression",
+								"start": 297,
+								"end": 329,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 297,
+									"end": 320,
+									"object": {
+										"type": "CallExpression",
+										"start": 297,
+										"end": 315,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 297,
+											"end": 313,
+											"object": {
+												"type": "CallExpression",
+												"start": 297,
+												"end": 308,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 297,
+													"end": 306,
+													"object": {
+														"type": "MemberExpression",
+														"start": 297,
+														"end": 300,
+														"object": {
+															"type": "Identifier",
+															"start": 297,
+															"end": 298,
+															"name": "x"
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 299,
+															"end": 300,
+															"name": "s"
+														},
+														"computed": false,
+														"optional": false
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 305,
+														"end": 306,
+														"name": "m"
+													},
+													"computed": false,
+													"optional": true
+												},
+												"arguments": [],
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 312,
+												"end": 313,
+												"name": "m"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 319,
+										"end": 320,
+										"name": "c"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 321,
+										"end": 328,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "Identifier",
+											"start": 327,
+											"end": 328,
+											"name": "d"
+										}
+									}
+								],
+								"optional": false
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c2\n ",
+									"start": 286,
+									"end": 296
+								}
+							]
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 331,
+							"end": 332,
+							"name": "c"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A chain that breaks under it hugs the pair: the block keeps the `(` line and the",
+							"start": 173,
+							"end": 256
+						},
+						{
+							"type": "Line",
+							"value": " links take one indent.",
+							"start": 258,
+							"end": 283
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

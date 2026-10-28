@@ -35,7 +35,7 @@
 # known bugs.
 #
 # Format: KIND<TAB>POSITION
-# shapes: 33
+# shapes: 34
 UNHONORED	ArrowFunctionExpression.body
 UNHONORED	ArrowFunctionExpression.typeParameters
 UNHONORED	AssignmentExpression.left
@@ -43,6 +43,7 @@ UNHONORED	AssignmentPattern.left
 UNHONORED	BinaryExpression.left
 UNHONORED	BinaryExpression.right
 UNHONORED	CallExpression.callee
+UNHONORED	ChainExpression.expression
 UNHONORED	ClassDeclaration.superClass
 UNHONORED	ConditionalExpression.alternate
 UNHONORED	ConditionalExpression.consequent

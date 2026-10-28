@@ -466,12 +466,11 @@ impl<'a> Printer<'a> {
             Printer::gap_start_after_owned_pair(tagged.tag.span().end, trailing_gap);
 
         let tag_doc = if let Some(pair_open) = pair_open {
-            // The tag has one rendering, so both layouts take the same body.
+            // The tag has one rendering, so every arm takes the same body.
             let inner = self.build_expression_doc(tagged.tag);
             self.build_owned_required_pair_doc(
                 (pair_open, tagged.tag.span().start),
                 trailing_gap,
-                inner,
                 inner,
                 ")",
             )

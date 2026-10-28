@@ -228,7 +228,6 @@ fn build_call_head(
             (span.start, call.callee.span().start),
             trailing_gap,
             callee_doc,
-            callee_doc,
             ")",
         )
     } else {

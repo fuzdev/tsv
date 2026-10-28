@@ -52,6 +52,16 @@ enum ShellTail {
     ForClauseSeparator,
 }
 
+/// Which leading runs [`Printer::leading_run_reparses_owned`] may call owned on the reparse:
+/// a lone glued block of either line count (a REQUIRED pair, whose shell prints the block
+/// glued to the operand whatever its lines), or only a single-line one (the ASI operand
+/// shell, which an owned multi-line block keeps).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ReparsedRun {
+    SingleLine,
+    AnyLines,
+}
+
 /// How [`Printer::build_paren_leading_value_doc`] splits a `(`→value gap: the run the
 /// `(` line keeps, the value with the rest of the run prepended, and whether the caller
 /// must open its parens.
@@ -2098,7 +2108,9 @@ impl<'a> Printer<'a> {
         }
         // A shell the TRAILING gap keeps holds this run either way — glued inside it, the
         // comment is owned on the reparse and the same shell prints the same bytes.
-        if !needs_trailing && self.leading_run_reparses_owned(leading_start, expr_start) {
+        if !needs_trailing
+            && self.leading_run_reparses_owned(leading_start, expr_start, ReparsedRun::SingleLine)
+        {
             let run = self
                 .build_inline_comments_between_doc_trailing_space_opt(leading_start, expr_start);
             // A SEQUENCE's own pair is the one that survives, and the run is inside it —
@@ -2221,16 +2233,29 @@ impl<'a> Printer<'a> {
     /// operand: a line break the author put INSIDE a stripped `(` is erased with it, so
     /// `(/* c */ (⏎x))` reaches the operand glued all the same. Deliberately no wider: a
     /// second comment in the gap stays emit-visible on the reparse too (only the LAST one
-    /// can glue to the operand), a multi-line one keeps an ASI shell
-    /// ([`Self::redundant_shell_holds_line_spanning_owned_comment`]), and a comment the
-    /// author broke after is not glued at all — each of those is stable as it stands.
-    fn leading_run_reparses_owned(&self, gap_start: u32, operand_start: u32) -> bool {
+    /// can glue to the operand), and a comment the author broke after is not glued at all —
+    /// each of those is stable as it stands.
+    ///
+    /// A MULTI-LINE block is the one shape the two callers answer differently, which is
+    /// what `lines` says. At the ASI shell it keeps the shell
+    /// ([`Self::redundant_shell_holds_line_spanning_owned_comment`]: an owned multi-line
+    /// block is a line terminator ahead of the operand), so it does not fold there
+    /// ([`ReparsedRun::SingleLine`]). A REQUIRED pair prints the glued block glued to the
+    /// operand whatever its line count, and the reparse owns it and folds — so the
+    /// interior newline the shell gate counts is the comment's own, not the run's, and the
+    /// shell was a first pass the second one undid ([`ReparsedRun::AnyLines`]).
+    fn leading_run_reparses_owned(
+        &self,
+        gap_start: u32,
+        operand_start: u32,
+        lines: ReparsedRun,
+    ) -> bool {
         let mut run = self.comments_in_source_between(gap_start, operand_start);
         let (Some(comment), None) = (run.next(), run.next()) else {
             return false;
         };
         comment.is_block
-            && !comment.multiline
+            && (!comment.multiline || lines == ReparsedRun::AnyLines)
             && !comment.owned_by_node
             && self.comment_hugs_next(comment)
     }
@@ -2364,22 +2389,28 @@ impl<'a> Printer<'a> {
         inner: DocId,
         close: &'static str,
     ) -> Option<DocId> {
-        if !self.has_comments_to_emit_between(gap_start, operand_start)
-            || !self.has_newline_between(gap_start, operand_start)
-            // A newline AROUND a glued block — ahead of it, or inside a `(` stripped from
-            // behind it — is not the run's: the expanded shell would print the comment
-            // glued to the operand, which the reparse owns and folds.
-            || self.leading_run_reparses_owned(gap_start, operand_start)
-        {
-            return None;
-        }
-        Some(self.build_leading_run_expanded_shell_doc(
-            gap_start,
-            operand_start,
-            trailing_gap,
-            inner,
-            close,
-        ))
+        self.required_pair_takes_leading_shell(gap_start, operand_start)
+            .then(|| {
+                self.build_leading_run_expanded_shell_doc(
+                    gap_start,
+                    operand_start,
+                    trailing_gap,
+                    inner,
+                    close,
+                )
+            })
+    }
+
+    /// The gate of [`Self::build_required_pair_leading_shell_doc`], for a caller that builds
+    /// the shell's body only once the shell is known to be taken
+    /// ([`Self::build_shaped_owned_required_pair_doc`]).
+    fn required_pair_takes_leading_shell(&self, gap_start: u32, operand_start: u32) -> bool {
+        self.has_comments_to_emit_between(gap_start, operand_start)
+            && self.has_newline_between(gap_start, operand_start)
+            // A newline AROUND a glued block — ahead of it, inside a `(` stripped from
+            // behind it, or inside the block itself — is not the run's: the expanded shell
+            // would print the comment glued to the operand, which the reparse owns and folds.
+            && !self.leading_run_reparses_owned(gap_start, operand_start, ReparsedRun::AnyLines)
     }
 
     /// The index just past the `)` that closes a REQUIRED pair around an operand
@@ -2462,92 +2493,116 @@ impl<'a> Printer<'a> {
         trailing_gap.map_or(operand_end, |(_, close)| close)
     }
 
-    /// A REQUIRED pair that owns BOTH of its gaps — `(`→operand and operand→`)`.
+    /// A REQUIRED pair that owns BOTH of its gaps — `(`→operand and operand→`)` — around an
+    /// operand with one rendering: the frozen chain base, the bare IIFE callee, a tagged
+    /// template's function tag, the sealed `new` callee / tag
+    /// ([`Self::build_sealed_non_null_paren_doc`]). The unshaped form of
+    /// [`Self::build_shaped_owned_required_pair_doc`], which carries the layering.
+    pub(in crate::printer) fn build_owned_required_pair_doc(
+        &self,
+        leading_gap: (u32, u32),
+        trailing_gap: Option<(u32, u32)>,
+        body: DocId,
+        close: &'static str,
+    ) -> DocId {
+        self.build_shaped_owned_required_pair_doc(
+            leading_gap,
+            trailing_gap,
+            || body,
+            |lead, trailing| self.concat_pair_runs(lead, body, trailing),
+            close,
+        )
+    }
+
+    /// `content` between a folded pair's leading run and its inline trailing run — the
+    /// unshaped fold every [`Self::build_shaped_owned_required_pair_doc`] caller shares.
+    pub(in crate::printer) fn concat_pair_runs(
+        &self,
+        lead: Option<DocId>,
+        content: DocId,
+        trailing: Option<DocId>,
+    ) -> DocId {
+        match (lead, trailing) {
+            (None, None) => content,
+            (Some(lead), None) => self.d().concat(&[lead, content]),
+            (None, Some(trailing)) => self.d().concat(&[content, trailing]),
+            (Some(lead), Some(trailing)) => self.d().concat(&[lead, content, trailing]),
+        }
+    }
+
+    /// A REQUIRED pair that owns BOTH of its gaps — `(`→operand and operand→`)` — where the
+    /// position may SHAPE the operand's folded rendering (the chain's sealed / IIFE base:
+    /// the expanding-parens hang, a ternary's `)`-dropping group).
     ///
     /// The one emission for every position where the pair the printer emits is the
-    /// author's own and nothing outside it can reach between the parens: the chain's
-    /// sealed / IIFE base, the bare IIFE callee, a tagged template's function tag.
-    /// Layering, which is the family's convention rather than this function's choice:
+    /// author's own and nothing outside it can reach between the parens. Layering, which is
+    /// the family's convention rather than this function's choice:
     ///
     /// - a leading run that occupies a line takes the expanded shell
     ///   ([`Self::build_required_pair_leading_shell_doc`]) — and a commented TRAILING
     ///   gap rides that SAME shell, after the operand, rather than declining it;
-    /// - otherwise the leading run folds flat above the operand, and a commented
-    ///   TRAILING gap then builds the shell around that
-    ///   ([`Self::build_paren_operand_comment_doc`]);
+    /// - otherwise the leading run folds flat above the operand, and a line-spanning
+    ///   TRAILING run then builds the shell around that
+    ///   ([`Self::build_trailing_run_expanded_shell_doc`]), while an inline block run
+    ///   trails the operand inside the shape;
     /// - with neither, the pair is bare.
     ///
     /// So exactly ONE shell is built however many of the two gaps hold comments. Two
     /// nest; none leaves the `//` glued to a `(` that never breaks and the operand at
     /// the enclosing indent.
     ///
-    /// `flat_body` and `broken_body` are the operand's two renderings, which differ
-    /// only where a caller shapes the flat one (the chain base's hang / ternary
-    /// forms); the fold is applied to **both**, since the trailing emitter's line-comment
-    /// arm prints the broken one and folding into the shaped body alone would DROP the
-    /// leading run at exactly the authoring that reaches it. A caller whose SHELL body
-    /// differs from its folded one asks the two halves separately —
-    /// [`Self::build_folded_required_pair_doc`].
-    pub(in crate::printer) fn build_owned_required_pair_doc(
+    /// ⚠️ **A shape is a shell too, which is why this function — not its caller — decides
+    /// which arm gets which body.** The expanding-parens hang is a paren-body layout of its
+    /// own (`group([indent([softline, x]), softline])`), so the two expanded shells print
+    /// `plain`, the operand's UNSHAPED doc: inside a hard-expanded shell no width is left
+    /// to decide, and a hang nested there breaks with the body into a blank line plus a
+    /// second indent on each side, which the next pass keeps as an author blank — a
+    /// format that grew a line per pass. The fold is the one arm that keeps the shape, and
+    /// the shape goes OUTSIDE the runs: `fold_shaped` receives the folded leading run and an
+    /// inline (block-only) trailing run and returns `shape(concat([lead, content, trailing]))`,
+    /// so a breaking hang carries the lead down onto the operand's line with it, and the
+    /// trailing block stays beside the operand's last line. Left outside the hang, the lead
+    /// stayed on the `(` line with a newline behind it, and the reparse read that as a run
+    /// occupying a line and took the shell. `plain` is lazy — built only by a shell, so a
+    /// caller whose folded content is a different doc (a binary base's chain-for-parens)
+    /// never pays for both.
+    pub(in crate::printer) fn build_shaped_owned_required_pair_doc(
         &self,
         leading_gap: (u32, u32),
         trailing_gap: Option<(u32, u32)>,
-        flat_body: DocId,
-        broken_body: DocId,
-        close: &'static str,
-    ) -> DocId {
-        self.build_required_pair_leading_shell_doc(
-            leading_gap.0,
-            leading_gap.1,
-            trailing_gap,
-            flat_body,
-            close,
-        )
-        .unwrap_or_else(|| {
-            self.build_folded_required_pair_doc(
-                leading_gap,
-                trailing_gap,
-                flat_body,
-                broken_body,
-                close,
-            )
-        })
-    }
-
-    /// [`Self::build_owned_required_pair_doc`] past its leading-shell arm — the form for
-    /// a caller whose shell and fold take DIFFERENT bodies.
-    ///
-    /// The non-null's `needs_parens` arm is the one such caller: its operand may carry a
-    /// ternary's width-driven expanding parens, which belong in the folded body but not
-    /// inside a hard-expanded shell, where there is no width left to decide. Every other
-    /// position hands one body to both and takes the combined form above.
-    pub(in crate::printer) fn build_folded_required_pair_doc(
-        &self,
-        leading_gap: (u32, u32),
-        trailing_gap: Option<(u32, u32)>,
-        flat_body: DocId,
-        broken_body: DocId,
+        plain: impl FnOnce() -> DocId,
+        fold_shaped: impl FnOnce(Option<DocId>, Option<DocId>) -> DocId,
         close: &'static str,
     ) -> DocId {
         let d = self.d();
         let (gap_start, operand_start) = leading_gap;
-        let fold = |body: DocId| match self.build_rhs_comments_opt(gap_start, operand_start) {
-            Some(lead) => d.concat(&[lead, body]),
-            None => body,
-        };
-        let flat_body = fold(flat_body);
-        if let Some((start, end)) = trailing_gap
-            && let Some(doc) = self.build_paren_operand_comment_doc(
-                start,
-                end,
-                flat_body,
-                fold(broken_body),
+        if self.required_pair_takes_leading_shell(gap_start, operand_start) {
+            return self.build_leading_run_expanded_shell_doc(
+                gap_start,
+                operand_start,
+                trailing_gap,
+                plain(),
                 close,
-            )
-        {
-            return doc;
+            );
         }
-        d.concat(&[d.text("("), flat_body, d.text(close)])
+        let lead = || self.build_rhs_comments_opt(gap_start, operand_start);
+        let mut trailing = None;
+        if let Some((start, end)) = trailing_gap {
+            if self.has_line_spanning_comments_to_emit_between(start, end) {
+                // The trailing emitter's line arm is the other expanded shell, so it takes
+                // the unshaped body too.
+                let body = plain();
+                let body = lead().map_or(body, |lead| d.concat(&[lead, body]));
+                return self.build_trailing_run_expanded_shell_doc(start, end, body, close);
+            } else if self.has_comments_to_emit_between(start, end) {
+                // An inline block run trails the operand INSIDE the shape, as the lead leads
+                // it: appended past a breaking hang, it landed behind the hang's closing
+                // break, at the pair's own column plus a space.
+                trailing =
+                    Some(self.build_chain_block_comments_doc(start, end, CommentSpacing::Leading));
+            }
+        }
+        d.concat(&[d.text("("), fold_shaped(lead(), trailing), d.text(close)])
     }
 
     /// An operand in a position that prints a REQUIRED pair around some operand
@@ -3545,8 +3600,7 @@ impl<'a> Printer<'a> {
         span_end: u32,
     ) -> Option<(DocId, u32)> {
         let close = self.value_paren_line_comment_close(value_end, span_end)?;
-        let shell =
-            self.build_paren_operand_comment_doc(value_end, close, value_doc, value_doc, ")")?;
+        let shell = self.build_paren_operand_comment_doc(value_end, close, value_doc, ")")?;
         Some((shell, Self::past_grouping_close(close, span_end)))
     }
 
@@ -3584,28 +3638,25 @@ impl<'a> Printer<'a> {
     /// whose own span is what ends at the `)` (`build_ts_type_assertion_doc`, which
     /// calls from each of its two return paths).
     ///
-    /// `flat_body` and `broken_body` are the same doc at every caller but the chain
-    /// base, which alone has two renderings of its operand — the split is earned there
-    /// and nowhere else.
-    ///
     /// Returns `None` when the gap holds nothing to emit, leaving the caller to
     /// render its own bare parens — which is what makes the retention the comment's
     /// doing: an empty gap still strips a redundant shell.
     ///
-    /// `broken_body` renders the expanded layout — a `//` cannot trail inline before
+    /// A line-spanning run takes the expanded layout — a `//` cannot trail inline before
     /// the `)` (it would swallow it), and a multi-line block already makes the shell
     /// span lines, where a shell that breaks expands rather than gluing its operand to
     /// the `(` (the rule [`Self::trailing_paren_comment_parts`] states for the same
-    /// gap) — so the operand goes multiline with the comment inside; `flat_body`
-    /// renders the inline single-line-block one. `close` is what follows the operand: `")"` where a
-    /// separate node prints the `!` (or where nothing does), `")!"` where this doc owns
-    /// it.
+    /// gap) — so the operand goes multiline with the comment inside; a single-line block
+    /// run trails `operand` inline. `operand` is UNSHAPED: the expanded layout is a shell
+    /// of its own, so a caller whose operand takes a paren-body shape where it folds asks
+    /// [`Self::build_shaped_owned_required_pair_doc`] instead. `close` is what follows the
+    /// operand: `")"` where a separate node prints the `!` (or where nothing does),
+    /// `")!"` where this doc owns it.
     pub(crate) fn build_paren_operand_comment_doc(
         &self,
         start: u32,
         end: u32,
-        flat_body: DocId,
-        broken_body: DocId,
+        operand: DocId,
         close: &'static str,
     ) -> Option<DocId> {
         let d = self.d();
@@ -3619,15 +3670,28 @@ impl<'a> Printer<'a> {
             // trails inline on the operand's line, and the closer drops below it.
             // A chain-gap classification here is a category error: its `leading_*`
             // buckets would hoist an own-line comment above the operand.
-            let mut body = DocBuf::with_capacity(3);
-            body.push(broken_body);
-            self.push_anchored_trailing_run(&mut body, start, end, RunLeadingBlank::Keep);
-            return Some(self.compose_expanded_shell_doc(None, &body, close));
+            return Some(self.build_trailing_run_expanded_shell_doc(start, end, operand, close));
         }
         if self.has_comments_to_emit_between(start, end) {
             let trailing = self.build_chain_block_comments_doc(start, end, CommentSpacing::Leading);
-            return Some(d.concat(&[d.text("("), flat_body, trailing, d.text(close)]));
+            return Some(d.concat(&[d.text("("), operand, trailing, d.text(close)]));
         }
         None
+    }
+
+    /// [`Self::build_paren_operand_comment_doc`]'s line-spanning arm — the expanded shell
+    /// with `operand` one indent in and the trailing run anchored behind it — for a caller
+    /// that has already asked whether the gap holds a line-spanning run.
+    fn build_trailing_run_expanded_shell_doc(
+        &self,
+        start: u32,
+        end: u32,
+        operand: DocId,
+        close: &'static str,
+    ) -> DocId {
+        let mut body = DocBuf::with_capacity(3);
+        body.push(operand);
+        self.push_anchored_trailing_run(&mut body, start, end, RunLeadingBlank::Keep);
+        self.compose_expanded_shell_doc(None, &body, close)
     }
 }

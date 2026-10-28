@@ -605,8 +605,8 @@ impl<'a> Printer<'a> {
     /// than `start` means the seam prints something ahead of it, so nothing below leads the
     /// run.
     ///
-    /// The gates live in one place ([`Self::outermost_owned_claim_applies`]) so the three
-    /// forms cannot answer them differently, and the suppression and the prepend are one
+    /// The gates live in one place ([`Self::outermost_owned_claim_applies`]) so no two
+    /// forms can answer them differently, and the suppression and the prepend are one
     /// call in each — suppressing where nothing prepends is a DROP and
     /// prepending without suppressing a DOUBLE-PRINT (`docs/comments.md` hazard 1), and a
     /// hand-rolled copy of this pairing double-printed every JSDoc cast in a sequence.
@@ -623,35 +623,19 @@ impl<'a> Printer<'a> {
         self.prepend_owned_leading_comment_at(start, doc)
     }
 
-    /// The **two-body** form, for a pair emitter that takes a FLAT and a BROKEN rendering of
-    /// the same operand ([`Self::build_owned_required_pair_doc`]'s chain-base caller).
-    ///
-    /// ⚠️ **Both bodies need the prepend, and the single-body form cannot give it to them.**
-    /// The bodies are two docs, not one — the flat one shaped by the position, the broken one
-    /// the operand's plain doc — and a caller that claims around only the shaped one leaves
-    /// the other built under the SUPPRESSION with nothing printing the comment: a DROP
-    /// (`docs/comments.md` hazard 1). Worse, a memoized `inner()` shared by the two arms
-    /// makes the drop invisible from the call site, because the suppressed doc is what the
-    /// memo already holds. `gaps:audit` is what found it — the shape needs a `//` in the
-    /// pair's TRAILING gap, which is what makes the trailing emitter pick the broken body.
-    pub(in crate::printer) fn build_value_pair_with_outermost_owned_comment(
+    /// Whether [`Self::build_value_with_outermost_owned_comment`] takes a claim for `value` —
+    /// whether the value's doc will OPEN with the multi-line block it owns, printed outside
+    /// its group. A layout that wraps the value asks it (the chain base's hug,
+    /// `chain::printing`'s `BaseShape`).
+    pub(in crate::printer) fn value_claims_outermost_owned_comment(
         &self,
         value: &Expression<'_>,
-        build: impl FnOnce() -> (DocId, DocId),
-    ) -> (DocId, DocId) {
-        let start = value.span().start;
-        if !self.outermost_owned_claim_applies(start, outermost_claim_child(value)) {
-            return build();
-        }
-        let (flat, broken) = self.with_owned_comment_claimed_above(start, build);
-        (
-            self.prepend_owned_leading_comment_at(start, flat),
-            self.prepend_owned_leading_comment_at(start, broken),
-        )
+    ) -> bool {
+        self.outermost_owned_claim_applies(value.span().start, outermost_claim_child(value))
     }
 
-    /// The four gates of the outermost-owned claim, in one place so the three forms above
-    /// cannot answer them differently.
+    /// The four gates of the outermost-owned claim, in one place so the claim forms above,
+    /// and the predicate a wrapping layout reads, cannot answer them differently.
     fn outermost_owned_claim_applies(
         &self,
         start: u32,
