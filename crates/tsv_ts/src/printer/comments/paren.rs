@@ -544,10 +544,15 @@ impl<'a> Printer<'a> {
     /// - an assignment whose target needs its parens (a type-assertion target — the
     ///   cataloged "Assignment-target shell, leading comment").
     ///
-    /// And plus the two steps the PRINTED form takes past [`left_side_child`]'s shape: a
-    /// chain link steps over a non-null the chain flattens
-    /// ([`Self::chain_flattened_non_null_operand`]), and a cast or a postfix update steps
-    /// to its operand where that prints first and bare ([`Self::bare_cast_operand`]).
+    /// And plus the steps the PRINTED form takes past [`left_side_child`]'s shape: a chain
+    /// link steps over a non-null the chain flattens
+    /// ([`Self::chain_flattened_non_null_operand`]), a cast or a postfix update steps to
+    /// its operand where that prints first and bare ([`Self::bare_cast_operand`]), and an
+    /// instantiation steps to its operand where no pair stands around it
+    /// ([`Self::instantiation_operand_prints_pair`]) — prettier's `getLeftSide` reaches it
+    /// through `node.expression` too. The builder prints the stripped shell's run ahead of
+    /// the operand, so the readers must walk on to see it: `x = (// c⏎a)<T>` hangs under
+    /// the operator as `x = (// c⏎a)()` does.
     ///
     /// Askers that walk the whole spine take [`Self::hoisted_left_spine`], which also
     /// stops at a shell the chain prints mid-chain.
@@ -567,6 +572,12 @@ impl<'a> Printer<'a> {
         use internal::ExpressionKind;
         if let Some(operand) = self.bare_cast_operand(expr) {
             return Some(operand);
+        }
+        // An instantiation strips its operand's redundant shell and prints the run ahead of
+        // the operand ([`Printer::build_shell_operand_doc`]), unless a pair stands there.
+        if let ExpressionKind::TSInstantiationExpression(inst) = &expr.kind {
+            return (!self.instantiation_operand_prints_pair(inst, expr.span))
+                .then_some(inst.expression);
         }
         let child = left_side_child(expr)?;
         // A chain link's step lands past a non-null the chain flattens.
@@ -941,7 +952,8 @@ impl<'a> Printer<'a> {
     /// [`Self::hoisted_left_spine`] — so it ends before a shell the chain prints
     /// mid-chain, and at every pair a construct keeps for its run — through the kinds
     /// whose hoist site honors the claim: a binary, a member, a call, a tagged template, a
-    /// conditional, a sequence head, a cast's or postfix update's bare operand, and a
+    /// conditional, a sequence head, a cast's or postfix update's bare operand, an
+    /// instantiation's stripped operand ([`Self::build_shell_operand_doc`]), and a
     /// non-null — a link of the member / call chain above it, whose head window holds the
     /// operand's shell, or a standalone one, whose leading run declines the claimed region
     /// like every other site's (`((/* c */ (x).a())! + 1).b` prints `/* c */ (x.a()! + 1).b`).
@@ -1002,6 +1014,7 @@ impl<'a> Printer<'a> {
                     | internal::ExpressionKind::TSAsExpression(_)
                     | internal::ExpressionKind::TSSatisfiesExpression(_)
                     | internal::ExpressionKind::UpdateExpression(_)
+                    | internal::ExpressionKind::TSInstantiationExpression(_)
             ) {
                 break;
             }
@@ -2699,8 +2712,15 @@ impl<'a> Printer<'a> {
         // The flat tail serves both regimes: a glued-block run leads the operand —
         // inside the pair where one prints, ahead of the bare operand where the
         // stripped run leads the statement (and there a line comment's hardline
-        // separator is what keeps the statement after it on its own line).
-        let lead = self.build_rhs_comments_opt(leading_start, target_start);
+        // separator is what keeps the statement after it on its own line). The bare
+        // operand of an instantiation is a left-spine hoist site, so it declines a region
+        // an enclosing claimer prints (`await ((// c⏎a))<T>`); no claim reaches an
+        // assignment target, where this is the plain gap run. The span names no claimer.
+        let lead = self.removed_paren_comments_opt(
+            Span::new(node_start, target.span().end),
+            leading_start,
+            target_start,
+        );
         let core = match lead {
             Some(lead) => d.concat(&[lead, inner]),
             None => inner,

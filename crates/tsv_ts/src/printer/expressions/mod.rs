@@ -1510,27 +1510,17 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
         // The shared operand-shell seam also emits the `^`→expression gap — the
-        // authored `(`'s interior, which no other emitter reaches.
-        // An instantiation head keeps the pair a second list asks for.
-        let second_list_pair =
-            self.instantiation_keeps_pair(inst_expr.expression, SecondTypeArgs::Expression);
-        // An optional chain the author sealed keeps its pair
-        // ([`instantiation_operand_is_sealed_chain`]): bare, the list and whatever follows
-        // it join the chain. The `!` spelling (`(a?.b)!<T>`) is the sealed shell's own
-        // builder; every other operand asks the position.
+        // authored `(`'s interior, which no other emitter reaches. The `!` spelling of a
+        // sealed chain (`(a?.b)!<T>`) is the sealed shell's own builder; every other
+        // operand asks the position, through the context the left-spine walk reads too
+        // ([`Self::instantiation_operand_prints_pair`]).
         let operand_doc = match self.build_sealed_non_null_paren_doc(inst_expr.expression) {
             Some(sealed_doc) => sealed_doc,
-            None => {
-                let sealed =
-                    instantiation_operand_is_sealed_chain(span.start, inst_expr.expression);
-                self.build_shell_operand_doc(
-                    span.start,
-                    inst_expr.expression,
-                    ParenContext::InstantiationExpression {
-                        source_pair: second_list_pair || sealed,
-                    },
-                )
-            }
+            None => self.build_shell_operand_doc(
+                span.start,
+                inst_expr.expression,
+                self.instantiation_operand_context(inst_expr, span),
+            ),
         };
         parts.push(operand_doc);
         // Preserve comments between expression and type args: `fn/* c */ <string>`
@@ -1545,6 +1535,43 @@ impl<'a> Printer<'a> {
         }
         parts.push(self.build_type_parameter_instantiation_doc(&inst_expr.type_arguments));
         d.concat(&parts)
+    }
+
+    /// Whether an instantiation's operand prints inside a pair — the one its position asks
+    /// for ([`Self::instantiation_operand_context`]), whose `source_pair` already names a
+    /// sealed chain, the `!` spelling the builder routes to
+    /// [`Self::build_sealed_non_null_paren_doc`] included. Where none stands, the builder
+    /// strips the operand's grouping shell and prints its run AHEAD of the operand, which is
+    /// what makes the instantiation a step of the left-spine walk
+    /// ([`Printer::hoisted_left_side_child`]); where one does, the run stays inside it.
+    /// The builder and this read the same context, so they cannot part on the pair.
+    pub(crate) fn instantiation_operand_prints_pair(
+        &self,
+        inst_expr: &crate::ast::internal::TSInstantiationExpression<'_>,
+        span: Span,
+    ) -> bool {
+        self.needs_parens(
+            inst_expr.expression,
+            self.instantiation_operand_context(inst_expr, span),
+        )
+    }
+
+    /// The paren context an instantiation's operand prints in
+    /// ([`Self::build_ts_instantiation_doc`]). An instantiation head keeps the pair a second
+    /// list asks for, and an optional chain the author sealed keeps its pair
+    /// ([`instantiation_operand_is_sealed_chain`]): bare, the list and whatever follows it
+    /// join the chain.
+    pub(crate) fn instantiation_operand_context(
+        &self,
+        inst_expr: &crate::ast::internal::TSInstantiationExpression<'_>,
+        span: Span,
+    ) -> ParenContext {
+        let second_list_pair =
+            self.instantiation_keeps_pair(inst_expr.expression, SecondTypeArgs::Expression);
+        let sealed = instantiation_operand_is_sealed_chain(span.start, inst_expr.expression);
+        ParenContext::InstantiationExpression {
+            source_pair: second_list_pair || sealed,
+        }
     }
 
     /// Build a Doc for a TypeScript non-null assertion expression

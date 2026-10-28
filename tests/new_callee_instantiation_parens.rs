@@ -24,6 +24,12 @@
 //! them does not parse (`` new a?.b()<T>`t`() ``), so no fixture variant can carry them. Their
 //! trees are not compared through tsv's wire, which hoists a list off an unparenthesized
 //! instantiation callee and not off a parenthesized one (the script-body difference above).
+//!
+//! A comment in the operand's own stripped shell under that pair leads the callee from the
+//! `new`→callee gap, ahead of the pair, in one pass: the instantiation is a step of the
+//! callee's left spine
+//! (`typescript_specific/generics/instantiation_operand_left_side_shell_comment_prettier_divergence`
+//! pins the other value seams; prettier strips the pair, the semantic slip above).
 
 use serde_json::Value;
 
@@ -162,5 +168,17 @@ fn new_callee_comment_ahead_of_a_kept_pair_settles_on_the_second_pass() {
         let twice = format(&format(source));
         assert_eq!(twice, settled, "settled from {source:?}");
         assert_eq!(format(&twice), twice, "a fixed point: {source:?}");
+    }
+}
+
+#[test]
+fn operand_shell_comment_leads_the_callee() {
+    for (source, printed) in [
+        ("new ((// c\n[]())<U>)();", "new // c\n\t([]()<U>)();\n"),
+        ("new ((// c\nf())<T>)(x);", "new // c\n\t(f()<T>)(x);\n"),
+    ] {
+        let out = format(source);
+        assert_eq!(out, printed, "printed from {source:?}");
+        assert_eq!(format(&out), out, "a fixed point: {source:?}");
     }
 }
