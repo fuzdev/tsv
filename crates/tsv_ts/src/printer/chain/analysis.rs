@@ -32,7 +32,7 @@ use tsv_lang::{Comment, Span, TAB_WIDTH, has_line_spanning_comments_to_emit_in_r
 /// (`Printer::region_kept_shell_targets`): a base, a member object, a callee or a non-null
 /// operand, each printed as one parenthesized base.
 ///
-/// A struct rather than separate parameters because every recursive step needs the first
+/// A struct rather than separate parameters because every step of the walk needs the first
 /// two and none is ever passed alone — the same reason `ParenLeadingValue` travels as one.
 #[derive(Clone, Copy)]
 pub struct LinearizeInput<'i> {
@@ -62,13 +62,13 @@ pub struct LinearizeInput<'i> {
 fn linearize_chain<'a>(expr: &'a Expression<'_>, input: LinearizeInput<'_>) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
     let mut paren_gaps = Vec::new();
-    linearize_recursive(expr, input, &mut nodes, &mut paren_gaps);
+    linearize_spine(expr, input, &mut nodes, &mut paren_gaps);
     let _ = finalize_chain_nodes(&mut nodes, &paren_gaps, input);
     nodes
 }
 
 // The three typed entry points below fill a caller-owned `ChainNodeVec` — the `&mut` the
-// recursive walkers already take — rather than returning one. A `ChainNodeVec` is an inline
+// walkers already take — rather than returning one. A `ChainNodeVec` is an inline
 // array of eight 56-byte `ChainNode`s and a chain holds ~3 (p50 = 3, mean 2.82 over 40,239
 // chains a fuz_app pass — `buffer_sizes`), so a by-value return copies the WHOLE array,
 // length-independently, into a second slot the caller reserves to receive it; the caller's
@@ -147,7 +147,7 @@ pub fn linearize_chain_from_member_into<'a>(
 /// gap's comments are handled by `build_ts_non_null_doc` before this entry is
 /// reached (a `//` there makes `needs_parens` true, a block comment takes its
 /// trailing-comment branch), so only the comment-free case arrives here. Nested
-/// non-nulls go through `linearize_recursive`'s own arm, which does gate.
+/// non-nulls go through the walk's own step ([`non_null_step`]), which does gate.
 pub fn linearize_chain_from_non_null_into<'a>(
     non_null: &'a internal::TSNonNullExpression<'_>,
     span: Span,
@@ -159,7 +159,7 @@ pub fn linearize_chain_from_non_null_into<'a>(
         "the linearizer fills its buffer, never appends"
     );
     let mut paren_gaps = Vec::new();
-    linearize_recursive(non_null.expression, input, nodes, &mut paren_gaps);
+    linearize_spine(non_null.expression, input, nodes, &mut paren_gaps);
     nodes.push(ChainNode::non_null(non_null, span));
     finalize_chain_nodes(nodes, &paren_gaps, input)
 }
@@ -505,7 +505,7 @@ fn non_null_operand_paren_leading_start(
 /// (`ChainExpression(TSNonNull(…))` vs `TSNonNull(ChainExpression(…))`), so
 /// preserving the author's form keeps tsv's output AST-faithful to the input.
 /// The `!`-outside source (`(a?.b)!.c`) takes the `seals_optional_chain` arm in
-/// `linearize_recursive` instead (it never reaches here), so it stays as written too.
+/// [`non_null_step`] instead (it never reaches here), so it stays as written too.
 ///
 /// `parent_start` is the `(` this pair prints — the enclosing member/call node's own
 /// start — so the base carries its leading gap and emits it inside the parens
@@ -518,97 +518,289 @@ fn push_sealed_chain_base<'a>(
     nodes.push(ChainNode::sealed_base(child, parent_start));
 }
 
-fn linearize_recursive<'a>(
+/// One link of the chain spine [`linearize_spine_loop`] has descended through and not yet
+/// pushed: the step that runs once everything below the link is linearized.
+#[derive(Clone, Copy)]
+enum PendingLink<'a> {
+    /// A call: push its node, after handing an IIFE callee base its leading `(` where the
+    /// walk descended into the callee ([`finish_call_callee`]).
+    Call {
+        call: &'a internal::CallExpression<'a>,
+        span: Span,
+        /// Whether the walk descended into the callee — `false` where the callee stopped it as
+        /// a base of its own ([`call_callee_step`]).
+        descended: bool,
+    },
+    /// A member: push its lookup node ([`linearize_member_node`]).
+    Member {
+        member: &'a internal::MemberExpression<'a>,
+        span: Span,
+    },
+    /// A non-null assertion whose operand did not keep the pair the `!` closes
+    /// ([`non_null_step`]): push its `!` ([`finish_non_null`]).
+    NonNull {
+        non_null: &'a internal::TSNonNullExpression<'a>,
+        span: Span,
+    },
+}
+
+/// The links [`linearize_spine_loop`] holds: a chain's rest past [`LINK_FRAMES`] links, the
+/// first eight of it without spilling to the heap.
+type PendingLinks<'a> = SmallVec<[PendingLink<'a>; 8]>;
+
+/// The link frames [`linearize_spine`] recurses through before it walks the rest of a chain
+/// in [`linearize_spine_loop`]: the common chain is a few links long and its recursion is
+/// the cheaper walk, while a chain past them costs the stack of this many frames whatever
+/// its length.
+const LINK_FRAMES: u32 = 16;
+
+/// Linearize the chain rooted at `expr` onto `nodes`, base first: a member, call or
+/// non-null link pushes its node after everything below it, so the nodes come out in
+/// execution order.
+///
+/// Each link runs in two halves: on the way down, its descent half pushes what stops the
+/// walk there (a base of its own) or hands back the operand to walk; once everything below
+/// it is linearized, its return half pushes the link's node, reading `nodes` as it then
+/// stands (the last node, the last member node). The first [`LINK_FRAMES`] links recurse;
+/// the rest of a longer chain is walked by [`linearize_spine_loop`], which runs the same
+/// halves in the same order without a frame per link.
+fn linearize_spine<'a>(
     expr: &'a Expression<'_>,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
+    linearize_link(expr, input, nodes, paren_gaps, LINK_FRAMES);
+}
+
+/// [`linearize_spine`]'s recursion: `expr`'s link, with `frames` link frames left before
+/// the rest of the chain goes to [`linearize_spine_loop`].
+fn linearize_link<'a>(
+    expr: &'a Expression<'_>,
+    input: LinearizeInput<'_>,
+    nodes: &mut ChainNodeVec<'a>,
+    paren_gaps: &mut Vec<ParenGap>,
+    frames: u32,
+) {
+    let Some(frames) = frames.checked_sub(1) else {
+        linearize_spine_loop(expr, input, nodes, paren_gaps);
+        return;
+    };
     match &expr.kind {
-        // CallExpression: recurse into callee, then add Call node
         ExpressionKind::CallExpression(call) => {
-            linearize_call_callee(call, expr.span, input, nodes, paren_gaps);
+            if let Some(callee) = call_callee_step(call, expr.span, input, nodes) {
+                linearize_link(callee, input, nodes, paren_gaps, frames);
+                finish_call_callee(call, expr.span, nodes);
+            }
             nodes.push(ChainNode::call(call, expr.span));
         }
-
-        // MemberExpression: recurse into object, then add Member node
         ExpressionKind::MemberExpression(member) => {
-            linearize_member_object(member, expr.span, input, nodes, paren_gaps);
+            if let Some(object) = member_object_step(member, expr.span, input, nodes) {
+                linearize_link(object, input, nodes, paren_gaps, frames);
+            }
             linearize_member_node(member, expr.span, input.source, nodes, paren_gaps);
         }
-
-        // TSNonNullExpression: recurse into expression, then add NonNull node
         ExpressionKind::TSNonNullExpression(non_null) => {
-            // Two authorings keep the whole operand a parenthesized base + `!` instead
-            // of flattening it into the chain:
-            // - a sealed parenthesized optional chain (`(a?.b)!.c`): the trailing
-            //   access reached via this node's parent must not be absorbed, so it
-            //   renders `(a?.b)!.c`, not `a?.b!.c`;
-            // - a comment that SPANS A LINE in the operand→`!` gap (`(aaa // c⏎)!.bbb`,
-            //   `(aaa /* a⏎b */)!.bbb`), which can only come from a grouping shell —
-            //   written bare, the `//` would swallow the `!` and the multi-line block
-            //   would put a line break before it (`[no LineTerminator here]`). The shell
-            //   is RETAINED for the comment's sake, emitted inside the parens
-            //   (`build_paren_operand_comment_doc`'s expanded layout), the same answer
-            //   the standalone non-null gives this gap. Flattening instead hands the
-            //   region to `NonNullGap::Bang`, whose emitter is block-only — the `//`
-            //   would be dropped and the block inlined into a dead output, with nothing
-            //   left to parenthesize at print time.
-            let inner = &non_null.expression;
-            if let Some(start) =
-                non_null_operand_paren_leading_start(non_null, expr.span, input.comments)
-            {
-                nodes.push(ChainNode::paren_base_before_non_null(
-                    inner,
-                    start,
-                    expr.span.end,
-                ));
-                nodes.push(ChainNode::non_null_after_paren_operand());
-            } else {
-                if input
-                    .region_kept_shells
-                    .is_some_and(|marks| marks.is_marked(inner.span()))
-                {
-                    // A kept shell around a longer head (`typeof (c.d)!.e`), as at a
-                    // member object.
-                    nodes.push(ChainNode::base(inner, true));
-                } else {
-                    linearize_recursive(inner, input, nodes, paren_gaps);
-                }
-                // A comment from the stripped grouping parens (`(x + y /* c */)!.foo`)
-                // lives between the operand and the `!`. When the operand is a
-                // parenthesized base, keep the comment INSIDE the parens, where the
-                // author wrote it, rather than dropping it.
-                if let Some(ChainNode::Base {
-                    needs_parens: true,
-                    paren_comment_end,
-                    followed_by_non_null,
-                    ..
-                }) = nodes.last_mut()
-                {
-                    *paren_comment_end = Some(expr.span.end);
-                    *followed_by_non_null = true;
-                    nodes.push(ChainNode::non_null_after_paren_operand());
-                } else {
-                    nodes.push(ChainNode::non_null(non_null, expr.span));
+            match non_null_step(non_null, expr.span, input, nodes) {
+                NonNullStep::Done => {}
+                NonNullStep::Finish => finish_non_null(non_null, expr.span, nodes),
+                NonNullStep::Descend(inner) => {
+                    linearize_link(inner, input, nodes, paren_gaps, frames);
+                    finish_non_null(non_null, expr.span, nodes);
                 }
             }
         }
-
         // Base case: expression that's not part of the chain structure. A
         // `TSInstantiationExpression` lands here too — as a member object (`(A<T>).x`)
         // or a `!` operand (`(A<T>)!.x`) it is a parenthesized base by the `ChainBase`
         // rule, type args kept; only as a CALL callee is it transparent, and
-        // `linearize_call_callee` unwraps it before recursing.
-        _ => {
-            // ChainBase always parenthesizes a binary base for precedence, so
-            // the for-init `in` rule never changes the verdict here — pass `false`.
-            let needs_parens = needs_parens(expr, ParenContext::ChainBase, false)
-                || input
-                    .region_kept_shells
-                    .is_some_and(|marks| marks.is_marked(expr.span()));
-            nodes.push(ChainNode::base(expr, needs_parens));
+        // `call_callee_step` unwraps it before descending.
+        _ => push_chain_base(expr, input, nodes),
+    }
+}
+
+/// The rest of a chain past [`LINK_FRAMES`] links, walked as a loop: it descends through the
+/// links running each descent half and holding each return half ([`PendingLink`]) until a
+/// base ends the descent, then runs the held halves innermost first — the order
+/// [`linearize_link`]'s recursion returns in, so each half reads the `nodes` it would read
+/// there. A link costs a held entry rather than a native stack frame.
+#[inline(never)]
+fn linearize_spine_loop<'a>(
+    expr: &'a Expression<'_>,
+    input: LinearizeInput<'_>,
+    nodes: &mut ChainNodeVec<'a>,
+    paren_gaps: &mut Vec<ParenGap>,
+) {
+    let mut pending = PendingLinks::new();
+    let mut current = expr;
+    loop {
+        match &current.kind {
+            ExpressionKind::CallExpression(call) => {
+                let callee = call_callee_step(call, current.span, input, nodes);
+                pending.push(PendingLink::Call {
+                    call,
+                    span: current.span,
+                    descended: callee.is_some(),
+                });
+                match callee {
+                    Some(callee) => current = callee,
+                    None => break,
+                }
+            }
+            ExpressionKind::MemberExpression(member) => {
+                let object = member_object_step(member, current.span, input, nodes);
+                pending.push(PendingLink::Member {
+                    member,
+                    span: current.span,
+                });
+                match object {
+                    Some(object) => current = object,
+                    None => break,
+                }
+            }
+            ExpressionKind::TSNonNullExpression(non_null) => {
+                match non_null_step(non_null, current.span, input, nodes) {
+                    NonNullStep::Done => break,
+                    NonNullStep::Finish => {
+                        pending.push(PendingLink::NonNull {
+                            non_null,
+                            span: current.span,
+                        });
+                        break;
+                    }
+                    NonNullStep::Descend(inner) => {
+                        pending.push(PendingLink::NonNull {
+                            non_null,
+                            span: current.span,
+                        });
+                        current = inner;
+                    }
+                }
+            }
+            // the base case, as in `linearize_link`
+            _ => {
+                push_chain_base(current, input, nodes);
+                break;
+            }
         }
+    }
+    while let Some(link) = pending.pop() {
+        match link {
+            PendingLink::Call {
+                call,
+                span,
+                descended,
+            } => {
+                if descended {
+                    finish_call_callee(call, span, nodes);
+                }
+                nodes.push(ChainNode::call(call, span));
+            }
+            PendingLink::Member { member, span } => {
+                linearize_member_node(member, span, input.source, nodes, paren_gaps);
+            }
+            PendingLink::NonNull { non_null, span } => finish_non_null(non_null, span, nodes),
+        }
+    }
+}
+
+/// Push `expr`, which ends the walk, as the chain's base.
+#[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
+#[inline(always)]
+fn push_chain_base<'a>(
+    expr: &'a Expression<'_>,
+    input: LinearizeInput<'_>,
+    nodes: &mut ChainNodeVec<'a>,
+) {
+    // ChainBase always parenthesizes a binary base for precedence, so
+    // the for-init `in` rule never changes the verdict here — pass `false`.
+    let needs_parens = needs_parens(expr, ParenContext::ChainBase, false)
+        || input
+            .region_kept_shells
+            .is_some_and(|marks| marks.is_marked(expr.span()));
+    nodes.push(ChainNode::base(expr, needs_parens));
+}
+
+/// What a non-null link does with its operand ([`non_null_step`]).
+enum NonNullStep<'a> {
+    /// The operand kept the pair the `!` closes: both nodes are pushed, nothing is left.
+    Done,
+    /// The operand is a base of its own, already pushed: the `!` is left
+    /// ([`finish_non_null`]).
+    Finish,
+    /// The operand continues the chain: walk it, then push the `!`.
+    Descend(&'a Expression<'a>),
+}
+
+/// The descent half of a non-null link: push what stops the walk at the operand, or hand
+/// the operand back to walk.
+#[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
+#[inline(always)]
+fn non_null_step<'a>(
+    non_null: &'a internal::TSNonNullExpression<'_>,
+    span: Span,
+    input: LinearizeInput<'_>,
+    nodes: &mut ChainNodeVec<'a>,
+) -> NonNullStep<'a> {
+    // Two authorings keep the whole operand a parenthesized base + `!` instead
+    // of flattening it into the chain:
+    // - a sealed parenthesized optional chain (`(a?.b)!.c`): the trailing
+    //   access reached via this node's parent must not be absorbed, so it
+    //   renders `(a?.b)!.c`, not `a?.b!.c`;
+    // - a comment that SPANS A LINE in the operand→`!` gap (`(aaa // c⏎)!.bbb`,
+    //   `(aaa /* a⏎b */)!.bbb`), which can only come from a grouping shell —
+    //   written bare, the `//` would swallow the `!` and the multi-line block
+    //   would put a line break before it (`[no LineTerminator here]`). The shell
+    //   is RETAINED for the comment's sake, emitted inside the parens
+    //   (`build_paren_operand_comment_doc`'s expanded layout), the same answer
+    //   the standalone non-null gives this gap. Flattening instead hands the
+    //   region to `NonNullGap::Bang`, whose emitter is block-only — the `//`
+    //   would be dropped and the block inlined into a dead output, with nothing
+    //   left to parenthesize at print time.
+    let inner = non_null.expression;
+    if let Some(start) = non_null_operand_paren_leading_start(non_null, span, input.comments) {
+        nodes.push(ChainNode::paren_base_before_non_null(
+            inner, start, span.end,
+        ));
+        nodes.push(ChainNode::non_null_after_paren_operand());
+        NonNullStep::Done
+    } else if input
+        .region_kept_shells
+        .is_some_and(|marks| marks.is_marked(inner.span()))
+    {
+        // A kept shell around a longer head (`typeof (c.d)!.e`), as at a
+        // member object.
+        nodes.push(ChainNode::base(inner, true));
+        NonNullStep::Finish
+    } else {
+        NonNullStep::Descend(inner)
+    }
+}
+
+/// The return half of a non-null link, once its operand is linearized: push its `!`.
+#[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
+#[inline(always)]
+fn finish_non_null(
+    non_null: &internal::TSNonNullExpression<'_>,
+    span: Span,
+    nodes: &mut ChainNodeVec<'_>,
+) {
+    // A comment from the stripped grouping parens (`(x + y /* c */)!.foo`)
+    // lives between the operand and the `!`. When the operand is a
+    // parenthesized base, keep the comment INSIDE the parens, where the
+    // author wrote it, rather than dropping it.
+    if let Some(ChainNode::Base {
+        needs_parens: true,
+        paren_comment_end,
+        followed_by_non_null,
+        ..
+    }) = nodes.last_mut()
+    {
+        *paren_comment_end = Some(span.end);
+        *followed_by_non_null = true;
+        nodes.push(ChainNode::non_null_after_paren_operand());
+    } else {
+        nodes.push(ChainNode::non_null(non_null, span));
     }
 }
 
@@ -617,7 +809,7 @@ fn linearize_recursive<'a>(
 /// A parenthesized optional chain (`(a?.b).c`, `(a?.b!).c`) terminates the chain —
 /// see `child_stops_optional_chain` — and stays a sealed base node built via
 /// `push_sealed_chain_base` (which keeps the whole sealed child, `!` included, inside
-/// the parens, preserving the author's form). Every other object recurses normally;
+/// the parens, preserving the author's form). Every other object is walked on;
 /// an instantiation object (`(A<T>).x`) becomes a parenthesized base there by the
 /// `ChainBase` rule, its type args kept.
 fn linearize_member_object<'a>(
@@ -627,9 +819,25 @@ fn linearize_member_object<'a>(
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
+    if let Some(object) = member_object_step(member, span, input, nodes) {
+        linearize_spine(object, input, nodes, paren_gaps);
+    }
+}
+
+/// The descent half of [`linearize_member_object`]: push the object where it stops the
+/// walk as a base of its own, or hand it back to walk.
+#[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
+#[inline(always)]
+fn member_object_step<'a>(
+    member: &'a internal::MemberExpression<'_>,
+    span: Span,
+    input: LinearizeInput<'_>,
+    nodes: &mut ChainNodeVec<'a>,
+) -> Option<&'a Expression<'a>> {
     let object: &Expression<'_> = member.object;
     if let Some(start) = member_object_paren_leading_start(member, span) {
         push_sealed_chain_base(object, start, nodes);
+        None
     } else if input
         .region_kept_shells
         .is_some_and(|marks| marks.is_marked(object.span()))
@@ -637,8 +845,9 @@ fn linearize_member_object<'a>(
         // A kept shell around a longer head (`typeof (c.d).e`) stays one parenthesized
         // base: flattened, the pair would have no node to print on.
         nodes.push(ChainNode::base(object, true));
+        None
     } else {
-        linearize_recursive(object, input, nodes, paren_gaps);
+        Some(object)
     }
 }
 
@@ -700,7 +909,7 @@ pub(crate) fn transparent_callee_sealed_chain<'a>(
 /// A parenthesized optional chain callee (`(a?.b)()`) terminates the chain and
 /// must stay a parenthesized base node — see `child_stops_optional_chain` — and so
 /// does one instantiated by a transparent instantiation callee
-/// ([`transparent_callee_sealed_chain`]). All other callees recurse normally.
+/// ([`transparent_callee_sealed_chain`]). All other callees are walked on.
 fn linearize_call_callee<'a>(
     call: &'a internal::CallExpression<'_>,
     span: Span,
@@ -708,13 +917,29 @@ fn linearize_call_callee<'a>(
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
+    if let Some(callee) = call_callee_step(call, span, input, nodes) {
+        linearize_spine(callee, input, nodes, paren_gaps);
+        finish_call_callee(call, span, nodes);
+    }
+}
+
+/// The descent half of [`linearize_call_callee`]: push the callee where it stops the walk
+/// as a base of its own, or hand back the expression to walk.
+#[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
+#[inline(always)]
+fn call_callee_step<'a>(
+    call: &'a internal::CallExpression<'_>,
+    span: Span,
+    input: LinearizeInput<'_>,
+    nodes: &mut ChainNodeVec<'a>,
+) -> Option<&'a Expression<'a>> {
     if child_stops_optional_chain(span.start, call.optional, call.callee) {
         push_sealed_chain_base(call.callee, span.start, nodes);
-        return;
+        return None;
     }
     if let Some((chain, open)) = transparent_callee_sealed_chain(call) {
         push_sealed_chain_base(chain, open, nodes);
-        return;
+        return None;
     }
     // A kept shell around a longer callee (`typeof (c.d)()`), as at a member object.
     if input
@@ -722,17 +947,27 @@ fn linearize_call_callee<'a>(
         .is_some_and(|marks| marks.is_marked(call.callee.span()))
     {
         nodes.push(ChainNode::base(call.callee, true));
-        return;
+        return None;
     }
     // A transparent instantiation callee ([`transparent_instantiation_callee`]) emits
     // nothing itself: the Call node prints its type arguments, so the walk goes on into the
     // instantiated expression.
-    let callee = transparent_instantiation_callee(call).map_or(call.callee, |inst| inst.expression);
-    linearize_recursive(callee, input, nodes, paren_gaps);
+    Some(transparent_instantiation_callee(call).map_or(call.callee, |inst| inst.expression))
+}
+
+/// The return half of [`linearize_call_callee`], once the callee the walk descended into
+/// is linearized.
+#[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
+#[inline(always)]
+fn finish_call_callee(
+    call: &internal::CallExpression<'_>,
+    span: Span,
+    nodes: &mut ChainNodeVec<'_>,
+) {
     // An IIFE callee reached through the chain (`( // c⏎() => {})().p`) owns its own
     // leading gap, exactly as the bare-callee path does: the pair is required and
     // prettier keeps the run inside it. A function or arrow is never itself a chain,
-    // so `linearize_recursive` pushed exactly one node for it and that node is the
+    // so the walk pushed exactly one node for it and that node is the
     // base this call's `(` belongs to.
     if let Some(start) = call_callee_paren_leading_start(call, span)
         && let Some(ChainNode::Base {
@@ -768,7 +1003,7 @@ pub(super) fn member_lookup_node<'a>(
 
 /// Process a MemberExpression node: handle paren gaps and push the appropriate ChainNode.
 ///
-/// Extracted from `linearize_recursive` so it can be shared with
+/// A step of `linearize_spine`, shared with
 /// `linearize_chain_from_member_into`.
 fn linearize_member_node<'a>(
     member: &'a internal::MemberExpression<'_>,
@@ -1625,6 +1860,126 @@ mod tests {
                     found,
                     "{label}: member {commented} vanished from the grouping"
                 );
+            }
+        }
+    }
+
+    /// The nodes and paren gaps of `root`'s chain, walked by [`linearize_link`] with `frames`
+    /// link frames — or, for `None`, by [`linearize_spine_loop`] from the first link.
+    fn linearized(root: &Expression<'_>, input: LinearizeInput<'_>, frames: Option<u32>) -> String {
+        let (mut nodes, mut paren_gaps) = (ChainNodeVec::new(), Vec::new());
+        match frames {
+            Some(frames) => linearize_link(root, input, &mut nodes, &mut paren_gaps, frames),
+            None => linearize_spine_loop(root, input, &mut nodes, &mut paren_gaps),
+        }
+        format!("{nodes:?} {paren_gaps:?}")
+    }
+
+    /// Every expression a chain test walks from: each link down the spine of `expr`, and
+    /// the same for every call argument and every tagged template's tag on the way.
+    fn chain_roots<'a>(expr: &'a Expression<'a>, out: &mut Vec<&'a Expression<'a>>) {
+        out.push(expr);
+        match &expr.kind {
+            ExpressionKind::CallExpression(call) => {
+                chain_roots(call.callee, out);
+                for argument in call.arguments {
+                    chain_roots(argument, out);
+                }
+            }
+            ExpressionKind::MemberExpression(member) => chain_roots(member.object, out),
+            ExpressionKind::TSNonNullExpression(non_null) => {
+                chain_roots(non_null.expression, out);
+            }
+            ExpressionKind::TSInstantiationExpression(inst) => chain_roots(inst.expression, out),
+            ExpressionKind::TaggedTemplateExpression(tagged) => chain_roots(tagged.tag, out),
+            _ => {}
+        }
+    }
+
+    /// The loop pushes the nodes and the paren gaps the recursion pushes, in the same order —
+    /// the loop from the first link, the recursion all the way down, and the walk itself,
+    /// which switches from one to the other past [`LINK_FRAMES`] links — over chains that
+    /// reach every descent half and every return half: sealed optional chains, transparent
+    /// instantiations, IIFE bases, retained `!` shells, stripped-paren gaps with comments,
+    /// and the kept shells of a comma-list region (every link's span marked, every other
+    /// one, none), each also behind a run of links long enough to reach the switch.
+    #[test]
+    fn linearize_spine_runs_the_halves_in_the_recursions_order() {
+        let short = [
+            "a.b.c.d;",
+            "a().b().c!.d;",
+            "a?.b.c?.().d;",
+            "(a?.b).c.d();",
+            "(a?.b)!.c();",
+            "(a?.b!).c().d;",
+            "(a?.b)()!.c;",
+            "(a?.b)<T>?.(c).d;",
+            "((a?.b)<T>)?.(c).d;",
+            "f<T>(x).y<U>().z;",
+            "f<T><U>(x).y;",
+            "( // c\n() => {})().p.q();",
+            "(function () {})().p;",
+            "(/* c */ () => 1)()().p!;",
+            "(aaa // c\n)!.bbb.ccc();",
+            "(aaa /* a\nb */)!.bbb!.ccc;",
+            "(x + y /* c */)!.foo().bar;",
+            "/* c */ (a).b.c();",
+            "(/* c */ (a).b).c().d;",
+            "((a).b /* d */).c().d();",
+            "(((a).b).c /* e */).d().e;",
+            "a[0][1].b!()!.c;",
+            "new a.b().c.d();",
+            "a`t`.b.c();",
+            "(a, b).c().d;",
+            "(await x).y.z();",
+            "a!.b!!.c!();",
+            "a.b(c.d().e, (f?.g).h()).i;",
+            "a.b`x${c.d()}`.e();",
+            "x.y(() => z.w().v).u;",
+        ];
+        let long_tail = ".b!/* c */.c()?.d[0]".repeat(LINK_FRAMES as usize / 2);
+        let sources: Vec<String> = short
+            .iter()
+            .map(|&source| source.to_owned())
+            .chain(short.iter().map(|source| {
+                let chain = source.trim_end_matches(";\n").trim_end_matches(';');
+                format!("({chain}){long_tail}.e;")
+            }))
+            .collect();
+        for source in &sources {
+            let source = source.as_str();
+            let arena = Bump::new();
+            let program = crate::parse(source, &arena).expect("parses");
+            let mut roots = Vec::new();
+            for statement in program.body {
+                if let internal::StatementKind::ExpressionStatement(statement) = &statement.kind {
+                    chain_roots(statement.expression, &mut roots);
+                }
+            }
+            let every = SpanMarks::default();
+            let alternate = SpanMarks::default();
+            for (i, root) in roots.iter().enumerate() {
+                every.mark(root.span);
+                if i % 2 == 1 {
+                    alternate.mark(root.span);
+                }
+            }
+            let withheld = SpanMarks::default();
+            for marks in [None, Some(&every), Some(&alternate)] {
+                let input = LinearizeInput {
+                    source,
+                    comments: program.comments,
+                    withheld_clarity_pairs: &withheld,
+                    region_kept_shells: marks,
+                };
+                for root in &roots {
+                    let recursed = linearized(root, input, Some(u32::MAX));
+                    let looped = linearized(root, input, None);
+                    let switched = linearized(root, input, Some(LINK_FRAMES));
+                    let at = &source[root.span.range()];
+                    assert_eq!(looped, recursed, "{source:?} from {at:?}");
+                    assert_eq!(switched, recursed, "{source:?} from {at:?}");
+                }
             }
         }
     }
