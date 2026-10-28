@@ -157,98 +157,122 @@ pub(crate) fn print_node_inner<'a>(
                 // Asked BEFORE any base doc is built — building one can re-mark the
                 // target from a nested value position inside the ternary's own branches.
                 let base_ternary = printer.chain_base_ternary(expr);
-                // Resolved BEFORE the bodies, because the claim below takes both and this is
-                // what says whether there are two. The window it opens is documented at the
-                // emitter call below, with the rest of the pair's gap reading.
-                let trailing_gap = trailing_gap();
-                // A curried arrow chain that IS a callee (`paren_leading_start`, as below)
-                // takes prettier's callee shape, exactly as the bare-callee path gives it
-                // ([`crate::printer::ArrowChainContext::Callee`]) — and on the same terms: that
-                // shape opens the pair from inside the operand's doc, so a comment in either
-                // of the pair's gaps leaves the pair to the shell builders instead.
-                let callee_chain = is_curried_arrow_chain(expr)
-                    && paren_leading_start.is_some_and(|start| {
-                        printer.pair_gaps_are_comment_free((start, base_start), trailing_gap)
-                    });
-                // The plain expression doc, memoized lazily: every arm consumes it EXCEPT
-                // a binary base's common path, which builds the chain-for-parens operand
-                // doc instead — eager, a parenthesized binary base paid two full doc
-                // builds for one rendered doc. The rare trailing-gap branch still
-                // consumes it (the line-comment layout's broken body), which is why it is
-                // a memo rather than moved into the arms that use it.
-                let mut inner_memo = None;
-                let mut inner = || -> DocId {
-                    *inner_memo.get_or_insert_with(|| {
-                        if callee_chain {
-                            printer
-                                .build_with_arrow_chain_context(ArrowChainContext::Callee, || {
-                                    printer.build_expression_doc(expr)
-                                })
-                        } else {
-                            printer.build_expression_doc(expr)
-                        }
-                    })
+                // Every layout candidate of the chain prints its base, so the pair and the
+                // base inside it are built once and shared, as the unparenthesized arm below
+                // shares its base: a base holding the next level's chain
+                // (`!(!(…).b().c()).b().c()`) otherwise rebuilt every level below it per
+                // candidate, three builds a level. Everything else this arm reads at this
+                // node is its position in its chain, the same in every candidate, except the
+                // expanding-ternary verdict, which a candidate's build can re-mark from
+                // inside the ternary's own branches — so the verdict is part of the key
+                // ([`ShareTag::ChainParenBase`] / [`ShareTag::ChainExpandedParenBase`]), and
+                // a candidate reading the other one builds its own.
+                //
+                // TODO: that re-mark is a leak, not an input: `ternary_hang_target` is never
+                // restored, so a value position inside a branch (`!(c ? (y = z) : e).b().c()`)
+                // flips the verdict for every later candidate and the rendered one hangs where
+                // prettier expands. Deciding the verdict once per chain, before the candidates,
+                // fixes it and leaves one tag.
+                let tag = if base_ternary.is_some_and(|ternary| ternary.expands) {
+                    ShareTag::ChainExpandedParenBase
+                } else {
+                    ShareTag::ChainParenBase
                 };
-                // A MULTI-LINE block the base OWNS prints just inside the pair's `(`,
-                // outside the base's own group
-                // ([`Printer::build_value_pair_with_outermost_owned_comment`]) — the pair's
-                // leading run below is built on the **to emit** axis, which skips an owned
-                // comment, so the two partition the gap rather than competing for it.
-                //
-                // ⚠️ The TWO-BODY form, because the trailing emitter prints the broken one:
-                // claiming around the shaped body alone left the broken one built under the
-                // suppression with nothing printing the comment, and `inner`'s memo made
-                // that invisible from here (`gaps:audit` found it as a DROP).
-                let (inner_group, broken_body) = printer
-                    .build_value_pair_with_outermost_owned_comment(expr, || {
-                        let shaped = shaped_base_doc(
-                            printer,
-                            expr,
-                            base_ternary,
-                            *followed_by_non_null,
-                            &mut inner,
-                        );
-                        // The broken body is the trailing emitter's alone, and only its
-                        // line-spanning layout prints it
-                        // ([`Printer::build_paren_operand_comment_doc`]), so the unshaped doc
-                        // is built only where that gap holds such a run — a parenthesized
-                        // binary base would otherwise pay a second full doc build on every
-                        // chain whose `!` bounds a comment-free gap, and a base nesting
-                        // another (`a == (a == (…)!.b)!.b`) compounded it to 2^depth. Without
-                        // one this is the bare pair the emitter itself falls back to.
-                        let broken = if trailing_gap.is_some_and(|(start, end)| {
-                            printer.has_line_spanning_comments_to_emit_between(start, end)
-                        }) {
-                            inner()
-                        } else {
-                            shaped
-                        };
-                        (shaped, broken)
-                    });
-                // A base that OWNS its leading gap emits it here, inside the pair —
-                // nothing else can reach between a surviving `(` and the base
-                // (`prepend_removed_paren_comments` at the chain's own head hoists the
-                // run out in front of the pair, the one cell of the family that did).
-                // The trailing half is the comment from the stripped grouping parens
-                // before the `)` (`(x + y /* c */)!.foo`) — prettier relocates it past
-                // the `)`; tsv keeps it where the author wrote it. The `!` itself is
-                // the next node, so this doc closes at the `)`.
-                //
-                // `paren_comment_end` is the linearizer's, set where a non-null's `!`
-                // bounds the region; an IIFE base's pair carries no `!`, so its `)` is
-                // read from the source through the shared seam — the same answer the
-                // bare-callee path takes for the same pair. Keyed on
-                // `paren_leading_start`, which is what says this base IS a callee: an
-                // arrow that is merely a member OBJECT (`(() => 1 /* c */).p`) prints
-                // the same pair but its trailing gap belongs to the member seam, and
-                // claiming it here double-printed the comment.
-                printer.build_owned_required_pair_doc(
-                    (paren_leading_start.unwrap_or(base_start), base_start),
-                    trailing_gap,
-                    inner_group,
-                    broken_body,
-                    ")",
-                )
+                let key = printer.chain_share_key(expr, tag);
+                printer.chain_shared_doc(key, || {
+                    // Resolved BEFORE the bodies, because the claim below takes both and this is
+                    // what says whether there are two. The window it opens is documented at the
+                    // emitter call below, with the rest of the pair's gap reading.
+                    let trailing_gap = trailing_gap();
+                    // A curried arrow chain that IS a callee (`paren_leading_start`, as below)
+                    // takes prettier's callee shape, exactly as the bare-callee path gives it
+                    // ([`crate::printer::ArrowChainContext::Callee`]) — and on the same terms: that
+                    // shape opens the pair from inside the operand's doc, so a comment in either
+                    // of the pair's gaps leaves the pair to the shell builders instead.
+                    let callee_chain = is_curried_arrow_chain(expr)
+                        && paren_leading_start.is_some_and(|start| {
+                            printer.pair_gaps_are_comment_free((start, base_start), trailing_gap)
+                        });
+                    // The plain expression doc, memoized lazily: every arm consumes it EXCEPT
+                    // a binary base's common path, which builds the chain-for-parens operand
+                    // doc instead — eager, a parenthesized binary base paid two full doc
+                    // builds for one rendered doc. The rare trailing-gap branch still
+                    // consumes it (the line-comment layout's broken body), which is why it is
+                    // a memo rather than moved into the arms that use it.
+                    let mut inner_memo = None;
+                    let mut inner = || -> DocId {
+                        *inner_memo.get_or_insert_with(|| {
+                            if callee_chain {
+                                printer.build_with_arrow_chain_context(
+                                    ArrowChainContext::Callee,
+                                    || printer.build_expression_doc(expr),
+                                )
+                            } else {
+                                printer.build_expression_doc(expr)
+                            }
+                        })
+                    };
+                    // A MULTI-LINE block the base OWNS prints just inside the pair's `(`,
+                    // outside the base's own group
+                    // ([`Printer::build_value_pair_with_outermost_owned_comment`]) — the pair's
+                    // leading run below is built on the **to emit** axis, which skips an owned
+                    // comment, so the two partition the gap rather than competing for it.
+                    //
+                    // ⚠️ The TWO-BODY form, because the trailing emitter prints the broken one:
+                    // claiming around the shaped body alone left the broken one built under the
+                    // suppression with nothing printing the comment, and `inner`'s memo made
+                    // that invisible from here (`gaps:audit` found it as a DROP).
+                    let (inner_group, broken_body) = printer
+                        .build_value_pair_with_outermost_owned_comment(expr, || {
+                            let shaped = shaped_base_doc(
+                                printer,
+                                expr,
+                                base_ternary,
+                                *followed_by_non_null,
+                                &mut inner,
+                            );
+                            // The broken body is the trailing emitter's alone, and only its
+                            // line-spanning layout prints it
+                            // ([`Printer::build_paren_operand_comment_doc`]), so the unshaped doc
+                            // is built only where that gap holds such a run — a parenthesized
+                            // binary base would otherwise pay a second full doc build on every
+                            // chain whose `!` bounds a comment-free gap, and a base nesting
+                            // another (`a == (a == (…)!.b)!.b`) compounded it to 2^depth. Without
+                            // one this is the bare pair the emitter itself falls back to.
+                            let broken = if trailing_gap.is_some_and(|(start, end)| {
+                                printer.has_line_spanning_comments_to_emit_between(start, end)
+                            }) {
+                                inner()
+                            } else {
+                                shaped
+                            };
+                            (shaped, broken)
+                        });
+                    // A base that OWNS its leading gap emits it here, inside the pair —
+                    // nothing else can reach between a surviving `(` and the base
+                    // (`prepend_removed_paren_comments` at the chain's own head hoists the
+                    // run out in front of the pair, the one cell of the family that did).
+                    // The trailing half is the comment from the stripped grouping parens
+                    // before the `)` (`(x + y /* c */)!.foo`) — prettier relocates it past
+                    // the `)`; tsv keeps it where the author wrote it. The `!` itself is
+                    // the next node, so this doc closes at the `)`.
+                    //
+                    // `paren_comment_end` is the linearizer's, set where a non-null's `!`
+                    // bounds the region; an IIFE base's pair carries no `!`, so its `)` is
+                    // read from the source through the shared seam — the same answer the
+                    // bare-callee path takes for the same pair. Keyed on
+                    // `paren_leading_start`, which is what says this base IS a callee: an
+                    // arrow that is merely a member OBJECT (`(() => 1 /* c */).p`) prints
+                    // the same pair but its trailing gap belongs to the member seam, and
+                    // claiming it here double-printed the comment.
+                    printer.build_owned_required_pair_doc(
+                        (paren_leading_start.unwrap_or(base_start), base_start),
+                        trailing_gap,
+                        inner_group,
+                        broken_body,
+                        ")",
+                    )
+                })
             } else {
                 // Every layout candidate of the chain prints its base, so it is built once and
                 // shared ([`ShareTag::ChainBase`]): a base that holds a chain of its own (a tag

@@ -157,6 +157,12 @@ pub(crate) enum ShareTag {
     /// parameter list, built only to ask whether it will break, under the asking state
     /// `Printer::ask_signature_params` sets.
     SignatureParamsProbe = 10 * 4,
+    /// `chain::print_node_inner` — a chain's parenthesized base with its pair, which every
+    /// layout candidate of the chain prints.
+    ChainParenBase = 11 * 4,
+    /// [`ShareTag::ChainParenBase`] for a base whose left-spine ternary takes the expanded
+    /// pair — a verdict one candidate's build can change for the next, so it keys apart.
+    ChainExpandedParenBase = 12 * 4,
 }
 
 impl ShareTag {
@@ -181,6 +187,8 @@ const _: () = assert!(ShareTag::ChainBase as u8 & ShareTag::STATE_BITS == 0);
 const _: () = assert!(ShareTag::ChainBreakProbe as u8 & ShareTag::STATE_BITS == 0);
 const _: () = assert!(ShareTag::ChainTypeArgs as u8 & ShareTag::STATE_BITS == 0);
 const _: () = assert!(ShareTag::SignatureParamsProbe as u8 & ShareTag::STATE_BITS == 0);
+const _: () = assert!(ShareTag::ChainParenBase as u8 & ShareTag::STATE_BITS == 0);
+const _: () = assert!(ShareTag::ChainExpandedParenBase as u8 & ShareTag::STATE_BITS == 0);
 
 /// One break a doc build reads as AUTHORED although the source does not hold it — the state
 /// [`Printer::assumed_break`] carries while a convergence state is built.
@@ -743,9 +751,10 @@ pub struct Printer<'a> {
     ///   carry the comment out of its own construct. An argument entry records its doc
     ///   with its own list-element wrapping included (`build_list_element_doc` runs inside
     ///   the share), which restores the count, so its replay adds nothing; an entry whose
-    ///   build ends unwrapped is the one that needs it. A chain base
-    ///   ([`ShareTag::ChainBase`]) is one: a base is no list element, so a run its build
-    ///   defers is the enclosing element's to flush, on every build of that element.
+    ///   build ends unwrapped is the one that needs it. A chain base, bare
+    ///   ([`ShareTag::ChainBase`]) or parenthesized ([`ShareTag::ChainParenBase`]), is one:
+    ///   a base is no list element, so a run its build defers is the enclosing element's to
+    ///   flush, on every build of that element.
     /// - [`Self::forced_list_elements`] / [`Self::nullable_union_type_args`] — **not
     ///   replayed.** Both are append-only for the whole document and only searched: the
     ///   first build's entries stay, naming the very element starts and docs a hit returns,
@@ -1625,7 +1634,9 @@ impl<'a> Printer<'a> {
     /// The key carries the builder AND the two `expandLastArg` flags, which are the only
     /// Printer state a chain's flat and expanded candidates reach a given node under
     /// differently — so a hit is byte-identical to a rebuild by construction rather than
-    /// by the caller having checked. See the `chain_arg_share_active` field doc.
+    /// by the caller having checked. See the `chain_arg_share_active` field doc. A builder
+    /// whose doc reads one more such state keys it in its tag
+    /// ([`ShareTag::ChainExpandedParenBase`]).
     ///
     /// An [assumed break](Self::assumed_break) is the one other state, and it changes the doc
     /// of exactly the nodes whose span holds its position: those are built fresh (`None`),

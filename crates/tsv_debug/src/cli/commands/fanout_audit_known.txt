@@ -11,31 +11,7 @@
 # counter's work exponent alone: any other finding on a member fails as NEW.
 #
 # Regenerate with `deno task fanout:audit:update`.
-# shapes: 27
-multiplicity	k307_as_paren_base_member_chain	K307
-multiplicity	k307_binary_paren_base_member_chain	K307
-multiplicity	k307_commented_paren_base_member_chain	K307
-multiplicity	k307_owned_comment_paren_base_member_chain	K307
-multiplicity	k307_paren_base_member_chain	K307
-multiplicity	k307_ternary_paren_base_member_chain	K307
-multiplicity	k307_trailing_comment_paren_base_member_chain	K307
-multiplicity	k307_typeof_paren_base_member_chain	K307
-density	k307_as_paren_base_member_chain	K307
-density	k307_binary_paren_base_member_chain	K307
-density	k307_commented_paren_base_member_chain	K307
-density	k307_owned_comment_paren_base_member_chain	K307
-density	k307_paren_base_member_chain	K307
-density	k307_ternary_paren_base_member_chain	K307
-density	k307_trailing_comment_paren_base_member_chain	K307
-density	k307_typeof_paren_base_member_chain	K307
+# shapes: 3
 work	chain links holding `<` or `<<` (scans, n^2)	K73
 work	k285_leading_block_comment_run	K285
 work	k285_svelte_tag_run	K285
-work	k307_as_paren_base_member_chain	K307
-work	k307_binary_paren_base_member_chain	K307
-work	k307_commented_paren_base_member_chain	K307
-work	k307_owned_comment_paren_base_member_chain	K307
-work	k307_paren_base_member_chain	K307
-work	k307_ternary_paren_base_member_chain	K307
-work	k307_trailing_comment_paren_base_member_chain	K307
-work	k307_typeof_paren_base_member_chain	K307

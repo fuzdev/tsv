@@ -342,9 +342,10 @@ const PREFIX_PAIR_FORMS: &[(&str, &str)] = &[
 const PREFIX_PAIR_INNER: &[&str] = &["", "- ", "!", "<T>", "await "];
 
 /// What the prefix pair sweep follows an authored pair with ([`prefix_pair_sweep`]):
-/// nothing, a member after a `!`, and an instantiation — links a printer takes a path of
-/// its own for behind a pair it may keep.
-const PREFIX_PAIR_LINKS: &[&str] = &["", "!.b", "<T>"];
+/// nothing, a member after a `!`, an instantiation, and a member chain of two calls, which
+/// the member-chain printer lays out in several candidates around the pair as its base —
+/// links a printer takes a path of its own for behind a pair it may keep.
+const PREFIX_PAIR_LINKS: &[&str] = &["", "!.b", "<T>", ".b().c()"];
 
 /// The prefix operators nested over their authored pairs ([`PREFIX_PAIR_FORMS`]), bare and
 /// with a second operator inside the pair ([`PREFIX_PAIR_INNER`]), each pair followed by
@@ -354,8 +355,14 @@ const PREFIX_PAIR_LINKS: &[&str] = &["", "!.b", "<T>"];
 /// TODO: K305, K306 — two forms are left out, each a printer bug of its own that no depth
 /// reaches: they format at a single level to a form whose own format differs (F1). A block
 /// comment opening a prefix operator's bare pair before a link (K305: `-(/*c*/a)!.b` →
-/// `-/*c*/ a!.b` → `-(/*c*/ a!.b)`, the same with `<T>`), and one closing a binary operand's
+/// `-/*c*/ a!.b` → `-(/*c*/ a!.b)`, the same with `<T>` and a member chain), and one closing a binary operand's
 /// pair (K306: `a == (a /*c*/)` → `a == a /*c*/` → `a == a; /*c*/`).
+///
+/// TODO: K313 — a block comment closing an authored pair that a member chain
+/// of calls follows, nested two levels — `!(!(a /*c*/).b().c() /*c*/).b().c()` prints the
+/// outer comment after the pair's `)`, and its own format moves it to a line of its own
+/// ahead of `.b()` (F1). So `.b().c()` skips the pair's trailing-comment form (not after
+/// `new `, whose pair is a callee and formats stably).
 fn prefix_pair_sweep(shapes: &mut Vec<Shape>) {
     for &op in PREFIXES.iter().chain(&["a == "]) {
         for &(before, after) in PREFIX_PAIR_FORMS {
@@ -365,7 +372,9 @@ fn prefix_pair_sweep(shapes: &mut Vec<Shape>) {
                     let unary_comment_link =
                         !binary && before == "(/*c*/" && inner.is_empty() && !link.is_empty();
                     let binary_trailing_comment = binary && after == "/*c*/)" && link.is_empty();
-                    if unary_comment_link || binary_trailing_comment {
+                    let chain_trailing_comment =
+                        op != "new " && after == "/*c*/)" && link == ".b().c()";
+                    if unary_comment_link || binary_trailing_comment || chain_trailing_comment {
                         continue;
                     }
                     shapes.push(Shape {

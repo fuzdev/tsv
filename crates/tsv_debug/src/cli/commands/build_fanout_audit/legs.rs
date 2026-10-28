@@ -167,7 +167,7 @@ const NO_CAUSE: &str = "-";
 /// prefix, any other the whole name. A shape written for a bug carries its number in its
 /// name; any other shape that fails is listed by its full name. Each later fix removes its
 /// entries (and the ratchet's lines with them).
-const KNOWN_CAUSES: &[(&str, &str)] = &[("k285_*", "K285"), ("k289_*", "K289"), ("k307_*", "K307")];
+const KNOWN_CAUSES: &[(&str, &str)] = &[("k285_*", "K285"), ("k289_*", "K289")];
 
 fn known_cause(shape: &str) -> &'static str {
     KNOWN_CAUSES
