@@ -167,7 +167,7 @@ const NO_CAUSE: &str = "-";
 /// prefix, any other the whole name. A shape written for a bug carries its number in its
 /// name; any other shape that fails is listed by its full name. Each later fix removes its
 /// entries (and the ratchet's lines with them).
-const KNOWN_CAUSES: &[(&str, &str)] = &[("k285_*", "K285"), ("k289_*", "K289")];
+const KNOWN_CAUSES: &[(&str, &str)] = &[("k285_*", "K285"), ("k289_*", "K289"), ("k307_*", "K307")];
 
 fn known_cause(shape: &str) -> &'static str {
     KNOWN_CAUSES
@@ -584,6 +584,63 @@ pub(super) fn bug_inputs() -> Vec<Input> {
             Ts,
             Nesting,
             ["", "f(() => { ", "a;", " }, a)", ";\n"],
+        ),
+        // a member chain of two calls whose base is a parenthesized prefix operation holding
+        // the next level
+        hand(
+            "k307_paren_base_member_chain",
+            Ts,
+            Nesting,
+            ["x = ", "(!", "a", ".b().c())", ";\n"],
+        ),
+        // the same nest behind a doubled pair, `typeof` over an authored one
+        hand(
+            "k307_typeof_paren_base_member_chain",
+            Ts,
+            Nesting,
+            ["x = ", "(typeof (", "a", ".b().c()))", ";\n"],
+        ),
+        // the same nest with a binary base, which builds the chain-for-parens operand
+        hand(
+            "k307_binary_paren_base_member_chain",
+            Ts,
+            Nesting,
+            ["x = ", "(a + ", "a", ".b().c())", ";\n"],
+        ),
+        // the same nest with a ternary base, the next level in its alternate
+        hand(
+            "k307_ternary_paren_base_member_chain",
+            Ts,
+            Nesting,
+            ["x = ", "(c ? d : ", "a", ".b().c())", ";\n"],
+        ),
+        // the same nest with a cast base
+        hand(
+            "k307_as_paren_base_member_chain",
+            Ts,
+            Nesting,
+            ["x = ", "(", "a", ".b().c() as T)", ";\n"],
+        ),
+        // the same nest with a block comment leading each base inside its pair
+        hand(
+            "k307_commented_paren_base_member_chain",
+            Ts,
+            Nesting,
+            ["x = ", "(/*c*/ !", "a", ".b().c())", ";\n"],
+        ),
+        // the same nest with a multi-line block comment each base owns
+        hand(
+            "k307_owned_comment_paren_base_member_chain",
+            Ts,
+            Nesting,
+            ["x = ", "(/* c\n */ !", "a", ".b().c())", ";\n"],
+        ),
+        // the same nest with a line comment in each pair's trailing gap
+        hand(
+            "k307_trailing_comment_paren_base_member_chain",
+            Ts,
+            Nesting,
+            ["x = ", "(!", "a", ".b().c() // c\n)", ";\n"],
         ),
     ]
 }
