@@ -1,0 +1,679 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 566,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block glued inside the stripped shell at the head of a unary operand leads the",
+			"start": 20,
+			"end": 103
+		},
+		{
+			"type": "Line",
+			"value": " operand's doc, so the operand takes the comment-holder pair in one pass.",
+			"start": 105,
+			"end": 180
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 190,
+			"end": 197
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 215,
+			"end": 222
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 239,
+			"end": 246
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 267,
+			"end": 274
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 290,
+			"end": 297
+		},
+		{
+			"type": "Line",
+			"value": " Every unary operator answers the same.",
+			"start": 308,
+			"end": 349
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 357,
+			"end": 364
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 382,
+			"end": 389
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 401,
+			"end": 408
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 420,
+			"end": 427
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 439,
+			"end": 446
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 458,
+			"end": 465
+		},
+		{
+			"type": "Line",
+			"value": " So does a unary nested in a larger expression.",
+			"start": 475,
+			"end": 524
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 538,
+			"end": 545
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 565,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 556,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 182,
+					"end": 204,
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 182,
+						"end": 203,
+						"operator": "typeof",
+						"prefix": true,
+						"argument": {
+							"type": "MemberExpression",
+							"start": 198,
+							"end": 202,
+							"object": {
+								"type": "Identifier",
+								"start": 198,
+								"end": 199,
+								"name": "x"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 200,
+								"end": 201,
+								"name": "y"
+							},
+							"computed": true,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 190,
+									"end": 197
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block glued inside the stripped shell at the head of a unary operand leads the",
+							"start": 20,
+							"end": 103
+						},
+						{
+							"type": "Line",
+							"value": " operand's doc, so the operand takes the comment-holder pair in one pass.",
+							"start": 105,
+							"end": 180
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 207,
+					"end": 228,
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 207,
+						"end": 227,
+						"operator": "typeof",
+						"prefix": true,
+						"argument": {
+							"type": "MemberExpression",
+							"start": 223,
+							"end": 226,
+							"object": {
+								"type": "Identifier",
+								"start": 223,
+								"end": 224,
+								"name": "x"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 225,
+								"end": 226,
+								"name": "y"
+							},
+							"computed": false,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 215,
+									"end": 222
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 231,
+					"end": 256,
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 231,
+						"end": 255,
+						"operator": "typeof",
+						"prefix": true,
+						"argument": {
+							"type": "CallExpression",
+							"start": 247,
+							"end": 254,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 247,
+								"end": 252,
+								"object": {
+									"type": "CallExpression",
+									"start": 247,
+									"end": 250,
+									"callee": {
+										"type": "Identifier",
+										"start": 247,
+										"end": 248,
+										"name": "x"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 251,
+									"end": 252,
+									"name": "y"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [],
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 239,
+									"end": 246
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 259,
+					"end": 279,
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 259,
+						"end": 278,
+						"operator": "typeof",
+						"prefix": true,
+						"argument": {
+							"type": "TSNonNullExpression",
+							"start": 275,
+							"end": 277,
+							"expression": {
+								"type": "Identifier",
+								"start": 275,
+								"end": 276,
+								"name": "x"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 267,
+									"end": 274
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 282,
+					"end": 305,
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 282,
+						"end": 304,
+						"operator": "typeof",
+						"prefix": true,
+						"argument": {
+							"type": "TSInstantiationExpression",
+							"start": 298,
+							"end": 303,
+							"expression": {
+								"type": "ArrayExpression",
+								"start": 298,
+								"end": 300,
+								"elements": []
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 300,
+								"end": 303,
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 301,
+										"end": 302,
+										"typeName": {
+											"type": "Identifier",
+											"start": 301,
+											"end": 302,
+											"name": "U"
+										}
+									}
+								]
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 290,
+									"end": 297
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 351,
+					"end": 371,
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 351,
+						"end": 370,
+						"operator": "void",
+						"prefix": true,
+						"argument": {
+							"type": "MemberExpression",
+							"start": 365,
+							"end": 369,
+							"object": {
+								"type": "Identifier",
+								"start": 365,
+								"end": 366,
+								"name": "x"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 367,
+								"end": 368,
+								"name": "y"
+							},
+							"computed": true,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 357,
+									"end": 364
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Every unary operator answers the same.",
+							"start": 308,
+							"end": 349
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 374,
+					"end": 396,
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 374,
+						"end": 395,
+						"operator": "delete",
+						"prefix": true,
+						"argument": {
+							"type": "MemberExpression",
+							"start": 390,
+							"end": 394,
+							"object": {
+								"type": "Identifier",
+								"start": 390,
+								"end": 391,
+								"name": "x"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 392,
+								"end": 393,
+								"name": "y"
+							},
+							"computed": true,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 382,
+									"end": 389
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 399,
+					"end": 415,
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 399,
+						"end": 414,
+						"operator": "!",
+						"prefix": true,
+						"argument": {
+							"type": "MemberExpression",
+							"start": 409,
+							"end": 413,
+							"object": {
+								"type": "Identifier",
+								"start": 409,
+								"end": 410,
+								"name": "x"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 411,
+								"end": 412,
+								"name": "y"
+							},
+							"computed": true,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 401,
+									"end": 408
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 418,
+					"end": 434,
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 418,
+						"end": 433,
+						"operator": "-",
+						"prefix": true,
+						"argument": {
+							"type": "MemberExpression",
+							"start": 428,
+							"end": 432,
+							"object": {
+								"type": "Identifier",
+								"start": 428,
+								"end": 429,
+								"name": "x"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 430,
+								"end": 431,
+								"name": "y"
+							},
+							"computed": true,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 420,
+									"end": 427
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 437,
+					"end": 453,
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 437,
+						"end": 452,
+						"operator": "+",
+						"prefix": true,
+						"argument": {
+							"type": "MemberExpression",
+							"start": 447,
+							"end": 451,
+							"object": {
+								"type": "Identifier",
+								"start": 447,
+								"end": 448,
+								"name": "x"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 449,
+								"end": 450,
+								"name": "y"
+							},
+							"computed": true,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 439,
+									"end": 446
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 456,
+					"end": 472,
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 456,
+						"end": 471,
+						"operator": "~",
+						"prefix": true,
+						"argument": {
+							"type": "MemberExpression",
+							"start": 466,
+							"end": 470,
+							"object": {
+								"type": "Identifier",
+								"start": 466,
+								"end": 467,
+								"name": "x"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 468,
+								"end": 469,
+								"name": "y"
+							},
+							"computed": true,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 458,
+									"end": 465
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 526,
+					"end": 555,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 526,
+						"end": 554,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 526,
+							"end": 527,
+							"name": "z"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 530,
+							"end": 554,
+							"left": {
+								"type": "UnaryExpression",
+								"start": 530,
+								"end": 550,
+								"operator": "typeof",
+								"prefix": true,
+								"argument": {
+									"type": "MemberExpression",
+									"start": 546,
+									"end": 549,
+									"object": {
+										"type": "Identifier",
+										"start": 546,
+										"end": 547,
+										"name": "x"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 548,
+										"end": 549,
+										"name": "y"
+									},
+									"computed": false,
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 538,
+											"end": 545
+										}
+									]
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "Identifier",
+								"start": 553,
+								"end": 554,
+								"name": "T"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " So does a unary nested in a larger expression.",
+							"start": 475,
+							"end": 524
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

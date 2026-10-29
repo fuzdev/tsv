@@ -412,9 +412,19 @@ impl<'a> Printer<'a> {
         // `owned ⇒ is_block`). Inert for the wrap, which ORs the two, but this flag is the
         // reason the wrap survives a run the emitter prints nothing for, so it has to mean
         // what it says.
+        //
+        // An OWNED comment is counted up to the operand's printed leaf, not its span start: a
+        // block glued inside the stripped shell at the head of the operand's chain
+        // (`typeof ((/* c */x)[y])`) sits inside the span, yet its leaf prints it first, so it
+        // leads the operand's doc exactly as a comment in this gap does — and the reparse
+        // finds it here. The walk stops at the first pair the printer re-emits
+        // ([`Printer::stripped_left_spine_leaf`]), which holds an owned comment inside it
+        // (`typeof (/* c */ a + b).m()` keeps one pair). A layout question only: the
+        // operand's own doc prints the comment, inside this shell, so no emitter widens.
         let owned_leading_comment = leading_comments_opt.is_none()
             && !operand_encloses_owned_comment
-            && self.has_comments_on_page_between(leading_run_start, argument_start);
+            && (self.has_comments_on_page_between(leading_run_start, argument_start)
+                || self.owned_comment_leads_operand(unary.argument, argument_start));
         let has_leading_comments =
             paren_glued.is_some() || leading_comments_opt.is_some() || owned_leading_comment;
 
@@ -584,6 +594,35 @@ impl<'a> Printer<'a> {
         } else {
             d.concat(&[d.text(unary.operator.as_str()), argument_doc])
         }
+    }
+
+    /// Whether a comment the operand's printed leaf OWNS sits inside the operand's span,
+    /// ahead of that leaf — in a stripped grouping shell at the head of its left spine — so
+    /// the operand's doc opens with it ([`Self::build_unary_doc_gap`]'s holder pair).
+    fn owned_comment_leads_operand(&self, argument: &Expression<'_>, argument_start: u32) -> bool {
+        // No shell opens the operand, so nothing sits ahead of its leaf: the common case, one
+        // byte ([`left_spine_has_no_shell`]'s test).
+        if self.source.as_bytes().get(argument_start as usize) != Some(&b'(')
+            || !self.has_comments_on_page_between(argument_start, argument.span().end)
+        {
+            return false;
+        }
+        // The printed leaf: past every erased shell the printer does not re-emit — a pair a
+        // comma-list region keeps for the author is re-emitted too
+        // ([`Printer::region_keeps_shell`]), and holds the comment inside it — and at a
+        // sequence, whose own pair prints first (its envelope is the caller's to notice).
+        let mut leaf = argument;
+        while let Some(child) = self.stripped_left_side_child(leaf)
+            && !self.region_keeps_shell(child)
+            && !matches!(child.kind, ExpressionKind::SequenceExpression(_))
+        {
+            leaf = child;
+        }
+        let leaf_start = leaf.span().start;
+        leaf_start > argument_start
+            && self
+                .comments_on_page_between(argument_start, leaf_start)
+                .any(|c| c.owned_by_node)
     }
 
     /// Build a doc for a chain of binary operators with line wrapping support — **the

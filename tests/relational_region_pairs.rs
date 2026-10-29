@@ -437,6 +437,12 @@ fn the_prefix_shell_keeps_every_spelling_of_its_operand() {
             "fn(a < b, typeof (c.d /* k */)!.e > (f, g));",
             "fn(a < b, typeof (c.d /* k */)!.e > (f, g));",
         ),
+        // A comment inside the kept pair stays inside it: the pair prints first, so the
+        // operand takes no comment-holder pair of its own.
+        (
+            "fn(a < b, typeof (/* c */ x)[i] > (f, g));",
+            "fn(a < b, typeof (/* c */ x)[i] > (f, g));",
+        ),
         // A pair around the operand and one around its head inside it both stay.
         (
             "fn(a < b, typeof ((c)()), e > (f, g));",
