@@ -1830,6 +1830,174 @@ impl LeadingEdgeWalk<'_> {
     }
 }
 
+/// [`DocArena::gap_comment_line`]'s answer: whether a doc prints a comment on a line of its
+/// own in the gap ahead of one token.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GapCommentLine {
+    /// In some layout a comment there has a line break before it and one after it (a `//`
+    /// needs only the one before) — a comment a reparse reads as own-line.
+    OwnLine,
+    /// The token was found, and no layout prints such a comment ahead of it.
+    Inline,
+    /// The token was not found, or the walk outran its budget.
+    Unknown,
+}
+
+/// How many `(node, state)` visits [`DocArena::gap_comment_line`] takes before it answers
+/// [`GapCommentLine::Unknown`].
+const GAP_LINE_BUDGET: u32 = 1 << 16;
+
+/// [`GapLineWalk`]'s state bits, one run of non-code text at a time: a line printed in the
+/// run so far; a comment in it printed after such a line, still waiting for one after it;
+/// a comment in it with a line on both sides; the same, in the run ahead of the last code
+/// token.
+const GAP_LINE: u8 = 1;
+const GAP_PENDING: u8 = 2;
+const GAP_OWN: u8 = 4;
+const GAP_OWN_PREV: u8 = 8;
+
+/// A block comment's step in a [`GapLineWalk`] run: it waits for a line after it when one
+/// came before it, and one spanning lines leaves the next comment on the line its own
+/// interior began, the next pass's reading of a comment on a multi-line block's closing
+/// line (`GapTrailScan::fixed`).
+const fn gap_block_comment(state: u8, spans_lines: bool) -> u8 {
+    let state = if state & GAP_LINE != 0 {
+        state | GAP_PENDING
+    } else {
+        state
+    };
+    if spans_lines { state | GAP_LINE } else { state }
+}
+
+/// [`DocArena::gap_comment_line`]'s walk: every layout in print order, a state per layout,
+/// memoized per `(node, state)` into the set of states it can leave.
+struct GapLineWalk<'a> {
+    nodes: &'a [DocNode],
+    children: &'a [DocId],
+    pool: &'a str,
+    source: &'a str,
+    target: u32,
+    memo: FxHashMap<(DocId, u8), u16>,
+    budget: u32,
+    found_inline: bool,
+    found_own: bool,
+}
+
+impl GapLineWalk<'_> {
+    /// The set of states `id` leaves, entered in any state of `states` (a bit per state).
+    fn walk(&mut self, id: DocId, states: u16) -> u16 {
+        let mut out = 0;
+        for state in 0..16u8 {
+            if states & (1 << state) != 0 {
+                out |= self.walk_one(id, state);
+            }
+        }
+        out
+    }
+
+    fn walk_one(&mut self, id: DocId, state: u8) -> u16 {
+        crate::fanout_probe::walk();
+        if let Some(&known) = self.memo.get(&(id, state)) {
+            return known;
+        }
+        if self.budget == 0 {
+            return 1 << state;
+        }
+        self.budget -= 1;
+        let one = |state: u8| 1u16 << state;
+        let out = match &self.nodes[id.index()] {
+            DocNode::Text(t) => {
+                if let DocText::SourceSpan(span, _) | DocText::VerbatimSpan(span, _) = t
+                    && span.start == self.target
+                {
+                    if state & (GAP_OWN | GAP_OWN_PREV) != 0 {
+                        self.found_own = true;
+                    } else {
+                        self.found_inline = true;
+                    }
+                }
+                let s = super::types::resolve_text(t, Some(self.source), self.pool)
+                    .trim_start_matches([' ', '\t']);
+                if s.is_empty() {
+                    one(state)
+                } else if s.starts_with("//") {
+                    one(if state & GAP_LINE != 0 {
+                        state | GAP_OWN
+                    } else {
+                        state
+                    })
+                } else if s.starts_with("/*") {
+                    one(gap_block_comment(
+                        state,
+                        crate::printing::contains_line_terminator(s),
+                    ))
+                } else if state & GAP_OWN != 0 {
+                    one(GAP_OWN_PREV)
+                } else {
+                    one(0)
+                }
+            }
+            DocNode::MultilineText { span, .. } => {
+                if span
+                    .slice(self.pool)
+                    .trim_start_matches([' ', '\t'])
+                    .starts_with("/*")
+                {
+                    one(gap_block_comment(state, true))
+                } else if state & GAP_OWN != 0 {
+                    one(GAP_OWN_PREV)
+                } else {
+                    one(0)
+                }
+            }
+            DocNode::Line(_) => one(if state & GAP_PENDING != 0 {
+                state | GAP_LINE | GAP_OWN
+            } else {
+                state | GAP_LINE
+            }),
+            // A deferred run prints at the end of the line it is on: read in place, where the
+            // reparse finds it — on a multi-line block's closing line, say.
+            DocNode::LineSuffix(inner) => self.walk_one(*inner, state),
+            DocNode::LineSuffixBoundary
+            | DocNode::EmbedEnd { .. }
+            | DocNode::FlushBreak
+            | DocNode::BreakParent
+            | DocNode::FlowProbeEnd => one(state),
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => self.walk_one(*inner, state),
+            DocNode::AlignRoot { contents, .. }
+            | DocNode::Align { contents, .. }
+            | DocNode::IndentIfBreak { contents, .. }
+            | DocNode::GatedState { contents, .. } => self.walk_one(*contents, state),
+            DocNode::WithContext { doc, .. } => self.walk_one(*doc, state),
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                let mut states = one(state);
+                for &kid in range.resolve(self.children) {
+                    states = self.walk(kid, states);
+                }
+                states
+            }
+            DocNode::Group {
+                contents,
+                expanded_states,
+                ..
+            } => {
+                let mut out = self.walk_one(*contents, state);
+                for &alt in expanded_states.resolve(self.children) {
+                    out |= self.walk_one(alt, state);
+                }
+                out
+            }
+            DocNode::IfBreak {
+                break_doc,
+                flat_doc,
+                ..
+            } => self.walk_one(*break_doc, state) | self.walk_one(*flat_doc, state),
+        };
+        self.memo.insert((id, state), out);
+        out
+    }
+}
+
 /// Where [`DocArena::glue_leading_comment_lines`]'s walk leaves a doc's leading edge.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Glue {
@@ -3994,6 +4162,47 @@ impl DocArena {
         });
         walk.run();
         walk.edge
+    }
+
+    /// Whether `id` prints a comment on a line of its own in the gap ahead of the code token
+    /// that is the source slice starting at `token_start` — the question a restricted
+    /// production asks of a member gap its source shows an own-line comment in, since only a
+    /// gap the chain prints that way is one the reparse hangs the argument for.
+    ///
+    /// The gap is the run of non-code text (whitespace, comments, lines) ahead of the token,
+    /// together with the run ahead of the code token before it, so a member's `.` / `?.`
+    /// printed as a token of its own does not end it. Nothing outside it counts — a line the
+    /// doc prints at another gap — and a deferred run ([`DocNode::LineSuffix`]) is read in
+    /// place, where it is built, rather than at the end of the line it lands on. Every
+    /// layout is followed (each `if_break` arm, a conditional group's states) and every line
+    /// counts as broken, so the answer is [`GapCommentLine::OwnLine`] when any layout can
+    /// print such a comment; a multi-line block's interior is a line only for the comments
+    /// after it, which then stand on the line it began.
+    pub fn gap_comment_line(&self, id: DocId, token_start: u32, source: &str) -> GapCommentLine {
+        let nodes = self.nodes.borrow();
+        let children = self.children.borrow();
+        let pool = self.text_pool.borrow();
+        let mut walk = GapLineWalk {
+            nodes: &nodes,
+            children: &children,
+            pool: &pool,
+            source,
+            target: token_start,
+            memo: FxHashMap::default(),
+            budget: GAP_LINE_BUDGET,
+            found_inline: false,
+            found_own: false,
+        };
+        walk.walk_one(id, 0);
+        if walk.budget == 0 {
+            GapCommentLine::Unknown
+        } else if walk.found_own {
+            GapCommentLine::OwnLine
+        } else if walk.found_inline {
+            GapCommentLine::Inline
+        } else {
+            GapCommentLine::Unknown
+        }
     }
 
     /// `id` with every breakable line its leading edge prints BEHIND A COMMENT replaced by

@@ -17,9 +17,9 @@ use crate::printer::chain::{chain_mid_chain_paren_gaps, find_bracket_position};
 use crate::printer::comments::left_spine_shell_is_comment_free;
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::statements::TerminatorGap;
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::doc::{DocBuf, LeadingBreak};
+use tsv_lang::doc::{DocBuf, GapCommentLine, LeadingBreak};
 use tsv_lang::source_scan::{
     find_char_skipping_comments, has_newline_after_position, has_newline_before_position,
     rfind_char_skipping_comments,
@@ -81,6 +81,19 @@ impl GapStart {
     }
 }
 
+/// What a restricted production's argument asks of the hanging pair, from the source
+/// ([`Printer::argument_hang`]).
+pub(in crate::printer) enum ArgumentHang {
+    /// No own-line comment the pair answers for.
+    Bare,
+    /// A comment that ends a line ahead of the argument in every arm — the pair.
+    Always,
+    /// Own-line comments only in plain member gaps (each named by its property's token
+    /// start), which the chain may print glued: the pair only when the arm's doc prints one
+    /// of them on a line of its own ([`Printer::argument_gap_hangs`]).
+    IfGapPrintsLine(SmallVec<[u32; 2]>),
+}
+
 impl<'a> Printer<'a> {
     /// Shared dispatch for return/throw argument formatting.
     ///
@@ -90,11 +103,13 @@ impl<'a> Printer<'a> {
     /// 3. Binaryish arguments → conditional parens (ifBreak)
     /// 4. Otherwise → plain `keyword expr;`
     ///
-    /// The source predicate ([`Self::argument_has_own_line_comment`]) chooses the arm; the
+    /// The source predicate ([`Self::argument_hang`]) chooses the arm; the
     /// arm's own doc is then the authority on ASI ([`Self::argument_leading_break`]): a
     /// line it would end ahead of the argument's first token in every layout takes the
     /// hanging pair, and one it ends only when a group breaks takes a pair that prints
-    /// with that break — the binary arm's own, or [`Self::build_asi_soft_pair`].
+    /// with that break — the binary arm's own, or [`Self::build_asi_soft_pair`]. It is also
+    /// the authority on a member gap the predicate only named: the pair is taken when the
+    /// doc prints a comment there on a line of its own ([`Self::argument_gap_hangs`]).
     ///
     /// `gap` is the statement container's deferral fact
     /// (`StatementContext::gap`), threaded into every arm's terminator split —
@@ -126,7 +141,8 @@ impl<'a> Printer<'a> {
         // an output line MERGE into one (the second delimiter becomes text). The binaryish
         // and sequence arms keep such a comment inside the parens they print themselves;
         // asking here is what makes every operand answer alike.
-        if self.argument_has_own_line_comment(keyword_start, arg)
+        let hang = self.argument_hang(keyword_start, arg);
+        if matches!(hang, ArgumentHang::Always)
             || (!self.operand_arm_keeps_line_comment_inside(keyword, arg)
                 && self.operand_parens_hold_line_comment(arg.span().end, span_end))
         {
@@ -152,8 +168,12 @@ impl<'a> Printer<'a> {
         // left-spine shell.
         let edge_gate = self.has_comments_on_page_between(keyword_end, arg.span().start)
             || !left_spine_shell_is_comment_free(self.source, arg.span().start);
+        // A member gap the source shows an own-line comment in asks for the hanging pair only
+        // when the arm's doc prints that comment on a line of its own (`ArgumentHang`).
         let leading_break = |doc: DocId| {
-            if edge_gate {
+            if self.argument_gap_hangs(&hang, doc) {
+                LeadingBreak::Hard
+            } else if edge_gate {
                 self.argument_leading_break(doc)
             } else {
                 LeadingBreak::None
@@ -173,6 +193,9 @@ impl<'a> Printer<'a> {
                 return self.build_comment_paren_doc(keyword, keyword_end, arg, span_end, gap);
             }
             let expr_doc = self.build_expression_doc(arg);
+            if self.argument_gap_hangs(&hang, expr_doc) {
+                return self.build_comment_paren_doc(keyword, keyword_end, arg, span_end, gap);
+            }
             let mut parts: DocBuf = if let Some(comments_doc) = inline_comments {
                 smallvec![
                     d.text(keyword),
@@ -364,8 +387,9 @@ impl<'a> Printer<'a> {
         );
     }
 
-    /// Check if a return/throw argument has own-line comments that require
-    /// unconditional paren wrapping.
+    /// What a return/throw argument's own-line comments ask of the hanging pair: always,
+    /// never, or only if the arm's doc prints a named member gap's comment on a line of its
+    /// own ([`ArgumentHang`]).
     ///
     /// Matches Prettier's `returnArgumentHasLeadingComment`
     /// (`utilities/return-statement-has-leading-comment.js`).
@@ -373,17 +397,17 @@ impl<'a> Printer<'a> {
     /// Shared with `build_yield_doc`: `yield`/`yield*` are restricted productions
     /// like `return`/`throw`, so they ask the same question and must not answer it
     /// differently — one question, one predicate.
-    pub(in crate::printer) fn argument_has_own_line_comment(
+    pub(in crate::printer) fn argument_hang(
         &self,
         keyword_start: u32,
         arg: &Expression<'_>,
-    ) -> bool {
+    ) -> ArgumentHang {
         // Own-line comment before the argument itself (`return (\n// c\nexpr)`).
         if self.has_leading_own_line_comment_in_range(
             GapStart::Keyword(keyword_start),
             arg.span().start,
         ) {
-            return true;
+            return ArgumentHang::Always;
         }
         // A sequence operand prints its own `(`, which takes in a comment the keyword gap
         // holds inside the statement's stripped `(` (`throw (/* c */ a, b)` prints the
@@ -406,11 +430,30 @@ impl<'a> Printer<'a> {
                         )
                 })
         {
-            return true;
+            return ArgumentHang::Always;
         }
 
         // Walk the left side of chainable expressions checking for own-line comments
-        self.chain_has_own_line_comment(arg)
+        let mut gaps = SmallVec::new();
+        if self.chain_has_own_line_comment(arg, &mut gaps) {
+            ArgumentHang::Always
+        } else if gaps.is_empty() {
+            ArgumentHang::Bare
+        } else {
+            ArgumentHang::IfGapPrintsLine(gaps)
+        }
+    }
+
+    /// Whether `doc`, an arm built for a `hang` the chooser left to the doc, prints a comment
+    /// on a line of its own in one of the member gaps it named — the reparse's own-line
+    /// reading of that gap, so the argument hangs. A gap the read cannot find keeps the pair.
+    pub(in crate::printer) fn argument_gap_hangs(&self, hang: &ArgumentHang, doc: DocId) -> bool {
+        let ArgumentHang::IfGapPrintsLine(gaps) = hang else {
+            return false;
+        };
+        gaps.iter().any(|&token_start| {
+            self.d().gap_comment_line(doc, token_start, self.source) != GapCommentLine::Inline
+        })
     }
 
     /// Walk the left side of the argument looking for leading own-line comments.
@@ -439,8 +482,12 @@ impl<'a> Printer<'a> {
     /// way the chain prints that gap ([`Self::mid_chain_shell_gap_hangs`]) rather than
     /// as a hoisted run; the walk goes on below it, since a shell deeper on the spine
     /// still leads the chain's head.
-    fn chain_has_own_line_comment(&self, expr: &Expression<'_>) -> bool {
-        self.chain_has_own_line_comment_below(expr, None, None)
+    fn chain_has_own_line_comment(
+        &self,
+        expr: &Expression<'_>,
+        gaps: &mut SmallVec<[u32; 2]>,
+    ) -> bool {
+        self.chain_has_own_line_comment_below(expr, None, None, gaps)
     }
 
     /// [`Self::chain_has_own_line_comment`] at `expr`, inside the member / call run rooted
@@ -452,6 +499,7 @@ impl<'a> Printer<'a> {
         mut expr: &'e Expression<'e>,
         mut chain_root: Option<&'e Expression<'e>>,
         mut group: Option<&'e Expression<'e>>,
+        gaps: &mut SmallVec<[u32; 2]>,
     ) -> bool {
         // A loop down the left spine, not a recursion: a chain is as long as the spine limit
         // lets it be, and a frame per link is what the stack contract prices
@@ -468,14 +516,18 @@ impl<'a> Printer<'a> {
                 // The whole gap is asked first, so only a hit pays the `[` scan.
                 let obj_end = self.member_gap_start(member.object);
                 let prop_start = member.property.span().start;
-                if self.has_leading_own_line_comment_in_range(GapStart::Node(obj_end), prop_start)
-                    && (!member.computed
-                        || self.has_leading_own_line_comment_in_range(
-                            GapStart::Node(obj_end),
-                            find_bracket_position(self.source, obj_end, prop_start),
-                        ))
-                {
-                    return true;
+                if self.has_leading_own_line_comment_in_range(GapStart::Node(obj_end), prop_start) {
+                    if !member.computed {
+                        // A plain member's gap is printed by the chain, which glues an
+                        // own-line block in a flat member run: whether it keeps its line is
+                        // the arm's doc to say.
+                        gaps.push(self.member_gap_token(member));
+                    } else if self.has_leading_own_line_comment_in_range(
+                        GapStart::Node(obj_end),
+                        find_bracket_position(self.source, obj_end, prop_start),
+                    ) {
+                        return true;
+                    }
                 }
             }
             if let ExpressionKind::CallExpression(call) = &expr.kind
@@ -489,7 +541,9 @@ impl<'a> Printer<'a> {
                     member.property.span().start,
                 )
             {
-                return true;
+                // Whether the chain does break before the call's member is the arm's doc to
+                // say, as for the own-line reading above.
+                gaps.push(self.member_gap_token(member));
             }
             // No descent through a cast's or a postfix update's bare operand: whether a run
             // hoisted out of it ends a line ahead of the argument is the built doc's to say
@@ -546,12 +600,20 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The token a member gap ends at, for [`Self::argument_gap_hangs`]: the property's
+    /// first printed byte — past a private name's `#`, which prints with the `.`.
+    fn member_gap_token(&self, member: &internal::MemberExpression<'_>) -> u32 {
+        let prop_start = member.property.span().start;
+        prop_start + u32::from(self.source.as_bytes().get(prop_start as usize) == Some(&b'#'))
+    }
+
     /// Whether a called member's object→property gap holds a comment on the closing line
     /// of a multi-line block before it (`a.b.c /*⏎*/ /* e */.m()`): the block forces the
     /// chain open, the broken chain starts the call's member on a line of its own, and the
     /// comment then ends its line — the own-line comment the reparse's object→property
     /// reading hangs ([`Self::has_leading_own_line_comment_in_range`]). The source has no
-    /// newline after it yet, so the first pass must ask for the hanging pair itself.
+    /// newline after it yet, so the first pass names the gap itself, and the arm's doc says
+    /// whether the chain does break there ([`Self::argument_gap_hangs`]).
     fn callee_gap_ends_line_after_multiline_block(&self, obj_end: u32, prop_start: u32) -> bool {
         let mut block_end = None;
         // The gap emitter's own run, which also prints a comment after a `)` that opens

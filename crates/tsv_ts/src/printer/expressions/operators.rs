@@ -7,6 +7,7 @@
 use crate::ast::internal::{self, BinaryOperator, Expression, ExpressionKind};
 use crate::printer::comments::{AsiOperandShell, CommentSpacing, left_spine_shell_is_comment_free};
 use crate::printer::ignore::FrozenOperandPair;
+use crate::printer::statements::restricted_production::ArgumentHang;
 use crate::printer::{
     CommentVec, ParenContext, Printer, RunLeadingBlank, class_expr_has_decorators,
     flattened_left_operand,
@@ -2142,7 +2143,8 @@ impl<'a> Printer<'a> {
         // see `build_hanging_paren_doc` for the shared rule, and
         // docs/conformance_prettier_ts_comments.md §Comment relocation for why prettier (whose own
         // retention is scoped to those two) diverges here.
-        if self.argument_has_own_line_comment(yield_expr_span.start, arg) {
+        let hang = self.argument_hang(yield_expr_span.start, arg);
+        if matches!(hang, ArgumentHang::Always) {
             // Shared with `return`/`throw` (`build_comment_paren_doc`), the three restricted
             // productions on one path: a same-line-as-`(` `//` comment trails the `(`, a
             // sequence operand renders bare, and a comment before the `)` stays inside. The
@@ -2183,7 +2185,11 @@ impl<'a> Printer<'a> {
         // takes a pair printed with that break. Gated on page, since a comment the operand
         // owns is invisible to the gap's emit axis and still prints there (in the gap's own
         // stripped `(` or the operand's left-spine shell).
-        let edge = if self.has_comments_on_page_between(keyword_end, argument_start)
+        // A member gap the source shows an own-line comment in hangs only when the operand's
+        // doc prints that comment on a line of its own (`ArgumentHang`).
+        let edge = if self.argument_gap_hangs(&hang, tail) {
+            LeadingBreak::Hard
+        } else if self.has_comments_on_page_between(keyword_end, argument_start)
             || !left_spine_shell_is_comment_free(self.source, argument_start)
         {
             self.argument_leading_break(tail)

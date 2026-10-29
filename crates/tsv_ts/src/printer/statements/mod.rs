@@ -15,7 +15,7 @@ mod control_flow;
 pub(in crate::printer) mod function;
 mod head_parens;
 mod modules;
-mod restricted_production;
+pub(in crate::printer) mod restricted_production;
 mod type_declarations;
 pub(in crate::printer) mod variable;
 

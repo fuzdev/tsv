@@ -1,0 +1,215 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// an own-line block before a member the chain prints inline is glued, so no pair is owed
+	function fn1() {
+		return (
+			/* c */
+			a.b
+		);
+	}
+	function fn2() {
+		throw (
+			/* c */
+			a?.b
+		);
+	}
+	function* fn3() {
+		yield /* c */
+		a.b + 1;
+	}
+
+	// a multi-line block glues the same way
+	function fn4() {
+		return (
+			/* m
+		n */
+			a.b
+		);
+	}
+
+	// an assignment argument keeps only its clarity pair
+	function fn5() {
+		return (
+			/* c */
+			a.b = 1
+		);
+	}
+
+	// a member the chain's head absorbs, and a member-only chain broken for width
+	function fn6() {
+		return (
+			a/* c */
+			.b
+				.m(1)
+		);
+	}
+	function fn7() {
+		return (
+			/* c */
+			a.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.cccccccccccccccccccccccccccccccccccccccccc
+				.dddddddddddddddddd
+		);
+	}
+
+	// a block on a kept pair's `)` line stays there, below the pair's `//`
+	function fn8() {
+		return (a?.()).m(); // c
+		/* d */
+	}
+
+	// a comment the chain prints on a line of its own keeps the pair: before a call it breaks
+	// before, a line comment, and a computed member
+	function fn9() {
+		return (
+			a
+				/* c */
+				.b()
+		);
+	}
+	function fn10() {
+		return (
+			// c
+			a.b
+		);
+	}
+	function fn11() {
+		return (
+			/* c */
+			a[k]
+		);
+	}
+
+	// the same read at a private member, at a called member behind a multi-line block's closing
+	// line the chain keeps glued, and through an assignment argument
+	class K {
+		#p = 1;
+		fn12() {
+			return a
+				./* c */
+				#p;
+		}
+	}
+	function fn13() {
+		return a
+			.b()
+			.c /* m
+		n */ /* c */
+			.d(1);
+	}
+	function fn14() {
+		return (
+			// c
+			a.b = 1
+		);
+	}
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// an own-line block before a member the chain prints inline is glued, so no pair is owed
+	function fn1() {
+		return (
+			/* c */
+			a.b
+		);
+	}
+	function fn2() {
+		throw (
+			/* c */
+			a?.b
+		);
+	}
+	function* fn3() {
+		yield; /* c */
+		a.b + 1;
+	}
+
+	// a multi-line block glues the same way
+	function fn4() {
+		return (
+			/* m
+		n */
+			a.b
+		);
+	}
+
+	// an assignment argument keeps only its clarity pair
+	function fn5() {
+		return (
+			/* c */
+			a.b = 1
+		);
+	}
+
+	// a member the chain's head absorbs, and a member-only chain broken for width
+	function fn6() {
+		return a /* c */.b
+			.m(1);
+	}
+	function fn7() {
+		return (
+			/* c */
+			a.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.cccccccccccccccccccccccccccccccccccccccccc
+				.dddddddddddddddddd
+		);
+	}
+
+	// a block on a kept pair's `)` line stays there, below the pair's `//`
+	function fn8() {
+		return (a?.()).m(); // c
+		/* d */
+	}
+
+	// a comment the chain prints on a line of its own keeps the pair: before a call it breaks
+	// before, a line comment, and a computed member
+	function fn9() {
+		return (
+			a
+				/* c */
+				.b()
+		);
+	}
+	function fn10() {
+		return (
+			// c
+			a.b
+		);
+	}
+	function fn11() {
+		return (
+			/* c */
+			a[k]
+		);
+	}
+
+	// the same read at a private member, at a called member behind a multi-line block's closing
+	// line the chain keeps glued, and through an assignment argument
+	class K {
+		#p = 1;
+		fn12() {
+			return a /* c */.#p;
+		}
+	}
+	function fn13() {
+		return a
+			.b()
+			.c /* m
+		n */ /* c */
+			.d(1);
+	}
+	function fn14() {
+		return (
+			// c
+			a.b = 1
+		);
+	}
+</script>

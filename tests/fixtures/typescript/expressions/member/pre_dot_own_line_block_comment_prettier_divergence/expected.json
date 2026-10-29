@@ -1,0 +1,412 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 356,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an own-line block before a plain member is glued between the object and the member",
+			"start": 20,
+			"end": 105
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 109,
+			"end": 116
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 134,
+			"end": 141
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 154,
+			"end": 161
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 185,
+			"end": 192
+		},
+		{
+			"type": "Line",
+			"value": " a multi-line block glues the same way",
+			"start": 198,
+			"end": 238
+		},
+		{
+			"type": "Block",
+			"value": " m\n\tn ",
+			"start": 255,
+			"end": 265
+		},
+		{
+			"type": "Line",
+			"value": " a member the chain's head absorbs ahead of a call",
+			"start": 271,
+			"end": 323
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 327,
+			"end": 334
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 355,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 346,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 107,
+					"end": 119,
+					"expression": {
+						"type": "MemberExpression",
+						"start": 107,
+						"end": 118,
+						"object": {
+							"type": "Identifier",
+							"start": 107,
+							"end": 108,
+							"name": "a",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 109,
+									"end": 116
+								}
+							]
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 117,
+							"end": 118,
+							"name": "b"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line block before a plain member is glued between the object and the member",
+							"start": 20,
+							"end": 105
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 121,
+					"end": 145,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 127,
+							"end": 144,
+							"id": {
+								"type": "Identifier",
+								"start": 127,
+								"end": 129,
+								"name": "v1"
+							},
+							"init": {
+								"type": "ChainExpression",
+								"start": 132,
+								"end": 144,
+								"expression": {
+									"type": "MemberExpression",
+									"start": 132,
+									"end": 144,
+									"object": {
+										"type": "Identifier",
+										"start": 132,
+										"end": 133,
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 134,
+												"end": 141
+											}
+										]
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 143,
+										"end": 144,
+										"name": "b"
+									},
+									"computed": false,
+									"optional": true
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 147,
+					"end": 164,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 147,
+						"end": 163,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 147,
+							"end": 149,
+							"name": "v2"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 152,
+							"end": 163,
+							"object": {
+								"type": "Identifier",
+								"start": 152,
+								"end": 153,
+								"name": "a",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 154,
+										"end": 161
+									}
+								]
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 162,
+								"end": 163,
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 166,
+					"end": 195,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 172,
+							"end": 194,
+							"id": {
+								"type": "Identifier",
+								"start": 172,
+								"end": 174,
+								"name": "fn"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 177,
+								"end": 194,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "MemberExpression",
+									"start": 183,
+									"end": 194,
+									"object": {
+										"type": "Identifier",
+										"start": 183,
+										"end": 184,
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 185,
+												"end": 192
+											}
+										]
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 193,
+										"end": 194,
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 240,
+					"end": 268,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 246,
+							"end": 267,
+							"id": {
+								"type": "Identifier",
+								"start": 246,
+								"end": 248,
+								"name": "v3"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 253,
+								"end": 267,
+								"object": {
+									"type": "Identifier",
+									"start": 253,
+									"end": 254,
+									"name": "a",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " m\n\tn ",
+											"start": 255,
+											"end": 265
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 266,
+									"end": 267,
+									"name": "b"
+								},
+								"computed": false,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multi-line block glues the same way",
+							"start": 198,
+							"end": 238
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 325,
+					"end": 345,
+					"expression": {
+						"type": "CallExpression",
+						"start": 325,
+						"end": 344,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 325,
+							"end": 341,
+							"object": {
+								"type": "MemberExpression",
+								"start": 325,
+								"end": 336,
+								"object": {
+									"type": "Identifier",
+									"start": 325,
+									"end": 326,
+									"name": "a",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 327,
+											"end": 334
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 335,
+									"end": 336,
+									"name": "b"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 340,
+								"end": 341,
+								"name": "m"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 342,
+								"end": 343,
+								"value": 1,
+								"raw": "1"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a member the chain's head absorbs ahead of a call",
+							"start": 271,
+							"end": 323
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
