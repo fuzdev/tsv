@@ -17,9 +17,9 @@
 //! (`GapCommentRun::Dangling`'s `defer_inline` arm in `tsv_ts`).
 //!
 //! This is the renderer-level FLOOR under the build-time askers in `tsv_ts`
-//! (`Printer::trailer_follows_through_closers` and friends), which keep a comment where
-//! the author wrote it but read the *source* and so cannot see a trailer past a further
-//! token. Whether two deferred comments share an output line is a layout fact only this
+//! (`Printer::comment_reaches_line_end_after` and friends), which keep a comment where
+//! the author wrote it but read the *source*, and so see only the shapes each one asks
+//! about. Whether two deferred comments share an output line is a layout fact only this
 //! module has.
 
 use smallvec::SmallVec;

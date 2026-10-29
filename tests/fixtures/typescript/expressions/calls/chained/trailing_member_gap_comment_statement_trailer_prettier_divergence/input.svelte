@@ -40,4 +40,55 @@
 		fn() // c17
 			.bar;
 	} // c18
+
+	// past a further token the closers read could not cross: a lookup's brackets, the
+	// call the lookup is the callee of, then the trailer
+	obj[
+		fn() // c19
+			.bar
+	](); /* c20 */
+	obj[
+		fn() // c21
+			?.bar
+	](); // c22
+	obj[
+		fn()! // c23
+			.bar
+	](); /* c24 */
+	const d =
+		obj[
+			fn() // c25
+				.bar
+		](); // c26
+
+	// an arrow body, the trailer behind a lookup on the arrow — and one inside the
+	// statement, ahead of a chain that continues past it
+	(() =>
+		fn() // c27
+			.bar)[i]; // c28
+	const e = (() =>
+		fn() // c29
+			.bar)[i]; /* c30 */
+	(() =>
+		fn() // c31
+			.bar)[i] /* c32 */
+		.baz()[i];
+
+	// past an operator's right side and past a following sibling in a list
+	fn() // c33
+		.bar + a; /* c34 */
+	foo(
+		fn() // c35
+			.bar,
+		a
+	); /* c36 */
+
+	// the same two with a `//` trailer, which the collapse would push onto a line of its own
+	fn() // c37
+		.bar + a; // c38
+	foo(
+		fn() // c39
+			.bar,
+		a
+	); // c40
 </script>

@@ -638,6 +638,15 @@ pub struct Printer<'a> {
     /// a chain's inner arrows — which is what makes the suppression a de-duplication rather
     /// than a DROP (`docs/comments.md` hazard 1).
     pub(crate) claimed_owned_comment_start: Cell<Option<u32>>,
+    /// Span of the innermost statement being built — set by
+    /// [`Printer::build_statement_doc`] and save/restored around it, so a builder nested in
+    /// a function or class body reads its own statement, never an enclosing one's.
+    ///
+    /// The bound of a read that must see everything the statement can print on one output
+    /// line after a position inside it ([`Printer::comment_reaches_line_end_after`]): the
+    /// statement ends its own line, so nothing past it but its own trailer can reach a line
+    /// end that a construct inside it defers to.
+    pub(crate) enclosing_statement: Cell<Option<Span>>,
     /// The span of a redundant paren shell whose LEADING run an enclosing keyword→value
     /// gap already claims, so the shell's own emitter
     /// ([`Printer::build_parenthesized_type_unwrap_doc`]) must not print it a second time.
@@ -977,6 +986,7 @@ impl<'a> Printer<'a> {
             inline_every_member_lookup: Cell::new(None),
             inline_member_call_tail: Cell::new(None),
             claimed_owned_comment_start: Cell::new(None),
+            enclosing_statement: Cell::new(None),
             claimed_shell_leading_run: Cell::new(None),
             head_memo: types::HeadMemo::default(),
             claimed_left_spine_run: Cell::new(None),
@@ -2674,30 +2684,60 @@ impl<'a> Printer<'a> {
         !has_newline_before_position(self.source, comment.span.start)
     }
 
-    /// Whether a **trailer** — a comment following content on its own line — is the
-    /// next thing after `pos` once closing punctuation is stepped over: only whitespace
-    /// and closers (`)` `]` `}` `;` `,`) between `pos` and the comment's start. The
-    /// **in-source** axis (an owned comment counts: it occupies the line all the same),
-    /// read against the real source, so it stays true under [`Self::set_canonical`].
+    /// Whether a comment may reach the output line end that a construct ending at `pos`
+    /// defers a same-line `//` to. Two reads, both on the **in-source** axis (an owned
+    /// comment counts: it occupies the line all the same), against the real source, so
+    /// they stay true under [`Self::set_canonical`]. The on-page axis counts the same
+    /// comments here; in-source is asked because the answer must be a fact of the source
+    /// alone, never of what some printer has claimed, which is what keeps it the same on
+    /// both passes:
+    ///
+    /// 1. **any** comment between `pos` and the end of the innermost enclosing statement
+    ///    ([`Printer::enclosing_statement`]), behind whatever tokens: a lookup's brackets
+    ///    and the call they are the callee of (`obj[fn() // c⏎.bar](); /* c1 */`), an
+    ///    arrow body and a lookup on the arrow (`(() => fn() // c⏎.bar)[i] /* c1 */`), an
+    ///    operator's right side, a following sibling in a list;
+    /// 2. a **trailer** — a comment following content on its own line — that is the next
+    ///    thing past the statement's end (or past `pos`, with no statement in reach) once
+    ///    closing punctuation is stepped over: only whitespace and closers (`)` `]` `}`
+    ///    `;` `,`) before it. A statement's own trailer (`fn().bar; // c1`), and one past an
+    ///    enclosing block's `}`.
     ///
     /// The question a same-line-`//` deferral must ask before taking the line end for
-    /// itself: a construct that closes flat after `pos` carries the trailer onto the
-    /// same output line, where it welds onto the deferred one (`// c // c1`, the second
-    /// `//` becoming text of the first) or is reordered behind it (`/* c1 */ // c`), so
-    /// the deferral is lossless only when this is false. Reading through closers rather
-    /// than only `pos`'s source line is what makes the answer stable across passes: the
-    /// expanded layout's own reprint puts `);` on a line below the member. Conservative
-    /// by design — a break the enclosing layout takes between the two only makes the
-    /// caller's expansion unneeded, never wrong. A trailer behind a further TOKEN is out
-    /// of reach — an operator's right side (`.bar as T; // c1`) and, the commoner
-    /// spelling, a following sibling in a list (`foo(fn() // c⏎.bar, z); // c1`), where
-    /// the scan stops on `z`. Whether such a trailer lands on the deferred comment's line
-    /// is a layout fact no build-time read can see, so the residual weld there is a
-    /// tracked open item, whose structural answer would be a renderer-level flush guard.
-    pub(crate) fn trailer_follows_through_closers(&self, pos: u32) -> bool {
-        self.comments_in_source_after(pos).next().is_some_and(|c| {
+    /// itself: whatever prints flat after `pos` carries such a comment onto the same
+    /// output line, where it welds onto the deferred one (`// c // c1`, the second `//`
+    /// becoming text of the first) or is reordered behind it (`/* c1 */ // c`), so the
+    /// deferral is lossless only when this is false.
+    ///
+    /// ⚠️ The first read counts a comment of ANY kind, not only a trailer, because that is
+    /// what makes the answer stable across passes. A comment behind further tokens moves
+    /// with the layout: the expanded reprint can give it a line of its own (a block leading
+    /// the next argument once the list breaks), so a trailer-only read expands on pass 1
+    /// and collapses back on pass 2. The count of comments inside the statement does not
+    /// move with the layout, and one the reprint carries past the statement's `;` is the
+    /// second read's. The second read stays
+    /// trailer-only and closer-bounded, as reading through closers is what makes it
+    /// stable: the expanded reprint puts `);` on a line below the member. Both are
+    /// conservative by design — a break the enclosing layout takes between the two (a
+    /// broken list's own line, a block's `}`) only makes the caller's expansion unneeded,
+    /// never wrong, and the expansion is the shape prettier prints anyway.
+    pub(crate) fn comment_reaches_line_end_after(&self, pos: u32) -> bool {
+        let from = match self.enclosing_statement.get() {
+            Some(stmt) if stmt.start <= pos && pos <= stmt.end => {
+                if self
+                    .comments_in_source_between(pos, stmt.end)
+                    .next()
+                    .is_some()
+                {
+                    return true;
+                }
+                stmt.end
+            }
+            _ => pos,
+        };
+        self.comments_in_source_after(from).next().is_some_and(|c| {
             self.comment_follows_content_on_its_line(c)
-                && self.source.as_bytes()[pos as usize..c.span.start as usize]
+                && self.source.as_bytes()[from as usize..c.span.start as usize]
                     .iter()
                     .all(|b| {
                         b.is_ascii_whitespace() || matches!(b, b')' | b']' | b'}' | b';' | b',')

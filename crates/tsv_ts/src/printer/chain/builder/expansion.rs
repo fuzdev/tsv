@@ -140,11 +140,14 @@ fn gap_forces_expansion(node: &ChainNode<'_>, printer: &Printer<'_>) -> bool {
 ///    the property is *owned* by it — printed by the member's own doc rather than by
 ///    this gap, which does not spare it from landing ahead of the deferred comment
 ///    (trailing_member_gap_comment_run).
-/// 2. **a trailer past the chain**, read from the chain's source end through any
-///    closing punctuation (`fn()// c⏎.bar⏎); // c1` — the expanded layout's own
-///    reprint puts `);` on a later line, so a same-line read would collapse it back on
-///    pass two), in-source axis. Both would flush at one line end, welding
-///    (`fn().bar; // c // c1`, the second `//` becoming text of the first) or
+/// 2. **a comment past the chain** that can reach the same line end
+///    ([`Printer::comment_reaches_line_end_after`]): any comment between the chain's end
+///    and the end of its enclosing statement, behind whatever tokens (a lookup's
+///    brackets and the call on them, `obj[fn()// c⏎.bar](); /* c1 */`; an arrow body,
+///    `(() => fn()// c⏎.bar)[i] /* c1 */`; an operator's right side; a following
+///    argument), or a trailer past the statement's end through closing punctuation
+///    (`fn()// c⏎.bar; // c1`), in-source axis. Both would flush at one line end,
+///    welding (`fn().bar; // c // c1`, the second `//` becoming text of the first) or
 ///    reordering past a block (`fn().bar; /* c1 */ // c`). Conservative by design: a
 ///    layout break between the two only makes the expansion unneeded, never wrong
 ///    (trailing_member_gap_comment_statement_trailer).
@@ -200,7 +203,7 @@ fn trailing_member_gap_line_comment<'a>(
     // answer. The ownership read is first: it is a field load where the trailer read is a
     // comment search.
     deferred_line_seen
-        && (!printer.embed.printer_owns_line || printer.trailer_follows_through_closers(chain_end))
+        && (!printer.embed.printer_owns_line || printer.comment_reaches_line_end_after(chain_end))
 }
 
 /// Check if a call node has complex (non-simple) arguments

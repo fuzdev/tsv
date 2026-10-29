@@ -6,4 +6,6 @@
 	someLongName(() => {
 		g();
 	}).bbbbb(() => 2).ccccc; // c
+	obj[fn().bar](); // c2
+	const f = (() => fn().bar)[i]; // c3
 </script>

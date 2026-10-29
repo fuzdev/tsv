@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 207,
+	"end": 269,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -27,17 +27,29 @@
 			"value": " c",
 			"start": 192,
 			"end": 196
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 215,
+			"end": 220
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 253,
+			"end": 258
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 206,
+		"end": 268,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 197,
+			"end": 259,
 			"body": [
 				{
 					"type": "VariableDeclaration",
@@ -352,6 +364,141 @@
 							"value": " c",
 							"start": 192,
 							"end": 196
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 198,
+					"end": 214,
+					"expression": {
+						"type": "CallExpression",
+						"start": 198,
+						"end": 213,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 198,
+							"end": 211,
+							"object": {
+								"type": "Identifier",
+								"start": 198,
+								"end": 201,
+								"name": "obj"
+							},
+							"property": {
+								"type": "MemberExpression",
+								"start": 202,
+								"end": 210,
+								"object": {
+									"type": "CallExpression",
+									"start": 202,
+									"end": 206,
+									"callee": {
+										"type": "Identifier",
+										"start": 202,
+										"end": 204,
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 207,
+									"end": 210,
+									"name": "bar"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"computed": true,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 215,
+							"end": 220
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 222,
+					"end": 252,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 228,
+							"end": 251,
+							"id": {
+								"type": "Identifier",
+								"start": 228,
+								"end": 229,
+								"name": "f"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 232,
+								"end": 251,
+								"object": {
+									"type": "ArrowFunctionExpression",
+									"start": 233,
+									"end": 247,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "MemberExpression",
+										"start": 239,
+										"end": 247,
+										"object": {
+											"type": "CallExpression",
+											"start": 239,
+											"end": 243,
+											"callee": {
+												"type": "Identifier",
+												"start": 239,
+												"end": 241,
+												"name": "fn"
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 244,
+											"end": 247,
+											"name": "bar"
+										},
+										"computed": false,
+										"optional": false
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 249,
+									"end": 250,
+									"name": "i"
+								},
+								"computed": true,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c3",
+							"start": 253,
+							"end": 258
 						}
 					]
 				}

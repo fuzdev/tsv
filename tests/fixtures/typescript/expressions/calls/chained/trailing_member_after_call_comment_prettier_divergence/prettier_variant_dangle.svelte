@@ -13,4 +13,11 @@
 		() => 2
 	) // c
 	.ccccc;
+	obj[
+		fn() // c2
+		.bar
+	]();
+	const f = (() =>
+		fn() // c3
+		.bar)[i];
 </script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1029,
+	"end": 1971,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -171,17 +171,185 @@
 			"value": " c18",
 			"start": 1012,
 			"end": 1018
+		},
+		{
+			"type": "Line",
+			"value": " past a further token the closers read could not cross: a lookup's brackets, the",
+			"start": 1021,
+			"end": 1103
+		},
+		{
+			"type": "Line",
+			"value": " call the lookup is the callee of, then the trailer",
+			"start": 1105,
+			"end": 1158
+		},
+		{
+			"type": "Line",
+			"value": " c19",
+			"start": 1172,
+			"end": 1178
+		},
+		{
+			"type": "Block",
+			"value": " c20 ",
+			"start": 1193,
+			"end": 1202
+		},
+		{
+			"type": "Line",
+			"value": " c21",
+			"start": 1216,
+			"end": 1222
+		},
+		{
+			"type": "Line",
+			"value": " c22",
+			"start": 1238,
+			"end": 1244
+		},
+		{
+			"type": "Line",
+			"value": " c23",
+			"start": 1259,
+			"end": 1265
+		},
+		{
+			"type": "Block",
+			"value": " c24 ",
+			"start": 1280,
+			"end": 1289
+		},
+		{
+			"type": "Line",
+			"value": " c25",
+			"start": 1316,
+			"end": 1322
+		},
+		{
+			"type": "Line",
+			"value": " c26",
+			"start": 1339,
+			"end": 1345
+		},
+		{
+			"type": "Line",
+			"value": " an arrow body, the trailer behind a lookup on the arrow — and one inside the",
+			"start": 1348,
+			"end": 1427
+		},
+		{
+			"type": "Line",
+			"value": " statement, ahead of a chain that continues past it",
+			"start": 1429,
+			"end": 1482
+		},
+		{
+			"type": "Line",
+			"value": " c27",
+			"start": 1498,
+			"end": 1504
+		},
+		{
+			"type": "Line",
+			"value": " c28",
+			"start": 1518,
+			"end": 1524
+		},
+		{
+			"type": "Line",
+			"value": " c29",
+			"start": 1550,
+			"end": 1556
+		},
+		{
+			"type": "Block",
+			"value": " c30 ",
+			"start": 1570,
+			"end": 1579
+		},
+		{
+			"type": "Line",
+			"value": " c31",
+			"start": 1595,
+			"end": 1601
+		},
+		{
+			"type": "Block",
+			"value": " c32 ",
+			"start": 1614,
+			"end": 1623
+		},
+		{
+			"type": "Line",
+			"value": " past an operator's right side and past a following sibling in a list",
+			"start": 1639,
+			"end": 1710
+		},
+		{
+			"type": "Line",
+			"value": " c33",
+			"start": 1717,
+			"end": 1723
+		},
+		{
+			"type": "Block",
+			"value": " c34 ",
+			"start": 1736,
+			"end": 1745
+		},
+		{
+			"type": "Line",
+			"value": " c35",
+			"start": 1759,
+			"end": 1765
+		},
+		{
+			"type": "Block",
+			"value": " c36 ",
+			"start": 1783,
+			"end": 1792
+		},
+		{
+			"type": "Line",
+			"value": " the same two with a `//` trailer, which the collapse would push onto a line of its own",
+			"start": 1795,
+			"end": 1884
+		},
+		{
+			"type": "Line",
+			"value": " c37",
+			"start": 1891,
+			"end": 1897
+		},
+		{
+			"type": "Line",
+			"value": " c38",
+			"start": 1910,
+			"end": 1916
+		},
+		{
+			"type": "Line",
+			"value": " c39",
+			"start": 1930,
+			"end": 1936
+		},
+		{
+			"type": "Line",
+			"value": " c40",
+			"start": 1954,
+			"end": 1960
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1028,
+		"end": 1970,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 1019,
+			"end": 1961,
 			"body": [
 				{
 					"type": "ExpressionStatement",
@@ -788,6 +956,851 @@
 							"value": " c18",
 							"start": 1012,
 							"end": 1018
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1160,
+					"end": 1192,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1160,
+						"end": 1191,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 1160,
+							"end": 1189,
+							"object": {
+								"type": "Identifier",
+								"start": 1160,
+								"end": 1163,
+								"name": "obj"
+							},
+							"property": {
+								"type": "MemberExpression",
+								"start": 1167,
+								"end": 1186,
+								"object": {
+									"type": "CallExpression",
+									"start": 1167,
+									"end": 1171,
+									"callee": {
+										"type": "Identifier",
+										"start": 1167,
+										"end": 1169,
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false,
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c19",
+											"start": 1172,
+											"end": 1178
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1183,
+									"end": 1186,
+									"name": "bar"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"computed": true,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " past a further token the closers read could not cross: a lookup's brackets, the",
+							"start": 1021,
+							"end": 1103
+						},
+						{
+							"type": "Line",
+							"value": " call the lookup is the callee of, then the trailer",
+							"start": 1105,
+							"end": 1158
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c20 ",
+							"start": 1193,
+							"end": 1202
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1204,
+					"end": 1237,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1204,
+						"end": 1236,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 1204,
+							"end": 1234,
+							"object": {
+								"type": "Identifier",
+								"start": 1204,
+								"end": 1207,
+								"name": "obj"
+							},
+							"property": {
+								"type": "ChainExpression",
+								"start": 1211,
+								"end": 1231,
+								"expression": {
+									"type": "MemberExpression",
+									"start": 1211,
+									"end": 1231,
+									"object": {
+										"type": "CallExpression",
+										"start": 1211,
+										"end": 1215,
+										"callee": {
+											"type": "Identifier",
+											"start": 1211,
+											"end": 1213,
+											"name": "fn"
+										},
+										"arguments": [],
+										"optional": false,
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c21",
+												"start": 1216,
+												"end": 1222
+											}
+										]
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1228,
+										"end": 1231,
+										"name": "bar"
+									},
+									"computed": false,
+									"optional": true
+								}
+							},
+							"computed": true,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c22",
+							"start": 1238,
+							"end": 1244
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1246,
+					"end": 1279,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1246,
+						"end": 1278,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 1246,
+							"end": 1276,
+							"object": {
+								"type": "Identifier",
+								"start": 1246,
+								"end": 1249,
+								"name": "obj"
+							},
+							"property": {
+								"type": "MemberExpression",
+								"start": 1253,
+								"end": 1273,
+								"object": {
+									"type": "TSNonNullExpression",
+									"start": 1253,
+									"end": 1258,
+									"expression": {
+										"type": "CallExpression",
+										"start": 1253,
+										"end": 1257,
+										"callee": {
+											"type": "Identifier",
+											"start": 1253,
+											"end": 1255,
+											"name": "fn"
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c23",
+											"start": 1259,
+											"end": 1265
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1270,
+									"end": 1273,
+									"name": "bar"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"computed": true,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c24 ",
+							"start": 1280,
+							"end": 1289
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1291,
+					"end": 1338,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1297,
+							"end": 1337,
+							"id": {
+								"type": "Identifier",
+								"start": 1297,
+								"end": 1298,
+								"name": "d"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 1303,
+								"end": 1337,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 1303,
+									"end": 1335,
+									"object": {
+										"type": "Identifier",
+										"start": 1303,
+										"end": 1306,
+										"name": "obj"
+									},
+									"property": {
+										"type": "MemberExpression",
+										"start": 1311,
+										"end": 1331,
+										"object": {
+											"type": "CallExpression",
+											"start": 1311,
+											"end": 1315,
+											"callee": {
+												"type": "Identifier",
+												"start": 1311,
+												"end": 1313,
+												"name": "fn"
+											},
+											"arguments": [],
+											"optional": false,
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " c25",
+													"start": 1316,
+													"end": 1322
+												}
+											]
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 1328,
+											"end": 1331,
+											"name": "bar"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"computed": true,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c26",
+							"start": 1339,
+							"end": 1345
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1484,
+					"end": 1517,
+					"expression": {
+						"type": "MemberExpression",
+						"start": 1484,
+						"end": 1516,
+						"object": {
+							"type": "ArrowFunctionExpression",
+							"start": 1485,
+							"end": 1512,
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [],
+							"body": {
+								"type": "MemberExpression",
+								"start": 1493,
+								"end": 1512,
+								"object": {
+									"type": "CallExpression",
+									"start": 1493,
+									"end": 1497,
+									"callee": {
+										"type": "Identifier",
+										"start": 1493,
+										"end": 1495,
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false,
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c27",
+											"start": 1498,
+											"end": 1504
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1509,
+									"end": 1512,
+									"name": "bar"
+								},
+								"computed": false,
+								"optional": false
+							}
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 1514,
+							"end": 1515,
+							"name": "i"
+						},
+						"computed": true,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an arrow body, the trailer behind a lookup on the arrow — and one inside the",
+							"start": 1348,
+							"end": 1427
+						},
+						{
+							"type": "Line",
+							"value": " statement, ahead of a chain that continues past it",
+							"start": 1429,
+							"end": 1482
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c28",
+							"start": 1518,
+							"end": 1524
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1526,
+					"end": 1569,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1532,
+							"end": 1568,
+							"id": {
+								"type": "Identifier",
+								"start": 1532,
+								"end": 1533,
+								"name": "e"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 1536,
+								"end": 1568,
+								"object": {
+									"type": "ArrowFunctionExpression",
+									"start": 1537,
+									"end": 1564,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "MemberExpression",
+										"start": 1545,
+										"end": 1564,
+										"object": {
+											"type": "CallExpression",
+											"start": 1545,
+											"end": 1549,
+											"callee": {
+												"type": "Identifier",
+												"start": 1545,
+												"end": 1547,
+												"name": "fn"
+											},
+											"arguments": [],
+											"optional": false,
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " c29",
+													"start": 1550,
+													"end": 1556
+												}
+											]
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 1561,
+											"end": 1564,
+											"name": "bar"
+										},
+										"computed": false,
+										"optional": false
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1566,
+									"end": 1567,
+									"name": "i"
+								},
+								"computed": true,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c30 ",
+							"start": 1570,
+							"end": 1579
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1581,
+					"end": 1636,
+					"expression": {
+						"type": "MemberExpression",
+						"start": 1581,
+						"end": 1635,
+						"object": {
+							"type": "CallExpression",
+							"start": 1581,
+							"end": 1632,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 1581,
+								"end": 1630,
+								"object": {
+									"type": "MemberExpression",
+									"start": 1581,
+									"end": 1613,
+									"object": {
+										"type": "ArrowFunctionExpression",
+										"start": 1582,
+										"end": 1609,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "MemberExpression",
+											"start": 1590,
+											"end": 1609,
+											"object": {
+												"type": "CallExpression",
+												"start": 1590,
+												"end": 1594,
+												"callee": {
+													"type": "Identifier",
+													"start": 1590,
+													"end": 1592,
+													"name": "fn"
+												},
+												"arguments": [],
+												"optional": false,
+												"trailingComments": [
+													{
+														"type": "Line",
+														"value": " c31",
+														"start": 1595,
+														"end": 1601
+													}
+												]
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 1606,
+												"end": 1609,
+												"name": "bar"
+											},
+											"computed": false,
+											"optional": false
+										}
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1611,
+										"end": 1612,
+										"name": "i"
+									},
+									"computed": true,
+									"optional": false,
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c32 ",
+											"start": 1614,
+											"end": 1623
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1627,
+									"end": 1630,
+									"name": "baz"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [],
+							"optional": false
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 1633,
+							"end": 1634,
+							"name": "i"
+						},
+						"computed": true,
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1712,
+					"end": 1735,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 1712,
+						"end": 1734,
+						"left": {
+							"type": "MemberExpression",
+							"start": 1712,
+							"end": 1730,
+							"object": {
+								"type": "CallExpression",
+								"start": 1712,
+								"end": 1716,
+								"callee": {
+									"type": "Identifier",
+									"start": 1712,
+									"end": 1714,
+									"name": "fn"
+								},
+								"arguments": [],
+								"optional": false,
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c33",
+										"start": 1717,
+										"end": 1723
+									}
+								]
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1727,
+								"end": 1730,
+								"name": "bar"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 1733,
+							"end": 1734,
+							"name": "a"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " past an operator's right side and past a following sibling in a list",
+							"start": 1639,
+							"end": 1710
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c34 ",
+							"start": 1736,
+							"end": 1745
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1747,
+					"end": 1782,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1747,
+						"end": 1781,
+						"callee": {
+							"type": "Identifier",
+							"start": 1747,
+							"end": 1750,
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "MemberExpression",
+								"start": 1754,
+								"end": 1773,
+								"object": {
+									"type": "CallExpression",
+									"start": 1754,
+									"end": 1758,
+									"callee": {
+										"type": "Identifier",
+										"start": 1754,
+										"end": 1756,
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false,
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c35",
+											"start": 1759,
+											"end": 1765
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1770,
+									"end": 1773,
+									"name": "bar"
+								},
+								"computed": false,
+								"optional": false
+							},
+							{
+								"type": "Identifier",
+								"start": 1777,
+								"end": 1778,
+								"name": "a"
+							}
+						],
+						"optional": false
+					},
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c36 ",
+							"start": 1783,
+							"end": 1792
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1886,
+					"end": 1909,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 1886,
+						"end": 1908,
+						"left": {
+							"type": "MemberExpression",
+							"start": 1886,
+							"end": 1904,
+							"object": {
+								"type": "CallExpression",
+								"start": 1886,
+								"end": 1890,
+								"callee": {
+									"type": "Identifier",
+									"start": 1886,
+									"end": 1888,
+									"name": "fn"
+								},
+								"arguments": [],
+								"optional": false,
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c37",
+										"start": 1891,
+										"end": 1897
+									}
+								]
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1901,
+								"end": 1904,
+								"name": "bar"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 1907,
+							"end": 1908,
+							"name": "a"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same two with a `//` trailer, which the collapse would push onto a line of its own",
+							"start": 1795,
+							"end": 1884
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c38",
+							"start": 1910,
+							"end": 1916
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1918,
+					"end": 1953,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1918,
+						"end": 1952,
+						"callee": {
+							"type": "Identifier",
+							"start": 1918,
+							"end": 1921,
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "MemberExpression",
+								"start": 1925,
+								"end": 1944,
+								"object": {
+									"type": "CallExpression",
+									"start": 1925,
+									"end": 1929,
+									"callee": {
+										"type": "Identifier",
+										"start": 1925,
+										"end": 1927,
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false,
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c39",
+											"start": 1930,
+											"end": 1936
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1941,
+									"end": 1944,
+									"name": "bar"
+								},
+								"computed": false,
+								"optional": false
+							},
+							{
+								"type": "Identifier",
+								"start": 1948,
+								"end": 1949,
+								"name": "a"
+							}
+						],
+						"optional": false
+					},
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c40",
+							"start": 1954,
+							"end": 1960
 						}
 					]
 				}

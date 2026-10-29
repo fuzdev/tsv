@@ -20,6 +20,13 @@ statement. Prettier's dangle form is stable there too, breaking the member call'
 short callback out of its parens when the head call's callback is the one whose
 body breaks (the third statement).
 
+The collapse also holds for a short chain NESTED in something that keeps printing after
+it — a lookup's brackets with a call on the lookup (`obj[fn() // c2⏎.bar]()`), an arrow
+body with a lookup on the arrow (`(() => fn() // c3⏎.bar)[i]`) — as long as nothing else
+in the statement can reach the line end the comment defers to. With a later comment in
+the statement the chain breaks instead, each comment in place: the boundary
+`trailing_member_gap_comment_statement_trailer` pins those shapes beside these two.
+
 Per Comment Position Philosophy, both keep the comment associated with the same
 position in the chain; the divergence is purely the inline-vs-expanded chain
 layout. This is the member-access sibling of the computed-access

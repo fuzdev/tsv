@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 715,
+	"end": 524,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,302 +12,130 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " a deferred gap comment and a statement trailer reach one line end",
-			"start": 20,
-			"end": 88
-		},
-		{
-			"type": "Line",
-			"value": " c1",
-			"start": 105,
-			"end": 110
-		},
-		{
-			"type": "Line",
-			"value": " c2",
-			"start": 112,
-			"end": 117
-		},
-		{
-			"type": "Line",
-			"value": " the same past a following sibling in an argument list",
-			"start": 120,
-			"end": 176
-		},
-		{
-			"type": "Line",
-			"value": " c3",
-			"start": 196,
-			"end": 201
-		},
-		{
-			"type": "Line",
-			"value": " c4",
-			"start": 203,
-			"end": 208
-		},
-		{
-			"type": "Line",
 			"value": " a retained type shell's run, behind the member's own trailing comment",
-			"start": 211,
-			"end": 283
+			"start": 20,
+			"end": 92
 		},
 		{
 			"type": "Line",
 			"value": " c5",
-			"start": 306,
-			"end": 311
+			"start": 115,
+			"end": 120
 		},
 		{
 			"type": "Line",
 			"value": " c6",
-			"start": 314,
-			"end": 319
+			"start": 123,
+			"end": 128
 		},
 		{
 			"type": "Line",
 			"value": " a block tail: the run separates at the body's own indent",
-			"start": 329,
-			"end": 388
+			"start": 138,
+			"end": 197
 		},
 		{
 			"type": "Line",
 			"value": " c7",
-			"start": 415,
-			"end": 420
+			"start": 224,
+			"end": 229
 		},
 		{
 			"type": "Line",
 			"value": " c8",
-			"start": 423,
-			"end": 428
+			"start": 232,
+			"end": 237
 		},
 		{
 			"type": "Line",
 			"value": " a sequence's keep-inside gap, where the run's separator is the flush's alone",
-			"start": 434,
-			"end": 513
+			"start": 243,
+			"end": 322
 		},
 		{
 			"type": "Line",
 			"value": " c9",
-			"start": 554,
-			"end": 559
+			"start": 363,
+			"end": 368
 		},
 		{
 			"type": "Line",
 			"value": " c10",
-			"start": 563,
-			"end": 569
+			"start": 372,
+			"end": 378
 		},
 		{
 			"type": "Line",
 			"value": " a bracketed type list's closer, where the run separates inside the brackets",
-			"start": 580,
-			"end": 658
+			"start": 389,
+			"end": 467
 		},
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 687,
-			"end": 691
+			"start": 496,
+			"end": 500
 		},
 		{
 			"type": "Line",
 			"value": " inj",
-			"start": 694,
-			"end": 700
+			"start": 503,
+			"end": 509
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 714,
+		"end": 523,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 705,
+			"end": 514,
 			"body": [
 				{
-					"type": "ExpressionStatement",
-					"start": 90,
-					"end": 104,
-					"expression": {
-						"type": "TSAsExpression",
-						"start": 90,
-						"end": 103,
-						"expression": {
-							"type": "MemberExpression",
-							"start": 90,
-							"end": 98,
-							"object": {
-								"type": "CallExpression",
-								"start": 90,
-								"end": 94,
-								"callee": {
-									"type": "Identifier",
-									"start": 90,
-									"end": 92,
-									"name": "fn"
-								},
-								"arguments": [],
-								"optional": false
-							},
-							"property": {
-								"type": "Identifier",
-								"start": 95,
-								"end": 98,
-								"name": "bar"
-							},
-							"computed": false,
-							"optional": false
-						},
-						"typeAnnotation": {
-							"type": "TSTypeReference",
-							"start": 102,
-							"end": 103,
-							"typeName": {
-								"type": "Identifier",
-								"start": 102,
-								"end": 103,
-								"name": "T"
-							}
-						}
-					},
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " a deferred gap comment and a statement trailer reach one line end",
-							"start": 20,
-							"end": 88
-						}
-					],
-					"trailingComments": [
-						{
-							"type": "Line",
-							"value": " c1",
-							"start": 105,
-							"end": 110
-						}
-					]
-				},
-				{
-					"type": "ExpressionStatement",
-					"start": 178,
-					"end": 195,
-					"expression": {
-						"type": "CallExpression",
-						"start": 178,
-						"end": 194,
-						"callee": {
-							"type": "Identifier",
-							"start": 178,
-							"end": 180,
-							"name": "fn"
-						},
-						"arguments": [
-							{
-								"type": "MemberExpression",
-								"start": 181,
-								"end": 190,
-								"object": {
-									"type": "CallExpression",
-									"start": 181,
-									"end": 186,
-									"callee": {
-										"type": "Identifier",
-										"start": 181,
-										"end": 184,
-										"name": "fn1"
-									},
-									"arguments": [],
-									"optional": false
-								},
-								"property": {
-									"type": "Identifier",
-									"start": 187,
-									"end": 190,
-									"name": "bar"
-								},
-								"computed": false,
-								"optional": false
-							},
-							{
-								"type": "Identifier",
-								"start": 192,
-								"end": 193,
-								"name": "a"
-							}
-						],
-						"optional": false
-					},
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " c2",
-							"start": 112,
-							"end": 117
-						},
-						{
-							"type": "Line",
-							"value": " the same past a following sibling in an argument list",
-							"start": 120,
-							"end": 176
-						}
-					],
-					"trailingComments": [
-						{
-							"type": "Line",
-							"value": " c3",
-							"start": 196,
-							"end": 201
-						}
-					]
-				},
-				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 285,
-					"end": 326,
+					"start": 94,
+					"end": 135,
 					"id": {
 						"type": "Identifier",
-						"start": 290,
-						"end": 291,
+						"start": 99,
+						"end": 100,
 						"name": "A"
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
-						"start": 296,
-						"end": 325,
+						"start": 105,
+						"end": 134,
 						"types": [
 							{
 								"type": "TSParenthesizedType",
-								"start": 298,
-								"end": 305,
+								"start": 107,
+								"end": 114,
 								"typeAnnotation": {
 									"type": "TSIntersectionType",
-									"start": 299,
-									"end": 304,
+									"start": 108,
+									"end": 113,
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 299,
-											"end": 300,
+											"start": 108,
+											"end": 109,
 											"typeName": {
 												"type": "Identifier",
-												"start": 299,
-												"end": 300,
+												"start": 108,
+												"end": 109,
 												"name": "B"
 											}
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 303,
-											"end": 304,
+											"start": 112,
+											"end": 113,
 											"typeName": {
 												"type": "Identifier",
-												"start": 303,
-												"end": 304,
+												"start": 112,
+												"end": 113,
 												"name": "C"
 											}
 										}
@@ -316,28 +144,28 @@
 										{
 											"type": "Line",
 											"value": " c5",
-											"start": 306,
-											"end": 311
+											"start": 115,
+											"end": 120
 										}
 									]
 								}
 							},
 							{
 								"type": "TSTypeReference",
-								"start": 324,
-								"end": 325,
+								"start": 133,
+								"end": 134,
 								"typeName": {
 									"type": "Identifier",
-									"start": 324,
-									"end": 325,
+									"start": 133,
+									"end": 134,
 									"name": "D"
 								},
 								"leadingComments": [
 									{
 										"type": "Line",
 										"value": " c6",
-										"start": 314,
-										"end": 319
+										"start": 123,
+										"end": 128
 									}
 								]
 							}
@@ -346,26 +174,20 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " c4",
-							"start": 203,
-							"end": 208
-						},
-						{
-							"type": "Line",
 							"value": " a retained type shell's run, behind the member's own trailing comment",
-							"start": 211,
-							"end": 283
+							"start": 20,
+							"end": 92
 						}
 					]
 				},
 				{
 					"type": "FunctionDeclaration",
-					"start": 390,
-					"end": 431,
+					"start": 199,
+					"end": 240,
 					"id": {
 						"type": "Identifier",
-						"start": 399,
-						"end": 402,
+						"start": 208,
+						"end": 211,
 						"name": "fn2"
 					},
 					"expression": false,
@@ -374,21 +196,21 @@
 					"params": [],
 					"body": {
 						"type": "BlockStatement",
-						"start": 405,
-						"end": 431,
+						"start": 214,
+						"end": 240,
 						"body": [
 							{
 								"type": "ExpressionStatement",
-								"start": 409,
-								"end": 414,
+								"start": 218,
+								"end": 223,
 								"expression": {
 									"type": "CallExpression",
-									"start": 409,
-									"end": 413,
+									"start": 218,
+									"end": 222,
 									"callee": {
 										"type": "Identifier",
-										"start": 409,
-										"end": 411,
+										"start": 218,
+										"end": 220,
 										"name": "fn"
 									},
 									"arguments": [],
@@ -398,14 +220,14 @@
 									{
 										"type": "Line",
 										"value": " c7",
-										"start": 415,
-										"end": 420
+										"start": 224,
+										"end": 229
 									},
 									{
 										"type": "Line",
 										"value": " c8",
-										"start": 423,
-										"end": 428
+										"start": 232,
+										"end": 237
 									}
 								]
 							}
@@ -415,19 +237,19 @@
 						{
 							"type": "Line",
 							"value": " a block tail: the run separates at the body's own indent",
-							"start": 329,
-							"end": 388
+							"start": 138,
+							"end": 197
 						}
 					]
 				},
 				{
 					"type": "FunctionDeclaration",
-					"start": 515,
-					"end": 577,
+					"start": 324,
+					"end": 386,
 					"id": {
 						"type": "Identifier",
-						"start": 524,
-						"end": 527,
+						"start": 333,
+						"end": 336,
 						"name": "fn3"
 					},
 					"expression": false,
@@ -436,28 +258,28 @@
 					"params": [],
 					"body": {
 						"type": "BlockStatement",
-						"start": 530,
-						"end": 577,
+						"start": 339,
+						"end": 386,
 						"body": [
 							{
 								"type": "ReturnStatement",
-								"start": 534,
-								"end": 574,
+								"start": 343,
+								"end": 383,
 								"argument": {
 									"type": "SequenceExpression",
-									"start": 546,
-									"end": 553,
+									"start": 355,
+									"end": 362,
 									"expressions": [
 										{
 											"type": "Identifier",
-											"start": 546,
-											"end": 547,
+											"start": 355,
+											"end": 356,
 											"name": "a"
 										},
 										{
 											"type": "Identifier",
-											"start": 552,
-											"end": 553,
+											"start": 361,
+											"end": 362,
 											"name": "b"
 										}
 									],
@@ -465,8 +287,8 @@
 										{
 											"type": "Line",
 											"value": " c9",
-											"start": 554,
-											"end": 559
+											"start": 363,
+											"end": 368
 										}
 									]
 								},
@@ -474,8 +296,8 @@
 									{
 										"type": "Line",
 										"value": " c10",
-										"start": 563,
-										"end": 569
+										"start": 372,
+										"end": 378
 									}
 								]
 							}
@@ -485,71 +307,71 @@
 						{
 							"type": "Line",
 							"value": " a sequence's keep-inside gap, where the run's separator is the flush's alone",
-							"start": 434,
-							"end": 513
+							"start": 243,
+							"end": 322
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 660,
-					"end": 704,
+					"start": 469,
+					"end": 513,
 					"id": {
 						"type": "Identifier",
-						"start": 665,
-						"end": 666,
+						"start": 474,
+						"end": 475,
 						"name": "G"
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
-						"start": 669,
-						"end": 703,
+						"start": 478,
+						"end": 512,
 						"typeName": {
 							"type": "Identifier",
-							"start": 669,
-							"end": 672,
+							"start": 478,
+							"end": 481,
 							"name": "Foo"
 						},
 						"typeArguments": {
 							"type": "TSTypeParameterInstantiation",
-							"start": 672,
-							"end": 703,
+							"start": 481,
+							"end": 512,
 							"params": [
 								{
 									"type": "TSTypeReference",
-									"start": 676,
-									"end": 677,
+									"start": 485,
+									"end": 486,
 									"typeName": {
 										"type": "Identifier",
-										"start": 676,
-										"end": 677,
+										"start": 485,
+										"end": 486,
 										"name": "A"
 									}
 								},
 								{
 									"type": "TSUnionType",
-									"start": 681,
-									"end": 686,
+									"start": 490,
+									"end": 495,
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 681,
-											"end": 682,
+											"start": 490,
+											"end": 491,
 											"typeName": {
 												"type": "Identifier",
-												"start": 681,
-												"end": 682,
+												"start": 490,
+												"end": 491,
 												"name": "a"
 											}
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 685,
-											"end": 686,
+											"start": 494,
+											"end": 495,
 											"typeName": {
 												"type": "Identifier",
-												"start": 685,
-												"end": 686,
+												"start": 494,
+												"end": 495,
 												"name": "b"
 											}
 										}
@@ -558,8 +380,8 @@
 										{
 											"type": "Line",
 											"value": " c",
-											"start": 687,
-											"end": 691
+											"start": 496,
+											"end": 500
 										}
 									]
 								}
@@ -570,16 +392,16 @@
 						{
 							"type": "Line",
 							"value": " a bracketed type list's closer, where the run separates inside the brackets",
-							"start": 580,
-							"end": 658
+							"start": 389,
+							"end": 467
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Line",
 							"value": " inj",
-							"start": 694,
-							"end": 700
+							"start": 503,
+							"end": 509
 						}
 					]
 				}

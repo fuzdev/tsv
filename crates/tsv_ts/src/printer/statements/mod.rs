@@ -212,7 +212,11 @@ impl<'a> Printer<'a> {
         );
         // A statement ends its own line, so a run its value deferred out of a stripped
         // pair flushes there, never at an enclosing list's comma.
-        self.with_line_ending_construct(|| self.build_statement_doc_uncounted(statement, ctx))
+        let outer = self.enclosing_statement.replace(Some(statement.span));
+        let built =
+            self.with_line_ending_construct(|| self.build_statement_doc_uncounted(statement, ctx));
+        self.enclosing_statement.set(outer);
+        built
     }
 
     fn build_statement_doc_uncounted(
