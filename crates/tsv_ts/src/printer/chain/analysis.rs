@@ -9,7 +9,7 @@ use super::builder::{build_chain_doc, mark_long_curried_calls};
 use super::printing::chain_gap_share_any;
 use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
 use crate::ast::internal::{self, Expression, ExpressionKind, IdentName};
-use crate::printer::calls::is_memberish;
+use crate::printer::calls::{call_paren_open, is_memberish, sole_template_on_its_own_line};
 use crate::printer::comments::{paren_pair_keeps_leading_run, paren_shell_close_after};
 use crate::printer::{
     ParenContext, Printer, SecondTypeArgs, SpanMarks, instantiation_keeps_pair_before_type_args,
@@ -17,7 +17,6 @@ use crate::printer::{
 };
 use smallvec::SmallVec;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::has_newline_before_position;
 use tsv_lang::{Comment, Span, TAB_WIDTH, has_line_spanning_comments_to_emit_in_range};
 
 //
@@ -343,7 +342,7 @@ fn finalize_chain_nodes(
 ) -> bool {
     apply_paren_gaps(nodes, paren_gaps, input.printer);
     fix_callee_base_parens(nodes, input);
-    let long_curried = mark_own_call_layout(nodes, input.printer.source);
+    let long_curried = mark_own_call_layout(nodes, input.printer);
     #[cfg(feature = "buffer_stats")]
     crate::printer::buffer_stats::record_chain_nodes(nodes.len());
     long_curried
@@ -377,13 +376,13 @@ fn finalize_chain_nodes(
 /// Returns whether the walk met a long-curried pair: a call directly followed by a call that
 /// takes at least one argument and fewer than it — exactly the pairs
 /// [`mark_long_curried_calls`] decides, so a chain without one skips that pass.
-fn mark_own_call_layout(nodes: &mut [ChainNode<'_>], source: &str) -> bool {
+fn mark_own_call_layout(nodes: &mut [ChainNode<'_>], printer: &Printer<'_>) -> bool {
     let mut entered = false;
     let mut long_curried = false;
     // The argument count of the node after this one when that node is a call.
     let mut next_call_args = None;
     for node in nodes.iter_mut().rev() {
-        let ChainNode::Call { call, facts, .. } = node else {
+        let ChainNode::Call { call, span, facts } = node else {
             next_call_args = None;
             continue;
         };
@@ -400,7 +399,8 @@ fn mark_own_call_layout(nodes: &mut [ChainNode<'_>], source: &str) -> bool {
             entered = swallowed;
         } else {
             facts.own_call_layout = true;
-            entered = is_memberish(call.callee) && !template_preempts_chain_redirect(call, source);
+            entered = is_memberish(call.callee)
+                && !template_preempts_chain_redirect(printer, call, *span);
         }
     }
     long_curried
@@ -410,10 +410,18 @@ fn mark_own_call_layout(nodes: &mut [ChainNode<'_>], source: &str) -> bool {
 /// on a line of its own, the one condition in `printCallExpression`'s top `if` that a call
 /// with a memberish callee can meet, and so the only thing that stops the
 /// `printMemberChain` redirect below it.
-fn template_preempts_chain_redirect(call: &internal::CallExpression<'_>, source: &str) -> bool {
+fn template_preempts_chain_redirect(
+    printer: &Printer<'_>,
+    call: &internal::CallExpression<'_>,
+    span: Span,
+) -> bool {
     call.arguments.len() == 1
         && is_multiline_template_expression(call.arguments[0])
-        && !has_newline_before_position(source, call.arguments[0].span().start)
+        && !sole_template_on_its_own_line(
+            printer,
+            call_paren_open(printer, call, span),
+            call.arguments[0].span().start,
+        )
 }
 
 /// Re-evaluate the base node's parens under `Callee` context when it is the

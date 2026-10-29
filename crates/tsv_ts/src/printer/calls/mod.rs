@@ -39,7 +39,9 @@ mod test_patterns;
 pub(crate) use arg_comments::{
     PartitionedComments, has_stripped_paren_gap, skip_stripped_open_paren,
 };
-pub(in crate::printer) use arg_wrapping::{AssumedHugKind, AssumedParamHug};
+pub(in crate::printer) use arg_wrapping::{
+    AssumedHugKind, AssumedParamHug, sole_template_on_its_own_line,
+};
 pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_comment_layout};
 
 use super::chain::{self, ChainCall, call_callee_paren_leading_start};

@@ -1,0 +1,331 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 427,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A leading comment occupies the interpolation whatever the value's kind, an optional",
+			"start": 20,
+			"end": 106
+		},
+		{
+			"type": "Line",
+			"value": " chain included: the interpolation breaks at its `${` and `}` around the chain.",
+			"start": 108,
+			"end": 189
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 210,
+			"end": 218
+		},
+		{
+			"type": "Line",
+			"value": " The same comment hoisted out of a stripped shell at the chain's head.",
+			"start": 268,
+			"end": 340
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 361,
+			"end": 369
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 426,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 417,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 191,
+					"end": 265,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 197,
+							"end": 264,
+							"id": {
+								"type": "Identifier",
+								"start": 197,
+								"end": 200,
+								"name": "aaa"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 203,
+								"end": 264,
+								"expressions": [
+									{
+										"type": "ChainExpression",
+										"start": 219,
+										"end": 259,
+										"expression": {
+											"type": "CallExpression",
+											"start": 219,
+											"end": 259,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 219,
+												"end": 227,
+												"object": {
+													"type": "Identifier",
+													"start": 219,
+													"end": 222,
+													"name": "bbb"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 224,
+													"end": 227,
+													"name": "ccc"
+												},
+												"computed": false,
+												"optional": true
+											},
+											"arguments": [
+												{
+													"type": "FunctionExpression",
+													"start": 228,
+													"end": 258,
+													"id": null,
+													"expression": false,
+													"generator": false,
+													"async": false,
+													"params": [],
+													"body": {
+														"type": "BlockStatement",
+														"start": 240,
+														"end": 258,
+														"body": [
+															{
+																"type": "ReturnStatement",
+																"start": 245,
+																"end": 254,
+																"argument": {
+																	"type": "Literal",
+																	"start": 252,
+																	"end": 253,
+																	"value": 1,
+																	"raw": "1"
+																}
+															}
+														]
+													}
+												}
+											],
+											"optional": false
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 210,
+												"end": 218
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 204,
+										"end": 205,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 262,
+										"end": 263,
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A leading comment occupies the interpolation whatever the value's kind, an optional",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " chain included: the interpolation breaks at its `${` and `}` around the chain.",
+							"start": 108,
+							"end": 189
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 342,
+					"end": 416,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 348,
+							"end": 415,
+							"id": {
+								"type": "Identifier",
+								"start": 348,
+								"end": 351,
+								"name": "ddd"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 354,
+								"end": 415,
+								"expressions": [
+									{
+										"type": "ChainExpression",
+										"start": 370,
+										"end": 410,
+										"expression": {
+											"type": "CallExpression",
+											"start": 370,
+											"end": 410,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 370,
+												"end": 378,
+												"object": {
+													"type": "Identifier",
+													"start": 370,
+													"end": 373,
+													"name": "eee"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 375,
+													"end": 378,
+													"name": "fff"
+												},
+												"computed": false,
+												"optional": true
+											},
+											"arguments": [
+												{
+													"type": "FunctionExpression",
+													"start": 379,
+													"end": 409,
+													"id": null,
+													"expression": false,
+													"generator": false,
+													"async": false,
+													"params": [],
+													"body": {
+														"type": "BlockStatement",
+														"start": 391,
+														"end": 409,
+														"body": [
+															{
+																"type": "ReturnStatement",
+																"start": 396,
+																"end": 405,
+																"argument": {
+																	"type": "Literal",
+																	"start": 403,
+																	"end": 404,
+																	"value": 1,
+																	"raw": "1"
+																}
+															}
+														]
+													}
+												}
+											],
+											"optional": false
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c2 ",
+												"start": 361,
+												"end": 369
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 355,
+										"end": 356,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 413,
+										"end": 414,
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same comment hoisted out of a stripped shell at the chain's head.",
+							"start": 268,
+							"end": 340
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

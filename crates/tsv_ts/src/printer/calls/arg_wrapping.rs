@@ -2978,7 +2978,11 @@ pub(super) fn multiline_template_hug_applies(
     is_sole_multiline_template_arg(args)
         // Prettier's `isTemplateOnItsOwnLine`: a template the author put on a line of its
         // own declines, and the caller falls through to the expanded layout.
-        && !has_newline_before_position(printer.source, args[0].span().start)
+        && !sole_template_on_its_own_line(
+            printer,
+            gap_start,
+            args[0].span().start,
+        )
         // An honored directive in this gap DECLINES the hug — the parameter list's answer to
         // the same question (`docs/conformance_prettier_ignore.md` §On parameter lists: "a
         // lone huggable parameter expands rather than hugging, because a hug would pull the
@@ -2992,6 +2996,82 @@ pub(super) fn multiline_template_hug_applies(
         // the template on a fresh line only when nothing else follows it, and
         // `` fn(⏎// prettier-ignore⏎/* x */ `a⏎b`) `` glues a SECOND comment to the backtick.
         && printer.args_frozen_span(gap_start, args, 0).is_none()
+}
+
+/// Prettier's `isTemplateOnItsOwnLine` for a sole multiline template argument, read at the
+/// rule's FIXED POINT: whether the template starts a line of its own, asked of what the
+/// chosen layout PRINTS ahead of the backtick rather than of the source alone.
+///
+/// Prettier asks the source — a newline between the backtick and the last thing before it
+/// — and with no comment in the `(`-line gap that is a fixed point both ways: the hug
+/// prints the backtick behind the `(`, the expanded list on a line of its own. A comment
+/// run in the gap breaks that, because what precedes the backtick in the OUTPUT is the
+/// run's last separator, which the source test never reads:
+///
+/// - hugged behind a run that ends its line (a `//`, an own-line block — often one the
+///   printer relocated from the callee→`(` gap or out of a stripped shell:
+///   `` x()⏎/* c */⏎(`⏎`) ``, `` a(// c⏎(`⏎`)) ``), the backtick lands on a line of its own
+///   and the next pass expands;
+/// - expanded behind a run that glues to the backtick (a block glued to a stripped `(`
+///   whose newline the source test read: `` a(/* c */ (⏎`a⏎b`)) ``), the backtick follows
+///   the comment and the next pass hugs.
+///
+/// Prettier takes those two passes; tsv answers with the layout whose output reads as
+/// itself. The authored answer stands when its own layout is stable — or when neither is,
+/// where no answer converges. Each layout's last separator is its emitter's own decision
+/// ([`Printer::rhs_comments_glued_tail_separator`] for the hug,
+/// [`Printer::leading_run_tail_separator`] in the argument list's stripped-paren mode for
+/// the expanded list), and a comment OWNED by the template is glued to it in both.
+///
+/// The one definition, asked by every spelling of the hug: the plain call and `new`
+/// ([`multiline_template_hug_applies`]), the member chain's redirect preempt and the chain's
+/// own link, whose hug prints the plain call's run.
+pub(in crate::printer) fn sole_template_on_its_own_line(
+    printer: &Printer<'_>,
+    gap_start: u32,
+    template_start: u32,
+) -> bool {
+    let authored = has_newline_before_position(printer.source, template_start);
+    if !printer.has_comments_on_page_between(gap_start, template_start) {
+        return authored;
+    }
+    sole_template_on_its_own_line_commented(printer, gap_start, template_start, authored)
+}
+
+/// [`sole_template_on_its_own_line`] past its comment gate.
+#[inline(never)]
+fn sole_template_on_its_own_line_commented(
+    printer: &Printer<'_>,
+    gap_start: u32,
+    template_start: u32,
+    authored: bool,
+) -> bool {
+    use crate::printer::comments::{LeadingGlue, LeadingSeparator};
+    let owned_last = printer
+        .comments_on_page_between(gap_start, template_start)
+        .last()
+        .is_some_and(|c| c.owned_by_node);
+    let (hug_glued, list_glued) = if owned_last {
+        (true, true)
+    } else {
+        let list_glued = printer
+            .leading_run_tail_separator(
+                printer.comments_to_emit_between(gap_start, template_start),
+                template_start,
+                LeadingGlue::AdjacentStrippedParen,
+            )
+            .is_some_and(|(separator, _)| separator == LeadingSeparator::Space);
+        let hug_glued = printer.rhs_comments_glued_tail_separator(gap_start, template_start)
+            == Some(LeadingSeparator::Space);
+        (hug_glued, list_glued)
+    };
+    if authored {
+        // Expanded unless its output glues the backtick back and the hug's keeps it glued.
+        !(list_glued && hug_glued)
+    } else {
+        // Hugged unless its output strands the backtick and the expanded list's keeps it so.
+        !hug_glued && !list_glued
+    }
 }
 
 /// The shape half of [`multiline_template_hug_applies`] — the argument list is one

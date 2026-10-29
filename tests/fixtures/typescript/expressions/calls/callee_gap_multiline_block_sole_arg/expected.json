@@ -1,0 +1,342 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 351,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A multi-line block between the callee and its `(` leads the sole argument, and its",
+			"start": 20,
+			"end": 105
+		},
+		{
+			"type": "Line",
+			"value": " lines break the argument list open",
+			"start": 107,
+			"end": 144
+		},
+		{
+			"type": "Block",
+			"value": " c1\nd1 ",
+			"start": 157,
+			"end": 168
+		},
+		{
+			"type": "Block",
+			"value": " c2\nd2 ",
+			"start": 192,
+			"end": 203
+		},
+		{
+			"type": "Block",
+			"value": " c4\nd4 ",
+			"start": 230,
+			"end": 241
+		},
+		{
+			"type": "Line",
+			"value": " A single-line block leads the argument inline",
+			"start": 260,
+			"end": 308
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 318,
+			"end": 326
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 350,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 341,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 146,
+					"end": 184,
+					"expression": {
+						"type": "CallExpression",
+						"start": 146,
+						"end": 183,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 146,
+							"end": 153,
+							"object": {
+								"type": "Identifier",
+								"start": 146,
+								"end": 149,
+								"name": "aaa"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 150,
+								"end": 153,
+								"name": "bbb"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 169,
+								"end": 180,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 175,
+									"end": 180,
+									"callee": {
+										"type": "Identifier",
+										"start": 175,
+										"end": 178,
+										"name": "ccc"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1\nd1 ",
+										"start": 157,
+										"end": 168
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line block between the callee and its `(` leads the sole argument, and its",
+							"start": 20,
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " lines break the argument list open",
+							"start": 107,
+							"end": 144
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 186,
+					"end": 221,
+					"expression": {
+						"type": "CallExpression",
+						"start": 186,
+						"end": 220,
+						"callee": {
+							"type": "CallExpression",
+							"start": 186,
+							"end": 218,
+							"callee": {
+								"type": "ArrayExpression",
+								"start": 186,
+								"end": 188,
+								"elements": []
+							},
+							"arguments": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 204,
+									"end": 215,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "CallExpression",
+										"start": 210,
+										"end": 215,
+										"callee": {
+											"type": "Identifier",
+											"start": 210,
+											"end": 213,
+											"name": "ddd"
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c2\nd2 ",
+											"start": 192,
+											"end": 203
+										}
+									]
+								}
+							],
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 223,
+					"end": 257,
+					"expression": {
+						"type": "CallExpression",
+						"start": 223,
+						"end": 256,
+						"callee": {
+							"type": "Identifier",
+							"start": 223,
+							"end": 226,
+							"name": "hhh"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 242,
+								"end": 253,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 248,
+									"end": 253,
+									"callee": {
+										"type": "Identifier",
+										"start": 248,
+										"end": 251,
+										"name": "iii"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c4\nd4 ",
+										"start": 230,
+										"end": 241
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 310,
+					"end": 340,
+					"expression": {
+						"type": "CallExpression",
+						"start": 310,
+						"end": 339,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 310,
+							"end": 317,
+							"object": {
+								"type": "Identifier",
+								"start": 310,
+								"end": 313,
+								"name": "eee"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 314,
+								"end": 317,
+								"name": "fff"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 327,
+								"end": 338,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 333,
+									"end": 338,
+									"callee": {
+										"type": "Identifier",
+										"start": 333,
+										"end": 336,
+										"name": "ggg"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c3 ",
+										"start": 318,
+										"end": 326
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A single-line block leads the argument inline",
+							"start": 260,
+							"end": 308
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

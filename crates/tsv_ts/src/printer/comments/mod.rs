@@ -50,7 +50,7 @@ pub(crate) use paren::{
     AsiOperandShell, LeftSpineClaim, ParenLeadingValue, next_significant_byte,
     paren_pair_keeps_leading_run, paren_shell_close_after,
 };
-pub(crate) use paren::{leading_regex_start, left_spine_shell_is_comment_free};
+pub(crate) use paren::{LeftSpineStep, leading_regex_start, left_spine_shell_is_comment_free};
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
 pub(super) use super::{Printer, calls};
@@ -310,6 +310,18 @@ impl LeadingGlue {
     fn first_opens_own_line(self) -> bool {
         matches!(self, Self::AdjacentOwnLine)
     }
+}
+
+/// The separator a leading-comment run prints after one comment — prettier's
+/// `printLeadingComment` three ([`Printer::push_leading_comment_run`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LeadingSeparator {
+    /// A space: the comment is glued to what follows (`/* c */ X`).
+    Space,
+    /// The soft `line`: a newline after the `*/` but none before the `/*`.
+    Line,
+    /// A blank-preserving `hardline`: a line comment, or an own-line block.
+    Hard,
 }
 
 /// How a broke-after run's separators render
@@ -2571,17 +2583,38 @@ impl<'a> Printer<'a> {
     /// beside it in the same concat. Welding it instead merged the pair on one pass
     /// (`= /* c1 */ /* c2 */⏎v`) and collapsed the value onto it on the next.
     pub(crate) fn build_rhs_comments_glued_opt(&self, start: u32, end: u32) -> Option<DocId> {
-        let (doc, forces_break) = self.build_leading_comment_run_with_break(
-            start,
+        let glue = self.rhs_comments_glued_mode(start, end)?;
+        self.build_leading_comment_run_opt(start, end, glue)
+    }
+
+    /// The glue [`build_rhs_comments_glued_opt`](Self::build_rhs_comments_glued_opt) builds its
+    /// run in: the glued mode, or the plain one when the glued run would push a `hardline`.
+    /// `None` when the range holds no comment to emit.
+    fn rhs_comments_glued_mode(&self, start: u32, end: u32) -> Option<LeadingGlue> {
+        let (_, forces_break) = self.leading_run_tail_separator(
+            self.comments_to_emit_between(start, end),
             end,
             LeadingGlue::AdjacentGlued,
-            None,
         )?;
-        if forces_break {
-            self.build_leading_comment_run_opt(start, end, LeadingGlue::Adjacent)
+        Some(if forces_break {
+            LeadingGlue::Adjacent
         } else {
-            Some(doc)
-        }
+            LeadingGlue::AdjacentGlued
+        })
+    }
+
+    /// The separator [`build_rhs_comments_glued_opt`](Self::build_rhs_comments_glued_opt)
+    /// prints after its run's LAST comment — read in that builder's own mode
+    /// ([`Self::rhs_comments_glued_mode`]) through [`Self::leading_run_tail_separator`],
+    /// without building the run. `None` when the range holds no comment to emit.
+    pub(crate) fn rhs_comments_glued_tail_separator(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> Option<LeadingSeparator> {
+        let glue = self.rhs_comments_glued_mode(start, end)?;
+        self.leading_run_tail_separator(self.comments_to_emit_between(start, end), end, glue)
+            .map(|(separator, _)| separator)
     }
 
     /// Emit a run of leading comments before `terminal_pos` — the value, member,
@@ -2673,99 +2706,156 @@ impl<'a> Printer<'a> {
         let mut is_first = true;
         let mut comments = comments.peekable();
         while let Some(comment) = comments.next() {
-            // See `LeadingGlue::AdjacentAnchorLine`: only the run's first comment can have
-            // its authored newline-before erased, and only at that one site.
-            let first_shares_anchor_line = is_first && glue.first_shares_anchor_line();
-            let first_opens_own_line = is_first && glue.first_opens_own_line();
-            is_first = false;
             parts.push(self.build_comment_doc(comment));
-            // The next thing after this comment — the following comment, or the
-            // terminal (value/member/item/body) for the last one. Anchored on the
-            // PHYSICAL next comment, not just the emitted one: an owned comment (glued
-            // to the value, so printed by the value's node and skipped by the emit
-            // iterator) still occupies the gap here, and both the glue test and the
-            // blank-line scan below are physical questions. Anchoring past it would
-            // unglue a run the author wrote glued (`/* a */ /* b⏎*/ v` → `/* a */` on
-            // its own line) and, worse, read the owned comment's own newline as an
-            // author blank line — inserting one on the next pass (non-idempotent).
-            // Owned comments are always the glued suffix of a leading run, so this
-            // only ever differs at the last emitted comment; bounding `blank_scan_end`
-            // at the emit-next keeps it from over-reaching a caller's filtered set.
-            let next = self.blank_scan_end_after(
+            let (separator, next) = self.leading_comment_separator(
                 comment,
-                comments.peek().map_or(terminal_pos, |c| c.span.start),
+                comments.peek().copied(),
+                terminal_pos,
+                glue,
+                is_first,
             );
-            // An honored format-ignore directive next in the run keeps its line whatever
-            // the source around THIS comment says (`Self::directive_follows`).
-            let directive_next = self.directive_follows(comments.peek().copied());
-            let hugs = !directive_next
-                && match glue {
-                    // `AdjacentValueGap` differs from `Adjacent` only in the blank-line
-                    // rule below, not in the hug test — the soft `line` is the point at a
-                    // value gap (it lets a value too long for the comment's line break
-                    // below it), so it must not become an unconditional space.
-                    LeadingGlue::Adjacent
-                    | LeadingGlue::AdjacentValueGap
-                    | LeadingGlue::AdjacentAnchorLine
-                    | LeadingGlue::AdjacentOwnLine => self.comment_hugs_next(comment),
-                    // A glued (not own-line) single-line block hugs across a source
-                    // newline; the hugs-what-follows case still hugs as in `Adjacent`.
-                    // ⚠️ That first half asks the comment's own neighbours, never the
-                    // distance to `next`: for the LAST comment `next` is the value's span
-                    // start, which sits INSIDE any grouping paren the author wrote, so a
-                    // break they put after the `(` read as a break after the comment and
-                    // un-glued a run prettier keeps glued (`= /* c */ (⏎v)`).
-                    LeadingGlue::AdjacentGlued => {
-                        comment.is_block
-                            && (self.comment_hugs_next(comment)
-                                || !self.comment_cannot_glue_to_operator(comment))
-                    }
-                    // `Adjacent`, plus the stripped grouping paren the author glued the
-                    // comment to (`/* c */ (⏎…`) — invisible in the output, so the newline it
-                    // left behind must not un-glue the pair.
-                    LeadingGlue::AdjacentStrippedParen => {
-                        self.comment_hugs_next(comment)
-                            || (comment.is_block
-                                && calls::has_stripped_paren_gap(
-                                    self.source,
-                                    comment.span.end,
-                                    next,
-                                ))
-                    }
-                };
-            if hugs {
-                // Value (or next comment) shares the `*/` line — keep it glued.
-                parts.push(d.text(" "));
-            } else if !directive_next
-                && comment.is_block
-                // `first_shares_anchor_line ||` reads as "this comment HAS no own line to
-                // keep, so don't ask" — and short-circuits the source scan when so.
-                && (first_shares_anchor_line
-                    || !(first_opens_own_line || self.is_own_line_comment(comment)))
-                && !(glue.blank_forces_own_line()
-                    && self.has_blank_line_between_strict(comment.span.end, next))
-            {
-                // A block with a newline *after* its `*/` but none before its `/*`:
-                // prettier's `printLeadingComment` emits a soft `line` here, so what
-                // follows pulls up onto the comment's line when the enclosing group
-                // fits and drops below when it breaks. An own-line block (newline on
-                // both sides) takes the `hardline` branch instead.
-                //
-                // Whether a **blank** line after the `*/` overrides that and forces the
-                // hardline is per-site (`LeadingGlue::blank_forces_own_line`): it does
-                // in a list, where a blank between items is ordinary authoring tsv
-                // preserves, and does not in a value gap, where the blank sits inside a
-                // break already judged unforced.
-                parts.push(d.line());
-            } else {
-                // Line comment, or an own-line block: keep them on separate lines
-                // (preserve the author's layout; a line comment must break so it
-                // can't absorb the value).
-                self.push_blank_preserving_hardline(parts, comment.span.end, next);
-                forces_break = true;
+            is_first = false;
+            match separator {
+                LeadingSeparator::Space => parts.push(d.text(" ")),
+                LeadingSeparator::Line => parts.push(d.line()),
+                LeadingSeparator::Hard => {
+                    self.push_blank_preserving_hardline(parts, comment.span.end, next);
+                    forces_break = true;
+                }
             }
         }
         forces_break
+    }
+
+    /// What [`push_leading_comment_run`](Self::push_leading_comment_run) would print after
+    /// the run's LAST comment, and whether any separator in the run is a `hardline` — the
+    /// emitter's own decision ([`Self::leading_comment_separator`]), read without building
+    /// the run. `None` for an empty run.
+    ///
+    /// For the layout question a seam must answer BEFORE it picks the builder that emits
+    /// the run: whether the item the run leads still shares the last comment's line in the
+    /// output — the reparse's reading of that line. A sole multiline template the call hug
+    /// prints behind a comment run is the case (`sole_template_on_its_own_line`, in
+    /// `calls::arg_wrapping`).
+    pub(crate) fn leading_run_tail_separator<'c>(
+        &self,
+        comments: impl Iterator<Item = &'c Comment>,
+        terminal_pos: u32,
+        glue: LeadingGlue,
+    ) -> Option<(LeadingSeparator, bool)> {
+        let mut is_first = true;
+        let mut any_hard = false;
+        let mut last = None;
+        let mut comments = comments.peekable();
+        while let Some(comment) = comments.next() {
+            let (separator, _) = self.leading_comment_separator(
+                comment,
+                comments.peek().copied(),
+                terminal_pos,
+                glue,
+                is_first,
+            );
+            is_first = false;
+            any_hard |= separator == LeadingSeparator::Hard;
+            last = Some(separator);
+        }
+        last.map(|separator| (separator, any_hard))
+    }
+
+    /// The separator [`push_leading_comment_run`](Self::push_leading_comment_run) prints
+    /// after `comment` — the one statement of the run's three-way rule, read by the emitter
+    /// and by [`Self::leading_run_tail_separator`] — plus the blank-scan end its `hardline`
+    /// preserves an author blank up to. `peek` is the run's next comment.
+    fn leading_comment_separator(
+        &self,
+        comment: &Comment,
+        peek: Option<&Comment>,
+        terminal_pos: u32,
+        glue: LeadingGlue,
+        is_first: bool,
+    ) -> (LeadingSeparator, u32) {
+        // See `LeadingGlue::AdjacentAnchorLine`: only the run's first comment can have
+        // its authored newline-before erased, and only at that one site.
+        let first_shares_anchor_line = is_first && glue.first_shares_anchor_line();
+        let first_opens_own_line = is_first && glue.first_opens_own_line();
+        // The next thing after this comment — the following comment, or the
+        // terminal (value/member/item/body) for the last one. Anchored on the
+        // PHYSICAL next comment, not just the emitted one: an owned comment (glued
+        // to the value, so printed by the value's node and skipped by the emit
+        // iterator) still occupies the gap here, and both the glue test and the
+        // blank-line scan below are physical questions. Anchoring past it would
+        // unglue a run the author wrote glued (`/* a */ /* b⏎*/ v` → `/* a */` on
+        // its own line) and, worse, read the owned comment's own newline as an
+        // author blank line — inserting one on the next pass (non-idempotent).
+        // Owned comments are always the glued suffix of a leading run, so this
+        // only ever differs at the last emitted comment; bounding `blank_scan_end`
+        // at the emit-next keeps it from over-reaching a caller's filtered set.
+        let next = self.blank_scan_end_after(comment, peek.map_or(terminal_pos, |c| c.span.start));
+        // An honored format-ignore directive next in the run keeps its line whatever
+        // the source around THIS comment says (`Self::directive_follows`).
+        let directive_next = self.directive_follows(peek);
+        let hugs = !directive_next
+            && match glue {
+                // `AdjacentValueGap` differs from `Adjacent` only in the blank-line
+                // rule below, not in the hug test — the soft `line` is the point at a
+                // value gap (it lets a value too long for the comment's line break
+                // below it), so it must not become an unconditional space.
+                LeadingGlue::Adjacent
+                | LeadingGlue::AdjacentValueGap
+                | LeadingGlue::AdjacentAnchorLine
+                | LeadingGlue::AdjacentOwnLine => self.comment_hugs_next(comment),
+                // A glued (not own-line) single-line block hugs across a source
+                // newline; the hugs-what-follows case still hugs as in `Adjacent`.
+                // ⚠️ That first half asks the comment's own neighbours, never the
+                // distance to `next`: for the LAST comment `next` is the value's span
+                // start, which sits INSIDE any grouping paren the author wrote, so a
+                // break they put after the `(` read as a break after the comment and
+                // un-glued a run prettier keeps glued (`= /* c */ (⏎v)`).
+                LeadingGlue::AdjacentGlued => {
+                    comment.is_block
+                        && (self.comment_hugs_next(comment)
+                            || !self.comment_cannot_glue_to_operator(comment))
+                }
+                // `Adjacent`, plus the stripped grouping paren the author glued the
+                // comment to (`/* c */ (⏎…`) — invisible in the output, so the newline it
+                // left behind must not un-glue the pair.
+                LeadingGlue::AdjacentStrippedParen => {
+                    self.comment_hugs_next(comment)
+                        || (comment.is_block
+                            && calls::has_stripped_paren_gap(self.source, comment.span.end, next))
+                }
+            };
+        let separator = if hugs {
+            // Value (or next comment) shares the `*/` line — keep it glued.
+            LeadingSeparator::Space
+        } else if !directive_next
+            && comment.is_block
+            // `first_shares_anchor_line ||` reads as "this comment HAS no own line to
+            // keep, so don't ask" — and short-circuits the source scan when so.
+            && (first_shares_anchor_line
+                || !(first_opens_own_line || self.is_own_line_comment(comment)))
+            && !(glue.blank_forces_own_line()
+                && self.has_blank_line_between_strict(comment.span.end, next))
+        {
+            // A block with a newline *after* its `*/` but none before its `/*`:
+            // prettier's `printLeadingComment` emits a soft `line` here, so what
+            // follows pulls up onto the comment's line when the enclosing group
+            // fits and drops below when it breaks. An own-line block (newline on
+            // both sides) takes the `hardline` branch instead.
+            //
+            // Whether a **blank** line after the `*/` overrides that and forces the
+            // hardline is per-site (`LeadingGlue::blank_forces_own_line`): it does
+            // in a list, where a blank between items is ordinary authoring tsv
+            // preserves, and does not in a value gap, where the blank sits inside a
+            // break already judged unforced.
+            LeadingSeparator::Line
+        } else {
+            // Line comment, or an own-line block: keep them on separate lines
+            // (preserve the author's layout; a line comment must break so it
+            // can't absorb the value).
+            LeadingSeparator::Hard
+        };
+        (separator, next)
     }
 
     /// Push a leading block-comment run the author broke after

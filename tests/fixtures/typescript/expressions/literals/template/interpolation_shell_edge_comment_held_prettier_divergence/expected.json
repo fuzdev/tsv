@@ -1,0 +1,340 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 472,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `//` in a shell the member chain prints MID-CHAIN stays in the chain: it occupies",
+			"start": 20,
+			"end": 106
+		},
+		{
+			"type": "Line",
+			"value": " nothing at the `${` edge, and the interpolation hugs the chain",
+			"start": 108,
+			"end": 173
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 197,
+			"end": 202
+		},
+		{
+			"type": "Line",
+			"value": " A comment the leaf OWNS stays inside a pair the printer keeps (here the member object's",
+			"start": 225,
+			"end": 315
+		},
+		{
+			"type": "Line",
+			"value": " parens around a conditional), so the interpolation hugs too",
+			"start": 317,
+			"end": 379
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 398,
+			"end": 406
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 471,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 462,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 175,
+					"end": 222,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 181,
+							"end": 221,
+							"id": {
+								"type": "Identifier",
+								"start": 181,
+								"end": 184,
+								"name": "aaa"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 187,
+								"end": 221,
+								"expressions": [
+									{
+										"type": "CallExpression",
+										"start": 191,
+										"end": 218,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 191,
+											"end": 213,
+											"object": {
+												"type": "MemberExpression",
+												"start": 191,
+												"end": 209,
+												"object": {
+													"type": "Identifier",
+													"start": 191,
+													"end": 194,
+													"name": "bbb"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 206,
+													"end": 209,
+													"name": "ccc",
+													"leadingComments": [
+														{
+															"type": "Line",
+															"value": " c1",
+															"start": 197,
+															"end": 202
+														}
+													]
+												},
+												"computed": false,
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 210,
+												"end": 213,
+												"name": "ddd"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 214,
+												"end": 217,
+												"name": "eee"
+											}
+										],
+										"optional": false
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 188,
+										"end": 189,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 219,
+										"end": 220,
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `//` in a shell the member chain prints MID-CHAIN stays in the chain: it occupies",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " nothing at the `${` edge, and the interpolation hugs the chain",
+							"start": 108,
+							"end": 173
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 381,
+					"end": 461,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 387,
+							"end": 460,
+							"id": {
+								"type": "Identifier",
+								"start": 387,
+								"end": 390,
+								"name": "fff"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 393,
+								"end": 460,
+								"expressions": [
+									{
+										"type": "CallExpression",
+										"start": 397,
+										"end": 457,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 397,
+											"end": 427,
+											"object": {
+												"type": "ConditionalExpression",
+												"start": 407,
+												"end": 422,
+												"test": {
+													"type": "Identifier",
+													"start": 407,
+													"end": 410,
+													"name": "ggg"
+												},
+												"consequent": {
+													"type": "Identifier",
+													"start": 413,
+													"end": 416,
+													"name": "hhh"
+												},
+												"alternate": {
+													"type": "Identifier",
+													"start": 419,
+													"end": 422,
+													"name": "iii"
+												},
+												"leadingComments": [
+													{
+														"type": "Block",
+														"value": " c2 ",
+														"start": 398,
+														"end": 406
+													}
+												]
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 424,
+												"end": 427,
+												"name": "jjj"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "FunctionExpression",
+												"start": 428,
+												"end": 456,
+												"id": null,
+												"expression": false,
+												"generator": false,
+												"async": false,
+												"params": [],
+												"body": {
+													"type": "BlockStatement",
+													"start": 440,
+													"end": 456,
+													"body": [
+														{
+															"type": "ReturnStatement",
+															"start": 444,
+															"end": 453,
+															"argument": {
+																"type": "Literal",
+																"start": 451,
+																"end": 452,
+																"value": 1,
+																"raw": "1"
+															}
+														}
+													]
+												}
+											}
+										],
+										"optional": false
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 394,
+										"end": 395,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 458,
+										"end": 459,
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment the leaf OWNS stays inside a pair the printer keeps (here the member object's",
+							"start": 225,
+							"end": 315
+						},
+						{
+							"type": "Line",
+							"value": " parens around a conditional), so the interpolation hugs too",
+							"start": 317,
+							"end": 379
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

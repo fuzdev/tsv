@@ -1,0 +1,237 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 390,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " fits at 100 columns: the interpolation stays on one line",
+			"start": 20,
+			"end": 79
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 97,
+			"end": 105
+		},
+		{
+			"type": "Line",
+			"value": " 101 columns: the interpolation breaks at its `${` and `}`, the comment leading the value",
+			"start": 182,
+			"end": 273
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 294,
+			"end": 302
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 389,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 380,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 81,
+					"end": 179,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 87,
+							"end": 178,
+							"id": {
+								"type": "Identifier",
+								"start": 87,
+								"end": 90,
+								"name": "vvv"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 93,
+								"end": 178,
+								"expressions": [
+									{
+										"type": "CallExpression",
+										"start": 106,
+										"end": 175,
+										"callee": {
+											"type": "Identifier",
+											"start": 106,
+											"end": 109,
+											"name": "fff"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 110,
+												"end": 174,
+												"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+											}
+										],
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 97,
+												"end": 105
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 94,
+										"end": 95,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 176,
+										"end": 177,
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " fits at 100 columns: the interpolation stays on one line",
+							"start": 20,
+							"end": 79
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 275,
+					"end": 379,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 281,
+							"end": 378,
+							"id": {
+								"type": "Identifier",
+								"start": 281,
+								"end": 284,
+								"name": "www"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 287,
+								"end": 378,
+								"expressions": [
+									{
+										"type": "CallExpression",
+										"start": 303,
+										"end": 373,
+										"callee": {
+											"type": "Identifier",
+											"start": 303,
+											"end": 306,
+											"name": "ggg"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 307,
+												"end": 372,
+												"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+											}
+										],
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c2 ",
+												"start": 294,
+												"end": 302
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 288,
+										"end": 289,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 376,
+										"end": 377,
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 columns: the interpolation breaks at its `${` and `}`, the comment leading the value",
+							"start": 182,
+							"end": 273
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

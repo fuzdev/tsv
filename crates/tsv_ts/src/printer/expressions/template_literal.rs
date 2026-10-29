@@ -5,7 +5,7 @@
 
 use crate::ast::internal::{Expression, ExpressionKind};
 use crate::printer::chain::tag_paren_leading_start;
-use crate::printer::comments::CommentSpacing;
+use crate::printer::comments::{CommentSpacing, LeftSpineStep, left_spine_shell_is_comment_free};
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::needs_parens::strip_non_null_wrappers;
 use crate::printer::{CommentVec, ParenContext, Printer, SecondTypeArgs};
@@ -125,10 +125,20 @@ impl<'a> Printer<'a> {
                 // qualifying-type list — which decides this layout only for an interpolation
                 // holding NO comment — and collapse a `${…}` the comment had already broken,
                 // at every kind outside that list (`${/* c⏎d */ a!}`, `${/* c⏎d */ f()}`).
+                //
+                // Both halves read the value's PRINTED edges, not its span: a run the value's
+                // printer hoists out of a stripped shell on its left spine sits inside the span
+                // yet prints right behind the `${`, where the shell-free spelling writes it and
+                // the reparse reads it (`${(/* c */ a)`⏎`}` prints `${/* c */ a`⏎`}`, which
+                // wraps), and one in a shell on its right spine prints at its end. Bounding the
+                // scan at the span hugged on the first pass what the second wraps
+                // ([`Self::interpolation_leading_comment_on_page`]).
                 let interpolation_has_comment_on_page = template_has_comments
-                    && (self.has_comments_on_page_between(quasi.span.end, expr.span().start)
-                        || self
-                            .has_comments_on_page_between(expr.span().end, next_quasi.span.start));
+                    && (self.interpolation_leading_comment_on_page(quasi.span.end, expr)
+                        || self.has_comments_on_page_between(
+                            self.right_spine_printed_end(expr),
+                            next_quasi.span.start,
+                        ));
                 let has_trailing_line_comment = trailing_comments.iter().any(|c| !c.is_block);
                 // Whether a broken interpolation wraps its value in `${`/`}` breaks — the
                 // closing one is a line end a deferred run can take (below).
@@ -235,6 +245,50 @@ impl<'a> Printer<'a> {
 
         parts.push(d.text("`"));
         d.concat(&parts)
+    }
+
+    /// Whether a comment occupies the interpolation AHEAD of its value, as printed: in the
+    /// `${`→value gap, or hoisted to the value's front from a stripped shell on its left
+    /// spine.
+    ///
+    /// Walks [`Self::left_spine_steps`], and the two comment classes travel differently
+    /// (`docs/comments.md` §The left-spine shell run). A run the shell gap EMITS is hoisted
+    /// out in front of a pair the printer re-emits, but not out of a shell the chain prints
+    /// mid-chain. A comment the leaf OWNS prints from the leaf's own doc, which the chain
+    /// prints first however far below a mid-chain shell it sits
+    /// (`${(/* c */ a.b.c())?.d⏎}`), but which a re-emitted pair holds
+    /// (`${(/* c */ a + b).m⏎}` keeps the block behind the member object's `(`, where it
+    /// occupies nothing at the interpolation's edge).
+    fn interpolation_leading_comment_on_page(&self, gap_start: u32, expr: &Expression<'_>) -> bool {
+        let start = expr.span().start;
+        if self.has_comments_on_page_between(gap_start, start) {
+            return true;
+        }
+        if self.source.as_bytes().get(start as usize) != Some(&b'(')
+            || left_spine_shell_is_comment_free(self.source, start)
+        {
+            return false;
+        }
+        let mut owned_held = false;
+        self.left_spine_steps(expr).any(
+            |LeftSpineStep {
+                 node,
+                 child,
+                 mid_chain,
+             }| {
+                owned_held |= self.left_shell_paren_is_emitted(node, child);
+                node.span().start < child.span().start
+                    && self
+                        .comments_in_source_between(node.span().start, child.span().start)
+                        .any(|c| {
+                            if c.owned_by_node {
+                                !owned_held
+                            } else {
+                                !mid_chain
+                            }
+                        })
+            },
+        )
     }
 
     /// Get the visual indent size of the last line in template quasi text.

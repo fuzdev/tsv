@@ -584,8 +584,13 @@ pub(super) fn last_arg_has_comments(
             return true;
         }
     } else {
-        // Single-arg: check after opening paren
-        if printer.has_comments_on_page_between(paren_open + 1, last_start) {
+        // Single-arg: the whole `paren_open`→argument window. `paren_open` is where the
+        // argument side OPENS (`CalleeGap::paren_open`) — the callee's end on an unsplit gap,
+        // where a callee→`(` comment the printer relocates into the list sits; never the
+        // `(` itself there, so skipping a byte from it skipped a comment glued to the
+        // callee (`a.b/* c⏎d */(() => e())` hugged on pass 1, then expanded once the
+        // comment led the argument).
+        if printer.has_comments_on_page_between(paren_open, last_start) {
             return true;
         }
     }

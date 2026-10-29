@@ -34,7 +34,7 @@ use super::arg_wrapping::{
     classify_chain_arg, first_arg_signature_refuses_expand_first, last_arg_arrow_gap_break,
     last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, prepend_hugged_arrow_body_comments, should_expand_first_arg,
-    try_hook_deps_args_doc,
+    sole_template_on_its_own_line, try_hook_deps_args_doc,
 };
 use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::expressions::functions::{
@@ -44,7 +44,6 @@ use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocArena;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::has_newline_before_position;
 
 /// The doc a chain call prints ahead of its `(`: an optional call's `?.` half, the
 /// callee→type-arguments comments and the type arguments themselves — `None` when the call
@@ -1113,7 +1112,7 @@ fn build_chain_args_single(
     //    that separate are `` a.b(`x⏎y`).c() `` (a link, expands) and `` a(`x⏎y`).b() ``
     //    (prettier's chain BASE, printed with `print()`, hugs).
     let template_expands = is_multiline_template_expression(arg)
-        && (has_newline_before_position(printer.source, arg_start) || !own_call_layout);
+        && (sole_template_on_its_own_line(printer, paren_open, arg_start) || !own_call_layout);
 
     if template_expands {
         // `arg_with_comments`, per the ⚠️ above — this arm rebuilt the argument from
@@ -1149,8 +1148,26 @@ fn build_chain_args_single(
     // exactly two movers, both prettier-suite files, and both AWAY from prettier's committed
     // output. The residual — the member-chain link, where tsv hugs and prettier expands — is
     // a chain-linearization difference, not this arm's.
+    //
+    // The `(`-line run takes the plain call's hug run ([`try_hug_multiline_template_arg`]'s
+    // glued value-gap emitter, [`Printer::build_rhs_comments_glued_opt`]), not the list's:
+    // the hug is one layout across the call families, and [`sole_template_on_its_own_line`]
+    // decided it by what THAT run prints ahead of the backtick. The list's run keeps a
+    // block the callee→`(` gap relocated on a line of its own where the plain call glues it
+    // (`[] /* c */⏎(`⏎`).b()` printed `[](/* c */⏎`⏎`).b()`, which the next pass expands).
     if is_multiline_template_expression(arg) {
-        return with_chain_head(d, head, d.concat(&[prefix, arg_with_comments, d.text(")")]));
+        let leading = if has_leading_comments {
+            printer.build_rhs_comments_glued_opt(paren_open, arg_start)
+        } else {
+            None
+        };
+        let mut parts = DocBuf::new();
+        parts.push(prefix);
+        parts.extend(leading);
+        parts.push(arg_doc);
+        parts.extend(trailing_comments_doc);
+        parts.push(d.text(")"));
+        return with_chain_head(d, head, d.concat(&parts));
     }
 
     // Block-body arrows: use conditional_group to try hug first, then expand.

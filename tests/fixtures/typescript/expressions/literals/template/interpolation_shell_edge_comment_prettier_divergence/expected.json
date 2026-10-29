@@ -1,0 +1,985 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 647,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 554,
+				"end": 556,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 556,
+				"end": 595,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 559,
+							"end": 561,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 561,
+							"end": 590,
+							"expression": {
+								"type": "TemplateLiteral",
+								"start": 562,
+								"end": 589,
+								"expressions": [
+									{
+										"type": "TaggedTemplateExpression",
+										"start": 578,
+										"end": 584,
+										"tag": {
+											"type": "Identifier",
+											"start": 578,
+											"end": 581,
+											"name": "nnn"
+										},
+										"quasi": {
+											"type": "TemplateLiteral",
+											"start": 581,
+											"end": 584,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 582,
+													"end": 583,
+													"value": {
+														"raw": "\n",
+														"cooked": "\n"
+													},
+													"tail": true
+												}
+											]
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c5 ",
+												"start": 569,
+												"end": 577
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 563,
+										"end": 564,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 587,
+										"end": 588,
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 590,
+							"end": 591,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 595,
+				"end": 597,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 597,
+				"end": 646,
+				"name": "p",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 601,
+						"end": 636,
+						"name": "class",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 607,
+							"end": 636,
+							"expression": {
+								"type": "TemplateLiteral",
+								"start": 608,
+								"end": 635,
+								"expressions": [
+									{
+										"type": "TaggedTemplateExpression",
+										"start": 624,
+										"end": 630,
+										"tag": {
+											"type": "Identifier",
+											"start": 624,
+											"end": 627,
+											"name": "sss"
+										},
+										"quasi": {
+											"type": "TemplateLiteral",
+											"start": 627,
+											"end": 630,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 628,
+													"end": 629,
+													"value": {
+														"raw": "\n",
+														"cooked": "\n"
+													},
+													"tail": true
+												}
+											]
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c8 ",
+												"start": 615,
+												"end": 623
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 609,
+										"end": 610,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 633,
+										"end": 634,
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 638,
+							"end": 642,
+							"raw": "\n\tt\n",
+							"data": "\n\tt\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment in a stripped shell at the value's HEAD prints right behind the `${`",
+			"start": 20,
+			"end": 101
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 122,
+			"end": 130
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 164,
+			"end": 172
+		},
+		{
+			"type": "Line",
+			"value": " e2",
+			"start": 177,
+			"end": 182
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 224,
+			"end": 232
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 310,
+			"end": 318
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 355,
+			"end": 363
+		},
+		{
+			"type": "Line",
+			"value": " ... and one in a stripped shell at the value's END prints at its end",
+			"start": 380,
+			"end": 451
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 530,
+			"end": 538
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 569,
+			"end": 577
+		},
+		{
+			"type": "Block",
+			"value": " c8 ",
+			"start": 615,
+			"end": 623
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 554,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 545,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 103,
+					"end": 143,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 109,
+							"end": 142,
+							"id": {
+								"type": "Identifier",
+								"start": 109,
+								"end": 112,
+								"name": "aaa"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 115,
+								"end": 142,
+								"expressions": [
+									{
+										"type": "TaggedTemplateExpression",
+										"start": 131,
+										"end": 137,
+										"tag": {
+											"type": "Identifier",
+											"start": 131,
+											"end": 134,
+											"name": "bbb"
+										},
+										"quasi": {
+											"type": "TemplateLiteral",
+											"start": 134,
+											"end": 137,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 135,
+													"end": 136,
+													"value": {
+														"raw": "\n",
+														"cooked": "\n"
+													},
+													"tail": true
+												}
+											]
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 122,
+												"end": 130
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 116,
+										"end": 117,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 140,
+										"end": 141,
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment in a stripped shell at the value's HEAD prints right behind the `${`",
+							"start": 20,
+							"end": 101
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 145,
+					"end": 207,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 151,
+							"end": 206,
+							"id": {
+								"type": "Identifier",
+								"start": 151,
+								"end": 154,
+								"name": "ccc"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 157,
+								"end": 206,
+								"expressions": [
+									{
+										"type": "CallExpression",
+										"start": 173,
+										"end": 201,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 173,
+											"end": 191,
+											"object": {
+												"type": "Identifier",
+												"start": 173,
+												"end": 176,
+												"name": "ddd",
+												"trailingComments": [
+													{
+														"type": "Line",
+														"value": " e2",
+														"start": 177,
+														"end": 182
+													}
+												]
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 187,
+												"end": 191,
+												"name": "then"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "ArrowFunctionExpression",
+												"start": 192,
+												"end": 200,
+												"id": null,
+												"expression": true,
+												"generator": false,
+												"async": false,
+												"params": [
+													{
+														"type": "Identifier",
+														"start": 193,
+														"end": 194,
+														"name": "v"
+													}
+												],
+												"body": {
+													"type": "Identifier",
+													"start": 199,
+													"end": 200,
+													"name": "v"
+												}
+											}
+										],
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c2 ",
+												"start": 164,
+												"end": 172
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 158,
+										"end": 159,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 204,
+										"end": 205,
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 209,
+					"end": 285,
+					"expression": {
+						"type": "CallExpression",
+						"start": 209,
+						"end": 284,
+						"callee": {
+							"type": "Identifier",
+							"start": 209,
+							"end": 212,
+							"name": "fff"
+						},
+						"arguments": [
+							{
+								"type": "TemplateLiteral",
+								"start": 216,
+								"end": 281,
+								"expressions": [
+									{
+										"type": "CallExpression",
+										"start": 233,
+										"end": 275,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 233,
+											"end": 241,
+											"object": {
+												"type": "Identifier",
+												"start": 233,
+												"end": 236,
+												"name": "ggg"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 237,
+												"end": 241,
+												"name": "each"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [
+											{
+												"type": "FunctionExpression",
+												"start": 242,
+												"end": 274,
+												"id": null,
+												"expression": false,
+												"generator": false,
+												"async": false,
+												"params": [],
+												"body": {
+													"type": "BlockStatement",
+													"start": 254,
+													"end": 274,
+													"body": [
+														{
+															"type": "ReturnStatement",
+															"start": 260,
+															"end": 269,
+															"argument": {
+																"type": "Literal",
+																"start": 267,
+																"end": 268,
+																"value": 1,
+																"raw": "1"
+															}
+														}
+													]
+												}
+											}
+										],
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c3 ",
+												"start": 224,
+												"end": 232
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 217,
+										"end": 218,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 279,
+										"end": 280,
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 287,
+					"end": 334,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 293,
+							"end": 333,
+							"id": {
+								"type": "Identifier",
+								"start": 293,
+								"end": 296,
+								"name": "ooo"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 299,
+								"end": 333,
+								"expressions": [
+									{
+										"type": "TemplateLiteral",
+										"start": 303,
+										"end": 330,
+										"expressions": [
+											{
+												"type": "TaggedTemplateExpression",
+												"start": 319,
+												"end": 325,
+												"tag": {
+													"type": "Identifier",
+													"start": 319,
+													"end": 322,
+													"name": "ppp"
+												},
+												"quasi": {
+													"type": "TemplateLiteral",
+													"start": 322,
+													"end": 325,
+													"expressions": [],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 323,
+															"end": 324,
+															"value": {
+																"raw": "\n",
+																"cooked": "\n"
+															},
+															"tail": true
+														}
+													]
+												},
+												"leadingComments": [
+													{
+														"type": "Block",
+														"value": " c6 ",
+														"start": 310,
+														"end": 318
+													}
+												]
+											}
+										],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 304,
+												"end": 305,
+												"value": {
+													"raw": "x",
+													"cooked": "x"
+												},
+												"tail": false
+											},
+											{
+												"type": "TemplateElement",
+												"start": 328,
+												"end": 329,
+												"value": {
+													"raw": "y",
+													"cooked": "y"
+												},
+												"tail": true
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 300,
+										"end": 301,
+										"value": {
+											"raw": "w",
+											"cooked": "w"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 331,
+										"end": 332,
+										"value": {
+											"raw": "z",
+											"cooked": "z"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 336,
+					"end": 377,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 342,
+							"end": 376,
+							"id": {
+								"type": "Identifier",
+								"start": 342,
+								"end": 345,
+								"name": "qqq"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 348,
+								"end": 376,
+								"expressions": [
+									{
+										"type": "TaggedTemplateExpression",
+										"start": 364,
+										"end": 371,
+										"tag": {
+											"type": "TSNonNullExpression",
+											"start": 364,
+											"end": 368,
+											"expression": {
+												"type": "Identifier",
+												"start": 364,
+												"end": 367,
+												"name": "rrr"
+											}
+										},
+										"quasi": {
+											"type": "TemplateLiteral",
+											"start": 368,
+											"end": 371,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 369,
+													"end": 370,
+													"value": {
+														"raw": "\n",
+														"cooked": "\n"
+													},
+													"tail": true
+												}
+											]
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c7 ",
+												"start": 355,
+												"end": 363
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 349,
+										"end": 350,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 374,
+										"end": 375,
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 453,
+					"end": 544,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 459,
+							"end": 543,
+							"id": {
+								"type": "Identifier",
+								"start": 459,
+								"end": 462,
+								"name": "hhh"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 465,
+								"end": 543,
+								"expressions": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 472,
+										"end": 529,
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "BinaryExpression",
+											"start": 481,
+											"end": 529,
+											"left": {
+												"type": "CallExpression",
+												"start": 481,
+												"end": 523,
+												"callee": {
+													"type": "MemberExpression",
+													"start": 481,
+													"end": 489,
+													"object": {
+														"type": "Identifier",
+														"start": 481,
+														"end": 484,
+														"name": "iii"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 485,
+														"end": 489,
+														"name": "each"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"arguments": [
+													{
+														"type": "FunctionExpression",
+														"start": 490,
+														"end": 522,
+														"id": null,
+														"expression": false,
+														"generator": false,
+														"async": false,
+														"params": [],
+														"body": {
+															"type": "BlockStatement",
+															"start": 502,
+															"end": 522,
+															"body": [
+																{
+																	"type": "ReturnStatement",
+																	"start": 508,
+																	"end": 517,
+																	"argument": {
+																		"type": "Literal",
+																		"start": 515,
+																		"end": 516,
+																		"value": 1,
+																		"raw": "1"
+																	}
+																}
+															]
+														}
+													}
+												],
+												"optional": false
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 526,
+												"end": 529,
+												"name": "jjj"
+											}
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c4 ",
+												"start": 530,
+												"end": 538
+											}
+										]
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 466,
+										"end": 467,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 541,
+										"end": 542,
+										"value": {
+											"raw": "y",
+											"cooked": "y"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " ... and one in a stripped shell at the value's END prints at its end",
+							"start": 380,
+							"end": 451
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
