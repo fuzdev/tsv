@@ -60,6 +60,49 @@ enum FlattenMode {
     Atomize,
 }
 
+/// The doc levels [`DocArena::flatten_lines_impl`] walks by recursion, a frame each, before
+/// the subtree below is walked by [`DocArena::flatten_lines_loop`]: the common flattened doc
+/// is a few levels deep and its recursion is the cheaper walk, while a deeper one costs the
+/// stack of this many frames whatever its depth — a doc nests a level per link of some
+/// chains (a run of commented `!`), so its depth is bounded only by `SPINE_LIMIT`.
+const FLATTEN_FRAMES: u32 = 32;
+
+/// What [`DocArena::flatten_build`] reads of one node ([`DocArena::flatten_info`]): its
+/// kind and the ids of the children the copy is built from.
+enum FlattenInfo {
+    /// Copied as itself.
+    Keep,
+    FlattenedMultilineText(String),
+    Line(LineKind),
+    Indent(DocId),
+    Dedent(DocId),
+    AlignRoot(usize, DocId),
+    Align(u32, DocId),
+    Group {
+        contents: DocId,
+        expanded_states: ChildRange,
+        should_break: bool,
+    },
+    IfBreakFlat(DocId),
+    IndentIfBreakContents(DocId),
+    Concat(DocBuf),
+    Fill(DocBuf),
+    WithContext(DocId, DocContext),
+    LineSuffix(DocId),
+    BreakParent,
+    GatedState(DocId, DocId, GateAdmit),
+}
+
+impl FlattenInfo {
+    /// Whether the copy takes the original's comment-ledger tag
+    /// ([`DocArena::flatten_retag`]): every rebuilt node's does but an atomized group's,
+    /// whose copy the atomizing arm hands back untagged.
+    #[cfg(feature = "comment_check")]
+    fn retags(&self, mode: FlattenMode) -> bool {
+        !(mode == FlattenMode::Atomize && matches!(self, Self::Group { .. }))
+    }
+}
+
 /// Index into `DocArena.nodes`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct DocId(u32);
@@ -5073,7 +5116,12 @@ impl DocArena {
     /// one line no matter what wants [`Self::atomize`] — a different question,
     /// and now a different name.
     pub fn remove_lines(&self, id: DocId) -> DocId {
-        self.flatten_lines_impl(id, FlattenMode::RemoveLines, &mut WalkMemo::new())
+        self.flatten_lines_impl(
+            id,
+            FlattenMode::RemoveLines,
+            &mut WalkMemo::new(),
+            FLATTEN_FRAMES,
+        )
     }
 
     /// `root` with every occurrence of the node `target` replaced by `replacement` — a
@@ -5286,118 +5334,234 @@ impl DocArena {
     /// **Only sound where the content provably has no required newline.** Deleting a hard
     /// line does not relayout anything — it deletes a newline the content demanded, fusing
     /// whatever sat on either side (`/* a⏎b */` → `/* ab */`, gluing `a` to `b`). Its one
-    /// caller, the template-interpolation atomizer, first routes any interpolation
-    /// containing a comment or a source newline down a *different* branch, so nothing that
-    /// must break can reach here.
+    /// caller, the template-interpolation atomizer, first routes any interpolation whose doc
+    /// will break, or whose source spans lines (an interior `//` or multi-line comment among
+    /// them), down a *different* branch, so nothing that must break can reach here. A
+    /// single-line block comment can reach it, and carries no newline.
     ///
     /// Folding the two into one function under prettier's name is how a multi-line comment
     /// in a flattened arrow signature gets its newline deleted. Two questions, two names.
     pub fn atomize(&self, id: DocId) -> DocId {
-        self.flatten_lines_impl(id, FlattenMode::Atomize, &mut WalkMemo::new())
+        self.flatten_lines_impl(
+            id,
+            FlattenMode::Atomize,
+            &mut WalkMemo::new(),
+            FLATTEN_FRAMES,
+        )
     }
 
     /// [`Self::remove_lines`] and [`Self::atomize`]'s walk, memoized per node within one
     /// call: a node's flattened copy is a function of the node and the call's `mode`, and
     /// render reads a doc by its nodes, never their ids' positions, so a subtree shared
     /// in the input stays shared in the copy (a copied group is never keyed).
+    ///
+    /// Recursive while `frames` doc levels of it are left to spend ([`FLATTEN_FRAMES`]
+    /// from the entry points); below them the subtree is walked by
+    /// [`Self::flatten_lines_loop`], so a doc's depth costs a bounded stack.
     fn flatten_lines_impl(
         &self,
         id: DocId,
         mode: FlattenMode,
         memo: &mut WalkMemo<DocId, DocId>,
+        frames: u32,
     ) -> DocId {
+        if frames == 0 {
+            return self.flatten_lines_loop(id, mode, memo);
+        }
         crate::fanout_probe::walk();
         if let Some(known) = memo.visit(id) {
             return known;
         }
-        // Extract node info while borrowing, then release borrow before allocating.
-        // This pattern avoids RefCell conflicts since alloc() needs borrow_mut().
-        enum Info {
-            Keep, // Return id unchanged
-            FlattenedMultilineText(String),
-            Line(LineKind),
-            Indent(DocId),
-            Dedent(DocId),
-            AlignRoot(usize, DocId),
-            Align(u32, DocId),
-            Group {
-                contents: DocId,
-                expanded_states: ChildRange,
-                should_break: bool,
-            },
-            IfBreakFlat(DocId),
-            IndentIfBreakContents(DocId),
-            Concat(DocBuf),
-            Fill(DocBuf),
-            WithContext(DocId, DocContext),
-            LineSuffix(DocId),
-            BreakParent,
-            GatedState(DocId, DocId, GateAdmit),
+        let info = self.flatten_info(id, mode);
+        #[cfg(feature = "comment_check")]
+        let retags = info.retags(mode);
+        let new_id = self.flatten_build(id, info, mode, &mut |kid| {
+            self.flatten_lines_impl(kid, mode, memo, frames - 1)
+        });
+        #[cfg(feature = "comment_check")]
+        self.flatten_retag(id, new_id, retags);
+        memo.record(id, new_id)
+    }
+
+    /// [`Self::flatten_lines_impl`]'s walk of the subtree under `root` without recursing:
+    /// a post-order loop over an explicit stack, which visits, flattens and allocates in
+    /// the recursion's order — each node's children in order, each copy after its
+    /// children's — so its copy, its node ids and the memo's entries are the recursion's.
+    #[cold]
+    #[inline(never)]
+    fn flatten_lines_loop(
+        &self,
+        root: DocId,
+        mode: FlattenMode,
+        memo: &mut WalkMemo<DocId, DocId>,
+    ) -> DocId {
+        /// A node to visit, or a visited node to copy once its children are: its info,
+        /// and where its children's copies start on the result stack.
+        enum Step {
+            Enter(DocId),
+            Exit(DocId, FlattenInfo, usize),
         }
-
-        let info = {
-            let nodes = self.nodes.borrow();
-            match &nodes[id.index()] {
-                DocNode::Text(_)
-                | DocNode::LineSuffixBoundary
-                | DocNode::EmbedEnd { .. }
-                | DocNode::FlowProbeEnd => Info::Keep,
-                // `MultilineText`'s `\n`s are hard lines pre-joined into one body, so it
-                // follows `mode` for the same reason a `Line(Hard)` does — see the fn docs.
-                DocNode::MultilineText { span, .. } => match mode {
-                    FlattenMode::RemoveLines => Info::Keep,
-                    FlattenMode::Atomize => {
-                        let pool = self.text_pool.borrow();
-                        Info::FlattenedMultilineText(span.slice(&pool).replace('\n', ""))
+        let mut steps = vec![Step::Enter(root)];
+        // the copies of the visited nodes not yet taken by their parent, in visit order
+        let mut copies: Vec<DocId> = Vec::new();
+        let mut kids = DocBuf::new();
+        while let Some(step) = steps.pop() {
+            match step {
+                Step::Enter(id) => {
+                    crate::fanout_probe::walk();
+                    if let Some(known) = memo.visit(id) {
+                        copies.push(known);
+                        continue;
                     }
-                },
-                DocNode::Line(kind) => Info::Line(*kind),
-                DocNode::Indent(inner) => Info::Indent(*inner),
-                DocNode::Dedent(inner) => Info::Dedent(*inner),
-                DocNode::AlignRoot { n, contents } => Info::AlignRoot(*n, *contents),
-                DocNode::Align { n, contents } => Info::Align(*n, *contents),
-                // A copied group is a new instance, so it is never keyed: at every caller a
-                // keyed group's readers sit in the same flattened subtree as the group (a
-                // chain's heads and its body indent / callee `)`, a head group and its
-                // dangle), and flatten away below — to the flat arm / the bare contents —
-                // so nothing is left to key on the copy.
-                DocNode::Group {
-                    contents,
-                    expanded_states,
-                    should_break,
-                    ..
-                } => Info::Group {
-                    contents: *contents,
-                    expanded_states: *expanded_states,
-                    should_break: *should_break,
-                },
-                DocNode::IfBreak { flat_doc, .. } => Info::IfBreakFlat(*flat_doc),
-                DocNode::IndentIfBreak { contents, .. } => Info::IndentIfBreakContents(*contents),
-                DocNode::Concat(range) => {
-                    let children = self.children.borrow();
-                    Info::Concat(DocBuf::from_slice(range.resolve(&children)))
+                    let info = self.flatten_info(id, mode);
+                    kids.clear();
+                    self.flatten_children(&info, mode, &mut kids);
+                    steps.push(Step::Exit(id, info, copies.len()));
+                    steps.extend(kids.iter().rev().map(|&kid| Step::Enter(kid)));
                 }
-                DocNode::Fill(range) => {
-                    let children = self.children.borrow();
-                    Info::Fill(DocBuf::from_slice(range.resolve(&children)))
+                Step::Exit(id, info, first) => {
+                    #[cfg(feature = "comment_check")]
+                    let retags = info.retags(mode);
+                    let mut next = first;
+                    let new_id = self.flatten_build(id, info, mode, &mut |_| {
+                        let copy = copies[next];
+                        next += 1;
+                        copy
+                    });
+                    debug_assert_eq!(
+                        next,
+                        copies.len(),
+                        "the copy took every child the loop flattened"
+                    );
+                    copies.truncate(first);
+                    #[cfg(feature = "comment_check")]
+                    self.flatten_retag(id, new_id, retags);
+                    copies.push(memo.record(id, new_id));
                 }
-                DocNode::WithContext { doc, context } => Info::WithContext(*doc, context.clone()),
-                DocNode::LineSuffix(inner) => Info::LineSuffix(*inner),
-                // Both are pure layout-forcing markers with no content: flattening
-                // drops them the same way (`Info::BreakParent` → `empty()`).
-                DocNode::BreakParent | DocNode::FlushBreak => Info::BreakParent,
-                DocNode::GatedState {
-                    probe,
-                    contents,
-                    admit,
-                } => Info::GatedState(*probe, *contents, *admit),
             }
-        }; // nodes borrow dropped here
+        }
+        debug_assert_eq!(copies.len(), 1, "the root's copy is the loop's one result");
+        copies[0]
+    }
 
-        let new_id = match info {
-            Info::Keep => id,
-            Info::FlattenedMultilineText(flat) => self.text_pooled(&flat),
-            Info::Line(kind) => match kind {
+    /// What [`Self::flatten_build`] reads of node `id`, taken while the arena is borrowed —
+    /// released before the build allocates, since `alloc()` needs `borrow_mut()`.
+    #[inline]
+    fn flatten_info(&self, id: DocId, mode: FlattenMode) -> FlattenInfo {
+        let nodes = self.nodes.borrow();
+        match &nodes[id.index()] {
+            DocNode::Text(_)
+            | DocNode::LineSuffixBoundary
+            | DocNode::EmbedEnd { .. }
+            | DocNode::FlowProbeEnd => FlattenInfo::Keep,
+            // `MultilineText`'s `\n`s are hard lines pre-joined into one body, so it
+            // follows `mode` for the same reason a `Line(Hard)` does — see `remove_lines`.
+            DocNode::MultilineText { span, .. } => match mode {
+                FlattenMode::RemoveLines => FlattenInfo::Keep,
+                FlattenMode::Atomize => {
+                    let pool = self.text_pool.borrow();
+                    FlattenInfo::FlattenedMultilineText(span.slice(&pool).replace('\n', ""))
+                }
+            },
+            DocNode::Line(kind) => FlattenInfo::Line(*kind),
+            DocNode::Indent(inner) => FlattenInfo::Indent(*inner),
+            DocNode::Dedent(inner) => FlattenInfo::Dedent(*inner),
+            DocNode::AlignRoot { n, contents } => FlattenInfo::AlignRoot(*n, *contents),
+            DocNode::Align { n, contents } => FlattenInfo::Align(*n, *contents),
+            // A copied group is a new instance, so it is never keyed: at every caller a
+            // keyed group's readers sit in the same flattened subtree as the group (a
+            // chain's heads and its body indent / callee `)`, a head group and its
+            // dangle), and flatten away below — to the flat arm / the bare contents —
+            // so nothing is left to key on the copy.
+            DocNode::Group {
+                contents,
+                expanded_states,
+                should_break,
+                ..
+            } => FlattenInfo::Group {
+                contents: *contents,
+                expanded_states: *expanded_states,
+                should_break: *should_break,
+            },
+            DocNode::IfBreak { flat_doc, .. } => FlattenInfo::IfBreakFlat(*flat_doc),
+            DocNode::IndentIfBreak { contents, .. } => {
+                FlattenInfo::IndentIfBreakContents(*contents)
+            }
+            DocNode::Concat(range) => {
+                let children = self.children.borrow();
+                FlattenInfo::Concat(DocBuf::from_slice(range.resolve(&children)))
+            }
+            DocNode::Fill(range) => {
+                let children = self.children.borrow();
+                FlattenInfo::Fill(DocBuf::from_slice(range.resolve(&children)))
+            }
+            DocNode::WithContext { doc, context } => {
+                FlattenInfo::WithContext(*doc, context.clone())
+            }
+            DocNode::LineSuffix(inner) => FlattenInfo::LineSuffix(*inner),
+            // Both are pure layout-forcing markers with no content: flattening
+            // drops them the same way (`FlattenInfo::BreakParent` → `empty()`).
+            DocNode::BreakParent | DocNode::FlushBreak => FlattenInfo::BreakParent,
+            DocNode::GatedState {
+                probe,
+                contents,
+                admit,
+            } => FlattenInfo::GatedState(*probe, *contents, *admit),
+        }
+    }
+
+    /// The children [`Self::flatten_build`] asks the copies of for `info`, in the order it
+    /// asks — what [`Self::flatten_lines_loop`] flattens ahead of the build.
+    fn flatten_children(&self, info: &FlattenInfo, mode: FlattenMode, out: &mut DocBuf) {
+        match info {
+            FlattenInfo::Keep
+            | FlattenInfo::FlattenedMultilineText(_)
+            | FlattenInfo::Line(_)
+            | FlattenInfo::BreakParent => {}
+            FlattenInfo::Indent(inner)
+            | FlattenInfo::Dedent(inner)
+            | FlattenInfo::AlignRoot(_, inner)
+            | FlattenInfo::Align(_, inner)
+            | FlattenInfo::IfBreakFlat(inner)
+            | FlattenInfo::IndentIfBreakContents(inner)
+            | FlattenInfo::WithContext(inner, _)
+            | FlattenInfo::LineSuffix(inner) => out.push(*inner),
+            FlattenInfo::Group {
+                contents,
+                expanded_states,
+                should_break,
+            } => {
+                out.push(*contents);
+                if mode == FlattenMode::RemoveLines && !should_break {
+                    let children = self.children.borrow();
+                    out.extend_from_slice(expanded_states.resolve(&children));
+                }
+            }
+            FlattenInfo::Concat(kids) | FlattenInfo::Fill(kids) => out.extend_from_slice(kids),
+            FlattenInfo::GatedState(probe, contents, _) => {
+                out.push(*probe);
+                out.push(*contents);
+            }
+        }
+    }
+
+    /// The flattened copy of node `id`, read as `info`, its children's copies taken from
+    /// `flatten` in [`Self::flatten_children`]'s order — by recursion
+    /// ([`Self::flatten_lines_impl`]) or from the loop's result stack
+    /// ([`Self::flatten_lines_loop`]). Out of line over a `dyn` closure, so the two walks
+    /// share one body.
+    #[inline(never)]
+    fn flatten_build(
+        &self,
+        id: DocId,
+        info: FlattenInfo,
+        mode: FlattenMode,
+        flatten: &mut dyn FnMut(DocId) -> DocId,
+    ) -> DocId {
+        match info {
+            FlattenInfo::Keep => id,
+            FlattenInfo::FlattenedMultilineText(flat) => self.text_pooled(&flat),
+            FlattenInfo::Line(kind) => match kind {
                 LineKind::Normal => self.text(" "),
                 LineKind::Soft => self.empty(),
                 // Prettier's `!doc.hard` gate: a hard line passes through untouched, because
@@ -5409,28 +5573,28 @@ impl DocArena {
                     FlattenMode::Atomize => self.empty(),
                 },
             },
-            Info::Indent(inner) => {
-                let new_inner = self.flatten_lines_impl(inner, mode, memo);
+            FlattenInfo::Indent(inner) => {
+                let new_inner = flatten(inner);
                 self.indent(new_inner)
             }
-            Info::Dedent(inner) => {
-                let new_inner = self.flatten_lines_impl(inner, mode, memo);
+            FlattenInfo::Dedent(inner) => {
+                let new_inner = flatten(inner);
                 self.dedent(new_inner)
             }
-            Info::AlignRoot(n, contents) => {
-                let new_contents = self.flatten_lines_impl(contents, mode, memo);
+            FlattenInfo::AlignRoot(n, contents) => {
+                let new_contents = flatten(contents);
                 self.align_root(n, new_contents)
             }
-            Info::Align(n, contents) => {
-                let new_contents = self.flatten_lines_impl(contents, mode, memo);
+            FlattenInfo::Align(n, contents) => {
+                let new_contents = flatten(contents);
                 self.align(n, new_contents)
             }
-            Info::Group {
+            FlattenInfo::Group {
                 contents,
                 expanded_states,
                 should_break,
             } => {
-                let flat_contents = self.flatten_lines_impl(contents, mode, memo);
+                let flat_contents = flatten(contents);
                 if mode == FlattenMode::Atomize {
                     // Atomize: emulate prettier's re-render at `printWidth: Infinity`, where a
                     // conditional group's *least*-expanded state always fits and is chosen. So
@@ -5442,13 +5606,12 @@ impl DocArena {
                     // real width, falls back to the most-expanded one, and emits its separators
                     // as literal spaces — `xs.map( (i) => fn(i) )` — or, when that state's
                     // separator was a `softline`, deletes a required one: `(i) =>fn(i)`.
-                    let group = self.alloc(DocNode::Group {
+                    return self.alloc(DocNode::Group {
                         contents: flat_contents,
                         expanded_states: ChildRange::EMPTY,
                         keyed: false,
                         should_break,
                     });
-                    return memo.record(id, group);
                 }
                 if should_break {
                     self.alloc(DocNode::Group {
@@ -5465,10 +5628,7 @@ impl DocArena {
                             let children = self.children.borrow();
                             DocBuf::from_slice(expanded_states.resolve(&children))
                         };
-                        let new_kids: DocBuf = kids
-                            .into_iter()
-                            .map(|kid| self.flatten_lines_impl(kid, mode, memo))
-                            .collect();
+                        let new_kids: DocBuf = kids.into_iter().map(&mut *flatten).collect();
                         self.alloc_children(&new_kids)
                     };
                     self.alloc(DocNode::Group {
@@ -5479,60 +5639,61 @@ impl DocArena {
                     })
                 }
             }
-            Info::IfBreakFlat(flat_doc) => self.flatten_lines_impl(flat_doc, mode, memo),
-            Info::IndentIfBreakContents(contents) => self.flatten_lines_impl(contents, mode, memo),
-            Info::Concat(kids) => {
+            FlattenInfo::IfBreakFlat(flat_doc) => flatten(flat_doc),
+            FlattenInfo::IndentIfBreakContents(contents) => flatten(contents),
+            FlattenInfo::Concat(kids) => {
                 // A flattened `softline` is `empty()`; a concat carries no empty child,
                 // since every later walk would visit it for nothing.
                 let empty = self.empty();
                 self.concat_iter(
                     kids.into_iter()
-                        .map(|kid| self.flatten_lines_impl(kid, mode, memo))
+                        .map(&mut *flatten)
                         .filter(|&kid| kid != empty),
                 )
             }
-            Info::Fill(kids) => {
+            FlattenInfo::Fill(kids) => {
                 // Fill becomes regular concat when flattened — and, as a concat, carries
                 // no empty child either (a flattened softline separator). The parity a
                 // `Fill` keeps between its items and separators is gone with the fill.
                 let empty = self.empty();
                 self.concat_iter(
                     kids.into_iter()
-                        .map(|kid| self.flatten_lines_impl(kid, mode, memo))
+                        .map(&mut *flatten)
                         .filter(|&kid| kid != empty),
                 )
             }
-            Info::WithContext(doc, context) => {
-                let new_doc = self.flatten_lines_impl(doc, mode, memo);
+            FlattenInfo::WithContext(doc, context) => {
+                let new_doc = flatten(doc);
                 self.with_context(new_doc, context)
             }
-            Info::LineSuffix(inner) => {
-                let new_inner = self.flatten_lines_impl(inner, mode, memo);
+            FlattenInfo::LineSuffix(inner) => {
+                let new_inner = flatten(inner);
                 self.line_suffix(new_inner)
             }
-            Info::BreakParent => self.empty(),
+            FlattenInfo::BreakParent => self.empty(),
             // Rebuild both halves, keeping the gate: under `remove_lines` (which
             // keeps conditional-group states) the state must stay gated; under
             // `atomize` the node is unreachable through a group (states dropped)
             // and the rebuild is inert.
-            Info::GatedState(probe, contents, admit) => {
-                let new_probe = self.flatten_lines_impl(probe, mode, memo);
-                let new_contents = self.flatten_lines_impl(contents, mode, memo);
+            FlattenInfo::GatedState(probe, contents, admit) => {
+                let new_probe = flatten(probe);
+                let new_contents = flatten(contents);
                 self.gated_state_admitting(new_probe, new_contents, admit)
             }
-        };
+        }
+    }
 
-        // Rebuilding the tree strands a comment doc's ledger tag on the discarded original
-        // (a re-allocated node gets a fresh `DocId`), so the renderer never records the emit
-        // and the — verbatim-printed — comment reads as DROPPED. Carry the tag onto each
-        // rebuilt node. Every recursion routes through here, so a tagged comment anywhere in
-        // the subtree is covered. `comment_check`-only — production output is byte-identical.
-        #[cfg(feature = "comment_check")]
-        if new_id != id {
+    /// Rebuilding the tree strands a comment doc's ledger tag on the discarded original
+    /// (a re-allocated node gets a fresh `DocId`), so the renderer never records the emit
+    /// and the — verbatim-printed — comment reads as DROPPED. Carry the tag onto each
+    /// rebuilt node. Every node of the walk routes through here, so a tagged comment
+    /// anywhere in the subtree is covered. `comment_check`-only — production output is
+    /// byte-identical.
+    #[cfg(feature = "comment_check")]
+    fn flatten_retag(&self, id: DocId, new_id: DocId, retags: bool) {
+        if retags && new_id != id {
             self.retag_comment_doc(new_id, id);
         }
-
-        memo.record(id, new_id)
     }
 
     //
@@ -6955,8 +7116,8 @@ mod walk_memo_tests {
     //! transfer instead of threading its state, so it is also graded against the
     //! state-threading walk it replaced.
     use super::{
-        DocArena, DocId, DocNode, LastLeaf, PendingRun, RUN_WIDTH_CAP, SuffixWalk, WALK_MEMO_AFTER,
-        WalkMemo, WalkStore, test_memo_after,
+        DocArena, DocId, DocNode, FLATTEN_FRAMES, FlattenMode, LastLeaf, PendingRun, RUN_WIDTH_CAP,
+        SuffixWalk, WALK_MEMO_AFTER, WalkMemo, WalkStore, test_memo_after,
     };
     use crate::config::{EmbedContext, PRINT_WIDTH};
     use crate::doc::{Mode, arena_fits, arena_print_doc};
@@ -7259,5 +7420,206 @@ mod walk_memo_tests {
         assert_eq!(kids.len(), 2);
         assert_eq!(kids[0], kids[1], "one flattened copy, named twice");
         assert_eq!(render(&a, flat), "a ba b");
+    }
+
+    /// Every node and child list `a` holds, in allocation order — what two arenas built
+    /// alike must agree on when two walks are to have built the same copy.
+    fn arena_dump(a: &DocArena) -> String {
+        format!("{:?}\n{:?}", a.nodes.borrow(), a.children.borrow())
+    }
+
+    /// The flattening loop ([`DocArena::flatten_lines_loop`]) builds the recursion's copy:
+    /// on two arenas built alike, a walk entering the loop at once (no frames), one
+    /// switching to it mid-walk, and the recursion return the same node and allocate the
+    /// same nodes and child lists, in the same order, in both modes — the DAG and the tree form, with the memo answering from
+    /// the first visit and from the production threshold.
+    #[test]
+    fn flattening_in_the_loop_allocates_the_recursions_copy() {
+        for (after, max_depth) in [(0, 5), (WALK_MEMO_AFTER, 8)] {
+            test_memo_after::with(after, || {
+                for seed in 0..300 {
+                    for depth in 1..=max_depth {
+                        for shared in [true, false] {
+                            for mode in [FlattenMode::RemoveLines, FlattenMode::Atomize] {
+                                let copy = |frames: u32| {
+                                    let a = DocArena::new();
+                                    let doc = build(&a, seed, 0, depth, shared);
+                                    let flat = a.flatten_lines_impl(
+                                        doc,
+                                        mode,
+                                        &mut WalkMemo::new(),
+                                        frames,
+                                    );
+                                    (flat, arena_dump(&a), render(&a, flat))
+                                };
+                                let recursion = copy(FLATTEN_FRAMES);
+                                for frames in [0, 1, 2] {
+                                    assert_eq!(
+                                        copy(frames),
+                                        recursion,
+                                        "{mode:?}, {frames} frames, memo after {after}, \
+                                         seed {seed}, depth {depth}, shared {shared}"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    /// The same over a doc holding every node kind the walk copies — the kinds the
+    /// generated family leaves out among them (a fill, an align, a dedent, a context, a
+    /// gated state, an `indent_if_break`, a multi-line text, a break marker), each over a
+    /// shared subtree.
+    #[test]
+    fn flattening_in_the_loop_copies_every_kind_as_the_recursion_does() {
+        let copy = |mode: FlattenMode, frames: u32| {
+            let a = DocArena::new();
+            let shared = a.group(a.concat(&[a.text("a"), a.line(), a.text("b")]));
+            let keyed = a.group_with_id(a.concat(&[shared, a.softline()]));
+            let kinds = [
+                a.fill(&[shared, a.line(), a.text("c"), a.softline(), shared]),
+                a.align(2, a.concat(&[a.hardline(), shared])),
+                a.align_root(0, shared),
+                a.dedent(a.concat(&[shared, a.literalline()])),
+                a.with_context(shared, super::DocContext::default()),
+                a.conditional_group(&[
+                    shared,
+                    a.gated_state(a.concat(&[shared, a.line()]), shared),
+                ]),
+                keyed.doc(),
+                a.indent_if_break(shared, keyed),
+                a.line_suffix(a.concat(&[a.text(" "), shared])),
+                a.multiline_text("/* a\n b */"),
+                a.concat(&[a.break_parent(), a.flush_break(), a.line_suffix_boundary()]),
+                a.if_break(a.text("x"), shared),
+                // a broken group holding states, which `remove_lines` keeps as they are:
+                // no constructor builds one, so the walk must not visit them either
+                a.alloc(DocNode::Group {
+                    contents: shared,
+                    expanded_states: a.alloc_children(&[a.concat(&[shared, a.line()])]),
+                    keyed: false,
+                    should_break: true,
+                }),
+            ];
+            let doc = a.group_break(a.concat(&kinds));
+            let flat = a.flatten_lines_impl(doc, mode, &mut WalkMemo::new(), frames);
+            (flat, arena_dump(&a), render(&a, flat))
+        };
+        for mode in [FlattenMode::RemoveLines, FlattenMode::Atomize] {
+            for frames in [0, 1, 2, 3] {
+                assert_eq!(
+                    copy(mode, frames),
+                    copy(mode, FLATTEN_FRAMES),
+                    "{mode:?}, {frames} frames"
+                );
+            }
+        }
+    }
+
+    /// The loop counts the recursion's doc-walk visits ([`crate::fanout_probe::walk`]):
+    /// one per node entered, a memo hit included, whichever walk enters it.
+    #[cfg(feature = "fanout_check")]
+    #[test]
+    fn flattening_in_the_loop_counts_the_recursions_walks() {
+        use crate::fanout_probe::{Budget, arm, disarm};
+        let walks = |mode: FlattenMode, frames: u32| {
+            let a = DocArena::new();
+            let shared = a.group(a.concat(&[a.text("a"), a.line(), a.text("b")]));
+            let mut doc = a.concat(&[shared, a.softline(), shared]);
+            for _ in 0..4 {
+                doc = a.indent(a.concat(&[doc, a.line(), shared]));
+            }
+            arm(Budget {
+                builds: u64::MAX,
+                walks: u64::MAX,
+                scans: u64::MAX,
+                predicates: u64::MAX,
+                nodes: u64::MAX,
+            });
+            a.flatten_lines_impl(doc, mode, &mut WalkMemo::new(), frames);
+            disarm().walks
+        };
+        for mode in [FlattenMode::RemoveLines, FlattenMode::Atomize] {
+            let recursion = walks(mode, FLATTEN_FRAMES);
+            assert!(recursion > 0, "{mode:?}: the walk counted its visits");
+            for frames in [0, 1, 2, 3] {
+                assert_eq!(walks(mode, frames), recursion, "{mode:?}, {frames} frames");
+            }
+        }
+    }
+
+    /// A subtree shared in the input stays shared in the copy below the frames the
+    /// recursion spends, where the loop walks it: one copy, named twice.
+    #[test]
+    fn flattening_past_the_recursion_shares_a_shared_subtrees_copy() {
+        let a = DocArena::new();
+        let shared = a.group(a.concat(&[a.text("a"), a.line(), a.text("b")]));
+        let mut doc = a.if_break(
+            a.concat(&[shared, a.text(","), shared]),
+            a.concat(&[shared, shared]),
+        );
+        for _ in 0..FLATTEN_FRAMES * 2 {
+            doc = a.indent(doc);
+        }
+        for mode in [FlattenMode::RemoveLines, FlattenMode::Atomize] {
+            let mut flat = a.flatten_lines_impl(doc, mode, &mut WalkMemo::new(), FLATTEN_FRAMES);
+            for _ in 0..FLATTEN_FRAMES * 2 {
+                let DocNode::Indent(inner) = a.get(flat).clone() else {
+                    panic!("an indent flattens to an indent");
+                };
+                flat = inner;
+            }
+            let DocNode::Concat(range) = a.get(flat).clone() else {
+                panic!("the flat arm of an `if_break` flattens to its concat");
+            };
+            let kids = range.resolve(&a.borrow_children()).to_vec();
+            assert_eq!(kids.len(), 2);
+            assert_eq!(
+                kids[0], kids[1],
+                "{mode:?}: one flattened copy, named twice"
+            );
+            assert_eq!(render(&a, flat), "a ba b", "{mode:?}");
+        }
+    }
+
+    /// A doc nested far deeper than [`FLATTEN_FRAMES`] flattens on a small stack: past
+    /// them its levels cost heap, not a frame each. The copy keeps every text and no line.
+    #[test]
+    fn a_deep_doc_flattens_without_a_frame_per_level() {
+        const LEVELS: usize = 100_000;
+        let leaves = std::thread::Builder::new()
+            .stack_size(256 << 10)
+            .spawn(|| {
+                let a = DocArena::new();
+                let mut doc = a.text("a");
+                for _ in 0..LEVELS {
+                    doc = a.group(a.concat(&[a.text("!"), a.line(), doc]));
+                }
+                [a.remove_lines(doc), a.atomize(doc)].map(|flat| {
+                    // the copy's leaves, by kind, walked without recursing
+                    let (mut texts, mut lines) = (0, 0);
+                    let mut stack = vec![flat];
+                    while let Some(id) = stack.pop() {
+                        match a.get(id).clone() {
+                            DocNode::Text(_) => texts += 1,
+                            DocNode::Line(_) => lines += 1,
+                            DocNode::Group { contents, .. } => stack.push(contents),
+                            DocNode::Concat(range) => {
+                                stack.extend_from_slice(range.resolve(&a.borrow_children()));
+                            }
+                            other => panic!("a group, a concat or a leaf, not {other:?}"),
+                        }
+                    }
+                    (texts, lines)
+                })
+            })
+            .expect("spawn")
+            .join()
+            .expect("the flatten ran");
+        // each level's `line` is a space in the copy, a text of its own
+        assert_eq!(leaves, [(LEVELS * 2 + 1, 0); 2]);
     }
 }

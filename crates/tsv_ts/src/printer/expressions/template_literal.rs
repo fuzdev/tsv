@@ -207,9 +207,11 @@ impl<'a> Printer<'a> {
                     //
                     // `atomize`, not `remove_lines`: this genuinely wants ONE
                     // line, hard lines included, which prettier's `removeLines` deliberately
-                    // won't do. Sound only because the branches above already claimed every
-                    // interpolation holding a comment or a source newline — so nothing that
-                    // must break reaches here.
+                    // won't do. Sound only because the branch above already claimed every
+                    // interpolation whose doc will break or whose source spans lines (an
+                    // interior `//` or multi-line comment among them) — so nothing that must
+                    // break reaches here. A single-line block comment can, and carries no
+                    // newline.
                     d.atomize(full_expr_doc)
                 };
 

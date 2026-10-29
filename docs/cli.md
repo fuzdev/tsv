@@ -368,7 +368,11 @@ counter bounds both shapes a walk recurses through:
   tiered the walks up, needs the most, and the weight keeps about a quarter over the
   smallest one at which every leg holds its margin. A run of `!`, each with a block comment
   in its gap (`a!/*c*/!/*c*/`), is printed iteratively, so its links stay plain non-null
-  assertions.
+  assertions. Its doc nests a level per link, though, so the doc walks pay for it: the
+  renderer and its fits walk run on explicit stacks, the flattening walk (`remove_lines` /
+  `atomize`, which the template printer runs over an interpolation) recurses a few dozen
+  doc levels and walks the rest on one too, and the build-time layout walk behind
+  `will_break` recurses a small frame per level, which the stack gate below grades.
 
 **The spine count bounds every root-to-leaf path, not one chain.** A path can pass
 several chains (a chain whose leaf holds another, `(a + … + a) + a + …`), and the leaf is
