@@ -334,14 +334,15 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         let expr_end = stmt.expression.span().end;
-        // The value reports which grouping `)` — if any — it retained and emitted the gap
-        // up to, because that region is then the VALUE's share rather than the
-        // terminator's. Asking the source a second time here instead would DROP whatever
-        // the value declined to claim: the two must be one answer.
-        let (value_doc, consumed_close) = if stmt.is_directive {
+        // The value reports where the terminator gap opens — past a grouping `)` it retained
+        // and emitted the gap up to, or back at the start of a trailing region it handed over
+        // — because that region is then the VALUE's share, or the terminator's. Asking the
+        // source a second time here instead would DROP whatever the value declined to claim,
+        // or print twice what it handed over: the two must be one answer.
+        let (value_doc, gap_start) = if stmt.is_directive {
             // The directive builder makes the claim itself (it is a reassembly), so it must
             // not also be wrapped below.
-            (self.build_directive_doc(stmt), None)
+            (self.build_directive_doc(stmt), expr_end)
         } else {
             // A MULTI-LINE block the expression OWNS is claimed HERE rather than by the
             // innermost node its token begins, so it prints outside the expression's own
@@ -350,14 +351,14 @@ impl<'a> Printer<'a> {
             // leading run belongs to the statement LIST, which emits it on the **to emit**
             // axis and so never sees the owned member — this seam owes only that one comment
             // (`syntax/comments/statement_leading_multiline_block_flat`).
-            let mut consumed = None;
+            let mut gap_start = expr_end;
             let doc = self.build_value_with_outermost_owned_comment(stmt.expression, || {
-                let (doc, close) =
+                let (doc, start) =
                     self.build_expression_statement_value_doc(stmt, span, ctx.in_program_or_block);
-                consumed = Some(close);
+                gap_start = start;
                 doc
             });
-            (doc, consumed.flatten())
+            (doc, gap_start)
         };
 
         // Comments between the expression and the `;`, with the `;` bound to the
@@ -366,14 +367,72 @@ impl<'a> Printer<'a> {
         // (`fn() // c` → `fn(); // c`), an own-line comment drops to its own line after it
         // (emitting a line comment before the `;` would swallow it). See
         // `push_semicolon_with_gap_comments`.
-        let gap_start =
-            consumed_close.map_or(expr_end, |close| Self::past_grouping_close(close, span.end));
         if self.semicolon_gap_is_bare(gap_start, span.end) {
             return d.concat(&[value_doc, d.text(";")]);
         }
         let mut parts: DocBuf = smallvec![value_doc];
+        if gap_start < expr_end
+            && ctx.clause_tail().is_some()
+            && self.push_handed_clause_semicolon(
+                &mut parts,
+                Span::new(gap_start, expr_end),
+                span.end,
+                ctx.terminator_gap(),
+            )
+        {
+            return d.concat(&parts);
+        }
         self.push_statement_semicolon(&mut parts, gap_start, span.end, ctx.terminator_gap());
         d.concat(&parts)
+    }
+
+    /// The `;` of a CLAUSE body whose value handed its trailing region to the terminator
+    /// ([`Printer::with_statement_tail`]): the run the node claims rides in `line_suffix`
+    /// docs behind the `;`, and `true` says so.
+    ///
+    /// The reparse reads that region as the terminator gap's, past the `;` — printed by the
+    /// enclosing list after the whole clause-bearing statement, or by the construct's own
+    /// gap after the body (an `if`'s `else` gap) — outside the clause's group either way.
+    /// Printed inline here instead, a multi-line block or an own-line comment would force
+    /// the clause's group open on this pass alone (`if (a)⏎\tx = b; /* m⏎n */` for
+    /// `if (a) x = (b /* m⏎n */);`). Deferred, it lands where the reparse puts it. Only
+    /// while no block prints inline behind
+    /// the statement on its line: one would land ahead of a deferred run, so the gap keeps
+    /// the inline split (`false`) and its order.
+    fn push_handed_clause_semicolon(
+        &self,
+        parts: &mut DocBuf,
+        handed: Span,
+        span_end: u32,
+        gap: TerminatorGap,
+    ) -> bool {
+        // Past the value's own end the gap holds the author's own spelling of the comments
+        // after the `)`; the node's split answers those, so any of them keeps it.
+        let claim_end = self.node_terminator_claim_end(handed.start, span_end, gap);
+        if self.has_comments_to_emit_between(handed.end, claim_end) {
+            return false;
+        }
+        // A block that prints inline behind the statement on its last line — the list's
+        // share of the gap, or one the construct's own gap takes right after an ASI statement
+        // (`if (c) y = (b /* c */) /* d */⏎else z();`). A `//` there defers too, behind this
+        // run, so it keeps its order.
+        let bytes_len = self.source.len() as u32;
+        let next = self
+            .next_significant_byte(span_end, bytes_len)
+            .map_or(bytes_len, |pos| pos as u32);
+        if self.comments_to_emit_between(claim_end, next).any(|c| {
+            c.is_block
+                && (c.span.start < span_end || !self.has_newline_between(span_end, c.span.start))
+        }) {
+            return false;
+        }
+        // The run is the value's same-line blocks alone ([`Printer::with_statement_tail`]),
+        // each deferred behind the `;`.
+        parts.push(self.d().text(";"));
+        for comment in self.comments_to_emit_between(handed.start, handed.end) {
+            parts.push(self.build_trailing_line_comment_doc(comment));
+        }
+        true
     }
 
     /// A directive-prologue entry's VALUE — the literal's own source bytes, plus the
@@ -398,6 +457,38 @@ impl<'a> Printer<'a> {
         self.prepend_owned_leading_comment_at(span.start, text)
     }
 
+    /// The expression statement's expression doc proper, under the statement's context
+    /// flags: the nested-paren target and the chain's expression-statement merge rule.
+    #[inline]
+    fn build_expression_statement_expr_doc(
+        &self,
+        stmt: &internal::ExpressionStatement<'_>,
+        nested_paren: Option<Span>,
+    ) -> DocId {
+        self.expr_stmt_paren_target.set(nested_paren);
+
+        self.is_expression_statement.set(true);
+        let doc = match &stmt.expression {
+            // One of prettier's two `printSequenceExpression` parent arms (the `for`
+            // head is the other): the operands after the first take a continuation
+            // indent. Claimed here rather than in the expression dispatch because
+            // that is where the parent is known — a sequence nested deeper inside
+            // this statement is an ordinary operand and keeps the default layout.
+            Expression {
+                span,
+                kind: ExpressionKind::SequenceExpression(seq),
+            } => self.build_sequence_doc(seq, *span, SeqLayout::Indented),
+            // Everything else takes the ordinary dispatch, which is where a
+            // binary picks up the continuation indent an `ExpressionStatement`
+            // parent gets from prettier's fall-through (a labeled statement's
+            // body IS an expression statement, so it rides along).
+            expr => self.build_expression_doc(expr),
+        };
+        self.is_expression_statement.set(false);
+        self.expr_stmt_paren_target.set(None);
+        doc
+    }
+
     /// The non-directive expression statement's VALUE — the expression plus whatever parens
     /// this print gives it (required, directive-avoiding, or a source pair it keeps) and the
     /// comments only those parens can emit. The statement's `;` and the comments bound to it
@@ -406,16 +497,18 @@ impl<'a> Printer<'a> {
     /// `in_program_or_block` is threaded from [`Printer::build_statement_doc`] for the
     /// "avoid becoming a directive" rule (see [`Printer::needs_avoid_directive_parens`]).
     ///
-    /// Returns the doc and the grouping `)` this print RETAINED and emitted the
-    /// expression→`)` gap inside, if any — the caller's terminator scan resumes past it.
-    /// Reported rather than re-derived, because only the branch that ran knows whether it
-    /// claimed that region; re-asking the source would drop what it declined to claim.
+    /// Returns the doc and where the caller's terminator gap opens: past the grouping `)`
+    /// this print RETAINED and emitted the expression→`)` gap inside, or, for the plain
+    /// statement, at the start of the trailing region the value handed to the terminator
+    /// ([`Printer::with_statement_tail`]) — else the expression's end. Reported rather than
+    /// re-derived, because only the branch that ran knows what it claimed; re-asking the
+    /// source would drop what it declined to claim, or double what it handed over.
     fn build_expression_statement_value_doc(
         &self,
         stmt: &internal::ExpressionStatement<'_>,
         span: Span,
         in_program_or_block: bool,
-    ) -> (DocId, Option<u32>) {
+    ) -> (DocId, u32) {
         let d = self.d();
         // A `//` the author wrote inside the value's own grouping parens keeps those
         // parens: the terminator gap would defer it past the `)` and the `;`, onto a line
@@ -478,29 +571,19 @@ impl<'a> Printer<'a> {
         // matching node's doc builder consumes the (non-consuming, span-matched) paren
         // target and wraps itself; clear it afterward so it can't leak into a sibling
         // statement.
+        // The plain statement IS its expression, so the `;` follows the value directly and
+        // its gap may take over the value's trailing region ([`Printer::with_statement_tail`]);
+        // a statement that wraps its value in parens of its own keeps the region inside them.
+        let plain = !needs_parens && !source_paren && shell_close.is_none();
+        let mut tail_gap_start = expr_end;
         let expr_doc = match frozen {
             Some(span) => self.build_frozen_expression_doc(stmt.expression, span),
             None => {
-                self.expr_stmt_paren_target.set(nested_paren);
-                self.is_expression_statement.set(true);
-                let doc = match &stmt.expression {
-                    // One of prettier's two `printSequenceExpression` parent arms (the `for`
-                    // head is the other): the operands after the first take a continuation
-                    // indent. Claimed here rather than in the expression dispatch because
-                    // that is where the parent is known — a sequence nested deeper inside
-                    // this statement is an ordinary operand and keeps the default layout.
-                    Expression {
-                        span,
-                        kind: ExpressionKind::SequenceExpression(seq),
-                    } => self.build_sequence_doc(seq, *span, SeqLayout::Indented),
-                    // Everything else takes the ordinary dispatch, which is where a
-                    // binary picks up the continuation indent an `ExpressionStatement`
-                    // parent gets from prettier's fall-through (a labeled statement's
-                    // body IS an expression statement, so it rides along).
-                    expr => self.build_expression_doc(expr),
-                };
-                self.is_expression_statement.set(false);
-                self.expr_stmt_paren_target.set(None);
+                let (doc, gap_start) = self
+                    .with_statement_tail(plain.then_some(stmt.expression), || {
+                        self.build_expression_statement_expr_doc(stmt, nested_paren)
+                    });
+                tail_gap_start = gap_start.unwrap_or(expr_end);
                 doc
             }
         };
@@ -522,7 +605,7 @@ impl<'a> Printer<'a> {
         // expression: the branch below would push it alone and `concat` would hand it
         // back, so the buffer is skipped outright (the common case by a wide margin).
         if !needs_parens && !source_paren && shell_close.is_none() {
-            return (expr_doc, None);
+            return (expr_doc, tail_gap_start);
         }
         let mut parts = DocBuf::new();
         let mut consumed_close = None;
@@ -595,7 +678,9 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(")"));
             }
         }
-        (d.concat(&parts), consumed_close)
+        let gap_start =
+            consumed_close.map_or(expr_end, |close| Self::past_grouping_close(close, span.end));
+        (d.concat(&parts), gap_start)
     }
 
     /// Emit the expression→`)` gap's trailing run inside a retained grouping pair, and

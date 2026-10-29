@@ -1965,7 +1965,7 @@ impl<'a> Printer<'a> {
     /// [`Self::shell_meets_statement_terminator`] once. A comment occupies bytes even
     /// where nothing emits it, so a walk that stepped over whitespace alone would stop
     /// on the `/` and answer about the wrong token.
-    fn next_significant_byte(&self, start: u32, end: u32) -> Option<usize> {
+    pub(in crate::printer) fn next_significant_byte(&self, start: u32, end: u32) -> Option<usize> {
         next_significant_byte(self.source, start, end)
     }
 
@@ -3159,6 +3159,20 @@ impl<'a> Printer<'a> {
             (ShellTail::StatementTerminator, _) => doc,
         };
 
+        // A shell that closes the enclosing statement's value hands its trailing region —
+        // its own gap and a commented region inside the value that ends with it — to the
+        // statement's terminator gap ([`Printer::with_statement_tail`]), which prints it past
+        // the `;` in source order. Never a frozen value (its slice prints the region) nor a
+        // sequence (its own pair stands in for the shell); a pair the shell keeps holds it.
+        if tail == ShellTail::StatementTerminator
+            && frozen.is_none()
+            && self.statement_tail_may_take(boundary_end)
+            && let Some(doc) =
+                self.build_handed_shell_value_doc(expr, expr_end, boundary_end, position_parens)
+        {
+            return doc;
+        }
+
         if !self.has_trailing_paren_comments(expr_end, boundary_end) {
             return wrap_in(self.build_shell_inner_doc(expr, frozen));
         }
@@ -3220,6 +3234,28 @@ impl<'a> Printer<'a> {
         )
     }
 
+    /// A value shell's value built under the statement-tail claim its region hands over
+    /// ([`Self::build_shell_value_doc`]) — out of line, since almost no shell takes it.
+    ///
+    /// `None` when the shell keeps its region after all: a sequence (its own pair stands in
+    /// for the shell), a retained shell, or a region that is not a run of same-line blocks.
+    #[cold]
+    #[inline(never)]
+    fn build_handed_shell_value_doc(
+        &self,
+        expr: &internal::Expression<'_>,
+        expr_end: u32,
+        boundary_end: u32,
+        position_parens: bool,
+    ) -> Option<DocId> {
+        if matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_)) {
+            return None;
+        }
+        let retains = self.shell_gap_retains_parens(expr_end, boundary_end, position_parens);
+        let region = self.shell_statement_tail_region(expr, boundary_end, retains)?;
+        Some(self.with_statement_tail_claim(region, || self.build_expression_doc(expr)))
+    }
+
     /// The trailing half of [`Self::build_shell_value_doc`] for a value whose doc the
     /// CALLER builds: a chained conditional in a ternary ALTERNATE (`: (aaa ? bbb : ccc /* t */)`),
     /// whose branch arm builds the nested conditional in its chained geometry and so cannot
@@ -3234,14 +3270,20 @@ impl<'a> Printer<'a> {
         boundary_end: u32,
         inner: impl FnOnce() -> DocId,
     ) -> DocId {
-        self.build_stripped_shell_tail_doc_with(
-            expr,
-            expr_end,
-            boundary_end,
-            self.shell_tail(boundary_end),
-            false,
-            inner,
-        )
+        let tail = self.shell_tail(boundary_end);
+        // The statement-tail hand-over [`Self::build_shell_value_doc`] makes, for this
+        // caller-built value.
+        if tail == ShellTail::StatementTerminator
+            && self.statement_tail_may_take(boundary_end)
+            && let Some(region) = self.shell_statement_tail_region(
+                expr,
+                boundary_end,
+                self.shell_gap_retains_parens(expr_end, boundary_end, false),
+            )
+        {
+            return self.with_statement_tail_claim(region, inner);
+        }
+        self.build_stripped_shell_tail_doc_with(expr, expr_end, boundary_end, tail, false, inner)
     }
 
     /// A stripped value shell's TRAILING gap — `expr_end` (the value's printed end) to
@@ -3304,6 +3346,13 @@ impl<'a> Printer<'a> {
         // A ternary ALTERNATE is terminator-adjacent and does reach this arm, which is
         // prettier's answer there too; the pair its branch may print is applied outside,
         // by `parenthesize_ternary_branch`, so nothing here crosses a surviving `)`.
+        // A shell that closes the value of an expression statement or a declaration's last
+        // declarator hands its region to that statement's terminator gap instead, whenever
+        // the region is a run of same-line blocks ([`Self::shell_statement_tail_region`]) —
+        // for its ASI spelling too, and in order with a comment written after it. This arm
+        // answers the rest: the positions with no statement tail (a class field, a `return`
+        // / `throw` / `export default` value) and a region that also holds a `//` or an
+        // own-line comment below the value.
         if tail == ShellTail::StatementTerminator
             && self.shell_meets_statement_terminator(boundary_end)
         {

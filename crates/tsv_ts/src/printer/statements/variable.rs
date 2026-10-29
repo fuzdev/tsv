@@ -748,12 +748,21 @@ impl<'a> Printer<'a> {
         // wrote it in (`const x = (/* c⏎d */ a = b)`); claimed by the gap seam above the
         // wrap, it would land in front of the pair. The claim declines on its own under a
         // hoist, and for a sequence, which claims inside its own envelope.
-        let inner = self.build_value_with_outermost_owned_comment(init, || match frozen {
+        // A pair the position adds holds the value's trailing region, so no shell below it
+        // hands that region to the declaration's terminator ([`Printer::without_statement_tail`]).
+        let build = || match frozen {
             Some(frozen) => {
                 self.build_frozen_value_shell_doc(init, frozen, boundary_end, position_parens)
             }
             None => {
                 self.build_expression_doc_with_paren_comments(init, boundary_end, position_parens)
+            }
+        };
+        let inner = self.build_value_with_outermost_owned_comment(init, || {
+            if position_parens {
+                self.without_statement_tail(build)
+            } else {
+                build()
             }
         });
         self.wrap_value_position_parens(init, boundary_end, position_parens, inner)
@@ -957,6 +966,13 @@ impl<'a> Printer<'a> {
         let mut rest_parts = DocBuf::new();
 
         // Declarators
+        // The LAST declarator's value ends the statement, so a terminator this declaration
+        // prints may take over its trailing region ([`Printer::with_statement_tail`]).
+        let tail_end = terminator
+            .is_some()
+            .then(|| decl.declarations.last().map(|last| last.span.end))
+            .flatten();
+        let outer_tail = self.arm_statement_tail(tail_end);
         for (i, declarator) in decl.declarations.iter().enumerate() {
             if i > 0 {
                 let prev_end = decl.declarations[i - 1].span.end;
@@ -1170,6 +1186,7 @@ impl<'a> Printer<'a> {
                 target.push(id_doc);
             }
         }
+        let tail_gap_start = self.disarm_statement_tail(outer_tail);
 
         // The list's two indents — prettier's `indent(first)` and `indent(rest)` — or
         // neither under a broken keyword gap (see `list_indents`). A single declarator takes
@@ -1203,7 +1220,7 @@ impl<'a> Printer<'a> {
             let terminator_gap = crate::declaration_terminator_gap(decl);
             self.push_statement_semicolon(
                 &mut parts,
-                terminator_gap.start,
+                tail_gap_start.unwrap_or(terminator_gap.start),
                 terminator_gap.end,
                 gap,
             );

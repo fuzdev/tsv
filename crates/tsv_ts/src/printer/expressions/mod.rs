@@ -372,8 +372,17 @@ impl<'a> Printer<'a> {
             ExpressionKind::ConditionalExpression(cond) => {
                 self.build_conditional_doc(cond, expr.span)
             }
+            // No shell in an arrow's body hands its trailing region to the enclosing
+            // statement ([`Printer::without_statement_tail`]): the body takes pairs of its own
+            // (a ternary's, an object's, an assignment's) that would hold it. Only an arrow
+            // ending where the tail does can reach it. A body the statement's own walk reaches
+            // is claimed before the build, which this leaves be.
             ExpressionKind::ArrowFunctionExpression(arrow) => {
-                self.build_arrow_doc(arrow, expr.span)
+                if self.statement_tail_ends_at(expr.span.end) {
+                    self.without_statement_tail(|| self.build_arrow_doc(arrow, expr.span))
+                } else {
+                    self.build_arrow_doc(arrow, expr.span)
+                }
             }
             ExpressionKind::FunctionExpression(func) => {
                 self.maybe_wrap_expr_stmt_paren(func.span, self.build_function_doc(func))

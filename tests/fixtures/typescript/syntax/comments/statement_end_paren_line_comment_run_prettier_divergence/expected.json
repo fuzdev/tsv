@@ -1,0 +1,126 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 159,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Two `//` comments written inside and after a stripped shell at a statement's end keep a",
+			"start": 10,
+			"end": 100
+		},
+		{
+			"type": "Line",
+			"value": " line each.",
+			"start": 102,
+			"end": 115
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 138,
+			"end": 142
+		},
+		{
+			"type": "Line",
+			"value": " e",
+			"start": 144,
+			"end": 148
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 158,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 149,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 117,
+					"end": 136,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 123,
+							"end": 135,
+							"id": {
+								"type": "Identifier",
+								"start": 123,
+								"end": 124,
+								"name": "v"
+							},
+							"init": {
+								"type": "LogicalExpression",
+								"start": 127,
+								"end": 135,
+								"left": {
+									"type": "Identifier",
+									"start": 127,
+									"end": 128,
+									"name": "b"
+								},
+								"operator": "&&",
+								"right": {
+									"type": "ArrayExpression",
+									"start": 132,
+									"end": 135,
+									"elements": [
+										{
+											"type": "Literal",
+											"start": 133,
+											"end": 134,
+											"value": 1,
+											"raw": "1"
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two `//` comments written inside and after a stripped shell at a statement's end keep a",
+							"start": 10,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " line each.",
+							"start": 102,
+							"end": 115
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 138,
+							"end": 142
+						},
+						{
+							"type": "Line",
+							"value": " e",
+							"start": 144,
+							"end": 148
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -18,7 +18,8 @@ statement with **two** fixed points, one per authoring, which F1 cannot see.
 
 **tsv**: strips the shell and defers the trailing block past the statement `;` (via
 `line_suffix`) — the declarator's own value-to-`;` trailing-comment handling — reaching
-the fixed point in **one pass**, from either authoring:
+the fixed point in **one pass**, from every authoring — a single shell, a doubled
+one, and the ASI spelling with no `;`:
 
 ```ts
 const a = x; /* t */

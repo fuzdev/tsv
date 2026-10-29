@@ -10,6 +10,17 @@ use crate::ast::internal;
 use crate::lexer::{is_es_line_terminator, is_es_whitespace};
 use tsv_lang::Span;
 
+/// A statement whose terminator gap may take over its value's trailing region
+/// ([`Printer::with_statement_tail`]).
+#[derive(Clone, Copy)]
+pub(in crate::printer) struct StatementTail {
+    /// Where the value ends — the position a trailing region must close at to be the
+    /// statement's.
+    end: u32,
+    /// Where the region handed to the terminator so far begins; `end` while nothing is.
+    handed: u32,
+}
+
 /// Which terminator a statement kind owns — prettier's `shouldIgnoredNodePrintSemicolon`,
 /// read as the three answers it gives. It is therefore also what a freeze over the
 /// statement must NOT copy.
@@ -361,5 +372,231 @@ impl<'a> Printer<'a> {
                 None => return pos,
             }
         }
+    }
+
+    /// Build a statement's VALUE with its trailing region open to the statement's terminator
+    /// gap, returning the value's doc and where that gap now opens.
+    ///
+    /// The statement-terminator twin of [`Printer::member_gap_start`] (`docs/comments.md`
+    /// §The right-spine shell run): a comment written last inside a grouping pair whose `)`
+    /// ends the value (`x + (y /* c */);`, `v = (b /* c */)`, `x = a + (q + b /* c */);`)
+    /// sits inside the value's span, yet nothing but `)`s and trivia stands between it and
+    /// the terminator, and the reparse reads it from the terminator gap. So the gap opens
+    /// where the value's PRINTED content ends: the region from there is claimed
+    /// ([`Printer::claimed_right_spine_run`]) — the binary chain's trailing emitter declines
+    /// it and its layout gate does not count it, so the chain lays out as its comment-free
+    /// twin, which is what the reparse gives it — and the terminator's one emitter prints
+    /// the whole gap in source order. That is also what keeps two comments in order: a block
+    /// the value deferred out of its shell would flush behind one the terminator printed
+    /// inline after the `;`.
+    ///
+    /// The region is opened two ways, one per emitter that would otherwise print it: here,
+    /// down the value's right spine ([`Self::statement_tail_region`]) — a value no pair of the
+    /// statement's encloses — and at a value SHELL whose `)` closes at the value's end
+    /// ([`Self::shell_statement_tail_region`]), which alone knows whether its position keeps
+    /// a pair. The value's end is the same for the `;` spelling and the ASI one, so the two
+    /// format alike; `None` arms no tail, and shadows an enclosing statement's. Returns where
+    /// the gap now opens, `None` with no tail armed.
+    ///
+    /// An expression statement whose value the statement does not wrap calls this; a
+    /// variable declaration that prints its own terminator arms its tail around the
+    /// declarator loop instead ([`Self::arm_statement_tail`]), the shells alone opening it.
+    #[inline]
+    pub(in crate::printer) fn with_statement_tail<T>(
+        &self,
+        value: Option<&internal::Expression<'_>>,
+        build: impl FnOnce() -> T,
+    ) -> (T, Option<u32>) {
+        let outer = self.arm_statement_tail(value.map(|value| value.span().end));
+        // Asked only of a tail that armed, so a region is never claimed for a terminator gap
+        // that would not take it over.
+        let region = value
+            .zip(self.statement_tail.get())
+            .and_then(|(value, tail)| self.statement_tail_region(value, tail.end));
+        // One call site for `build`, so the value's whole build inlines once.
+        let outer_claim = region.map(|region| self.open_statement_tail_claim(region));
+        let built = build();
+        if let Some(outer_claim) = outer_claim {
+            self.claimed_right_spine_run.set(outer_claim);
+        }
+        (built, self.disarm_statement_tail(outer))
+    }
+
+    /// The arming half of [`Self::with_statement_tail`] with no walk, for a builder that
+    /// cannot wrap its value in a closure (a declaration's declarator loop). Returns the
+    /// enclosing tail, to hand back to [`Self::disarm_statement_tail`].
+    #[inline]
+    pub(in crate::printer) fn arm_statement_tail(&self, end: Option<u32>) -> Option<StatementTail> {
+        let end = end.filter(|_| self.document_has_paren_closing_block());
+        self.statement_tail
+            .replace(end.map(|end| StatementTail { end, handed: end }))
+    }
+
+    /// [`Printer::has_paren_closing_block`], computed on first ask: a region a tail takes over
+    /// ends in a same-line block followed by a shell's `)`, so a document holding no block
+    /// followed by a `)` has none, and its statements arm no tail.
+    #[inline]
+    fn document_has_paren_closing_block(&self) -> bool {
+        if let Some(answer) = self.has_paren_closing_block.get() {
+            return answer;
+        }
+        let bytes = self.source.as_bytes();
+        let answer = self.comments.iter().any(|c| {
+            c.is_block
+                && bytes[c.span.end as usize..]
+                    .iter()
+                    .find(|&&b| !matches!(b, b' ' | b'\t' | b'\n' | b'\r'))
+                    == Some(&b')')
+        });
+        self.has_paren_closing_block.set(Some(answer));
+        answer
+    }
+
+    /// Restore the enclosing tail and report where this one's terminator gap opens
+    /// (`None` when none was armed).
+    #[inline]
+    pub(in crate::printer) fn disarm_statement_tail(
+        &self,
+        outer: Option<StatementTail>,
+    ) -> Option<u32> {
+        self.statement_tail.replace(outer).map(|tail| tail.handed)
+    }
+
+    /// The trailing region of `expr` that a statement tail closing at `end` takes over:
+    /// from where `expr`'s printed content ends ([`Printer::right_spine_printed_end_with`],
+    /// stopping at a pair the printer adds) to `end`, when it holds a comment to emit.
+    ///
+    /// `None` when the region holds anything but same-line blocks, and when the value holds
+    /// an honored format-ignore directive: a frozen slice prints its source verbatim, the
+    /// region included, so claiming it too would print it twice. Asked only past the comment
+    /// gate, so the scans cost nothing in the common case.
+    #[inline]
+    fn statement_tail_region(&self, expr: &internal::Expression<'_>, end: u32) -> Option<Span> {
+        if !self.statement_tail_bytes_admit(end) {
+            return None;
+        }
+        self.statement_tail_region_walk(expr, end)
+    }
+
+    /// The byte gate of [`Self::statement_tail_region`]: the region holds only `)`s,
+    /// whitespace and same-line blocks, so one ends it — walking back from `end` over `)`s and
+    /// whitespace reaches a `*/`, which almost no value's end does. A node's span ends at a
+    /// token, so the region's last byte is a shell's `)` — the one byte almost every value
+    /// fails on.
+    #[inline]
+    pub(in crate::printer) fn statement_tail_bytes_admit(&self, end: u32) -> bool {
+        let bytes = self.source.as_bytes();
+        let mut i = end as usize;
+        if i == 0 || bytes[i - 1] != b')' {
+            return false;
+        }
+        while i > 0 && matches!(bytes[i - 1], b')' | b' ' | b'\t' | b'\n' | b'\r') {
+            i -= 1;
+        }
+        i >= 2 && bytes[i - 1] == b'/' && bytes[i - 2] == b'*'
+    }
+
+    /// [`Self::statement_tail_region`] past its byte gate, out of line.
+    #[cold]
+    #[inline(never)]
+    fn statement_tail_region_walk(
+        &self,
+        expr: &internal::Expression<'_>,
+        end: u32,
+    ) -> Option<Span> {
+        let start = self.right_spine_printed_end_with(expr, true);
+        if start >= end || !self.has_comments_to_emit_between(start, end) {
+            return None;
+        }
+        // Only a run of blocks on the value's own last line: a `//` or an own-line comment
+        // keeps the deferral its own emitter gives it, which already lands past the `;` —
+        // handed to the terminator it would open a line that a `//` the gap's next owner
+        // defers behind it welds onto.
+        let mut prev_end = start;
+        let same_line_blocks = self.comments_to_emit_between(start, end).all(|c| {
+            let glued = c.is_block && !self.comment_has_newline_between(prev_end, c.span.start);
+            prev_end = c.span.end;
+            glued
+        });
+        if !same_line_blocks {
+            return None;
+        }
+        if self
+            .comments_in_source_between(expr.span().start, end)
+            .any(|c| self.is_honored_directive(c))
+        {
+            return None;
+        }
+        Some(Span::new(start, end))
+    }
+
+    /// Run `build` with `region` claimed for the statement tail: the value's emitters
+    /// decline it, and the terminator gap opens no later than its start.
+    pub(in crate::printer) fn with_statement_tail_claim<T>(
+        &self,
+        region: Span,
+        build: impl FnOnce() -> T,
+    ) -> T {
+        let outer = self.open_statement_tail_claim(region);
+        let built = build();
+        self.claimed_right_spine_run.set(outer);
+        built
+    }
+
+    /// Claim `region` for the statement tail ([`Self::with_statement_tail_claim`]) and return
+    /// the claim it displaces, for the caller to restore.
+    fn open_statement_tail_claim(&self, region: Span) -> Option<Span> {
+        if let Some(mut tail) = self.statement_tail.get() {
+            tail.handed = tail.handed.min(region.start);
+            self.statement_tail.set(Some(tail));
+        }
+        self.claimed_right_spine_run.replace(Some(region))
+    }
+
+    /// Whether a value shell closing at `boundary_end` may hand its region to the enclosing
+    /// statement's terminator gap ([`Self::with_statement_tail`]) — the cheap half of the
+    /// question, inline: a tail ends there and the bytes admit a region. The rest is asked out
+    /// of line by the shell's hand-over ([`Self::shell_statement_tail_region`]).
+    #[inline]
+    pub(in crate::printer) fn statement_tail_may_take(&self, boundary_end: u32) -> bool {
+        self.statement_tail_ends_at(boundary_end) && self.statement_tail_bytes_admit(boundary_end)
+    }
+
+    /// The region a stripped value shell closing at `boundary_end` hands to the enclosing
+    /// statement's terminator gap, past [`Self::statement_tail_may_take`] — to be claimed for
+    /// the value's build ([`Self::with_statement_tail_claim`]): the shell does not keep its
+    /// pair (`retains_parens` — a comment that needs the pair, or a pair the position prints
+    /// anyway, holds the comment inside it), and the region from the value's printed end
+    /// holds a run of same-line blocks.
+    pub(in crate::printer) fn shell_statement_tail_region(
+        &self,
+        expr: &internal::Expression<'_>,
+        boundary_end: u32,
+        retains_parens: bool,
+    ) -> Option<Span> {
+        if retains_parens {
+            return None;
+        }
+        self.statement_tail_region_walk(expr, boundary_end)
+    }
+
+    /// Run `build` with no statement tail armed: a value the position wraps in a pair of its
+    /// own keeps its trailing region inside that pair, out of the enclosing statement's
+    /// terminator gap.
+    #[inline]
+    pub(in crate::printer) fn without_statement_tail<T>(&self, build: impl FnOnce() -> T) -> T {
+        let outer = self.arm_statement_tail(None);
+        let built = build();
+        self.disarm_statement_tail(outer);
+        built
+    }
+
+    /// Whether a statement tail is armed and ends at `end` — the one position a shell inside
+    /// a node ending there could hand over to ([`Self::shell_statement_tail_region`]).
+    #[inline]
+    pub(in crate::printer) fn statement_tail_ends_at(&self, end: u32) -> bool {
+        self.statement_tail
+            .get()
+            .is_some_and(|tail| tail.end == end)
     }
 }

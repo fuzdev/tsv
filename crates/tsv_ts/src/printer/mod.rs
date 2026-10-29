@@ -675,6 +675,15 @@ pub struct Printer<'a> {
     /// ([`Printer::wrap_chain_with_paren_comments`]) and the gap prints it after the `)`.
     /// Save/restored around the chain's build.
     pub(crate) claimed_right_spine_run: Cell<Option<Span>>,
+    /// The statement whose value is being built, when its terminator gap may take over the
+    /// value's TRAILING region ([`Printer::with_statement_tail`]): where the value ends, and
+    /// where the region handed to the terminator so far begins. Save/restored around the
+    /// value's build, so a statement nested inside the value states its own.
+    pub(in crate::printer) statement_tail: Cell<Option<statement_tail::StatementTail>>,
+    /// Whether any block comment in the document is followed, past whitespace, by a `)` — the
+    /// one shape a statement tail can take over ([`Printer::with_statement_tail`]); `None`
+    /// until a statement first asks. A document without one arms no tail at all.
+    pub(in crate::printer) has_paren_closing_block: Cell<Option<bool>>,
     /// The span a linearized chain's BASE freezes — an alone-on-line format-ignore directive
     /// in the grouping parens the parser erased ahead of it
     /// ([`Printer::left_spine_operand_frozen_span`]).
@@ -972,6 +981,8 @@ impl<'a> Printer<'a> {
             head_memo: types::HeadMemo::default(),
             claimed_left_spine_run: Cell::new(None),
             claimed_right_spine_run: Cell::new(None),
+            statement_tail: Cell::new(None),
+            has_paren_closing_block: Cell::new(None),
             frozen_chain_base: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
@@ -2220,7 +2231,22 @@ impl<'a> Printer<'a> {
     /// (`yield (x)`, `() => (x)`, `x = (y = …)`) ends the walk at the parent's end — whether
     /// that shell prints is its parent printer's decision, not re-derived here — so a comment
     /// in a shell below it still defers (a known gap); a kept pair ends it at the pair's `)`.
-    fn right_spine_printed_end(&self, expr: &internal::Expression<'_>) -> u32 {
+    pub(in crate::printer) fn right_spine_printed_end(
+        &self,
+        expr: &internal::Expression<'_>,
+    ) -> u32 {
+        self.right_spine_printed_end_with(expr, false)
+    }
+
+    /// [`Self::right_spine_printed_end`], optionally stopping at an arrow whose expression
+    /// body is a conditional — the one step of the walk where the printer adds a pair of its
+    /// own (`() => (c ? d : e)`), which a statement tail must not reach past
+    /// ([`Printer::with_statement_tail`]).
+    pub(in crate::printer) fn right_spine_printed_end_with(
+        &self,
+        expr: &internal::Expression<'_>,
+        stop_at_printed_pair: bool,
+    ) -> u32 {
         use internal::ExpressionKind as K;
         let mut expr = expr;
         loop {
@@ -2233,6 +2259,12 @@ impl<'a> Printer<'a> {
                     Err(close) => return close,
                 },
                 K::ArrowFunctionExpression(arrow) => match arrow.body {
+                    internal::ArrowFunctionBody::Expression(body)
+                        if stop_at_printed_pair
+                            && matches!(body.kind, K::ConditionalExpression(_)) =>
+                    {
+                        return expr.span().end;
+                    }
                     internal::ArrowFunctionBody::Expression(body) => body,
                     internal::ArrowFunctionBody::BlockStatement(_) => return expr.span().end,
                 },

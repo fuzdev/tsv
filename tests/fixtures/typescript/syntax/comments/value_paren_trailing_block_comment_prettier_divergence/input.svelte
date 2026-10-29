@@ -1,7 +1,7 @@
 <script>
 	// A redundant paren shell around a value whose trailing gap holds a block comment.
 	// A value position is `;`-terminated, so the comment defers past the `;` — the
-	// declarator's own value-to-`;` handling — from either authoring, in one pass.
+	// declarator's own value-to-`;` handling — from every authoring, in one pass.
 	const a = x; /* t */
 
 	const b = fn(); /* t */
