@@ -1035,6 +1035,26 @@ fn construct_shapes() -> Vec<Shape> {
             "!/*c*/",
             "();\n",
         ),
+        // the same run as a template literal's interpolation, plain and tagged: a level of
+        // doc nesting per link, which the template printer flattens onto one line whole.
+        // The count charges the tag as a tagged link, where the wire holds it as one level
+        // of nesting below the floor the spine's calibration reads past, so the tagged one
+        // is bounded, not calibrated
+        ts_flat(
+            "ts_template_non_null_comment",
+            NON_NULL,
+            "x = `${a",
+            "!/*c*/",
+            "}`;\n",
+        ),
+        ts_spine_unrecorded(
+            "ts_tagged_template_non_null_comment",
+            "x = t`${a",
+            "!/*c*/",
+            "",
+            "",
+            "}`;\n",
+        ),
         ts_flat("ts_as_flat", 8, "x = a", " as T", ";\n"),
         ts_flat("ts_tagged_flat", 14, "x = a", "``", ";\n"),
         ts_flat("ts_new_callee_flat", SUBSCRIPT, "x = new a", ".b", "();\n"),
