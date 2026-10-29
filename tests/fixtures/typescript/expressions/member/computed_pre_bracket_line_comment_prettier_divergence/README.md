@@ -12,7 +12,11 @@ pinned separately by
 wrote it: a same-line comment trails the object (`arr // c1`), an own-line comment
 keeps its own line before the `[`. A comment written *inside* the brackets belongs to
 the bracket, not to the chain gap, so it stays inside them (case `d`, a chain with a
-call — the path that reaches the brackets through the chain builder).
+call — the path that reaches the brackets through the chain builder). With a comment inside one
+lookup's brackets and another before the next `[` (case `e`), the chain still breaks at
+every lookup with each comment in place; and a `//` leading the next index from a stripped
+shell (case `f`, `unformatted_ours_stripped_shell`) lays out as the comment written in its
+brackets.
 
 **Prettier** hoists the comment out to lead the whole expression, before the
 assignment RHS — and when two comments share the gap it **reorders** them

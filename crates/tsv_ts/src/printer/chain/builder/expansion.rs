@@ -7,7 +7,7 @@
 
 use crate::printer::calls::arg_predicates::is_simple_call_argument;
 
-use super::super::printing::{chain_gap_any, node_comment_gap};
+use super::super::printing::{chain_gap_share_any, node_comment_gap};
 use super::super::types::{ChainGroup, ChainNode};
 use crate::printer::Printer;
 
@@ -28,12 +28,12 @@ pub(super) fn has_blank_lines_between_methods<'a>(
         let Some(node) = group.nodes.first() else {
             return false;
         };
-        // Hole-honoring ([`chain_gap_any`]): a blank a widened range sweeps up sits INSIDE
-        // the object — between two call arguments, say — and is not a blank between methods.
-        node.comment_range().is_some_and(|gap| {
-            chain_gap_any(gap, node.paren_gap_skip(), |obj_end, prop_start| {
-                printer.has_blank_line_between(obj_end, prop_start)
-            })
+        // The chain's share of the gap ([`chain_gap_share_any`]): a blank a widened range
+        // sweeps up sits INSIDE the object — between two call arguments, say — and one
+        // inside a computed member's brackets sits inside the lookup; neither is a blank
+        // between methods.
+        chain_gap_share_any(node, printer.get_source(), |obj_end, prop_start| {
+            printer.has_blank_line_between(obj_end, prop_start)
         })
     })
 }
@@ -85,20 +85,31 @@ pub(super) fn has_comments_forcing_expansion<'a>(
                 continue;
             }
 
-            // Hole-honoring ([`chain_gap_any`]): the comments a widened range sweeps up
-            // belong to the object subtree's own printers or to the chain head, and
-            // expanding this chain around one is a layout the un-widened spelling of the
-            // same document does not get.
-            if let Some(gap) = node.comment_range()
-                && chain_gap_any(gap, node.paren_gap_skip(), |start, end| {
-                    printer.has_comments_to_emit_between(start, end)
-                })
-            {
+            if gap_forces_expansion(node, printer) {
                 return true;
             }
         }
     }
     false
+}
+
+/// Whether a node's comment gap holds a comment that forces the chain open — the per-node
+/// question of [`has_comments_forcing_expansion`], asked of the CHAIN's share of the gap
+/// ([`chain_gap_share_any`]).
+///
+/// Hole-honoring: the comments a widened range sweeps up belong to the object subtree's own
+/// printers or to the chain head, and expanding this chain around one is a layout the
+/// un-widened spelling of the same document does not get. And a computed member's share stops
+/// at its `[`: the interior is the lookup's own, printed inline around the index — a block
+/// against it (`x[/* c */⏎y.p]` prints `x[/* c */ y.p]`), a `//` breaking the brackets — so
+/// neither forces the chain. Counting the block forced the chain open on the pass that read it
+/// unglued and not on the pass after; counting the `//` broke the chain before a `[` prettier
+/// keeps on the object's line (`x[⏎// c⏎y.p⏎]()`). A group the broken index makes break still
+/// expands the rest of the chain, as prettier's does (`x[⏎// c⏎y.p⏎]⏎\t.m()⏎\t.n()`).
+fn gap_forces_expansion(node: &ChainNode<'_>, printer: &Printer<'_>) -> bool {
+    chain_gap_share_any(node, printer.get_source(), |start, end| {
+        printer.has_comments_to_emit_between(start, end)
+    })
 }
 
 /// Whether a trailing member's gap carries a line comment the chain must EXPAND around

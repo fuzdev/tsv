@@ -1,0 +1,1117 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1020,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 984,
+				"end": 986,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 986,
+				"end": 1019,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 989,
+							"end": 991,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 991,
+							"end": 1014,
+							"expression": {
+								"type": "CallExpression",
+								"start": 992,
+								"end": 1013,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 992,
+									"end": 1011,
+									"object": {
+										"type": "Identifier",
+										"start": 992,
+										"end": 993,
+										"name": "x"
+									},
+									"property": {
+										"type": "MemberExpression",
+										"start": 1005,
+										"end": 1008,
+										"object": {
+											"type": "Identifier",
+											"start": 1005,
+											"end": 1006,
+											"name": "y"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 1007,
+											"end": 1008,
+											"name": "p"
+										},
+										"computed": false,
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c7",
+												"start": 997,
+												"end": 1002
+											}
+										]
+									},
+									"computed": true,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1014,
+							"end": 1015,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a `//` leading the index from inside a stripped shell prints at the index's",
+			"start": 20,
+			"end": 98
+		},
+		{
+			"type": "Line",
+			"value": " leading edge, and the lookup lays out as for the comment written there",
+			"start": 100,
+			"end": 173
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 180,
+			"end": 185
+		},
+		{
+			"type": "Line",
+			"value": " the optional lookup, and a member call after it",
+			"start": 200,
+			"end": 250
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 259,
+			"end": 264
+		},
+		{
+			"type": "Line",
+			"value": " a value, a `return`, and a member-only chain",
+			"start": 281,
+			"end": 328
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 342,
+			"end": 347
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 394,
+			"end": 399
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 433,
+			"end": 438
+		},
+		{
+			"type": "Line",
+			"value": " an index nested in an index",
+			"start": 455,
+			"end": 485
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 498,
+			"end": 503
+		},
+		{
+			"type": "Line",
+			"value": " the broken index still breaks the rest of the chain, and a lookup after a call",
+			"start": 523,
+			"end": 604
+		},
+		{
+			"type": "Line",
+			"value": " starts a group of its own, as prettier groups them",
+			"start": 606,
+			"end": 659
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 666,
+			"end": 671
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 711,
+			"end": 716
+		},
+		{
+			"type": "Line",
+			"value": " a blank inside the brackets is the lookup's, not a blank between methods, and a",
+			"start": 742,
+			"end": 824
+		},
+		{
+			"type": "Line",
+			"value": " `//` inside a trailing lookup's brackets keeps the lookup in the chain's tail",
+			"start": 826,
+			"end": 906
+		},
+		{
+			"type": "Block",
+			"value": " c10 ",
+			"start": 942,
+			"end": 951
+		},
+		{
+			"type": "Line",
+			"value": " c11",
+			"start": 958,
+			"end": 964
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 997,
+			"end": 1002
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 984,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 975,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 175,
+					"end": 197,
+					"expression": {
+						"type": "CallExpression",
+						"start": 175,
+						"end": 196,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 175,
+							"end": 194,
+							"object": {
+								"type": "Identifier",
+								"start": 175,
+								"end": 176,
+								"name": "x"
+							},
+							"property": {
+								"type": "MemberExpression",
+								"start": 188,
+								"end": 191,
+								"object": {
+									"type": "Identifier",
+									"start": 188,
+									"end": 189,
+									"name": "y"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 190,
+									"end": 191,
+									"name": "p"
+								},
+								"computed": false,
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 180,
+										"end": 185
+									}
+								]
+							},
+							"computed": true,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a `//` leading the index from inside a stripped shell prints at the index's",
+							"start": 20,
+							"end": 98
+						},
+						{
+							"type": "Line",
+							"value": " leading edge, and the lookup lays out as for the comment written there",
+							"start": 100,
+							"end": 173
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 252,
+					"end": 278,
+					"expression": {
+						"type": "ChainExpression",
+						"start": 252,
+						"end": 277,
+						"expression": {
+							"type": "CallExpression",
+							"start": 252,
+							"end": 277,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 252,
+								"end": 275,
+								"object": {
+									"type": "MemberExpression",
+									"start": 252,
+									"end": 273,
+									"object": {
+										"type": "Identifier",
+										"start": 252,
+										"end": 253,
+										"name": "x"
+									},
+									"property": {
+										"type": "MemberExpression",
+										"start": 267,
+										"end": 270,
+										"object": {
+											"type": "Identifier",
+											"start": 267,
+											"end": 268,
+											"name": "y"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 269,
+											"end": 270,
+											"name": "p"
+										},
+										"computed": false,
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 259,
+												"end": 264
+											}
+										]
+									},
+									"computed": true,
+									"optional": true
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 274,
+									"end": 275,
+									"name": "m"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the optional lookup, and a member call after it",
+							"start": 200,
+							"end": 250
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 330,
+					"end": 361,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 330,
+						"end": 360,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 330,
+							"end": 331,
+							"name": "q"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 336,
+							"end": 360,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 336,
+								"end": 358,
+								"object": {
+									"type": "Identifier",
+									"start": 336,
+									"end": 337,
+									"name": "x"
+								},
+								"property": {
+									"type": "MemberExpression",
+									"start": 351,
+									"end": 354,
+									"object": {
+										"type": "Identifier",
+										"start": 351,
+										"end": 352,
+										"name": "y"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 353,
+										"end": 354,
+										"name": "p"
+									},
+									"computed": false,
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c3",
+											"start": 342,
+											"end": 347
+										}
+									]
+								},
+								"computed": true,
+								"optional": false
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a value, a `return`, and a member-only chain",
+							"start": 281,
+							"end": 328
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 364,
+					"end": 416,
+					"id": {
+						"type": "Identifier",
+						"start": 373,
+						"end": 374,
+						"name": "f"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 377,
+						"end": 416,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 381,
+								"end": 413,
+								"argument": {
+									"type": "CallExpression",
+									"start": 388,
+									"end": 412,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 388,
+										"end": 410,
+										"object": {
+											"type": "Identifier",
+											"start": 388,
+											"end": 389,
+											"name": "x"
+										},
+										"property": {
+											"type": "MemberExpression",
+											"start": 403,
+											"end": 406,
+											"object": {
+												"type": "Identifier",
+												"start": 403,
+												"end": 404,
+												"name": "y"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 405,
+												"end": 406,
+												"name": "p"
+											},
+											"computed": false,
+											"optional": false,
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " c4",
+													"start": 394,
+													"end": 399
+												}
+											]
+										},
+										"computed": true,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 419,
+					"end": 452,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 419,
+						"end": 451,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 419,
+							"end": 420,
+							"name": "q"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 425,
+							"end": 451,
+							"object": {
+								"type": "MemberExpression",
+								"start": 425,
+								"end": 449,
+								"object": {
+									"type": "MemberExpression",
+									"start": 425,
+									"end": 428,
+									"object": {
+										"type": "Identifier",
+										"start": 425,
+										"end": 426,
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 427,
+										"end": 428,
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "MemberExpression",
+									"start": 442,
+									"end": 445,
+									"object": {
+										"type": "Identifier",
+										"start": 442,
+										"end": 443,
+										"name": "y"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 444,
+										"end": 445,
+										"name": "p"
+									},
+									"computed": false,
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c5",
+											"start": 433,
+											"end": 438
+										}
+									]
+								},
+								"computed": true,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 450,
+								"end": 451,
+								"name": "c"
+							},
+							"computed": false,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 487,
+					"end": 520,
+					"expression": {
+						"type": "CallExpression",
+						"start": 487,
+						"end": 519,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 487,
+							"end": 517,
+							"object": {
+								"type": "Identifier",
+								"start": 487,
+								"end": 488,
+								"name": "x"
+							},
+							"property": {
+								"type": "MemberExpression",
+								"start": 492,
+								"end": 514,
+								"object": {
+									"type": "Identifier",
+									"start": 492,
+									"end": 493,
+									"name": "y"
+								},
+								"property": {
+									"type": "MemberExpression",
+									"start": 507,
+									"end": 510,
+									"object": {
+										"type": "Identifier",
+										"start": 507,
+										"end": 508,
+										"name": "z"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 509,
+										"end": 510,
+										"name": "p"
+									},
+									"computed": false,
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c6",
+											"start": 498,
+											"end": 503
+										}
+									]
+								},
+								"computed": true,
+								"optional": false
+							},
+							"computed": true,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an index nested in an index",
+							"start": 455,
+							"end": 485
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 661,
+					"end": 695,
+					"expression": {
+						"type": "CallExpression",
+						"start": 661,
+						"end": 694,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 661,
+							"end": 692,
+							"object": {
+								"type": "CallExpression",
+								"start": 661,
+								"end": 687,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 661,
+									"end": 685,
+									"object": {
+										"type": "MemberExpression",
+										"start": 661,
+										"end": 680,
+										"object": {
+											"type": "Identifier",
+											"start": 661,
+											"end": 662,
+											"name": "x"
+										},
+										"property": {
+											"type": "MemberExpression",
+											"start": 674,
+											"end": 677,
+											"object": {
+												"type": "Identifier",
+												"start": 674,
+												"end": 675,
+												"name": "y"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 676,
+												"end": 677,
+												"name": "p"
+											},
+											"computed": false,
+											"optional": false,
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " c8",
+													"start": 666,
+													"end": 671
+												}
+											]
+										},
+										"computed": true,
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 684,
+										"end": 685,
+										"name": "m"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 691,
+								"end": 692,
+								"name": "n"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the broken index still breaks the rest of the chain, and a lookup after a call",
+							"start": 523,
+							"end": 604
+						},
+						{
+							"type": "Line",
+							"value": " starts a group of its own, as prettier groups them",
+							"start": 606,
+							"end": 659
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 698,
+					"end": 739,
+					"expression": {
+						"type": "CallExpression",
+						"start": 698,
+						"end": 738,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 698,
+							"end": 736,
+							"object": {
+								"type": "CallExpression",
+								"start": 698,
+								"end": 731,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 698,
+									"end": 729,
+									"object": {
+										"type": "MemberExpression",
+										"start": 698,
+										"end": 727,
+										"object": {
+											"type": "CallExpression",
+											"start": 698,
+											"end": 703,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 698,
+												"end": 701,
+												"object": {
+													"type": "Identifier",
+													"start": 698,
+													"end": 699,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 700,
+													"end": 701,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "MemberExpression",
+											"start": 720,
+											"end": 723,
+											"object": {
+												"type": "Identifier",
+												"start": 720,
+												"end": 721,
+												"name": "y"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 722,
+												"end": 723,
+												"name": "p"
+											},
+											"computed": false,
+											"optional": false,
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " c9",
+													"start": 711,
+													"end": 716
+												}
+											]
+										},
+										"computed": true,
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 728,
+										"end": 729,
+										"name": "m"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 735,
+								"end": 736,
+								"name": "n"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 908,
+					"end": 925,
+					"expression": {
+						"type": "CallExpression",
+						"start": 908,
+						"end": 924,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 908,
+							"end": 922,
+							"object": {
+								"type": "CallExpression",
+								"start": 908,
+								"end": 920,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 908,
+									"end": 918,
+									"object": {
+										"type": "MemberExpression",
+										"start": 908,
+										"end": 916,
+										"object": {
+											"type": "CallExpression",
+											"start": 908,
+											"end": 913,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 908,
+												"end": 911,
+												"object": {
+													"type": "Identifier",
+													"start": 908,
+													"end": 909,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 910,
+													"end": 911,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 914,
+											"end": 915,
+											"name": "y"
+										},
+										"computed": true,
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 917,
+										"end": 918,
+										"name": "m"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 921,
+								"end": 922,
+								"name": "n"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a blank inside the brackets is the lookup's, not a blank between methods, and a",
+							"start": 742,
+							"end": 824
+						},
+						{
+							"type": "Line",
+							"value": " `//` inside a trailing lookup's brackets keeps the lookup in the chain's tail",
+							"start": 826,
+							"end": 906
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 928,
+					"end": 974,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 928,
+						"end": 973,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 928,
+							"end": 929,
+							"name": "q"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 932,
+							"end": 973,
+							"object": {
+								"type": "MemberExpression",
+								"start": 932,
+								"end": 954,
+								"object": {
+									"type": "CallExpression",
+									"start": 932,
+									"end": 941,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 932,
+										"end": 939,
+										"object": {
+											"type": "CallExpression",
+											"start": 932,
+											"end": 937,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 932,
+												"end": 935,
+												"object": {
+													"type": "Identifier",
+													"start": 932,
+													"end": 933,
+													"name": "a"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 934,
+													"end": 935,
+													"name": "b"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 938,
+											"end": 939,
+											"name": "c"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false,
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c10 ",
+											"start": 942,
+											"end": 951
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 952,
+									"end": 953,
+									"name": "x"
+								},
+								"computed": true,
+								"optional": false
+							},
+							"property": {
+								"type": "MemberExpression",
+								"start": 967,
+								"end": 970,
+								"object": {
+									"type": "Identifier",
+									"start": 967,
+									"end": 968,
+									"name": "y"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 969,
+									"end": 970,
+									"name": "p"
+								},
+								"computed": false,
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c11",
+										"start": 958,
+										"end": 964
+									}
+								]
+							},
+							"computed": true,
+							"optional": false
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

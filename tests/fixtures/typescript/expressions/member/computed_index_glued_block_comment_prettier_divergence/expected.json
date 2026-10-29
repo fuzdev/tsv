@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 366,
+	"end": 382,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -19,89 +19,89 @@
 		{
 			"type": "Line",
 			"value": " force",
-			"start": 102,
-			"end": 110
+			"start": 104,
+			"end": 112
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 113,
-			"end": 121
+			"start": 116,
+			"end": 124
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 122,
-			"end": 130
+			"start": 125,
+			"end": 133
 		},
 		{
 			"type": "Line",
 			"value": " Blocks the author put on their own lines keep them.",
-			"start": 143,
-			"end": 197
+			"start": 148,
+			"end": 202
 		},
 		{
 			"type": "Line",
 			"value": " force",
-			"start": 214,
-			"end": 222
+			"start": 221,
+			"end": 229
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 225,
-			"end": 233
+			"start": 233,
+			"end": 241
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 236,
-			"end": 244
+			"start": 245,
+			"end": 253
 		},
 		{
 			"type": "Line",
 			"value": " The optional form takes the same path.",
-			"start": 257,
-			"end": 298
+			"start": 268,
+			"end": 309
 		},
 		{
 			"type": "Line",
 			"value": " force",
-			"start": 317,
-			"end": 325
+			"start": 330,
+			"end": 338
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 328,
-			"end": 336
+			"start": 342,
+			"end": 350
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 337,
-			"end": 345
+			"start": 351,
+			"end": 359
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 365,
+		"end": 381,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 356,
+			"end": 372,
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 87,
-					"end": 140,
+					"end": 145,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 93,
-							"end": 139,
+							"end": 144,
 							"id": {
 								"type": "Identifier",
 								"start": 93,
@@ -110,37 +110,37 @@
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 97,
-								"end": 139,
+								"start": 99,
+								"end": 144,
 								"object": {
 									"type": "Identifier",
-									"start": 97,
-									"end": 100,
+									"start": 99,
+									"end": 102,
 									"name": "obj"
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 133,
-									"end": 136,
+									"start": 137,
+									"end": 140,
 									"name": "idx",
 									"leadingComments": [
 										{
 											"type": "Line",
 											"value": " force",
-											"start": 102,
-											"end": 110
+											"start": 104,
+											"end": 112
 										},
 										{
 											"type": "Block",
 											"value": " c1 ",
-											"start": 113,
-											"end": 121
+											"start": 116,
+											"end": 124
 										},
 										{
 											"type": "Block",
 											"value": " c2 ",
-											"start": 122,
-											"end": 130
+											"start": 125,
+											"end": 133
 										}
 									]
 								},
@@ -161,52 +161,52 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 199,
-					"end": 254,
+					"start": 204,
+					"end": 265,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 205,
-							"end": 253,
+							"start": 210,
+							"end": 264,
 							"id": {
 								"type": "Identifier",
-								"start": 205,
-								"end": 206,
+								"start": 210,
+								"end": 211,
 								"name": "b"
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 209,
-								"end": 253,
+								"start": 216,
+								"end": 264,
 								"object": {
 									"type": "Identifier",
-									"start": 209,
-									"end": 212,
+									"start": 216,
+									"end": 219,
 									"name": "obj"
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 247,
-									"end": 250,
+									"start": 257,
+									"end": 260,
 									"name": "idx",
 									"leadingComments": [
 										{
 											"type": "Line",
 											"value": " force",
-											"start": 214,
-											"end": 222
+											"start": 221,
+											"end": 229
 										},
 										{
 											"type": "Block",
 											"value": " c1 ",
-											"start": 225,
-											"end": 233
+											"start": 233,
+											"end": 241
 										},
 										{
 											"type": "Block",
 											"value": " c2 ",
-											"start": 236,
-											"end": 244
+											"start": 245,
+											"end": 253
 										}
 									]
 								},
@@ -220,63 +220,63 @@
 						{
 							"type": "Line",
 							"value": " Blocks the author put on their own lines keep them.",
-							"start": 143,
-							"end": 197
+							"start": 148,
+							"end": 202
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 300,
-					"end": 355,
+					"start": 311,
+					"end": 371,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 306,
-							"end": 354,
+							"start": 317,
+							"end": 370,
 							"id": {
 								"type": "Identifier",
-								"start": 306,
-								"end": 307,
+								"start": 317,
+								"end": 318,
 								"name": "c"
 							},
 							"init": {
 								"type": "ChainExpression",
-								"start": 310,
-								"end": 354,
+								"start": 323,
+								"end": 370,
 								"expression": {
 									"type": "MemberExpression",
-									"start": 310,
-									"end": 354,
+									"start": 323,
+									"end": 370,
 									"object": {
 										"type": "Identifier",
-										"start": 310,
-										"end": 313,
+										"start": 323,
+										"end": 326,
 										"name": "obj"
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 348,
-										"end": 351,
+										"start": 363,
+										"end": 366,
 										"name": "idx",
 										"leadingComments": [
 											{
 												"type": "Line",
 												"value": " force",
-												"start": 317,
-												"end": 325
+												"start": 330,
+												"end": 338
 											},
 											{
 												"type": "Block",
 												"value": " c1 ",
-												"start": 328,
-												"end": 336
+												"start": 342,
+												"end": 350
 											},
 											{
 												"type": "Block",
 												"value": " c2 ",
-												"start": 337,
-												"end": 345
+												"start": 351,
+												"end": 359
 											}
 										]
 									},
@@ -291,8 +291,8 @@
 						{
 							"type": "Line",
 							"value": " The optional form takes the same path.",
-							"start": 257,
-							"end": 298
+							"start": 268,
+							"end": 309
 						}
 					]
 				}

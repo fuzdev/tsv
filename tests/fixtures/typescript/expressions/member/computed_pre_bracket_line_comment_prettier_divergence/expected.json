@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 613,
+	"end": 966,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -72,26 +72,74 @@
 		},
 		{
 			"type": "Line",
-			"value": " brackets breaking internally keeps the chain on the `=` line.",
+			"value": " broken lookup hangs below the `=`, as prettier's does.",
 			"start": 504,
-			"end": 568
+			"end": 561
 		},
 		{
 			"type": "Line",
 			"value": " c5",
-			"start": 589,
-			"end": 594
+			"start": 585,
+			"end": 590
+		},
+		{
+			"type": "Line",
+			"value": " A comment inside the first brackets and one before the next `[`: the chain breaks",
+			"start": 603,
+			"end": 687
+		},
+		{
+			"type": "Line",
+			"value": " at every lookup, each comment where it was written.",
+			"start": 689,
+			"end": 743
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 762,
+			"end": 767
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 779,
+			"end": 784
+		},
+		{
+			"type": "Line",
+			"value": " The next index led by a `//` inside a stripped shell lays out as the comment",
+			"start": 801,
+			"end": 880
+		},
+		{
+			"type": "Line",
+			"value": " written in its brackets.",
+			"start": 882,
+			"end": 909
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 923,
+			"end": 928
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 938,
+			"end": 943
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 612,
+		"end": 965,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 603,
+			"end": 956,
 			"body": [
 				{
 					"type": "VariableDeclaration",
@@ -290,31 +338,31 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 570,
-					"end": 602,
+					"start": 563,
+					"end": 600,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 576,
-							"end": 601,
+							"start": 569,
+							"end": 599,
 							"id": {
 								"type": "Identifier",
-								"start": 576,
-								"end": 577,
+								"start": 569,
+								"end": 570,
 								"name": "d"
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 580,
-								"end": 601,
+								"start": 575,
+								"end": 599,
 								"object": {
 									"type": "CallExpression",
-									"start": 580,
-									"end": 585,
+									"start": 575,
+									"end": 580,
 									"callee": {
 										"type": "Identifier",
-										"start": 580,
-										"end": 583,
+										"start": 575,
+										"end": 578,
 										"name": "foo"
 									},
 									"arguments": [],
@@ -322,15 +370,15 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 597,
-									"end": 598,
+									"start": 594,
+									"end": 595,
 									"name": "i",
 									"leadingComments": [
 										{
 											"type": "Line",
 											"value": " c5",
-											"start": 589,
-											"end": 594
+											"start": 585,
+											"end": 590
 										}
 									]
 								},
@@ -349,9 +397,229 @@
 						},
 						{
 							"type": "Line",
-							"value": " brackets breaking internally keeps the chain on the `=` line.",
+							"value": " broken lookup hangs below the `=`, as prettier's does.",
 							"start": 504,
-							"end": 568
+							"end": 561
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 745,
+					"end": 798,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 745,
+						"end": 797,
+						"operator": "=",
+						"left": {
+							"type": "MemberExpression",
+							"start": 745,
+							"end": 748,
+							"object": {
+								"type": "Identifier",
+								"start": 745,
+								"end": 746,
+								"name": "q"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 747,
+								"end": 748,
+								"name": "r"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"right": {
+							"type": "ChainExpression",
+							"start": 751,
+							"end": 797,
+							"expression": {
+								"type": "MemberExpression",
+								"start": 751,
+								"end": 797,
+								"object": {
+									"type": "MemberExpression",
+									"start": 751,
+									"end": 792,
+									"object": {
+										"type": "MemberExpression",
+										"start": 751,
+										"end": 778,
+										"object": {
+											"type": "Identifier",
+											"start": 751,
+											"end": 754,
+											"name": "arr"
+										},
+										"property": {
+											"type": "MemberExpression",
+											"start": 771,
+											"end": 774,
+											"object": {
+												"type": "Identifier",
+												"start": 771,
+												"end": 772,
+												"name": "y"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 773,
+												"end": 774,
+												"name": "p"
+											},
+											"computed": false,
+											"optional": false,
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " c6",
+													"start": 762,
+													"end": 767
+												}
+											]
+										},
+										"computed": true,
+										"optional": false,
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c7",
+												"start": 779,
+												"end": 784
+											}
+										]
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 790,
+										"end": 791,
+										"name": "y"
+									},
+									"computed": true,
+									"optional": true
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 796,
+									"end": 797,
+									"name": "c"
+								},
+								"computed": false,
+								"optional": false
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment inside the first brackets and one before the next `[`: the chain breaks",
+							"start": 603,
+							"end": 687
+						},
+						{
+							"type": "Line",
+							"value": " at every lookup, each comment where it was written.",
+							"start": 689,
+							"end": 743
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 911,
+					"end": 955,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 911,
+						"end": 954,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 911,
+							"end": 912,
+							"name": "q"
+						},
+						"right": {
+							"type": "ChainExpression",
+							"start": 915,
+							"end": 954,
+							"expression": {
+								"type": "MemberExpression",
+								"start": 915,
+								"end": 954,
+								"object": {
+									"type": "MemberExpression",
+									"start": 915,
+									"end": 922,
+									"object": {
+										"type": "Identifier",
+										"start": 915,
+										"end": 916,
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 920,
+										"end": 921,
+										"name": "i"
+									},
+									"computed": true,
+									"optional": false,
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c8",
+											"start": 923,
+											"end": 928
+										}
+									]
+								},
+								"property": {
+									"type": "MemberExpression",
+									"start": 947,
+									"end": 950,
+									"object": {
+										"type": "Identifier",
+										"start": 947,
+										"end": 948,
+										"name": "y"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 949,
+										"end": 950,
+										"name": "p"
+									},
+									"computed": false,
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c9",
+											"start": 938,
+											"end": 943
+										}
+									]
+								},
+								"computed": true,
+								"optional": true
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The next index led by a `//` inside a stripped shell lays out as the comment",
+							"start": 801,
+							"end": 880
+						},
+						{
+							"type": "Line",
+							"value": " written in its brackets.",
+							"start": 882,
+							"end": 909
 						}
 					]
 				}

@@ -11,4 +11,19 @@
 		.bar
 		// c1
 		.baz;
+
+	// A lookup with a comment in its brackets takes the same path: the gap comment after it
+	// keeps its own line.
+	const c = arr
+		[ // c3
+			i
+		]
+		// c4
+		.baz;
+
+	// A block in the brackets, the same.
+	const d = arr
+		[/* c5 */ i]
+		// c6
+		.baz;
 </script>

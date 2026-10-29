@@ -13,7 +13,7 @@
 
 use super::Printer;
 use crate::ast::internal::{self, Expression, ExpressionKind};
-use crate::printer::chain::chain_mid_chain_paren_gaps;
+use crate::printer::chain::{chain_mid_chain_paren_gaps, find_bracket_position};
 use crate::printer::comments::left_spine_shell_is_comment_free;
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::statements::TerminatorGap;
@@ -461,9 +461,20 @@ impl<'a> Printer<'a> {
                 // chain prints it, opening at the head's printed end, so a comment a stripped
                 // shell there holds ends the `)`'s line ahead of the rest of the gap
                 // ([`Printer::member_gap_start`]).
+                //
+                // A computed member's gap stops at its `[`: a comment inside the brackets
+                // breaks the brackets, not the line after the keyword — the lookup keeps its
+                // `[` on the object's line (`return x[⏎// c⏎y.p⏎];`), so no pair is owed.
+                // The whole gap is asked first, so only a hit pays the `[` scan.
                 let obj_end = self.member_gap_start(member.object);
                 let prop_start = member.property.span().start;
-                if self.has_leading_own_line_comment_in_range(GapStart::Node(obj_end), prop_start) {
+                if self.has_leading_own_line_comment_in_range(GapStart::Node(obj_end), prop_start)
+                    && (!member.computed
+                        || self.has_leading_own_line_comment_in_range(
+                            GapStart::Node(obj_end),
+                            find_bracket_position(self.source, obj_end, prop_start),
+                        ))
+                {
                     return true;
                 }
             }

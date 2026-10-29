@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 901,
+	"end": 912,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -25,101 +25,101 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 188,
-			"end": 193
+			"start": 191,
+			"end": 196
 		},
 		{
 			"type": "Line",
 			"value": " Optional chain, same shape.",
-			"start": 204,
-			"end": 234
+			"start": 209,
+			"end": 239
 		},
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 255,
-			"end": 260
+			"start": 263,
+			"end": 268
 		},
 		{
 			"type": "Line",
 			"value": " Comment on the `[` line (not its own line): tsv keeps it trailing the `[`",
-			"start": 271,
-			"end": 347
+			"start": 281,
+			"end": 357
 		},
 		{
 			"type": "Line",
 			"value": " (the open-delimiter-trailing rule), prettier relocates it.",
-			"start": 349,
-			"end": 410
+			"start": 359,
+			"end": 420
 		},
 		{
 			"type": "Line",
 			"value": " c3",
-			"start": 427,
-			"end": 432
+			"start": 439,
+			"end": 444
 		},
 		{
 			"type": "Line",
 			"value": " Inside a CHAIN, with a numeric index — the one accessor kind the chain grouping",
-			"start": 443,
-			"end": 525
+			"start": 457,
+			"end": 539
 		},
 		{
 			"type": "Line",
-			"value": " otherwise glues into the preceding group. The `//` makes it start a group",
-			"start": 527,
-			"end": 603
+			"value": " glues into the preceding group. A `//` inside the brackets leaves it there, and",
+			"start": 541,
+			"end": 623
 		},
 		{
 			"type": "Line",
-			"value": " instead, and the bracket-interior rule above is unchanged by that.",
-			"start": 605,
-			"end": 674
+			"value": " the bracket-interior rule above is unchanged by that.",
+			"start": 625,
+			"end": 681
 		},
 		{
 			"type": "Line",
 			"value": " c4",
-			"start": 687,
-			"end": 692
+			"start": 694,
+			"end": 699
 		},
 		{
 			"type": "Line",
 			"value": " The `?.[` spelling of that same `[`-line case. The authored form may space the",
-			"start": 703,
-			"end": 784
+			"start": 710,
+			"end": 791
 		},
 		{
 			"type": "Line",
 			"value": " `?.` off the `[` (`obj ?. [`), which must reach the identical output.",
-			"start": 786,
-			"end": 858
+			"start": 793,
+			"end": 865
 		},
 		{
 			"type": "Line",
 			"value": " c5",
-			"start": 877,
-			"end": 882
+			"start": 886,
+			"end": 891
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 900,
+		"end": 911,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 891,
+			"end": 902,
 			"body": [
 				{
 					"type": "VariableDeclaration",
 					"start": 171,
-					"end": 201,
+					"end": 206,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 177,
-							"end": 200,
+							"end": 205,
 							"id": {
 								"type": "Identifier",
 								"start": 177,
@@ -128,25 +128,25 @@
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 181,
-								"end": 200,
+								"start": 183,
+								"end": 205,
 								"object": {
 									"type": "Identifier",
-									"start": 181,
-									"end": 184,
+									"start": 183,
+									"end": 186,
 									"name": "arr"
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 196,
-									"end": 197,
+									"start": 200,
+									"end": 201,
 									"name": "i",
 									"leadingComments": [
 										{
 											"type": "Line",
 											"value": " c1",
-											"start": 188,
-											"end": 193
+											"start": 191,
+											"end": 196
 										}
 									]
 								},
@@ -173,44 +173,44 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 236,
-					"end": 268,
+					"start": 241,
+					"end": 278,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 242,
-							"end": 267,
+							"start": 247,
+							"end": 277,
 							"id": {
 								"type": "Identifier",
-								"start": 242,
-								"end": 243,
+								"start": 247,
+								"end": 248,
 								"name": "b"
 							},
 							"init": {
 								"type": "ChainExpression",
-								"start": 246,
-								"end": 267,
+								"start": 253,
+								"end": 277,
 								"expression": {
 									"type": "MemberExpression",
-									"start": 246,
-									"end": 267,
+									"start": 253,
+									"end": 277,
 									"object": {
 										"type": "Identifier",
-										"start": 246,
-										"end": 249,
+										"start": 253,
+										"end": 256,
 										"name": "obj"
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 263,
-										"end": 264,
+										"start": 272,
+										"end": 273,
 										"name": "i",
 										"leadingComments": [
 											{
 												"type": "Line",
 												"value": " c2",
-												"start": 255,
-												"end": 260
+												"start": 263,
+												"end": 268
 											}
 										]
 									},
@@ -225,47 +225,47 @@
 						{
 							"type": "Line",
 							"value": " Optional chain, same shape.",
-							"start": 204,
-							"end": 234
+							"start": 209,
+							"end": 239
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 412,
-					"end": 440,
+					"start": 422,
+					"end": 454,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 418,
-							"end": 439,
+							"start": 428,
+							"end": 453,
 							"id": {
 								"type": "Identifier",
-								"start": 418,
-								"end": 419,
+								"start": 428,
+								"end": 429,
 								"name": "c"
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 422,
-								"end": 439,
+								"start": 434,
+								"end": 453,
 								"object": {
 									"type": "Identifier",
-									"start": 422,
-									"end": 425,
+									"start": 434,
+									"end": 437,
 									"name": "arr"
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 435,
-									"end": 436,
+									"start": 448,
+									"end": 449,
 									"name": "i",
 									"leadingComments": [
 										{
 											"type": "Line",
 											"value": " c3",
-											"start": 427,
-											"end": 432
+											"start": 439,
+											"end": 444
 										}
 									]
 								},
@@ -279,43 +279,43 @@
 						{
 							"type": "Line",
 							"value": " Comment on the `[` line (not its own line): tsv keeps it trailing the `[`",
-							"start": 271,
-							"end": 347
+							"start": 281,
+							"end": 357
 						},
 						{
 							"type": "Line",
 							"value": " (the open-delimiter-trailing rule), prettier relocates it.",
-							"start": 349,
-							"end": 410
+							"start": 359,
+							"end": 420
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 676,
-					"end": 700,
+					"start": 683,
+					"end": 707,
 					"expression": {
 						"type": "MemberExpression",
-						"start": 676,
-						"end": 699,
+						"start": 683,
+						"end": 706,
 						"object": {
 							"type": "CallExpression",
-							"start": 676,
-							"end": 685,
+							"start": 683,
+							"end": 692,
 							"callee": {
 								"type": "MemberExpression",
-								"start": 676,
-								"end": 683,
+								"start": 683,
+								"end": 690,
 								"object": {
 									"type": "Identifier",
-									"start": 676,
-									"end": 679,
+									"start": 683,
+									"end": 686,
 									"name": "arr"
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 680,
-									"end": 683,
+									"start": 687,
+									"end": 690,
 									"name": "foo"
 								},
 								"computed": false,
@@ -326,16 +326,16 @@
 						},
 						"property": {
 							"type": "Literal",
-							"start": 695,
-							"end": 696,
+							"start": 702,
+							"end": 703,
 							"value": 0,
 							"raw": "0",
 							"leadingComments": [
 								{
 									"type": "Line",
 									"value": " c4",
-									"start": 687,
-									"end": 692
+									"start": 694,
+									"end": 699
 								}
 							]
 						},
@@ -346,63 +346,63 @@
 						{
 							"type": "Line",
 							"value": " Inside a CHAIN, with a numeric index — the one accessor kind the chain grouping",
-							"start": 443,
-							"end": 525
+							"start": 457,
+							"end": 539
 						},
 						{
 							"type": "Line",
-							"value": " otherwise glues into the preceding group. The `//` makes it start a group",
-							"start": 527,
-							"end": 603
+							"value": " glues into the preceding group. A `//` inside the brackets leaves it there, and",
+							"start": 541,
+							"end": 623
 						},
 						{
 							"type": "Line",
-							"value": " instead, and the bracket-interior rule above is unchanged by that.",
-							"start": 605,
-							"end": 674
+							"value": " the bracket-interior rule above is unchanged by that.",
+							"start": 625,
+							"end": 681
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 860,
-					"end": 890,
+					"start": 867,
+					"end": 901,
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 866,
-							"end": 889,
+							"start": 873,
+							"end": 900,
 							"id": {
 								"type": "Identifier",
-								"start": 866,
-								"end": 867,
+								"start": 873,
+								"end": 874,
 								"name": "d"
 							},
 							"init": {
 								"type": "ChainExpression",
-								"start": 870,
-								"end": 889,
+								"start": 879,
+								"end": 900,
 								"expression": {
 									"type": "MemberExpression",
-									"start": 870,
-									"end": 889,
+									"start": 879,
+									"end": 900,
 									"object": {
 										"type": "Identifier",
-										"start": 870,
-										"end": 873,
+										"start": 879,
+										"end": 882,
 										"name": "obj"
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 885,
-										"end": 886,
+										"start": 895,
+										"end": 896,
 										"name": "i",
 										"leadingComments": [
 											{
 												"type": "Line",
 												"value": " c5",
-												"start": 877,
-												"end": 882
+												"start": 886,
+												"end": 891
 											}
 										]
 									},
@@ -417,14 +417,14 @@
 						{
 							"type": "Line",
 							"value": " The `?.[` spelling of that same `[`-line case. The authored form may space the",
-							"start": 703,
-							"end": 784
+							"start": 710,
+							"end": 791
 						},
 						{
 							"type": "Line",
 							"value": " `?.` off the `[` (`obj ?. [`), which must reach the identical output.",
-							"start": 786,
-							"end": 858
+							"start": 793,
+							"end": 865
 						}
 					]
 				}

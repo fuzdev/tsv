@@ -21,7 +21,9 @@ into the line below — which would merge two comments onto one line
 applying the [comment-position
 philosophy](../../../../../../../docs/conformance_prettier.md#comment-position-philosophy)
 — comments stay where the author placed them. Block-only comments don't force
-this (they format inline on the fill path), so only line comments route here.
+this (they format inline on the fill path), so only line comments route here. A computed lookup
+with comments inside its brackets takes the same path (cases `c`, `d`): its own bracket
+printer lays out the interior, and the gap comment after it keeps its own line.
 
 Reason: Comment relocation. See
 [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

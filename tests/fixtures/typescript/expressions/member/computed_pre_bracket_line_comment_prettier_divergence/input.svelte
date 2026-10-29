@@ -16,9 +16,29 @@
 		[j];
 
 	// A call in the chain: a comment inside the brackets stays inside them, and the
-	// brackets breaking internally keeps the chain on the `=` line.
-	const d = foo()[
-		// c5
-		i
-	];
+	// broken lookup hangs below the `=`, as prettier's does.
+	const d =
+		foo()[
+			// c5
+			i
+		];
+
+	// A comment inside the first brackets and one before the next `[`: the chain breaks
+	// at every lookup, each comment where it was written.
+	q.r = arr
+		[
+			// c6
+			y.p
+		] // c7
+		?.[y]
+		.c;
+
+	// The next index led by a `//` inside a stripped shell lays out as the comment
+	// written in its brackets.
+	q = a
+		[i] // c8
+		?.[
+			// c9
+			y.p
+		];
 </script>

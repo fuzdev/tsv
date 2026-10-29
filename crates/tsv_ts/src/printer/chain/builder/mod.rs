@@ -31,8 +31,8 @@ use super::analysis::{
 };
 use super::inline_lookups::{InlineLookups, resolve_inline_lookups};
 use super::printing::{
-    chain_gap_any, has_inside_bracket_comments, member_lookup_group, node_comment_gap, print_group,
-    print_group_expanded, print_node_inner,
+    chain_gap_share_any, has_inside_bracket_comments, member_lookup_group, node_comment_gap,
+    print_group, print_group_expanded, print_node_inner,
 };
 use super::types::{ChainGroup, ChainNode, ChainNodeVec};
 use crate::ast::internal::{ArrowFunctionBody, CallExpression, Expression, ExpressionKind};
@@ -237,14 +237,12 @@ fn build_chain_doc_impl<'a>(
     // to make. Behind it, a parenthesized head (a cast, an `await`, an arrow) fell
     // through to the call-chain path, whose boundary-less `line_suffix` defers the
     // comment to end of line; it then merged with whatever else flushed there
-    // (`.g; // c1 // c2`), the second `//` becoming text of the first. `has_bracket_comments`
-    // still routes first: fill can't break inside a computed member's brackets, which is
-    // a shape question this builder doesn't answer.
-    if !has_calls
-        && !has_bracket_comments
-        && chain_has_comments
-        && member_only_has_interior_line_comments(groups, printer)
-    {
+    // (`.g; // c1 // c2`), the second `//` becoming text of the first. A lookup with
+    // comments in its brackets takes this path too: the builder prints each node through
+    // its own printer, so the lookup's bracket emitter still lays out the interior, and
+    // the gap `//` keeps its line (`arr⏎\t[ // c⏎\t\ti⏎\t]⏎\t// d⏎\t.c`) where the
+    // bracket-comment path below would defer it past the chain.
+    if !has_calls && chain_has_comments && member_only_has_interior_line_comments(groups, printer) {
         return build_member_only_chain_with_comments_doc(groups, printer);
     }
 
@@ -553,13 +551,13 @@ fn peel_trailing_member_tail<'a, 'p>(
         gap_comments = Some(classified);
     }
     // The tail's interior gaps must be comment-free — an interior comment needs the
-    // comment-aware chain paths.
+    // comment-aware chain paths. The chain's share of each gap
+    // ([`chain_gap_share_any`]): a comment inside a computed lookup's brackets is the
+    // lookup's own, printed by its bracket emitter on either path.
     if printer.chain_has_comments()
         && tail.iter().skip(1).any(|n| {
-            n.comment_range().is_some_and(|gap| {
-                chain_gap_any(gap, n.paren_gap_skip(), |start, end| {
-                    printer.has_comments_to_emit_between(start, end)
-                })
+            chain_gap_share_any(n, printer.get_source(), |start, end| {
+                printer.has_comments_to_emit_between(start, end)
             })
         })
     {

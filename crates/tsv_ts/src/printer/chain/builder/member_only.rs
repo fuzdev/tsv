@@ -21,10 +21,9 @@ use tsv_lang::doc::{DocBuf, arena::DocId};
 /// [`build_member_only_chain_with_comments_doc`].
 ///
 /// The second spelling of "does a node's gap hold a `//`" — the grouping asks the same
-/// question as `analysis::gap_has_line_comment`, over the RAW `ChainNode::comment_range`
-/// rather than this printer-narrowed [`node_comment_gap`]. The two differ only for a
-/// computed member (the narrow one cuts at the `[`), and deliberately; read that
-/// function's warning before unifying them.
+/// question as `analysis::gap_has_line_comment`, over `chain_gap_share_any`'s share rather
+/// than this printer-narrowed [`node_comment_gap`]; both stop at a computed member's `[`, and
+/// differ only in that the share can be asked before `Printer::chain_has_comments` is set.
 ///
 /// Routed through [`chain_gap_any`] like every other question about a chain gap. A
 /// member-ONLY chain never widens — `apply_paren_gaps` requires a call — so the hole is

@@ -15,7 +15,7 @@
 
 use crate::ast::internal::{self, AssignmentOperator, Expression, ExpressionKind};
 use crate::printer::calls::chain_has_calls;
-use crate::printer::chain::chain_paren_leading_gap;
+use crate::printer::chain::{chain_paren_leading_gap, find_bracket_position};
 use crate::printer::class_expr_has_decorators;
 use crate::printer::comments::ValueGap;
 use crate::printer::conditional_should_break_after_op;
@@ -742,7 +742,7 @@ fn is_poorly_breakable_chain_walk(
                 if walk.chain_has_calls {
                     let object_end = printer.member_gap_start(member.object);
                     let gap_end = if member.computed {
-                        crate::printer::chain::find_bracket_position(
+                        find_bracket_position(
                             printer.source,
                             object_end,
                             member.property.span().start,
@@ -1678,11 +1678,11 @@ impl<'a> Printer<'a> {
                 }
                 ExpressionKind::MemberExpression(member) => {
                     // Check for line comments between object and property. For a computed
-                    // member this range deliberately includes the bracket INTERIOR: a
-                    // comment inside `[...]` makes the brackets break around it, so the
-                    // chain still breaks internally and the layout answer is the same —
-                    // keep the RHS on the operator line rather than also breaking after
-                    // `=` (`const a = obj[ // force⏎…`).
+                    // member the gap stops at its `[`: a comment inside the brackets breaks
+                    // the brackets, which stay on the object's line, and the chain does not
+                    // break around it — so the value lays out as any value that breaks does,
+                    // hung below the operator as prettier hangs it
+                    // (`q =⏎\tx[⏎\t\t// c⏎\t\ty.p⏎\t]()`).
                     //
                     // ⚠️ A **frozen** gap is the one exception, and for the reason the rule
                     // is stated on: there is no chain to break. The `//` there is the
@@ -1694,12 +1694,21 @@ impl<'a> Printer<'a> {
                     // (`const a = /* line1⏎line2 */ obj⏎// prettier-ignore⏎.prop`), a
                     // divergence only an owned multi-line comment ahead of the base makes
                     // visible — see `build_frozen_opaque_node_doc`.
+                    //
+                    // The whole gap is asked first, so only a hit pays the `[` scan.
                     let obj_end = self.member_gap_start(member.object);
                     let prop_start = member.property.span().start;
-                    if !self.member_gap_frozen(obj_end, prop_start)
-                        && self.has_line_comments_between(obj_end, prop_start)
-                    {
-                        return true;
+                    if self.has_line_comments_between(obj_end, prop_start) {
+                        let prop_start = if member.computed {
+                            find_bracket_position(self.source, obj_end, prop_start)
+                        } else {
+                            prop_start
+                        };
+                        if !self.member_gap_frozen(obj_end, prop_start)
+                            && self.has_line_comments_between(obj_end, prop_start)
+                        {
+                            return true;
+                        }
                     }
                     member.object
                 }

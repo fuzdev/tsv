@@ -857,7 +857,10 @@ pub(crate) fn has_inside_bracket_comments<'a>(node: &ChainNode<'a>, printer: &Pr
         let prop_span = printer.get_property_span(expr);
         let inside =
             find_computed_bracket(printer.get_source(), *object_end, prop_span.start).inside;
-        printer.has_comments_on_page_between(inside, prop_span.start)
+        // The interior runs to where the index STARTS PRINTING: a run in a stripped shell on
+        // its left spine prints at the index's leading edge, inside the brackets, where the
+        // shell-free spelling writes it (`a[i]⏎?.[(// c⏎y).p]` against `a[i]⏎?.[⏎// c⏎y.p]`).
+        printer.has_comments_on_page_between(inside, printer.left_spine_printed_start(expr))
             || printer.has_comments_on_page_between(prop_span.end, *bracket_end)
     } else {
         false
@@ -1055,6 +1058,44 @@ pub(crate) fn node_comment_gap(node: &ChainNode<'_>, printer: &Printer<'_>) -> O
         return Some((object_end, bracket_open));
     }
     Some((object_end, property_start))
+}
+
+/// The CHAIN's share of a node's comment gap ([`ChainNode::comment_range`]): the whole gap,
+/// except a computed member's, which stops at its `[`.
+///
+/// The bracket interior is the lookup's own — the bracket emitter and the index's doc print it,
+/// around the index — so a comment there is no chain gap comment: it neither starts a chain group
+/// nor forces the chain open, and the lookup stays in the group prettier puts it in
+/// (`x[⏎// c⏎y.p⏎]()` keeps its `[` on `x`'s line, as `x.f(⏎// c⏎a⏎).g()` keeps its `(`). Unlike
+/// [`node_comment_gap`] it does not read `Printer::chain_has_comments`, so the grouping can ask
+/// it; the `[` is located only for a computed member, and only when `f` would answer `true` over
+/// the whole gap.
+///
+/// Asked of every member node a chain's grouping walks, where the gap is nearly always a
+/// comment-free `.` — so the whole-gap ask is inline at each site, and only a computed member
+/// whose gap answered `true` reaches the `[` scan.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+pub(crate) fn chain_gap_share_any(
+    node: &ChainNode<'_>,
+    source: &str,
+    mut f: impl FnMut(u32, u32) -> bool,
+) -> bool {
+    let Some(gap) = node.comment_range() else {
+        return false;
+    };
+    if !chain_gap_any(gap, node.paren_gap_skip(), &mut f) {
+        return false;
+    }
+    match node {
+        ChainNode::ComputedMember {
+            expr, object_end, ..
+        } => {
+            let open = find_bracket_position(source, *object_end, expr.span().start);
+            chain_gap_any((gap.0, open), node.paren_gap_skip(), f)
+        }
+        _ => true,
+    }
 }
 
 /// Ask `f` about a chain node's comment gap while honoring the node's own

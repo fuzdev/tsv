@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 282,
+	"end": 533,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,17 +45,59 @@
 			"value": " c1",
 			"start": 258,
 			"end": 263
+		},
+		{
+			"type": "Line",
+			"value": " A lookup with a comment in its brackets takes the same path: the gap comment after it",
+			"start": 274,
+			"end": 362
+		},
+		{
+			"type": "Line",
+			"value": " keeps its own line.",
+			"start": 364,
+			"end": 386
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 406,
+			"end": 411
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 423,
+			"end": 428
+		},
+		{
+			"type": "Line",
+			"value": " A block in the brackets, the same.",
+			"start": 439,
+			"end": 476
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 495,
+			"end": 503
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 509,
+			"end": 514
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 281,
+		"end": 532,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 272,
+			"end": 523,
 			"body": [
 				{
 					"type": "VariableDeclaration",
@@ -202,6 +244,162 @@
 							"value": " A single own-line comment before a member.",
 							"start": 188,
 							"end": 233
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 388,
+					"end": 436,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 394,
+							"end": 435,
+							"id": {
+								"type": "Identifier",
+								"start": 394,
+								"end": 395,
+								"name": "c"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 398,
+								"end": 435,
+								"object": {
+									"type": "MemberExpression",
+									"start": 398,
+									"end": 420,
+									"object": {
+										"type": "Identifier",
+										"start": 398,
+										"end": 401,
+										"name": "arr"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 415,
+										"end": 416,
+										"name": "i",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c3",
+												"start": 406,
+												"end": 411
+											}
+										]
+									},
+									"computed": true,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 432,
+									"end": 435,
+									"name": "baz",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c4",
+											"start": 423,
+											"end": 428
+										}
+									]
+								},
+								"computed": false,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A lookup with a comment in its brackets takes the same path: the gap comment after it",
+							"start": 274,
+							"end": 362
+						},
+						{
+							"type": "Line",
+							"value": " keeps its own line.",
+							"start": 364,
+							"end": 386
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 478,
+					"end": 522,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 484,
+							"end": 521,
+							"id": {
+								"type": "Identifier",
+								"start": 484,
+								"end": 485,
+								"name": "d"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 488,
+								"end": 521,
+								"object": {
+									"type": "MemberExpression",
+									"start": 488,
+									"end": 506,
+									"object": {
+										"type": "Identifier",
+										"start": 488,
+										"end": 491,
+										"name": "arr"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 504,
+										"end": 505,
+										"name": "i",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c5 ",
+												"start": 495,
+												"end": 503
+											}
+										]
+									},
+									"computed": true,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 518,
+									"end": 521,
+									"name": "baz",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c6",
+											"start": 509,
+											"end": 514
+										}
+									]
+								},
+								"computed": false,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block in the brackets, the same.",
+							"start": 439,
+							"end": 476
 						}
 					]
 				}

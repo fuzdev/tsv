@@ -6,7 +6,7 @@
 // - Merge decisions: Determine if first groups should be merged
 
 use super::builder::{build_chain_doc, mark_long_curried_calls};
-use super::printing::chain_gap_any;
+use super::printing::chain_gap_share_any;
 use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
 use crate::ast::internal::{self, Expression, ExpressionKind, IdentName};
 use crate::printer::calls::is_memberish;
@@ -1357,20 +1357,16 @@ pub(super) fn should_merge_first_groups<'a>(
     should_not_wrap(groups, in_expression_statement, printer)
 }
 
-/// Whether a chain node's comment gap (see [`ChainNode::comment_range`]) holds a
-/// line comment — the grouping's comment question. Nodes without a gap (a base, a
-/// call, a `!`) answer `false`.
+/// Whether a chain node's comment gap holds a line comment — the grouping's comment
+/// question. Nodes without a gap (a base, a call, a `!`) answer `false`.
 ///
-/// ⚠️ This is the RAW range, not the printer's narrowed
-/// [`node_comment_gap`](super::printing::node_comment_gap): for a computed member the
-/// latter cuts the gap at the `[`, and it cannot be asked here — it reads
-/// `Printer::chain_has_comments`, which `build_chain_doc` sets *after* grouping. So a
-/// `//` written INSIDE the brackets (`arr.foo()[ // c⏎0]`) also starts a group. That
-/// is the wanted answer rather than a tolerated one: the comment still occupies the
-/// line the accessor would otherwise be glued onto, and the trailing group's own
-/// pre-bracket break is what keeps it off the index (pinned by
-/// `member/computed_leading_line_comment`). Take this asymmetry as deliberate before
-/// "fixing" the two spellings into one.
+/// Asked of the CHAIN's share of the gap ([`chain_gap_share_any`]): a computed member's stops
+/// at its `[`. A `//` inside the brackets is the lookup's own, printed by the bracket emitter
+/// and the index's doc around the index, so the lookup stays in the group prettier puts it in
+/// (`x[⏎// c⏎y.p⏎]()`, `arr.foo()[ // c⏎0⏎]` — the latter's `//` keeps the `[` line by the
+/// delimiter rule, inside the brackets). A `//` between the object and the `[` does start a
+/// group: a member inside a group can only defer its gap comment to the line end, and that one
+/// would swallow the `[i]` printed after it.
 ///
 /// Asked of every member node the grouping walks, and the gap is the `.` alone in ~98% of
 /// those asks — so the head is inline: the node's range answers at the site, and the
@@ -1386,10 +1382,8 @@ fn gap_has_line_comment(node: &ChainNode<'_>, printer: &Printer<'_>) -> bool {
     // this node prints none of — an inner member's gap forces its OWN node's group split,
     // and the head's share is printed ahead of the whole chain. Asking the range whole
     // split the group for a comment that is not on this gap's line at all.
-    node.comment_range().is_some_and(|gap| {
-        chain_gap_any(gap, node.paren_gap_skip(), |start, end| {
-            printer.has_line_comments_between(start, end)
-        })
+    chain_gap_share_any(node, printer.source, |start, end| {
+        printer.has_line_comments_between(start, end)
     })
 }
 
