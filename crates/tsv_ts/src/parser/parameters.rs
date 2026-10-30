@@ -354,8 +354,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // one wire level: the parameter, over its decorators, its pattern, its
                 // annotation and its default (the depth limit's count) — none where the
                 // list's grouping level is the parameter's (`parameter_levels`)
-                let param =
-                    self.nested(parameter_levels, |p| p.parse_parameter(allow_decorators))?;
+                let param = self.nested(parameter_levels, |p| {
+                    p.parse_parameter(allow_decorators, parameter_levels)
+                })?;
 
                 let is_rest = matches!(param.kind, ExpressionKind::RestElement(_));
                 params.push(param);
@@ -396,10 +397,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// One parameter of a list ([`Parser::parse_parameter_list_inner`]): its decorators
     /// (`allow_decorators`, else a `@` rejects), then the binding — an identifier, a
     /// parameter property, a destructuring pattern or a rest element — with its marker,
-    /// annotation and default.
+    /// annotation and default. `parameter_levels` is what the list charged the parameter
+    /// beside its grouping level: none in a signature list, where the grouping level is the
+    /// parameter's own, so a rest parameter's pattern is charged its own level here.
     fn parse_parameter(
         &mut self,
         allow_decorators: bool,
+        parameter_levels: u32,
     ) -> Result<Expression<'arena>, ParseError> {
         // Parameter decorators: `@dec1 @dec2 <param>`. Parsed up front so the
         // parameter body below can be any binding form — a parameter property
@@ -479,7 +483,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                 .insert(at, decorators_start);
                         }
                         self.rewind(checkpoint);
-                        return self.parse_parameter(allow_decorators);
+                        return self.parse_parameter(allow_decorators, parameter_levels);
                     }
                     // one wire level: the binding inside the `TSParameterProperty`
                     let parameter = self.nested(1, Self::parse_simple_param)?;
@@ -557,9 +561,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // wrongly attach it to the pattern).
                     // one wire level: the pattern under the `RestElement` (the depth
                     // limit's count) — owed where the list charges the parameter nothing
-                    // (`parse_signature_parameter_list`); in a value list the gate's wire
-                    // walk finds no level for it, so there it is a level of surplus
-                    let pattern = self.nested(1, Self::parse_binding_pattern)?;
+                    // (`parse_signature_parameter_list`); a value list's grouping level
+                    // has no wire node of its own, so there the parameter's level and the
+                    // grouping level already hold the `RestElement` and its pattern
+                    let pattern_levels = u32::from(parameter_levels == 0);
+                    let pattern = self.nested(pattern_levels, Self::parse_binding_pattern)?;
                     // A trailing `?`/`: T` binds to the rest element (acorn's
                     // shape), never to the inner pattern.
                     let (optional, type_annotation, arg_end) =

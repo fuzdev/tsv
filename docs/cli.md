@@ -301,8 +301,10 @@ counter bounds both shapes a walk recurses through:
   spread, a statement, a class expression, a parameter (a type-member signature's is paid
   for by its list's level, the signature's own being the member's), a parameter property's
   binding (its decorators sit on that binding, a level below a plain parameter's), a rest
-  parameter's pattern, a shorthand property's default (`{ a = d }`, the `AssignmentPattern`
-  a pattern reads it as), a declarator, a `for` head's declaration, a `catch` clause, an
+  parameter's pattern (in any parameter list but a type member's signature the parens'
+  level pays for it, since no wire node stands for them), a shorthand property's default
+  (`{ a = d }`, the `AssignmentPattern` a pattern reads it as), a declarator, a `for`
+  head's declaration, a `catch` clause, an
   enum member, a decorator, a declaration under its `export`, a tuple element (a named
   one's type one more), a conditional type's extends type and branches,
   an arrow's concise body; two for an object literal (the object and its `Property`), a
