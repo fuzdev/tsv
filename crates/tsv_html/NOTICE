@@ -1,7 +1,11 @@
-tsv_html includes the WHATWG HTML Living Standard's list of named character references.
+tsv includes the WHATWG HTML Living Standard's list of named character references. It
+is the table of the tsv_html crate's entity decoder, which tsv's Svelte support compiles
+in, and with it every tsv binary, N-API addon and WebAssembly module; this notice ships
+with the tsv_html crate and with each tsv npm package and GitHub Release.
 
   Source:   https://html.spec.whatwg.org/entities.json
-  Files:    src/entities.json (the data), src/entities_table.rs (generated from it)
+  Files:    in the tsv_html crate, src/entities.json (the data) and
+            src/entities_table.rs (generated from it)
   Changes:  each entry is reduced to its name without the leading `&` and the characters
             it stands for (the `codepoints` arrays are dropped), and the generated file
             restates the list as a Rust perfect hash table (each name and its characters
@@ -44,4 +48,4 @@ tsv_html includes the WHATWG HTML Living Standard's list of named character refe
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
   IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-The rest of the crate is licensed under 0BSD (see the repository's LICENSE).
+tsv's own code is licensed under 0BSD.

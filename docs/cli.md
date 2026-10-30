@@ -35,7 +35,8 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 - **`tsv` GitHub Release asset**: the same production binary, one per platform
   package (`tsv-<triple>`, `tsv-win32-x64.exe`), attached to each
   [GitHub Release](https://github.com/fuzdev/tsv/releases) beside a
-  `SHA512SUMS` (`sha512sum -c`), for use without npm (`curl` + `chmod +x`).
+  `SHA512SUMS` (`sha512sum -c`) and the binaries' third-party `NOTICE`, for use
+  without npm (`curl` + `chmod +x`).
   Pulled back from the npm registry at release time, so it is byte-identical to
   the binary the platform package ships; every asset carries a build provenance
   attestation (`gh attestation verify <file> -R fuzdev/tsv`). The checksum file

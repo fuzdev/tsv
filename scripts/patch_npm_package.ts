@@ -22,8 +22,8 @@
  * load, so two overlapping inits keep one instance. See step 1b below.
  *
  * Also patches package.json (name, description, conditional exports, npm
- * metadata) and copies the variant README + repo LICENSE into the package
- * root. The crate has no `README.md` at its root — `README_format.md`,
+ * metadata) and copies the variant README, the repo LICENSE and the third-party
+ * `NOTICE` (`THIRD_PARTY_NOTICE`) into the package root. The crate has no `README.md` at its root — `README_format.md`,
  * `README_parse.md`, and `README_all.md` are the canonical sources and ship
  * as each package's `README.md`.
  *
@@ -72,7 +72,7 @@ import {
 	facade_files,
 	facade_type_names
 } from './npm_facade.ts';
-import { NPM_SHARED_METADATA } from './npm_metadata.ts';
+import { NPM_SHARED_METADATA, THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import { format_size, gzip_size } from './size.ts';
 import { stage_file } from './stage_file.ts';
 
@@ -791,7 +791,8 @@ console.log(`Created ${pkg_root}/index.d.ts`);
 Deno.writeTextFileSync(`${pkg_root}/${browser_dts}`, shared_dts);
 console.log(`Created ${pkg_root}/${browser_dts}`);
 
-// 5. Copy the variant README and the repo LICENSE into the package root.
+// 5. Copy the variant README, the repo LICENSE and the third-party NOTICE into the package
+// root.
 
 const readme_src = `crates/tsv_wasm/README_${variant}.md`;
 stage_file(readme_src, `${pkg_root}/README.md`);
@@ -799,6 +800,10 @@ console.log(`Copied ${readme_src} → ${pkg_root}/README.md`);
 
 stage_file('LICENSE', `${pkg_root}/LICENSE`);
 console.log(`Copied LICENSE → ${pkg_root}/LICENSE`);
+
+// the WHATWG notice for the entity table compiled into the bundle (see THIRD_PARTY_NOTICE)
+stage_file(THIRD_PARTY_NOTICE.source, `${pkg_root}/${THIRD_PARTY_NOTICE.published}`);
+console.log(`Copied ${THIRD_PARTY_NOTICE.source} → ${pkg_root}/${THIRD_PARTY_NOTICE.published}`);
 
 // The facade the entries import — its parse half (with the reconstruction helper
 // index.js/browser.js/index.d.ts re-export, and the AST types) in the parse-capable
@@ -877,7 +882,8 @@ pkg.files = [
 	...facade_files(families).map((file) => file.published),
 	...(variant === 'all' ? [cli_file] : []),
 	'README.md',
-	'LICENSE'
+	'LICENSE',
+	THIRD_PARTY_NOTICE.published
 ];
 pkg.keywords = [
 	'typescript',

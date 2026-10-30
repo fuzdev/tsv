@@ -7,12 +7,13 @@
  *   `facade_parse.d.ts`, `facade_strip.d.ts`, `facade_error.d.ts`, `locations.d.ts`,
  *   `tsv_ast.d.ts`), the table
  *   `scripts/npm_facade.ts` names — + the shared `cli.js` + the `bin.js` dispatcher wired
- *   as the `tsv` bin + README + LICENSE + generated package.json with the exact-pinned
- *   platform `optionalDependencies`).
+ *   as the `tsv` bin + README + LICENSE + the third-party NOTICE + generated package.json
+ *   with the exact-pinned platform `optionalDependencies`).
  * - `pkg/<triple>/` — ONE platform package, `@fuzdev/tsv-<triple>`: the
  *   built cdylib copied to `tsv_napi.node` (a byte-identical rename), the
  *   real `tsv_cli` binary copied to `tsv`/`tsv.exe` (what `bin.js` execs —
- *   `npx tsv` on this set runs the native CLI), plus a generated
+ *   `npx tsv` on this set runs the native CLI), the LICENSE and the
+ *   third-party NOTICE both binaries need, plus a generated
  *   package.json whose `os`/`cpu`/`libc` fields drive install-time
  *   selection.
  *
@@ -35,7 +36,7 @@ import { parseArgs } from 'node:util';
 
 import { cli_binary_name, host_triple } from './napi_host.ts';
 import { ALL_FAMILIES, LOCATIONS_EXPORT, facade_files } from './npm_facade.ts';
-import { NPM_SHARED_METADATA } from './npm_metadata.ts';
+import { NPM_SHARED_METADATA, THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import { cargo_workspace_version } from './release/version.ts';
 import { format_size } from './size.ts';
 import { stage_file } from './stage_file.ts';
@@ -118,7 +119,10 @@ for (const [from, to] of [
 	// binds to the native loader here and to the wasm engine in
 	// @fuzdev/tsv-wasm (where it IS the bin); here it is bin.js's fallback
 	['crates/tsv_wasm/npm/cli.js', 'cli.js'],
-	['LICENSE', 'LICENSE']
+	['LICENSE', 'LICENSE'],
+	// the WHATWG notice for the entity table the platform binaries compile in (see
+	// THIRD_PARTY_NOTICE); the loader ships it too, as the package a consumer installs
+	[THIRD_PARTY_NOTICE.source, THIRD_PARTY_NOTICE.published]
 ]) {
 	stage_file(from, `${loader_dir}/${to}`);
 }
@@ -156,7 +160,8 @@ write_pkg(loader_dir, {
 		...facade_files(ALL_FAMILIES).map((file) => file.published),
 		'cli.js',
 		'README.md',
-		'LICENSE'
+		'LICENSE',
+		THIRD_PARTY_NOTICE.published
 	],
 	keywords: [
 		'typescript',
@@ -211,6 +216,7 @@ if (Deno.build.os !== 'windows') {
 	Deno.chmodSync(`${platform_dir}/${cli_binary}`, 0o755);
 }
 stage_file('LICENSE', `${platform_dir}/LICENSE`);
+stage_file(THIRD_PARTY_NOTICE.source, `${platform_dir}/${THIRD_PARTY_NOTICE.published}`);
 Deno.writeTextFileSync(
 	`${platform_dir}/README.md`,
 	`# @fuzdev/tsv-${triple}\n\n` +
@@ -222,7 +228,7 @@ write_pkg(platform_dir, {
 	version,
 	description: `prebuilt tsv N-API binding for ${triple}`,
 	main: 'tsv_napi.node',
-	files: ['tsv_napi.node', cli_binary, 'README.md', 'LICENSE'],
+	files: ['tsv_napi.node', cli_binary, 'README.md', 'LICENSE', THIRD_PARTY_NOTICE.published],
 	...platform_fields(triple),
 	...NPM_SHARED_METADATA
 });

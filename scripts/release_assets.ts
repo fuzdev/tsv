@@ -1,8 +1,13 @@
 /**
  * Collect the GitHub Release assets for one version: the native `tsv` CLI
- * binary of every `@fuzdev/tsv-<triple>` platform package, plus a `SHA512SUMS`
- * file (`sha512sum -c` format). The release workflow's `release` job runs this
- * after the npm publish and uploads the directory.
+ * binary of every `@fuzdev/tsv-<triple>` platform package, a `SHA512SUMS`
+ * file (`sha512sum -c` format) over those binaries, and the third-party
+ * `NOTICE` the binaries' license terms require beside them (`THIRD_PARTY_NOTICE`,
+ * copied from the checkout rather than from the registry: in the workflow the checkout
+ * is the tag's own, so it is the file the packages ship; a local run against an older
+ * version takes the current one).
+ * The release workflow's `release` job runs this after the npm publish and
+ * uploads the directory.
  *
  * The binaries come FROM THE REGISTRY, not from the workflow's build artifacts:
  * `npm pack` of each platform package the published loader names in its
@@ -40,6 +45,7 @@
 import { parseArgs } from 'node:util';
 
 import { cli_binary_name } from './napi_host.ts';
+import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import { command_capture } from './release/command.ts';
 import { version_from_tag } from './release/version.ts';
 
@@ -168,6 +174,11 @@ const collect = async (): Promise<void> => {
 	}
 	Deno.writeTextFileSync(`${out_dir}/SHA512SUMS`, sums.join('\n') + '\n');
 	console.log(`  SHA512SUMS  (${asset_names.length} assets)`);
+
+	// The binaries' third-party notice, as the documentation BSD 3-Clause asks a binary
+	// distribution to carry: the same file every platform package ships beside the binary.
+	Deno.copyFileSync(THIRD_PARTY_NOTICE.source, `${out_dir}/${THIRD_PARTY_NOTICE.published}`);
+	console.log(`  ${THIRD_PARTY_NOTICE.published}  (${THIRD_PARTY_NOTICE.source})`);
 };
 
 try {

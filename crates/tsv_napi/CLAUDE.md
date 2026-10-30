@@ -312,8 +312,10 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   back **from the registry** (`scripts/release_assets.ts`; `deno task release:assets v<version> --out <dir>`),
   so an asset is byte-identical to what npm serves even on a recovery re-run where the
   matrix rebuilds while the publish step skips live versions; its registry reads retry for
-  a bounded window, since a just-published version can lag the read path. Every asset, the
-  checksum file included, gets a Sigstore build provenance attestation
+  a bounded window, since a just-published version can lag the read path. Beside them, the
+  binaries' third-party `NOTICE` (the WHATWG entity table's license, copied from the
+  checkout; every package ships the same file — `THIRD_PARTY_NOTICE` in
+  `scripts/npm_metadata.ts`). Every asset, the checksum file included, gets a Sigstore build provenance attestation
   (`actions/attest-build-provenance`, ahead of the Release so a failed attestation fails
   before anything is public; `gh attestation verify <file> -R fuzdev/tsv`). The first create
   attaches the assets in the same call, so a Release is never public without them; on a

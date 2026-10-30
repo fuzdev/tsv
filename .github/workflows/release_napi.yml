@@ -40,7 +40,8 @@
 # (scripts/release_notes.ts); assets = each platform package's native `tsv`
 # CLI binary + SHA512SUMS, pulled back from the registry
 # (scripts/release_assets.ts) so an asset is byte-identical to what npm
-# serves, each with a Sigstore provenance attestation
+# serves, plus the binaries' third-party NOTICE from the checkout, each with a
+# Sigstore provenance attestation
 # (actions/attest-build-provenance; `gh attestation verify <file> -R fuzdev/tsv`).
 #
 # workflow_dispatch runs the whole matrix and gates with `npm publish
@@ -415,8 +416,9 @@ jobs:
   # `tsv` CLI binary of every platform package plus a SHA512SUMS — pulled back
   # FROM THE REGISTRY (scripts/release_assets.ts), so an asset is byte-identical
   # to what npm serves even on a recovery re-run, where the matrix rebuilds
-  # while the publish step skips the versions already live. Runs only after a
-  # REAL publish: the tag push, or a dry_run=false dispatch on the tag (the
+  # while the publish step skips the versions already live — and the third-party
+  # NOTICE the binaries' license terms require beside them (from the checkout).
+  # Runs only after a REAL publish: the tag push, or a dry_run=false dispatch on the tag (the
   # only real publish the workflow admits — a tagless one is refused before
   # the matrix builds); the weekly schedule and dry-run dispatches never create
   # a Release. The first create attaches the assets in the same call, so a
@@ -465,8 +467,8 @@ jobs:
             scripts/release_assets.ts "$GITHUB_REF_NAME" --out "$RUNNER_TEMP/assets"
           cat "$RUNNER_TEMP/assets/SHA512SUMS"
 
-      # Provenance attestation over EVERY asset — the binaries and the
-      # SHA512SUMS beside them, so a verifier who fetches only the checksum file
+      # Provenance attestation over EVERY asset — the binaries, the NOTICE and
+      # the SHA512SUMS beside them, so a verifier who fetches only the checksum file
       # has something to verify it against (Sigstore, stored on the repo;
       # `gh attestation verify <file> -R fuzdev/tsv`). Ahead of the Release so a
       # failed attestation fails before anything is public; a re-run attests

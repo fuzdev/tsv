@@ -70,6 +70,7 @@ import {
 } from './check_staged_freshness.ts';
 import { cli_binary_name } from './napi_host.ts';
 import { ALL_FAMILIES, facade_files, facade_type_names } from './npm_facade.ts';
+import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 import { register_dts_specifier_test } from './dts_specifiers.ts';
 import { register_facade_surface_suite } from './facade_surface_suite.ts';
@@ -682,6 +683,26 @@ process.stdout.write(JSON.stringify({
 				`declared file missing: ${file}`
 			);
 		}
+		// Both packages carry the WHATWG notice for the entity table the binaries compile in
+		// (`THIRD_PARTY_NOTICE`), declared and verbatim.
+		const notice = readFileSync(
+			new URL(`../${THIRD_PARTY_NOTICE.source}`, import.meta.url),
+			'utf8'
+		);
+		for (const [label, pkg, dir] of [
+			['loader', loader_pkg, 'tsv'],
+			['platform', platform_pkg, `tsv-${triple}`]
+		] as const) {
+			assert.ok(pkg.files.includes(THIRD_PARTY_NOTICE.published), `${label} files declares NOTICE`);
+			assert.equal(
+				readFileSync(
+					join(staged, 'node_modules', '@fuzdev', dir, THIRD_PARTY_NOTICE.published),
+					'utf8'
+				),
+				notice,
+				`${label} NOTICE is the source verbatim`
+			);
+		}
 	});
 
 	// over the hand-written declarations here (the wasm packages' run in `scripts/test_npm.ts`)
@@ -892,7 +913,7 @@ describe('cli (bin.js): the tsv bin dispatching to the native CLI binary', () =>
 	// The execute bit is posix-only: npm packs the on-disk mode and only chmods
 	// `bin` entries at install, so a 644 there ships a broken npx — on Windows
 	// there is no mode to pin. (`npm` is a .cmd there, hence the shell.)
-	it('npm pack ships the CLI binary', () => {
+	it('npm pack ships the CLI binary and the third-party NOTICE', () => {
 		const result = spawnSync('npm', ['pack', '--dry-run', '--json'], {
 			cwd: join(pkg_root, triple),
 			encoding: 'utf-8',
@@ -905,6 +926,11 @@ describe('cli (bin.js): the tsv bin dispatching to the native CLI binary', () =>
 		if (posix) {
 			assert.ok(entry.mode & 0o111, `packed mode ${entry.mode.toString(8)} is not executable`);
 		}
+		// the binaries' third-party notice rides in the same tarball
+		assert.ok(
+			report.files.some((f: { path: string }) => f.path === THIRD_PARTY_NOTICE.published),
+			`${THIRD_PARTY_NOTICE.published} missing from the packed file list`
+		);
 	});
 
 	it('format --content prints formatted source', () => {

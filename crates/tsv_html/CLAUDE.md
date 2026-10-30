@@ -73,7 +73,11 @@ not here. This crate stays AST-agnostic.
   names stand for two code points — Svelte's own table keeps only the first,
   which is one of the decoder's cataloged corrections. The list is WHATWG's
   under CC BY 4.0 (BSD 3-Clause where incorporated into source code); `NOTICE`
-  carries the attribution and both licenses, and ships in the crate.
+  carries the attribution and both licenses, and ships in the crate — and, since
+  BSD 3-Clause asks a binary distribution to carry it, in every npm package and
+  every GitHub Release beside the CLI binaries (`THIRD_PARTY_NOTICE` in
+  `scripts/npm_metadata.ts` names it; the staging scripts copy it verbatim and
+  `validate:artifacts` and the package suites fail a package without it).
 - **Pure `&str` API**: classification predicates take tag names, not
   AST nodes or a parser's name representation, so the crate stays
   independent of any particular parser.

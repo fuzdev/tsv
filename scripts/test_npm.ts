@@ -49,6 +49,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { Worker } from 'node:worker_threads';
 
 import { facade_files } from './npm_facade.ts';
+import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import { assert_staged_fresh, wasm_package_checks } from './check_staged_freshness.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 import { register_dts_specifier_test } from './dts_specifiers.ts';
@@ -248,6 +249,19 @@ describe(`package metadata: ${pkg_dir}`, () => {
 				`files entry ${rel} does not exist`
 			);
 		}
+	});
+
+	// The bundle compiles in the WHATWG entity table, whose license requires its notice in
+	// every binary distribution (`THIRD_PARTY_NOTICE`): declared, present, and verbatim.
+	it('ships the third-party NOTICE, verbatim', () => {
+		assert.ok(pkg.files.includes(THIRD_PARTY_NOTICE.published), 'files declares the NOTICE');
+		assert.equal(
+			readFileSync(
+				new URL(`../${pkg_dir}/${THIRD_PARTY_NOTICE.published}`, import.meta.url),
+				'utf8'
+			),
+			readFileSync(new URL(`../${THIRD_PARTY_NOTICE.source}`, import.meta.url), 'utf8')
+		);
 	});
 
 	it('index.js is marked side-effectful (auto-init survives tree-shaking)', () => {

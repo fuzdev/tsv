@@ -1,6 +1,7 @@
 /**
  * Validates the built WASM artifacts: binary sizes against expected ranges,
- * plus a Deno runtime smoke test of every built bundle.
+ * a Deno runtime smoke test of every built bundle, and the third-party
+ * `NOTICE` each npm package must ship (`THIRD_PARTY_NOTICE`).
  *
  * Size bounds are deliberately tight (~±8%) so a legitimate size change
  * fails here and gets acknowledged by updating the constants below — a
@@ -43,6 +44,7 @@ import {
 	type StagedCheck,
 	wasm_package_checks
 } from './check_staged_freshness.ts';
+import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import { format_size } from './size.ts';
 
 let passed = 0;
@@ -567,6 +569,36 @@ for (const variant of VARIANTS) {
 			return verdict;
 		});
 	}
+}
+
+// --- Third-party notice ---
+//
+// Every npm package compiles in the WHATWG entity table, whose license requires its notice
+// in the documentation of a binary distribution (`THIRD_PARTY_NOTICE`). A package without
+// it is not publishable, however well it sizes and smokes.
+
+console.log('\n=== Third-party notice ===');
+
+const notice_source = Deno.readTextFileSync(THIRD_PARTY_NOTICE.source);
+for (const variant of VARIANTS) {
+	const dir = wasm_bundle_dir(variant, 'npm');
+	const label = `${variant}/npm`;
+	if (file_size(`${dir}/package.json`) === null) {
+		skip(`${label} NOTICE — not built`);
+		continue;
+	}
+	const files = (JSON.parse(Deno.readTextFileSync(`${dir}/package.json`)) as { files?: string[] })
+		.files;
+	check(label, `package.json files declares ${THIRD_PARTY_NOTICE.published}`, () =>
+		(files ?? []).includes(THIRD_PARTY_NOTICE.published)
+	);
+	check(
+		label,
+		`${THIRD_PARTY_NOTICE.published} is ${THIRD_PARTY_NOTICE.source} verbatim`,
+		() =>
+			file_size(`${dir}/${THIRD_PARTY_NOTICE.published}`) !== null &&
+			Deno.readTextFileSync(`${dir}/${THIRD_PARTY_NOTICE.published}`) === notice_source
+	);
 }
 
 function check(target: string, name: string, assertion: () => boolean): void {

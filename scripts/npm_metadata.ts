@@ -34,3 +34,19 @@ export const NPM_SHARED_METADATA = {
 	// restricted — the publish scripts pass `--access public` as well
 	publishConfig: { access: 'public' }
 } as const;
+
+/**
+ * The third-party notice every published tsv package ships, and every GitHub Release
+ * carries beside its CLI binaries: the WHATWG license for the named character references
+ * table compiled into each engine (`tsv_html`'s entity decoder). BSD 3-Clause, which
+ * governs the table as source code, requires its notice in the documentation of any
+ * binary distribution, and every wasm bundle, N-API addon and CLI binary is one.
+ *
+ * One source, the `tsv_html` crate's own `NOTICE`, because that copy must live inside the
+ * crate (`cargo package` reads nothing outside it); every package and the Release copy it
+ * verbatim, so no second spelling can drift. tsv's own code stays 0BSD (`LICENSE`).
+ */
+export const THIRD_PARTY_NOTICE = {
+	source: 'crates/tsv_html/NOTICE',
+	published: 'NOTICE'
+} as const;

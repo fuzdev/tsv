@@ -62,6 +62,7 @@ import {
 	type WasmVariant
 } from '../benches/js/lib/tsv_artifacts.ts';
 import { ALL_FAMILIES, facade_sources } from './npm_facade.ts';
+import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -215,7 +216,8 @@ export function wasm_package_checks(
 			label: `staged package entries (${variant})`,
 			staged: `${dir}/index.js`,
 			crates: [...CORE_CRATES, ...WASM_CRATES],
-			files: [...PATCHER_SOURCES, 'deno.json'],
+			// the third-party NOTICE is copied in the same pass
+			files: [...PATCHER_SOURCES, 'deno.json', THIRD_PARTY_NOTICE.source],
 			rebuild
 		},
 		{
@@ -303,7 +305,8 @@ export function napi_addon_check(triple: string): StagedCheck {
 		// the addon links the discovery crates too (its `format` feature pulls `tsv_ignore` +
 		// `tsv_discover` for the `IgnoreStack` export), so an edit there must stale it
 		crates: [...CORE_CRATES, 'tsv_napi', 'tsv_ignore', 'tsv_discover'],
-		files: ['scripts/build_napi_packages.ts'],
+		// the third-party NOTICE beside it is staged in the same pass
+		files: ['scripts/build_napi_packages.ts', THIRD_PARTY_NOTICE.source],
 		rebuild: 'deno task build:napi:packages'
 	};
 }
@@ -313,8 +316,8 @@ export function napi_addon_check(triple: string): StagedCheck {
  * loader package copies, not just `index.js`: the staged files are written in one pass,
  * so `index.js`'s mtime dates the whole staging and a sibling edited since then is the
  * same staleness. (`cli.js` gets its own check only because it is the one shared with the
- * wasm package. `README.md` and `LICENSE` are copied too and absent here — a reader that
- * grades the README adds its own check.)
+ * wasm package. The third-party `NOTICE` is graded with the rest; `README.md` and `LICENSE`
+ * are copied too and absent here — a reader that grades the README adds its own check.)
  */
 export function napi_loader_checks(): Array<StagedCheck> {
 	const rebuild = 'deno task build:napi:packages';
@@ -331,7 +334,8 @@ export function napi_loader_checks(): Array<StagedCheck> {
 				...facade_sources(ALL_FAMILIES),
 				'scripts/build_napi_packages.ts',
 				'scripts/npm_facade.ts',
-				'scripts/npm_metadata.ts'
+				'scripts/npm_metadata.ts',
+				THIRD_PARTY_NOTICE.source
 			],
 			rebuild
 		},
