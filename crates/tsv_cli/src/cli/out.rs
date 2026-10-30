@@ -141,6 +141,7 @@ pub fn exit_with_parse_error(code: i32, error: &tsv_lang::Error) -> ! {
 }
 
 /// `println!` over [`write_stdout`] — the only stdout line-writer in the CLI.
+#[doc(hidden)]
 #[macro_export]
 macro_rules! out_line {
     ($($arg:tt)*) => {{
@@ -151,6 +152,7 @@ macro_rules! out_line {
 }
 
 /// `eprintln!` over [`write_stderr`] — the only stderr line-writer in the CLI.
+#[doc(hidden)]
 #[macro_export]
 macro_rules! err_line {
     ($($arg:tt)*) => {{

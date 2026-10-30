@@ -45,8 +45,8 @@ always-pruned safety nets, the formattable-extension check, the heuristic-shadow
 warning — lives one layer up in [`tsv_discover`](../tsv_discover/CLAUDE.md), which
 builds on `IgnoreStack` (consuming `is_ignored_leaf` / `is_reincluded` /
 `negation_under` / `has_gitignore_layers` / `gitignore_anchors`, plus `exclusion` /
-`tsv_exclusion` / `gitignore_exclusion` — the ancestor-walking answer's witnesses — with
-`tsv_layer_source` and `split_segments` to bound and warn about a path an argument
+`override_exclusion` / `gitignore_exclusion` — the ancestor-walking answer's witnesses — with
+`override_layer_source` and `split_segments` to bound and warn about a path an argument
 named). Deliberately: `IgnoreStack` stays a pure gitignore(5) matcher, reusable beyond
 tsv's own discovery rules, and the three surfaces share the prune *decision* through
 `tsv_discover` rather than re-deriving it from these primitives.
@@ -71,21 +71,25 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   one directory's `.gitignore`, anchored at `anchor` (relative to the format
   root, `""` = root). Push shallow-first; pop on a DFS unwind.
 - `IgnoreStack::push_formatignore(anchor, content)` /
-  `push_prettierignore(anchor, content)` / `pop_tsv()` — add/drop one directory's tsv
+  `push_prettierignore(anchor, content)` / `pop_override()` — add/drop one directory's tsv
   layer, evaluated after every `.gitignore`. The two pushes match identically; the
   layer records which file it was read from, for a diagnostic to name.
-- `IgnoreStack::is_ignored(path, is_dir)` — `path` relative to the format root;
+- `PathKind { File, Directory }` — the `kind` every path query takes (whether the path
+  itself is a directory, which trailing-`/` patterns turn on); `PathKind::from_is_dir(bool)`
+  converts a flag. The binding wrappers keep their JS-facing `(path, is_dir: bool)` and
+  `pop_tsv` names and convert at the boundary.
+- `IgnoreStack::is_ignored(path, kind)` — `path` relative to the format root;
   walks the ancestor prefixes (git's parent-directory prune). The arbitrary-path
   query, and `exclusion` with its witness dropped — one prefix walk
   (`first_excluded_prefix`) serves both.
-- `IgnoreStack::is_ignored_leaf(path, is_dir)` — like `is_ignored` but evaluates
+- `IgnoreStack::is_ignored_leaf(path, kind)` — like `is_ignored` but evaluates
   only `path`'s **own** last-match, **no ancestor walk**, so discovery skips the
   O(depth) re-walk per entry (the matcher dominates discovery; this roughly halves
   its self-time on a deep tree). Equivalent to `is_ignored` *only when every
   ancestor is already known not-ignored* — a sharp contract, see Known edges.
-- `IgnoreStack::is_reincluded(path, is_dir)` — the per-path `!`-negation polarity
+- `IgnoreStack::is_reincluded(path, kind)` — the per-path `!`-negation polarity
   (no ancestor prune), so a caller's heuristic can defer to an explicit re-include.
-- `IgnoreStack::negation_under(prefix) -> Option<Negation>` — every **tsv-layer**
+- `IgnoreStack::negation_under(prefix) -> Option<Negation>` (`#[doc(hidden)]` with `Negation` / `NegationRule` / `NegationTail` — `tsv_discover`'s shadow-warning input, no stability promise) — every **tsv-layer**
   negation anchored *under* `prefix` (its layer anchor + leading literal segments has
   `prefix` as a prefix, and the rule reaches under it: a literal segment beyond, or a
   glob tail — `!dist/*.ts` is as inert under a pruned `dist` as `!dist/keep.ts`), as
@@ -114,25 +118,25 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   discovery replay with **no** top-down walk (the VS Code extension, via
   `tsv_discover::is_path_pruned`) reconstruct each ancestor's `heuristic_active` —
   the heuristic is off at a level once a `.gitignore` anchored above it is present.
-- `IgnoreStack::exclusion(path, is_dir) -> Option<Exclusion>` — the witness behind
+- `IgnoreStack::exclusion(path, kind) -> Option<Exclusion>` — the witness behind
   `is_ignored`: the shallowest excluded prefix of `path` (`Exclusion::depth`), the
   directory holding the excluding rule's file (`anchor_depth`), both counted in
   `split_segments` segments, and the file itself
   (`IgnoreSource::{Gitignore, Formatignore, Prettierignore}`, with `file_name()`). A
   diagnostic query off the hot path: `tsv_discover` reads it for a path an argument
   named, to warn which directory put the path out of scope and whose rule did.
-- `IgnoreStack::tsv_exclusion(path, is_dir) -> Option<Exclusion>` — `exclusion` over the
+- `IgnoreStack::override_exclusion(path, kind) -> Option<Exclusion>` — `exclusion` over the
   tsv layers alone, every `.gitignore` layer set aside. `Some` only where `exclusion` is
   (tsv layers are read last), and the same answer wherever `exclusion`'s witness is a tsv
   layer. `tsv_discover` reads it for a named path, beside the next query, to decide the
   remedy: a `.formatignore`/`.prettierignore` rule is the user's to narrow, and a
   named *file* one excludes is skipped quietly.
-- `IgnoreStack::gitignore_exclusion(path, is_dir) -> Option<Exclusion>` — `exclusion`
+- `IgnoreStack::gitignore_exclusion(path, kind) -> Option<Exclusion>` — `exclusion`
   over the `.gitignore` layers alone. A tsv rule at a prefix is the witness `exclusion`
   names there, so this is how a diagnostic learns a `.gitignore` rule stands behind it,
   at that depth or below — where narrowing the tsv rule alone would leave the path
   excluded, and the remedy is the re-include lines instead.
-- `IgnoreStack::tsv_layer_source(anchor) -> Option<IgnoreSource>` — which file the tsv
+- `IgnoreStack::override_layer_source(anchor) -> Option<IgnoreSource>` — which file the tsv
   layer at `anchor` was read from. `tsv_discover` asks it of the format root, so a
   remedy names the file the root reads rather than one whose creation would shadow it.
 - `split_segments(path) -> Vec<&str>` — a path's meaningful segments (empty and `.`

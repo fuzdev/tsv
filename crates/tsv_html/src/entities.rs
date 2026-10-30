@@ -118,10 +118,21 @@ pub(crate) fn entity_hash_seeded(name: &[u8], seed: u64) -> u64 {
     hash ^ (hash >> 31)
 }
 
+/// Where a run of text whose character references are decoded sits — the one fact about
+/// it [`decode_character_references`] reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ReferenceContext {
+    /// Text content: every valid reference is decoded.
+    Text,
+    /// An attribute value: a named reference without its `;` is decoded only when not
+    /// followed by `=` or an alphanumeric character (HTML's attribute-value rule).
+    AttributeValue,
+}
+
 /// Decode HTML character references in a string.
 ///
 /// This function decodes both named entities and numeric character references.
-/// The behavior differs slightly based on whether the input is an attribute value:
+/// The behavior differs slightly by `context` ([`ReferenceContext`]):
 ///
 /// - In attribute values: Named entities without semicolons are only decoded if not
 ///   followed by `=` or alphanumeric characters (per HTML5 spec)
@@ -130,20 +141,24 @@ pub(crate) fn entity_hash_seeded(name: &[u8], seed: u64) -> u64 {
 /// # Examples
 ///
 /// ```
-/// use tsv_html::decode_character_references;
+/// use tsv_html::{ReferenceContext, decode_character_references};
 ///
 /// // Named entities
-/// assert_eq!(decode_character_references("&lt;tag&gt;", false), "<tag>");
-/// assert_eq!(decode_character_references("&amp; &quot;", false), "& \"");
+/// assert_eq!(decode_character_references("&lt;tag&gt;", ReferenceContext::Text), "<tag>");
+/// assert_eq!(decode_character_references("&amp; &quot;", ReferenceContext::Text), "& \"");
 ///
 /// // Numeric decimal
-/// assert_eq!(decode_character_references("&#65;", false), "A");
+/// assert_eq!(decode_character_references("&#65;", ReferenceContext::Text), "A");
 ///
 /// // Numeric hex
-/// assert_eq!(decode_character_references("&#x41;", false), "A");
-/// assert_eq!(decode_character_references("&#X41;", false), "A");
+/// assert_eq!(decode_character_references("&#x41;", ReferenceContext::Text), "A");
+/// assert_eq!(decode_character_references("&#X41;", ReferenceContext::Text), "A");
+///
+/// // A named reference with no `;` before `=` stays as written in an attribute value
+/// assert_eq!(decode_character_references("&amp=", ReferenceContext::AttributeValue), "&amp=");
 /// ```
-pub fn decode_character_references(html: &str, is_attribute_value: bool) -> String {
+pub fn decode_character_references(html: &str, context: ReferenceContext) -> String {
+    let is_attribute_value = context == ReferenceContext::AttributeValue;
     let mut result = String::with_capacity(html.len());
     let mut i = 0;
 
@@ -398,7 +413,10 @@ mod tests {
             "CounterClockwiseContourIntegral;".len()
         );
         assert_eq!(
-            decode_character_references("&CounterClockwiseContourIntegral;", false),
+            decode_character_references(
+                "&CounterClockwiseContourIntegral;",
+                ReferenceContext::Text
+            ),
             "\u{2233}"
         );
     }
@@ -408,44 +426,89 @@ mod tests {
     #[test]
     fn test_long_name_run() {
         let text = format!("&{}", "a".repeat(10_000));
-        assert_eq!(decode_character_references(&text, false), text);
+        assert_eq!(
+            decode_character_references(&text, ReferenceContext::Text),
+            text
+        );
         let text = format!("&amp{}", "a".repeat(10_000));
         assert_eq!(
-            decode_character_references(&text, false),
+            decode_character_references(&text, ReferenceContext::Text),
             format!("&{}", "a".repeat(10_000))
         );
     }
 
     #[test]
     fn test_basic_named_entities() {
-        assert_eq!(decode_character_references("&lt;", false), "<");
-        assert_eq!(decode_character_references("&gt;", false), ">");
-        assert_eq!(decode_character_references("&amp;", false), "&");
-        assert_eq!(decode_character_references("&quot;", false), "\"");
-        assert_eq!(decode_character_references("&nbsp;", false), "\u{00A0}");
-        assert_eq!(decode_character_references("&copy;", false), "©");
+        assert_eq!(
+            decode_character_references("&lt;", ReferenceContext::Text),
+            "<"
+        );
+        assert_eq!(
+            decode_character_references("&gt;", ReferenceContext::Text),
+            ">"
+        );
+        assert_eq!(
+            decode_character_references("&amp;", ReferenceContext::Text),
+            "&"
+        );
+        assert_eq!(
+            decode_character_references("&quot;", ReferenceContext::Text),
+            "\""
+        );
+        assert_eq!(
+            decode_character_references("&nbsp;", ReferenceContext::Text),
+            "\u{00A0}"
+        );
+        assert_eq!(
+            decode_character_references("&copy;", ReferenceContext::Text),
+            "©"
+        );
     }
 
     #[test]
     fn test_numeric_decimal() {
-        assert_eq!(decode_character_references("&#65;", false), "A");
-        assert_eq!(decode_character_references("&#8364;", false), "€");
-        assert_eq!(decode_character_references("&#128169;", false), "💩");
+        assert_eq!(
+            decode_character_references("&#65;", ReferenceContext::Text),
+            "A"
+        );
+        assert_eq!(
+            decode_character_references("&#8364;", ReferenceContext::Text),
+            "€"
+        );
+        assert_eq!(
+            decode_character_references("&#128169;", ReferenceContext::Text),
+            "💩"
+        );
     }
 
     #[test]
     fn test_numeric_hex() {
-        assert_eq!(decode_character_references("&#x41;", false), "A");
-        assert_eq!(decode_character_references("&#X41;", false), "A");
-        assert_eq!(decode_character_references("&#x20AC;", false), "€");
-        assert_eq!(decode_character_references("&#x1F4A9;", false), "💩");
+        assert_eq!(
+            decode_character_references("&#x41;", ReferenceContext::Text),
+            "A"
+        );
+        assert_eq!(
+            decode_character_references("&#X41;", ReferenceContext::Text),
+            "A"
+        );
+        assert_eq!(
+            decode_character_references("&#x20AC;", ReferenceContext::Text),
+            "€"
+        );
+        assert_eq!(
+            decode_character_references("&#x1F4A9;", ReferenceContext::Text),
+            "💩"
+        );
     }
 
     #[test]
     fn test_mixed_content() {
-        assert_eq!(decode_character_references("&lt;tag&gt;", false), "<tag>");
         assert_eq!(
-            decode_character_references("&amp; &quot; &copy;", false),
+            decode_character_references("&lt;tag&gt;", ReferenceContext::Text),
+            "<tag>"
+        );
+        assert_eq!(
+            decode_character_references("&amp; &quot; &copy;", ReferenceContext::Text),
             "& \" ©"
         );
     }
@@ -453,7 +516,10 @@ mod tests {
     #[test]
     fn test_invalid_entities() {
         // Unknown entity - keep as is
-        assert_eq!(decode_character_references("&unknown;", false), "&unknown;");
+        assert_eq!(
+            decode_character_references("&unknown;", ReferenceContext::Text),
+            "&unknown;"
+        );
     }
 
     #[test]
@@ -482,10 +548,22 @@ mod tests {
     #[test]
     fn test_legacy_entities_no_semicolon() {
         // Legacy entities without semicolon should decode in content
-        assert_eq!(decode_character_references("&AMP", false), "&");
-        assert_eq!(decode_character_references("&COPY", false), "©");
-        assert_eq!(decode_character_references("&LT", false), "<");
-        assert_eq!(decode_character_references("&GT", false), ">");
+        assert_eq!(
+            decode_character_references("&AMP", ReferenceContext::Text),
+            "&"
+        );
+        assert_eq!(
+            decode_character_references("&COPY", ReferenceContext::Text),
+            "©"
+        );
+        assert_eq!(
+            decode_character_references("&LT", ReferenceContext::Text),
+            "<"
+        );
+        assert_eq!(
+            decode_character_references("&GT", ReferenceContext::Text),
+            ">"
+        );
     }
 
     #[test]
@@ -494,45 +572,60 @@ mod tests {
 
         // Should NOT decode (followed by '=')
         assert_eq!(
-            decode_character_references("&AMP=value", true),
+            decode_character_references("&AMP=value", ReferenceContext::AttributeValue),
             "&AMP=value"
         );
 
         // Should NOT decode (followed by alphanumeric)
         assert_eq!(
-            decode_character_references("&AMPersand", true),
+            decode_character_references("&AMPersand", ReferenceContext::AttributeValue),
             "&AMPersand"
         );
 
         // Should decode (followed by punctuation)
-        assert_eq!(decode_character_references("&AMP&more", true), "&&more");
+        assert_eq!(
+            decode_character_references("&AMP&more", ReferenceContext::AttributeValue),
+            "&&more"
+        );
 
         // Should decode (followed by space)
-        assert_eq!(decode_character_references("&AMP ", true), "& ");
+        assert_eq!(
+            decode_character_references("&AMP ", ReferenceContext::AttributeValue),
+            "& "
+        );
 
         // Should always decode with semicolon
-        assert_eq!(decode_character_references("&AMP;=test", true), "&=test");
+        assert_eq!(
+            decode_character_references("&AMP;=test", ReferenceContext::AttributeValue),
+            "&=test"
+        );
 
         // The blocking class is ASCII alphanumeric, nothing wider and nothing narrower:
         // an underscore does not block (JS's `\b` word class, which Svelte reaches for,
         // would), and neither does a non-ASCII letter or digit (`char::is_alphanumeric`
         // would). Both decode in text content too, where no rule applies at all.
-        assert_eq!(decode_character_references("&AMP_x", true), "&_x");
         assert_eq!(
-            decode_character_references("&COPY\u{4e2d}", true),
+            decode_character_references("&AMP_x", ReferenceContext::AttributeValue),
+            "&_x"
+        );
+        assert_eq!(
+            decode_character_references("&COPY\u{4e2d}", ReferenceContext::AttributeValue),
             "©\u{4e2d}"
         );
         assert_eq!(
-            decode_character_references("&COPY\u{663}", true),
+            decode_character_references("&COPY\u{663}", ReferenceContext::AttributeValue),
             "©\u{663}"
         );
         assert_eq!(
-            decode_character_references("&COPY\u{ff11}", true),
+            decode_character_references("&COPY\u{ff11}", ReferenceContext::AttributeValue),
             "©\u{ff11}"
         );
-        assert_eq!(decode_character_references("&AMP_x", false), "&_x");
         assert_eq!(
-            decode_character_references("&COPY\u{4e2d}", false),
+            decode_character_references("&AMP_x", ReferenceContext::Text),
+            "&_x"
+        );
+        assert_eq!(
+            decode_character_references("&COPY\u{4e2d}", ReferenceContext::Text),
             "©\u{4e2d}"
         );
     }
@@ -540,54 +633,111 @@ mod tests {
     #[test]
     fn test_incomplete_entities() {
         // Incomplete entity names should stay as literal text
-        assert_eq!(decode_character_references("&am", false), "&am");
-        assert_eq!(decode_character_references("&l", false), "&l");
-        assert_eq!(decode_character_references("&", false), "&");
+        assert_eq!(
+            decode_character_references("&am", ReferenceContext::Text),
+            "&am"
+        );
+        assert_eq!(
+            decode_character_references("&l", ReferenceContext::Text),
+            "&l"
+        );
+        assert_eq!(
+            decode_character_references("&", ReferenceContext::Text),
+            "&"
+        );
     }
 
     #[test]
     fn test_numeric_edge_cases() {
         // Zero codepoint -> NUL character
-        assert_eq!(decode_character_references("&#0;", false), "\0");
+        assert_eq!(
+            decode_character_references("&#0;", ReferenceContext::Text),
+            "\0"
+        );
 
         // Surrogate halves -> NUL
-        assert_eq!(decode_character_references("&#xD800;", false), "\0");
-        assert_eq!(decode_character_references("&#55296;", false), "\0"); // 0xD800 in decimal
+        assert_eq!(
+            decode_character_references("&#xD800;", ReferenceContext::Text),
+            "\0"
+        );
+        assert_eq!(
+            decode_character_references("&#55296;", ReferenceContext::Text),
+            "\0"
+        ); // 0xD800 in decimal
 
         // Line feed -> space
-        assert_eq!(decode_character_references("&#10;", false), " ");
+        assert_eq!(
+            decode_character_references("&#10;", ReferenceContext::Text),
+            " "
+        );
 
         // Windows-1252 range -> Euro sign
-        assert_eq!(decode_character_references("&#128;", false), "€");
+        assert_eq!(
+            decode_character_references("&#128;", ReferenceContext::Text),
+            "€"
+        );
     }
 
     #[test]
     fn test_uppercase_hex_entity() {
         // Enhancement over Svelte: we support uppercase X
-        assert_eq!(decode_character_references("&#X41;", false), "A");
-        assert_eq!(decode_character_references("&#X1F4A9;", false), "💩");
+        assert_eq!(
+            decode_character_references("&#X41;", ReferenceContext::Text),
+            "A"
+        );
+        assert_eq!(
+            decode_character_references("&#X1F4A9;", ReferenceContext::Text),
+            "💩"
+        );
 
         // Lowercase still works
-        assert_eq!(decode_character_references("&#x41;", false), "A");
-        assert_eq!(decode_character_references("&#x1F4A9;", false), "💩");
+        assert_eq!(
+            decode_character_references("&#x41;", ReferenceContext::Text),
+            "A"
+        );
+        assert_eq!(
+            decode_character_references("&#x1F4A9;", ReferenceContext::Text),
+            "💩"
+        );
     }
 
     #[test]
     fn test_numeric_no_semicolon() {
         // Numeric entities work without semicolons too
-        assert_eq!(decode_character_references("&#65", false), "A");
-        assert_eq!(decode_character_references("&#x41", false), "A");
-        assert_eq!(decode_character_references("&#X41", false), "A");
+        assert_eq!(
+            decode_character_references("&#65", ReferenceContext::Text),
+            "A"
+        );
+        assert_eq!(
+            decode_character_references("&#x41", ReferenceContext::Text),
+            "A"
+        );
+        assert_eq!(
+            decode_character_references("&#X41", ReferenceContext::Text),
+            "A"
+        );
     }
 
     #[test]
     fn test_degenerate_references() {
         // Empty/zero-length references collect no name or digits and stay literal —
         // these are the boundary cases for the name/digit scanners.
-        assert_eq!(decode_character_references("&;", false), "&;");
-        assert_eq!(decode_character_references("&#;", false), "&#;");
-        assert_eq!(decode_character_references("&#x;", false), "&#x;");
-        assert_eq!(decode_character_references("&#X;", false), "&#X;");
+        assert_eq!(
+            decode_character_references("&;", ReferenceContext::Text),
+            "&;"
+        );
+        assert_eq!(
+            decode_character_references("&#;", ReferenceContext::Text),
+            "&#;"
+        );
+        assert_eq!(
+            decode_character_references("&#x;", ReferenceContext::Text),
+            "&#x;"
+        );
+        assert_eq!(
+            decode_character_references("&#X;", ReferenceContext::Text),
+            "&#X;"
+        );
     }
 
     /// Every scan in this module walks a `&str` by byte offset while the runs it slices are
@@ -625,21 +775,21 @@ mod tests {
                     rest /= base;
                 }
 
-                for is_attribute_value in [false, true] {
-                    let decoded = decode_character_references(&input, is_attribute_value);
+                for context in [ReferenceContext::Text, ReferenceContext::AttributeValue] {
+                    let decoded = decode_character_references(&input, context);
                     // Decoding replaces a whole reference with the one or two characters
                     // it stands for and copies every other character through. The
                     // shortest reference is four characters (`&lt;`), so the run can
                     // only ever shorten.
                     assert!(
                         decoded.chars().count() <= input.chars().count(),
-                        "{input:?} grew to {decoded:?} (attribute value: {is_attribute_value})"
+                        "{input:?} grew to {decoded:?} (context: {context:?})"
                     );
                     // Nothing but a reference is rewritten, and a reference needs an '&'.
                     if !input.contains('&') {
                         assert_eq!(
                             decoded, input,
-                            "rewrote {input:?} with no reference in it (attribute value: {is_attribute_value})"
+                            "rewrote {input:?} with no reference in it (context: {context:?})"
                         );
                     }
                 }
@@ -652,32 +802,32 @@ mod tests {
         // A non-ASCII character can only end a name run — no such run can name an entity,
         // so the source is preserved verbatim, semicolon or not.
         assert_eq!(
-            decode_character_references("a&b\u{4e2d}pos;", true),
+            decode_character_references("a&b\u{4e2d}pos;", ReferenceContext::AttributeValue),
             "a&b\u{4e2d}pos;"
         );
         assert_eq!(
-            decode_character_references("a&b\u{4e2d}pos", true),
+            decode_character_references("a&b\u{4e2d}pos", ReferenceContext::AttributeValue),
             "a&b\u{4e2d}pos"
         );
         // A well-formed reference beside one still decodes.
         assert_eq!(
-            decode_character_references("&amp; a&b\u{4e2d}pos;", true),
+            decode_character_references("&amp; a&b\u{4e2d}pos;", ReferenceContext::AttributeValue),
             "& a&b\u{4e2d}pos;"
         );
         // A numeric reference's digit run ends at the same place for the same reason, but
         // the prefix it collected is still a reference (the spec's missing-semicolon path),
         // so the decode takes it and the multibyte character starts the text after it.
         assert_eq!(
-            decode_character_references("&#4\u{663}1;", false),
+            decode_character_references("&#4\u{663}1;", ReferenceContext::Text),
             "\u{4}\u{663}1;"
         );
         assert_eq!(
-            decode_character_references("&#x4\u{1f4a9}1;", false),
+            decode_character_references("&#x4\u{1f4a9}1;", ReferenceContext::Text),
             "\u{4}\u{1f4a9}1;"
         );
         // With no ASCII digit at all there is no reference to take.
         assert_eq!(
-            decode_character_references("&#x\u{663}1;", false),
+            decode_character_references("&#x\u{663}1;", ReferenceContext::Text),
             "&#x\u{663}1;"
         );
     }
@@ -689,34 +839,46 @@ mod tests {
     fn test_multi_codepoint_entities() {
         // A combining mark, which is what makes the reference mean what it names.
         assert_eq!(
-            decode_character_references("&NotEqualTilde;", false),
+            decode_character_references("&NotEqualTilde;", ReferenceContext::Text),
             "\u{2242}\u{338}"
         );
         assert_eq!(
-            decode_character_references("&nLt;", false),
+            decode_character_references("&nLt;", ReferenceContext::Text),
             "\u{226a}\u{20d2}"
         );
         // A variation selector.
         assert_eq!(
-            decode_character_references("&caps;", false),
+            decode_character_references("&caps;", ReferenceContext::Text),
             "\u{2229}\u{fe00}"
         );
         // Two characters outright — a ligature spelled as its letters, and two spaces.
-        assert_eq!(decode_character_references("&fjlig;", false), "fj");
         assert_eq!(
-            decode_character_references("&ThickSpace;", false),
+            decode_character_references("&fjlig;", ReferenceContext::Text),
+            "fj"
+        );
+        assert_eq!(
+            decode_character_references("&ThickSpace;", ReferenceContext::Text),
             "\u{205f}\u{200a}"
         );
         // The attribute-value path decodes the same table.
-        assert_eq!(decode_character_references("&bne;", true), "=\u{20e5}");
+        assert_eq!(
+            decode_character_references("&bne;", ReferenceContext::AttributeValue),
+            "=\u{20e5}"
+        );
         // The base character each pairs with has its own single-code-point reference.
-        assert_eq!(decode_character_references("&esim;", false), "\u{2242}");
-        assert_eq!(decode_character_references("&cap;", false), "\u{2229}");
+        assert_eq!(
+            decode_character_references("&esim;", ReferenceContext::Text),
+            "\u{2242}"
+        );
+        assert_eq!(
+            decode_character_references("&cap;", ReferenceContext::Text),
+            "\u{2229}"
+        );
         // Every one of the 93 is a semicolon-terminated name: no legacy spelling of one
         // exists, so a semicolon-less prefix decodes to whatever shorter name it holds
         // (here none, leaving the source verbatim).
         assert_eq!(
-            decode_character_references("&NotEqualTilde", false),
+            decode_character_references("&NotEqualTilde", ReferenceContext::Text),
             "&NotEqualTilde"
         );
     }
@@ -725,11 +887,17 @@ mod tests {
     fn test_longest_match_fallthrough() {
         // No-semicolon longest match: "COPY" is a legacy entity but "COPYRIGHT" is
         // not, so only the "COPY" prefix decodes and "RIGHT" is left as text.
-        assert_eq!(decode_character_references("&COPYRIGHT", false), "©RIGHT");
+        assert_eq!(
+            decode_character_references("&COPYRIGHT", ReferenceContext::Text),
+            "©RIGHT"
+        );
         // Semicolon present but neither "notit;" nor "notit" is an entity; the
         // legacy longest-match loop (which runs after the semicolon-first loop
         // breaks) still finds "not", matching Svelte's decoder — &not → ¬, "it;" stays.
-        assert_eq!(decode_character_references("&notit;", false), "¬it;");
+        assert_eq!(
+            decode_character_references("&notit;", ReferenceContext::Text),
+            "¬it;"
+        );
     }
 
     #[test]
@@ -738,25 +906,49 @@ mod tests {
         // so it normalizes to NUL like any other out-of-range one (Svelte parity — its
         // `parseInt` never overflows).
         assert_eq!(
-            decode_character_references("&#99999999999999;", false),
+            decode_character_references("&#99999999999999;", ReferenceContext::Text),
             "\0"
         );
-        assert_eq!(decode_character_references("&#xFFFFFFFFFF;", false), "\0");
-        assert_eq!(decode_character_references("&#4294967296;", false), "\0");
+        assert_eq!(
+            decode_character_references("&#xFFFFFFFFFF;", ReferenceContext::Text),
+            "\0"
+        );
+        assert_eq!(
+            decode_character_references("&#4294967296;", ReferenceContext::Text),
+            "\0"
+        );
         // The largest value that still fits, one past the largest supported code point,
         // and the plane boundary just below — all the same answer.
-        assert_eq!(decode_character_references("&#4294967295;", false), "\0");
-        assert_eq!(decode_character_references("&#1114112;", false), "\0");
+        assert_eq!(
+            decode_character_references("&#4294967295;", ReferenceContext::Text),
+            "\0"
+        );
+        assert_eq!(
+            decode_character_references("&#1114112;", ReferenceContext::Text),
+            "\0"
+        );
         // Every code point Unicode defines survives, in whichever plane — an assigned one
         // (0x30000 is CJK Extension G) and a private-use one alike. Only a surrogate half
         // and a value past the last code point take the NUL sentinel.
-        assert_eq!(decode_character_references("&#x2FFFF;", false), "\u{2FFFF}");
-        assert_eq!(decode_character_references("&#x30000;", false), "\u{30000}");
-        assert_eq!(decode_character_references("&#xF0000;", false), "\u{F0000}");
         assert_eq!(
-            decode_character_references("&#x10FFFF;", false),
+            decode_character_references("&#x2FFFF;", ReferenceContext::Text),
+            "\u{2FFFF}"
+        );
+        assert_eq!(
+            decode_character_references("&#x30000;", ReferenceContext::Text),
+            "\u{30000}"
+        );
+        assert_eq!(
+            decode_character_references("&#xF0000;", ReferenceContext::Text),
+            "\u{F0000}"
+        );
+        assert_eq!(
+            decode_character_references("&#x10FFFF;", ReferenceContext::Text),
             "\u{10FFFF}"
         );
-        assert_eq!(decode_character_references("&#x110000;", false), "\0");
+        assert_eq!(
+            decode_character_references("&#x110000;", ReferenceContext::Text),
+            "\0"
+        );
     }
 }

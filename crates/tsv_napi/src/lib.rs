@@ -503,7 +503,7 @@ impl IgnoreStack {
     /// directory).
     #[napi(js_name = "pop_tsv", catch_unwind)]
     pub fn pop_tsv(&mut self) {
-        self.inner.pop_tsv();
+        self.inner.pop_override();
     }
 
     /// Whether `path` (relative to the format root, `/`-separated) is ignored;
@@ -511,7 +511,8 @@ impl IgnoreStack {
     /// not one, whatever it points at, as git reads one.
     #[napi(js_name = "is_ignored", catch_unwind)]
     pub fn is_ignored(&self, path: String, is_dir: bool) -> bool {
-        self.inner.is_ignored(&path, is_dir)
+        self.inner
+            .is_ignored(&path, tsv_ignore::PathKind::from_is_dir(is_dir))
     }
 
     /// The discovery verdict for one child **directory**, delegating to

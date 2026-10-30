@@ -5,7 +5,7 @@ use argh::FromArgs;
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use tsv_discover::is_safety_net;
-use tsv_ignore::IgnoreStack;
+use tsv_ignore::{IgnoreStack, PathKind};
 
 /// Audit doc/fixture integrity: divergence cataloging, link resolution, README hygiene.
 ///
@@ -322,13 +322,13 @@ fn walk_markdown(
             format!("{dir_rel}/{name}")
         };
         if file_type.is_dir() {
-            if is_safety_net(&name) || stack.is_ignored_leaf(&child_rel, true) {
+            if is_safety_net(&name) || stack.is_ignored_leaf(&child_rel, PathKind::Directory) {
                 continue;
             }
             walk_markdown(&entry.path(), &child_rel, stack, out)?;
         } else if file_type.is_file()
             && name.ends_with(".md")
-            && !stack.is_ignored_leaf(&child_rel, false)
+            && !stack.is_ignored_leaf(&child_rel, PathKind::File)
         {
             out.push(PathBuf::from(&child_rel));
         }

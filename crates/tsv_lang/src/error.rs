@@ -333,19 +333,19 @@ pub struct ErrorReport {
     pub refused: bool,
 }
 
-/// A parse error — **8 bytes**, because the payload lives behind the `Box`.
-///
-/// The size is the point. A `Result<T, E>` is sized by `max(T, E)`, so an inline
-/// [`Repr`] (96 bytes) makes *every* fallible function whose success payload is
-/// smaller than that return 96 bytes through memory on its hot `Ok` path — and the parsers
-/// are full of `Result<(), _>`, `Result<bool, _>`, `Result<usize, _>`. Boxing the payload
-/// once, here, shrinks the `Result` at every one of those call sites in all three language
-/// crates without a single signature mentioning a `Box`.
-///
-/// The larger effect is on code size rather than the data path: the error half of each
-/// `Result` shrinks at every site, including the many whose `Result` size never changed
-/// because a fat AST node (`Statement`, `Expression`) already dominated it, so the hot
-/// parse loops pack into less instruction cache.
+// 8 bytes, because the payload lives behind the `Box`. The size is the point: a
+// `Result<T, E>` is sized by `max(T, E)`, so an inline `Repr` (96 bytes) makes every fallible
+// function whose success payload is smaller than that return 96 bytes through memory on its
+// hot `Ok` path — and the parsers are full of `Result<(), _>`, `Result<bool, _>`,
+// `Result<usize, _>`. Boxing the payload once, here, shrinks the `Result` at every one of
+// those call sites in all three language crates without a single signature mentioning a
+// `Box`. The larger effect is on code size rather than the data path: the error half of each
+// `Result` shrinks at every site, including the many whose `Result` size never changed
+// because a fat AST node (`Statement`, `Expression`) already dominated it, so the hot parse
+// loops pack into less instruction cache.
+/// A parse error: what went wrong ([`Error::kind`]), where ([`Error::span`], UTF-8 byte
+/// offsets), and the pointed report a binding renders ([`Error::report`]). One pointer
+/// wide, so a `Result` carrying it costs a successful call almost nothing.
 ///
 /// # Display
 ///

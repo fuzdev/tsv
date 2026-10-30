@@ -21,7 +21,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 use std::sync::atomic::{AtomicU32, Ordering};
-use tsv_ignore::IgnoreStack;
+use tsv_ignore::{IgnoreStack, PathKind};
 
 /// Whether a `git` binary is callable.
 fn git_available() -> bool {
@@ -161,7 +161,7 @@ fn assert_matches_git(tag: &str, layers: &[(&str, &str)], candidates: &[(&str, b
 
     let mut mismatches = Vec::new();
     for (path, is_dir) in candidates.iter().filter(|(p, _)| grades_here(p)) {
-        let ours = stack.is_ignored(path, *is_dir);
+        let ours = stack.is_ignored(path, PathKind::from_is_dir(*is_dir));
         let theirs = git_ignored(&repo, path);
         if ours != theirs {
             mismatches.push(format!("{path} (dir={is_dir}): ours={ours} git={theirs}"));

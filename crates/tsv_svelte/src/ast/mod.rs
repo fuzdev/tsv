@@ -1939,6 +1939,18 @@ pub enum TextDecoding {
     Raw,
 }
 
+impl TextDecoding {
+    /// The context a decoding text's references are read in — attribute rules for
+    /// [`TextDecoding::AttributeValue`], text-content rules otherwise ([`TextDecoding::Raw`]
+    /// never decodes, so its answer is never asked).
+    pub(crate) fn reference_context(self) -> tsv_html::ReferenceContext {
+        match self {
+            Self::AttributeValue => tsv_html::ReferenceContext::AttributeValue,
+            Self::Fragment | Self::Raw => tsv_html::ReferenceContext::Text,
+        }
+    }
+}
+
 impl Text {
     /// Construct a `Text`, precomputing the whitespace scalars from `raw_span`.
     /// `source` must be the host document `raw_span` was recorded against (the same
@@ -1987,10 +1999,7 @@ impl Text {
         if self.data_is_raw(raw) {
             return Cow::Borrowed(raw);
         }
-        Cow::Owned(decode_text_data(
-            raw,
-            self.decoding == TextDecoding::AttributeValue,
-        ))
+        Cow::Owned(decode_text_data(raw, self.decoding.reference_context()))
     }
 
     /// Whether [`Self::data`] is `raw` itself — `raw` being this node's own
@@ -2009,8 +2018,8 @@ impl Text {
 /// [`Text::data`]'s decode, for a raw that holds a `&`.
 #[cold]
 #[inline(never)]
-fn decode_text_data(raw: &str, is_attribute_value: bool) -> String {
-    tsv_html::decode_character_references(raw, is_attribute_value)
+fn decode_text_data(raw: &str, context: tsv_html::ReferenceContext) -> String {
+    tsv_html::decode_character_references(raw, context)
 }
 
 /// Svelte ExpressionTag - {expression} in template
@@ -2346,7 +2355,7 @@ mod tests {
                     TextDecoding::Raw => Cow::Borrowed(raw),
                     _ if raw.contains('&') => Cow::Owned(tsv_html::decode_character_references(
                         raw,
-                        decoding == TextDecoding::AttributeValue,
+                        decoding.reference_context(),
                     )),
                     _ => Cow::Borrowed(raw),
                 };

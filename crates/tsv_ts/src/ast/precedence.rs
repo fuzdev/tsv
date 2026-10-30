@@ -65,7 +65,7 @@ pub(crate) fn get_precedence(op: BinaryOperator) -> PrecedenceLevel {
 }
 
 /// Returns true if the operator is right-associative
-// TODO: test-only since `precedence` went `pub(crate)` — no printer path asks it.
+// TODO: no printer path asks it — delete it with its test, or give the binary printer a use.
 #[cfg(test)]
 fn is_right_associative(op: BinaryOperator) -> bool {
     matches!(op, BinaryOperator::StarStar)

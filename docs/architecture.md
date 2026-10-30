@@ -908,7 +908,7 @@ pub fn is_mathml_element(name: &str) -> bool;
 
 // Whitespace and entities
 pub fn preserves_whitespace(name: &str) -> bool;
-pub fn decode_character_references(html: &str, is_attribute_value: bool) -> String;
+pub fn decode_character_references(html: &str, context: ReferenceContext) -> String; // Text | AttributeValue
 ```
 
 Inline-ness is derived by negation in consumers (`!is_block_element(...)`) — no positive inline list is exported.

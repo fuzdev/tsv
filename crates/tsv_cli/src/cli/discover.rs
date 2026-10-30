@@ -7,7 +7,7 @@ use tsv_discover::{
     DirVerdict, classify_dir, prettierignore_outside_repo_warning, prettierignore_shadowed_warning,
     quote_path, should_format_file, unsupported_extension_error,
 };
-use tsv_ignore::IgnoreStack;
+use tsv_ignore::{IgnoreStack, PathKind};
 
 use crate::cli::out::path_text;
 
@@ -375,7 +375,7 @@ fn collect_root(root: &Path, symlink: bool, cwd: Option<&Path>, out: &mut Walk<'
     // child as usual.
     // the matcher's kind for the argument: a directory, unless it is a link to one
     let matcher_dir = !symlink;
-    if stack.is_ignored(&base_rel, matcher_dir) {
+    if stack.is_ignored(&base_rel, PathKind::from_is_dir(matcher_dir)) {
         if let Some(warning) = tsv_discover::excluded_argument_warning(
             &root.to_string_lossy(),
             &base_rel,
@@ -447,7 +447,7 @@ fn push_dir_layers(
     warnings: &mut Vec<String>,
 ) -> Option<PushedLayers> {
     let anchor = rel_to(&format_root.path, dir);
-    if stack.is_ignored(&anchor, true) {
+    if stack.is_ignored(&anchor, PathKind::Directory) {
         return None;
     }
     Some(push_layers(
@@ -558,7 +558,7 @@ struct PushedLayers {
 impl PushedLayers {
     fn pop_from(self, stack: &mut IgnoreStack) {
         if self.tsv {
-            stack.pop_tsv();
+            stack.pop_override();
         }
         if self.gitignore {
             stack.pop_gitignore();
@@ -643,7 +643,7 @@ fn collect_file(path: &str, cwd: Option<&Path>, scope: &mut FileScope, out: &mut
     let dir_abs = file_abs.parent().unwrap_or(&file_abs);
     scope.enter(dir_abs, &mut out.warnings);
     let rel = rel_to(&scope.format_root.path, &file_abs);
-    if !scope.stack.is_ignored(&rel, false) {
+    if !scope.stack.is_ignored(&rel, PathKind::File) {
         out.files.push(PathBuf::from(path));
         return false;
     }

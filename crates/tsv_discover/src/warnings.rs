@@ -6,11 +6,11 @@
 
 use crate::quote::{UNSPELLABLE_REASON, line_can_spell, quote_path, quote_path_owned};
 use std::fmt::Write as _;
-use tsv_ignore::{IgnoreSource, IgnoreStack, Negation, NegationTail};
+use tsv_ignore::{IgnoreSource, IgnoreStack, Negation, NegationTail, PathKind};
 
 /// The stderr warning for a pruned directory that a tsv-layer `!` rule was trying to
 /// re-include *into*, or `None` when no such rule is written
-/// ([`IgnoreStack::negation_under`], which is how [`classify_dir`](crate::classify_dir) reaches
+/// (`IgnoreStack::negation_under`, which is how [`classify_dir`](crate::classify_dir) reaches
 /// [`DirVerdict::PruneWithWarning`](crate::DirVerdict::PruneWithWarning)). The re-include is a silent no-op — git's
 /// parent-directory rule — whether the build-output heuristic pruned the directory or an
 /// ignore rule excluded it, and the text says which. The remedy is the lines that reach
@@ -60,7 +60,7 @@ pub fn shadow_warning(d: &str, loose_root: Option<&str>, stack: &IgnoreStack) ->
         )),
         None => None,
     };
-    let cause = match stack.exclusion(d, true) {
+    let cause = match stack.exclusion(d, PathKind::Directory) {
         Some(exclusion) => {
             let excluding_file = ignore_file_display(
                 &segments[..exclusion.anchor_depth],
@@ -74,7 +74,7 @@ pub fn shadow_warning(d: &str, loose_root: Option<&str>, stack: &IgnoreStack) ->
                 // added there, so it is the user's to narrow — and where a `.gitignore`
                 // rule stands behind it, narrowing alone leaves that one in force, so the
                 // lines that pass it go beside the narrowing: one warning, not one per rerun
-                let remedy = match stack.gitignore_exclusion(d, true) {
+                let remedy = match stack.gitignore_exclusion(d, PathKind::Directory) {
                     None => "narrow or negate that rule to format it".to_string(),
                     Some(git) => {
                         let git_file = ignore_file_display(
@@ -393,8 +393,8 @@ pub fn excluded_argument_warning(
     loose_root: Option<&str>,
     stack: &IgnoreStack,
 ) -> Option<String> {
-    let exclusion = stack.exclusion(rel, is_dir)?;
-    let tsv = stack.tsv_exclusion(rel, is_dir);
+    let exclusion = stack.exclusion(rel, PathKind::from_is_dir(is_dir))?;
+    let tsv = stack.override_exclusion(rel, PathKind::from_is_dir(is_dir));
     // a named file a tsv rule excludes is a deliberate opt-out, skipped quietly, whether
     // or not a `.gitignore` excludes it too — and whichever of the two sits shallower.
     // The directory arm below names both blockers where a `.gitignore` above the tsv
@@ -423,7 +423,7 @@ pub fn excluded_argument_warning(
     // re-includes what it excluded, or the shallowest exclusion would sit there (the
     // re-include idiom itself — `!/dist/`, `/dist/*` — names `dist/sub` this way)
     let gitignore = stack
-        .gitignore_exclusion(rel, is_dir)
+        .gitignore_exclusion(rel, PathKind::from_is_dir(is_dir))
         .filter(|git| git.depth >= named.depth);
     // a `.gitignore` is read only inside a repo, so a witness in one means the format
     // root is the repo root — what "the repo-root <file>" names, in the remedy below and
@@ -440,7 +440,7 @@ pub fn excluded_argument_warning(
     };
     let rule_file = ignore_file_display(&segments[..named.anchor_depth], named.source, loose_root);
     let root_file = stack
-        .tsv_layer_source("")
+        .override_layer_source("")
         .unwrap_or(IgnoreSource::Formatignore)
         .file_name();
     // what a `.gitignore` or a deeper tsv rule excludes, as a clause names it
@@ -636,7 +636,7 @@ mod tests {
     use super::*;
     use crate::test_support::{stack_from, tsv_stack};
     use crate::*;
-    use tsv_ignore::IgnoreStack;
+    use tsv_ignore::{IgnoreStack, PathKind};
 
     #[test]
     fn shadow_warning_text_is_stable() {
@@ -945,7 +945,7 @@ mod tests {
         stack.push_prettierignore("lib", "p.ts\n");
         for rel in ["skip.ts", "gen/a.ts", "lib/p.ts"] {
             // still out of scope — only the warning is withheld
-            assert!(stack.is_ignored(rel, false), "{rel}");
+            assert!(stack.is_ignored(rel, PathKind::File), "{rel}");
             assert_eq!(
                 excluded_argument_warning(rel, rel, false, None, &stack),
                 None,
@@ -1093,12 +1093,21 @@ mod tests {
             let mut fixed = IgnoreStack::new();
             fixed.push_gitignore("", GITIGNORE);
             fixed.push_formatignore("", &lines.join("\n"));
-            assert!(!fixed.is_ignored(rel, is_dir), "{rel}: {lines:?}");
+            assert!(
+                !fixed.is_ignored(rel, PathKind::from_is_dir(is_dir)),
+                "{rel}: {lines:?}"
+            );
             if is_dir {
-                assert!(!fixed.is_ignored(&format!("{rel}/z.ts"), false), "{rel}");
+                assert!(
+                    !fixed.is_ignored(&format!("{rel}/z.ts"), PathKind::File),
+                    "{rel}"
+                );
             }
             for other in still_excluded {
-                assert!(fixed.is_ignored(other, false), "{rel}: {other} {lines:?}");
+                assert!(
+                    fixed.is_ignored(other, PathKind::File),
+                    "{rel}: {other} {lines:?}"
+                );
             }
         }
     }
@@ -1170,7 +1179,10 @@ mod tests {
             (".cache/x/a.ts", false),
             ("build/a.ts", false),
         ] {
-            assert!(!empty.is_ignored(rel, is_dir), "{rel}");
+            assert!(
+                !empty.is_ignored(rel, PathKind::from_is_dir(is_dir)),
+                "{rel}"
+            );
             assert_eq!(
                 excluded_argument_warning(rel, rel, is_dir, None, &empty),
                 None,
@@ -1181,7 +1193,7 @@ mod tests {
         let mut stack = IgnoreStack::new();
         stack.push_gitignore("", "build/\n");
         stack.push_formatignore("", "!build/\n");
-        assert!(!stack.is_ignored("build/sub", true));
+        assert!(!stack.is_ignored("build/sub", PathKind::Directory));
         assert_eq!(
             excluded_argument_warning("build/sub", "build/sub", true, None, &stack),
             None
@@ -1289,7 +1301,7 @@ mod tests {
                 fixed.push_gitignore(a, content);
             }
             fixed.push_formatignore(anchor, &format!("{rule}{}\n", lines.join("\n")));
-            assert!(!fixed.is_ignored(file, false), "{file}: {lines:?}");
+            assert!(!fixed.is_ignored(file, PathKind::File), "{file}: {lines:?}");
             assert!(
                 should_format_file("keep.ts", file, &fixed),
                 "{file}: {lines:?}"
@@ -1330,9 +1342,12 @@ mod tests {
             let mut fixed = IgnoreStack::new();
             fixed.push_gitignore("", git);
             fixed.push_formatignore("", &format!("{tsv}{}\n", lines.join("\n")));
-            assert!(!fixed.is_ignored(rel, true), "{rel}: {lines:?}");
             assert!(
-                fixed.is_ignored("vendor/other", true) || rel == "same",
+                !fixed.is_ignored(rel, PathKind::Directory),
+                "{rel}: {lines:?}"
+            );
+            assert!(
+                fixed.is_ignored("vendor/other", PathKind::Directory) || rel == "same",
                 "{lines:?}"
             );
         }
@@ -1354,7 +1369,7 @@ mod tests {
         fixed.push_gitignore("", "pkg/vendor/lib/\n");
         fixed.push_formatignore("", &lines.join("\n"));
         fixed.push_formatignore("pkg", "");
-        assert!(!fixed.is_ignored("pkg/vendor/lib", true));
+        assert!(!fixed.is_ignored("pkg/vendor/lib", PathKind::Directory));
         // a tsv-only exclusion keeps the short remedy
         let stack = stack_from(&[], &[("", "vendor/\n")]);
         assert!(
@@ -1375,7 +1390,7 @@ mod tests {
             "dist/sub is excluded by a rule in the repo-root .formatignore, so nothing under it is formatted; narrow or negate that rule to format it"
         );
         let narrowed = stack_from(&[("", "dist/\n")], &[("", "!/dist/\n!/dist/keep.ts\n")]);
-        assert!(!narrowed.is_ignored("dist/sub", true));
+        assert!(!narrowed.is_ignored("dist/sub", PathKind::Directory));
     }
 
     #[test]
@@ -1409,10 +1424,16 @@ mod tests {
             fixed.push_gitignore("", "dist/\n");
             fixed.push_formatignore("", &format!("{rule}{}\n", lines.join("\n")));
             for path in in_scope {
-                assert!(!fixed.is_ignored(path, false), "{rule}: {path} {lines:?}");
+                assert!(
+                    !fixed.is_ignored(path, PathKind::File),
+                    "{rule}: {path} {lines:?}"
+                );
             }
             for path in out_of_scope {
-                assert!(fixed.is_ignored(path, false), "{rule}: {path} {lines:?}");
+                assert!(
+                    fixed.is_ignored(path, PathKind::File),
+                    "{rule}: {path} {lines:?}"
+                );
             }
         }
         let stack = stack_from(&[("", "dist/\n")], &[("", "!dist/**/keep.ts\n")]);
@@ -1447,11 +1468,11 @@ mod tests {
                 lines.join("\n")
             ),
         );
-        assert!(!fixed.is_ignored("dist/keep.ts", false));
-        assert!(!fixed.is_ignored("dist/sub/x.ts", false));
-        assert!(!fixed.is_ignored("dist/a.log", false));
-        assert!(fixed.is_ignored("dist/other.ts", false));
-        assert!(fixed.is_ignored("dist/sub/other.ts", false));
+        assert!(!fixed.is_ignored("dist/keep.ts", PathKind::File));
+        assert!(!fixed.is_ignored("dist/sub/x.ts", PathKind::File));
+        assert!(!fixed.is_ignored("dist/a.log", PathKind::File));
+        assert!(fixed.is_ignored("dist/other.ts", PathKind::File));
+        assert!(fixed.is_ignored("dist/sub/other.ts", PathKind::File));
         // across files: the root's `!pkg/dist/a.ts` is re-spelled for pkg/.formatignore,
         // the deepest file holding one, whose lines are read after the root's rule
         let stack = stack_from(
@@ -1468,9 +1489,9 @@ mod tests {
         fixed.push_gitignore("pkg", "dist/\n");
         fixed.push_formatignore("", "!pkg/dist/a.ts\n");
         fixed.push_formatignore("pkg", &format!("!dist/b.ts\n{}\n", lines.join("\n")));
-        assert!(!fixed.is_ignored("pkg/dist/a.ts", false));
-        assert!(!fixed.is_ignored("pkg/dist/b.ts", false));
-        assert!(fixed.is_ignored("pkg/dist/c.ts", false));
+        assert!(!fixed.is_ignored("pkg/dist/a.ts", PathKind::File));
+        assert!(!fixed.is_ignored("pkg/dist/b.ts", PathKind::File));
+        assert!(fixed.is_ignored("pkg/dist/c.ts", PathKind::File));
     }
 
     /// The property the transcript tests above are instances of: applying the offered
@@ -1589,14 +1610,14 @@ mod tests {
                 for (rule, targets, _) in &chosen {
                     for target in *targets {
                         assert!(
-                            !fixed.is_ignored(target, false),
+                            !fixed.is_ignored(target, PathKind::File),
                             "{rules:?}: {rule} names {target}, out of scope after {lines:?}"
                         );
                     }
                 }
                 for probe in &out {
                     assert!(
-                        fixed.is_ignored(probe, false),
+                        fixed.is_ignored(probe, PathKind::File),
                         "{rules:?}: {lines:?} admit {probe}, which no rule names"
                     );
                 }
@@ -1607,9 +1628,11 @@ mod tests {
                         && chosen.iter().all(|(_, targets, _)| {
                             targets
                                 .iter()
-                                .all(|target| !fixed.is_ignored(target, false))
+                                .all(|target| !fixed.is_ignored(target, PathKind::File))
                         })
-                        && out.iter().all(|probe| fixed.is_ignored(probe, false))
+                        && out
+                            .iter()
+                            .all(|probe| fixed.is_ignored(probe, PathKind::File))
                 };
                 for (i, line) in lines.iter().enumerate() {
                     if patterns.iter().any(|pattern| pattern == line) {
@@ -1675,8 +1698,8 @@ mod tests {
         fixed.push_gitignore("pkg", "dist/\n");
         fixed.push_formatignore("", &format!("!pkg/dist/keep.ts\n{}\n", lines.join("\n")));
         fixed.push_formatignore("pkg", "");
-        assert!(!fixed.is_ignored("pkg/dist/keep.ts", false));
-        assert!(fixed.is_ignored("pkg/dist/other.ts", false));
+        assert!(!fixed.is_ignored("pkg/dist/keep.ts", PathKind::File));
+        assert!(fixed.is_ignored("pkg/dist/other.ts", PathKind::File));
         // and where the pruned directory's own name holds a control character, no line
         // past the `.gitignore` rule can be offered either: the narrowing stands alone,
         // and the warning says why (the name quoted, as every printed path is)

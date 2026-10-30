@@ -143,11 +143,8 @@ impl WireCoordinates {
     ///
     /// One walk over the characters ahead of the position. The error path's answer, so a
     /// walk rather than a table: it runs once, on a source that failed to parse. The wire
-    /// writers answer the same question from the tables they build anyway
-    /// (`LocationTracker` + `ByteToCharMap`). `tests/error_coordinates.rs` grades this
-    /// walk against an independent count of its own, and against the `loc` those tables
-    /// put on the wire at every node position of a set of sources holding each feature
-    /// the coordinates turn on.
+    /// writers answer the same question from their own tables; a test grades this walk
+    /// against them.
     #[must_use]
     pub fn point(self, source: &str, position: usize) -> WirePoint {
         let mut position = position.min(source.len());

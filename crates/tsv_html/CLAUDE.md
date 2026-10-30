@@ -28,7 +28,7 @@ not here. This crate stays AST-agnostic.
   Inline-ness is derived by negation in the
   consumer (matches prettier-plugin-svelte: `isInline = !isBlock`); no
   positive list is exported.
-- **Custom-element name chars** (`elements.rs`): `is_pcen_char` — the one
+- **Custom-element name chars** (`elements.rs`): `is_custom_element_name_char` — the one
   `char`-level predicate (the rest of the API is `&str`), a `PCENChar` per
   the HTML "valid custom element name" grammar. Shared by `tsv_svelte`'s
   tokenizer (keep a whole custom-element name in one token) and its name
@@ -46,7 +46,7 @@ not here. This crate stays AST-agnostic.
   table (`<li>`, `<p>`, table parts, …), split so a parser settles whether an
   element has a row once and asks the trigger per child. Having a row at all
   is the `next` = end-of-parent answer.
-- **Entity decoding** (`entities.rs`): `decode_character_references` —
+- **Entity decoding** (`entities.rs`): `decode_character_references(html, ReferenceContext)` —
   named, decimal, and hex (lower- and uppercase) character references
   with HTML5 attribute-context rules and Windows-1252 / surrogate
   normalization. Svelte's decoder is the AST-parity target, so its

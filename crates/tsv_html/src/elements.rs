@@ -269,7 +269,7 @@ pub fn is_foreign_element(tag_name: &str) -> bool {
 /// validator (the hyphen-tail run) — a single source of truth for the ranges.
 ///
 /// [spec]: https://html.spec.whatwg.org/multipage/custom-elements.html#valid-custom-element-name
-pub fn is_pcen_char(c: char) -> bool {
+pub fn is_custom_element_name_char(c: char) -> bool {
     c.is_ascii_alphanumeric()
         || matches!(c, '-' | '.' | '_' | '\u{00B7}')
         || matches!(c,

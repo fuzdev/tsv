@@ -173,7 +173,7 @@ fn is_namespaced_name(name: &str) -> bool {
 
 /// `REGEX_VALID_TAG_NAME` (`utils.js`): `/^[a-zA-Z][a-zA-Z0-9]*(-[…PCENChar…]*)?$/u` — an
 /// ASCII-alpha start, ASCII alphanumerics, then optionally a hyphen introducing a run of
-/// [`PCENChar`](tsv_html::is_pcen_char) (custom-element names such as `<my-café>`). The Unicode
+/// [`PCENChar`](tsv_html::is_custom_element_name_char) (custom-element names such as `<my-café>`). The Unicode
 /// ranges are literal, so no general-category lookup is needed.
 ///
 /// The head is read on bytes: its whole class is ASCII, so a byte that is not an ASCII
@@ -198,12 +198,12 @@ fn is_valid_element_local_name(name: &str) -> bool {
     }
 }
 
-/// Whether every character of `tail` is a [`PCENChar`](tsv_html::is_pcen_char) — the run a
+/// Whether every character of `tail` is a [`PCENChar`](tsv_html::is_custom_element_name_char) — the run a
 /// custom-element name carries after its first hyphen (an empty one is valid).
 #[cold]
 #[inline(never)]
 fn is_pcen_run(tail: &str) -> bool {
-    tail.chars().all(tsv_html::is_pcen_char)
+    tail.chars().all(tsv_html::is_custom_element_name_char)
 }
 
 /// Result type for parsing elements - either a regular element or a special element.
@@ -1257,7 +1257,7 @@ mod tests {
         let mut after_hyphen = false;
         for c in chars {
             if after_hyphen {
-                if !tsv_html::is_pcen_char(c) {
+                if !tsv_html::is_custom_element_name_char(c) {
                     return false;
                 }
             } else if c.is_ascii_alphanumeric() {

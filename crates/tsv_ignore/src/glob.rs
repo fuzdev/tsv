@@ -493,7 +493,7 @@ mod tests {
         stack.push_gitignore("", &rule);
         let depth = 24;
         let path = format!("{}/x.ts", vec!["a"; depth].join("/"));
-        let (ignored, work) = count_matches(|| stack.is_ignored(&path, false));
+        let (ignored, work) = count_matches(|| stack.is_ignored(&path, crate::PathKind::File));
         assert!(!ignored);
         // per ancestor prefix of `k` segments, at most one match per rule segment per
         // path segment

@@ -9,7 +9,7 @@
 use crate::quote::quote_path;
 use crate::warnings::shadow_warning;
 use std::path::Path;
-use tsv_ignore::IgnoreStack;
+use tsv_ignore::{IgnoreStack, PathKind};
 
 /// Directory names skipped during discovery in **every** mode — VCS metadata and
 /// `node_modules`. Catastrophic or pointless to recurse, and not reliably listed
@@ -59,6 +59,8 @@ impl DirVerdict {
     /// The verdict's string tag — `"descend"`, `"prune"` or `"prune_warn"` — the one
     /// spelling the WASM and N-API `IgnoreStack.classify_dir` both return, so the JS CLI
     /// (`npm/cli.js`) reads either package's engine with one set of string compares.
+    /// Binding plumbing, hidden: a Rust caller matches the enum.
+    #[doc(hidden)]
     pub const fn as_tag(&self) -> &'static str {
         match self {
             DirVerdict::Descend => "descend",
@@ -145,7 +147,7 @@ pub fn unsupported_extension_error(path: &str) -> Option<String> {
 /// with the TypeScript grammar, so a JavaScript file is refused rather than read as
 /// TypeScript: there, `f(a < b, c > (d))` is a generic call whose type arguments the
 /// strip would blank, where JavaScript reads two comparisons.
-pub const STRIPPABLE_EXTENSIONS: [&str; 3] = ["ts", "mts", "cts"];
+pub(crate) const STRIPPABLE_EXTENSIONS: [&str; 3] = ["ts", "mts", "cts"];
 
 /// The JavaScript extensions, which `tsv strip` refuses with a message of their own.
 const JAVASCRIPT_EXTENSIONS: [&str; 3] = ["js", "mjs", "cjs"];
@@ -263,7 +265,7 @@ fn classify_dir_inner(
     // guess (an explicit directive beats it).
     if heuristic_active
         && (name.starts_with('.') || HEURISTIC_DIRS.contains(&name))
-        && !stack.is_reincluded(child_rel, true)
+        && !stack.is_reincluded(child_rel, PathKind::Directory)
     {
         // a tsv-layer `!child_rel/<file>` re-include is a silent no-op under this
         // prune (git's parent-dir rule); the warning points at the dir-level
@@ -281,7 +283,7 @@ fn classify_dir_inner(
     // initial root with a full `is_ignored`. That drops the O(depth) ancestor
     // re-walk that dominated discovery (~70% of `--list` on a deep tree); see
     // `IgnoreStack::is_ignored_leaf`'s contract.
-    if stack.is_ignored_leaf(child_rel, true) {
+    if stack.is_ignored_leaf(child_rel, PathKind::Directory) {
         // a tsv-layer `!child_rel/<file>` is as inert under this prune as under the
         // heuristic's; the warning names the rule as the cause
         return if stack.negation_under(child_rel).is_some() {
@@ -312,7 +314,7 @@ fn classify_dir_inner(
 /// level once a `.gitignore` anchored *above* it is present — and returns `true`
 /// at the first ancestor [`classify_dir`] would not `Descend` into. It does the
 /// **directory** half of discovery only; pair it with
-/// [`is_ignored(rel, false)`](tsv_ignore::IgnoreStack::is_ignored) for the
+/// [`is_ignored(rel, PathKind::File)`](tsv_ignore::IgnoreStack::is_ignored) for the
 /// file-level match (a file no directory prunes may still be ignored by a rule).
 ///
 /// Equivalent to running [`classify_dir`] down a real single-path walk — it calls
@@ -409,7 +411,7 @@ pub fn should_format_file(name: &str, child_rel: &str, stack: &IgnoreStack) -> b
         child_rel.rsplit('/').next() == Some(name),
         "should_format_file: {name:?} is not the last segment of child_rel {child_rel:?}",
     );
-    is_formattable(name) && !stack.is_ignored_leaf(child_rel, false)
+    is_formattable(name) && !stack.is_ignored_leaf(child_rel, PathKind::File)
 }
 
 #[cfg(test)]

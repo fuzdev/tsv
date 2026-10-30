@@ -79,7 +79,7 @@ crates (the open-convention stance):
   the same line ("No parser could be inferred"). The message's extension list
   renders from `FORMATTABLE_EXTENSIONS`, so a new language flows through; the text
   is produced once here, like `shadow_warning`.
-- `STRIPPABLE_EXTENSIONS` / `strip_unsupported_extension_error(path) -> Option<String>` — the
+- `strip_unsupported_extension_error(path) -> Option<String>` (over the crate-private `STRIPPABLE_EXTENSIONS`) — the
   extensions `tsv strip` takes (the TypeScript extensions alone; a `.svelte.ts` and a `.d.ts`
   are `.ts`) and the argument error for a file named to it outside them (read without regard
   to ASCII case, as `is_formattable` reads one) — a JavaScript file's saying why, since it
@@ -145,7 +145,7 @@ crates (the open-convention stance):
   matcher's per-level query ignores layers anchored below the queried directory (a
   deeper layer fails to `relativize`), as does the `negation_under` query picking
   `Prune` vs `PruneWithWarning`, which reads only layers anchored above the directory.
-  Pair with `IgnoreStack::is_ignored(rel, false)` for the file-level match.
+  Pair with `IgnoreStack::is_ignored(rel, PathKind::File)` for the file-level match.
   `classify_dir` stays the primitive for real traversers, which thread
   `heuristic_active` naturally as they descend. The CLIs never ask it of a path an
   argument named: see `excluded_argument_warning`.
@@ -179,7 +179,7 @@ crates (the open-convention stance):
 
   Every other exclusion warns, naming the file the rule sits in
   (`IgnoreStack::exclusion`'s `IgnoreSource` and `anchor_depth`). A tsv rule that
-  bounds the path is the one named (`IgnoreStack::tsv_exclusion`, preferred over the
+  bounds the path is the one named (`IgnoreStack::override_exclusion`, preferred over the
   whole stack's witness), since re-including past a `.gitignore` would leave it standing
   — and, added to the same file, override it; a tsv rule excluding a directory is the
   user's to narrow. When a `.gitignore` excludes an ancestor *above* the directory the
@@ -193,7 +193,7 @@ crates (the open-convention stance):
   A path only a `.gitignore` excludes gets the anchored lines that re-include it and nothing beside it (`!/build/`, `/build/*`, `!/build/a.ts`), every
   path spelled literally (`pattern_path` escapes `*`, `?`, `[`, `]`, `\` and trailing
   spaces, so a `[slug]` directory is no character class), for the file the repo root
-  reads (`IgnoreStack::tsv_layer_source` — its `.prettierignore` where it has no
+  reads (`IgnoreStack::override_layer_source` — its `.prettierignore` where it has no
   `.formatignore`, since creating one would shadow it). A path holding a control
   character other than a tab — a line feed, which splits any line; a file name ending in
   `\r`, which a line's end strips; any other, which an ignore file could hold only raw and

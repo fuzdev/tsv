@@ -139,6 +139,9 @@ pub struct Stripped<'s> {
     // parallel module loader. Reserved as shape; it lands with a consumer.
 }
 
+// A new variant compiles silently at every in-workspace match, which `#[non_exhaustive]`
+// forces to carry a `_` arm: give it an arm of its own in tsv_wasm's and tsv_napi's
+// `strip_typescript` and in tsv_debug's `strip` command and strip-fixture grader.
 /// Why [`strip`] produced no output.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
