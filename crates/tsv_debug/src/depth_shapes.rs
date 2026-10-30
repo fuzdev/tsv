@@ -1059,8 +1059,8 @@ fn construct_shapes() -> Vec<Shape> {
         ts_flat("ts_tagged_flat", 14, "x = a", "``", ";\n"),
         ts_flat("ts_new_callee_flat", SUBSCRIPT, "x = new a", ".b", "();\n"),
         ts_flat("ts_decorator_flat", SUBSCRIPT, "@a", ".b", "\nclass A {}\n"),
-        ts_flat("ts_type_array_flat", 6, "type T = A", "[]", ";\n"),
-        ts_flat("ts_type_indexed_flat", 6, "type T = A", "[K]", ";\n"),
+        ts_flat("ts_type_array_flat", 5, "type T = A", "[]", ";\n"),
+        ts_flat("ts_type_indexed_flat", 5, "type T = A", "[K]", ";\n"),
         ts_flat("ts_qualified_flat", 1, "type T = A", ".B", ";\n"),
         ts_flat("ts_import_equals_flat", 1, "import x = A", ".B", ";\n"),
         // the operator chains the binary-chain printer does not flatten, each link of which

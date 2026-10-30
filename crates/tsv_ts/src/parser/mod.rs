@@ -326,16 +326,19 @@ impl ListFrame {
 // linearizer and the type strip, each of which recurses through only its first few links — and, for
 // the dearer ones, the stack their walks spend per link over an operator's, rounded up over every
 // build the contract covers: the native optimized and debug builds, and the WASM engine's two
-// stacks (its shadow stack in linear memory, and the host engine's own, cold and tiered up). A type
-// suffix's and a non-null's are set by a debug build's frames. The re-entering links' is set by the
-// WASM shadow stack once V8 has tiered the walks up: the smallest weight at which every leg of the
-// gates holds its nine-tenths margin is that stack's (the native builds hold at a lower one), and
-// the weight keeps about a quarter over it, so a printer change that grows a re-entering walk's
-// frame fails the gate before it eats the contract's own margin. Whether a link re-enters is the
-// printer's answer (`printer::binary_left_operand_reenters`, `printer::call_may_print_whole`); the
-// units themselves are graded over every pair of link kinds, a sample of triples and the links with
-// comments in their gaps, natively by `tests/depth_limit.rs` and in the WASM engine by
-// `scripts/depth_wasm.ts`.
+// stacks (its shadow stack in linear memory, and the host engine's own, cold and tiered up). The
+// re-entering links', an assertion's and a type suffix's weights keep about a quarter over the
+// smallest at which every leg of the gates holds its nine-tenths margin, so a printer change that
+// grows one of those walks fails the gate before it eats the contract's own margin, and the WASM
+// engine sets them: the re-entering links' by its shadow stack once V8 has tiered the walks up, an
+// assertion's by that shadow stack in either tier, and a type suffix's by the engine's own stack
+// once tiered up (the native builds hold at lower ones). A non-null's is the smallest a debug
+// build's frames hold, which price it above a subscript's (a run of `!` with a comment in each gap
+// nests a doc level per link).
+// Whether a link re-enters is the printer's answer (`printer::binary_left_operand_reenters`,
+// `printer::call_may_print_whole`); the units themselves are graded over every pair of link kinds,
+// a sample of triples and the links with comments in their gaps, natively by
+// `tests/depth_limit.rs` and in the WASM engine by `scripts/depth_wasm.ts`.
 
 /// The spine units of a binary or logical operator, a postfix `++` / `--`, or a qualified
 /// name's `.`.
@@ -363,7 +366,7 @@ pub(super) const LINK_TAG: u32 = 14;
 /// The spine units of an `as` / `satisfies` link.
 pub(super) const LINK_ASSERTION: u32 = 8;
 /// The spine units of a type's `[]` / `[K]` suffix link.
-pub(super) const LINK_TYPE_SUFFIX: u32 = 6;
+pub(super) const LINK_TYPE_SUFFIX: u32 = 5;
 
 /// The parser state [`Parser::rewind`] restores after one of the grammar's
 /// speculative parses ([`Parser::parse_arrow_or_rewind`],

@@ -351,7 +351,7 @@ counter bounds both shapes a walk recurses through:
   first few links — but every other walk recurses down the spine, so a flat chain needs a
   bound of its own; a nesting count never sees one. A link counts the units its walks
   spend stack for: one for an operator, a qualified name's `.`, a member access, a call or
-  an instantiation; two for a non-null assertion; eight for an assertion; six for a
+  an instantiation; two for a non-null assertion; eight for an assertion; five for a
   type's `[]` or `[K]`, a conditional type's check type or a tuple element's `?`;
   fourteen for a tagged template; and ten for a conditional's test, a sequence's first
   expression, and a link whose walk **re-enters the expression printer**
@@ -367,11 +367,14 @@ counter bounds both shapes a walk recurses through:
   template — and that call itself. The fixed units are set by the build that spends the
   most on the link, over every build the contract covers, and graded by the gate below,
   which generates every pair of link kinds and a seeded sample of triples, rather than
-  trusting a list. The re-entry weight is the WASM engine's: its shadow stack, once V8 has
-  tiered the walks up, needs the most, and the weight keeps about a quarter over the
-  smallest one at which every leg holds its margin. A run of `!`, each with a block comment
-  in its gap (`a!/*c*/!/*c*/`), is printed iteratively, so its links stay plain non-null
-  assertions. Its doc nests a level per link, though, so the doc walks pay for it: the
+  trusting a list. The re-entry, assertion and type-suffix weights keep about a quarter over
+  the smallest one at which every leg holds its margin, and the WASM engine sets them: the
+  re-entry weight by its shadow stack once V8 has tiered the walks up, an assertion's by
+  that shadow stack in either tier, a type suffix's by the engine's own stack once tiered
+  up. A non-null assertion's is the smallest a debug build holds, above a subscript's: a
+  run of `!`, each with a block comment in its gap (`a!/*c*/!/*c*/`), is printed
+  iteratively, so its links stay plain non-null assertions, but its doc nests a level per
+  link, so the doc walks pay for it: the
   renderer and its fits walk run on explicit stacks, the flattening walk (`remove_lines` /
   `atomize`, which the template printer runs over an interpolation) recurses a few dozen
   doc levels and walks the rest on one too, and the build-time layout walk behind
