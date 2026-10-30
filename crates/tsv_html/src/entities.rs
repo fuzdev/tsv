@@ -11,7 +11,10 @@
 //!
 //! - Source: <https://html.spec.whatwg.org/entities.json>, one entry per name holding
 //!   the characters it stands for
-//! - Generated at compile time from `src/entities.json` by `build.rs`
+//! - Generated from `src/entities.json` into the committed `src/entities_table.rs` (a
+//!   perfect hash table, see `entity`) by `deno task entities:update`; the generator runs
+//!   as the `entities_table_is_fresh` test, which fails when the two disagree. The
+//!   crate's `NOTICE` attributes the list and states its license
 //! - 93 of the 2,231 names stand for **two** code points — a combining mark, a variation
 //!   selector, or a second character — which is why a lookup answers a `&str`
 //!
@@ -47,7 +50,7 @@
 //! - <https://html.spec.whatwg.org/entities.json>
 //! - Svelte implementation: packages/svelte/src/compiler/phases/1-parse/utils/html.js
 
-use phf::phf_map;
+use crate::entities_table::{ENTITIES, ENTITY_DISPLACEMENTS, ENTITY_SEED, LONGEST_ENTITY_NAME};
 
 // Windows-1252 code point replacements for the range 128-159
 // Source: http://en.wikipedia.org/wiki/Character_encodings_in_HTML#Illegal_characters
@@ -57,10 +60,63 @@ const WINDOWS_1252: [u32; 32] = [
     8216, 8217, 8220, 8221, 8226, 8211, 8212, 732, 8482, 353, 8250, 339, 157, 382, 376,
 ];
 
-// Entity data sourced from: https://html.spec.whatwg.org/entities.json
-// Stored in: crates/tsv_html/src/entities.json
-// Generated at compile time by build.rs
-include!(concat!(env!("OUT_DIR"), "/entities_map.rs"));
+/// The characters the named reference `name` stands for (`name` without its `&`, with its
+/// semicolon if it has one), or `None` when no reference has that name.
+///
+/// [`ENTITIES`] is a perfect hash table, in the hash-and-displace shape (CHD) `phf` builds:
+/// the hash picks a bucket, the bucket's displacement pair picks the one slot a name of that
+/// hash can occupy, and the slot's name is compared with `name`. One hash and one compare,
+/// whether or not `name` is a reference — the prefix search below asks for up to
+/// [`LONGEST_ENTITY_NAME`] names that mostly are not. The generator
+/// (`entities_table_is_fresh`) searches the seed and the displacements, through this same
+/// [`entity_hash`] and [`entity_slot`].
+fn entity(name: &str) -> Option<&'static str> {
+    let (name_slot, characters) = *ENTITIES.get(entity_slot(entity_hash(name.as_bytes())))?;
+    (name_slot == name).then_some(characters)
+}
+
+/// The slot of [`ENTITIES`] a name with hash `hash` can occupy: phf's `get_index` over the
+/// three fields [`entity_hash`] packs, a bucket and the two displacement coefficients.
+pub(crate) fn entity_slot(hash: u64) -> usize {
+    let (bucket, f1, f2) = entity_hash_parts(hash);
+    let Some(&(d1, d2)) = ENTITY_DISPLACEMENTS.get(bucket as usize % ENTITY_DISPLACEMENTS.len())
+    else {
+        // unreachable: the index is reduced modulo the length
+        return usize::MAX;
+    };
+    (d2.wrapping_add(f1.wrapping_mul(d1)).wrapping_add(f2) as usize) % ENTITIES.len()
+}
+
+/// The three fields of a name's hash: its bucket, then the two coefficients its bucket's
+/// displacement pair is applied with.
+pub(crate) const fn entity_hash_parts(hash: u64) -> (u32, u32, u32) {
+    (
+        (hash >> 43) as u32,
+        ((hash >> 22) & 0x1F_FFFF) as u32,
+        (hash & 0x3F_FFFF) as u32,
+    )
+}
+
+/// The table's hash of a name: FNV-1a over its bytes from the generator's seed
+/// ([`ENTITY_SEED`]), then splitmix64's finalizer, since FNV's last byte reaches only the
+/// low bits and [`entity_hash_parts`] reads the high ones too.
+pub(crate) fn entity_hash(name: &[u8]) -> u64 {
+    entity_hash_seeded(name, ENTITY_SEED)
+}
+
+/// [`entity_hash`] from an explicit seed, which the generator varies.
+pub(crate) fn entity_hash_seeded(name: &[u8], seed: u64) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325 ^ seed;
+    for &byte in name {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash ^= hash >> 30;
+    hash = hash.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    hash ^= hash >> 27;
+    hash = hash.wrapping_mul(0x94d0_49bb_1331_11eb);
+    hash ^ (hash >> 31)
+}
 
 /// Decode HTML character references in a string.
 ///
@@ -207,7 +263,7 @@ fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, &
     if rest[run_len..].starts_with(';') {
         let consumed = run_len + 1;
         for name in [&rest[..consumed], run] {
-            if let Some(&characters) = ENTITIES.get(name) {
+            if let Some(characters) = entity(name) {
                 return Some((consumed, characters));
             }
         }
@@ -216,15 +272,10 @@ fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, &
     // Otherwise (and for a semicolon that closed no reference — `&notit;` is `&not` + `it;`)
     // the longest prefix of the run that names one wins. No name is longer than
     // `LONGEST_ENTITY_NAME`, so the search starts there rather than at the run's end: from the
-    // end it hashed every prefix of the run, quadratic in a long alphanumeric run.
-    let (longest_len, characters) =
-        (1..=run_len.min(LONGEST_ENTITY_NAME))
-            .rev()
-            .find_map(|len| {
-                ENTITIES
-                    .get(&run[..len])
-                    .map(|&characters| (len, characters))
-            })?;
+    // end it looked up every prefix of the run, quadratic in a long alphanumeric run.
+    let (longest_len, characters) = (1..=run_len.min(LONGEST_ENTITY_NAME))
+        .rev()
+        .find_map(|len| entity(&run[..len]).map(|characters| (len, characters)))?;
 
     // Check if we should decode in attribute context: don't decode if followed by '=' or an
     // ASCII alphanumeric — the spec's named-character-reference state, verbatim. The class is
@@ -306,7 +357,7 @@ mod tests {
     #[test]
     fn test_entity_table_shape() {
         let mut two_character = 0;
-        for (name, characters) in &ENTITIES {
+        for &(name, characters) in &ENTITIES {
             let bare = name.strip_suffix(';').unwrap_or(name);
             assert!(
                 !bare.is_empty() && bare.bytes().all(|b| b.is_ascii_alphanumeric()),
@@ -322,12 +373,24 @@ mod tests {
         assert_eq!(two_character, 93);
     }
 
+    /// [`entity`] finds every name in the table, each in its own slot, and nothing else.
+    #[test]
+    fn test_entity_table_lookup() {
+        for (slot, &(name, characters)) in ENTITIES.iter().enumerate() {
+            assert_eq!(entity_slot(entity_hash(name.as_bytes())), slot, "{name:?}");
+            assert_eq!(entity(name), Some(characters), "{name:?}");
+        }
+        for absent in ["", "amp;;", "AMp;", "nbsp;x", "notin", "&amp;", "\u{e9}"] {
+            assert_eq!(entity(absent), None, "{absent:?}");
+        }
+    }
+
     /// `LONGEST_ENTITY_NAME` bounds the name search, so it must be the table's longest key:
     /// shorter and a long name stops decoding.
     #[test]
     fn test_longest_entity_name() {
         assert_eq!(
-            ENTITIES.keys().map(|name| name.len()).max(),
+            ENTITIES.iter().map(|(name, _)| name.len()).max(),
             Some(LONGEST_ENTITY_NAME)
         );
         assert_eq!(

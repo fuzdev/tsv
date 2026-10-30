@@ -6,6 +6,9 @@
 
 mod elements;
 mod entities;
+#[cfg(test)]
+mod entities_gen;
+mod entities_table;
 mod whitespace;
 
 // Re-export public API

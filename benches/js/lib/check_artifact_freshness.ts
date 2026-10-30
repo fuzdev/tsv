@@ -121,9 +121,8 @@ const _mtime_cache = new Map<string, SourceMtime>();
 /**
  * Newest mtime across every file under `src/`, the crate's `build.rs`, and its
  * `Cargo.toml`, for the given crates. Memoized per crate set. Every file under `src/`,
- * not `*.rs` alone: a build script's inputs sit there too (`tsv_html`'s
- * `src/entities.json`, which `build.rs` compiles into the entity table), and a walk
- * that saw only Rust let a codegen change stale nothing on any artifact.
+ * not `*.rs` alone: a build script's or an `include_*!`'s inputs can sit there too, and
+ * a walk that saw only Rust let a codegen change stale nothing on any artifact.
  */
 export async function newest_source_mtime(crates: readonly string[]): Promise<SourceMtime> {
 	const key = crates.join(',');

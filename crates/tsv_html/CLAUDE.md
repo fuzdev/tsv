@@ -9,8 +9,8 @@ formatter. See the root
 
 ## Architecture Position
 
-Zero dependencies on other `tsv_*` crates (only `phf` at runtime;
-`serde_json` at build time — see `Cargo.toml`).
+Zero dependencies: no `tsv_*` crate, no external crate, no build script (`serde_json`
+is a dev-dependency, for the entity-table generator alone).
 Current consumers: `tsv_svelte` (its tokenizer, its parser — the element's `TagFacts` and
 implicit tag closing — and its printer), `tsv_svelte_compile`, and `tsv_debug`'s whitespace-aware audits (render normalization, authoring, blank, razor).
 
@@ -56,14 +56,24 @@ not here. This crate stays AST-agnostic.
 
 ## Distinctives
 
-- **Compile-time entity table**: `build.rs` reads `src/entities.json`
-  (the WHATWG HTML
+- **Committed entity table**: `src/entities_table.rs` is generated from
+  `src/entities.json` (the WHATWG HTML
   [named character references list](https://html.spec.whatwg.org/entities.json),
-  name → the characters it stands for) and emits a `phf::Map` at
-  `$OUT_DIR/entities_map.rs`, `include!`d by `entities.rs` — zero runtime
-  init cost. The value is a `&'static str` because some names stand for two
-  code points — Svelte's own table keeps only the first, which is one of the
-  decoder's cataloged corrections.
+  name → the characters it stands for) by `deno task entities:update`. The
+  generator is the `entities_table_is_fresh` unit test (`src/entities_gen.rs`),
+  which fails when the committed file is stale, so `deno task test` gates it. The
+  table is a perfect hash in `phf`'s CHD shape — a seed, a displacement pair per
+  bucket, one name per slot — built with the decoder's own hash (`entity_hash` /
+  `entity_slot` in `entities.rs`): one hash and one compare per lookup, hit or
+  miss, which the decoder's longest-prefix search needs since most of the names
+  it asks for are not references. No build script, no code generator or JSON
+  parser in a consumer's build, and no `phf` itself, whose map type changes shape
+  under its `ptrhash` feature (a consumer could turn it on; a committed `phf::Map`
+  literal would then stop compiling). The value is a `&'static str` because some
+  names stand for two code points — Svelte's own table keeps only the first,
+  which is one of the decoder's cataloged corrections. The list is WHATWG's
+  under CC BY 4.0 (BSD 3-Clause where incorporated into source code); `NOTICE`
+  carries the attribution and both licenses, and ships in the crate.
 - **Pure `&str` API**: classification predicates take tag names, not
   AST nodes or a parser's name representation, so the crate stays
   independent of any particular parser.

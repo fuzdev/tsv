@@ -53,6 +53,7 @@
 		"fixtures:init": "cargo run -p tsv_debug --quiet fixture_init",
 		"fixtures:list": "cargo run -p tsv_debug --quiet fixtures_update_parsed --list",
 		"fixtures:validate": "cargo run -p tsv_debug --quiet fixtures_validate",
+		"entities:update": "TSV_ENTITIES_UPDATE=1 cargo test -p tsv_html --lib entities_table_is_fresh",
 		"fixtures:update": "cargo run -p tsv_debug --quiet fixtures_update",
 		"fixtures:update:parsed": "cargo run -p tsv_debug --quiet fixtures_update_parsed",
 		"fixtures:update:formatted": "cargo run -p tsv_debug --quiet fixtures_update_formatted",

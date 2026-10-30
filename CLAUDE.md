@@ -157,6 +157,8 @@ deno task test:depth:wasm # the full sweep's shapes at the same depths through t
 #                          job (deno.json `//test:depth:wasm`)
 deno task test:audits    # cargo test -p tsv_lang --features audits — the `swallow_check` + `comment_check` seams' own tests; in `check`
 deno task lint           # cargo clippy
+deno task entities:update # regenerate tsv_html's committed entity table from its entities.json (the generator is
+#                          a unit test that fails on a stale table, so `deno task test` gates it)
 cargo fmt                # Rust
 tsv format .             # the repo's own TS/JS — tsv formats itself (`--check` in the gate)
 
@@ -879,7 +881,6 @@ The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh
 
 - `serde_json` — wire-JSON emission (exact `f64` formatting; the oracle the hand string escaper is tested against), reached through `tsv_lang`'s `json` feature (and directly by `tsv_ffi`, which serializes its `{"error": …}` payload with it); no shipped crate deserializes. The one reader, `tsv_debug::json` (fixture gate, audits, tests), enables `unbounded_depth` — the default 128-level recursion limit refused wires the parser emits fine. `serde` itself is a dev-tooling dep (`tsv_debug`'s `derive`); the language crates see it only transitively
 - `smallvec` — stack-allocated vectors (printers + `tsv_check`)
-- `phf` — compile-time perfect hash maps (`tsv_html`'s entity table)
 - `unicode-ident` / `unicode-segmentation` / `unicode-width` — XID identifiers, grapheme clustering, display width (CJK, zero-width)
 - `bumpalo` — bump arena for the internal AST (and, via `tsv_arena`, the bindings' per-thread `reset()` reuse; `tsv_check`'s caller-owned arenas follow the same contract)
 - `talc` — WASM global allocator (`tsv_wasm`, wasm32-only target dep): pure-Rust `no_std`, replacing dlmalloc; the `WasmGrowAndExtend` source keeps the warm instance's linear-memory high-water at dlmalloc parity. Pulls `lock_api` + `allocator-api2` (+ `scopeguard`) into the wasm32 graph only

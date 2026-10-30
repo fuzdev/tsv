@@ -72,7 +72,6 @@ bumpalo = { version = "3.20.3", features = ["collections"] }
 # Async runtime + combinators — dev/debug tooling only (tsv_debug, integration tests)
 tokio = { version = "1" }
 futures-util = "0.3"
-phf = { version = "0.14", features = ["macros"] }
 serde = { version = "1", features = ["derive"] }
 # preserve_order: keep object key order (wire field-order conformance).
 # float_roundtrip: exact shortest f64 parsing.
