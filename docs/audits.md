@@ -76,7 +76,7 @@ Chunking is by stride because fixture sizes cluster by directory and per-file wo
 quadratic in file size.
 
 **What the fixture-tree audits format each seed AS.** Every audit that drives
-`tsv_cli::cli::format_source` names no source type, so a TypeScript seed is parsed as a
+`tsv_debug`'s `format_source` names no source type, so a TypeScript seed is parsed as a
 **module and retried as a script** if that fails
 ([cli.md §Multi-File Formatting](./cli.md#multi-file-formatting)) — the
 `typescript/script_goal/*` inputs are ordinary seeds. Fixture *validation* is the exception:

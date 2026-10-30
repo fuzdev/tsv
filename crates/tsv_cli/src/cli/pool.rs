@@ -4,7 +4,7 @@
 //! claim loop every worker runs ([`drain`]) and the read-out that puts each claimed
 //! outcome back at its index ([`slot_outcomes`]). Nothing here knows what a file's
 //! outcome *is* — that stays with the command (`commands/format.rs`, whose
-//! `WorkerArenas` is the work a claim hands to `drain`) — so the pool reads as one
+//! `WorkerFormatters` is the work a claim hands to `drain`) — so the pool reads as one
 //! mechanism beside the stack sizing it shares with `main` (`cli/stack.rs`).
 
 use crate::cli::discover::{FileSink, path_sort_key};

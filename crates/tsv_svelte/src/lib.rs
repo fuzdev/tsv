@@ -1,11 +1,14 @@
 //! Svelte parsing and formatting library
 //!
-//! This crate provides Svelte component parsing and code formatting.
+//! This crate provides Svelte component parsing and code formatting: [`format()`] formats
+//! one component in one call, and a [`Formatter`] formats many on one thread, keeping its
+//! arenas warm between calls.
 
 #[doc(hidden)]
 pub mod __private;
 #[doc(hidden)]
 pub mod ast;
+mod formatter;
 mod lexer;
 mod parser;
 mod printer;
@@ -15,6 +18,7 @@ mod whitespace;
 
 use __private::{format_folded_in, parse_folded};
 use ast::Root;
+pub use formatter::Formatter;
 pub use tsv_lang::{
     Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, STACK_SIZE, WireCoordinates,
     WirePoint, run_with_stack,
@@ -82,14 +86,29 @@ fn refuse_lone_cr_in_tag_line_comment(source: &str, arena: &bumpalo::Bump) -> Re
 /// A parse error, or a refusal of a lone `\r` inside an in-tag `//` comment, where the
 /// fold would end the comment early.
 pub fn format(source: &str) -> Result<String> {
+    format_in(
+        source,
+        &bumpalo::Bump::new(),
+        tsv_lang::doc::arena::DocArena::for_source,
+    )
+}
+
+/// The one format path, shared by [`format()`] and [`Formatter`]: fold, parse into `arena`,
+/// then print into the doc arena `doc_arena` hands over once the parse has succeeded (handed
+/// the folded text, so a fresh one is sized to it and a failed parse never builds one).
+/// Nothing borrowed from either arena escapes: the result is owned.
+pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
+    source: &str,
+    arena: &bumpalo::Bump,
+    doc_arena: impl FnOnce(&str) -> D,
+) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse (see
     // `tsv_lang::printing::normalize_carriage_returns`); `parse` leaves the author's bytes
     // alone so its offsets stay a drop-in contract with Svelte's.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
-    let arena = bumpalo::Bump::new();
-    let root = parse_folded(&folded, &arena)?;
-    let doc_arena = tsv_lang::doc::arena::DocArena::for_source(folded.text());
-    Ok(format_folded_in(&root, &folded, &doc_arena))
+    let root = parse_folded(&folded, arena)?;
+    let doc_arena = doc_arena(folded.text());
+    Ok(format_folded_in(&root, &folded, doc_arena.borrow()))
 }
 
 /// What [`parse_to_json_with`]'s wire carries. The default is [`parse_to_json`]'s: the

@@ -6,12 +6,15 @@
 //! ## Usage
 //!
 //! ```
-//! use tsv_ts::{Goal, format, format_with_goal, strip};
+//! use tsv_ts::{Formatter, Goal, format, format_with_goal, strip};
 //!
 //! // Format in one call: Module, retried as Script only if that fails
 //! assert_eq!(format("const x=42;").unwrap(), "const x = 42;\n");
 //! // ...or at exactly one goal, with no retry
 //! assert!(format_with_goal("with (a) b;", Goal::Module).is_err());
+//! // Many sources on one thread: a `Formatter` keeps its arenas warm between calls
+//! let mut formatter = Formatter::new();
+//! assert_eq!(formatter.format("let y=1").unwrap(), "let y = 1;\n");
 //!
 //! // Strip the types, keeping every surviving character at its line and column
 //! assert_eq!(strip("let x: number = 1;").unwrap().code, "let x         = 1;");
@@ -58,6 +61,7 @@
 pub mod __private;
 #[doc(hidden)]
 pub mod ast;
+mod formatter;
 mod goal;
 mod lexer;
 mod parser;
@@ -75,6 +79,7 @@ pub use tsv_lang::{
     WirePoint, run_with_stack,
 };
 
+pub use formatter::Formatter;
 pub use goal::Goal;
 pub use strip::{StripError, Stripped, UnsupportedKind, strip, strip_with_goal};
 
@@ -163,15 +168,27 @@ pub fn format_with_goal(source: &str, goal: Goal) -> Result<String> {
 }
 
 fn format_with_optional_goal(source: &str, goal: Option<Goal>) -> Result<String> {
+    format_in(source, goal, &bumpalo::Bump::new(), DocArena::for_source)
+}
+
+/// The one format path, shared by the one-shot functions and [`Formatter`]: fold, parse into
+/// `arena`, then print into the doc arena `doc_arena` hands over once the parse has
+/// succeeded (handed the folded text, so a fresh one is sized to it and a failed parse never
+/// builds one). Nothing borrowed from either arena escapes: the result is owned.
+pub(crate) fn format_in<D: std::borrow::Borrow<DocArena>>(
+    source: &str,
+    goal: Option<Goal>,
+    arena: &bumpalo::Bump,
+    doc_arena: impl FnOnce(&str) -> D,
+) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse — see
     // `tsv_lang::printing::normalize_carriage_returns` for why it belongs here and not on
     // the finished string. `parse` deliberately does NOT do this: its offsets are a
     // drop-in contract over the author's own bytes.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
-    let arena = bumpalo::Bump::new();
-    let program = parse_folded(&folded, goal, &arena)?;
-    let doc_arena = DocArena::for_source(folded.text());
-    Ok(format_folded_in(&program, &folded, &doc_arena))
+    let program = parse_folded(&folded, goal, arena)?;
+    let doc_arena = doc_arena(folded.text());
+    Ok(format_folded_in(&program, &folded, doc_arena.borrow()))
 }
 
 /// The shared body of `__private::format_ast_in` and `format_folded_in`: the one place the

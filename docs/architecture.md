@@ -609,7 +609,7 @@ elements, mapped-type values) indent their continuations correctly.
 Svelte / `parseCss` over the bytes on disk. Every **parse-then-format** entry point
 instead folds `<CR>` and `<CR><LF>` to `<LF>` *before* parsing
 (`tsv_lang::printing::normalize_carriage_returns`, called from each language crate's
-`format`, the CLI's `format_source`, each binding's format export, and
+`format` and `Formatter` (the CLI's path), each binding's format export, and
 `tsv_svelte_compile`'s `canonicalize_js`, each then parsing the folded document through
 its language's `parse_folded`), so tsv's output is LF-only, even inside the regions it
 copies verbatim — a frozen embedded body, a `format-ignore` region, a multi-line

@@ -57,7 +57,7 @@
 
 use serde_json::Value;
 
-use tsv_cli::cli::format_source::format_source;
+use crate::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use crate::deno;

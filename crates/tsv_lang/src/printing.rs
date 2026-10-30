@@ -317,8 +317,8 @@ pub fn ecmascript_lines(text: &str) -> impl Iterator<Item = &str> {
 /// Call this on a source string **before parsing it to FORMAT**, and never before parsing it
 /// for the wire AST: the fold shifts byte offsets, and `parse`'s offsets are a drop-in
 /// contract with acorn / Svelte / `parseCss` over the author's own bytes. Every
-/// parse-then-format entry point does it — each language crate's `format`, the CLI's
-/// `format_source`, each binding's format export, and `canonicalize_js` — so no printer ever
+/// parse-then-format entry point does it — each language crate's `format` and `Formatter`
+/// (the CLI's), each binding's format export, and `canonicalize_js` — so no printer ever
 /// sees a `<CR>`.
 /// It is also where prettier answers the same question (`normalizeEndOfLine`, in
 /// `normalizeInputAndOptions`, ahead of the parse).

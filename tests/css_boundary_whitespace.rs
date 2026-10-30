@@ -2874,8 +2874,6 @@ fn a_frozen_node_keeps_the_run_in_front_of_it_byte_for_byte() {
 /// `format-ignore` spelling.
 #[test]
 fn a_frozen_stylesheet_node_keeps_its_leading_zwnbsp() {
-    use tsv_cli::cli::format_source::format_source;
-    use tsv_cli::cli::input::ParserType;
     for (label, source, expected) in [
         (
             "prettier-ignore",
@@ -2893,12 +2891,13 @@ fn a_frozen_stylesheet_node_keeps_its_leading_zwnbsp() {
             "/* format-ignore */\n\u{feff}a  {}\n",
         ),
     ] {
-        let via_cli = format_source(source, ParserType::Css).expect("format_source");
+        let mut formatter = tsv_css::Formatter::new();
+        let via_cli = formatter.format(source).expect("Formatter");
         let via_str = tsv_css::format(source).expect("format");
-        assert_eq!(via_cli, expected, "{label}: format_source");
+        assert_eq!(via_cli, expected, "{label}: tsv_css::Formatter");
         assert_eq!(via_str, expected, "{label}: tsv_css::format");
         assert_eq!(
-            format_source(&via_cli, ParserType::Css).expect("re-format"),
+            formatter.format(&via_cli).expect("re-format"),
             via_cli,
             "{label}: formatting must be a fixed point"
         );

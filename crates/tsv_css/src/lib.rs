@@ -1,6 +1,8 @@
 //! CSS parsing and formatting library
 //!
-//! Provides CSS parsing, formatting, and AST conversion functionality.
+//! Provides CSS parsing, formatting, and AST conversion functionality: [`format()`] formats
+//! one source in one call, and a [`Formatter`] formats many on one thread, keeping its
+//! arenas warm between calls.
 //! Part of the tsv (precise language tools for TypeScript/JS, CSS, and Svelte in Rust) project.
 
 #[doc(hidden)]
@@ -10,6 +12,7 @@ pub mod ast;
 mod color;
 mod comments;
 mod escapes;
+mod formatter;
 mod keyword_set;
 mod lexer;
 mod number;
@@ -19,6 +22,7 @@ mod url;
 mod whitespace;
 
 use __private::{format_folded_in, parse_folded};
+pub use formatter::Formatter;
 pub use tsv_lang::{
     Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, STACK_SIZE, WireCoordinates,
     WirePoint, run_with_stack,
@@ -43,14 +47,29 @@ pub const WIRE_COORDINATES: WireCoordinates = WireCoordinates {
 ///
 /// A parse error.
 pub fn format(source: &str) -> Result<String> {
+    format_in(
+        source,
+        &bumpalo::Bump::new(),
+        tsv_lang::doc::arena::DocArena::for_source,
+    )
+}
+
+/// The one format path, shared by [`format()`] and [`Formatter`]: fold, parse into `arena`,
+/// then print into the doc arena `doc_arena` hands over once the parse has succeeded (handed
+/// the folded text, so a fresh one is sized to it and a failed parse never builds one).
+/// Nothing borrowed from either arena escapes: the result is owned.
+pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
+    source: &str,
+    arena: &bumpalo::Bump,
+    doc_arena: impl FnOnce(&str) -> D,
+) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse (see
     // `tsv_lang::printing::normalize_carriage_returns`); `parse` leaves the author's bytes
     // alone so its offsets stay a drop-in contract with `parseCss`'s.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
-    let arena = bumpalo::Bump::new();
-    let stylesheet = parse_folded(&folded, &arena)?;
-    let doc_arena = tsv_lang::doc::arena::DocArena::for_source(folded.text());
-    Ok(format_folded_in(&stylesheet, &folded, &doc_arena))
+    let stylesheet = parse_folded(&folded, arena)?;
+    let doc_arena = doc_arena(folded.text());
+    Ok(format_folded_in(&stylesheet, &folded, doc_arena.borrow()))
 }
 
 /// What [`parse_to_json_with`]'s wire carries. The default is [`parse_to_json`]'s: the

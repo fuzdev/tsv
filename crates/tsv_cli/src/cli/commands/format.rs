@@ -1,7 +1,6 @@
 use crate::cli::discover::{
     Diagnostics, Discovered, discover_files, discover_into, path_from_sort_key,
 };
-use crate::cli::format_source::{format_source_in, format_source_with_source_type};
 use crate::cli::input::{InputArgs, ParserType, ResolvedInput};
 use crate::cli::out::{
     exit_with_error, exit_with_parse_error, path_bytes, path_text, write_stdout,
@@ -158,7 +157,7 @@ impl FormatCommand {
         }
         .resolve_with_source_type(self.source_type.as_deref())
         .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
-        let formatted = format_source_with_source_type(input.content(), parser_type, goal)
+        let formatted = format_one(input.content(), parser_type, goal)
             .unwrap_or_else(|e| exit_with_parse_error(2, &e));
         if self.check {
             if formatted != input.content() {
@@ -394,8 +393,8 @@ fn format_streamed(paths: &[String], mode: FormatMode, jobs: usize) -> Formatted
     let (discovery, claimed): (Result<Diagnostics, Vec<String>>, Vec<_>) = thread::scope(|scope| {
         let _release = ReleasePoolOnUnwind(&queue);
         let worker = || {
-            let mut arenas = WorkerArenas::new();
-            drain(|| queue.claim(), |path| arenas.format(path, mode))
+            let mut formatters = WorkerFormatters::default();
+            drain(|| queue.claim(), |path| formatters.format_file(path, mode))
         };
         let handles = spawn_pool(scope, jobs, worker);
 
@@ -446,83 +445,105 @@ fn format_streamed(paths: &[String], mode: FormatMode, jobs: usize) -> Formatted
     }
 }
 
-/// One worker's reusable arenas, and the only way to reach [`format_file`] — the work a
-/// pool worker hands to `drain` (`cli/pool.rs`) for each file it claims.
-///
-/// **The rewind is the contract, so it lives here rather than at each caller.** Each
-/// `reset()` keeps the largest chunk and rewinds, so only the first file (and any that
-/// grow past the high-water mark) pays an alloc — the rest reuse it. The drain loop
-/// wants that, and its two predecessors each spelled the setup and the two resets
-/// themselves; a loop that forgot one, or an early `continue` past it, would grow a
-/// worker's arena monotonically over its whole share of the tree. Owning the pair makes
-/// the rewind structural instead of a rule stated in a doc comment.
-struct WorkerArenas {
-    ast: bumpalo::Bump,
-    doc: tsv_lang::doc::arena::DocArena,
+/// `--content` / `--stdin`'s one format: the language's public one-shot `format`, with the
+/// TypeScript goal the flags named (`None`: the module grammar retried as a script).
+fn format_one(
+    source: &str,
+    parser_type: ParserType,
+    goal: Option<tsv_ts::Goal>,
+) -> Result<String, tsv_lang::Error> {
+    match parser_type {
+        ParserType::Svelte => tsv_svelte::format(source),
+        ParserType::Css => tsv_css::format(source),
+        ParserType::TypeScript => match goal {
+            Some(goal) => tsv_ts::format_with_goal(source, goal),
+            None => tsv_ts::format(source),
+        },
+    }
 }
 
-impl WorkerArenas {
-    fn new() -> Self {
-        Self {
-            ast: bumpalo::Bump::new(),
-            doc: tsv_lang::doc::arena::DocArena::new(),
+/// One worker's formatters, one per language, each created on the worker's first file of
+/// its language — the work a pool worker hands to `drain` (`cli/pool.rs`) for each file it
+/// claims.
+///
+/// A `Formatter` keeps its arenas warm across calls and rewinds them at the start of each
+/// one, so only a worker's first file of a language (and any that grows past that
+/// language's high-water mark) pays an arena allocation; the rest reuse it. One per
+/// language because each crate's AST lives in that crate's own arena; created lazily so a
+/// worker that never meets a language holds nothing for it — a TypeScript-only tree costs
+/// what one shared pair of arenas did.
+#[derive(Default)]
+struct WorkerFormatters {
+    ts: Option<tsv_ts::Formatter>,
+    css: Option<tsv_css::Formatter>,
+    svelte: Option<tsv_svelte::Formatter>,
+}
+
+impl WorkerFormatters {
+    /// Format one file, writing it in place when the output differs (in
+    /// [`FormatMode::Write`]).
+    fn format_file(&mut self, path: impl AsRef<Path>, mode: FormatMode) -> FileOutcome {
+        let path = path.as_ref();
+        let source = match fs::read_to_string(path) {
+            Ok(source) => source,
+            Err(e) => return FileOutcome::Error(format!("read failed: {e}")),
+        };
+        let name = path.to_string_lossy();
+        let parser_type = ParserType::from_extension(&name);
+        // A path's own extension can settle the goal (`.mjs`/`.mts` are ES modules by
+        // name), and where it does the module-then-script fallback has nothing to fall
+        // back to — see `tsv_ts::Goal::from_extension`. Everything else stays unnamed and
+        // takes the fallback, which is what reaches a legacy sloppy script.
+        let goal = tsv_ts::Goal::from_extension(&name);
+        // catch_unwind isolates formatter bugs to the file; release builds use
+        // panic=abort so this only pays off in dev/corpus profiles. A formatter a panic
+        // left mid-document is sound to reuse: it rewinds at the start of its next call.
+        let result =
+            panic::catch_unwind(AssertUnwindSafe(|| self.format(&source, parser_type, goal)));
+        let formatted = match result {
+            Ok(Ok(formatted)) => formatted,
+            Ok(Err(e)) => return FileOutcome::Error(format!("{e:#}")),
+            Err(_) => {
+                return FileOutcome::Error("panic while formatting (internal bug)".to_string());
+            }
+        };
+        if formatted == source {
+            return FileOutcome::Unchanged;
+        }
+        if mode == FormatMode::Write
+            && let Err(e) = fs::write(path, &formatted)
+        {
+            return FileOutcome::Error(format!("write failed: {e}"));
+        }
+        FileOutcome::Changed
+    }
+
+    /// `source` through its language's formatter, created on first use. A named goal is
+    /// exact; `None` is the module grammar retried as a script.
+    fn format(
+        &mut self,
+        source: &str,
+        parser_type: ParserType,
+        goal: Option<tsv_ts::Goal>,
+    ) -> Result<String, tsv_lang::Error> {
+        match parser_type {
+            ParserType::Svelte => self
+                .svelte
+                .get_or_insert_with(tsv_svelte::Formatter::new)
+                .format(source),
+            ParserType::Css => self
+                .css
+                .get_or_insert_with(tsv_css::Formatter::new)
+                .format(source),
+            ParserType::TypeScript => {
+                let formatter = self.ts.get_or_insert_with(tsv_ts::Formatter::new);
+                match goal {
+                    Some(goal) => formatter.format_with_goal(source, goal),
+                    None => formatter.format(source),
+                }
+            }
         }
     }
-
-    /// Format one file into the arenas, then rewind both.
-    ///
-    /// The `&mut self` is what makes the resets sound: the per-file AST and doc tree
-    /// borrow the arenas and are dropped inside [`format_file`], which returns an owned
-    /// [`FileOutcome`], so nothing borrowed from either arena is alive by the time this
-    /// returns.
-    fn format(&mut self, path: impl AsRef<Path>, mode: FormatMode) -> FileOutcome {
-        let outcome = format_file(path.as_ref(), mode, &self.ast, &self.doc);
-        self.ast.reset();
-        self.doc.reset();
-        outcome
-    }
-}
-
-/// Format one file into the worker's reusable arenas, writing in place when the
-/// output differs (in [`FormatMode::Write`]). Reached only through
-/// [`WorkerArenas::format`], which rewinds both arenas once this has returned its owned
-/// outcome.
-fn format_file(
-    path: &Path,
-    mode: FormatMode,
-    arena: &bumpalo::Bump,
-    doc_arena: &tsv_lang::doc::arena::DocArena,
-) -> FileOutcome {
-    let source = match fs::read_to_string(path) {
-        Ok(source) => source,
-        Err(e) => return FileOutcome::Error(format!("read failed: {e}")),
-    };
-    let name = path.to_string_lossy();
-    let parser_type = ParserType::from_extension(&name);
-    // A path's own extension can settle the goal (`.mjs`/`.mts` are ES modules by
-    // name), and where it does the module-then-script fallback has nothing to fall
-    // back to — see `tsv_ts::Goal::from_extension`. Everything else stays unnamed and
-    // takes the fallback, which is what reaches a legacy sloppy script.
-    let goal = tsv_ts::Goal::from_extension(&name);
-    // catch_unwind isolates formatter bugs to the file; release builds use
-    // panic=abort so this only pays off in dev/corpus profiles
-    let result = panic::catch_unwind(AssertUnwindSafe(|| {
-        format_source_in(&source, parser_type, goal, arena, doc_arena)
-    }));
-    let formatted = match result {
-        Ok(Ok(formatted)) => formatted,
-        Ok(Err(e)) => return FileOutcome::Error(format!("{e:#}")),
-        Err(_) => return FileOutcome::Error("panic while formatting (internal bug)".to_string()),
-    };
-    if formatted == source {
-        return FileOutcome::Unchanged;
-    }
-    if mode == FormatMode::Write
-        && let Err(e) = fs::write(path, &formatted)
-    {
-        return FileOutcome::Error(format!("write failed: {e}"));
-    }
-    FileOutcome::Changed
 }
 
 /// Format files in parallel: a shared next-index counter over the sorted list
@@ -538,13 +559,13 @@ fn format_files(files: &[PathBuf], mode: FormatMode, jobs: usize) -> Vec<FileOut
         // the next index off the shared counter — dynamic load balancing with no lock,
         // and results that land in input order without one either
         let worker = || {
-            let mut arenas = WorkerArenas::new();
+            let mut formatters = WorkerFormatters::default();
             drain(
                 || {
                     let i = next.fetch_add(1, Ordering::Relaxed);
                     (i < files.len()).then(|| (i, &files[i]))
                 },
-                |path| arenas.format(path, mode),
+                |path| formatters.format_file(path, mode),
             )
         };
         let handles = spawn_pool(scope, workers, worker);

@@ -404,12 +404,12 @@ fn profile_strip_once(
 
 /// Run one parse + format iteration, return (parse_duration, format_duration).
 ///
-/// The shipped format path, phase for phase (`tsv_cli`'s `format_source_in`, the bindings'
-/// `parse_format!`): fold the source's carriage returns, parse the folded text through the
-/// language's `parse_folded` (TypeScript with no source type named: the module grammar,
-/// retried as a script), and format it with `format_folded_in`. The fold is timed in the
-/// parse column — it runs ahead of the parse, and its pass takes the document's line
-/// verdict the format then reads instead of walking the source again.
+/// The shipped format path, phase for phase (each language crate's `format` and
+/// `Formatter`, the bindings' `parse_format!`): fold the source's carriage returns, parse
+/// the folded text through the language's `parse_folded` (TypeScript with no source type
+/// named: the module grammar, retried as a script), and format it with `format_folded_in`.
+/// The fold is timed in the parse column — it runs ahead of the parse, and its pass takes
+/// the document's line verdict the format then reads instead of walking the source again.
 ///
 /// Arenas are caller-owned and reset between iterations (see `profile_file`);
 /// setup/teardown stays outside both timed regions.

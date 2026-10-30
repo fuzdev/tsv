@@ -48,7 +48,7 @@ use std::collections::BTreeMap;
 use serde::de::DeserializeSeed;
 use serde_json::Value;
 
-use tsv_cli::cli::format_source::format_source;
+use crate::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use crate::diff::{DiffOptions, diff_to_string};
@@ -1813,7 +1813,7 @@ pub(crate) use ledger::*;
 
 #[cfg(feature = "internal_comment_check")]
 mod ledger {
-    use tsv_cli::cli::format_source::format_source;
+    use crate::format_source::format_source;
     use tsv_cli::cli::input::ParserType;
     use tsv_lang::comment_ledger::{self, CommentFinding};
 

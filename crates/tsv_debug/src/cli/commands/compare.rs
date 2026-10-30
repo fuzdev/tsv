@@ -1,8 +1,8 @@
 use crate::cli::CliError;
 use crate::deno;
 use crate::diff::{Color, ColorChoice, DiffOptions, diff_to_string};
+use crate::format_source::format_source_with_source_type;
 use argh::FromArgs;
-use tsv_cli::cli::format_source::format_source_with_source_type;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
 /// Compare our printer output with prettier (shows diff).

@@ -1,6 +1,5 @@
 pub mod commands;
 pub mod discover;
-pub mod format_source;
 pub mod input;
 pub mod out;
 mod pool;

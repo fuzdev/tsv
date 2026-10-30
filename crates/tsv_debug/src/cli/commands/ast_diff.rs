@@ -1,9 +1,9 @@
 use crate::cli::CliError;
 use crate::deno;
 use crate::diff::{DiffOptions, diff_to_string};
+use crate::format_source::format_source_with_source_type;
 use crate::render_normalize::normalize_pair;
 use argh::FromArgs;
-use tsv_cli::cli::format_source::format_source_with_source_type;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
 /// Compare ASTs to verify semantic equivalence (round-trip or two-file).

@@ -24,18 +24,21 @@
 //! Not fixturable: the format path folds a lone `<CR>`, so no input holding one is a
 //! fixed point.
 
-use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
+
+#[path = "support/formatter.rs"]
+mod formatter;
+use formatter::format_via_formatter;
 
 /// The words every refusal opens with.
 const REFUSAL: &str = "lone carriage return inside a '//' comment in a tag";
 
-/// The CLI's `format_source` error and the fused `tsv_svelte::format` error for
+/// The CLI's `Formatter` error and the fused `tsv_svelte::format` error for
 /// `source` — two entry points that must agree, asserted here so each case states it once.
 fn svelte_format_error(source: &str) -> String {
     let cli = format!(
         "{:#}",
-        format_source(source, ParserType::Svelte).expect_err("the format must refuse")
+        format_via_formatter(source, ParserType::Svelte).expect_err("the format must refuse")
     );
     let fused = format!(
         "{:#}",
@@ -47,7 +50,7 @@ fn svelte_format_error(source: &str) -> String {
 
 /// The format of `source` through both Svelte entry points, which must agree.
 fn svelte_format_ok(source: &str, label: &str) -> String {
-    let cli = format_source(source, ParserType::Svelte)
+    let cli = format_via_formatter(source, ParserType::Svelte)
         .unwrap_or_else(|e| panic!("{label} must format: {e}"));
     let fused = tsv_svelte::format(source).expect("the fused format must agree");
     assert_eq!(
@@ -184,7 +187,7 @@ fn typescript_and_css_format_a_lone_cr_as_its_line_feed() {
     ] {
         let lf = source.replace('\r', "\n");
         let format = |text: &str| {
-            let cli = format_source(text, parser)
+            let cli = format_via_formatter(text, parser)
                 .unwrap_or_else(|e| panic!("{parser:?} {text:?} must format: {e}"));
             let fused = match parser {
                 ParserType::TypeScript => tsv_ts::format(text),

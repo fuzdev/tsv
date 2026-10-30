@@ -33,7 +33,7 @@ use argh::FromArgs;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use tsv_cli::cli::format_source::format_source;
+use crate::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use crate::audit::vacuity::check_graded_nonzero;

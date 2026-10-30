@@ -46,7 +46,7 @@ use futures_util::StreamExt;
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 use crate::deno;
-use tsv_cli::cli::format_source::format_source;
+use crate::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use super::profile::{is_input_invalid_fixture, is_svelte, resolve_seed_files_named};

@@ -16,7 +16,6 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 
 - Input handling (file, `--content`, `--stdin`) — `cli/input.rs`
 - File/directory discovery with extension filter, gitignore-aware ignore evaluation (hierarchical `.gitignore`/`.formatignore`/`.prettierignore`), and the build-output heuristic fallback where no `.gitignore` is in scope (the per-entry verdicts from `tsv_discover`) — `cli/discover.rs`
-- The in-process parse+format entry point (`format_source`) — `cli/format_source.rs`
 - The thread stack reservation on every route and the `--jobs` ceiling (`sized_thread`, `run_on_sized_stack`, `clamp_worker_count`, over the library's `tsv_lang::STACK_SIZE` / `run_with_stack`) — `cli/stack.rs`
 - The `--pretty` re-indenter (tab-indented form of the compact wire, no deserializer) — `json_utils.rs`
 

@@ -324,7 +324,7 @@ fn test_format_source_type_module_rejects_script_only_content() {
 #[test]
 fn test_format_content_unset_source_type_falls_back_to_script() {
     // The `--content` arm is a different call site from path mode
-    // (`format_source_with_source_type`, not `format_source_in`), so the fallback is
+    // (the one-shot `tsv_ts::format`, not a worker's `Formatter`), so the fallback is
     // pinned there too: an UNSET source type formats a script-only source.
     let output = tsv(&[
         "format",
@@ -474,11 +474,11 @@ fn test_empty_input_is_its_own_fixed_point() {
     );
 }
 
-/// `format` folds `<CR><LF>` to `<LF>` ahead of the parse on every route
-/// (`format_source_in`), so its output is LF-only in every language — which makes a file
-/// whose only difference from its formatted form is the line terminator a *change*:
-/// `--check` exits 1 on it and a write rewrites it. `parse` takes the author's bytes as
-/// they are: its offsets count each `<CR>`.
+/// `format` folds `<CR><LF>` to `<LF>` ahead of the parse on every route (each language
+/// crate's `format` and `Formatter`), so its output is LF-only in every language — which
+/// makes a file whose only difference from its formatted form is the line terminator a
+/// *change*: `--check` exits 1 on it and a write rewrites it. `parse` takes the author's
+/// bytes as they are: its offsets count each `<CR>`.
 #[test]
 fn test_format_folds_crlf_to_lf_on_every_route_and_parse_keeps_it() {
     const CRLF_TS: &str = "const a = 1;\r\nconst b = 2;\r\n";

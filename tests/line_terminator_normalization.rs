@@ -8,7 +8,7 @@
 //! bytes. See `tsv_lang::printing::normalize_carriage_returns`.
 //!
 //! The seams are covered here rather than only by fixtures because a fixture reaches
-//! exactly one of them (the CLI's `format_source`, which every audit shares), while the
+//! exactly one of them (each crate's one-shot `format`, which every audit shares), while the
 //! rule is what makes a *new* entry point correct. The bindings' three
 //! (`tsv_ffi` / `tsv_napi` / `tsv_wasm`, one `parse_format!` each) are out of Rust's reach
 //! and are covered by their own npm-package tests.
@@ -22,8 +22,12 @@
 //! twin is the null control on the same dimension: its `<CR>` lands at a line END, so it
 //! survives a `'\n'` split and that spelling stayed correct throughout.
 
-use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
+use tsv_debug::format_source::format_source;
+
+#[path = "support/formatter.rs"]
+mod formatter;
+use formatter::format_via_formatter;
 
 /// The LF form, its lone-`<CR>` twin, and its `<CR><LF>` twin must all format to the same
 /// bytes — and that output must be a fixed point, since a formatter that agreed on pass one
@@ -49,11 +53,18 @@ fn assert_terminator_agnostic(lf: &str, parser: ParserType, label: &str) {
     }
 }
 
-/// `format_source`, asserting rather than unwrapping so a parse failure names the case.
+/// The one-shot `format` and the CLI's `Formatter`, which must agree, asserting rather than
+/// unwrapping so a parse failure names the case.
 fn format_ok(source: &str, parser: ParserType, label: &str) -> String {
     let formatted = format_source(source, parser);
     assert!(formatted.is_ok(), "{label} must format: {formatted:?}");
-    formatted.expect("asserted Ok above")
+    let formatted = formatted.expect("asserted Ok above");
+    assert_eq!(
+        format_via_formatter(source, parser).ok().as_ref(),
+        Some(&formatted),
+        "{label}: the Formatter and the one-shot format disagree"
+    );
+    formatted
 }
 
 /// A `.ts` document whose JSDoc comment is indented three levels deeper than its printed

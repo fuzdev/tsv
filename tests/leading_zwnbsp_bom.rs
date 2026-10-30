@@ -14,25 +14,25 @@
 //! U+FEFF is trivia there and the formatter drops it, with no BOM to write.
 //!
 //! The fixtures (`svelte/syntax/whitespace/leading_zwnbsp_prettier_divergence` and its CSS
-//! sibling) reach one entry point, the CLI's `format_source`. The rule has to hold at every
-//! one, so this asserts the same bytes from each: `format_source`, each crate's
-//! `format`, and the unfolded `format_ast` / `format_ast_in` over a caller's own parse. The
-//! bindings' `parse_format!` exports reach the crates' `format_folded_in`, as
-//! `format_source` does.
+//! sibling) reach one entry point, each crate's one-shot `format`. The rule has to hold at
+//! every one, so this asserts the same bytes from each: each crate's `format`, its
+//! `Formatter` (what `tsv format <path>` runs), and the unfolded `format_ast` /
+//! `format_ast_in` over a caller's own parse. The bindings' `parse_format!` exports reach
+//! the crates' `format_folded_in`, as `format` and `Formatter` do.
 
-use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
+
+#[path = "support/formatter.rs"]
+mod formatter;
+use formatter::format_via_formatter;
 
 const BOM: &str = "\u{FEFF}";
 
 /// Format `source` through every Rust entry point for `parser`, assert they agree, and
 /// return the shared output.
 fn format_all(source: &str, parser: ParserType, label: &str) -> String {
-    let via_cli = format_source(source, parser);
-    assert!(
-        via_cli.is_ok(),
-        "{label}: format_source failed: {via_cli:?}"
-    );
+    let via_cli = format_via_formatter(source, parser);
+    assert!(via_cli.is_ok(), "{label}: Formatter failed: {via_cli:?}");
     let via_cli = via_cli.expect("asserted Ok above");
 
     let arena = bumpalo::Bump::new();
@@ -64,17 +64,14 @@ fn format_all(source: &str, parser: ParserType, label: &str) -> String {
             )
         }
     };
-    assert_eq!(
-        via_str, via_cli,
-        "{label}: format disagrees with format_source"
-    );
+    assert_eq!(via_str, via_cli, "{label}: format disagrees with Formatter");
     assert_eq!(
         via_format, via_cli,
-        "{label}: format disagrees with format_source"
+        "{label}: format disagrees with Formatter"
     );
     assert_eq!(
         via_format_in, via_cli,
-        "{label}: format_ast_in disagrees with format_source"
+        "{label}: format_ast_in disagrees with Formatter"
     );
     via_cli
 }

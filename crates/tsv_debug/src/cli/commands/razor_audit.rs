@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 
-use tsv_cli::cli::format_source::format_source;
+use crate::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::{
     is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,

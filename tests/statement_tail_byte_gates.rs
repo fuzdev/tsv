@@ -17,8 +17,8 @@
 //! `<script>`). Each expected output is the formatter's settled answer and prettier's fixed
 //! point, and must be a fixed point here too.
 
-use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
+use tsv_debug::format_source::format_source;
 
 fn assert_formats(source: &str, parser: ParserType, expected: &str) {
     let formatted = format_ok(source, parser);

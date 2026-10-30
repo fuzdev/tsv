@@ -22,10 +22,10 @@ pub use variants::{
 };
 
 use crate::deno::{DenoError, parse_by_type_with_goal};
+use crate::format_source::format_source_with_source_type;
 use crate::json::to_json_with_tabs;
 use std::fs;
 use std::path::Path;
-use tsv_cli::cli::format_source::format_source_with_source_type;
 
 /// Recursively remove every position — `start`, `end`, `loc` and `name_loc` — from JSON
 /// for AST comparison. Not [`strip_locations`], which removes the line/column objects
