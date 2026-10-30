@@ -53,12 +53,12 @@ use tsv_arena::with_ast_arena;
 use tsv_arena::{parse_convert, parse_internal};
 
 // The one parse-error type, shared by every language crate: each re-exports
-// `tsv_lang::ParseError` (and the `ErrorReport` its `report` returns, whose span is two
+// `tsv_lang::Error` (and the `ErrorReport` its `report` returns, whose span is two
 // `WirePoint`s), so the shared error helpers below take a Svelte or CSS failure as readily as
 // a TypeScript one. Named through `tsv_ts` only because this crate takes no `tsv_lang` edge of
 // its own.
 #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
-use tsv_ts::ParseError;
+use tsv_ts::Error;
 use tsv_ts::{ErrorReport, WirePoint};
 
 /// Decode the optional `sourceType` argument (`"script"` / `"module"`); omitted,
@@ -118,7 +118,7 @@ impl Failure {
     /// refusal, `'parse'` otherwise), and the positionless one (a source over the size cap)
     /// thrown.
     #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
-    fn parse(e: &ParseError) -> Self {
+    fn parse(e: &Error) -> Self {
         match e.report() {
             Some(report) => Failure::Returned {
                 kind: if report.refused { "refused" } else { "parse" },

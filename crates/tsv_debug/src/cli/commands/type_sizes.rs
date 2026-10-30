@@ -18,8 +18,8 @@
 //! row that moved, without anyone having to have predicted it.
 //!
 //! **`Result<T>` is boarded beside `T`** because a `Result` wider than its
-//! payload costs a word on every fallible return: `tsv_lang::ParseError` is
-//! pointer-sized, so `Result<T, ParseError>` is free exactly when `T` has a
+//! payload costs a word on every fallible return: `tsv_lang::Error` is
+//! pointer-sized, so `Result<T, Error>` is free exactly when `T` has a
 //! niche to hide it in — which every AST node enum does, and a struct whose
 //! fields are all fully occupied does not. The star marks a payload of at least
 //! [`NICHE_MIN`] bytes that pays it. Narrower payloads are excluded rather than
@@ -67,7 +67,7 @@ pub struct TypeSizesCommand {
 }
 
 /// The payload width from which an unfilled error niche is worth flagging. A
-/// `Result<T, ParseError>` needs a pointer-sized hole in `T`, so anything
+/// `Result<T, Error>` needs a pointer-sized hole in `T`, so anything
 /// narrower than the pointer it must hide is widened by arithmetic rather than
 /// by a layout choice anyone could make differently.
 const NICHE_MIN: usize = 16;
@@ -85,7 +85,7 @@ pub(crate) struct TypeRow {
 }
 
 impl TypeRow {
-    /// True when a `Result<T, ParseError>` costs a word over the bare payload
+    /// True when a `Result<T, Error>` costs a word over the bare payload
     /// and the payload is wide enough for that to have been avoidable — see
     /// [`NICHE_MIN`].
     pub(crate) const fn pays_for_the_error(&self) -> bool {
@@ -555,7 +555,7 @@ pub(crate) fn board() -> Vec<TypeRow> {
             tsv_lang::CommentPosition,
             tsv_lang::EmbedContext,
             tsv_lang::LayoutMode,
-            tsv_lang::ParseError,
+            tsv_lang::Error,
             tsv_lang::Position,
             tsv_lang::Span,
             tsv_lang::doc::DocContext,
@@ -598,7 +598,7 @@ mod tests {
         assert!(named("tsv_lang::Span"));
     }
 
-    /// A `Result<T, ParseError>` can never be narrower than `T`, so a row where
+    /// A `Result<T, Error>` can never be narrower than `T`, so a row where
     /// it is means the board measured two unrelated types.
     #[test]
     fn a_result_is_never_narrower_than_its_payload() {

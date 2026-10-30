@@ -307,7 +307,7 @@ fn collect_file(source: &str, parser: ParserType, stats: &mut Stats) -> Result<(
 
     // the shipped format path: fold, parse the folded text, format it
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
-    let parse_error = |e: tsv_lang::ParseError| format!("{e}");
+    let parse_error = |e: tsv_lang::Error| format!("{e}");
     let output = match parser {
         ParserType::TypeScript => {
             let ast = tsv_ts::__private::parse_folded(&folded, None, &bump).map_err(parse_error)?;

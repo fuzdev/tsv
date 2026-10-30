@@ -423,7 +423,7 @@ fn profile_once(
     arena: &bumpalo::Bump,
     doc_arena: &tsv_lang::doc::arena::DocArena,
 ) -> Result<(Duration, Duration), String> {
-    let parse_error = |e: tsv_lang::ParseError| format!("parse error: {e}");
+    let parse_error = |e: tsv_lang::Error| format!("parse error: {e}");
     let t0 = Instant::now();
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     match parser_type {

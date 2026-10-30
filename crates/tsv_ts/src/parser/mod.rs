@@ -8,7 +8,7 @@ use crate::printer::ParenContext;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use std::collections::BTreeSet;
-use tsv_lang::{DepthBudget, DepthLimit, ParseError, Span, SpineCount};
+use tsv_lang::{DepthBudget, DepthLimit, Error, Span, SpineCount};
 
 // Import parsing implementations
 mod expression;
@@ -433,13 +433,13 @@ pub(super) struct Checkpoint<'arena> {
     had_line_terminator: bool,
     peek_had_line_terminator: bool,
     prev_end: usize,
-    lexer_error: Option<ParseError>,
+    lexer_error: Option<Error>,
     comments_len: usize,
     grouping_depth: u32,
     depth: DepthBudget,
     spine: SpineCount,
     lt_regions: LtRegions,
-    abandoned_type_arguments_error: Option<ParseError>,
+    abandoned_type_arguments_error: Option<Error>,
 }
 
 #[expect(clippy::struct_excessive_bools)]
@@ -560,7 +560,7 @@ pub struct Parser<'a, 'arena> {
     in_ambient_context: bool,
     /// Stored lexer error from peek_kind(). Returned on next advance() call.
     /// This ensures lexer errors propagate even when peek swallows them.
-    lexer_error: Option<ParseError>,
+    lexer_error: Option<Error>,
     /// Whether a line terminator (including before/inside comments drained
     /// during the peek) precedes the cached peek token. Only meaningful while
     /// `peek` is `Some`; consumed by `advance_inner()`.
@@ -682,7 +682,7 @@ pub struct Parser<'a, 'arena> {
     /// ([`Parser::prefer_abandoned_type_arguments_error`]). Carried by [`Checkpoint`],
     /// so a list abandoned inside a parse that is itself abandoned leaves nothing
     /// behind.
-    abandoned_type_arguments_error: Option<ParseError>,
+    abandoned_type_arguments_error: Option<Error>,
     /// Where each decorated parameter property's decorator run begins (its first `@`),
     /// once read. A parameter property's decorators sit one wire level deeper than a plain
     /// parameter's — on the binding inside the `TSParameterProperty` — and a run is parsed
@@ -716,7 +716,7 @@ pub struct Parser<'a, 'arena> {
     /// Where the same-line token after the latest such name `await` starts — the
     /// operand a module would have read. A Script error reported exactly there died
     /// only because `await` is a name at this goal, so [`Parser::parse`] marks it a
-    /// goal gate for the format fallback (`ParseError::is_goal_gated`).
+    /// goal gate for the format fallback (`Error::is_goal_gated`).
     await_name_operand: Option<usize>,
     /// Whether the code being parsed is **strict**. Seeded from the goal — Module
     /// code is always strict, Script code starts sloppy — and turned on (never off)
@@ -953,7 +953,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The comment drain records a line terminator it crosses, as it does between two
     /// tokens; ahead of the first token there is no previous token for one to separate
     /// it from, so the flag is cleared again.
-    pub(crate) fn prime(&mut self) -> Result<(), ParseError> {
+    pub(crate) fn prime(&mut self) -> Result<(), Error> {
         self.lexer.next_token_into(&mut self.current)?;
         self.current_decoded = self.decoded_to_arena();
         self.collect_comments()?;
@@ -961,7 +961,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(())
     }
 
-    pub(super) fn advance(&mut self) -> Result<(), ParseError> {
+    pub(super) fn advance(&mut self) -> Result<(), Error> {
         // Check for stored lexer error from peek_kind() - propagate it now
         if let Some(err) = self.lexer_error.take() {
             return Err(err);
@@ -970,7 +970,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// The token step of [`Parser::advance`], once no lexer error is held back.
-    fn advance_inner(&mut self) -> Result<(), ParseError> {
+    fn advance_inner(&mut self) -> Result<(), Error> {
         // Save previous token's end position for ASI span calculation
         self.prev_end = self.current.end as usize;
 
@@ -1005,7 +1005,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// inlines into the hot `advance` pump; the drain loop itself is cold-outlined into
     /// `drain_comments` so it never bloats the inlined fast path.
     #[inline]
-    pub(super) fn collect_comments(&mut self) -> Result<(), ParseError> {
+    pub(super) fn collect_comments(&mut self) -> Result<(), Error> {
         if matches!(self.current.kind, TokenKind::Comment { .. }) {
             self.drain_comments()
         } else {
@@ -1017,7 +1017,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// drain it and any consecutive comments. `#[cold]` + `#[inline(never)]` keep it off the hot pump.
     #[cold]
     #[inline(never)]
-    fn drain_comments(&mut self) -> Result<(), ParseError> {
+    fn drain_comments(&mut self) -> Result<(), Error> {
         while let TokenKind::Comment {
             is_block,
             content_start,
@@ -1087,8 +1087,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn nested<T>(
         &mut self,
         units: u32,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         if !self.depth.try_enter_beside(units, self.grouping_depth) {
             return Err(self.too_deep(DepthLimit::Nesting));
         }
@@ -1107,8 +1107,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline(always)]
     pub(super) fn chain<T>(
         &mut self,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         let outer = self.spine.take();
         let result = f(self);
         self.spine.fold(outer);
@@ -1127,8 +1127,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn statement_list<T>(
         &mut self,
         levels: u32,
-        f: impl FnOnce(&mut Self, &mut StatementFrame) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self, &mut StatementFrame) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         self.nested(levels, |p| {
             let mut frame = StatementFrame {
                 outer: p.spine.take(),
@@ -1166,7 +1166,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// [`LINK_ASSERTION`], [`LINK_TYPE_SUFFIX`].
     #[expect(clippy::inline_always)]
     #[inline(always)]
-    pub(super) fn spine_link(&mut self, units: u32) -> Result<(), ParseError> {
+    pub(super) fn spine_link(&mut self, units: u32) -> Result<(), Error> {
         if self.spine.try_link(units, &self.depth) {
             Ok(())
         } else {
@@ -1181,7 +1181,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// predicate wherever one can stack along a path
     /// ([`Parser::count_operand_pairs`], [`Parser::self_pair`]).
     #[inline]
-    pub(super) fn printer_pair(&mut self) -> Result<(), ParseError> {
+    pub(super) fn printer_pair(&mut self) -> Result<(), Error> {
         self.spine
             .try_pair(&self.depth)
             .map_err(|limit| self.too_deep(limit))
@@ -1196,7 +1196,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the operand is not under the level, so a right-nested assignment chain is charged
     /// its own depth, not a level per assignment on top of it.
     #[inline]
-    pub(super) fn level_above_operand(&mut self, operand_peak: u32) -> Result<(), ParseError> {
+    pub(super) fn level_above_operand(&mut self, operand_peak: u32) -> Result<(), Error> {
         self.depth
             .try_raise_peak(operand_peak + 1, &self.spine)
             .map_err(|limit| self.too_deep(limit))
@@ -1213,8 +1213,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn pair_free_root<T>(
         &mut self,
         end: RootEnd,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         let outer = self.pair_free_root.replace((self.current_pos().0, end));
         let result = f(self);
         self.pair_free_root = outer;
@@ -1228,7 +1228,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// with no pair counted and withdrawn: a pair counted at the bottom of a deep path and
     /// withdrawn above it would refuse a depth the printer's output never reaches.
     #[inline]
-    pub(super) fn self_pair(&mut self, start: usize) -> Result<(), ParseError> {
+    pub(super) fn self_pair(&mut self, start: usize) -> Result<(), Error> {
         let whole_root = self.pair_free_root.is_some_and(|(root, end)| {
             root == start
                 && match end {
@@ -1260,7 +1260,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         left: Option<(&Expression<'_>, ParenContext)>,
         right: Option<(&Expression<'_>, ParenContext)>,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         for (operand, ctx) in [left, right].into_iter().flatten() {
             if crate::printer::printer_adds_operand_pair(operand, ctx, self.in_for_header) {
                 self.printer_pair()?;
@@ -1281,7 +1281,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         left: &Expression<'_>,
         right: &Expression<'_>,
         expr_start: usize,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         let left_bare = expr_start == left.span().start as usize;
         let right_bare = right.span().end as usize == self.prev_token_end();
         self.count_operand_pairs(
@@ -1306,7 +1306,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (counted as a level already). `start` is where the sequence starts, the current
     /// token the one after it.
     #[inline]
-    pub(super) fn sequence_pair(&mut self, start: usize) -> Result<(), ParseError> {
+    pub(super) fn sequence_pair(&mut self, start: usize) -> Result<(), Error> {
         let whole_root = self.pair_free_root.is_some_and(|(root, end)| {
             root == start
                 && match end {
@@ -1357,7 +1357,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         operand_token: usize,
         holder: Option<(usize, usize)>,
         shell: bool,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         if !shell
             && ctx.is_operator_position()
             && !matches!(
@@ -1387,7 +1387,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         operand_token: usize,
         holder: Option<(usize, usize)>,
         shell: bool,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         // a wire-only parse keeps the author's pairs as nodes (`parse_preserve_parens`): they
         // are counted as the pairs they are, so it charges what the parse the printer reads
         // charges
@@ -1454,7 +1454,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         argument: &Expression<'_>,
         argument_token: usize,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         if matches!(argument.kind, ExpressionKind::BinaryExpression(_))
             && argument.span().start as usize == argument_token
         {
@@ -1477,7 +1477,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         expr_start: usize,
         consequent: &Expression<'_>,
         consequent_start: usize,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         if matches!(consequent.kind, ExpressionKind::ConditionalExpression(_))
             && consequent.span().start as usize == consequent_start
         {
@@ -1498,7 +1498,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         branch: &Expression<'_>,
         branch_token: usize,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         if branch.span().start as usize == branch_token
             && crate::printer::ternary_branch_takes_pair(branch)
         {
@@ -1518,7 +1518,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         head: &Expression<'_>,
         start: u32,
         ctx: ParenContext,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         if matches!(
             head.kind,
             ExpressionKind::FunctionExpression(_) | ExpressionKind::ClassExpression(_)
@@ -1538,7 +1538,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn arrow_return_pair(
         &mut self,
         return_type: Option<&TSTypeAnnotation<'_>>,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         if return_type.is_some_and(|r| matches!(r.type_annotation, TSType::Function(_))) {
             self.printer_pair()
         } else {
@@ -1564,7 +1564,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         object: &Expression<'_>,
         start: u32,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         if matches!(object.kind, ExpressionKind::Literal(_))
             && object.span().start == start
             && crate::printer::printer_parenthesizes_chain_base(object)
@@ -1682,7 +1682,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// [`Parser::call_prints_whole`] test, so the call site keeps only that test.
     #[expect(clippy::inline_always)]
     #[inline(always)]
-    pub(super) fn settle_call_link(&mut self, call: &Expression<'_>) -> Result<(), ParseError> {
+    pub(super) fn settle_call_link(&mut self, call: &Expression<'_>) -> Result<(), Error> {
         if Self::call_prints_whole(call)
             && let ExpressionKind::CallExpression(c) = &call.kind
         {
@@ -1720,8 +1720,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The depth-limit error at the current token.
     #[cold]
     #[inline(never)]
-    fn too_deep(&self, limit: DepthLimit) -> ParseError {
-        ParseError::too_deep(limit, self.current_pos().0)
+    fn too_deep(&self, limit: DepthLimit) -> Error {
+        Error::too_deep(limit, self.current_pos().0)
     }
 
     /// Convert a raw `source`-relative offset into an absolute `Span` coordinate:
@@ -1772,7 +1772,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `prev_token_end` (so a `?` with no following type annotation still
     /// extends the identifier span); otherwise `end` passes through unchanged.
     #[inline]
-    pub(super) fn eat_optional_marker(&mut self, end: usize) -> Result<(bool, usize), ParseError> {
+    pub(super) fn eat_optional_marker(&mut self, end: usize) -> Result<(bool, usize), Error> {
         Ok(if self.eat(TokenKind::Question)? {
             (true, self.prev_token_end())
         } else {
@@ -2033,9 +2033,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// namespace-segment / declare-module / enum / type-alias name parsers. The class
     /// paths capture inline instead (they additionally exclude the heritage-starting
     /// `implements`), and the import path captures the name across a following branch.
-    pub(super) fn take_binding_identifier(
-        &mut self,
-    ) -> Result<Option<Identifier<'arena>>, ParseError> {
+    pub(super) fn take_binding_identifier(&mut self) -> Result<Option<Identifier<'arena>>, Error> {
         let Some(name) = self.try_binding_name() else {
             return Ok(None);
         };
@@ -2182,7 +2180,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// it beside [`Parser::depth`] (`DepthBudget::check_beside`) — refused at the current
     /// token where the two together would pass `tsv_lang::NESTING_LIMIT`.
     #[inline]
-    pub(super) fn enter_grouping(&mut self) -> Result<(), ParseError> {
+    pub(super) fn enter_grouping(&mut self) -> Result<(), Error> {
         self.grouping_depth += 1;
         if !self.depth.check_beside(self.grouping_depth) {
             return Err(self.too_deep(DepthLimit::Nesting));
@@ -2248,8 +2246,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// success and error alike), where the body's own regions are dead.
     pub(super) fn with_lt_region_inherited<T>(
         &mut self,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         let saved = self.lt_regions;
         let saved_base = std::mem::replace(&mut self.lt_regions_statement_base, saved);
         let result = f(self);
@@ -2265,8 +2263,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         flag: fn(&mut Self) -> &mut bool,
         value: bool,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         let saved = std::mem::replace(flag(self), value);
         let result = f(self);
         *flag(self) = saved;
@@ -2281,8 +2279,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// inherits the outer flag.
     pub(super) fn with_arrow_return_type_barred<T>(
         &mut self,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         let saved = self
             .arrow_return_type_barred_at
             .replace(self.grouping_depth);
@@ -2300,8 +2298,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// error alike.
     pub(super) fn with_arrow_return_type_allowed<T>(
         &mut self,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         let saved = self.arrow_return_type_barred_at.take();
         let result = f(self);
         self.arrow_return_type_barred_at = saved;
@@ -2468,7 +2466,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// kept before the list was tried, so the error of a list abandoned inside this one
     /// is dropped with it; it is kept again only where the reading that replaces this
     /// list tries that `<` again, which a remembered answer does not.
-    pub(super) fn abandon_type_arguments(&mut self, lt: u32, error: ParseError) {
+    pub(super) fn abandon_type_arguments(&mut self, lt: u32, error: Error) {
         // the rewind has run: every context flag is back to what the list was tried in
         self.abandoned_type_argument_lists
             .insert((lt, self.type_arguments_context_key()));
@@ -2492,11 +2490,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `)` at the end of two comparisons, rather than a `:` no type takes at their
     /// start — and on a tie the list's, the first reading tried. A **goal gate** is
     /// reported as it stands: the format fallback reads its mark, not its position
-    /// ([`ParseError::is_goal_gated`]).
-    pub(crate) fn prefer_abandoned_type_arguments_error(
-        &mut self,
-        error: ParseError,
-    ) -> ParseError {
+    /// ([`Error::is_goal_gated`]).
+    pub(crate) fn prefer_abandoned_type_arguments_error(&mut self, error: Error) -> Error {
         match (self.abandoned_type_arguments_error.take(), error.position()) {
             (Some(kept), Some(reached))
                 if !error.is_goal_gated() && kept.position().is_some_and(|k| k >= reached) =>
@@ -2520,8 +2515,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         is_async: bool,
         is_generator: bool,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         let saved_await = std::mem::replace(&mut self.in_await, is_async);
         let saved_await_if_module = std::mem::replace(&mut self.in_await_if_module, is_async);
         let saved_yield = std::mem::replace(&mut self.in_yield, is_generator);
@@ -2547,8 +2542,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// speculative parse.
     pub(super) fn with_strict_scope<T>(
         &mut self,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         let saved = self.strict;
         let result = f(self);
         self.strict = saved;
@@ -2564,8 +2559,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// on — see [`Parser::with_strict_scope`] for the directive-driven case.
     pub(super) fn with_strict_class_scope<T>(
         &mut self,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         self.with_context_flag(|p| &mut p.strict, true, f)
     }
 
@@ -2577,8 +2572,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn with_fn_type_disallowed<T>(
         &mut self,
         value: bool,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         self.with_context_flag(|p| &mut p.fn_type_disallowed, value, f)
     }
 
@@ -2591,8 +2586,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn with_conditional_type_disallowed<T>(
         &mut self,
         value: bool,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         self.with_context_flag(|p| &mut p.conditional_type_disallowed, value, f)
     }
 
@@ -2603,8 +2598,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// parse. Wraps the full-type entry (`parse_type`).
     pub(super) fn with_full_type_context<T>(
         &mut self,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         self.with_fn_type_disallowed(false, |p| p.with_conditional_type_disallowed(false, f))
     }
 
@@ -2671,7 +2666,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// ([`Parser::legacy_escape_error`]) rides here for every literal as its token
     /// becomes a node; the gate's one other asker is the retroactive prologue walk
     /// (`Parser::note_directive`), over literals whose tokens are already gone.
-    pub(super) fn extract_string_cooked(&self) -> Result<StringCooked<'arena>, ParseError> {
+    pub(super) fn extract_string_cooked(&self) -> Result<StringCooked<'arena>, Error> {
         match self.current_decoded {
             Some(decoded) => {
                 if self.strict
@@ -2689,7 +2684,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// reached from [`Parser::extract_string_cooked`] only on the escape arm — a literal
     /// the lexer decoded. A literal with no escapes carries no backslash and so cannot
     /// hold one of these forms, which is what keeps the walk off the common path.
-    fn legacy_escape_error_in_current_string(&self) -> Option<ParseError> {
+    fn legacy_escape_error_in_current_string(&self) -> Option<Error> {
         let start = self.current.start as usize;
         let end = self.current.end as usize;
         // Quotes excluded. `get` rather than an index: the token is a well-formed string
@@ -2709,7 +2704,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// `raw` is a string literal's inner source with its quotes excluded, and `raw_start`
     /// that slice's position in the document the error is rendered against.
-    fn legacy_escape_error(&self, raw: &str, raw_start: usize) -> Option<ParseError> {
+    fn legacy_escape_error(&self, raw: &str, raw_start: usize) -> Option<Error> {
         let (offset, form) = find_legacy_escape(raw)?;
         let message = match form {
             LegacyEscape::NonOctalDecimal => {
@@ -2725,13 +2720,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     // Error construction helpers - reduce boilerplate for common error patterns
 
     /// Create an error with custom message at current position
-    pub(super) fn error_msg(&self, message: &str) -> ParseError {
-        ParseError::invalid_syntax(message.to_string(), self.current_pos().0)
+    pub(super) fn error_msg(&self, message: &str) -> Error {
+        Error::invalid_syntax(message.to_string(), self.current_pos().0)
     }
 
     /// Create an error with custom message at custom position
-    pub(super) fn error_msg_at(&self, message: &str, position: usize) -> ParseError {
-        ParseError::invalid_syntax(message.to_string(), position)
+    pub(super) fn error_msg_at(&self, message: &str, position: usize) -> Error {
+        Error::invalid_syntax(message.to_string(), position)
     }
 
     /// Create a **goal-gate** error at `position`: the construct is one only a module
@@ -2739,56 +2734,56 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `Goal::Script`. Marked so the format
     /// fallback can read the script attempt's death here as proof the source is a
     /// module rather than as one more position to compare
-    /// (`ParseError::is_goal_gated`; `parse_with_goal_or_fallback`).
-    pub(super) fn error_goal_gate_at(&self, message: &str, position: usize) -> ParseError {
-        ParseError::goal_gate(message.to_string(), position)
+    /// (`Error::is_goal_gated`; `parse_with_goal_or_fallback`).
+    pub(super) fn error_goal_gate_at(&self, message: &str, position: usize) -> Error {
+        Error::goal_gate(message.to_string(), position)
     }
 
     /// [`Parser::error_goal_gate_at`] at the current position.
-    pub(super) fn error_goal_gate(&self, message: &str) -> ParseError {
+    pub(super) fn error_goal_gate(&self, message: &str) -> Error {
         self.error_goal_gate_at(message, self.current_pos().0)
     }
 
     /// Create an error: "Expected X"
-    pub(super) fn error_expected(&self, what: &str) -> ParseError {
-        ParseError::invalid_syntax(format!("Expected {what}"), self.current_pos().0)
+    pub(super) fn error_expected(&self, what: &str) -> Error {
+        Error::invalid_syntax(format!("Expected {what}"), self.current_pos().0)
     }
 
     /// Create an error: "Expected X, found Y"
-    pub(super) fn error_expected_found(&self, what: &str) -> ParseError {
+    pub(super) fn error_expected_found(&self, what: &str) -> Error {
         let kind = &self.current.kind;
-        ParseError::invalid_syntax(
+        Error::invalid_syntax(
             format!("Expected {what}, found {kind}"),
             self.current_pos().0,
         )
     }
 
     /// Create an error: "Expected X, found Y" at custom position
-    pub(super) fn error_expected_found_at(&self, what: &str, position: usize) -> ParseError {
+    pub(super) fn error_expected_found_at(&self, what: &str, position: usize) -> Error {
         let kind = &self.current.kind;
-        ParseError::invalid_syntax(format!("Expected {what}, found {kind}"), position)
+        Error::invalid_syntax(format!("Expected {what}, found {kind}"), position)
     }
 
     /// Create an error: "Expected X after Y, found Z"
-    pub(super) fn error_expected_after(&self, what: &str, after: &str) -> ParseError {
+    pub(super) fn error_expected_after(&self, what: &str, after: &str) -> Error {
         let kind = &self.current.kind;
-        ParseError::invalid_syntax(
+        Error::invalid_syntax(
             format!("Expected {what} after '{after}', found {kind}"),
             self.current_pos().0,
         )
     }
 
     /// Create an error: "Unexpected keyword 'X'"
-    pub(super) fn error_unexpected_keyword(&self, kw: KeywordKind) -> ParseError {
-        ParseError::invalid_syntax(format!("Unexpected keyword '{kw}'"), self.current_pos().0)
+    pub(super) fn error_unexpected_keyword(&self, kw: KeywordKind) -> Error {
+        Error::invalid_syntax(format!("Unexpected keyword '{kw}'"), self.current_pos().0)
     }
 
     /// Create an error for the `with` statement in strict code. Named rather than folded
     /// into `error_unexpected_keyword` so the message says *why* the word is refused; a
     /// bare "unexpected keyword" reads like a parser gap for a construct that sloppy
     /// Script code accepts.
-    pub(super) fn error_with_statement(&self) -> ParseError {
-        ParseError::invalid_syntax(
+    pub(super) fn error_with_statement(&self) -> Error {
+        Error::invalid_syntax(
             "The 'with' statement is not allowed in strict mode".to_owned(),
             self.current_pos().0,
         )
@@ -2800,9 +2795,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &self,
         separator: &TokenKind,
         terminator: &TokenKind,
-    ) -> ParseError {
+    ) -> Error {
         let kind = &self.current.kind;
-        ParseError::invalid_syntax(
+        Error::invalid_syntax(
             // `TokenKind`'s `Display` already quotes a punctuator, so no quotes here.
             format!("Expected {separator} or {terminator} after list element, found {kind}"),
             self.current_pos().0,
@@ -2998,10 +2993,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// what parses. One helper for all four heads so they cannot drift apart — they
     /// had, which is how `declare interface` and `declare type` kept welding while
     /// `declare namespace` did not.
-    pub(super) fn require_same_line_declaration_name(
-        &mut self,
-        head: &str,
-    ) -> Result<(), ParseError> {
+    pub(super) fn require_same_line_declaration_name(&mut self, head: &str) -> Result<(), Error> {
         if self.peek_is_same_line_declaration_name() {
             Ok(())
         } else {
@@ -3027,7 +3019,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// The error [`Self::require_same_line_declaration_name`] raises, so the split
     /// caller above reports it in the same words.
-    pub(super) fn same_line_declaration_name_error(&self, head: &str) -> ParseError {
+    pub(super) fn same_line_declaration_name_error(&self, head: &str) -> Error {
         self.error_msg(&format!("{head} name must be on the same line"))
     }
 
@@ -3331,7 +3323,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// # Precondition
     /// Current token must satisfy [`Parser::current_is_identifier_or_keyword`], so
     /// callers own the "not a name here" error and its wording.
-    pub(super) fn parse_identifier_name_node(&mut self) -> Result<Identifier<'arena>, ParseError> {
+    pub(super) fn parse_identifier_name_node(&mut self) -> Result<Identifier<'arena>, Error> {
         debug_assert!(self.current_is_identifier_or_keyword());
         let (start, end) = self.current_pos();
         let name = self.current_ident_name();
@@ -3377,7 +3369,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Returns the PrivateIdentifier beside its span, which includes the `#`.
     pub(super) fn parse_private_identifier(
         &mut self,
-    ) -> Result<(PrivateIdentifier<'arena>, Span), ParseError> {
+    ) -> Result<(PrivateIdentifier<'arena>, Span), Error> {
         debug_assert!(matches!(self.current_kind(), TokenKind::Hash));
         let (start, hash_end) = self.current_pos();
         self.advance()?; // consume '#'
@@ -3399,7 +3391,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ))
     }
 
-    pub(super) fn expect(&mut self, kind: &TokenKind) -> Result<(), ParseError> {
+    pub(super) fn expect(&mut self, kind: &TokenKind) -> Result<(), Error> {
         if self.check(kind) {
             self.advance()
         } else {
@@ -3412,8 +3404,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// two `to_string` allocations + struct build shouldn't inflate the caller.
     #[cold]
     #[inline(never)]
-    fn unexpected_token_err(&self, kind: &TokenKind) -> ParseError {
-        ParseError::unexpected_token(
+    fn unexpected_token_err(&self, kind: &TokenKind) -> Error {
+        Error::unexpected_token(
             kind.to_string(),
             self.current.kind.to_string(),
             self.current_pos().0,
@@ -3434,13 +3426,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - Splits `>>>=` into `>` + re-lex (may become `>>=`)
     ///   Consume a `>` in type context and return the end position of the consumed `>`.
     ///   Handles `>>`, `>>>`, `>=`, etc. by splitting the token.
-    pub(super) fn greater_than_end_in_type(&mut self) -> Result<u32, ParseError> {
+    pub(super) fn greater_than_end_in_type(&mut self) -> Result<u32, Error> {
         let end = (self.current_pos().0 + 1) as u32;
         self.expect_greater_than_in_type()?;
         Ok(end)
     }
 
-    pub(super) fn expect_greater_than_in_type(&mut self) -> Result<(), ParseError> {
+    pub(super) fn expect_greater_than_in_type(&mut self) -> Result<(), Error> {
         match self.current.kind {
             TokenKind::GreaterThan => {
                 // Normal case: single `>`
@@ -3494,7 +3486,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.peek_decoded = None;
                 Ok(())
             }
-            _ => Err(ParseError::unexpected_token(
+            _ => Err(Error::unexpected_token(
                 "'>'".to_string(),
                 format!("'{}'", self.current.kind),
                 self.current_pos().0,
@@ -3515,7 +3507,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Expect `<` opening a type-argument list, splitting `<<` into `<` + `<`
     /// — the opening mirror of `expect_greater_than_in_type`.
-    pub(super) fn expect_less_than_in_type(&mut self) -> Result<(), ParseError> {
+    pub(super) fn expect_less_than_in_type(&mut self) -> Result<(), Error> {
         match self.current.kind {
             TokenKind::LessThan => self.advance(),
             TokenKind::LeftShift => {
@@ -3528,7 +3520,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.current.kind = TokenKind::LessThan;
                 Ok(())
             }
-            _ => Err(ParseError::unexpected_token(
+            _ => Err(Error::unexpected_token(
                 "'<'".to_string(),
                 format!("'{}'", self.current.kind),
                 self.current_pos().0,
@@ -3569,7 +3561,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///     None
     /// };
     /// ```
-    pub(super) fn eat(&mut self, kind: TokenKind) -> Result<bool, ParseError> {
+    pub(super) fn eat(&mut self, kind: TokenKind) -> Result<bool, Error> {
         if self.check(&kind) {
             self.advance()?;
             Ok(true)
@@ -3582,7 +3574,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Returns true if consumed, false otherwise; a lexer error on the token after it is
     /// returned, as [`Parser::eat`] returns one.
     #[inline]
-    pub(super) fn eat_contextual_keyword(&mut self, keyword: &str) -> Result<bool, ParseError> {
+    pub(super) fn eat_contextual_keyword(&mut self, keyword: &str) -> Result<bool, Error> {
         if matches!(self.current_kind(), TokenKind::Identifier) && self.current_value() == keyword {
             self.advance()?;
             Ok(true)
@@ -3628,7 +3620,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// terminator — the shape target is not the validity oracle, so tsv follows tsc.
     /// Per ecma262 §sec-comments a block comment holding a line terminator IS one, so
     /// `asserts /*⏎*/ a` declines on the same rule.
-    pub(super) fn eat_type_predicate_asserts(&mut self) -> Result<bool, ParseError> {
+    pub(super) fn eat_type_predicate_asserts(&mut self) -> Result<bool, Error> {
         if matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "asserts"
             && self.peek_is_identifier_or_keyword()
@@ -3666,12 +3658,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Returns Err if neither explicit semicolon nor ASI conditions are met.
     /// Consume a semicolon and return the end position (including the semicolon).
     /// Use this for statement spans that include the trailing semicolon.
-    pub(super) fn semicolon_end(&mut self) -> Result<u32, ParseError> {
+    pub(super) fn semicolon_end(&mut self) -> Result<u32, Error> {
         self.semicolon()?;
         Ok(self.prev_token_end() as u32)
     }
 
-    pub(super) fn semicolon(&mut self) -> Result<(), ParseError> {
+    pub(super) fn semicolon(&mut self) -> Result<(), Error> {
         if self.eat(TokenKind::Semicolon)? {
             return Ok(());
         }
@@ -3692,7 +3684,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Returns:
     /// - `Ok(true)` if more elements expected (found separator, not at terminator)
     /// - `Ok(false)` if list ended (found terminator or trailing separator)
-    /// - `Err(ParseError)` if neither separator nor terminator found
+    /// - `Err(Error)` if neither separator nor terminator found
     ///
     /// Handles trailing separators uniformly: `[1, 2,]` is valid
     ///
@@ -3709,7 +3701,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         separator: &TokenKind,
         terminator: &TokenKind,
-    ) -> Result<bool, ParseError> {
+    ) -> Result<bool, Error> {
         if self.check(separator) {
             self.advance()?;
             if self.check(terminator) {
@@ -3724,7 +3716,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Program<'arena>, ParseError> {
+    pub fn parse(&mut self) -> Result<Program<'arena>, Error> {
         self.parse_program()
             .map_err(|error| self.mark_await_operand_gate(error))
     }
@@ -3735,7 +3727,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the source was written as a module and the format fallback reports the module
     /// attempt's error (`parse_with_goal_or_fallback`). Applied once, here, rather than
     /// where the error is raised, because any kind of error can land on that token.
-    fn mark_await_operand_gate(&self, error: ParseError) -> ParseError {
+    fn mark_await_operand_gate(&self, error: Error) -> Error {
         if self.await_name_operand.is_some() && error.position() == self.await_name_operand {
             error.into_goal_gate()
         } else {
@@ -3743,7 +3735,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    fn parse_program(&mut self) -> Result<Program<'arena>, ParseError> {
+    fn parse_program(&mut self) -> Result<Program<'arena>, Error> {
         let start = self.base_offset; // Start at base_offset for embedded contexts
 
         // The outermost strictness scope: a Script's `"use strict"` prologue turns
@@ -3781,7 +3773,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the result to a Svelte pattern, then enforces end-of-input itself. (Expression tags
     /// use `parse_expression_with_comments`, which requires full consumption via
     /// `expect_end_of_input`.)
-    pub fn parse_expression_unbounded(&mut self) -> Result<Expression<'arena>, ParseError> {
+    pub fn parse_expression_unbounded(&mut self) -> Result<Expression<'arena>, Error> {
         self.parse_expression()
     }
 
@@ -3794,7 +3786,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the slice exactly — Svelte's `eat('}', true)`. Without this check a trailing token
     /// is silently dropped (`{@html a b}` → `{@html a}`), which loses content rather than
     /// diverging visibly.
-    pub fn expect_end_of_input(&self) -> Result<(), ParseError> {
+    pub fn expect_end_of_input(&self) -> Result<(), Error> {
         if self.current.kind == TokenKind::Eof {
             Ok(())
         } else {
@@ -3807,7 +3799,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The expression must fill the whole slice (see `expect_end_of_input`).
     pub fn parse_expression_with_comments(
         &mut self,
-    ) -> Result<(&'arena Expression<'arena>, &'arena [Comment]), ParseError> {
+    ) -> Result<(&'arena Expression<'arena>, &'arena [Comment]), Error> {
         let expr = self.parse_expression_ref()?;
         self.expect_end_of_input()?;
         let comments = self.take_comments();
@@ -3835,7 +3827,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub fn parse_assignment_expression_partial(
         &mut self,
         top_level_as: TopLevelAs,
-    ) -> Result<(&'arena Expression<'arena>, usize), ParseError> {
+    ) -> Result<(&'arena Expression<'arena>, usize), Error> {
         let saved = std::mem::replace(
             &mut self.top_level_as_is_assertion,
             top_level_as == TopLevelAs::Assertion,
@@ -3865,11 +3857,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// # Returns
     ///
     /// * `Ok(Expression)` - The converted pattern (ObjectPattern, ArrayPattern, etc.)
-    /// * `Err(ParseError)` - If the expression cannot be converted to a valid pattern
+    /// * `Err(Error)` - If the expression cannot be converted to a valid pattern
     pub fn expression_to_svelte_pattern(
         &mut self,
         expr: Expression<'arena>,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, Error> {
         // Svelte block and `{@const}` patterns, which Svelte reads as assignment
         // targets: a member or parenthesized target is accepted, a type-assertion
         // target still rejects (see `AssignableContext::SveltePattern`).
@@ -3887,7 +3879,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// rather than panicking (debug) or mis-extracting a "string" from the wrong
     /// token (release, where a bare `debug_assert!` would be elided). Surfaced by
     /// the `fuzz` gate (`tsv_debug fuzz`).
-    pub(super) fn parse_string_literal(&mut self) -> Result<Literal<'arena>, ParseError> {
+    pub(super) fn parse_string_literal(&mut self) -> Result<Literal<'arena>, Error> {
         if !matches!(self.current_kind(), TokenKind::String) {
             return Err(self.error_expected("string literal"));
         }
@@ -3907,7 +3899,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 pub fn parse_typescript<'arena>(
     source: &str,
     arena: &'arena Bump,
-) -> Result<Program<'arena>, ParseError> {
+) -> Result<Program<'arena>, Error> {
     parse_typescript_with_goal(source, Goal::Module, arena)
 }
 
@@ -3974,9 +3966,9 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     goal: Goal,
     arena: &'arena Bump,
     embedded: bool,
-    f: impl Fn(&mut Parser<'_, 'arena>) -> Result<T, ParseError>,
-    host_check: impl Fn(&T) -> Result<(), ParseError>,
-) -> Result<T, ParseError> {
+    f: impl Fn(&mut Parser<'_, 'arena>) -> Result<T, Error>,
+    host_check: impl Fn(&T) -> Result<(), Error>,
+) -> Result<T, Error> {
     // Each failure carries whether the host refused it (`true`) or the parse itself did.
     let checked = |parsed: T| {
         host_check(&parsed)
@@ -4018,7 +4010,7 @@ pub fn parse_typescript_with_goal<'arena>(
     source: &str,
     goal: Goal,
     arena: &'arena Bump,
-) -> Result<Program<'arena>, ParseError> {
+) -> Result<Program<'arena>, Error> {
     parse_retrying_acorn_followers(
         source,
         0,
@@ -4039,7 +4031,7 @@ pub fn parse_typescript_with_goal<'arena>(
 pub fn parse_typescript_preserve_parens<'arena>(
     source: &str,
     arena: &'arena Bump,
-) -> Result<Program<'arena>, ParseError> {
+) -> Result<Program<'arena>, Error> {
     parse_retrying_acorn_followers(
         source,
         0,

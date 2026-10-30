@@ -180,13 +180,13 @@ pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena
 /// # Returns
 ///
 /// * `Ok(Program)` - The parsed AST
-/// * `Err(ParseError)` - If parsing fails
+/// * `Err(Error)` - If parsing fails
 ///
 /// # Errors
 ///
 /// An error is positioned in the host document (`base_offset` included) but carries no
-/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
-/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does): a
+/// point — [`Error::wire_point`] is `None` — until the host fills its context over
+/// the whole document ([`Error::with_context`], as `tsv_svelte::parse` does): a
 /// context taken over `source`, a slice, would read that position against the wrong
 /// text. The same holds for every embedded entry point here that takes a `base_offset`.
 ///
@@ -319,7 +319,7 @@ pub fn parse_expression_with_comments<'arena>(
 /// * `Ok((pattern, comments))` - The parsed pattern (ObjectPattern, ArrayPattern, …) and
 ///   the comments this sub-parse consumed — a caller that drops them drops the comment
 ///   outright (see [`parse_type_annotation_partial`])
-/// * `Err(ParseError)` - If parsing or conversion fails
+/// * `Err(Error)` - If parsing or conversion fails
 ///
 /// # Errors
 ///
@@ -406,7 +406,7 @@ pub fn attach_pattern_type_annotation<'arena>(
         // pattern, so nothing else is reachable — and no other `Expression`
         // variant has an annotation slot to hold it. Reject rather than drop.
         _ => {
-            return Err(tsv_lang::lex_err(
+            return Err(Error::lex(
                 "type annotation is not valid on this binding pattern",
                 pattern.span.start as usize,
             ));

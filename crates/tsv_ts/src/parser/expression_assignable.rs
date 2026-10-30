@@ -6,7 +6,7 @@ use crate::ast::{
     ArrayPattern, AssignmentOperator, AssignmentPattern, Expression, ExpressionKind, ObjectPattern,
     ObjectPatternProperty, ObjectProperty, Property, PropertyKind, RestElement, SpreadElement,
 };
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::Parser;
 
@@ -84,7 +84,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         expr: Expression<'arena>,
         context: AssignableContext,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, Error> {
         // A parenthesized target is no binding target: `BindingElement` and
         // `BindingRestElement` derive a `BindingIdentifier` or a nested pattern, never a
         // parenthesized one, so `let [(a)] = x` is a syntax error (tsc TS1181, acorn
@@ -381,7 +381,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         expr: Expression<'arena>,
         context: AssignableContext,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, Error> {
         let start = expr.span().start_usize();
         let target = self.refine_assignable(expr, context)?;
         if matches!(target.kind, ExpressionKind::AssignmentPattern(_)) {
@@ -424,7 +424,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &self,
         left: &Expression<'arena>,
         expr_start: usize,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         let span = left.span();
         let parenthesized =
             span.start_usize() > expr_start && (span.end as usize) < self.prev_token_end();
@@ -465,7 +465,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `{...a,}`). The literal parser records the discarded comma on
     /// `spread_trailing_comma`; both the array and object pattern arms surface
     /// it. acorn: "Comma is not permitted after the rest element".
-    fn rest_trailing_comma_error(&self, pos: usize) -> ParseError {
+    fn rest_trailing_comma_error(&self, pos: usize) -> Error {
         self.error_msg_at(
             "A trailing comma is not permitted after a rest element",
             pos,
@@ -482,7 +482,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         spread: &SpreadElement<'arena>,
         context: AssignableContext,
-    ) -> Result<RestElement<'arena>, ParseError> {
+    ) -> Result<RestElement<'arena>, Error> {
         let argument = self.refine_assignable(spread.argument.clone(), context)?;
         if matches!(argument.kind, ExpressionKind::AssignmentPattern(_)) {
             return Err(self.error_msg_at(
@@ -503,7 +503,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         prop: ObjectProperty<'arena>,
         context: AssignableContext,
-    ) -> Result<ObjectPatternProperty<'arena>, ParseError> {
+    ) -> Result<ObjectPatternProperty<'arena>, Error> {
         match prop {
             ObjectProperty::Property(p) => {
                 // A method, accessor or generator property has no pattern form: the wire

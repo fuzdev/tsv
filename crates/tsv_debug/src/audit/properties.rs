@@ -73,7 +73,7 @@ pub(crate) enum BaseFixedPoint {
     Ok(String),
     /// The parser rejected the seed — ordinary over a fixture tree (a `tsv_rejects` fixture, a
     /// prettier-rejects input) and not this audit's business.
-    ParseError,
+    Error,
     /// The seed formats, but its output reformats to something else: F1 broken as authored.
     NonIdempotent,
 }
@@ -81,7 +81,7 @@ pub(crate) enum BaseFixedPoint {
 /// Format `source` and verify the result is a fixed point. See [`BaseFixedPoint`].
 pub(crate) fn base_fixed_point(source: &str, parser: ParserType) -> BaseFixedPoint {
     let Ok(f) = format_source(source, parser) else {
-        return BaseFixedPoint::ParseError;
+        return BaseFixedPoint::Error;
     };
     match format_source(&f, parser) {
         Ok(f2) if f2 == f => BaseFixedPoint::Ok(f),

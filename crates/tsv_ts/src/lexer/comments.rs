@@ -1,7 +1,6 @@
 use super::ES_LINE_TERMINATOR_LEADS;
 use super::is_es_line_terminator_at;
-use super::lex_err;
-use tsv_lang::ParseError;
+use tsv_lang::Error;
 
 /// The end of the TypeScript line comment `// ...` opening at `start`: the offset of the
 /// first `LineTerminator` after the `//`, or the end of input. The terminator is NOT part
@@ -43,7 +42,7 @@ pub(crate) fn line_comment_end(bytes: &[u8], start: usize) -> usize {
 ///
 /// NOTE: Content is preserved exactly as written. Indentation stripping for multi-line
 /// comments happens in the conversion layer (matching Svelte's behavior).
-pub(crate) fn block_comment_end(bytes: &[u8], start: usize) -> Result<usize, ParseError> {
+pub(crate) fn block_comment_end(bytes: &[u8], start: usize) -> Result<usize, Error> {
     let len = bytes.len();
 
     // `*` (`0x2a`) is ASCII and never a UTF-8 continuation byte, so a byte scan is sound
@@ -56,7 +55,7 @@ pub(crate) fn block_comment_end(bytes: &[u8], start: usize) -> Result<usize, Par
     loop {
         p = tsv_lang::swar::next_byte_of(bytes, p, [b'*']);
         if p >= len {
-            return Err(lex_err("Unterminated block comment", start));
+            return Err(Error::lex("Unterminated block comment", start));
         }
         // bytes[p] == b'*'
         if bytes.get(p + 1) == Some(&b'/') {

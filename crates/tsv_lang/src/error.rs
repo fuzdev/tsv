@@ -23,14 +23,14 @@ use crate::location::{WireCoordinates, WirePoint};
 pub(crate) struct ErrorContext {
     /// The excerpted source line (no terminator). A `Box<str>` rather than a `String`, and
     /// the caret column a `u32`, to keep the context — and so the payload every located
-    /// [`ParseErrorKind`] variant carries — at the size the `const` assert below pins.
+    /// [`Repr`] variant carries — at the size the `const` assert below pins.
     source_line: Box<str>,
     /// Characters from the excerpt's start to the error — what the caret is padded past.
     caret_column: u32,
     /// The error's position in the document's wire coordinates.
     point: WirePoint,
     /// The coordinates `point` was taken in, kept so the context can be re-taken over
-    /// another text ([`ParseError::unfold`]).
+    /// another text ([`Error::unfold`]).
     coordinates: WireCoordinates,
 }
 
@@ -129,13 +129,13 @@ fn format_error(base_msg: &str, position: usize, context: Option<&ErrorContext>)
     }
 }
 
-/// The error payload, behind the `Box` in [`ParseError`]. Private: `ParseError` is
+/// The error payload, behind the `Box` in [`Error`]. Private: `Error` is
 /// construction-only outside this module — nothing matches a variant or reads a field —
 /// so the constructor functions below are the whole API, and keeping the enum private
 /// makes them the only way in (which is what keeps `context` uniformly `None` at
-/// construction, filled later by [`ParseError::with_context`]).
+/// construction, filled later by [`Error::with_context`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum ParseErrorKind {
+enum Repr {
     UnexpectedToken {
         expected: String,
         found: String,
@@ -156,9 +156,9 @@ enum ParseErrorKind {
         position: usize,
         context: Option<ErrorContext>,
     },
-    // Constructed only by `ParseError::too_deep`: a located syntax error like the four
+    // Constructed only by `Error::too_deep`: a located syntax error like the four
     // above, kept apart so a caller can tell a resource limit from malformed source
-    // (`ParseError::is_too_deep`).
+    // (`Error::is_too_deep`).
     TooDeep {
         limit: DepthLimit,
         position: usize,
@@ -171,7 +171,7 @@ enum ParseErrorKind {
         size: usize,
         max: usize,
     },
-    // Constructed only by `ParseError::refusal`. Not a located error, though it has a
+    // Constructed only by `Error::refusal`. Not a located error, though it has a
     // span: see that constructor.
     Refused {
         message: Box<str>,
@@ -181,7 +181,7 @@ enum ParseErrorKind {
     },
 }
 
-impl ParseErrorKind {
+impl Repr {
     /// What went wrong, without where: the message's first part, ahead of the frame a
     /// located error renders under it — always ONE line. Every summary every surface prints or
     /// returns is built here, and several quote source text (a token, a Svelte attribute's
@@ -190,18 +190,18 @@ impl ParseErrorKind {
         escape_line_terminators(self.raw_summary())
     }
 
-    /// [`ParseErrorKind::summary`] before its line terminators are spelled out.
+    /// [`Repr::summary`] before its line terminators are spelled out.
     fn raw_summary(&self) -> String {
         match self {
-            ParseErrorKind::UnexpectedToken {
+            Repr::UnexpectedToken {
                 expected, found, ..
             } => format!("Expected {expected}, found {found}"),
-            ParseErrorKind::UnexpectedEof { .. } => "Unexpected end of file".to_owned(),
-            ParseErrorKind::InvalidSyntax { message, .. } => message.clone(),
-            ParseErrorKind::InvalidExpression { found, .. } => {
+            Repr::UnexpectedEof { .. } => "Unexpected end of file".to_owned(),
+            Repr::InvalidSyntax { message, .. } => message.clone(),
+            Repr::InvalidExpression { found, .. } => {
                 format!("Expected expression, found {found}")
             }
-            ParseErrorKind::TooDeep { limit, .. } => match limit {
+            Repr::TooDeep { limit, .. } => match limit {
                 DepthLimit::Nesting => format!(
                     "Nesting exceeds tsv's depth limit of {} levels",
                     limit.value()
@@ -212,10 +212,10 @@ impl ParseErrorKind {
                                       type suffixes exceeds tsv's length limit"
                     .to_string(),
             },
-            ParseErrorKind::FileTooLarge { size, max } => {
+            Repr::FileTooLarge { size, max } => {
                 format!("File too large: {size} bytes (maximum: {max} bytes / 4 GiB)")
             }
-            ParseErrorKind::Refused { message, .. } => message.to_string(),
+            Repr::Refused { message, .. } => message.to_string(),
         }
     }
 }
@@ -223,10 +223,10 @@ impl ParseErrorKind {
 /// The summary, then — for a located error with its context filled, and for a refusal — a
 /// `\n` and the frame; a located error no context has been filled for falls back to
 /// `at position N`.
-impl fmt::Display for ParseErrorKind {
+impl fmt::Display for Repr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let summary = self.summary();
-        if let ParseErrorKind::Refused { frame, .. } = self {
+        if let Repr::Refused { frame, .. } = self {
             return write!(f, "{summary}\n{frame}");
         }
         match self.located() {
@@ -239,8 +239,8 @@ impl fmt::Display for ParseErrorKind {
 }
 
 impl ErrorReport {
-    /// A refusal's report — what [`ParseError::refusal`] reports for the same arguments —
-    /// built directly, for a caller whose refusal is no `ParseError` (the type strip's,
+    /// A refusal's report — what [`Error::refusal`] reports for the same arguments —
+    /// built directly, for a caller whose refusal is no `Error` (the type strip's,
     /// `tsv_ts::UnsupportedKind::report`): `message` as the summary (its line terminators
     /// spelled out), the frame of `start` in `source` under `coordinates`, and the span
     /// `start..end`.
@@ -286,7 +286,7 @@ fn escape_line_terminators(summary: String) -> String {
 }
 
 /// A pointed error as a binding reports it: the summary and the frame apart, and the span
-/// in the document's wire coordinates ([`ParseError::report`]). The error's own message is
+/// in the document's wire coordinates ([`Error::report`]). The error's own message is
 /// exactly `summary`, a `\n`, then `frame`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErrorReport {
@@ -298,16 +298,16 @@ pub struct ErrorReport {
     /// Where the error starts: the point the header prints.
     pub start: WirePoint,
     /// Where it ends — `start` itself for a syntax error, which knows a point and no span;
-    /// a refusal's own end ([`ParseError::refusal`]).
+    /// a refusal's own end ([`Error::refusal`]).
     pub end: WirePoint,
-    /// A [`ParseError::refusal`] of a source that parses, not a syntax error.
+    /// An [`Error::refusal`] of a source that parses, not a syntax error.
     pub refused: bool,
 }
 
 /// A parse error — **8 bytes**, because the payload lives behind the `Box`.
 ///
 /// The size is the point. A `Result<T, E>` is sized by `max(T, E)`, so an inline
-/// [`ParseErrorKind`] (96 bytes) makes *every* fallible function whose success payload is
+/// [`Repr`] (96 bytes) makes *every* fallible function whose success payload is
 /// smaller than that return 96 bytes through memory on its hot `Ok` path — and the parsers
 /// are full of `Result<(), _>`, `Result<bool, _>`, `Result<usize, _>`. Boxing the payload
 /// once, here, shrinks the `Result` at every one of those call sites in all three language
@@ -322,13 +322,13 @@ pub struct ErrorReport {
 /// are exactly what the enum produces.
 #[derive(Clone, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct ParseError(Box<Payload>);
+pub struct Error(Box<Payload>);
 
-/// What a [`ParseError`] boxes: the error, and the one fact about it its message does
+/// What an [`Error`] boxes: the error, and the one fact about it its message does
 /// not carry.
 #[derive(Clone, PartialEq, Eq)]
 struct Payload {
-    kind: ParseErrorKind,
+    kind: Repr,
     /// The error is a **goal gate**: it fired on a construct one parse goal reads and the
     /// other refuses (`import` / `export` / `import.meta`, a top-level `for await`, or the
     /// operand of a top-level `await`, at `Script`), so the rejection says which grammar the
@@ -336,53 +336,54 @@ struct Payload {
     /// against rather than that it is broken. Beside the kind rather than on one variant,
     /// because the refusal it marks can take any kind's shape — the `await` operand's is
     /// whatever error the name reading hit there. Read by the format fallback's
-    /// attribution ([`ParseError::is_goal_gated`]).
+    /// attribution ([`Error::is_goal_gated`]).
     goal_gated: bool,
 }
 
 // The whole point of the newtype — guard it. `Box` is non-null, so the niche also carries
-// `Result<(), ParseError>` down to a bare pointer. `#[repr(transparent)]` makes both a layout
+// `Result<(), Error>` down to a bare pointer. `#[repr(transparent)]` makes both a layout
 // guarantee rather than rustc's choice, which is why these two hold in every build.
-const _: () = assert!(size_of::<ParseError>() == size_of::<*const ()>());
+const _: () = assert!(size_of::<Error>() == size_of::<*const ()>());
 const _: () = assert!(size_of::<Result<()>>() == size_of::<*const ()>());
 // The payload size the rationale above (and `with_context`'s move) is stated in, on a
 // 64-bit target: an inline error would cost every small `Result` this many bytes. An exact
 // rustc layout, so it is pinned in the test build only.
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<ParseErrorKind>() == 96);
+const _: () = assert!(size_of::<Repr>() == 96);
 
-impl fmt::Display for ParseError {
+impl fmt::Display for Error {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.kind.fmt(f)
     }
 }
 
-impl fmt::Debug for ParseError {
+impl fmt::Debug for Error {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.kind.fmt(f)
     }
 }
 
-impl std::error::Error for ParseError {}
+impl std::error::Error for Error {}
 
 /// Result type alias for parsing operations
-pub type Result<T> = std::result::Result<T, ParseError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
-/// Construct a lexer error. `#[cold]` / `#[inline(never)]` outlines the construction so it
-/// never bloats the inlined token-scan fast path. Shared by all three language lexers
-/// (`tsv_ts`, `tsv_css`, `tsv_svelte`).
-#[cold]
-#[inline(never)]
-pub fn lex_err(message: impl Into<String>, position: usize) -> ParseError {
-    ParseError::invalid_syntax(message.into(), position)
-}
+impl Error {
+    /// Construct a lexer error. `#[cold]` / `#[inline(never)]` outlines the construction so it
+    /// never bloats the inlined token-scan fast path. Shared by all three language lexers
+    /// (`tsv_ts`, `tsv_css`, `tsv_svelte`).
+    #[doc(hidden)]
+    #[cold]
+    #[inline(never)]
+    pub fn lex(message: impl Into<String>, position: usize) -> Error {
+        Error::invalid_syntax(message.into(), position)
+    }
 
-impl ParseError {
     #[inline]
-    fn new(kind: ParseErrorKind) -> Self {
-        ParseError(Box::new(Payload {
+    fn new(kind: Repr) -> Self {
+        Error(Box::new(Payload {
             kind,
             goal_gated: false,
         }))
@@ -390,7 +391,7 @@ impl ParseError {
 
     /// A general parse error at `position`.
     pub fn invalid_syntax(message: String, position: usize) -> Self {
-        ParseError::new(ParseErrorKind::InvalidSyntax {
+        Error::new(Repr::InvalidSyntax {
             message,
             position,
             context: None,
@@ -400,9 +401,9 @@ impl ParseError {
     /// A general parse error at `position` that is a **goal gate** — a construct one
     /// parse goal admits and the other refuses, so the error is evidence about the
     /// source's grammar rather than about a mistake in it. See
-    /// [`ParseError::is_goal_gated`].
+    /// [`Error::is_goal_gated`].
     pub fn goal_gate(message: String, position: usize) -> Self {
-        ParseError::invalid_syntax(message, position).into_goal_gate()
+        Error::invalid_syntax(message, position).into_goal_gate()
     }
 
     /// This error, marked a goal gate — for a refusal no construct-specific constructor
@@ -414,7 +415,7 @@ impl ParseError {
         self
     }
 
-    /// Whether this error is a goal gate ([`ParseError::goal_gate`]).
+    /// Whether this error is a goal gate ([`Error::goal_gate`]).
     ///
     /// The format fallback holds two errors for one source when both goals reject it,
     /// and a *script* attempt that died on a goal gate has proved the source a module —
@@ -427,7 +428,7 @@ impl ParseError {
 
     /// Found `found` where `expected` was required.
     pub fn unexpected_token(expected: String, found: String, position: usize) -> Self {
-        ParseError::new(ParseErrorKind::UnexpectedToken {
+        Error::new(Repr::UnexpectedToken {
             expected,
             found,
             position,
@@ -437,7 +438,7 @@ impl ParseError {
 
     /// Input ended while more was required.
     pub fn unexpected_eof(position: usize) -> Self {
-        ParseError::new(ParseErrorKind::UnexpectedEof {
+        Error::new(Repr::UnexpectedEof {
             position,
             context: None,
         })
@@ -445,7 +446,7 @@ impl ParseError {
 
     /// Found `found` where an expression was required.
     pub fn invalid_expression(found: String, position: usize) -> Self {
-        ParseError::new(ParseErrorKind::InvalidExpression {
+        Error::new(Repr::InvalidExpression {
             found,
             position,
             context: None,
@@ -453,17 +454,17 @@ impl ParseError {
     }
 
     /// The byte offset the error is reported at, in the coordinates the error was
-    /// built in (host coordinates for a parser error; see [`ParseError::shift_position`]
+    /// built in (host coordinates for a parser error; see [`Error::shift_position`]
     /// for the lexer case). `None` for the kinds that are not syntax errors, a source over
-    /// the `u32` cap and a [`ParseError::refusal`]. A caller holding two errors for one source
+    /// the `u32` cap and an [`Error::refusal`]. A caller holding two errors for one source
     /// reads this to say which got further — the format fallback's module-vs-script choice.
     pub fn position(&self) -> Option<usize> {
         self.0.kind.located().map(|(position, _)| *position)
     }
 
     /// Whether this is a **syntax error** — the source is malformed at a point — rather
-    /// than a source over the `u32` cap (positionless) or a [`ParseError::refusal`] of a
-    /// source that parses (pointed, but by its own span in [`ParseError::report`]). The one
+    /// than a source over the `u32` cap (positionless) or an [`Error::refusal`] of a
+    /// source that parses (pointed, but by its own span in [`Error::report`]). The one
     /// question every surface asks before choosing its channel: the CLI's `Parse error:` prefix (a
     /// binding reads the same split from [`ErrorReport::refused`]). A whole-document parse
     /// entry point fills every syntax error's context, so on its errors this is exactly
@@ -472,40 +473,40 @@ impl ParseError {
         self.0.kind.located().is_some()
     }
 
-    /// The [`ParseError::too_deep`] payload, built here where the kind is visible.
+    /// The [`Error::too_deep`] payload, built here where the kind is visible.
     pub(crate) fn depth_limit(limit: DepthLimit, position: usize) -> Self {
-        ParseError::new(ParseErrorKind::TooDeep {
+        Error::new(Repr::TooDeep {
             limit,
             position,
             context: None,
         })
     }
 
-    /// Whether this is a [`ParseError::too_deep`] — the source passed one of the parsers'
+    /// Whether this is an [`Error::too_deep`] — the source passed one of the parsers'
     /// depth limits, a resource bound rather than a grammar verdict. A speculative parse
     /// hands such an error back instead of rewinding to another reading, since the other
     /// reading would be chosen for the stack's sake, not the grammar's.
     pub fn is_too_deep(&self) -> bool {
-        matches!(self.0.kind, ParseErrorKind::TooDeep { .. })
+        matches!(self.0.kind, Repr::TooDeep { .. })
     }
 
     /// Source exceeds the 4 GiB − 1 cap the `u32` span offsets assume.
     fn file_too_large(size: usize, max: usize) -> Self {
-        ParseError::new(ParseErrorKind::FileTooLarge { size, max })
+        Error::new(Repr::FileTooLarge { size, max })
     }
 
     /// A **refusal**: `source` parses, but an operation cannot handle what it holds — a
     /// format that cannot print it without changing what it means (a Svelte in-tag `//`
     /// comment holding a lone `<CR>`, which the format path's line-terminator fold would end
-    /// early — `tsv_svelte::__private::parse_folded`). It covers the bytes `start..end`. The type
-    /// strip's refusals take the same report shape without a `ParseError`
-    /// ([`ErrorReport::refusal`], via `tsv_ts::UnsupportedKind::report`).
+    /// early). It covers the bytes `start..end`. The type strip's refusals take the same
+    /// report shape without an `Error` ([`ErrorReport::refusal`], via
+    /// `tsv_ts::UnsupportedKind::report`).
     ///
     /// The message is rendered here, with the `line:col` header and excerpt of `start` in
     /// `source` under `coordinates` that a located error prints, so it reads like every other
-    /// error, and the span is kept ([`ParseError::report`]). But it is **not a syntax error** —
-    /// no [`ParseError::position`], no [`ParseError::wire_point`],
-    /// [`ParseError::is_syntax_error`] false: the source is not malformed (`parse` accepts it),
+    /// error, and the span is kept ([`Error::report`]). But it is **not a syntax error** —
+    /// no [`Error::position`], no [`Error::wire_point`],
+    /// [`Error::is_syntax_error`] false: the source is not malformed (`parse` accepts it),
     /// so every surface reports it apart from a parse failure — the CLI's `Error:` prefix, the
     /// npm facade's `kind: 'refused'`.
     #[cold]
@@ -518,7 +519,7 @@ impl ParseError {
         coordinates: WireCoordinates,
     ) -> Self {
         let report = ErrorReport::refusal(message, source, start, end, coordinates);
-        ParseError::new(ParseErrorKind::Refused {
+        Error::new(Repr::Refused {
             message: report.summary.into(),
             frame: report.frame.into(),
             start: report.start,
@@ -528,11 +529,11 @@ impl ParseError {
 
     /// The error as a binding reports it — summary, frame and span — for every error with a
     /// point: a syntax error whose context is filled (its span the point alone:
-    /// `end == start`) and a [`ParseError::refusal`] (its own span, `refused` set). `None`
+    /// `end == start`) and an [`Error::refusal`] (its own span, `refused` set). `None`
     /// for a source over the size cap and for a located error no
-    /// [`ParseError::with_context`] has filled.
+    /// [`Error::with_context`] has filled.
     pub fn report(&self) -> Option<ErrorReport> {
-        if let ParseErrorKind::Refused {
+        if let Repr::Refused {
             frame, start, end, ..
         } = &self.0.kind
         {
@@ -562,17 +563,17 @@ impl ParseError {
         // `try_from` rather than `len > u32::MAX as usize`: on a 32-bit target (wasm32)
         // `usize` is `u32`, the comparison is vacuous, and clippy rejects it as such.
         if u32::try_from(source.len()).is_err() {
-            return Err(ParseError::file_too_large(source.len(), u32::MAX as usize));
+            return Err(Error::file_too_large(source.len(), u32::MAX as usize));
         }
         Ok(())
     }
 
     /// Lift a position out of a lexer's own coordinates into the document's.
     ///
-    /// A [`lex_err`] position indexes the lexer's `source`, which for the TypeScript and
+    /// An `Error::lex` position indexes the lexer's `source`, which for the TypeScript and
     /// CSS lexers is routinely a **slice** of the document the error is finally rendered
     /// against: a Svelte `<script>` / `<style>` island or template expression, the CSS
-    /// declaration-value scan (`source[from..]`). [`ParseError::with_context`] is handed the
+    /// declaration-value scan (`source[from..]`). [`Error::with_context`] is handed the
     /// whole document, so a slice-local position points at the wrong construct — an error
     /// on line 4 of a component rendered against line 1, out in the markup.
     ///
@@ -605,12 +606,12 @@ impl ParseError {
 
     /// Fill in where the error sits in `source` — the document every position of this
     /// error indexes — under the document's `coordinates`: the point its message header
-    /// prints and [`ParseError::wire_point`] reports, and the line excerpted under it. Each
+    /// prints and [`Error::wire_point`] reports, and the line excerpted under it. Each
     /// language crate's public parse entry points call this with that language's
     /// coordinates (`tsv_ts::WIRE_COORDINATES` and its siblings). The embedded entry points
-    /// (`tsv_ts::__private::parse_embedded` and its siblings, `tsv_css::__private::parse_embedded`)
-    /// do not: their source is a slice of a host document, so their errors leave context-free and
-    /// the host (`tsv_svelte::parse`) fills them over the whole document.
+    /// `tsv_svelte` uses for `<script>` / `<style>` bodies do not: their source is a slice of
+    /// a host document, so their errors leave context-free and the host (`tsv_svelte::parse`)
+    /// fills them over the whole document.
     ///
     /// ```ignore
     /// parser::parse(source).map_err(|e| e.with_context(source, WIRE_COORDINATES))
@@ -638,8 +639,8 @@ impl ParseError {
     /// the numbers its message header prints, as `line:column+1`.
     ///
     /// `None` for the kinds that are not syntax errors (a source over the `u32` cap, a
-    /// [`ParseError::refusal`] — whose span is [`ParseError::report`]'s) and for an
-    /// error no [`ParseError::with_context`] has filled — which only the embedded entry points
+    /// [`Error::refusal`] — whose span is [`Error::report`]'s) and for an
+    /// error no [`Error::with_context`] has filled — which only the embedded entry points
     /// return, ahead of their host's fill; no whole-document parse entry point does.
     pub fn wire_point(&self) -> Option<WirePoint> {
         self.0
@@ -666,49 +667,49 @@ impl ParseError {
     }
 }
 
-impl ParseErrorKind {
+impl Repr {
     /// The position and context slots of a located error, `None` for the kinds that are not
     /// syntax errors (`FileTooLarge`; `Refused`, whose point is fixed at construction).
-    /// Which variants carry a position is stated here and in [`ParseErrorKind::located_mut`]
+    /// Which variants carry a position is stated here and in [`Repr::located_mut`]
     /// — one match cannot lend both a shared and an exclusive borrow — so `position`,
     /// `shift_position` and `with_context` restate no variant list of their own, and a new
     /// variant is classified in these two.
     fn located(&self) -> Option<(&usize, &Option<ErrorContext>)> {
         match self {
-            ParseErrorKind::UnexpectedToken {
+            Repr::UnexpectedToken {
                 position, context, ..
             }
-            | ParseErrorKind::UnexpectedEof { position, context }
-            | ParseErrorKind::InvalidSyntax {
+            | Repr::UnexpectedEof { position, context }
+            | Repr::InvalidSyntax {
                 position, context, ..
             }
-            | ParseErrorKind::InvalidExpression {
+            | Repr::InvalidExpression {
                 position, context, ..
             }
-            | ParseErrorKind::TooDeep {
+            | Repr::TooDeep {
                 position, context, ..
             } => Some((position, context)),
-            ParseErrorKind::FileTooLarge { .. } | ParseErrorKind::Refused { .. } => None,
+            Repr::FileTooLarge { .. } | Repr::Refused { .. } => None,
         }
     }
 
-    /// [`ParseErrorKind::located`], mutably — the same variant list, kept in step.
+    /// [`Repr::located`], mutably — the same variant list, kept in step.
     fn located_mut(&mut self) -> Option<(&mut usize, &mut Option<ErrorContext>)> {
         match self {
-            ParseErrorKind::UnexpectedToken {
+            Repr::UnexpectedToken {
                 position, context, ..
             }
-            | ParseErrorKind::UnexpectedEof { position, context }
-            | ParseErrorKind::InvalidSyntax {
+            | Repr::UnexpectedEof { position, context }
+            | Repr::InvalidSyntax {
                 position, context, ..
             }
-            | ParseErrorKind::InvalidExpression {
+            | Repr::InvalidExpression {
                 position, context, ..
             }
-            | ParseErrorKind::TooDeep {
+            | Repr::TooDeep {
                 position, context, ..
             } => Some((position, context)),
-            ParseErrorKind::FileTooLarge { .. } | ParseErrorKind::Refused { .. } => None,
+            Repr::FileTooLarge { .. } | Repr::Refused { .. } => None,
         }
     }
 }
@@ -763,13 +764,13 @@ mod tests {
     /// fill — and every other constructor leaves it unset.
     #[test]
     fn test_goal_gate_mark_survives_shift_and_context() {
-        let e = ParseError::goal_gate("'export' is only allowed in a module".to_string(), 0)
+        let e = Error::goal_gate("'export' is only allowed in a module".to_string(), 0)
             .shift_position(3)
             .with_context("x; export {};", ECMA);
         assert!(e.is_goal_gated());
         assert_eq!(e.position(), Some(3));
-        assert!(!ParseError::invalid_syntax("x".to_string(), 0).is_goal_gated());
-        assert!(!ParseError::unexpected_eof(0).is_goal_gated());
+        assert!(!Error::invalid_syntax("x".to_string(), 0).is_goal_gated());
+        assert!(!Error::unexpected_eof(0).is_goal_gated());
     }
 
     /// `into_goal_gate` marks an error of any kind — the refusal a name `await` hits at
@@ -777,7 +778,7 @@ mod tests {
     /// error renders or reports.
     #[test]
     fn test_into_goal_gate_keeps_the_kind_and_its_message() {
-        let plain = ParseError::unexpected_token("';'".to_string(), "identifier".to_string(), 6)
+        let plain = Error::unexpected_token("';'".to_string(), "identifier".to_string(), 6)
             .with_context("await x;", ECMA);
         let gated = plain.clone().into_goal_gate();
         assert!(!plain.is_goal_gated());
@@ -796,14 +797,14 @@ mod tests {
     fn test_display_renders_through_the_newtype() {
         let source = "let x =\ny";
 
-        let e = ParseError::invalid_syntax("bad token".to_string(), 4);
+        let e = Error::invalid_syntax("bad token".to_string(), 4);
         assert_eq!(e.to_string(), "bad token at position 4");
         assert_eq!(
             e.with_context(source, ECMA).to_string(),
             "bad token\n1:5 let x =\n        ^ here"
         );
 
-        let e = ParseError::unexpected_token("';'".to_string(), "'y'".to_string(), 8);
+        let e = Error::unexpected_token("';'".to_string(), "'y'".to_string(), 8);
         assert_eq!(e.to_string(), "Expected ';', found 'y' at position 8");
         assert_eq!(
             e.with_context(source, ECMA).to_string(),
@@ -811,32 +812,32 @@ mod tests {
         );
 
         assert_eq!(
-            ParseError::unexpected_eof(9).to_string(),
+            Error::unexpected_eof(9).to_string(),
             "Unexpected end of file at position 9"
         );
         assert_eq!(
-            ParseError::invalid_expression("'='".to_string(), 6).to_string(),
+            Error::invalid_expression("'='".to_string(), 6).to_string(),
             "Expected expression, found '=' at position 6"
         );
         assert_eq!(
-            ParseError::file_too_large(5, 4).to_string(),
+            Error::file_too_large(5, 4).to_string(),
             "File too large: 5 bytes (maximum: 4 bytes / 4 GiB)"
         );
 
         // `with_context` on the context-free variant is a no-op, not a panic, and it has
         // no point to report.
-        let too_large = ParseError::file_too_large(5, 4).with_context(source, ECMA);
+        let too_large = Error::file_too_large(5, 4).with_context(source, ECMA);
         assert_eq!(
             too_large.to_string(),
             "File too large: 5 bytes (maximum: 4 bytes / 4 GiB)"
         );
         assert_eq!(too_large.wire_point(), None);
         // Nor does a located error no context has been filled for.
-        assert_eq!(ParseError::unexpected_eof(9).wire_point(), None);
+        assert_eq!(Error::unexpected_eof(9).wire_point(), None);
 
-        // `Debug` forwards too, so it prints the kind — not a `ParseError(..)` wrapper.
+        // `Debug` forwards too, so it prints the kind — not an `Error(..)` wrapper.
         assert!(
-            format!("{:?}", ParseError::unexpected_eof(9)).starts_with("UnexpectedEof"),
+            format!("{:?}", Error::unexpected_eof(9)).starts_with("UnexpectedEof"),
             "Debug must forward to the kind"
         );
     }
@@ -905,7 +906,7 @@ mod tests {
         for source in sources {
             for coordinates in [ECMA, LF] {
                 for position in 0..=source.len() + 2 {
-                    let e = ParseError::invalid_syntax("bad".to_string(), position)
+                    let e = Error::invalid_syntax("bad".to_string(), position)
                         .with_context(source, coordinates);
                     let p = e.wire_point().expect("a located, filled error has a point");
                     let rendered = e.to_string();
@@ -1010,9 +1011,9 @@ mod tests {
     #[test]
     fn a_refusal_renders_its_point_but_is_no_syntax_error() {
         let source = "ab\nc\rd";
-        // The `<CR>` itself, as `tsv_svelte::__private::parse_folded` points: the header counts
+        // The `<CR>` itself, as the Svelte format entry's refusal points: the header counts
         // `\n` lines, the excerpt stops at the `<CR>`.
-        let refusal = ParseError::refusal("no", source, 4, 5, LF);
+        let refusal = Error::refusal("no", source, 4, 5, LF);
         assert_eq!(refusal.to_string(), "no\n2:2 c\n     ^ here");
         assert_eq!(refusal.position(), None);
         assert_eq!(refusal.wire_point(), None);
@@ -1048,21 +1049,20 @@ mod tests {
             ("a\u{2029}b", "a<U+2029>b"),
             ("plain", "plain"),
         ] {
-            let e =
-                ParseError::invalid_syntax(format!("bad '{raw}'"), 2).with_context(source, ECMA);
+            let e = Error::invalid_syntax(format!("bad '{raw}'"), 2).with_context(source, ECMA);
             let report = e.report().expect("a filled syntax error reports");
             assert_eq!(report.summary, format!("bad '{spelled}'"));
             assert_eq!(
                 e.to_string(),
                 format!("{}\n{}", report.summary, report.frame)
             );
-            let e = ParseError::unexpected_token("';'".to_string(), format!("'{raw}'"), 2)
+            let e = Error::unexpected_token("';'".to_string(), format!("'{raw}'"), 2)
                 .with_context(source, ECMA);
             assert_eq!(
                 e.report().expect("reports").summary,
                 format!("Expected ';', found '{spelled}'")
             );
-            let refusal = ParseError::refusal(raw, source, 2, 3, LF);
+            let refusal = Error::refusal(raw, source, 2, 3, LF);
             let report = refusal.report().expect("a refusal reports");
             assert_eq!(report.summary, spelled);
             assert_eq!(
@@ -1078,7 +1078,7 @@ mod tests {
     #[test]
     fn a_syntax_error_reports_its_summary_frame_and_point() {
         let source = "let x =\ny";
-        let e = ParseError::unexpected_token("';'".to_string(), "'y'".to_string(), 8);
+        let e = Error::unexpected_token("';'".to_string(), "'y'".to_string(), 8);
         assert_eq!(e.report(), None);
         let e = e.with_context(source, ECMA);
         let report = e.report().expect("a filled syntax error reports");
@@ -1091,7 +1091,7 @@ mod tests {
             e.to_string(),
             format!("{}\n{}", report.summary, report.frame)
         );
-        assert_eq!(ParseError::file_too_large(5, 4).report(), None);
+        assert_eq!(Error::file_too_large(5, 4).report(), None);
     }
 
     /// An error raised over the folded text, unfolded, is the error a parse of the original
@@ -1101,12 +1101,12 @@ mod tests {
         let original = "a;\r\nb;\r\n  @";
         let folded = crate::printing::normalize_carriage_returns(original);
         let at_folded = folded.text().find('@').expect("@");
-        let e = ParseError::invalid_syntax("bad".to_string(), at_folded)
-            .with_context(folded.text(), ECMA);
+        let e =
+            Error::invalid_syntax("bad".to_string(), at_folded).with_context(folded.text(), ECMA);
         let unfolded = folded.unfold_error(e);
         let at_original = original.find('@').expect("@");
         let direct =
-            ParseError::invalid_syntax("bad".to_string(), at_original).with_context(original, ECMA);
+            Error::invalid_syntax("bad".to_string(), at_original).with_context(original, ECMA);
         assert_eq!(unfolded.position(), Some(at_original));
         assert_eq!(unfolded.wire_point(), direct.wire_point());
         assert_eq!(unfolded.to_string(), direct.to_string());
@@ -1115,7 +1115,7 @@ mod tests {
         // A text the fold left alone is handed back untouched.
         let plain = "a;\n@";
         let folded = crate::printing::normalize_carriage_returns(plain);
-        let e = ParseError::invalid_syntax("bad".to_string(), 3).with_context(plain, LF);
+        let e = Error::invalid_syntax("bad".to_string(), 3).with_context(plain, LF);
         assert_eq!(folded.unfold_error(e.clone()), e);
     }
 

@@ -855,8 +855,8 @@ impl OperandAnchor {
 /// reads each `/` the way the reader that settles that end will.
 ///
 /// The scanning crate does not answer any of them: the language crate that owns the
-/// grammar supplies them (`tsv_ts::__private::OPERAND_GRAMMAR`), and every scan at a regex boundary
-/// carries them ([`OperandAnchor::starts_regex`], [`scan_to_matching_brace`],
+/// grammar supplies them (the TypeScript crate's operand grammar), and every scan at a regex
+/// boundary carries them ([`OperandAnchor::starts_regex`], [`scan_to_matching_brace`],
 /// [`scan_to_matching_paren`], [`skip_template_literal`]).
 ///
 /// Which reader that is belongs to the scan, not to the question. A `>` and a `)` are

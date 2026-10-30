@@ -170,7 +170,7 @@ enum FileOutcome {
     /// The file could not be read.
     ReadError,
     /// Input didn't parse (a parse gap; out of scope).
-    ParseError,
+    Error,
     /// tsv couldn't format the input.
     FormatError,
     /// Formatted output didn't reparse (a round-trip failure — `roundtrip_audit`'s
@@ -216,7 +216,7 @@ impl BindingAuditCommand {
         for path in &files {
             match audit_file(path) {
                 FileOutcome::ReadError => *counts.entry("read_error").or_default() += 1,
-                FileOutcome::ParseError => *counts.entry("parse_error").or_default() += 1,
+                FileOutcome::Error => *counts.entry("parse_error").or_default() += 1,
                 FileOutcome::FormatError => *counts.entry("format_error").or_default() += 1,
                 FileOutcome::ReparseError => *counts.entry("reparse_error").or_default() += 1,
                 FileOutcome::CommentSetChanged => {
@@ -340,7 +340,7 @@ fn audit_file(path: &Path) -> FileOutcome {
         return FileOutcome::ReadError;
     };
     let Some(input) = extract_bindings(&source) else {
-        return FileOutcome::ParseError;
+        return FileOutcome::Error;
     };
     let Ok(formatted) = format_source(&source, ParserType::TypeScript) else {
         return FileOutcome::FormatError;

@@ -19,7 +19,7 @@ use super::*;
 /// its own bytes). So when the fold rewrote a lone `<CR>`
 /// (`FoldedSource::folded_lone_cr`), the author's own bytes are parsed first: their parse
 /// error is this one (exactly what `parse` reports for them), and an in-tag `//` comment
-/// holding a lone `<CR>` is refused ([`ParseError::refusal`], at the `<CR>` but no syntax
+/// holding a lone `<CR>` is refused ([`Error::refusal`], at the `<CR>` but no syntax
 /// error — the document is valid Svelte). A `<CR><LF>` is one line break in both readings,
 /// and a document the fold rewrote no lone `<CR>` in pays nothing.
 pub fn parse_folded<'arena>(

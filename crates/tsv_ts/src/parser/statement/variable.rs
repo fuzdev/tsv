@@ -2,7 +2,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::super::Parser;
 
@@ -52,7 +52,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a `const`/`let`/`var` declaration statement.
-    pub(super) fn parse_variable_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
+    pub(super) fn parse_variable_declaration(&mut self) -> Result<Statement<'arena>, Error> {
         self.parse_declaration_statement(self.current_variable_kind())
     }
 
@@ -62,7 +62,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_declaration_statement(
         &mut self,
         kind: VariableDeclarationKind,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, Error> {
         let (start, _) = self.current_pos();
         self.eat_declaration_keyword(kind)?;
         let (declarations, _) = self.parse_declarator_list(DeclaratorSite::Statement)?;
@@ -78,7 +78,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Consume `kind`'s keyword token(s) — `await using` is two
     /// ([`VariableDeclarationKind::words`]); the caller has already recognized them.
-    fn eat_declaration_keyword(&mut self, kind: VariableDeclarationKind) -> Result<(), ParseError> {
+    fn eat_declaration_keyword(&mut self, kind: VariableDeclarationKind) -> Result<(), Error> {
         for word in kind.words() {
             debug_assert_eq!(self.current_value(), *word);
             self.advance()?;
@@ -91,7 +91,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_declarator_list(
         &mut self,
         site: DeclaratorSite,
-    ) -> Result<(&'arena [VariableDeclarator<'arena>], u32), ParseError> {
+    ) -> Result<(&'arena [VariableDeclarator<'arena>], u32), Error> {
         // one wire level each: the `VariableDeclarator` over its pattern and initializer
         let first = self.nested(1, |p| p.parse_declarator(site))?;
         let mut end = first.span.end;
@@ -114,7 +114,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_declarator(
         &mut self,
         site: DeclaratorSite,
-    ) -> Result<VariableDeclarator<'arena>, ParseError> {
+    ) -> Result<VariableDeclarator<'arena>, Error> {
         let id_start = self.current_pos().0;
 
         // Parse binding pattern: identifier, array pattern [a, b], or object pattern {a, b}
@@ -177,7 +177,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_for_head_declaration(
         &mut self,
         kind: VariableDeclarationKind,
-    ) -> Result<VariableDeclaration<'arena>, ParseError> {
+    ) -> Result<VariableDeclaration<'arena>, Error> {
         let (decl_start, _) = self.current_pos();
         self.eat_declaration_keyword(kind)?;
         // one wire level: the `VariableDeclaration` under the `for` statement, which a
@@ -206,7 +206,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         name: IdentName<'arena>,
         site: DeclaratorSite,
-    ) -> Result<(Expression<'arena>, bool), ParseError> {
+    ) -> Result<(Expression<'arena>, bool), Error> {
         let (start, end) = self.current_pos();
         self.advance()?;
 

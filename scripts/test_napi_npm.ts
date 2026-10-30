@@ -1427,7 +1427,7 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 	}
 
 	// A parse failure's message is the engine's on both bins — the native CLI's
-	// `ParseError` and the binding's, one Rust type — and its `line:col` header is the
+	// `tsv_lang::Error` and the binding's, one Rust type — and its `line:col` header is the
 	// error's point in the file's own coordinates, on the format path too, whose parse
 	// reads the CR-folded text. A CRLF file with an astral character ahead of the error
 	// is where a header computed over the folded text, or counted in code points, would
@@ -1460,7 +1460,7 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 
 	// The format refusal of a source that parses is positionless, and no parse error:
 	// both bins print it after `Error: ` on a single input — the native CLI reading the
-	// `ParseError`'s missing position, the mirror the facade's plain `Error` — and after
+	// `tsv_lang::Error`'s missing position, the mirror the facade's plain `Error` — and after
 	// the path, with no prefix, in path mode.
 	it('a format refusal prints the same error on both bins, never as a parse error', () => {
 		const args = ['format', '--content', LONE_CR_TAG_COMMENT, '--parser', 'svelte'];

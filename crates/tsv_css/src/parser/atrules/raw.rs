@@ -5,7 +5,7 @@ use crate::lexer::TokenKind;
 use crate::url::trim_url_raw;
 use crate::whitespace::{Comments, Edge, holds_boundary_member, spell_run};
 use tsv_lang::printing::format_string_literal;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 /// Build the raw at-rule prelude string (used for both the printer and, for the media
 /// reader, the formatter's wrapping). `normalize_whitespace = true` (`@media` and
@@ -26,7 +26,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
     // (`"x"` → `'x'`, `url("x")` → `url('x')`, per the `singleQuote` option — the same
     // as declaration values and `@import`); other raw at-rules keep quotes verbatim.
     normalize_quotes: bool,
-) -> Result<(&'arena str, Span), ParseError> {
+) -> Result<(&'arena str, Span), Error> {
     // Add spaces around boolean operators (and, or, not) and after ':' for prettier compatibility
     let prelude_start_raw = parser.current_start();
     let prelude_start = parser.span_pos(prelude_start_raw);

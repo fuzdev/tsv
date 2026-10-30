@@ -204,7 +204,7 @@ fn time_once(
     arena: &bumpalo::Bump,
     doc_arena: &DocArena,
 ) -> Result<(Duration, Duration, usize), String> {
-    let parse_error = |e: tsv_lang::ParseError| format!("parse error: {e}");
+    let parse_error = |e: tsv_lang::Error| format!("parse error: {e}");
     let t0 = Instant::now();
     let folded = normalize_carriage_returns(source);
     match parser_type {

@@ -7,7 +7,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::expression_lookahead::{generic_function_type_arrow_end, paren_starts_function_type};
 use super::scan::{
@@ -16,12 +16,12 @@ use super::scan::{
 use super::{LINK_OPERATOR, LINK_TYPE_SUFFIX, Parser};
 
 // The type ladder's return (see `Parser::parse_type`): a reference plus the pointer-sized
-// `ParseError` needs a discriminant word, so the `Result` is two words — 16 B on 64-bit,
+// `Error` needs a discriminant word, so the `Result` is two words — 16 B on 64-bit,
 // which x86-64 hands back in two registers where an 80 B `TSType` needs a stack slot.
 // wasm32 returns every `Result` through a slot either way; there the width is 8 B
 // and the slot is 8 B rather than a whole `TSType`. rustc's layout, so a test-build pin.
 #[cfg(test)]
-const _: () = assert!(size_of::<Result<&TSType<'static>, ParseError>>() == 2 * size_of::<usize>());
+const _: () = assert!(size_of::<Result<&TSType<'static>, Error>>() == 2 * size_of::<usize>());
 
 impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a `: Type` annotation when the next token is a `:`, else `None` —
@@ -30,7 +30,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// an index-signature parameter) keep their own inline `else`.
     pub(in crate::parser) fn parse_optional_type_annotation(
         &mut self,
-    ) -> Result<Option<TSTypeAnnotation<'arena>>, ParseError> {
+    ) -> Result<Option<TSTypeAnnotation<'arena>>, Error> {
         if self.check(&TokenKind::Colon) {
             Ok(Some(self.parse_type_annotation()?))
         } else {
@@ -40,7 +40,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a type annotation (`: Type`) at the current position. Also the public entry
     /// point for embedders (`tsv_svelte`'s `{:then pattern: T}` / `{#each … as x: T}`).
-    pub fn parse_type_annotation(&mut self) -> Result<TSTypeAnnotation<'arena>, ParseError> {
+    pub fn parse_type_annotation(&mut self) -> Result<TSTypeAnnotation<'arena>, Error> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
 
@@ -68,7 +68,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the lexer's one-token lookahead has already skipped the trailing trivia by then,
     /// so that position is *past* a trailing comment. Same hazard, same answer, as
     /// [`Parser::parse_type_annotation`]'s embedding wrapper documents.
-    pub(crate) fn type_extent(&mut self) -> Result<usize, ParseError> {
+    pub(crate) fn type_extent(&mut self) -> Result<usize, Error> {
         Ok(self.parse_type()?.span().end as usize)
     }
 
@@ -94,7 +94,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// tuple / type-argument / template-literal slice is a slice of these references
     /// (`&'arena [&'arena TSType]`), and the type alias's right-hand side is one — so no
     /// type is copied out of the node its builder allocated.
-    pub(in crate::parser) fn parse_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    pub(in crate::parser) fn parse_type(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         debug_assert!(self.pending_conditional_extends.is_none());
         self.with_full_type_context(|p| {
             let start = p.current_pos().0;
@@ -165,7 +165,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse union type: `A | B | C` or `| A | B | C`
-    fn parse_union_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_union_type(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         let start = self.current_pos().0;
 
         // Handle leading pipe: `| A | B`
@@ -214,7 +214,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse intersection type: `A & B & C` or `& A & B & C`
-    fn parse_intersection_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_intersection_type(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         let start = self.current_pos().0;
 
         // Handle leading ampersand: `& A & B`
@@ -273,7 +273,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// — see [`Self::error_optional_marker_after_line_break`], where acorn's port drops
     /// the guard and tsv keeps it.
     ///
-    fn parse_array_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_array_type(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         let start = self.current_pos().0;
         let mut result = self.parse_primary_type()?;
 
@@ -316,7 +316,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse primary type (highest precedence)
-    fn parse_primary_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_primary_type(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         let (start, end) = self.current_pos();
         let span = Span::new(start as u32, end as u32);
 
@@ -489,7 +489,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_type_operator(
         &mut self,
         operator: TSTypeOperatorKind,
-    ) -> Result<&'arena TSType<'arena>, ParseError> {
+    ) -> Result<&'arena TSType<'arena>, Error> {
         let start = self.current_pos().0;
         self.advance()?; // consume the operator keyword (keyof, unique, readonly)
 
@@ -516,7 +516,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse infer type: `infer U` (in conditional type extends clause)
-    fn parse_infer_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_infer_type(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'infer'
 
@@ -656,7 +656,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse type reference: `Foo` or `Foo.Bar` or `Foo<T>`
-    fn parse_type_reference(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_type_reference(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         let start = self.current_pos().0;
         let type_name = self.parse_type_entity_name()?;
 
@@ -677,7 +677,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse import type: `import('module')` or `import('module', {with: {...}}).Foo<T>`
-    fn parse_import_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_import_type(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'import'
         let import = self.parse_import_type_body(start)?;
@@ -686,7 +686,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse import type body after `import` keyword has been consumed.
     /// Parses: `('module')`, `('module', {options}).Qualifier<TypeArgs>`
-    fn parse_import_type_body(&mut self, start: usize) -> Result<TSImportType<'arena>, ParseError> {
+    fn parse_import_type_body(&mut self, start: usize) -> Result<TSImportType<'arena>, Error> {
         // Expect '('
         self.expect(&TokenKind::ParenOpen)?;
 
@@ -742,7 +742,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse type query: `typeof x`, `typeof Foo.bar`, `typeof import("module")`
-    fn parse_type_query(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_type_query(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'typeof'
 
@@ -814,7 +814,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// What IS common to all four is the floor `parse_entity_name_inner` enforces: the
     /// head must be a word. Leaving even that to the callers is how `typeof 5` came to
     /// parse as an `Identifier` NAMED `"5"` — a fabricated node acorn rejects outright.
-    pub(crate) fn parse_type_entity_name(&mut self) -> Result<TSEntityName<'arena>, ParseError> {
+    pub(crate) fn parse_type_entity_name(&mut self) -> Result<TSEntityName<'arena>, Error> {
         self.parse_entity_name_inner(true)
     }
 
@@ -824,14 +824,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `parseEntityName(allowReservedWords: false)`.
     pub(crate) fn parse_module_reference_entity_name(
         &mut self,
-    ) -> Result<TSEntityName<'arena>, ParseError> {
+    ) -> Result<TSEntityName<'arena>, Error> {
         self.parse_entity_name_inner(false)
     }
 
     fn parse_entity_name_inner(
         &mut self,
         allow_reserved_words: bool,
-    ) -> Result<TSEntityName<'arena>, ParseError> {
+    ) -> Result<TSEntityName<'arena>, Error> {
         // The head is an `IdentifierName` at minimum — a word. Callers that need a
         // narrower head guard ahead of the call (see `parse_type_entity_name`); this
         // is the floor none of them may fall through, since `current_ident_name`
@@ -885,7 +885,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `parse_optional_type_arguments_same_line`.
     pub(in crate::parser) fn parse_optional_type_arguments(
         &mut self,
-    ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, ParseError> {
+    ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, Error> {
         if self.check_less_than_in_type() {
             Ok(Some(self.parse_type_arguments()?))
         } else {
@@ -905,7 +905,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// read its arguments directly until the shared rule was extended to it.
     pub(in crate::parser) fn parse_optional_type_arguments_same_line(
         &mut self,
-    ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, ParseError> {
+    ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, Error> {
         if self.had_line_terminator {
             Ok(None)
         } else {
@@ -916,7 +916,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse type arguments: `<T, U>` (trailing comma allowed, but cannot be empty)
     pub(in crate::parser) fn parse_type_arguments(
         &mut self,
-    ) -> Result<TSTypeParameterInstantiation<'arena>, ParseError> {
+    ) -> Result<TSTypeParameterInstantiation<'arena>, Error> {
         let start = self.current_pos().0;
         self.expect_less_than_in_type()?;
 
@@ -950,9 +950,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse parenthesized type `(T)` or function type `(x: T) => U`
-    fn parse_parenthesized_or_function_type(
-        &mut self,
-    ) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_parenthesized_or_function_type(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         // Raw `(` offset into `self.source` for the byte scan below (NOT
         // `current_pos()`, which adds `base_offset` for span coordinates and would
         // mis-index the embedded `<script>` slice).
@@ -1012,7 +1010,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse generic function type: `<T>() => U`, `<T, U extends V>(x: T) => U`
-    fn parse_generic_function_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_generic_function_type(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         // Function types are not allowed at operand positions (`A & <T>() => U`
         // must be `A & (<T>() => U)`) — see `fn_type_disallowed`.
         if self.fn_type_disallowed {
@@ -1052,7 +1050,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_constructor_type(
         &mut self,
         is_abstract: bool,
-    ) -> Result<&'arena TSType<'arena>, ParseError> {
+    ) -> Result<&'arena TSType<'arena>, Error> {
         // Constructor types are not allowed at operand positions (`A & new () => T`
         // must be `A & (new () => T)`) — see `fn_type_disallowed`.
         if self.fn_type_disallowed {
@@ -1102,7 +1100,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse function type parameters, up to (not including) the closing `)`.
     fn parse_function_type_params(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
+    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, Error> {
         let mut params = self.bvec();
 
         // two wire levels each: the function type over its parameters, and the parameter
@@ -1143,7 +1141,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a single function type parameter: an identifier (`x: T`), the `this`
     /// parameter (`this: T`), a destructuring pattern (`[a]?: T`, `{ a }: T`), or a
     /// rest element wrapping any of those (`...a: T[]`, `...[a]: T[]`, `...{ a }: T`).
-    fn parse_function_type_param(&mut self) -> Result<Expression<'arena>, ParseError> {
+    fn parse_function_type_param(&mut self) -> Result<Expression<'arena>, Error> {
         // Rest parameter: `...a`, `...[a]`, `...{ a }` (with an optional annotation).
         if self.check(&TokenKind::DotDotDot) {
             let (start, _) = self.current_pos();
@@ -1225,7 +1223,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse object type: `{ prop: T; method(): U }` or mapped type: `{ [K in T]: V }`
-    fn parse_object_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_object_type(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::BraceOpen)?;
 
@@ -1257,10 +1255,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse the body of a mapped type (after '{' has been consumed)
-    fn parse_mapped_type_body(
-        &mut self,
-        start: usize,
-    ) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_mapped_type_body(&mut self, start: usize) -> Result<&'arena TSType<'arena>, Error> {
         // Parse optional readonly modifier: `readonly`, `+readonly`, `-readonly`
         let readonly = self.parse_mapped_type_readonly_modifier()?;
 
@@ -1293,7 +1288,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         param_start: usize,
         param_name: IdentName<'arena>,
         readonly: Option<TSMappedTypeModifier>,
-    ) -> Result<&'arena TSType<'arena>, ParseError> {
+    ) -> Result<&'arena TSType<'arena>, Error> {
         // Parse constraint type (e.g., `keyof T`); two wire levels: the `TSMappedType` and
         // the `TSTypeParameter` the constraint sits in
         let constraint = self.nested(2, Self::parse_type)?;
@@ -1347,7 +1342,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// dropped token (matches acorn-typescript).
     fn parse_mapped_type_readonly_modifier(
         &mut self,
-    ) -> Result<Option<TSMappedTypeModifier>, ParseError> {
+    ) -> Result<Option<TSMappedTypeModifier>, Error> {
         if self.eat(TokenKind::Minus)? {
             // `-readonly`
             if self.eat_contextual_keyword("readonly")? {
@@ -1377,7 +1372,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// acorn-typescript).
     fn parse_mapped_type_optional_modifier(
         &mut self,
-    ) -> Result<Option<TSMappedTypeModifier>, ParseError> {
+    ) -> Result<Option<TSMappedTypeModifier>, Error> {
         if self.eat(TokenKind::Minus)? {
             // `-?`
             if self.eat(TokenKind::Question)? {
@@ -1402,7 +1397,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse tuple type: `[T, U, V]`, `[...T]`, `[label: T]`, `[T?]`, `[first: string, ...rest: T]`
-    fn parse_tuple_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_tuple_type(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::BracketOpen)?;
 
@@ -1442,7 +1437,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a single tuple element: `T`, `T?`, `...T`, `label: T`, `label?: T`, `...label: T`
-    fn parse_tuple_element(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_tuple_element(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         let elem_start = self.current_pos().0;
 
         // Check for rest element: `...T` or `...label: T`
@@ -1481,7 +1476,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `marker_pos` is the `?` itself, which the named-member path has already advanced
     /// past by the time it can tell the two markers apart — so both callers pass it
     /// rather than letting the caret drift a token between them.
-    fn error_optional_marker_after_line_break(&self, marker_pos: usize) -> ParseError {
+    fn error_optional_marker_after_line_break(&self, marker_pos: usize) -> Error {
         self.error_msg_at(
             "Optional tuple element `?` cannot follow a line terminator",
             marker_pos,
@@ -1525,7 +1520,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         keyword: Option<KeywordKind>,
         name: IdentName<'arena>,
         span: Span,
-    ) -> Result<&'arena TSType<'arena>, ParseError> {
+    ) -> Result<&'arena TSType<'arena>, Error> {
         if let Some(kw) = keyword {
             if let Some(ts_kind) = TSKeywordKind::from_lexer_keyword(kw) {
                 return Ok(self.alloc(TSType::Keyword(TSKeywordType::new(ts_kind, span))));
@@ -1546,7 +1541,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a tuple element (without leading `...`): `T`, `T?`, `label: T`, `label?: T`
-    fn parse_tuple_element_inner(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_tuple_element_inner(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         let elem_start = self.current_pos().0;
 
         // Check for named tuple member: `label: T` or `label?: T`
@@ -1643,7 +1638,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parallel structure to `parse_template_literal()` in expression.rs but parses
     /// types inside ${} instead of expressions. Kept separate for clarity despite
     /// duplication - the two contexts (expression vs type) rarely change together.
-    fn parse_template_literal_type(&mut self) -> Result<TemplateLiteralType<'arena>, ParseError> {
+    fn parse_template_literal_type(&mut self) -> Result<TemplateLiteralType<'arena>, Error> {
         let (start, _) = self.current_pos();
         let mut quasis = self.bvec();
         let mut types = self.bvec();
@@ -1748,7 +1743,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// method / construct signatures).
     pub(in crate::parser) fn parse_optional_type_parameters(
         &mut self,
-    ) -> Result<Option<TSTypeParameterDeclaration<'arena>>, ParseError> {
+    ) -> Result<Option<TSTypeParameterDeclaration<'arena>>, Error> {
         if self.check(&TokenKind::LessThan) {
             Ok(Some(self.parse_type_parameters()?))
         } else {
@@ -1758,7 +1753,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     pub(in crate::parser) fn parse_type_parameters(
         &mut self,
-    ) -> Result<TSTypeParameterDeclaration<'arena>, ParseError> {
+    ) -> Result<TSTypeParameterDeclaration<'arena>, Error> {
         let start = self.current_pos().0 as u32;
         self.expect(&TokenKind::LessThan)?;
 
@@ -1794,7 +1789,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a single type parameter: `T`, `T extends U`, or `T extends U = V`
     /// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
-    fn parse_type_parameter(&mut self) -> Result<TSTypeParameter<'arena>, ParseError> {
+    fn parse_type_parameter(&mut self) -> Result<TSTypeParameter<'arena>, Error> {
         let start = self.current_pos().0 as u32;
 
         // Parse optional modifiers: `const` (TS 5.0) and the `in`/`out` variance pair
@@ -1916,7 +1911,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The one caller that tells them apart is `Parser::parse_type_arguments_or_rewind`.
     pub(in crate::parser) fn parse_type_parameter_instantiation(
         &mut self,
-    ) -> Result<TSTypeParameterInstantiation<'arena>, ParseError> {
+    ) -> Result<TSTypeParameterInstantiation<'arena>, Error> {
         let (start, first) = self.parse_type_argument_list_head()?;
         self.parse_type_argument_list_tail(start, first)
     }
@@ -1928,7 +1923,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// commits to a list, so an error here is the list's own.
     pub(in crate::parser) fn parse_type_argument_list_head(
         &mut self,
-    ) -> Result<(u32, &'arena TSType<'arena>), ParseError> {
+    ) -> Result<(u32, &'arena TSType<'arena>), Error> {
         let start = self.current_pos().0 as u32;
         self.expect_less_than_in_type()?;
         Ok((start, self.parse_type_argument()?))
@@ -1938,7 +1933,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// list — the `TSTypeParameterInstantiation`, and the argument (the depth limit's
     /// count, [`Parser::nested`]). A type's nesting is counted where the type grammar
     /// recurses, as here, so a type that holds no other pays nothing.
-    fn parse_type_argument(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
+    fn parse_type_argument(&mut self) -> Result<&'arena TSType<'arena>, Error> {
         self.nested(2, Self::parse_type)
     }
 
@@ -1949,7 +1944,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: u32,
         first: &'arena TSType<'arena>,
-    ) -> Result<TSTypeParameterInstantiation<'arena>, ParseError> {
+    ) -> Result<TSTypeParameterInstantiation<'arena>, Error> {
         let mut params = self.bvec();
         params.push(first);
         // the arguments are siblings (`ListFrame`); the first is already counted
@@ -2049,7 +2044,7 @@ impl<'arena> Parser<'_, 'arena> {
     /// Count the pair the printer adds around a bare union or intersection `member` that
     /// binds looser than its neighbours ([`TypePairPosition::Member`]), a level of the
     /// output's nesting.
-    fn member_pair(&mut self, member: &TSType<'_>) -> Result<(), ParseError> {
+    fn member_pair(&mut self, member: &TSType<'_>) -> Result<(), Error> {
         if bare_type_takes_pair(member, TypePairPosition::Member) {
             self.printer_pair()
         } else {
@@ -2060,7 +2055,7 @@ impl<'arena> Parser<'_, 'arena> {
     /// [`Parser::member_pair`] for a union's or intersection's first member, asked once a
     /// second follows it (`types` holding the first alone): a member of one is printed as
     /// itself.
-    fn first_member_pair(&mut self, types: &[&TSType<'_>]) -> Result<(), ParseError> {
+    fn first_member_pair(&mut self, types: &[&TSType<'_>]) -> Result<(), Error> {
         match types {
             [first] => self.member_pair(first),
             _ => Ok(()),

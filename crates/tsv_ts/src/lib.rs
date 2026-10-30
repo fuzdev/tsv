@@ -33,7 +33,7 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
 use tsv_lang::{CommentFreeWindow, EmbedContext, Span};
-pub use tsv_lang::{ErrorReport, ParseError, Result, WirePoint};
+pub use tsv_lang::{Error, ErrorReport, Result, WirePoint};
 
 pub use goal::Goal;
 pub use strip::{StripError, Stripped, UnsupportedKind, strip, strip_with_goal};
@@ -41,7 +41,7 @@ pub use strip::{StripError, Stripped, UnsupportedKind, strip, strip_with_goal};
 /// The coordinates a TypeScript document's positions are reported in — acorn's: a
 /// leading BOM **counted** (acorn reads U+FEFF as whitespace, so it is one UTF-16 unit at
 /// offset 0), and ECMAScript's line terminators (LF, CR, CRLF as one, U+2028, U+2029).
-/// The wire writer's tables and every parse error's point (`ParseError::wire_point`, and
+/// The wire writer's tables and every parse error's point (`Error::wire_point`, and
 /// the `line:col` its message prints) read this one statement.
 pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinates {
     lines: tsv_lang::LineRule::Ecmascript,
@@ -100,7 +100,7 @@ fn with_doc_printer<'a, R>(
 /// # Returns
 ///
 /// * `Ok(Program)` - The parsed AST
-/// * `Err(ParseError)` - If parsing fails
+/// * `Err(Error)` - If parsing fails
 ///
 /// # Example
 ///
@@ -109,7 +109,7 @@ fn with_doc_printer<'a, R>(
 /// let ast = tsv_ts::parse("const x = 42;", &arena)?;
 /// ```
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Program<'arena>> {
-    ParseError::ensure_source_fits(source)?;
+    Error::ensure_source_fits(source)?;
     parser::parse_typescript(source, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
@@ -131,7 +131,7 @@ pub fn parse_with_goal<'arena>(
     goal: Goal,
     arena: &'arena bumpalo::Bump,
 ) -> Result<Program<'arena>> {
-    ParseError::ensure_source_fits(source)?;
+    Error::ensure_source_fits(source)?;
     parser::parse_typescript_with_goal(source, goal, arena)
         .map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
@@ -149,7 +149,7 @@ pub fn parse_with_goal<'arena>(
 /// was written against, decided in two steps. **A script attempt that died on a goal
 /// gate** — a top-level `import` / `export`, an `import.meta`, a top-level `for await`, or
 /// the operand a module reads after a top-level `await` (where a Script's name reading of
-/// the word fails), the constructs only a module holds ([`ParseError::is_goal_gated`]) —
+/// the word fails), the constructs only a module holds ([`Error::is_goal_gated`]) —
 /// has proved the file a module whatever else is in it, so the module attempt's error is
 /// the file's own: a
 /// broken module's script attempt dies there at its first module-only construct, even one
@@ -163,7 +163,7 @@ pub fn parse_with_goal<'arena>(
 /// error it shows on such a file is the typo. Pinned by
 /// `tests/format_fallback_error_attribution.rs`.
 ///
-/// **A module attempt the depth limit refused takes no retry** ([`ParseError::is_too_deep`]):
+/// **A module attempt the depth limit refused takes no retry** ([`Error::is_too_deep`]):
 /// the limit is no verdict on the grammar, and the script grammar reads every construct the
 /// module one accepts as the same tree but `await`, which it reads as a name — so a script
 /// attempt could only succeed by reading the source differently
@@ -221,7 +221,7 @@ pub fn parse_preserve_parens<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
 ) -> Result<Program<'arena>> {
-    ParseError::ensure_source_fits(source)?;
+    Error::ensure_source_fits(source)?;
     parser::parse_typescript_preserve_parens(source, arena)
         .map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
@@ -425,8 +425,8 @@ fn with_embedding_parser<'arena, T>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
-    f: impl Fn(&mut parser::Parser<'_, 'arena>) -> std::result::Result<T, ParseError>,
-    host_check: impl Fn(&T) -> std::result::Result<(), ParseError>,
+    f: impl Fn(&mut parser::Parser<'_, 'arena>) -> std::result::Result<T, Error>,
+    host_check: impl Fn(&T) -> std::result::Result<(), Error>,
 ) -> Result<T> {
     parser::parse_retrying_acorn_followers(
         source,

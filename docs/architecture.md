@@ -151,7 +151,7 @@ level**. The shape of a "tsv language" is a social contract, not a Rust
 trait:
 
 ```rust
-pub fn parse<'a>(source: &str, arena: &'a Bump) -> Result<InternalAst<'a>, ParseError>;
+pub fn parse<'a>(source: &str, arena: &'a Bump) -> Result<InternalAst<'a>, Error>;
 pub fn format(ast: &InternalAst, source: &str) -> String;
 pub fn convert_ast_json_bytes(ast: &InternalAst, source: &str) -> Vec<u8>;
 pub fn convert_ast_json_string(ast: &InternalAst, source: &str) -> String;
@@ -295,7 +295,7 @@ Language-agnostic primitives shared across all implementations:
 
 - `Span` — Source positions (u32 for memory efficiency)
 - `LocationTracker` — Lazy line/column computation (O(log n) binary search)
-- `ParseError` — Language-agnostic errors (String-based for flexibility)
+- `Error` — Language-agnostic errors (String-based for flexibility)
 - `doc` — **Document builder for Prettier-style formatting**
 - `printing` — Shared formatting utilities (string literals, whitespace)
 - `OutputBuffer` — Pre-allocated output string building with column tracking
@@ -330,7 +330,7 @@ What's shared through tsv_lang vs reimplemented per language, and why:
 - Width / indent (shared: Yes, should-be: Yes) — Hardcoded as `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts in `tsv_lang::config`
 - EmbedContext (shared: Yes, should-be: Yes) — Per-input embedding state for nested formatting (fields: [CLAUDE.md §Internal Configuration](../CLAUDE.md#internal-configuration-rust-library-only))
 - String formatting (shared: Yes, should-be: Yes) — Quote selection, escape swapping, visual width
-- Error types (shared: Yes, should-be: Yes) — ParseError with context enrichment
+- Error types (shared: Yes, should-be: Yes) — Error with context enrichment
 - Position tracking (shared: Yes, should-be: Yes) — Span (u32), LocationTracker
 
 **Code distribution** (`metrics` groups foundation = `tsv_lang` + `tsv_arena` + `tsv_html` + `tsv_ignore` + `tsv_discover` and languages = `tsv_ts` + `tsv_css` + `tsv_svelte`, counting the experimental compiler/checker and the tooling separately): a small foundation share against a language share several times larger reflects genuine domain complexity, not missing extraction opportunities. The doc builder already factors out the rendering algorithm (the expensive shared part); what remains language-specific is the _formatting decisions_ themselves — when to break, how to indent, where to attach comments — which differ fundamentally between TypeScript, CSS, and Svelte.
@@ -503,7 +503,7 @@ All parsers are fail-fast. Error context is computed **once, on the error path**
 parser.parse().map_err(|e| e.with_context(source, WIRE_COORDINATES))
 ```
 
-The context holds two things. The error's **point** (`ParseError::wire_point`) is where it sits in the wire's coordinates — the `start` a wire node there would carry and the `loc` the document's line rule gives it ([§`loc` lines](#loc-lines-one-rule-per-document)) — and the message's `line:col` header prints it. The **excerpt** under the message is a display line, bounded by every ECMAScript terminator whatever the language and never echoing a leading BOM, with a caret padded by display width. A format entry point parses the CR-folded text, so its error is mapped back onto the caller's bytes (`FoldedSource::parse_with`): its point is in the caller's own coordinates, the one a parse at the same goal reports for the same error. The npm packages return it as the `{kind: 'parse', message, frame, start, end, loc}` error of an `{ok: false}` result — the summary and the header-excerpt-caret frame apart (`ParseError::report`), the point as a span whose `end` is its `start` ([docs/cli.md §Parse errors](./cli.md#parse-errors)).
+The context holds two things. The error's **point** (`Error::wire_point`) is where it sits in the wire's coordinates — the `start` a wire node there would carry and the `loc` the document's line rule gives it ([§`loc` lines](#loc-lines-one-rule-per-document)) — and the message's `line:col` header prints it. The **excerpt** under the message is a display line, bounded by every ECMAScript terminator whatever the language and never echoing a leading BOM, with a caret padded by display width. A format entry point parses the CR-folded text, so its error is mapped back onto the caller's bytes (`FoldedSource::parse_with`): its point is in the caller's own coordinates, the one a parse at the same goal reports for the same error. The npm packages return it as the `{kind: 'parse', message, frame, start, end, loc}` error of an `{ok: false}` result — the summary and the header-excerpt-caret frame apart (`Error::report`), the point as a span whose `end` is its `start` ([docs/cli.md §Parse errors](./cli.md#parse-errors)).
 
 ## Printer Architecture
 
@@ -633,8 +633,8 @@ text, and folding it would end the comment early and print the rest of its line 
 lone `<CR>` in a Svelte document, the format parses the author's bytes first
 (`tsv_svelte::__private::parse_folded`, the parse every Svelte format entry point runs): their parse
 error is the format's error, and an in-tag `//` comment holding a lone `<CR>` with comment
-text after it is refused with a `ParseError::refusal` whose message names the `<CR>` and
-whose span (`ParseError::report`) is the `<CR>` — no syntax error, since the source is valid
+text after it is refused with an `Error::refusal` whose message names the `<CR>` and
+whose span (`Error::report`) is the `<CR>` — no syntax error, since the source is valid
 Svelte: the CLI prints it after `Error:` and the npm facade returns it as `kind: 'refused'`. A
 `<CR><LF>` is one line break in both readings and never refuses; a document the fold rewrote no
 lone `<CR>` in pays nothing.
@@ -861,7 +861,7 @@ A `format-ignore` / `prettier-ignore` comment suppresses formatting of the const
 
 Native tsv runs on the system allocator — no `#[global_allocator]`, no alternative-allocator dependency. The one exception is WebAssembly: `tsv_wasm` sets a wasm32-gated `#[global_allocator]` to [talc](https://github.com/SFBdragon/talc) (its `WasmGrowAndExtend` source), replacing std's default dlmalloc — the WASM format path is allocation-bound enough that the allocator itself was a measured wall, and the extend source holds the long-lived instance's linear-memory high-water at dlmalloc parity. The performance posture is otherwise structural: each layer avoids allocation by design rather than allocating faster.
 
-**Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a small POD (16 B; tsv_svelte's 12 B) that a byte cursor over the source emits. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied into the AST arena at receipt) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied. On the parser's hot path (`advance`, plus the CSS and Svelte lookaheads) the lexers write the token in place into the parser's slot (`next_token_into`) rather than returning a by-value `Result<Token, ParseError>` through a stack slot the parser would reload and re-scatter; other TS and CSS callers take it by value (`next_token`); the Svelte lexer has no by-value form.
+**Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a small POD (16 B; tsv_svelte's 12 B) that a byte cursor over the source emits. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied into the AST arena at receipt) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied. On the parser's hot path (`advance`, plus the CSS and Svelte lookaheads) the lexers write the token in place into the parser's slot (`next_token_into`) rather than returning a by-value `Result<Token, Error>` through a stack slot the parser would reload and re-scatter; other TS and CSS callers take it by value (`next_token`); the Svelte lexer has no by-value form.
 
 **Internal AST — bump-arena nested ownership, span-identity names, no raw text.** Nodes are allocated in a per-parse bump arena: recursive children are `&'arena T` and child collections `&'arena [T]` (not `Box`/`Vec`), with small children kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form as an `&'arena str`. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, arena-allocated as `&'arena str`.
 
@@ -1129,8 +1129,8 @@ The fat inline nodes carry no by-value-return penalty in the **expression**
 recursion either: each node is built in the arena and threaded up the recursive
 descent **by reference** (every `parse_*` on the expression ladder returns an
 `&'arena Expression`), so the recursion moves pointers regardless of node size. The
-return stays two scalars end to end: with `ParseError` boxing its
-own payload, `Result<&Expression, ParseError>` is two words, which x86-64 returns in
+return stays two scalars end to end: with `Error` boxing its
+own payload, `Result<&Expression, Error>` is two words, which x86-64 returns in
 two registers. Nothing rides beside the reference — a paren-stripped operand's
 paren-inclusive extent is not a field but the tokens its parse consumed (from the
 token current when the parse begins to the previous token's end when it returns),

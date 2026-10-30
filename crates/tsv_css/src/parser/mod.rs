@@ -16,7 +16,7 @@ use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use decl_scan::{ScannedDeclaration, TerminatorKind};
 use std::cell::Cell;
-use tsv_lang::{DepthBudget, DepthLimit, NESTING_LIMIT, ParseError, Span};
+use tsv_lang::{DepthBudget, DepthLimit, Error, NESTING_LIMIT, Span};
 
 pub(crate) struct CssParser<'a, 'arena> {
     source: &'a str,
@@ -73,7 +73,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         base_offset: usize,
         host_nesting: u32,
         arena: &'arena Bump,
-    ) -> Result<Self, ParseError> {
+    ) -> Result<Self, Error> {
         // The lexer scans `source` (the island) but reports errors against the document
         // it sits in, so it carries the same `base_offset` the spans below are shifted by.
         let mut lexer = Lexer::at_offset(source, base_offset);
@@ -229,7 +229,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     // `parse_complex_selector`, `parse_selector_list_with`, `parse_rule` and
     // `parse_declaration`, which sit on the recursive path. One shared body keeps those frames as they are.
     #[inline(never)]
-    pub(crate) fn advance(&mut self) -> Result<(), ParseError> {
+    pub(crate) fn advance(&mut self) -> Result<(), Error> {
         // The token comes either from the lookahead slot (lexed during a prior
         // `peek_kind()`) or fresh from the lexer. In both cases the decoded escape
         // value of the most-recently-lexed token is parked on the lexer's scratch and
@@ -378,7 +378,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// off anything but a non-ASCII-headed identifier. Most asks land on a token that is
     /// neither, and those pay a compare or two instead of a call into the loop.
     #[inline]
-    pub(in crate::parser) fn skip_boundary_whitespace(&mut self) -> Result<(), ParseError> {
+    pub(in crate::parser) fn skip_boundary_whitespace(&mut self) -> Result<(), Error> {
         if !self.may_open_boundary_run() {
             return Ok(());
         }
@@ -410,7 +410,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// The step loop behind [`skip_boundary_whitespace`](Self::skip_boundary_whitespace)'s
     /// inline head, reached only once the current token could open a run.
     #[inline(never)]
-    fn step_boundary_run(&mut self) -> Result<(), ParseError> {
+    fn step_boundary_run(&mut self) -> Result<(), Error> {
         loop {
             self.skip_whitespace()?;
             let run = self.boundary_run_len();
@@ -467,7 +467,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     #[inline]
     pub(in crate::parser) fn skip_boundary_whitespace_registering_comments(
         &mut self,
-    ) -> Result<bool, ParseError> {
+    ) -> Result<bool, Error> {
         if !self.may_open_boundary_run() && !self.check(TokenKind::Comment) {
             return Ok(false);
         }
@@ -479,7 +479,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// inline head, reached only once the current token could open a boundary run or is a
     /// comment.
     #[inline(never)]
-    fn step_boundary_trivia_registering_comments(&mut self) -> Result<bool, ParseError> {
+    fn step_boundary_trivia_registering_comments(&mut self) -> Result<bool, Error> {
         let mut saw_whitespace = false;
         loop {
             saw_whitespace |= self.check(TokenKind::Whitespace) || self.boundary_run_len() > 0;
@@ -496,7 +496,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// value (`TokenKind` is `Copy`) — like `tsv_ts`'s `peek_kind`, not a borrow of
     /// `self`. Result is cached so repeated peeks are efficient. (Named `peek_kind`,
     /// not `peek`, to match `tsv_ts` and avoid shadowing the `peek` field.)
-    pub(crate) fn peek_kind(&mut self) -> Result<TokenKind, ParseError> {
+    pub(crate) fn peek_kind(&mut self) -> Result<TokenKind, Error> {
         if let Some(token) = &self.peek {
             return Ok(token.kind);
         }
@@ -517,7 +517,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// [`peek_kind`](Self::peek_kind), kept out of line — for a caller inlined into a frame
     /// that recursion stacks, where the lex `peek_kind` inlines would grow that frame.
     #[inline(never)]
-    pub(crate) fn peek_kind_outlined(&mut self) -> Result<TokenKind, ParseError> {
+    pub(crate) fn peek_kind_outlined(&mut self) -> Result<TokenKind, Error> {
         self.peek_kind()
     }
 
@@ -534,7 +534,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// not a comment, which is every type selector in a real stylesheet: the temp-lexer
     /// walk below caches nothing, so taking it unconditionally would re-lex that token
     /// again at the following `advance()`.
-    pub(crate) fn peek_past_comments(&mut self) -> Result<TokenKind, ParseError> {
+    pub(crate) fn peek_past_comments(&mut self) -> Result<TokenKind, Error> {
         let next = self.peek_kind()?;
         if !matches!(next, TokenKind::Comment) {
             return Ok(next);
@@ -562,7 +562,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// combinator, `a /* c */<NBSP>, b` as a list that had ended, and `a { color <NBSP>: red }`
     /// as a nested rule. A lookahead whose whitespace class is narrower than the skip it
     /// predicts is the same defect as one wider than the lexer's.
-    pub(crate) fn peek_past_boundary_whitespace(&self) -> Result<TokenKind, ParseError> {
+    pub(crate) fn peek_past_boundary_whitespace(&self) -> Result<TokenKind, Error> {
         let (remaining, mut temp_lexer) = self.lookahead_lexer();
         loop {
             let token = temp_lexer.next_token()?;
@@ -605,7 +605,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// leaving whitespace alone. Registration (rather than
     /// [`Self::skip_boundary_whitespace_and_comments`]'s drop) is what lets the printer
     /// re-emit the comment at its authored position.
-    pub(crate) fn register_and_skip_comments(&mut self) -> Result<(), ParseError> {
+    pub(crate) fn register_and_skip_comments(&mut self) -> Result<(), Error> {
         while matches!(self.current_kind(), TokenKind::Comment) {
             self.register_current_comment();
             self.advance()?;
@@ -626,7 +626,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         )
     }
 
-    pub(crate) fn expect(&mut self, kind: TokenKind) -> Result<(), ParseError> {
+    pub(crate) fn expect(&mut self, kind: TokenKind) -> Result<(), Error> {
         if !self.check(kind) {
             return Err(self.error_expected_found(&kind.to_string()));
         }
@@ -635,7 +635,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 
     /// Expect a token and capture its end position before advancing.
     /// Used for nodes whose span should end at the delimiter token.
-    pub(crate) fn expect_and_capture(&mut self, kind: TokenKind) -> Result<u32, ParseError> {
+    pub(crate) fn expect_and_capture(&mut self, kind: TokenKind) -> Result<u32, Error> {
         if !self.check(kind) {
             return Err(self.error_expected_found(&kind.to_string()));
         }
@@ -644,7 +644,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         Ok(end)
     }
 
-    pub(crate) fn skip_whitespace(&mut self) -> Result<(), ParseError> {
+    pub(crate) fn skip_whitespace(&mut self) -> Result<(), Error> {
         while self.check(TokenKind::Whitespace) {
             self.advance()?;
         }
@@ -672,7 +672,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// Returns whether any comment was skipped — the declaration property→colon
     /// gap uses this to fold into `CssDeclaration::has_block_comment` without a
     /// re-scan.
-    pub(crate) fn skip_boundary_whitespace_and_comments(&mut self) -> Result<bool, ParseError> {
+    pub(crate) fn skip_boundary_whitespace_and_comments(&mut self) -> Result<bool, Error> {
         let mut saw_comment = false;
         loop {
             self.skip_boundary_whitespace()?;
@@ -704,7 +704,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     ///
     /// Returns whether a `<whitespace-token>` was among what it skipped — the boundary twin
     /// generalizes that answer to "whitespace at this juncture", boundary members included.
-    pub(crate) fn skip_whitespace_registering_comments(&mut self) -> Result<bool, ParseError> {
+    pub(crate) fn skip_whitespace_registering_comments(&mut self) -> Result<bool, Error> {
         let mut saw_whitespace = false;
         loop {
             if self.check(TokenKind::Whitespace) {
@@ -737,7 +737,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         &mut self,
         pos: usize,
         comments_len: usize,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         self.comments.truncate(comments_len);
         self.peek = None;
         self.lexer.seek(pos);
@@ -756,7 +756,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// case-flag readers (through [`advance_from`](Self::advance_from)) re-seat the same way.
     /// Only ever moves forward, so unlike [`rewind_to`](Self::rewind_to) every comment
     /// registered so far stands; any lookahead was lexed from before the jump and is dropped.
-    pub(in crate::parser) fn resume_at(&mut self, pos: usize) -> Result<(), ParseError> {
+    pub(in crate::parser) fn resume_at(&mut self, pos: usize) -> Result<(), Error> {
         debug_assert!(
             pos >= self.current_start(),
             "resume_at moves forward only ({pos} < {})",
@@ -774,7 +774,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     ///
     /// The whole-token case is a plain [`advance`](Self::advance), which keeps a cached
     /// lookahead; a split re-seats through [`resume_at`](Self::resume_at), which drops it.
-    pub(in crate::parser) fn advance_from(&mut self, end: usize) -> Result<(), ParseError> {
+    pub(in crate::parser) fn advance_from(&mut self, end: usize) -> Result<(), Error> {
         if end == self.current_end() {
             self.advance()
         } else {
@@ -811,7 +811,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// a `<` leaves the boundary skip nothing to step and the marker loop nothing to match, so
     /// the head returns before the call into the outlined loop.
     #[inline]
-    pub(crate) fn skip_html_comment_markers(&mut self) -> Result<(), ParseError> {
+    pub(crate) fn skip_html_comment_markers(&mut self) -> Result<(), Error> {
         if !self.may_open_boundary_run() && !self.check(TokenKind::LessThan) {
             return Ok(());
         }
@@ -821,7 +821,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// The loop behind [`skip_html_comment_markers`](Self::skip_html_comment_markers)'s inline
     /// head, reached only once the current token could open a boundary run or a marker.
     #[inline(never)]
-    fn step_html_comment_markers(&mut self) -> Result<(), ParseError> {
+    fn step_html_comment_markers(&mut self) -> Result<(), Error> {
         self.skip_boundary_whitespace()?;
         while self.check(TokenKind::LessThan)
             && self.source[self.current_start()..].starts_with("<!--")
@@ -945,7 +945,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// standing where the `{` or the next child is due — `a /* c */<NBSP>{` was a parse
     /// error. Ordering is safe: this runs with the comment already consumed and pushed, and
     /// stops on the NEXT one, which is the caller's arm to take.
-    pub(crate) fn parse_block_comment(&mut self) -> Result<Comment, ParseError> {
+    pub(crate) fn parse_block_comment(&mut self) -> Result<Comment, Error> {
         let comment = self.build_current_comment();
         self.advance()?;
         self.skip_boundary_whitespace()?;
@@ -955,34 +955,34 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     // Error Helpers
 
     /// Create an error with custom message at current position
-    pub(crate) fn error_msg(&self, message: &str) -> ParseError {
-        ParseError::invalid_syntax(message.to_string(), self.current_pos())
+    pub(crate) fn error_msg(&self, message: &str) -> Error {
+        Error::invalid_syntax(message.to_string(), self.current_pos())
     }
 
     /// Create an error with custom message at custom position
-    pub(crate) fn error_msg_at(&self, message: &str, position: usize) -> ParseError {
-        ParseError::invalid_syntax(message.to_string(), position)
+    pub(crate) fn error_msg_at(&self, message: &str, position: usize) -> Error {
+        Error::invalid_syntax(message.to_string(), position)
     }
 
     /// Create an error: "Expected X"
-    pub(crate) fn error_expected(&self, what: &str) -> ParseError {
-        ParseError::invalid_syntax(format!("Expected {what}"), self.current_pos())
+    pub(crate) fn error_expected(&self, what: &str) -> Error {
+        Error::invalid_syntax(format!("Expected {what}"), self.current_pos())
     }
 
     /// Create an error: "Expected X" at custom position
-    pub(crate) fn error_expected_at(&self, what: &str, position: usize) -> ParseError {
-        ParseError::invalid_syntax(format!("Expected {what}"), position)
+    pub(crate) fn error_expected_at(&self, what: &str, position: usize) -> Error {
+        Error::invalid_syntax(format!("Expected {what}"), position)
     }
 
     /// Create an error: "Expected X, found Y"
-    pub(crate) fn error_expected_found(&self, what: &str) -> ParseError {
+    pub(crate) fn error_expected_found(&self, what: &str) -> Error {
         let kind = self.current_kind();
-        ParseError::invalid_syntax(format!("Expected {what}, found {kind}"), self.current_pos())
+        Error::invalid_syntax(format!("Expected {what}, found {kind}"), self.current_pos())
     }
 
     /// Create an error: "Expected X after 'Y'"
-    pub(crate) fn error_expected_after(&self, what: &str, after: &str) -> ParseError {
-        ParseError::invalid_syntax(
+    pub(crate) fn error_expected_after(&self, what: &str, after: &str) -> Error {
+        Error::invalid_syntax(
             format!("Expected {what} after '{after}'"),
             self.current_pos(),
         )
@@ -996,8 +996,8 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     pub(crate) fn nested<T>(
         &mut self,
         units: u32,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         if !self.depth.try_enter(units) {
             return Err(self.too_deep(self.current_pos()));
         }
@@ -1016,16 +1016,16 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// The depth-limit error at `position` (host coordinates).
     #[cold]
     #[inline(never)]
-    pub(crate) fn too_deep(&self, position: usize) -> ParseError {
-        ParseError::too_deep(DepthLimit::Nesting, position)
+    pub(crate) fn too_deep(&self, position: usize) -> Error {
+        Error::too_deep(DepthLimit::Nesting, position)
     }
 
     /// Create an error: "Unexpected X"
-    pub(crate) fn error_unexpected(&self, what: &str) -> ParseError {
-        ParseError::invalid_syntax(format!("Unexpected {what}"), self.current_pos())
+    pub(crate) fn error_unexpected(&self, what: &str) -> Error {
+        Error::invalid_syntax(format!("Unexpected {what}"), self.current_pos())
     }
 
-    pub(crate) fn parse(&mut self) -> Result<CssStyleSheet<'arena>, ParseError> {
+    pub(crate) fn parse(&mut self) -> Result<CssStyleSheet<'arena>, Error> {
         let mut nodes = self.bvec();
 
         // The stylesheet body is a `read_body` boundary: whitespace, `/*` comments,
@@ -1077,7 +1077,7 @@ pub fn parse_css<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena Bump,
-) -> Result<CssStyleSheet<'arena>, ParseError> {
+) -> Result<CssStyleSheet<'arena>, Error> {
     let mut parser = CssParser::new(source, base_offset, host_nesting, arena)?;
     parser.parse()
 }

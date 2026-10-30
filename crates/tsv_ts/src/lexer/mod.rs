@@ -9,9 +9,6 @@ pub mod escapes;
 pub mod ident;
 mod token;
 
-// Shared lexer-error constructor: `core` / `comments` reach it via `super::lex_err`.
-use tsv_lang::lex_err;
-
 // Re-export public API
 pub(crate) use core::{
     ES_LINE_TERMINATOR_LEADS, is_es_line_terminator, is_es_line_terminator_at, is_es_whitespace,

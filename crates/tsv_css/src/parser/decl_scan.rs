@@ -46,7 +46,7 @@ use crate::lexer::{
 };
 use crate::parser::value::lists::ValueSeparator;
 use crate::parser::value::scan::is_value_separator;
-use tsv_lang::ParseError;
+use tsv_lang::Error;
 
 /// The token that closes a declaration's value. Exactly three can, so the scan reports
 /// which one rather than a general `TokenKind`: `CssParser::seat_at_terminator` builds that
@@ -335,7 +335,7 @@ fn scan_rule_or_declaration(
     from: usize,
     colon: usize,
     gap_comment: bool,
-) -> Result<bool, ParseError> {
+) -> Result<bool, Error> {
     let source = parser.source();
     let head = head_after_colon(source.as_bytes(), colon, gap_comment);
     match head.and_then(|head| scan_rule_or_declaration_and_value_bytes(source, head)) {
@@ -377,10 +377,7 @@ fn scan_rule_or_declaration(
 
 /// The rule-or-declaration verdict where the byte scan declined: the token walk, with the
 /// stash cleared, so `parse_declaration` lexes its head and scans the value itself.
-fn rule_or_declaration_by_tokens(
-    parser: &CssParser<'_, '_>,
-    from: usize,
-) -> Result<bool, ParseError> {
+fn rule_or_declaration_by_tokens(parser: &CssParser<'_, '_>, from: usize) -> Result<bool, Error> {
     parser.stash_declaration(None);
     scan_rule_or_declaration_tokens(parser.source(), parser.base_offset(), from)
 }
@@ -396,7 +393,7 @@ fn scan_rule_or_declaration_tokens(
     source: &str,
     base_offset: usize,
     from: usize,
-) -> Result<bool, ParseError> {
+) -> Result<bool, Error> {
     let mut lexer = Lexer::at_offset(&source[from..], base_offset + from);
     // `u32` so an unbalanced close saturates at zero — see `scan_value_tokens`.
     let mut paren: u32 = 0;
@@ -445,7 +442,7 @@ fn scan_rule_or_declaration_tokens(
 ///
 /// In debug the token lookahead runs behind a `:` the bytes found and must agree, so the
 /// test suite proves the equivalence.
-pub(super) fn identifier_child_is_rule(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
+pub(super) fn identifier_child_is_rule(parser: &CssParser<'_, '_>) -> Result<bool, Error> {
     let bytes = parser.source().as_bytes();
     let from = parser.current_end();
     match colon_after_trivia(bytes, from) {
@@ -513,7 +510,7 @@ fn colon_after_trivia(bytes: &[u8], from: usize) -> Option<(usize, bool)> {
 pub(super) fn scan_value(
     parser: &CssParser<'_, '_>,
     value_start: usize,
-) -> Result<(ValueFacts, Option<ValueSeparator>), ParseError> {
+) -> Result<(ValueFacts, Option<ValueSeparator>), Error> {
     let source = parser.source();
     match scan_value_bytes(source, value_start) {
         Some((facts, class)) => {
@@ -904,7 +901,7 @@ fn scan_value_tokens(
     source: &str,
     base_offset: usize,
     value_start: usize,
-) -> Result<ValueFacts, ParseError> {
+) -> Result<ValueFacts, Error> {
     let mut lexer = Lexer::at_offset(source, base_offset);
     lexer.seek(value_start);
 

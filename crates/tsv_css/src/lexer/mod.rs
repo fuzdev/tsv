@@ -54,8 +54,7 @@ use numbers::read_number_into;
 use strings::read_string;
 pub(crate) use strings::string_end;
 pub use token::{Token, TokenKind};
-// Shared lexer-error constructor: the scanner submodules reach it via `super::lex_err`.
-use tsv_lang::{ParseError, lex_err};
+use tsv_lang::Error;
 
 pub struct Lexer<'a> {
     source: &'a str,
@@ -119,13 +118,13 @@ impl<'a> Lexer<'a> {
     }
 
     /// Lift an error this lexer produced into the coordinates of the document it will be
-    /// rendered against (`ParseError::shift_position`).
+    /// rendered against (`Error::shift_position`).
     ///
     /// Applied once, at [`Lexer::next_token_into`] — this lexer's only fallible scan (the
     /// by-value [`Lexer::next_token`] wraps it), and so its only producer.
     #[cold]
     #[inline(never)]
-    fn host_err(&self, err: ParseError) -> ParseError {
+    fn host_err(&self, err: Error) -> Error {
         err.shift_position(self.base_offset)
     }
 
@@ -194,7 +193,7 @@ impl<'a> Lexer<'a> {
     /// `REGEX_PERCENTAGE` arm — and the keyframe stop became a parse error. The remainder
     /// can never be whitespace or a comment (the identifier lexer would not have consumed
     /// one), so the extra arms only add the readings this position really has.
-    pub(crate) fn token_at(&mut self, at: usize) -> Result<Token, ParseError> {
+    pub(crate) fn token_at(&mut self, at: usize) -> Result<Token, Error> {
         self.seek(at);
         self.next_token()
     }
@@ -214,7 +213,7 @@ impl<'a> Lexer<'a> {
     /// matching `)` so an interior `/*`, `:`, `,` etc. is literal content, not a comment /
     /// colon / separator. Quoted `url("…")` stays ident + `(` + string (a function-token).
     /// An unescaped spelling is its own source bytes, three of them to be a `url` at all.
-    fn identifier_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+    fn identifier_into(&mut self, dst: &mut Token) -> Result<(), Error> {
         let bytes = self.bytes;
         let start = self.pos;
         let run_from = start + usize::from(bytes.get(start) == Some(&b'$'));
@@ -246,7 +245,7 @@ impl<'a> Lexer<'a> {
     /// name with the cursor still on its first byte.
     #[cold]
     #[inline(never)]
-    fn read_decoded_identifier_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+    fn read_decoded_identifier_into(&mut self, dst: &mut Token) -> Result<(), Error> {
         let (token, decoded) = read_identifier(self.source, &mut self.pos)?;
         // The same `<url-token>` fork as `identifier_into`'s, matched on the decoded value so
         // an escaped spelling (`u\rl(`) still counts.
@@ -307,7 +306,7 @@ impl<'a> Lexer<'a> {
 
     /// Lex the next token straight into `*dst` — the parser's hot path, which writes its
     /// current-token slot (`advance`) and its lookahead slot (`peek_kind`) in place. A
-    /// `Result<Token, ParseError>` does not come back in registers: it is returned through
+    /// `Result<Token, Error>` does not come back in registers: it is returned through
     /// a stack slot the caller then reloads, copies and re-scatters, once per token.
     /// Writing through the caller's slot leaves only the error pointer to return. `*dst`
     /// is written only on success, so an error leaves the caller's token as it was.
@@ -315,7 +314,7 @@ impl<'a> Lexer<'a> {
     /// The lexer's one fallible scan, so the error path is lifted into host coordinates here
     /// ([`Lexer::host_err`]); the scan itself reports in the lexer's own.
     #[inline]
-    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), Error> {
         self.next_token_into_local(dst)
             .map_err(|err| self.host_err(err))
     }
@@ -327,7 +326,7 @@ impl<'a> Lexer<'a> {
     /// `peek_past_*` scans, `decl_scan`, the selector scans), the printer's own token
     /// scans, and `debug_token_stream`. The hot path — `advance` and `peek_kind` — writes
     /// the current token and the lookahead slot in place through [`Lexer::next_token_into`].
-    pub fn next_token(&mut self) -> Result<Token, ParseError> {
+    pub fn next_token(&mut self) -> Result<Token, Error> {
         let mut token = Token {
             kind: TokenKind::Eof,
             start: 0,
@@ -375,7 +374,7 @@ impl<'a> Lexer<'a> {
     /// free even where it is rare: the arms merge into one value, so every token would then
     /// copy the payload bytes through the merged stack temporary into `dst`.
     #[inline(never)]
-    fn next_token_into_local(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+    fn next_token_into_local(&mut self, dst: &mut Token) -> Result<(), Error> {
         // Start each token with a clean decoded flag. Callers copy the prior token's
         // decode out (`advance`/`new` at once, `peek` via its matching
         // `advance`-from-cache), so a stale decode never leaks onto a later token.
@@ -525,11 +524,7 @@ impl<'a> Lexer<'a> {
     /// [`Lexer::read_decoded_identifier_into`], so the handoff's `Result` is not one the
     /// optimizer can compute in the front.
     #[inline(never)]
-    fn finish_long_identifier_into(
-        &mut self,
-        dst: &mut Token,
-        from: usize,
-    ) -> Result<(), ParseError> {
+    fn finish_long_identifier_into(&mut self, dst: &mut Token, from: usize) -> Result<(), Error> {
         let start = self.pos;
         let end = ascii_identifier_run_end(self.bytes, from + IDENT_CHUNK);
         if !run_stop_ends_identifier(self.bytes.get(end).copied()) {
@@ -555,7 +550,7 @@ impl<'a> Lexer<'a> {
     /// `#[inline(never)]` because the front's frame-free shape depends on it: inlined, its
     /// calls would put their register saves back on every token.
     #[inline(never)]
-    fn next_token_dispatch(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+    fn next_token_dispatch(&mut self, dst: &mut Token) -> Result<(), Error> {
         let bytes = self.bytes;
         let start = self.pos;
         let first = bytes[start];
@@ -611,7 +606,7 @@ impl<'a> Lexer<'a> {
             // Any other ASCII byte is not a valid token start — error. `first as char` is
             // the exact character at `start` (ASCII round-trips).
             _ if first < 0x80 => {
-                return Err(lex_err(
+                return Err(Error::lex(
                     format!("Unexpected character in CSS: '{}'", first as char),
                     start,
                 ));
@@ -628,7 +623,7 @@ impl<'a> Lexer<'a> {
                     TokenKind::Whitespace
                 }
                 Some(ch) => {
-                    return Err(lex_err(
+                    return Err(Error::lex(
                         format!("Unexpected character in CSS: '{ch}'"),
                         start,
                     ));

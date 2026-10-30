@@ -1,8 +1,7 @@
-use super::lex_err;
 use super::token::{Token, TokenKind};
 use crate::escapes::escape_len;
 use crate::number::sign_starts_number;
-use tsv_lang::ParseError;
+use tsv_lang::Error;
 
 /// Whether `ch` is a non-ASCII CSS identifier code point.
 ///
@@ -158,7 +157,7 @@ pub(crate) fn is_ascii_identifier_start(b: u8) -> bool {
 pub(crate) fn read_identifier(
     source: &str,
     pos: &mut usize,
-) -> Result<(Token, Option<String>), ParseError> {
+) -> Result<(Token, Option<String>), Error> {
     let start = *pos;
     // `None` until an escape forces a decoded buffer; then materialized from the
     // verbatim run `source[start..pos]` scanned so far and appended to per escape.
@@ -230,7 +229,7 @@ pub(crate) fn read_identifier(
                     // error per css-syntax §4.3.7 (consume an escaped code
                     // point); the strict-throw model rejects it.
                     if *pos == start {
-                        return Err(lex_err("Unexpected end of input after backslash", *pos));
+                        return Err(Error::lex("Unexpected end of input after backslash", *pos));
                     }
                     break;
                 };
@@ -248,7 +247,7 @@ pub(crate) fn read_identifier(
                     // follows the css-syntax parse-error posture — see
                     // conformance_svelte.md §CSS Parser Scope & Error Model.)
                     if *pos == start {
-                        return Err(lex_err("Invalid escape: backslash before newline", *pos));
+                        return Err(Error::lex("Invalid escape: backslash before newline", *pos));
                     }
                     break;
                 } else {
@@ -280,7 +279,7 @@ pub(crate) fn read_identifier(
 /// Per CSS Syntax 3 §4.3.7 (consume an escaped code point), a value that is
 /// zero, is for a surrogate, or is greater than the maximum allowed code point
 /// (U+10FFFF) decodes to U+FFFD REPLACEMENT CHARACTER — it is not a parse error.
-pub(crate) fn decode_unicode_escape(source: &str, pos: &mut usize) -> Result<char, ParseError> {
+pub(crate) fn decode_unicode_escape(source: &str, pos: &mut usize) -> Result<char, Error> {
     let start = *pos;
     *pos += 1; // skip \
 
@@ -303,7 +302,7 @@ pub(crate) fn decode_unicode_escape(source: &str, pos: &mut usize) -> Result<cha
     }
 
     if digits == 0 {
-        return Err(lex_err("Invalid unicode escape sequence", start));
+        return Err(Error::lex("Invalid unicode escape sequence", start));
     }
 
     // Skip the hex escape's optional whitespace terminator.

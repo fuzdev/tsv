@@ -13,11 +13,11 @@ and Node's `module.stripTypeScriptTypes` share. The implementation is `tsv_ts::s
 - **Rust**: `tsv_ts::strip(source, &arena) -> Result<Stripped, StripError>`, the unset goal,
   and `tsv_ts::strip_with_goal(source, goal: Option<Goal>, &arena)`. `Stripped.code`
   borrows the source when nothing is type-only. `StripError::Parse` carries the
-  `ParseError`; `StripError::Unsupported { kind, span }` the refused construct
+  `Error`; `StripError::Unsupported { kind, span }` the refused construct
   (`UnsupportedKind::name` is its snake_case wire name) and its byte span.
   `StripError::message(source)` renders either as the CLI prints it, and
   `UnsupportedKind::report(span, source)` splits a refusal — summary, frame, span — as the
-  packages return it (a parse error's is `ParseError::report`).
+  packages return it (a parse error's is `Error::report`).
 - **npm**: `strip_typescript(source, options?)` in `@fuzdev/tsv-wasm` and the native
   `@fuzdev/tsv` — the `strip` cargo feature of `tsv_wasm` and `tsv_napi`, in each crate's
   default set, which the format-only and parse-only wasm packages build without. It

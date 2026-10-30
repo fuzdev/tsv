@@ -1,10 +1,9 @@
-use super::lex_err;
 use super::token::{Token, TokenKind};
-use tsv_lang::ParseError;
+use tsv_lang::Error;
 
 /// Read a CSS comment: /* ... */
 /// Content extracted via source[start+2..end-2]
-pub(crate) fn read_comment(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
+pub(crate) fn read_comment(source: &str, pos: &mut usize) -> Result<Token, Error> {
     let start = *pos;
     let bytes = source.as_bytes();
     let len = bytes.len();
@@ -23,7 +22,7 @@ pub(crate) fn read_comment(source: &str, pos: &mut usize) -> Result<Token, Parse
     loop {
         p = tsv_lang::swar::next_byte_of(bytes, p, [b'*']);
         if p >= len {
-            return Err(lex_err("Unterminated comment", start));
+            return Err(Error::lex("Unterminated comment", start));
         }
         if bytes.get(p + 1) == Some(&b'/') {
             p += 2; // past `*/`

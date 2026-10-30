@@ -3,7 +3,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::Parser;
 use crate::printer::ParenContext;
@@ -27,7 +27,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// currency).
     pub(super) fn parse_object_expression(
         &mut self,
-    ) -> Result<(ObjectExpression<'arena>, Span), ParseError> {
+    ) -> Result<(ObjectExpression<'arena>, Span), Error> {
         let arena = self.arena;
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
@@ -355,7 +355,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Returns the node beside its span, as `parse_object_expression` does.
     pub(super) fn parse_array_expression(
         &mut self,
-    ) -> Result<(ArrayExpression<'arena>, Span), ParseError> {
+    ) -> Result<(ArrayExpression<'arena>, Span), Error> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BracketOpen)?; // consume '['
         self.enter_grouping()?;
@@ -424,7 +424,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             } else if self.check(&TokenKind::BracketClose) {
                 break;
             } else {
-                return Err(ParseError::invalid_expression(
+                return Err(Error::invalid_expression(
                     format!("'{}'", self.current_kind()),
                     self.current_pos().0,
                 ));
@@ -453,7 +453,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         is_async: bool,
         is_generator: bool,
-    ) -> Result<FunctionExpression<'arena>, ParseError> {
+    ) -> Result<FunctionExpression<'arena>, Error> {
         // Parse optional type parameters: <T, U>
         let type_parameters = self.parse_optional_type_parameters()?;
 

@@ -126,12 +126,12 @@ pub fn exit_with_error(code: i32, message: impl std::fmt::Display) -> ! {
 
 /// [`exit_with_error`] for a single input the engine rejected (`parse`, and `format
 /// --content`/`--stdin`), prefixed by what the error is: `Parse error:` for a syntax
-/// error ([`tsv_lang::ParseError::is_syntax_error`]), and `Error:` for the kinds that are
+/// error ([`tsv_lang::Error::is_syntax_error`]), and `Error:` for the kinds that are
 /// not one — the size cap and a format's refusal of a source that parses
-/// ([`tsv_lang::ParseError::refusal`]). The JS mirror makes the same split on the facade
+/// ([`tsv_lang::Error::refusal`]). The JS mirror makes the same split on the facade
 /// result's `error.kind` (`cli.js`'s `result_failure`). A path-mode `format` names the file
 /// instead, with no prefix (`error: <path>: …`).
-pub fn exit_with_parse_error(code: i32, error: &tsv_lang::ParseError) -> ! {
+pub fn exit_with_parse_error(code: i32, error: &tsv_lang::Error) -> ! {
     let prefix = if error.is_syntax_error() {
         "Parse error"
     } else {

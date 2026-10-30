@@ -68,7 +68,7 @@
 //! did. No frame decision reads the pairs ([`SpineCount::runs_long`]): the output, whose
 //! pairs are grouping parens there, is framed exactly as its input was.
 
-use crate::error::ParseError;
+use crate::error::Error;
 
 /// The deepest nesting a parse accepts, in wire levels (see the module docs). Above every
 /// input the conformance gates parse (the deepest, tsc's
@@ -99,7 +99,7 @@ pub const NESTING_FLOOR: u32 = 32;
 const _: () = assert!(NESTING_LIMIT * NESTING_SPINE_WEIGHT < SPINE_LIMIT);
 const _: () = assert!(NESTING_FLOOR * NESTING_SPINE_WEIGHT + 5_000 < SPINE_LIMIT);
 
-/// Which depth limit a parse exceeded ([`ParseError::too_deep`]).
+/// Which depth limit a parse exceeded ([`Error::too_deep`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DepthLimit {
     /// [`NESTING_LIMIT`].
@@ -158,7 +158,7 @@ impl DepthBudget {
 
     /// Enter `units` wire levels of nesting; `false` (with nothing entered) where that
     /// would pass [`NESTING_LIMIT`]. The caller turns a `false` into
-    /// [`ParseError::too_deep`] at its current token.
+    /// [`Error::too_deep`] at its current token.
     #[inline]
     #[must_use]
     pub fn try_enter(&mut self, units: u32) -> bool {
@@ -265,7 +265,7 @@ impl DepthBudget {
     /// right side) is charged it. `Err` names the limit the raised level would pass, with
     /// `spine`'s printer pairs on top: [`NESTING_LIMIT`], or [`SPINE_LIMIT`] with the
     /// frame's links beside it ([`SpineCount::try_link`]) — nothing raised. The caller
-    /// turns it into [`ParseError::too_deep`].
+    /// turns it into [`Error::too_deep`].
     #[inline]
     pub fn try_raise_peak(&mut self, level: u32, spine: &SpineCount) -> Result<(), DepthLimit> {
         let peak = self.peak.max(level);
@@ -324,7 +324,7 @@ impl SpineCount {
 
     /// Add a link of `units` spine units; `false` (with nothing added) where the frame's
     /// count, with `budget`'s charged nesting on top, would pass [`SPINE_LIMIT`]. The caller
-    /// turns a `false` into [`ParseError::too_deep`].
+    /// turns a `false` into [`Error::too_deep`].
     #[inline]
     #[must_use]
     pub fn try_link(&mut self, units: u32, budget: &DepthBudget) -> bool {
@@ -355,7 +355,7 @@ impl SpineCount {
     /// names the limit the pair would pass: [`NESTING_LIMIT`], by the frame's pairs with
     /// `budget`'s charged nesting, or [`SPINE_LIMIT`], by its links with that nesting and
     /// the pairs charged — a chain's length, though the pair is what tipped it. The caller
-    /// turns it into [`ParseError::too_deep`].
+    /// turns it into [`Error::too_deep`].
     #[inline]
     pub fn try_pair(&mut self, budget: &DepthBudget) -> Result<(), DepthLimit> {
         let with_pair = Self::of(self.units(), self.pairs() + 1);
@@ -432,15 +432,15 @@ impl SpineCount {
     }
 }
 
-impl ParseError {
+impl Error {
     /// The parse passed `limit` at byte offset `position` (the token where the count
     /// tripped): a syntax error, positioned like every other, and told apart by
-    /// [`ParseError::is_too_deep`].
+    /// [`Error::is_too_deep`].
     #[cold]
     #[inline(never)]
     #[must_use]
     pub fn too_deep(limit: DepthLimit, position: usize) -> Self {
-        ParseError::depth_limit(limit, position)
+        Error::depth_limit(limit, position)
     }
 }
 
@@ -456,7 +456,7 @@ mod tests {
             lines: crate::LineRule::Ecmascript,
             bom: crate::LeadingBom::Counted,
         };
-        let nesting = ParseError::too_deep(DepthLimit::Nesting, 2).with_context("((x", coordinates);
+        let nesting = Error::too_deep(DepthLimit::Nesting, 2).with_context("((x", coordinates);
         assert!(nesting.is_too_deep() && nesting.is_syntax_error());
         assert_eq!(nesting.position(), Some(2));
         assert!(
@@ -464,10 +464,10 @@ mod tests {
                 .to_string()
                 .starts_with("Nesting exceeds tsv's depth limit of 256 levels\n")
         );
-        let spine = ParseError::too_deep(DepthLimit::Spine, 0);
+        let spine = Error::too_deep(DepthLimit::Spine, 0);
         assert!(spine.is_too_deep());
         assert!(spine.to_string().contains("exceeds tsv's length limit"));
-        assert!(!ParseError::invalid_syntax("x".to_string(), 0).is_too_deep());
+        assert!(!Error::invalid_syntax("x".to_string(), 0).is_too_deep());
     }
 
     #[test]

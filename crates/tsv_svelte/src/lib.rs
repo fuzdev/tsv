@@ -14,13 +14,13 @@ mod whitespace;
 
 use __private::{format_folded_in, parse_folded};
 pub use ast::Root;
-pub use tsv_lang::{ErrorReport, ParseError, Result, WirePoint};
+pub use tsv_lang::{Error, ErrorReport, Result, WirePoint};
 
 /// The coordinates a Svelte document's positions are reported in — Svelte's: a leading
 /// BOM **elided** (Svelte's `parse` strips it before parsing, so every offset indexes the
 /// BOM-less string, its acorn islands included), and `\n` alone ending a line, in the
 /// markup and in every `<script>`, template expression and `<style>` alike. The wire
-/// writer's tables and every parse error's point (`ParseError::wire_point`, and the
+/// writer's tables and every parse error's point (`Error::wire_point`, and the
 /// `line:col` its message prints) read this one statement.
 pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinates {
     lines: tsv_lang::LineRule::Lf,
@@ -39,7 +39,7 @@ pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinate
 /// # Returns
 ///
 /// * `Ok(Root)` - The parsed AST
-/// * `Err(ParseError)` - If parsing fails
+/// * `Err(Error)` - If parsing fails
 ///
 /// # Example
 ///
@@ -48,7 +48,7 @@ pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinate
 /// let ast = tsv_svelte::parse("<div>Hello</div>", &arena)?;
 /// ```
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Root<'arena>> {
-    ParseError::ensure_source_fits(source)?;
+    Error::ensure_source_fits(source)?;
     parser::parse_svelte(source, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
@@ -79,7 +79,7 @@ fn refuse_lone_cr_in_tag_line_comment(source: &str, arena: &bumpalo::Bump) -> Re
                 .iter()
                 .any(|b| !matches!(b, b' ' | b'\t' | b'\r'))
         {
-            return Err(ParseError::refusal(
+            return Err(Error::refusal(
                 "Lone carriage return inside a '//' comment in a tag: formatting folds it to a \
                  line feed, which would end the comment early",
                 source,

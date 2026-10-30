@@ -112,7 +112,7 @@ pub enum LineRule {
 /// leading byte-order mark, and which characters end its lines. Each language crate
 /// states its own once (`tsv_ts::WIRE_COORDINATES` and its siblings), and everything that
 /// reports a position for that language — the wire writers' tables
-/// ([`WireTables::new`]) and a parse error's point ([`crate::ParseError::wire_point`]) —
+/// ([`WireTables::new`]) and a parse error's point ([`crate::Error::wire_point`]) —
 /// reads that one statement rather than restating it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WireCoordinates {
@@ -821,7 +821,7 @@ pub(crate) struct LocationTracker {
     /// Byte offset of each line's first byte, ascending, `[0]` always present.
     ///
     /// `u32`, not `usize`: a source offset is already `u32`-bounded (`Span`,
-    /// and the 4 GiB file-size limit `ParseError::FileTooLarge` enforces), so
+    /// and the 4 GiB file-size limit `Error::ensure_source_fits` enforces), so
     /// the wide element bought nothing and cost the search half its cache
     /// residency. The searches hold their needle in `u32` too, so nothing
     /// widens per probe.

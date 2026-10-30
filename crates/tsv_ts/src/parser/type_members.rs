@@ -5,7 +5,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::Parser;
 
@@ -19,7 +19,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         param_name: IdentName<'arena>,
         id_start: usize,
         readonly: bool,
-    ) -> Result<TSTypeElement<'arena>, ParseError> {
+    ) -> Result<TSTypeElement<'arena>, Error> {
         let param_colon_start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
         // two wire levels: the parameter's `Identifier` and its `TSTypeAnnotation` (the
@@ -74,7 +74,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// is present. Shared by type literals (`{ … }`) and interface bodies.
     pub(in crate::parser) fn parse_type_members(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, TSTypeElement<'arena>>, ParseError> {
+    ) -> Result<bumpalo::collections::Vec<'arena, TSTypeElement<'arena>>, Error> {
         let mut members = self.bvec();
         // the members are siblings (`ListFrame`)
         let mut frame = self.list_frame();
@@ -101,9 +101,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse type element: property, method, call signature, construct signature, or index signature
-    pub(in crate::parser) fn parse_type_element(
-        &mut self,
-    ) -> Result<TSTypeElement<'arena>, ParseError> {
+    pub(in crate::parser) fn parse_type_element(&mut self) -> Result<TSTypeElement<'arena>, Error> {
         let start = self.current_pos().0;
 
         // `readonly` is a modifier only when a property key follows on the same line — an
@@ -326,7 +324,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_signature_return_type(
         &mut self,
         allow_type_predicate: bool,
-    ) -> Result<(Option<TSTypeAnnotation<'arena>>, u32), ParseError> {
+    ) -> Result<(Option<TSTypeAnnotation<'arena>>, u32), Error> {
         let return_type = if self.check(&TokenKind::Colon) {
             Some(if allow_type_predicate {
                 self.parse_return_type_annotation()?

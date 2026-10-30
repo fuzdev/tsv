@@ -4,7 +4,7 @@
 //! A parse error's point, graded against an independent reference.
 //!
 //! Every located parse error reports where it sits in its document's wire coordinates
-//! (`ParseError::wire_point`): `start`, the UTF-16 offset a wire node there would carry,
+//! (`Error::wire_point`): `start`, the UTF-16 offset a wire node there would carry,
 //! and `line` (1-based) / `column` (0-based, UTF-16 units) under the document's line rule —
 //! ECMAScript's terminators for a TypeScript document, LF alone for a Svelte document
 //! (every island in it included) and for a CSS one — with a leading byte-order mark
@@ -26,7 +26,7 @@
 use bumpalo::Bump;
 use std::path::Path;
 use tsv_debug::fixtures;
-use tsv_lang::ParseError;
+use tsv_lang::Error;
 
 #[path = "support/utf16_lines.rs"]
 mod utf16_lines;
@@ -58,7 +58,7 @@ fn reference_point(source: &str, position: usize, language: Language) -> (u32, u
 /// The parse error for `source`. A TypeScript source parses as the format path does when
 /// no source type is named — module, retried as a script — so the parse and the format
 /// it is compared with report from the same grammar.
-fn parse_error(source: &str, language: Language) -> Option<ParseError> {
+fn parse_error(source: &str, language: Language) -> Option<Error> {
     let arena = Bump::new();
     match language {
         Language::TypeScript => tsv_ts::parse_with_goal_or_fallback(source, None, &arena).err(),
@@ -67,7 +67,7 @@ fn parse_error(source: &str, language: Language) -> Option<ParseError> {
     }
 }
 
-fn format_error(source: &str, language: Language) -> Option<ParseError> {
+fn format_error(source: &str, language: Language) -> Option<Error> {
     match language {
         Language::TypeScript => tsv_ts::format_str(source).err(),
         Language::Svelte => tsv_svelte::format_str(source).err(),
@@ -76,7 +76,7 @@ fn format_error(source: &str, language: Language) -> Option<ParseError> {
 }
 
 /// Every way `error`'s point disagrees with the reference over `source`.
-fn point_violations(source: &str, language: Language, error: &ParseError) -> Vec<String> {
+fn point_violations(source: &str, language: Language, error: &Error) -> Vec<String> {
     let mut out = Vec::new();
     let Some(position) = error.position() else {
         return vec!["a positionless error".to_string()];

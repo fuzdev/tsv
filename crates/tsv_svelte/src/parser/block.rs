@@ -8,7 +8,7 @@ use crate::parser::element::{ElementParent, ParsedElement};
 use crate::whitespace::is_svelte_ws;
 use bumpalo::Bump;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 use tsv_ts::__private::TopLevelAs;
 use tsv_ts::{Expression, ExpressionKind};
 
@@ -310,14 +310,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a control flow block starting with {#
     ///
     /// Dispatches to specific block parsers based on the keyword.
-    pub(crate) fn parse_block(&mut self) -> Result<FragmentNode<'arena>, ParseError> {
+    pub(crate) fn parse_block(&mut self) -> Result<FragmentNode<'arena>, Error> {
         // two wire levels: the block and the `Fragment` its children sit in (the depth
         // limit's count)
         self.nested(2, Self::parse_block_body)
     }
 
     /// [`Self::parse_block`] inside its depth levels.
-    fn parse_block_body(&mut self) -> Result<FragmentNode<'arena>, ParseError> {
+    fn parse_block_body(&mut self) -> Result<FragmentNode<'arena>, Error> {
         let start = self.current_start();
 
         // We're at {#, consume it
@@ -339,7 +339,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse an if block: {#if test}...{:else if test}...{:else}...{/if}
-    fn parse_if_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
+    fn parse_if_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
         self.parse_if_block_inner(start, false)
     }
 
@@ -348,7 +348,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         start: usize,
         is_elseif: bool,
-    ) -> Result<FragmentNode<'arena>, ParseError> {
+    ) -> Result<FragmentNode<'arena>, Error> {
         // Get the content start position (after {# or {:)
         let tag_content_start = self.current_end();
 
@@ -477,7 +477,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         iterable: &str,
         expr_offset: usize,
         mark: EmbeddedParseMark,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, Error> {
         self.rewind_embedded_parses(mark);
         // Leading whitespace only, and `expr_offset` is already the first non-whitespace byte:
         // this slice ends at the head's SECOND `as`, so its trailing run may be a line
@@ -511,7 +511,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         content_offset: usize,
         expression: &Expression<'arena>,
         expr_end_pos: usize,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         if strip_head_keyword(&content[expr_end_pos - content_offset..], "as").is_some() {
             return Ok(());
         }
@@ -526,7 +526,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse an each block: {#each expression as context, index (key)}...{:else}...{/each}
-    fn parse_each_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
+    fn parse_each_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end();
 
@@ -708,7 +708,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         binding: &str,
         binding_offset: usize,
-    ) -> Result<EachBindingResult<'arena>, ParseError> {
+    ) -> Result<EachBindingResult<'arena>, Error> {
         // Calculate leading whitespace and adjust offset accordingly
         let leading_ws = binding.len() - binding.trim_start_matches(is_svelte_ws).len();
         // A trailing trim here cannot clip a line comment the way a head's does
@@ -767,7 +767,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         input: &str,
         offset: usize,
-    ) -> Result<(&'arena Expression<'arena>, usize), ParseError> {
+    ) -> Result<(&'arena Expression<'arena>, usize), Error> {
         let trimmed = input.trim_start_matches(is_svelte_ws);
         let ws_len = input.len() - trimmed.len();
         let adjusted = offset + ws_len;
@@ -821,12 +821,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `input[0]`, so `&input[..end]` is the whole bracketed run. Comment- and string-aware
     /// via the shared cursor. `offset` is `input[0]`'s source offset, where an unmatched
     /// bracket is reported.
-    fn matching_bracket_end(
-        &self,
-        input: &str,
-        open: u8,
-        offset: usize,
-    ) -> Result<usize, ParseError> {
+    fn matching_bracket_end(&self, input: &str, open: u8, offset: usize) -> Result<usize, Error> {
         let close = if open == b'{' { b'}' } else { b']' };
         let bytes = input.as_bytes();
         match_bracket(bytes, 0, bytes.len(), open, close, TriviaProfile::JS)
@@ -841,7 +836,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         remaining: &str,
         remaining_offset: usize,
-    ) -> Result<IndexAndKeyResult<'arena>, ParseError> {
+    ) -> Result<IndexAndKeyResult<'arena>, Error> {
         let tail = self.split_index_and_key(remaining, remaining_offset)?;
         let index = tail.index.map(|name| self.alloc_str_in(name));
         let key = match tail.key {
@@ -863,7 +858,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &self,
         remaining: &'s str,
         remaining_offset: usize,
-    ) -> Result<EachIndexAndKey<'s>, ParseError>
+    ) -> Result<EachIndexAndKey<'s>, Error>
     where
         'a: 's,
     {
@@ -934,7 +929,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse an await block: {#await expression}...{:then value}...{:catch error}...{/await}
-    fn parse_await_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
+    fn parse_await_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end();
 
@@ -1091,7 +1086,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `{:else}` is the block's *first* `{:else if}` landing on an alternate the
     /// `{:else}` already took. Calling that a duplicate names a clause the author
     /// never wrote twice.
-    fn reject_duplicate_else(&self) -> Result<(), ParseError> {
+    fn reject_duplicate_else(&self) -> Result<(), Error> {
         if !self.check(TokenKind::BlockContinue) {
             return Ok(());
         }
@@ -1122,7 +1117,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         keyword: &str,
         stop_keywords: &[&str],
-    ) -> Result<(Option<Fragment<'arena>>, Option<&'arena Expression<'arena>>), ParseError> {
+    ) -> Result<(Option<Fragment<'arena>>, Option<&'arena Expression<'arena>>), Error> {
         let tag_start = self.current_end();
         let (tag_content, content_start) = self.scan_block_tag_content(tag_start)?;
         // The value is absent only when the `}` follows the keyword directly (`{:then}`).
@@ -1211,7 +1206,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         content: &'a str,
         keyword: &str,
         keyword_start: usize,
-    ) -> Result<&'a str, ParseError> {
+    ) -> Result<&'a str, Error> {
         let rest = self.strip_dispatched_keyword(content, keyword, keyword_start)?;
         if rest.is_empty() || rest.starts_with(is_svelte_ws) {
             Ok(rest)
@@ -1229,7 +1224,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         content: &'a str,
         keyword: &str,
         keyword_start: usize,
-    ) -> Result<&'a str, ParseError> {
+    ) -> Result<&'a str, Error> {
         content
             .strip_prefix(keyword)
             .ok_or_else(|| self.error_expected_at(&format!("`{keyword}`"), keyword_start))
@@ -1243,7 +1238,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         content: &'a str,
         keyword: &str,
         keyword_start: usize,
-    ) -> Result<&'a str, ParseError> {
+    ) -> Result<&'a str, Error> {
         let rest = self.strip_keyword_value(content, keyword, keyword_start)?;
         if rest.is_empty() {
             return Err(
@@ -1259,11 +1254,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// junk is rejected (erroring at the first non-whitespace byte), never silently dropped.
     /// Shared by every block whose tag ends right after its payload — `{#each}`'s binding,
     /// `{#await}`'s promise, `{#snippet}`'s `)`, and every `{/block}` close.
-    fn reject_trailing_tag_content(
-        &self,
-        region: &str,
-        region_start: usize,
-    ) -> Result<(), ParseError> {
+    fn reject_trailing_tag_content(&self, region: &str, region_start: usize) -> Result<(), Error> {
         let trailing = region.trim_start_matches(is_svelte_ws);
         if !trailing.is_empty() {
             let trailing_start = region_start + subslice_offset(region, trailing);
@@ -1287,7 +1278,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         region: &str,
         region_offset: usize,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, Error> {
         let (pattern, binding_end) = self.parse_block_pattern(region, region_offset)?;
         self.reject_trailing_tag_content(&region[binding_end - region_offset..], binding_end)?;
         Ok(pattern)
@@ -1306,7 +1297,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         expected: &str,
         block_start: usize,
-    ) -> Result<usize, ParseError> {
+    ) -> Result<usize, Error> {
         // A `{:…}` still standing here is one this block's reader did not take — a keyword
         // the block has no clause for (`{#each}…{:then}`), or one written after a space
         // (`{: else}`). Canonical's `next` rejects it at the continuation, not at the block.
@@ -1343,7 +1334,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `{#each}`, `{#await}`, each an `expected_token`), `block_invalid_elseif` for the
     /// welded `{:elseif}`, and `block_invalid_continuation_placement` for a block with no
     /// continuations at all (`{#key}`, `{#snippet}`).
-    fn error_misplaced_continuation(&self, expected: &str) -> ParseError {
+    fn error_misplaced_continuation(&self, expected: &str) -> Error {
         // The `{:…}` braces are spelled by `clause`, so no literal reads as a format argument.
         let clause = |keyword: &str| format!("{{:{keyword}}}");
         let message = match expected {
@@ -1367,7 +1358,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse a key block: {#key expression}...{/key}
-    fn parse_key_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
+    fn parse_key_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end();
 
@@ -1409,7 +1400,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Parse a snippet block: {#snippet name(params)}...{/snippet}
     /// Also handles TypeScript generics: `{#snippet name<T>(params)}`
-    fn parse_snippet_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
+    fn parse_snippet_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end();
 
@@ -1641,7 +1632,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         content: &str,
         content_offset: usize,
         open_pos: usize,
-    ) -> Result<usize, ParseError> {
+    ) -> Result<usize, Error> {
         match_bracket(
             content.as_bytes(),
             open_pos,
@@ -1658,7 +1649,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(super) fn scan_block_tag_content(
         &mut self,
         start: usize,
-    ) -> Result<(&'a str, usize), ParseError> {
+    ) -> Result<(&'a str, usize), Error> {
         // Find the block tag's closing `}` (skips strings/comments/regex). `start`
         // is just after the `{#`/`{:`/`{@`/`{/` marker (or a declaration tag's `{`), so the
         // opening `{` is the depth-1 brace the scan matches; the scan itself starts past
@@ -1685,7 +1676,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         stop_keywords: &[&str],
         content_start: usize,
-    ) -> Result<Fragment<'arena>, ParseError> {
+    ) -> Result<Fragment<'arena>, Error> {
         let mut nodes = self.bvec();
         let mut last_end = content_start;
 

@@ -5,7 +5,7 @@ use bumpalo::collections::Vec as BumpVec;
 use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::{char_at, is_svelte_ws, name_run_end};
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::expression_tag::SequenceLocation;
 use super::parser_impl::SvelteParser;
@@ -307,7 +307,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         tag_name: &str,
         start: usize,
         parent: ElementParent,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         if self.root_only_meta_tags_seen & tag.bit() != 0 {
             return Err(self.error_msg_at(
                 &format!("A component can only have one `<{tag_name}>` element"),
@@ -334,7 +334,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn parse_element_or_special(
         &mut self,
         parent: ElementParent,
-    ) -> Result<ParsedElement<'arena>, ParseError> {
+    ) -> Result<ParsedElement<'arena>, Error> {
         // two wire levels: the element and the `Fragment` its children sit in (the depth
         // limit's count)
         self.nested(2, |p| p.parse_element_or_special_body(parent))
@@ -344,7 +344,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn parse_element_or_special_body(
         &mut self,
         parent: ElementParent,
-    ) -> Result<ParsedElement<'arena>, ParseError> {
+    ) -> Result<ParsedElement<'arena>, Error> {
         let start = self.current_start();
 
         // Parse opening tag: <tag>
@@ -431,7 +431,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Consuming the `>` lexes the token behind it as template, so this is for a tag whose
     /// content IS template. One whose content is scanned raw stops at the `>` instead — see
     /// [`read_opening_tag_end`](Self::read_opening_tag_end).
-    pub(super) fn finish_opening_tag(&mut self) -> Result<OpeningTagEnd, ParseError> {
+    pub(super) fn finish_opening_tag(&mut self) -> Result<OpeningTagEnd, Error> {
         let opening = self.read_opening_tag_end()?;
         self.advance()?; // consume >
         Ok(opening)
@@ -449,7 +449,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// closer above the opener). The scan takes the content from `after_gt` and repositions
     /// the lexer itself; a caller whose content is template consumes the `>`
     /// ([`finish_opening_tag`](Self::finish_opening_tag)).
-    fn read_opening_tag_end(&mut self) -> Result<OpeningTagEnd, ParseError> {
+    fn read_opening_tag_end(&mut self) -> Result<OpeningTagEnd, Error> {
         let self_closing = self.check(TokenKind::Slash);
         if self_closing {
             self.advance()?; // consume /
@@ -474,7 +474,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         tag_name: &'a str,
         facts: TagFacts,
         name_span: Span,
-    ) -> Result<ParsedElement<'arena>, ParseError> {
+    ) -> Result<ParsedElement<'arena>, Error> {
         // Parse attributes
         let attributes = self.parse_attributes()?;
 
@@ -557,7 +557,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         start: usize,
         name_span: Span,
         tag: SpecialElementTag,
-    ) -> Result<ParsedElement<'arena>, ParseError> {
+    ) -> Result<ParsedElement<'arena>, Error> {
         // Parse attributes, extracting `this` for SvelteElement and SvelteComponent
         let (attributes, this) = self.parse_special_element_attributes(tag)?;
 
@@ -624,7 +624,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         tag: SpecialElementTag,
         this: SpecialThisBinding<'arena>,
         name_span: Span,
-    ) -> Result<SpecialElementKind<'arena>, ParseError> {
+    ) -> Result<SpecialElementKind<'arena>, Error> {
         Ok(match tag {
             SpecialElementTag::SvelteElement => {
                 // A missing `this` and a valueless one are both `Absent` — Svelte reports
@@ -671,7 +671,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn parse_special_element_attributes(
         &mut self,
         tag: SpecialElementTag,
-    ) -> Result<SpecialElementAttrs<'arena>, ParseError> {
+    ) -> Result<SpecialElementAttrs<'arena>, Error> {
         let mut attributes = self.parse_attributes()?;
 
         // Nine of the eleven special tags never bind a `this`; for them the list is already
@@ -748,7 +748,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         opening_tag_end: usize,
         start: usize,
         implicit_close: ImplicitClose,
-    ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), ParseError> {
+    ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), Error> {
         let saved_head = self.in_svelte_head;
         let saved_shadow = self.in_shadowroot_template;
         self.in_svelte_head = in_svelte_head;
@@ -775,7 +775,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         opening_tag_end: usize,
         start: usize,
         implicit_close: ImplicitClose,
-    ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), ParseError> {
+    ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), Error> {
         let mut child_nodes = self.bvec();
         let mut last_end = opening_tag_end;
 
@@ -861,7 +861,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// stack slot of its own in that recursive frame, where `tag_name` is already held. Outlined
     /// so the trigger `match` and the peeked name hold no stack slot there either.
     #[inline(never)]
-    fn next_open_tag_closes(&mut self, tag_name: &str) -> Result<bool, ParseError> {
+    fn next_open_tag_closes(&mut self, tag_name: &str) -> Result<bool, Error> {
         let Some(next_name) = self.peek_open_tag_name()? else {
             return Ok(false);
         };
@@ -872,7 +872,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// tag name holds no stack slot in that recursive frame.
     #[cold]
     #[inline(never)]
-    fn error_unclosed_element(&self, tag_name: &str, start: usize) -> ParseError {
+    fn error_unclosed_element(&self, tag_name: &str, start: usize) -> Error {
         self.error_unclosed_at(&format!("element: <{tag_name}>"), start)
     }
 
@@ -918,7 +918,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// only be an invalid name, which `parse_element_or_special` rejects on either branch —
     /// but the same shortcut *was* a live bug in `is_next_tag`, so this asks the same
     /// question the same way rather than resting on the downstream reject.
-    fn peek_open_tag_name(&mut self) -> Result<Option<&'a str>, ParseError> {
+    fn peek_open_tag_name(&mut self) -> Result<Option<&'a str>, Error> {
         self.fill_peek()?;
         Ok(self.peek.as_ref().and_then(|p| {
             (p.kind == TokenKind::Identifier).then(|| {
@@ -938,7 +938,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `is_next_tag`, because the very next check is `expect(RightAngle)`: every character
     /// that would extend the run past its token is by definition not `\s`, `/` or `>`, so a
     /// longer run cannot reach the `>` and `</div%x>` is rejected either way.
-    pub(super) fn parse_closing_tag(&mut self, expected_name: &str) -> Result<u32, ParseError> {
+    pub(super) fn parse_closing_tag(&mut self, expected_name: &str) -> Result<u32, Error> {
         self.expect(TokenKind::LeftAngle)?;
         self.expect(TokenKind::Slash)?;
 
@@ -968,7 +968,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         tag_name: &str,
         content_start: usize,
         element_start: usize,
-    ) -> Result<BumpVec<'arena, FragmentNode<'arena>>, ParseError> {
+    ) -> Result<BumpVec<'arena, FragmentNode<'arena>>, Error> {
         // Nested raw-text uses an EXACT `</tag>` close (no `\s*` before `>`), matching
         // Svelte's generic element parser — unlike a top-level `<script>`/`<style>`, which
         // reads via the whitespace-tolerant `find_raw_text_close`. See that function.
@@ -1015,7 +1015,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         content_start: usize,
         element_start: usize,
-    ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), ParseError> {
+    ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), Error> {
         // `&'a [u8]` borrowed from the immutable source, so it survives the `&mut self`
         // expression-tag parse below (its lifetime is the source's, not this borrow's).
         let bytes = self.source.as_bytes();

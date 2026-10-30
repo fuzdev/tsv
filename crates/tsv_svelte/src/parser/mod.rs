@@ -6,7 +6,7 @@ use crate::parser::element::{ElementParent, ParsedElement, RootOnlyMetaTag};
 use crate::whitespace::{is_svelte_ws, skip_svelte_ws, svelte_ws_width_at};
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 // Module declarations
 mod attribute;
@@ -33,7 +33,7 @@ pub(crate) use expression_tag::scan_to_matching_brace;
 pub fn parse_svelte<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
-) -> Result<Root<'arena>, ParseError> {
+) -> Result<Root<'arena>, Error> {
     let mut parser = SvelteParser::new(source, arena)?;
     parser.parse_root()
 }
@@ -43,7 +43,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// Script and style tags can appear in any order, before/after/between markup.
     /// This parser handles all orderings by parsing linearly and categorizing nodes.
-    pub(crate) fn parse_root(&mut self) -> Result<Root<'arena>, ParseError> {
+    pub(crate) fn parse_root(&mut self) -> Result<Root<'arena>, Error> {
         let mut instance = None;
         let mut module = None;
         let mut css = None;
@@ -222,7 +222,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// svelte:options has no children, but it may be written with an explicit closing tag
     /// (`<svelte:options></svelte:options>`), whose `>` the span must reach.
     /// It configures component behavior via attributes like `runes`, `customElement`, etc.
-    fn parse_svelte_options(&mut self) -> Result<SvelteOptions<'arena>, ParseError> {
+    fn parse_svelte_options(&mut self) -> Result<SvelteOptions<'arena>, Error> {
         let start = self.current_start();
 
         // Parse opening: <svelte:options

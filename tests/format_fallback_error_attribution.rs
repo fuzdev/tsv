@@ -18,7 +18,7 @@
 //! attempt that died on a module-only construct — an `import` / `export` / `import.meta`
 //! outside a namespace body, a top-level `for await`, or the operand a module reads after a
 //! top-level `await` (at `Script` the word is a name, and the attempt dies on that token) —
-//! settles the file as a module outright (`ParseError::is_goal_gated`), and only past that
+//! settles the file as a module outright (`Error::is_goal_gated`), and only past that
 //! does the further error
 //! win: a broken sloppy script's module attempt dies early at its first sloppy construct,
 //! while its script attempt reaches the typo.

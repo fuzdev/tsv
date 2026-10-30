@@ -7,7 +7,7 @@ use crate::lexer::TokenKind;
 use crate::whitespace::{
     brace_interior_start, char_at, is_svelte_ws, name_run_end, skip_svelte_ws,
 };
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 use tsv_ts::ast::{Expression, IdentName, Identifier};
 
 use super::expression_tag::{
@@ -150,7 +150,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// - Shorthand attributes: `{name}` (equivalent to `name={name}`)
     pub(crate) fn parse_attributes(
         &mut self,
-    ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, ParseError> {
+    ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, Error> {
         self.parse_attributes_inner(AttributeReader::Element)
     }
 
@@ -159,14 +159,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// directives, and a raw value in which `{a: A}` is literal text rather than an expression.
     pub(crate) fn parse_attributes_literal(
         &mut self,
-    ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, ParseError> {
+    ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, Error> {
         self.parse_attributes_inner(AttributeReader::Static)
     }
 
     fn parse_attributes_inner(
         &mut self,
         reader: AttributeReader,
-    ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, ParseError> {
+    ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, Error> {
         let mut attributes = self.bvec();
 
         loop {
@@ -304,7 +304,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn parse_attribute_or_directive(
         &mut self,
         reader: AttributeReader,
-    ) -> Result<AttributeNode<'arena>, ParseError> {
+    ) -> Result<AttributeNode<'arena>, Error> {
         // Read the full attribute/directive name as Svelte's `read_tag` does — a raw run from
         // `current_start` up to a token-ending char (`/[\s=/>"']/`), so a name the lexer split
         // or over-ran (`ysc%%gibberish`, `{ #a}`) is whole before the directive `:` split and
@@ -342,7 +342,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         full_name: &str,
         colon_idx: usize,
         name_end: usize,
-    ) -> Result<AttributeNode<'arena>, ParseError> {
+    ) -> Result<AttributeNode<'arena>, Error> {
         let start = self.current_start();
         let head_span = Span {
             start: start as u32,
@@ -504,7 +504,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// only thing that knows it is the token kind. On a `String` token `current_start` is the
     /// opening quote, and `<div style:color="#fff">` — valid Svelte — would have its `#`
     /// read as a block marker and be rejected.
-    fn check_directive_value_placement(&self) -> Result<(), ParseError> {
+    fn check_directive_value_placement(&self) -> Result<(), Error> {
         if matches!(
             self.current_kind(),
             TokenKind::BlockOpen | TokenKind::TagOpen
@@ -535,9 +535,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// Accepts both `{expr}` and `"{expr}"` (quoted mustache) forms.
     /// Svelte's parser accepts quoted expressions in directives; prettier strips the quotes.
-    fn parse_directive_expression(
-        &mut self,
-    ) -> Result<(&'arena Expression<'arena>, Span), ParseError> {
+    fn parse_directive_expression(&mut self) -> Result<(&'arena Expression<'arena>, Span), Error> {
         self.check_directive_value_placement()?;
         if self.current_opens_directive_value() {
             // Standard form: {expr}
@@ -637,7 +635,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         start: usize,
         name_end: usize,
         head_span: Span,
-    ) -> Result<AttributeNode<'arena>, ParseError> {
+    ) -> Result<AttributeNode<'arena>, Error> {
         // Check for = (directive with value)
         let value = if self.check(TokenKind::Equals) {
             self.advance()?; // consume =
@@ -718,7 +716,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// - A call expression: {@attach tooltip("hi")}
     /// - A conditional: {@attach a ? fn1 : fn2}
     /// - An arrow function: {@attach (el) => el.focus()}
-    pub(crate) fn parse_attach_tag(&mut self) -> Result<AttachTag<'arena>, ParseError> {
+    pub(crate) fn parse_attach_tag(&mut self) -> Result<AttachTag<'arena>, Error> {
         // We're at the `{` of `{@attach expr}`; scan forward to find the closing `}`.
         let start = self.current_start();
 
@@ -793,7 +791,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// - An identifier: {...obj}
     /// - A call expression: {...getProps()}
     /// - A member expression: {...obj.nested}
-    fn parse_spread_attribute(&mut self) -> Result<SpreadAttribute<'arena>, ParseError> {
+    fn parse_spread_attribute(&mut self) -> Result<SpreadAttribute<'arena>, Error> {
         let start = self.current_start();
 
         // We're at '{', scan forward to find the closing '}'
@@ -858,7 +856,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Equivalent to: name={name}
     ///
     /// The content must be a valid identifier.
-    fn parse_shorthand_attribute(&mut self) -> Result<Attribute<'arena>, ParseError> {
+    fn parse_shorthand_attribute(&mut self) -> Result<Attribute<'arena>, Error> {
         let start = self.current_start();
 
         // We're at '{', scan forward to find the closing '}'
@@ -955,7 +953,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         name_start: usize,
         name_end: usize,
         reader: AttributeReader,
-    ) -> Result<Attribute<'arena>, ParseError> {
+    ) -> Result<Attribute<'arena>, Error> {
         // The name was already read as a Svelte `read_tag` run by the caller; it starts at
         // an Identifier token but may extend past it over special chars (`a%b`). The name is
         // span-identity (`source[name_span]`); just resync the lexer past it.
@@ -1031,7 +1029,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         start: usize,
         name_end: usize,
-    ) -> Result<Attribute<'arena>, ParseError> {
+    ) -> Result<Attribute<'arena>, Error> {
         let name_span = Span {
             start: start as u32,
             end: name_end as u32,
@@ -1073,7 +1071,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// character alone, slicing a character off each end — so `<script a="b>` silently loses
     /// the `b`. tsv rejects instead; see `conformance_svelte.md` §Static Attribute Reader
     /// Corrections.
-    fn read_static_attribute_value(&self, eq_end: usize) -> Result<(Text, usize), ParseError> {
+    fn read_static_attribute_value(&self, eq_end: usize) -> Result<(Text, usize), Error> {
         let source = self.source;
         let bytes = source.as_bytes();
         let value_start = skip_svelte_ws(source, eq_end);
@@ -1120,7 +1118,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Returns a `Vec<AttributeValue>` to support mixed text/expressions
     pub(crate) fn parse_attribute_value(
         &mut self,
-    ) -> Result<BumpVec<'arena, AttributeValue<'arena>>, ParseError> {
+    ) -> Result<BumpVec<'arena, AttributeValue<'arena>>, Error> {
         // Any value not starting with a quote is unquoted, read as a Svelte
         // `read_sequence` — a run of Text + {expr} chunks to the terminator regex.
         // Covers a bare identifier (`data-attr=value`), a single expression
@@ -1239,7 +1237,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// set is far laxer and whose `{` is never an expression.
     pub(crate) fn parse_unquoted_attribute_value(
         &mut self,
-    ) -> Result<BumpVec<'arena, AttributeValue<'arena>>, ParseError> {
+    ) -> Result<BumpVec<'arena, AttributeValue<'arena>>, Error> {
         // `src`/`bytes` borrow the source data (lifetime `'a`), so they stay valid
         // across the `&mut self` `parse_expression_tag_at` call below.
         let src = self.source;

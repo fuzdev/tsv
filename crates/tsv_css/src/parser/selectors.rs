@@ -3,7 +3,7 @@ use crate::ast::*;
 use crate::lexer::TokenKind;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 /// Register comment(s) sitting between a complex selector and its `,` separator
 /// (comments are inter-token trivia removed at tokenization — no token, not even
@@ -16,7 +16,7 @@ use tsv_lang::{ParseError, Span};
 /// at the comma boundary via `comments_to_emit_in_range` — the principled replacement for the
 /// old raw-source selector seam. Not needed by `parse_forgiving_selector_list`, whose
 /// terminator is `)` (not `{`); it registers comments unconditionally before its comma check.
-fn skip_comments_before_comma(parser: &mut CssParser<'_, '_>) -> Result<(), ParseError> {
+fn skip_comments_before_comma(parser: &mut CssParser<'_, '_>) -> Result<(), Error> {
     // Both halves are boundary-aware, and for the same reason: `read_selector_list` reaches
     // its `,` through one `allow_comment_or_whitespace`, so a `<NBSP>` between the comment
     // and the comma is trivia. A plain lookahead saw an identifier there and declined, and a
@@ -34,7 +34,7 @@ fn skip_comments_before_comma(parser: &mut CssParser<'_, '_>) -> Result<(), Pars
 /// first, and each one after a comma. Within a list the first item and the tail items
 /// parse identically, so the entire list body is shared here. `parse_item` is passed as a
 /// fn pointer (`parse_complex_selector`, `fn(&mut CssParser) -> Result<ComplexSelector,
-/// ParseError>`) rather than a closure — the complex and relative lists share one per-item
+/// Error>`) rather than a closure — the complex and relative lists share one per-item
 /// parser now that a leading combinator is accepted everywhere (see
 /// `parse_complex_selector`).
 ///
@@ -44,8 +44,8 @@ fn skip_comments_before_comma(parser: &mut CssParser<'_, '_>) -> Result<(), Pars
 /// in would distort this helper rather than dedup it.
 fn parse_selector_list_with<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-    parse_item: fn(&mut CssParser<'_, 'arena>) -> Result<ComplexSelector<'arena>, ParseError>,
-) -> Result<SelectorList<'arena>, ParseError> {
+    parse_item: fn(&mut CssParser<'_, 'arena>) -> Result<ComplexSelector<'arena>, Error>,
+) -> Result<SelectorList<'arena>, Error> {
     // `read_selector_list` opens with `allow_comment_or_whitespace` and takes its `start`
     // only after it, so the list opens on the NAME. `parse_complex_selector` skips the same
     // run a moment later, which is why every name already agrees — but the list's own
@@ -104,7 +104,7 @@ fn parse_selector_list_with<'arena>(
 /// See: CSS Selectors Level 4 - `<complex-selector-list>` vs `<relative-selector-list>`
 pub(crate) fn parse_complex_selector_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<SelectorList<'arena>, ParseError> {
+) -> Result<SelectorList<'arena>, Error> {
     parse_selector_list_with(parser, parse_complex_selector)
 }
 
@@ -135,7 +135,7 @@ pub(crate) fn parse_complex_selector_list<'arena>(
 /// See: CSS Selectors Level 4 - `<forgiving-selector-list>`
 pub(crate) fn parse_forgiving_selector_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<SelectorList<'arena>, ParseError> {
+) -> Result<SelectorList<'arena>, Error> {
     // The list's own `start`, past the boundary run — see `parse_selector_list_with`, whose
     // capture this mirrors. `:is()`/`:where()` reach here straight from the `(`, so this is
     // the only skip standing between the run and the `args.start` the wire emits.
@@ -234,7 +234,7 @@ fn create_invalid_selector<'arena>(
 fn extract_selector_until_comma_or_end<'a>(
     parser: &mut CssParser<'a, '_>,
     start_pos: usize,
-) -> Result<&'a str, ParseError> {
+) -> Result<&'a str, Error> {
     let mut depth = 0; // Track nesting depth for parens/brackets
 
     loop {
@@ -259,7 +259,7 @@ fn extract_selector_until_comma_or_end<'a>(
             }
             TokenKind::Eof => {
                 // Unexpected EOF - stop here
-                return Err(ParseError::unexpected_eof(
+                return Err(Error::unexpected_eof(
                     parser.base_offset() + parser.current_start(),
                 ));
             }
@@ -287,7 +287,7 @@ fn extract_selector_until_comma_or_end<'a>(
 /// See: CSS Selectors Level 4 - `<relative-selector-list>`
 pub(crate) fn parse_relative_selector_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<SelectorList<'arena>, ParseError> {
+) -> Result<SelectorList<'arena>, Error> {
     parse_selector_list_with(parser, parse_complex_selector)
 }
 
@@ -311,7 +311,7 @@ pub(crate) fn parse_relative_selector_list<'arena>(
 /// See: CSS Selectors Level 4 - `<complex-selector>` vs `<relative-selector>`
 pub(crate) fn parse_complex_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<ComplexSelector<'arena>, ParseError> {
+) -> Result<ComplexSelector<'arena>, Error> {
     // The list's own start is an `allow_comment_or_whitespace` juncture — before the first
     // selector and after every `,` — and the skip must precede the capture, since this
     // offset becomes the rule's, the prelude's and the selector's `start`.
@@ -430,7 +430,7 @@ fn explicit_combinator_kind(kind: TokenKind) -> Option<Combinator> {
 /// This is different from `parse_combinator()` which also returns Descendant for whitespace.
 pub(crate) fn parse_explicit_combinator(
     parser: &mut CssParser<'_, '_>,
-) -> Result<Option<(Combinator, Span)>, ParseError> {
+) -> Result<Option<(Combinator, Span)>, Error> {
     // `parseCss` reaches this position through `allow_comment_or_whitespace` + the
     // `allow_whitespace()` inside `read_combinator`, so the whole run — both whitespace
     // classes — belongs to the gap. It has to be stepped over BEFORE `combinator_start` is
@@ -460,7 +460,7 @@ pub(crate) fn parse_explicit_combinator(
 /// Returns (combinator type, combinator span)
 pub(crate) fn parse_combinator(
     parser: &mut CssParser<'_, '_>,
-) -> Result<Option<(Combinator, Span)>, ParseError> {
+) -> Result<Option<(Combinator, Span)>, Error> {
     // Capture position before skipping whitespace for descendant combinator
     let whitespace_start = parser.span_pos(parser.current_start());
     // `read_combinator` opens with `allow_whitespace()`, so the gap is the whole boundary
@@ -526,7 +526,7 @@ pub(crate) fn parse_combinator(
 /// Skip the trivia after a just-consumed explicit combinator symbol, registering any
 /// gap comment that follows it (`div > /* c */ p`, `:has(> /* c */ img)`) so the
 /// printer can re-emit it. Shared by `parse_combinator` and `parse_explicit_combinator`.
-fn skip_combinator_gap(parser: &mut CssParser<'_, '_>) -> Result<(), ParseError> {
+fn skip_combinator_gap(parser: &mut CssParser<'_, '_>) -> Result<(), Error> {
     // The boundary loop, because this is `read_combinator`'s second `allow_whitespace()` and
     // `parseCss` reaches the comment through the same `allow_comment_or_whitespace` as every
     // other juncture: a plain skip leaves a run standing where the comment is due, the comment
@@ -587,7 +587,7 @@ fn pseudo_arg_terminal_nth(parser: &CssParser<'_, '_>) -> bool {
 /// and not the identifier the lexer read. A lookahead that skipped only whitespace TOKENS
 /// here saw a selector start in the run itself and called `a /* c */<NBSP>{` a descendant
 /// combinator.
-fn comment_continues_selector(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
+fn comment_continues_selector(parser: &CssParser<'_, '_>) -> Result<bool, Error> {
     let after = parser.peek_past_boundary_whitespace()?;
     Ok(is_selector_start_kind(after) || is_explicit_combinator_kind(after))
 }
@@ -608,7 +608,7 @@ fn comment_continues_selector(parser: &CssParser<'_, '_>) -> Result<bool, ParseE
 /// selector start instead kept `.a/* c */<NBSP>{` in the compound and minted a second simple
 /// selector out of the run itself. The sibling reading of the same question is
 /// `comment_continues_selector`, and the two have to agree.
-fn compound_continues_across_comments(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
+fn compound_continues_across_comments(parser: &CssParser<'_, '_>) -> Result<bool, Error> {
     let (remaining, mut lexer) = parser.lookahead_lexer();
     loop {
         let token = lexer.next_token()?;
@@ -632,7 +632,7 @@ fn parse_relative_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     combinator: Option<Combinator>,
     combinator_span: Option<Span>,
-) -> Result<RelativeSelector<'arena>, ParseError> {
+) -> Result<RelativeSelector<'arena>, Error> {
     // Ahead of the capture below, which is this compound's `start` when no combinator
     // precedes it — see `skip_boundary_whitespace`.
     parser.skip_boundary_whitespace()?;
@@ -719,7 +719,7 @@ fn is_simple_selector_chain(parser: &CssParser<'_, '_>) -> bool {
 /// Parse a simple selector: type, class, id, attribute, pseudo-class, pseudo-element
 pub(crate) fn parse_simple_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<SimpleSelector<'arena>, ParseError> {
+) -> Result<SimpleSelector<'arena>, Error> {
     let start = parser.base_offset() + parser.current_start();
 
     // Inside functional pseudo-class args, a `<number>`/`<an+b>` term (followed by

@@ -48,12 +48,12 @@ use tsv_arena::parse_format;
 use tsv_arena::{parse_convert, parse_internal};
 
 // The one parse-error type, shared by every language crate: each re-exports
-// `tsv_lang::ParseError` (and the `ErrorReport` its `report` returns, whose span is two
+// `tsv_lang::Error` (and the `ErrorReport` its `report` returns, whose span is two
 // `WirePoint`s), so the shared error helpers below take a Svelte or CSS failure as readily as
 // a TypeScript one. Named through `tsv_ts`, as the language surface spells it; this crate's
 // own `tsv_lang` edge serves the wasm32 layout pins alone (`layout`).
 #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
-use tsv_ts::ParseError;
+use tsv_ts::Error;
 
 // WASM global allocator: talc replaces std's default dlmalloc on wasm32. The
 // format path is allocation-heavy (doc IR, output string, memo vecs) and
@@ -191,10 +191,10 @@ impl Failure {
 
 /// A parse error as the export ends on it: every pointed error RETURNED as
 /// `{ok: false, error}` — `kind` `'parse'` for a syntax error, `'refused'` for a format's
-/// refusal of a source that parses (`ParseError::report`'s `refused`) — and a positionless
+/// refusal of a source that parses (`Error::report`'s `refused`) — and a positionless
 /// one (a source over the size cap) thrown as a plain `Error`.
 #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
-fn parse_failure(e: &ParseError) -> Failure {
+fn parse_failure(e: &Error) -> Failure {
     match e.report() {
         Some(report) => Failure::Returned(failure_result(
             if report.refused { "refused" } else { "parse" },
@@ -600,7 +600,7 @@ macro_rules! wire_json {
                 convert_ast_json_string,
                 $source,
                 goal,
-                |e: ParseError| parse_failure(&e)
+                |e: Error| parse_failure(&e)
             )
         })
     };
@@ -674,7 +674,7 @@ macro_rules! lang_bindings {
             )
             .map_err(err)?;
             let parsed: Result<(), Failure> =
-                parse_internal!($goalness, $lang, source, goal, |e: ParseError| {
+                parse_internal!($goalness, $lang, source, goal, |e: Error| {
                     parse_failure(&e)
                 });
             match parsed {
@@ -696,7 +696,7 @@ macro_rules! lang_bindings {
             )
             .map_err(err)?;
             let formatted: Result<String, Failure> =
-                parse_format!($goalness, $lang, source, goal, |e: ParseError| {
+                parse_format!($goalness, $lang, source, goal, |e: Error| {
                     parse_failure(&e)
                 });
             match formatted {

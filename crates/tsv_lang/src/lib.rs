@@ -7,7 +7,7 @@
 //! - `WireTables` / `WirePositions` - what a wire writer emits positions from (the
 //!   byte→UTF-16 map, and the line table under the `locations` feature);
 //!   `LocationMapper` - the line/column view a `loc` emitter reads from them
-//! - `ParseError` - error types and result aliases
+//! - `Error` - error types and result aliases
 //! - `DepthBudget` / `NESTING_LIMIT` / `SPINE_LIMIT` - the parsers' depth limits
 //! - `OutputBuffer` - shared printer output utilities
 //! - `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` - hardcoded formatter settings, and
@@ -70,7 +70,7 @@ pub use depth::{
     DepthBudget, DepthLimit, NESTING_FLOOR, NESTING_LIMIT, NESTING_SPINE_WEIGHT, SPINE_LIMIT,
     SpineCount,
 };
-pub use error::{ErrorReport, ParseError, Result, lex_err};
+pub use error::{Error, ErrorReport, Result};
 pub use hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 #[cfg(feature = "json")]
 pub use json_writer::{JsonWriter, StageRun, StagedDigits, write_array, write_or_null};

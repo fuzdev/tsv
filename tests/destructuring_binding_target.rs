@@ -15,7 +15,7 @@
 use serde_json::Value;
 
 /// The wire JSON of `source`, or the parse error.
-fn parse_json(source: &str) -> Result<Value, tsv_lang::ParseError> {
+fn parse_json(source: &str) -> Result<Value, tsv_lang::Error> {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena)?;
     Ok(tsv_debug::json::wire_value(
@@ -24,7 +24,7 @@ fn parse_json(source: &str) -> Result<Value, tsv_lang::ParseError> {
 }
 
 /// The formatted output of `source`, or the parse error.
-fn format(source: &str) -> Result<String, tsv_lang::ParseError> {
+fn format(source: &str) -> Result<String, tsv_lang::Error> {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena)?;
     Ok(tsv_ts::format(&program, source))

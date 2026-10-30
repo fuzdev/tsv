@@ -1,6 +1,5 @@
 use std::fmt;
-// Shared lexer-error constructor: used by the unterminated/unexpected sites in the token scan.
-use tsv_lang::{ParseError, lex_err};
+use tsv_lang::Error;
 
 use crate::parser::scan_to_matching_brace;
 use crate::whitespace::{brace_interior_start, char_at, is_svelte_ws, skip_svelte_ws};
@@ -538,7 +537,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Lex the next token straight into `*dst` — the parser's current-token slot or its
-    /// lookahead slot. A `Result<Token, ParseError>` does not come back in registers: it is
+    /// lookahead slot. A `Result<Token, Error>` does not come back in registers: it is
     /// returned through a stack slot the caller then reloads and re-scatters, once per
     /// token, so writing through the caller's slot leaves only the error pointer to return.
     /// `*dst` is written only on success.
@@ -578,7 +577,7 @@ impl<'a> Lexer<'a> {
     /// The match yields only the token's KIND — every token spans `start` to the cursor — so
     /// the one store at the end is the only write of `*dst`.
     #[inline(never)]
-    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), Error> {
         let bytes = self.source.as_bytes();
         let mut i = self.position;
         if self.inside_tag {
@@ -710,7 +709,7 @@ impl<'a> Lexer<'a> {
     /// front: each handoff compiles to a jump, and only a token with text before it pays this
     /// function's register saves.
     #[inline(never)]
-    fn text_gap_then_token_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+    fn text_gap_then_token_into(&mut self, dst: &mut Token) -> Result<(), Error> {
         self.position =
             tsv_lang::swar::next_byte_of(self.source.as_bytes(), self.position, [b'<', b'{']);
         self.next_token_into(dst)
@@ -739,7 +738,7 @@ impl<'a> Lexer<'a> {
     /// cursors are more than the front ([`Lexer::next_token_into`]) can hold without saving
     /// registers, which it would then do on every token.
     #[inline(never)]
-    fn string_token_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+    fn string_token_into(&mut self, dst: &mut Token) -> Result<(), Error> {
         let bytes = self.source.as_bytes();
         let start = self.position;
         let quote = bytes[start];
@@ -760,7 +759,7 @@ impl<'a> Lexer<'a> {
             None => None,
         };
         let Some(end) = end else {
-            return Err(lex_err("Unterminated string literal in template", start));
+            return Err(Error::lex("Unterminated string literal in template", start));
         };
         self.position = end;
         *dst = Token {
@@ -780,7 +779,7 @@ impl<'a> Lexer<'a> {
     /// `#[inline(never)]` because the front's frame-free shape depends on it: inlined, its
     /// calls would put their register saves back on every token.
     #[inline(never)]
-    fn next_token_dispatch(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+    fn next_token_dispatch(&mut self, dst: &mut Token) -> Result<(), Error> {
         // Template mode (outside tags): skip text content, only tokenize special chars
         // Tag mode (inside <...>): tokenize everything including identifiers
         if self.inside_tag {
@@ -804,7 +803,7 @@ impl<'a> Lexer<'a> {
                 if !self.inside_tag && self.starts_with(b"<!--") {
                     let Some(end) = html_comment_end(self.source.as_bytes(), start + b"<!--".len())
                     else {
-                        return Err(lex_err("Unterminated HTML comment", start));
+                        return Err(Error::lex("Unterminated HTML comment", start));
                     };
                     self.position = end;
                     TokenKind::Comment
@@ -956,7 +955,7 @@ impl<'a> Lexer<'a> {
 #[cfg(test)]
 mod tests {
     use super::{
-        Lexer, ParseError, Token, TokenKind, char_at, html_comment_end, is_svelte_ws, lex_err,
+        Error, Lexer, Token, TokenKind, char_at, html_comment_end, is_svelte_ws,
         special_byte_at_or_after,
     };
 
@@ -995,7 +994,7 @@ mod tests {
 
     /// Lex `source` to its end (or its first error) through the front or through the dispatch
     /// alone, one step a token, recording each token with the lexer state the step leaves.
-    fn lex_all(source: &str, front: bool) -> Vec<Result<Step, ParseError>> {
+    fn lex_all(source: &str, front: bool) -> Vec<Result<Step, Error>> {
         let mut lexer = Lexer::new(source);
         let mut token = Token {
             kind: TokenKind::Eof,
@@ -1391,7 +1390,7 @@ mod tests {
                 let source = format!("{prefix}<!--{body}");
                 let start = prefix.len();
                 let expected = scalar(source.as_bytes(), start + 4)
-                    .ok_or_else(|| lex_err("Unterminated HTML comment", start));
+                    .ok_or_else(|| Error::lex("Unterminated HTML comment", start));
                 for front in [true, false] {
                     let steps = lex_all(&source, front);
                     let got = steps

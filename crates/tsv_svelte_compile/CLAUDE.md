@@ -6,7 +6,7 @@
 
 Depends on:
 
-- [`tsv_lang`](../tsv_lang/CLAUDE.md) — `ParseError`, `Span`, `Comment`
+- [`tsv_lang`](../tsv_lang/CLAUDE.md) — `Error`, `Span`, `Comment`
 - `tsv_svelte` — component parsing (`parse`) and the internal Svelte AST the transform walks
 - `tsv_ts` — the internal TS AST the generator constructs, plus `parse_with_goal` and the canonical reprint (`format_canonical`)
 - `tsv_css` — the parsed stylesheet the scoping analysis reads

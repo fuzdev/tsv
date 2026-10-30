@@ -63,7 +63,7 @@ mod walk;
 use std::borrow::Cow;
 use std::fmt;
 
-use tsv_lang::{ErrorReport, ParseError, Span};
+use tsv_lang::{Error, ErrorReport, Span};
 
 /// Strip the types from TypeScript `source`, keeping every surviving character at its line
 /// and UTF-16 column.
@@ -125,7 +125,7 @@ pub struct Stripped<'s> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StripError {
     /// The source does not parse.
-    Parse(ParseError),
+    Parse(Error),
     /// The source holds TypeScript syntax that type blanking cannot erase: a construct
     /// with runtime semantics, or an assertion whose blanking would regroup the expression.
     Unsupported {
@@ -218,7 +218,7 @@ impl UnsupportedKind {
     /// ([`ErrorReport::refusal`]): the summary `cannot strip <the construct>`, the frame
     /// [`StripError::message`] prints under it, and the span, in
     /// [`crate::WIRE_COORDINATES`]. Infallible, unlike a parse error's
-    /// [`ParseError::report`]: a refusal always has its span.
+    /// [`Error::report`]: a refusal always has its span.
     #[must_use]
     pub fn report(self, span: Span, source: &str) -> ErrorReport {
         ErrorReport::refusal(

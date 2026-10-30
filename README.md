@@ -268,7 +268,7 @@ Multi-crate workspace with clean separation of concerns:
 tsv/
 ├── Cargo.toml         # workspace root
 ├── crates/
-│   ├── tsv_lang/      # foundation (Span, Location, ParseError)
+│   ├── tsv_lang/      # foundation (Span, Location, Error)
 │   ├── tsv_arena/     # shared binding substrate: per-thread reusable AST/doc arenas + the goal axis
 │   ├── tsv_html/      # HTML classification and whitespace rules
 │   ├── tsv_ignore/    # gitignore-aware discovery matcher (.gitignore/.formatignore/.prettierignore)

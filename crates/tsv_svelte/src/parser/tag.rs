@@ -6,7 +6,7 @@ use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::TriviaProfile;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 use tsv_ts::{Expression, ExpressionKind};
 
 use super::parser_impl::SvelteParser;
@@ -16,7 +16,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a template tag starting with {@
     ///
     /// Dispatches to specific tag parsers based on the keyword.
-    pub(crate) fn parse_template_tag(&mut self) -> Result<FragmentNode<'arena>, ParseError> {
+    pub(crate) fn parse_template_tag(&mut self) -> Result<FragmentNode<'arena>, Error> {
         let start = self.current_start();
 
         // We're at {@, consume it
@@ -46,8 +46,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         start: usize,
         keyword: &str,
-        host_check: impl Fn(&Self, &'arena Expression<'arena>) -> Result<(), ParseError>,
-    ) -> Result<(&'arena Expression<'arena>, Span), ParseError> {
+        host_check: impl Fn(&Self, &'arena Expression<'arena>) -> Result<(), Error>,
+    ) -> Result<(&'arena Expression<'arena>, Span), Error> {
         let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
@@ -69,13 +69,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse an html tag: {@html expression}
-    fn parse_html_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
+    fn parse_html_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
         let (expression, span) = self.parse_keyword_expression_tag(start, "html", |_, _| Ok(()))?;
         Ok(FragmentNode::HtmlTag(HtmlTag { expression, span }))
     }
 
     /// Parse a const tag: {@const name = expression}
-    fn parse_const_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
+    fn parse_const_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
         let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
@@ -116,7 +116,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// At a `{` (`LeftBrace`), parse either a `{const}`/`{let}` declaration tag
     /// or an ordinary `{expr}` mustache, whichever the lookahead indicates.
     /// Shared by the root, element-children, and block-children fragment loops.
-    pub(crate) fn parse_brace_tag(&mut self) -> Result<FragmentNode<'arena>, ParseError> {
+    pub(crate) fn parse_brace_tag(&mut self) -> Result<FragmentNode<'arena>, Error> {
         if self.opens_declaration_tag() {
             self.parse_declaration_tag(self.current_start())
         } else {
@@ -132,7 +132,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn parse_declaration_tag(
         &mut self,
         start: usize,
-    ) -> Result<FragmentNode<'arena>, ParseError> {
+    ) -> Result<FragmentNode<'arena>, Error> {
         let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
@@ -166,7 +166,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         statement: &tsv_ts::Statement<'arena>,
         tag_content_start: usize,
         close_brace: usize,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         let tsv_ts::StatementKind::VariableDeclaration(declaration) = &statement.kind else {
             return Err(self.error_not_a_declaration(tag_content_start));
         };
@@ -205,7 +205,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// The tag's refusal of a statement that is no variable declaration.
-    fn error_not_a_declaration(&self, tag_content_start: usize) -> ParseError {
+    fn error_not_a_declaration(&self, tag_content_start: usize) -> Error {
         self.error_msg_at("expected a `const` or `let` declaration", tag_content_start)
     }
 
@@ -231,7 +231,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         decl_str: &'a str,
         decl_offset: usize,
-    ) -> Result<(&'arena Expression<'arena>, &'arena Expression<'arena>), ParseError> {
+    ) -> Result<(&'arena Expression<'arena>, &'arena Expression<'arena>), Error> {
         let (id, binding_end) = self.parse_block_pattern(decl_str, decl_offset)?;
         let after_binding = &decl_str[binding_end - decl_offset..];
         let at_eq = after_binding.trim_start_matches(is_svelte_ws);
@@ -279,7 +279,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         init: &Expression<'arena>,
         init_str: &str,
         init_offset: usize,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         match bare_sequence_comma(init, init_str) {
             Some(comma) => Err(self.error_msg_at(
                 "{@const ...} must consist of a single variable declaration",
@@ -303,7 +303,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Unlike Prettier (which strips comments), we preserve TS comments in debug
     /// tags; parsing via `parse_ts_expression` collects them into `Root.comments`
     /// for lookup by span.
-    fn parse_debug_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
+    fn parse_debug_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
         let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
@@ -391,7 +391,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// (`unwrap_comment_bound_pairs`): Svelte validates after `remove_parens`, to which a
     /// cast is nothing but parens + a comment, so `{@debug /** @type {A} */ (a)}`
     /// is an identifier to both parsers.
-    fn require_debug_identifier(&self, expr: &Expression<'arena>) -> Result<(), ParseError> {
+    fn require_debug_identifier(&self, expr: &Expression<'arena>) -> Result<(), Error> {
         if matches!(
             expr.unwrap_comment_bound_pairs().kind,
             ExpressionKind::Identifier(_)
@@ -422,7 +422,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// a comment, so `{@render /** @type {A} */ (fn())}` is a call to both
     /// parsers. The stored expression keeps the wrapper — the printer reproduces
     /// the authored cast from it.
-    fn parse_render_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
+    fn parse_render_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
         // The refusal runs inside the expression's parse, so tsc's comparison reading of
         // `{@render f<T, U><V>(x)}` — a sequence — is re-read as acorn-typescript's call
         // (`parse_ts_expression_checked`).

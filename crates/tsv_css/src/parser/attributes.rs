@@ -2,7 +2,7 @@ use super::CssParser;
 use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::boundary_split_offset;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 /// Parse attribute selector: `[attr]`, `[attr="value"]`, `[attr^="prefix"]`
 /// Supports namespace prefixes: [ns|attr], [*|attr], [|attr]
@@ -21,7 +21,7 @@ use tsv_lang::{ParseError, Span};
 pub(crate) fn parse_attribute_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     start: usize,
-) -> Result<SimpleSelector<'arena>, ParseError> {
+) -> Result<SimpleSelector<'arena>, Error> {
     parser.expect(TokenKind::LeftBracket)?;
     // `[` is its own `allow_whitespace()` juncture (`read_selector`'s attribute arm skips
     // before the name), so the run belongs to neither the bracket nor the name. Looped with
@@ -194,7 +194,7 @@ pub(crate) fn parse_attribute_selector<'arena>(
 /// matcher (`=`, `~=`, `|=`, `^=`, `$=`, `*=`) and its value.
 fn parse_attribute_matcher_and_value(
     parser: &mut CssParser<'_, '_>,
-) -> Result<(Option<AttributeMatcher>, Option<Span>), ParseError> {
+) -> Result<(Option<AttributeMatcher>, Option<Span>), Error> {
     if parser.check(TokenKind::RightBracket) {
         Ok((None, None)) // Just [attr]
     } else {
@@ -221,7 +221,7 @@ fn parse_attribute_matcher_and_value(
 /// the RAW token for the same reason: an escaped spelling (`\69`) is no flag to that regex.
 fn parse_attribute_flags<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<Option<&'arena str>, ParseError> {
+) -> Result<Option<&'arena str>, Error> {
     if !parser.check(TokenKind::Identifier) {
         return Ok(None);
     }
@@ -252,7 +252,7 @@ fn parse_attribute_flags<'arena>(
 /// ends the span at the split (`boundary_split_offset`) and re-seats there, so the skip below
 /// steps the run as it steps one the lexer tokenized on its own; the head of the token was
 /// stepped by the matcher→value juncture before it was read.
-fn parse_attribute_value(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, ParseError> {
+fn parse_attribute_value(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, Error> {
     let (start, mut end) = (parser.current_start(), parser.current_end());
     match parser.current_kind() {
         TokenKind::Identifier => {
@@ -282,7 +282,7 @@ fn parse_attribute_value(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>,
 /// The two components of a two-character matcher are separate `<delim-token>`s (css-syntax-3
 /// gives none of `~ | ^ $ =` a case in *consume a token*), so a comment may sit between them
 /// — but a `<whitespace-token>` may not, which is why only comments are skipped.
-fn parse_attribute_matcher(parser: &mut CssParser<'_, '_>) -> Result<AttributeMatcher, ParseError> {
+fn parse_attribute_matcher(parser: &mut CssParser<'_, '_>) -> Result<AttributeMatcher, Error> {
     let matcher = match parser.current_kind() {
         TokenKind::Equals => AttributeMatcher::Exact, // =
         TokenKind::Tilde => {

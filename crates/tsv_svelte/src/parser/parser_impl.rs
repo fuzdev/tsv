@@ -5,7 +5,7 @@ use crate::lexer::{Lexer, Token, TokenKind};
 use crate::parser::element::tag_name_end;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::{Comment, DepthBudget, DepthLimit, ParseError, Span};
+use tsv_lang::{Comment, DepthBudget, DepthLimit, Error, Span};
 use tsv_ts::__private::TopLevelAs;
 use tsv_ts::__private::{is_id_continue, is_id_start};
 use tsv_ts::Expression;
@@ -178,7 +178,7 @@ fn is_reserved_word(name: &str) -> bool {
 }
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
-    pub(crate) fn new(source: &'a str, arena: &'arena Bump) -> Result<Self, ParseError> {
+    pub(crate) fn new(source: &'a str, arena: &'arena Bump) -> Result<Self, Error> {
         let mut lexer = Lexer::new(source);
         let mut current = Token {
             kind: TokenKind::Eof,
@@ -211,8 +211,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn nested<T>(
         &mut self,
         units: u32,
-        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
-    ) -> Result<T, ParseError> {
+        f: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         if !self.depth.try_enter(units) {
             return Err(self.too_deep());
         }
@@ -231,8 +231,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// The depth-limit error at the current token.
     #[cold]
     #[inline(never)]
-    fn too_deep(&self) -> ParseError {
-        ParseError::too_deep(DepthLimit::Nesting, self.current_start())
+    fn too_deep(&self) -> Error {
+        Error::too_deep(DepthLimit::Nesting, self.current_start())
     }
 
     /// Allocate a single AST node in the arena, returning a shared `&'arena`
@@ -260,7 +260,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.arena.alloc_str(s)
     }
 
-    pub(crate) fn advance(&mut self) -> Result<(), ParseError> {
+    pub(crate) fn advance(&mut self) -> Result<(), Error> {
         match self.peek.take() {
             Some(token) => {
                 self.current = token;
@@ -277,7 +277,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Lex the next token into the lookahead slot unless it is cached there already, in
     /// place as [`advance`](Self::advance) lexes into the current one. A failed lex leaves
     /// the slot empty, as it found it.
-    pub(crate) fn fill_peek(&mut self) -> Result<(), ParseError> {
+    pub(crate) fn fill_peek(&mut self) -> Result<(), Error> {
         if self.peek.is_none() {
             let slot = self.peek.insert(Token {
                 kind: TokenKind::Eof,
@@ -331,7 +331,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// into its callers — the element parser among them, whose frame every level of element
     /// nesting pays, and which an inlined advance grows.
     #[inline(never)]
-    pub(crate) fn expect(&mut self, kind: TokenKind) -> Result<(), ParseError> {
+    pub(crate) fn expect(&mut self, kind: TokenKind) -> Result<(), Error> {
         if !self.check(kind) {
             return Err(self.error_expected_kind(kind));
         }
@@ -347,7 +347,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// error it never builds.
     #[cold]
     #[inline(never)]
-    pub(crate) fn error_expected_kind(&self, kind: TokenKind) -> ParseError {
+    pub(crate) fn error_expected_kind(&self, kind: TokenKind) -> Error {
         self.error_expected_found(&kind.to_string())
     }
 
@@ -359,7 +359,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// token: the lexer's identifier scan is narrower than the run, so a token-only compare
     /// answers yes for `<script%x>` / `<style%x>` / `<svelte:options%x>` and routes a name
     /// Svelte rejects into the raw-text or options parser, which never grades it again.
-    pub(crate) fn is_next_tag(&mut self, tag_name: &str) -> Result<bool, ParseError> {
+    pub(crate) fn is_next_tag(&mut self, tag_name: &str) -> Result<bool, Error> {
         if !self.check(TokenKind::LeftAngle) {
             return Ok(false);
         }
@@ -380,7 +380,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Peek at the next token to check if it matches the given kind
     /// Does not consume current token or advance parser
     /// Returns true if next token matches kind, false otherwise
-    pub(crate) fn is_next_token(&mut self, kind: TokenKind) -> Result<bool, ParseError> {
+    pub(crate) fn is_next_token(&mut self, kind: TokenKind) -> Result<bool, Error> {
         self.fill_peek()?;
         Ok(self.peek.as_ref().is_some_and(|p| p.kind == kind))
     }
@@ -391,7 +391,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &self,
         last_end: usize,
         nodes: &mut BumpVec<'arena, FragmentNode<'arena>>,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         if self.current_start() > last_end {
             let text = self.parse_text(last_end, self.current_start())?;
             nodes.push(FragmentNode::Text(text));
@@ -409,7 +409,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `{expr}` tag, a JS comment, a mid-tag attribute resync). A caller resuming into a
     /// KNOWN mode past an unrelated token must set `self.lexer.inside_tag` explicitly
     /// first — see `parse_rcdata_content`, which states template mode after `</textarea>`.
-    pub(crate) fn advance_to_position(&mut self, pos: usize) -> Result<(), ParseError> {
+    pub(crate) fn advance_to_position(&mut self, pos: usize) -> Result<(), Error> {
         // Resume the lexer at the new position (its mode is kept); any lookahead was lexed
         // from the old one.
         self.lexer.seek(pos);
@@ -428,7 +428,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Both name readers that mirror Svelte's `read_tag` need this — the tag name
     /// (`parser/element.rs`) and the attribute/directive name (`parser/attribute.rs`) — since
     /// each reads a raw run the lexer's narrower identifier scan can stop short of.
-    pub(crate) fn advance_past_name(&mut self, name_end: usize) -> Result<(), ParseError> {
+    pub(crate) fn advance_past_name(&mut self, name_end: usize) -> Result<(), Error> {
         if name_end == self.current_end() {
             self.advance()
         } else {
@@ -443,7 +443,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// to `expression_comments` and the lexer is advanced past the comment.
     ///
     /// Returns `true` if a comment was consumed, `false` if it's a regular slash.
-    pub(crate) fn try_read_js_comment(&mut self) -> Result<bool, ParseError> {
+    pub(crate) fn try_read_js_comment(&mut self) -> Result<bool, Error> {
         let pos = self.current_start();
         let bytes = self.source.as_bytes();
 
@@ -508,23 +508,23 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     // Note: No #[inline] - error paths are cold paths, inlining would just bloat code size
 
     /// Create error with custom message at current position
-    pub(crate) fn error_msg(&self, message: &str) -> ParseError {
-        ParseError::invalid_syntax(message.to_string(), self.current_start())
+    pub(crate) fn error_msg(&self, message: &str) -> Error {
+        Error::invalid_syntax(message.to_string(), self.current_start())
     }
 
     /// Create error with custom message at specified position
-    pub(crate) fn error_msg_at(&self, message: &str, position: usize) -> ParseError {
-        ParseError::invalid_syntax(message.to_string(), position)
+    pub(crate) fn error_msg_at(&self, message: &str, position: usize) -> Error {
+        Error::invalid_syntax(message.to_string(), position)
     }
 
     /// Create "Expected X" error at specified position
-    pub(crate) fn error_expected_at(&self, what: &str, position: usize) -> ParseError {
-        ParseError::invalid_syntax(format!("Expected {what}"), position)
+    pub(crate) fn error_expected_at(&self, what: &str, position: usize) -> Error {
+        Error::invalid_syntax(format!("Expected {what}"), position)
     }
 
     /// Create "Expected X, found Y" error at current position
-    pub(crate) fn error_expected_found(&self, what: &str) -> ParseError {
-        ParseError::invalid_syntax(
+    pub(crate) fn error_expected_found(&self, what: &str) -> Error {
+        Error::invalid_syntax(
             // The field, not `current_kind()`: formatting borrows it in place, where the
             // accessor's copy would take a stack slot in every frame this inlines into.
             format!("Expected {what}, found {}", self.current.kind),
@@ -533,13 +533,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Create "Unclosed X" error at specified position
-    pub(crate) fn error_unclosed_at(&self, what: &str, position: usize) -> ParseError {
-        ParseError::invalid_syntax(format!("Unclosed {what}"), position)
+    pub(crate) fn error_unclosed_at(&self, what: &str, position: usize) -> Error {
+        Error::invalid_syntax(format!("Unclosed {what}"), position)
     }
 
     /// Create "Duplicate X found" error at current position
-    pub(crate) fn error_duplicate(&self, what: &str) -> ParseError {
-        ParseError::invalid_syntax(format!("Duplicate {what} found"), self.current_start())
+    pub(crate) fn error_duplicate(&self, what: &str) -> Error {
+        Error::invalid_syntax(format!("Duplicate {what} found"), self.current_start())
     }
 
     /// Create "Duplicate {:kw} clause found" error at current position — a block
@@ -548,7 +548,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// The `{:…}` braces are spelled here rather than by the caller so the continuation
     /// guards (`{:then}`, `{:catch}`, `{:else}`) share one wording, and so no call site
     /// carries a literal that reads as a format argument.
-    pub(crate) fn error_duplicate_clause(&self, keyword: &str) -> ParseError {
+    pub(crate) fn error_duplicate_clause(&self, keyword: &str) -> Error {
         self.error_duplicate(&format!("{{:{keyword}}} clause"))
     }
 
@@ -560,8 +560,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `{:else}` and one `{:else if}`, so calling either a duplicate names a thing the
     /// author did not write. What is taken is the block's single alternate, and the
     /// clearest way to say so is to name the pair.
-    pub(crate) fn error_clause_after(&self, clause: &str, predecessor: &str) -> ParseError {
-        ParseError::invalid_syntax(
+    pub(crate) fn error_clause_after(&self, clause: &str, predecessor: &str) -> Error {
+        Error::invalid_syntax(
             format!("{{:{clause}}} cannot follow {{:{predecessor}}}"),
             self.current_start(),
         )
@@ -598,7 +598,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &self,
         s: &'a str,
         offset: usize,
-    ) -> Result<Option<&'a str>, ParseError> {
+    ) -> Result<Option<&'a str>, Error> {
         let Some(first) = s.chars().next().filter(|c| is_id_start(*c)) else {
             return Ok(None);
         };
@@ -612,8 +612,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Create "Unknown X: Y" error at specified position
-    pub(crate) fn error_unknown_at(&self, kind: &str, value: &str, position: usize) -> ParseError {
-        ParseError::invalid_syntax(format!("Unknown {kind}: {value}"), position)
+    pub(crate) fn error_unknown_at(&self, kind: &str, value: &str, position: usize) -> Error {
+        Error::invalid_syntax(format!("Unknown {kind}: {value}"), position)
     }
 
     // TypeScript Expression Parsing Helpers
@@ -641,7 +641,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, Error> {
         self.parse_ts_expression_checked(source, base_offset, |_, _| Ok(()))
     }
 
@@ -659,8 +659,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-        host_check: impl Fn(&Self, &'arena Expression<'arena>) -> Result<(), ParseError>,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+        host_check: impl Fn(&Self, &'arena Expression<'arena>) -> Result<(), Error>,
+    ) -> Result<&'arena Expression<'arena>, Error> {
         let this = &*self;
         let (expr, comments) = tsv_ts::__private::parse_expression_with_comments(
             source,
@@ -695,8 +695,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
         top_level_as: TopLevelAs,
-        host_check: impl Fn(&Self, &'arena Expression<'arena>, usize) -> Result<(), ParseError>,
-    ) -> Result<(&'arena Expression<'arena>, usize), ParseError> {
+        host_check: impl Fn(&Self, &'arena Expression<'arena>, usize) -> Result<(), Error>,
+    ) -> Result<(&'arena Expression<'arena>, usize), Error> {
         let this = &*self;
         let (expr, end_pos, comments) = tsv_ts::__private::parse_expression_partial_with_comments(
             source,
@@ -725,7 +725,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<TSTypeAnnotation<'arena>, ParseError> {
+    ) -> Result<TSTypeAnnotation<'arena>, Error> {
         let (ta, comments) = tsv_ts::__private::parse_type_annotation_partial(
             source,
             base_offset,
@@ -749,7 +749,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<&'arena mut Expression<'arena>, ParseError> {
+    ) -> Result<&'arena mut Expression<'arena>, Error> {
         let (pattern, comments) = tsv_ts::__private::parse_pattern_with_comments(
             source,
             base_offset,
@@ -796,8 +796,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-        host_check: impl Fn(&Self, &tsv_ts::Statement<'arena>) -> Result<(), ParseError>,
-    ) -> Result<tsv_ts::Statement<'arena>, ParseError> {
+        host_check: impl Fn(&Self, &tsv_ts::Statement<'arena>) -> Result<(), Error>,
+    ) -> Result<tsv_ts::Statement<'arena>, Error> {
         let this = &*self;
         let (stmt, comments) = tsv_ts::__private::parse_statement_with_comments(
             source,

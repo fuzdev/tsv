@@ -2,13 +2,13 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::super::Parser;
 use super::super::expression::alloc_expr;
 
 impl<'a, 'arena> Parser<'a, 'arena> {
-    pub(super) fn parse_return_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
+    pub(super) fn parse_return_statement(&mut self) -> Result<Statement<'arena>, Error> {
         let (start, _) = self.current_pos();
 
         // Consume 'return' keyword
@@ -43,7 +43,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
-    pub(super) fn parse_function_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
+    pub(super) fn parse_function_declaration(&mut self) -> Result<Statement<'arena>, Error> {
         self.parse_function_or_overload(false, None)
     }
 
@@ -64,7 +64,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         is_async: bool,
         start_override: Option<usize>,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, Error> {
         let start = start_override.unwrap_or_else(|| self.current_pos().0);
 
         // Consume 'function' keyword
@@ -143,9 +143,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse async function declaration: `async function foo() {}` or `async function* foo() {}`
-    pub(super) fn parse_async_function_declaration(
-        &mut self,
-    ) -> Result<Statement<'arena>, ParseError> {
+    pub(super) fn parse_async_function_declaration(&mut self) -> Result<Statement<'arena>, Error> {
         let (start, _) = self.current_pos();
 
         // Consume 'async' keyword
@@ -166,7 +164,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_function_declaration_or_declare(
         &mut self,
         is_async: bool,
-    ) -> Result<ExportFunctionDeclaration<'arena>, ParseError> {
+    ) -> Result<ExportFunctionDeclaration<'arena>, Error> {
         let (start, _) = self.current_pos();
 
         // Consume 'function' keyword
@@ -262,7 +260,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - They appear in expression position
     pub(in crate::parser) fn parse_function_expression(
         &mut self,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, Error> {
         let (start, _) = self.current_pos();
         self.parse_function_expression_inner(start, false)
     }
@@ -273,7 +271,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_async_function_expression(
         &mut self,
         start: usize,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, Error> {
         self.parse_function_expression_inner(start, true)
     }
 
@@ -282,7 +280,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         is_async: bool,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, Error> {
         // Consume 'function' keyword
         debug_assert!(matches!(
             self.current_kind(),

@@ -1,6 +1,5 @@
-use super::lex_err;
 use super::token::{Token, TokenKind};
-use tsv_lang::ParseError;
+use tsv_lang::Error;
 
 /// Read a CSS string: "..." or '...'
 /// Preserves raw escape sequences exactly as written (no quirks applied)
@@ -8,7 +7,7 @@ use tsv_lang::ParseError;
 ///
 /// **Architecture**: Lexer preserves raw content → Parser decodes → Conversion applies Svelte quirks
 /// This matches TypeScript's approach and keeps the lexer simple and consistent.
-pub(crate) fn read_string(source: &str, pos: &mut usize, quote: char) -> Result<Token, ParseError> {
+pub(crate) fn read_string(source: &str, pos: &mut usize, quote: char) -> Result<Token, Error> {
     let start = *pos;
     match string_end(source.as_bytes(), start) {
         Ok(p) => {
@@ -19,12 +18,12 @@ pub(crate) fn read_string(source: &str, pos: &mut usize, quote: char) -> Result<
                 end: p as u32,
             })
         }
-        Err(StringScanEnd::Unterminated) => Err(lex_err(
+        Err(StringScanEnd::Unterminated) => Err(Error::lex(
             format!("Unterminated string starting with {quote}"),
             start,
         )),
         Err(StringScanEnd::TrailingBackslash(at)) => {
-            Err(lex_err("Unexpected end of string after backslash", at))
+            Err(Error::lex("Unexpected end of string after backslash", at))
         }
     }
 }

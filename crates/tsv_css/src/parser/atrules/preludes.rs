@@ -3,7 +3,7 @@ use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::parser::selectors::{parse_complex_selector_list, parse_forgiving_selector_list};
 use crate::whitespace::{Comments, Edge, holds_boundary_member, spell_run};
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 /// Whether the current token is a CSS `<function-token>` — an identifier
 /// immediately followed by `(` with no intervening whitespace (`url(`, `layer(`,
@@ -52,7 +52,7 @@ fn parse_selector_argument<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     arg_start: usize,
     comments_len: usize,
-) -> Result<Option<SelectorList<'arena>>, ParseError> {
+) -> Result<Option<SelectorList<'arena>>, Error> {
     match parse_complex_selector_list(parser) {
         Ok(list) if parser.check(TokenKind::RightParen) => return Ok(Some(list)),
         // a depth limit is no verdict on the argument (see `parse_forgiving_selector_list`)
@@ -106,7 +106,7 @@ fn skip_gap_registering_comments(
     parser: &mut CssParser<'_, '_>,
     end: &mut usize,
     run: &mut OperatorRun,
-) -> Result<(), ParseError> {
+) -> Result<(), Error> {
     let gap_start = parser.current_start();
     let mark = run.text.len();
     parser.skip_boundary_whitespace()?;
@@ -383,7 +383,7 @@ pub(super) enum ConditionReader {
 pub(super) fn parse_condition_query<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     reader: ConditionReader,
-) -> Result<(ConditionQuery<'arena>, Span), ParseError> {
+) -> Result<(ConditionQuery<'arena>, Span), Error> {
     // The prelude's head, when it opens on a boundary run: stepped before the span begins,
     // like the ASCII whitespace the at-rule already stepped, so the span starts where the
     // canonical (trimmed) prelude does. The printer claims the run from the name's end.
@@ -541,7 +541,7 @@ fn parse_condition_part<'arena>(
     connector: Option<ConnectorRun<'arena>>,
     mut end_pos: usize,
     reader: ConditionReader,
-) -> Result<ConditionPartOutcome<'arena>, ParseError> {
+) -> Result<ConditionPartOutcome<'arena>, Error> {
     let part_start = parser.span_pos(parser.current_start());
     // One growable buffer instead of a `Vec<String>` of per-token / per-space pieces
     // joined at the end (mirrors `parse_raw_prelude_content` and
@@ -948,7 +948,7 @@ fn parse_condition_part<'arena>(
 /// function.
 pub(super) fn parse_supports_function_condition<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<Option<(ConditionQuery<'arena>, Span)>, ParseError> {
+) -> Result<Option<(ConditionQuery<'arena>, Span)>, Error> {
     let start = parser.base_offset() + parser.current_start();
     let ConditionPartOutcome::Parsed {
         part,
@@ -990,7 +990,7 @@ pub(super) fn parse_supports_function_condition<'arena>(
 /// - `sidebar (min-width: 100px) and (max-width: 200px)` - named container with conjunction
 pub(super) fn parse_container_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<(Option<&'arena str>, ConditionQuery<'arena>, Span), ParseError> {
+) -> Result<(Option<&'arena str>, ConditionQuery<'arena>, Span), Error> {
     // A boundary run at the prelude's head is stepped before the name is read — it is no
     // name (`@container <NBSP> x (…)`) — and before the span begins, so the span opens on the
     // name, where the printer reads it from (`prelude.start + name.len()`). The printer claims
@@ -1043,7 +1043,7 @@ pub(super) fn parse_container_prelude<'arena>(
 fn parse_scope_clause<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     what: &str,
-) -> Result<ScopeClause<'arena>, ParseError> {
+) -> Result<ScopeClause<'arena>, Error> {
     let paren_start = parser.span_pos(parser.current_start());
     parser.advance()?; // consume '('
     // Both gaps inside the parens step the boundary class (the list's own start and its
@@ -1084,7 +1084,7 @@ fn parse_scope_clause<'arena>(
 /// `prelude` string extracts to `""` (matching parseCss).
 pub(super) fn parse_scope_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<PreludeValue<'arena>, ParseError> {
+) -> Result<PreludeValue<'arena>, Error> {
     // Leading gap comments (`@scope /* c */ …`) register here: the shared at-rule
     // name skip in `parse_atrule` is a plain skip that stops at a comment, so a leading
     // comment is the current token on entry. Capturing `start` *after* this keeps it out
@@ -1188,7 +1188,7 @@ fn scope_to_keyword_len(parser: &CssParser<'_, '_>) -> Option<usize> {
 /// same bytes either way.
 pub(super) fn parse_custom_selector_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<PreludeValue<'arena>, ParseError> {
+) -> Result<PreludeValue<'arena>, Error> {
     // The raw offset the replay restarts from, and the registrations it discards.
     let prelude_start_raw = parser.current_start();
     let comments_len = parser.comments.len();
@@ -1218,7 +1218,7 @@ pub(super) fn parse_custom_selector_prelude<'arena>(
 /// the mismatch was found — the caller rewinds.
 fn parse_custom_selector_head_and_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<Option<(Span, SelectorList<'arena>)>, ParseError> {
+) -> Result<Option<(Span, SelectorList<'arena>)>, Error> {
     // Leading gap: `@custom-selector /* c */ :--a` (the shared name skip in `parse_atrule`
     // is a plain whitespace skip, so a leading comment is the current token on entry). It
     // steps the boundary class like every structural prelude gap, or a run there
@@ -1308,7 +1308,7 @@ fn parse_custom_selector_head_and_list<'arena>(
 /// error.
 pub(super) fn parse_import_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<PreludeValue<'arena>, ParseError> {
+) -> Result<PreludeValue<'arena>, Error> {
     // Raw offset of the prelude's first token, for the raw fallback below.
     let prelude_start_raw = parser.current_start();
     let start = parser.span_pos(parser.current_start());
@@ -1484,7 +1484,7 @@ fn url_token_has_unclosed_paren(text: &str) -> bool {
 /// [`CssParser::skip_boundary_whitespace_and_comments`]): the span re-emits them verbatim, and
 /// registering would additionally offer them to the `@import` prelude's gap emitters, which
 /// print between the parsed values — outside this function, where they would print twice.
-fn take_comment_run(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, ParseError> {
+fn take_comment_run(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, Error> {
     let mut start = None;
     let mut end = 0u32;
     loop {
@@ -1519,7 +1519,7 @@ fn take_comment_run(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, Pars
 ///
 /// The single definition of how far a prelude function's arguments reach — the `layer()`
 /// arm reads the span, the `<general-enclosed>` arm only needs the seek.
-fn consume_function_args(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, ParseError> {
+fn consume_function_args(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, Error> {
     let mut start = None;
     let mut end = 0u32;
     let mut depth: u32 = 0;
@@ -1542,7 +1542,7 @@ fn consume_function_args(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>,
 /// Parse a function value (e.g., url(), layer(), supports())
 fn parse_function_value<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<CssValue<'arena>, ParseError> {
+) -> Result<CssValue<'arena>, Error> {
     let value_start = parser.span_pos(parser.current_start());
 
     // Get function name (current token should be identifier). Kept verbatim from

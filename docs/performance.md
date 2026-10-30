@@ -743,7 +743,7 @@ width, so ranking by either alone mis-ranks the ladder.
 
 `type_sizes` prints the `size_of` / `align_of` board for every public AST type
 in `tsv_ts` / `tsv_svelte` / `tsv_css` plus the foundation types, widest first,
-with `size_of::<Result<T, ParseError>>()` beside each (a payload of at least 16
+with `size_of::<Result<T, Error>>()` beside each (a payload of at least 16
 bytes whose `Result` is wider has no niche for the error and pays a word on
 every fallible return — those rows are starred). `--min` / `--top` / `--group`
 trim it; `--json` for scripting. It complements the in-crate
@@ -753,7 +753,7 @@ those pin the few widths a change must not move, and this makes the rest
 rustc's layout rather than a guarantee, so those guards compile in the test build
 only (`cargo test` fails on a moved pin, a consumer's build never does), and the
 wasm32 widths are pinned in `tsv_wasm`, compiled for wasm32 by `build:packages`;
-only the niche guards a `#[repr(transparent)]` guarantees (`ParseError` and its
+only the niche guards a `#[repr(transparent)]` guarantees (`Error` and its
 `Result<()>`, `Option<GroupId>`) stay in every build. The `<=` bounds (`ShareEntry`,
 `PeeledTail`), upper bounds a smaller layout still satisfies, are test-build guards too:
 at zero slack, a toolchain that lays either out wider must fail `cargo test`, not a

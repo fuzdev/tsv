@@ -6,13 +6,13 @@ use super::selectors::{
 use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::is_boundary_whitespace;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 /// Parse pseudo-class or pseudo-element: :hover, ::before, :nth-child(2n+1)
 pub(crate) fn parse_pseudo_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     start: usize,
-) -> Result<SimpleSelector<'arena>, ParseError> {
+) -> Result<SimpleSelector<'arena>, Error> {
     parser.advance()?; // consume first :
     // selectors-4 forbids white space "between the ':'s, or between the ':' and
     // <ident-token> or <function-token>" — and a comment is not a `<whitespace-token>`,
@@ -217,7 +217,7 @@ fn classify_pseudo_args(pseudo_name: &str, is_pseudo_element: bool) -> PseudoArg
 fn parse_pseudo_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     arg_kind: PseudoArgKind,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
     parser.expect(TokenKind::LeftParen)?;
 
     let args_start = parser.current_start();
@@ -235,8 +235,8 @@ fn parse_pseudo_args<'arena>(
 /// outer `true`, and the top level returns to `false`.
 fn with_pseudo_args<'arena, R>(
     parser: &mut CssParser<'_, 'arena>,
-    f: impl FnOnce(&mut CssParser<'_, 'arena>) -> Result<R, ParseError>,
-) -> Result<R, ParseError> {
+    f: impl FnOnce(&mut CssParser<'_, 'arena>) -> Result<R, Error>,
+) -> Result<R, Error> {
     let saved = parser.in_pseudo_args;
     parser.in_pseudo_args = true;
     // four wire levels: the argument `SelectorList`, a `ComplexSelector`, a
@@ -255,7 +255,7 @@ fn finish_selector_list_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     args_start: usize,
     selectors: SelectorList<'arena>,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
     parser.skip_boundary_whitespace_registering_comments()?;
     let end = parser.expect_and_capture(TokenKind::RightParen)?;
     Ok((
@@ -278,7 +278,7 @@ fn finish_selector_list_args<'arena>(
 fn parse_part_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     args_start: usize,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
     parser.skip_boundary_whitespace_registering_comments()?;
 
     let mut idents = parser.bvec();
@@ -335,7 +335,7 @@ fn selector_list_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     args_start: usize,
     grammar: SelectorListGrammar,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
     with_pseudo_args(parser, |p| parse_selector_list_args(p, args_start, grammar))
 }
 
@@ -346,7 +346,7 @@ fn parse_selector_list_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     args_start: usize,
     grammar: SelectorListGrammar,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
     // Register a leading comment (`:is(/* c */ .a)`) so the printer interleaves it.
     parser.skip_boundary_whitespace_registering_comments()?;
 
@@ -381,7 +381,7 @@ fn parse_selector_list_args<'arena>(
 fn parse_nth_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     args_start: usize,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
     parser.skip_boundary_whitespace_registering_comments()?;
     let anb_start = parser.current_start();
 
@@ -466,7 +466,7 @@ fn parse_nth_args<'arena>(
 fn parse_unknown_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     args_start: usize,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
     // Register leading/trailing gap comments (`:current(/* c */ .a)`); the
     // built `SelectorList` args share `:is()`'s printer arm, which already
     // interleaves them, so this path is parser-only.

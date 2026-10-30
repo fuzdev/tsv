@@ -780,7 +780,7 @@ impl ParenAuditCommand {
         report.files_scanned += 1;
         let f = match base_fixed_point(&source, parser) {
             BaseFixedPoint::Ok(f) => f,
-            BaseFixedPoint::ParseError => {
+            BaseFixedPoint::Error => {
                 report.files_parse_error += 1;
                 return;
             }

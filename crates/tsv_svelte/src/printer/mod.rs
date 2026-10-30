@@ -1796,7 +1796,7 @@ fn print_document(
 /// `;`, so the second format never asks again.
 ///
 /// The respelled source differs from a source that parsed only by a character reference in
-/// template text, so its parse is expected to fail only on the size limit (`ParseError`'s
+/// template text, so its parse is expected to fail only on the size limit (`Error`'s
 /// `FileTooLarge`), which the few added bytes can cross — nothing proves that. Whatever the
 /// failure, the original is then printed unrespelled.
 fn format_respelled_tail(
@@ -1851,7 +1851,7 @@ fn format_respelled_tail(
 /// is read off what stands above the section, which the rewrite changes, so the original's
 /// verdict (`frozen`) goes along with it. The rewrite only moves source text and respells
 /// whitespace between two template nodes, so its parse is expected to fail only on the size
-/// limit (`ParseError`'s `FileTooLarge`), which the few added line breaks can cross — nothing
+/// limit (`Error`'s `FileTooLarge`), which the few added line breaks can cross — nothing
 /// proves that. Whatever the failure, the original is then printed with its runs where they
 /// stand (`sections` is its classification).
 fn format_lifted_runs(

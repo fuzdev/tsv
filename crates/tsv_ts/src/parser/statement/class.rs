@@ -10,7 +10,7 @@ use crate::ast::{
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::printer::ParenContext;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::super::Parser;
 use super::super::expression::alloc_expr;
@@ -94,13 +94,13 @@ struct ClassHead<'arena> {
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
-    pub(super) fn parse_class_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
+    pub(super) fn parse_class_declaration(&mut self) -> Result<Statement<'arena>, Error> {
         let class = self.parse_class_declaration_inner(true, false)?;
         Ok(Statement::from_class_declaration(self.arena.alloc(class)))
     }
 
     /// Parse an abstract class declaration: `abstract class Foo { ... }`
-    pub(super) fn parse_abstract_class(&mut self) -> Result<Statement<'arena>, ParseError> {
+    pub(super) fn parse_abstract_class(&mut self) -> Result<Statement<'arena>, Error> {
         // Capture position of 'abstract' before consuming it
         let abstract_start = self.current_pos().0;
         debug_assert_eq!(self.current_value(), "abstract");
@@ -134,7 +134,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_decorated_class(
         &mut self,
         module_item: Option<ModuleItemContext>,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, Error> {
         let start = self.current_pos().0;
 
         // Parse one or more decorators
@@ -229,7 +229,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         deco_start: usize,
         decorators: bumpalo::collections::Vec<'arena, Decorator<'arena>>,
         export: DecoratedClassExport,
-    ) -> Result<ClassDeclaration<'arena>, ParseError> {
+    ) -> Result<ClassDeclaration<'arena>, Error> {
         // `export default class {}` is the one name-optional decorated form.
         let name_required = export != DecoratedClassExport::BetweenDefault;
 
@@ -327,7 +327,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// through [`Parser::finish_decorated_class_expression`].
     pub(in crate::parser) fn parse_decorated_class_expression(
         &mut self,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, Error> {
         let start = self.current_pos().0;
         // one wire level: the `ClassExpression` over its decorators, heritage and body
         self.nested(1, |p| {
@@ -356,7 +356,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         start: usize,
         decorators: bumpalo::collections::Vec<'arena, Decorator<'arena>>,
         r#abstract: bool,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, Error> {
         if r#abstract {
             self.advance()?; // consume 'abstract'
         }
@@ -391,7 +391,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_decorators(
         &mut self,
         kind: DecoratorListKind,
-    ) -> Result<bumpalo::collections::Vec<'arena, Decorator<'arena>>, ParseError> {
+    ) -> Result<bumpalo::collections::Vec<'arena, Decorator<'arena>>, Error> {
         match kind {
             DecoratorListKind::Class => self.with_strict_class_scope(Self::parse_decorator_run),
             DecoratorListKind::Parameter => self.parse_decorator_run(),
@@ -403,7 +403,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// combinator or call it bare, one spelling either way.
     fn parse_decorator_run(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, Decorator<'arena>>, ParseError> {
+    ) -> Result<bumpalo::collections::Vec<'arena, Decorator<'arena>>, Error> {
         let mut decorators = self.bvec();
 
         while *self.current_kind() == TokenKind::At {
@@ -415,7 +415,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a single decorator: `@expression`, where the expression follows the
     /// restricted ES decorators grammar — see `parse_decorator_expression`.
-    fn parse_decorator(&mut self) -> Result<Decorator<'arena>, ParseError> {
+    fn parse_decorator(&mut self) -> Result<Decorator<'arena>, Error> {
         let start = self.current_pos().0;
 
         // Consume '@'
@@ -467,7 +467,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Option<&'arena Expression<'arena>>,
             Option<TSTypeParameterInstantiation<'arena>>,
         ),
-        ParseError,
+        Error,
     > {
         if !matches!(
             self.current_kind(),
@@ -516,7 +516,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Returns `Ok(None)` for the heritage reading and for a non-binding token; the caller
     /// decides whether a missing name is an error (declaration) or fine (expression /
     /// `export default`). Shared by both class paths.
-    fn take_class_name(&mut self) -> Result<Option<Identifier<'arena>>, ParseError> {
+    fn take_class_name(&mut self) -> Result<Option<Identifier<'arena>>, Error> {
         if self.current_value() == "implements" && self.peek_is_identifier_or_keyword() {
             return Ok(None);
         }
@@ -531,7 +531,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - No `declare` field
     pub(in crate::parser) fn parse_class_expression(
         &mut self,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, Error> {
         let (start, _) = self.current_pos();
         // one wire level: the `ClassExpression` over its heritage and body — a declaration's
         // is its statement's
@@ -557,7 +557,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         start: usize,
         decorators: Option<&'arena [Decorator<'arena>]>,
         r#abstract: bool,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, Error> {
         // Consume 'class' keyword
         debug_assert!(matches!(
             self.current_kind(),
@@ -601,7 +601,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_class_head_and_body(
         &mut self,
         name_required: bool,
-    ) -> Result<ClassHead<'arena>, ParseError> {
+    ) -> Result<ClassHead<'arena>, Error> {
         // Every part of a class is strict code (ecma262 sec-strict-mode-code), and
         // the scope opens at the `class` keyword (or earlier, at a decorator list —
         // `parse_decorators`) — ahead of the heritage clause, so
@@ -651,7 +651,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         name_required: bool,
         is_abstract: bool,
-    ) -> Result<ClassDeclaration<'arena>, ParseError> {
+    ) -> Result<ClassDeclaration<'arena>, Error> {
         let start = self.current_pos().0;
         self.parse_class_declaration_inner_with_start(name_required, is_abstract, start, false)
     }
@@ -668,7 +668,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         is_abstract: bool,
         start: usize,
         declare: bool,
-    ) -> Result<ClassDeclaration<'arena>, ParseError> {
+    ) -> Result<ClassDeclaration<'arena>, Error> {
         // The `class` keyword must be here. Most callers confirm it first, but the
         // modifier-prefix paths (`export default abstract`, `declare`) reach here
         // after consuming their modifier, so a missing `class` on malformed input
@@ -713,7 +713,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// forbidden constructs (a method body, a decorator, an initializer) parse
     /// structurally; their early-errors are deferred to diagnostics (see
     /// `parse_class_declaration_inner_with_start`).
-    pub(super) fn parse_class_body(&mut self) -> Result<ClassBody<'arena>, ParseError> {
+    pub(super) fn parse_class_body(&mut self) -> Result<ClassBody<'arena>, Error> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?;
 
@@ -764,9 +764,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// both; on `!` that discards a line terminator tsc treats as fatal, so tsv follows
     /// tsc over the shape target. Per ecma262 §sec-comments a block comment holding a
     /// line terminator IS one, so `a /*⏎*/ !: T` declines on the same rule.
-    pub(in crate::parser) fn parse_property_modifier(
-        &mut self,
-    ) -> Result<PropertyModifier, ParseError> {
+    pub(in crate::parser) fn parse_property_modifier(&mut self) -> Result<PropertyModifier, Error> {
         Ok(if self.eat(TokenKind::Question)? {
             PropertyModifier::Optional
         } else if !self.had_line_terminator && self.eat(TokenKind::Bang)? {
@@ -804,7 +802,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// structurally in either context, deferring their ambient-context early-errors
     /// (a decorator's TS1206, a body's TS1183) to diagnostics — see
     /// `parse_class_declaration_inner_with_start` and `finish_method_member`.
-    fn parse_class_member(&mut self) -> Result<ClassMember<'arena>, ParseError> {
+    fn parse_class_member(&mut self) -> Result<ClassMember<'arena>, Error> {
         // A member boundary ends a `<` region as a statement's does.
         self.reset_lt_region_for_statement();
         let (start, _) = self.current_pos();
@@ -1132,7 +1130,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn finish_method_member(
         &mut self,
         header: ClassMemberHeader<'arena>,
-    ) -> Result<ClassMember<'arena>, ParseError> {
+    ) -> Result<ClassMember<'arena>, Error> {
         let ClassMemberHeader {
             start,
             decorators,
@@ -1351,7 +1349,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn finish_property_member(
         &mut self,
         header: ClassMemberHeader<'arena>,
-    ) -> Result<ClassMember<'arena>, ParseError> {
+    ) -> Result<ClassMember<'arena>, Error> {
         let ClassMemberHeader {
             start,
             decorators,
@@ -1453,7 +1451,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         decorators: &'arena [Decorator<'arena>],
         is_static: bool,
         readonly: bool,
-    ) -> Result<ClassMember<'arena>, ParseError> {
+    ) -> Result<ClassMember<'arena>, Error> {
         // Consume `[`
         self.expect(&TokenKind::BracketOpen)?;
 

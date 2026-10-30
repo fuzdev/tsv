@@ -13,7 +13,7 @@
 // - \` - escaped backtick (template delimiter)
 // - \$ - escaped dollar (to prevent interpolation)
 
-use tsv_lang::ParseError;
+use tsv_lang::Error;
 use tsv_lang::swar::next_byte_of;
 
 /// Decode JS/TypeScript string escape sequences
@@ -46,7 +46,7 @@ use tsv_lang::swar::next_byte_of;
 /// A malformed `\x` or `\u` escape — a missing or non-hex digit, an unterminated or
 /// empty `\u{…}`, a value past U+10FFFF — is an error positioned at the offset into `s`
 /// of the backslash that opens it. `s` is a slice of some larger text, so the caller
-/// shifts that by the slice's own position (`ParseError::shift_position`) before the
+/// shifts that by the slice's own position (`Error::shift_position`) before the
 /// error leaves it.
 ///
 /// # Examples:
@@ -57,7 +57,7 @@ use tsv_lang::swar::next_byte_of;
 /// decode_string_escapes_into("\\u{1F4A9}", &mut out)?;
 /// assert_eq!(out, "💩");
 /// ```
-pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), ParseError> {
+pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Error> {
     out.clear();
     out.reserve(s.len());
     let result = out;
@@ -189,7 +189,7 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Parse
 /// decodes off the lexer's path: the re-run that surfaces an escape error the lexer
 /// swallowed, and the decode of a template's line-terminator-normalized raw text.
 /// The hot lexer path calls `_into` directly against a parked scratch buffer.
-pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
+pub fn decode_string_escapes(s: &str) -> Result<String, Error> {
     let mut out = String::new();
     decode_string_escapes_into(s, &mut out)?;
     Ok(out)
@@ -286,7 +286,7 @@ impl EscapeCursor<'_> {
 /// Its errors (and [`read_hex_value`]'s) are built at position 0, since neither reader
 /// knows where its escape began; [`decode_string_escapes_into`] shifts them to the
 /// escape's backslash.
-fn read_unicode_escape_value(chars: &mut EscapeCursor<'_>) -> Result<u32, ParseError> {
+fn read_unicode_escape_value(chars: &mut EscapeCursor<'_>) -> Result<u32, Error> {
     if chars.peek() != Some('{') {
         // Standard unicode escape: \uXXXX (4 digits → 0..=0xFFFF)
         return read_hex_value(chars, 4);
@@ -318,7 +318,7 @@ fn read_unicode_escape_value(chars: &mut EscapeCursor<'_>) -> Result<u32, ParseE
                     any_digit = true;
                 }
                 None => {
-                    return Err(ParseError::invalid_syntax(
+                    return Err(Error::invalid_syntax(
                         "Invalid unicode codepoint escape".to_string(),
                         0,
                     ));
@@ -327,7 +327,7 @@ fn read_unicode_escape_value(chars: &mut EscapeCursor<'_>) -> Result<u32, ParseE
             // End of input before the closing `}` — a `\u{…` escape must be
             // terminated (matches acorn).
             None => {
-                return Err(ParseError::invalid_syntax(
+                return Err(Error::invalid_syntax(
                     "Unterminated unicode codepoint escape".to_string(),
                     0,
                 ));
@@ -336,14 +336,14 @@ fn read_unicode_escape_value(chars: &mut EscapeCursor<'_>) -> Result<u32, ParseE
     }
 
     if !any_digit {
-        return Err(ParseError::invalid_syntax(
+        return Err(Error::invalid_syntax(
             "Invalid unicode codepoint escape length".to_string(),
             0,
         ));
     }
 
     if code > 0x10FFFF {
-        return Err(ParseError::invalid_syntax(
+        return Err(Error::invalid_syntax(
             format!("Invalid unicode codepoint: U+{code:X}"),
             0,
         ));
@@ -379,21 +379,21 @@ fn take_trail_surrogate(chars: &mut EscapeCursor<'_>) -> Option<u32> {
 /// Read exactly N hex digits from the cursor, accumulating their value directly
 /// into a `u32` — no intermediate `String` + `from_str_radix` allocation. N is at
 /// most 4 (the `\xHH` / `\uXXXX` escapes), so the value never overflows.
-fn read_hex_value(chars: &mut EscapeCursor<'_>, count: usize) -> Result<u32, ParseError> {
+fn read_hex_value(chars: &mut EscapeCursor<'_>, count: usize) -> Result<u32, Error> {
     let mut value: u32 = 0;
     for _ in 0..count {
         match chars.next() {
             Some(ch) => match ch.to_digit(16) {
                 Some(d) => value = value * 16 + d,
                 None => {
-                    return Err(ParseError::invalid_syntax(
+                    return Err(Error::invalid_syntax(
                         format!("Expected hex digit, found '{ch}'"),
                         0,
                     ));
                 }
             },
             None => {
-                return Err(ParseError::invalid_syntax(
+                return Err(Error::invalid_syntax(
                     "Unexpected end of string in escape sequence".to_string(),
                     0,
                 ));
@@ -640,7 +640,7 @@ mod tests {
     // The differential oracle: the decoder as a character-at-a-time loop over
     // `chars().peekable()`, kept verbatim as the model the run-copying decoder is
     // graded against. Never called outside these tests.
-    fn model_decode_into(s: &str, out: &mut String) -> Result<(), ParseError> {
+    fn model_decode_into(s: &str, out: &mut String) -> Result<(), Error> {
         out.clear();
         out.reserve(s.len());
         let result = out;
@@ -767,9 +767,7 @@ mod tests {
         Ok(())
     }
 
-    fn model_read_unicode_escape_value<I>(
-        chars: &mut std::iter::Peekable<I>,
-    ) -> Result<u32, ParseError>
+    fn model_read_unicode_escape_value<I>(chars: &mut std::iter::Peekable<I>) -> Result<u32, Error>
     where
         I: Iterator<Item = char>,
     {
@@ -804,7 +802,7 @@ mod tests {
                         any_digit = true;
                     }
                     None => {
-                        return Err(ParseError::invalid_syntax(
+                        return Err(Error::invalid_syntax(
                             "Invalid unicode codepoint escape".to_string(),
                             0,
                         ));
@@ -813,7 +811,7 @@ mod tests {
                 // End of input before the closing `}` — a `\u{…` escape must be
                 // terminated (matches acorn).
                 None => {
-                    return Err(ParseError::invalid_syntax(
+                    return Err(Error::invalid_syntax(
                         "Unterminated unicode codepoint escape".to_string(),
                         0,
                     ));
@@ -822,14 +820,14 @@ mod tests {
         }
 
         if !any_digit {
-            return Err(ParseError::invalid_syntax(
+            return Err(Error::invalid_syntax(
                 "Invalid unicode codepoint escape length".to_string(),
                 0,
             ));
         }
 
         if code > 0x10FFFF {
-            return Err(ParseError::invalid_syntax(
+            return Err(Error::invalid_syntax(
                 format!("Invalid unicode codepoint: U+{code:X}"),
                 0,
             ));
@@ -862,7 +860,7 @@ mod tests {
     fn model_read_hex_value<I>(
         chars: &mut std::iter::Peekable<I>,
         count: usize,
-    ) -> Result<u32, ParseError>
+    ) -> Result<u32, Error>
     where
         I: Iterator<Item = char>,
     {
@@ -872,14 +870,14 @@ mod tests {
                 Some(ch) => match ch.to_digit(16) {
                     Some(d) => value = value * 16 + d,
                     None => {
-                        return Err(ParseError::invalid_syntax(
+                        return Err(Error::invalid_syntax(
                             format!("Expected hex digit, found '{ch}'"),
                             0,
                         ));
                     }
                 },
                 None => {
-                    return Err(ParseError::invalid_syntax(
+                    return Err(Error::invalid_syntax(
                         "Unexpected end of string in escape sequence".to_string(),
                         0,
                     ));
@@ -894,7 +892,7 @@ mod tests {
     /// in the output buffer, which a caller reads only on `Ok` but which must not
     /// drift either.
     fn outcome(
-        decode: fn(&str, &mut String) -> Result<(), ParseError>,
+        decode: fn(&str, &mut String) -> Result<(), Error>,
         input: &str,
     ) -> (Result<(), String>, String) {
         // A dirty buffer: the decoder owns clearing it.

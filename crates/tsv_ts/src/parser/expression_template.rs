@@ -4,7 +4,7 @@
 
 use crate::ast::{TemplateCooked, TemplateElement, TemplateLiteral};
 use crate::lexer::TokenKind;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::Parser;
 
@@ -90,7 +90,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         content: &str,
         content_start: usize,
         tagged: bool,
-    ) -> Result<TemplateCooked<'arena>, ParseError> {
+    ) -> Result<TemplateCooked<'arena>, Error> {
         match self.current_decoded {
             Some(decoded) => Ok(TemplateCooked::Decoded(decoded)),
             None if content.contains('\\') => {
@@ -130,7 +130,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         span: Span,
         tail: bool,
         tagged: bool,
-    ) -> Result<TemplateElement<'arena>, ParseError> {
+    ) -> Result<TemplateElement<'arena>, Error> {
         let arena = self.arena;
         let (content, raw_span) = template_token_content(self.current_value(), span, tail);
         let cooked = self.template_cooked(content, raw_span.start as usize, tagged)?;
@@ -189,7 +189,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the returned token's stack slot and `update_current`'s escape-copy call live in that
     /// frame and widen it.
     #[inline(never)]
-    fn continue_template_after_brace(&mut self, raw_brace_end: usize) -> Result<(), ParseError> {
+    fn continue_template_after_brace(&mut self, raw_brace_end: usize) -> Result<(), Error> {
         let next_token = self.lexer.continue_template_from_brace(raw_brace_end)?;
         self.update_current(next_token);
         Ok(())
@@ -204,7 +204,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_template_literal(
         &mut self,
         tagged: bool,
-    ) -> Result<TemplateLiteral<'arena>, ParseError> {
+    ) -> Result<TemplateLiteral<'arena>, Error> {
         let (start, _) = self.current_pos();
         let mut quasis = self.bvec();
         let mut expressions = self.bvec();

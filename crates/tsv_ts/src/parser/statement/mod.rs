@@ -3,7 +3,7 @@
 use crate::ast::*;
 use crate::lexer::KeywordKind;
 use crate::lexer::TokenKind;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::{Parser, RootEnd};
 
@@ -71,7 +71,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(crate) fn parse_module_item(
         &mut self,
         context: ModuleItemContext,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, Error> {
         // A module item is a statement boundary, and `export` / `import` return below
         // without reaching `parse_statement_at`, which is where every other statement
         // ends the `<` regions of the one before it (`Parser::lt_regions_statement_base`).
@@ -102,7 +102,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         context: ModuleItemContext,
         keyword: &str,
         position: usize,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         if self.goal == crate::Goal::Module || context == ModuleItemContext::NamespaceBody {
             return Ok(());
         }
@@ -118,7 +118,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Error for an `import`/`export` declaration outside a module-item position.
-    fn error_module_item_position(&self) -> ParseError {
+    fn error_module_item_position(&self) -> Error {
         self.error_msg("'import' and 'export' may only appear at the top level")
     }
 
@@ -129,7 +129,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// A statement is one wire level of the depth limit's nesting count, which a list of
     /// them counts once ([`Parser::statement_list`]) and [`Parser::parse_nested_statement`]
     /// counts for the one statement it takes.
-    pub(crate) fn parse_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
+    pub(crate) fn parse_statement(&mut self) -> Result<Statement<'arena>, Error> {
         self.parse_statement_at(StatementPosition::List, None)
     }
 
@@ -142,7 +142,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// with no declaration to compete with, `let` is the `IdentifierReference` its own
     /// production admits, and ASI closes the statement at it. acorn spells the same fork
     /// as the `context` parameter of `parseStatement` / `isLet`.
-    pub(super) fn parse_nested_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
+    pub(super) fn parse_nested_statement(&mut self) -> Result<Statement<'arena>, Error> {
         // one wire level: the statement (see `Parser::parse_statement`)
         self.nested(1, |p| p.parse_statement_at(StatementPosition::Single, None))
     }
@@ -154,7 +154,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         position: StatementPosition,
         module_item: Option<ModuleItemContext>,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, Error> {
         // A `<` region dies at a statement boundary: what came before this statement —
         // an earlier statement, or the head this one is the body of — cannot reach a
         // `>` in it (`Parser::lt_regions_statement_base`).
@@ -460,7 +460,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Captures the start position before parsing so the span includes any
     /// surrounding parens: `('hello');` → span starts at `(`, not `'`.
-    fn parse_expression_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
+    fn parse_expression_statement(&mut self) -> Result<Statement<'arena>, Error> {
         let start = self.current_pos().0 as u32;
         // a bare assignment as the statement prints bare ([`Parser::self_pair`])
         // (a bare sequence takes a pair, `(a, b);`, counted as it is built)
@@ -505,7 +505,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         stmt: &mut Statement<'arena>,
         prologue: &[Statement<'arena>],
-    ) -> Result<bool, ParseError> {
+    ) -> Result<bool, Error> {
         let stmt_start = stmt.span.start;
         let StatementKind::ExpressionStatement(expr_stmt) = &mut stmt.kind else {
             return Ok(false);
@@ -542,7 +542,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// carries now that the body has turned strict, if it carries one. The literal's token
     /// is long gone, so the question is asked of its raw source — the same walk the
     /// string-literal seam runs (`Parser::legacy_escape_error`).
-    fn directive_legacy_escape_error(&self, stmt: &Statement<'arena>) -> Option<ParseError> {
+    fn directive_legacy_escape_error(&self, stmt: &Statement<'arena>) -> Option<Error> {
         let StatementKind::ExpressionStatement(expr_stmt) = &stmt.kind else {
             return None;
         };

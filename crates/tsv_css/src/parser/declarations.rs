@@ -2,7 +2,7 @@ use super::CssParser;
 use super::decl_scan::{DeclarationHead, ScannedDeclaration};
 use crate::ast::*;
 use crate::lexer::TokenKind;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 /// Check if we're looking at the start of a nested rule (selector) rather than a declaration.
 ///
@@ -18,7 +18,7 @@ use tsv_lang::{ParseError, Span};
 ///
 /// For identifiers, we need to look ahead: if next non-whitespace/comment token is `:`, it's a declaration.
 /// Custom-property identifiers (`--*`) are always declarations and bypass the lookahead.
-pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
+pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, Error> {
     match parser.current_kind() {
         // Unambiguous selector start tokens
         TokenKind::Ampersand
@@ -64,7 +64,7 @@ pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, P
 pub(crate) fn parse_rule<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     nested: bool,
-) -> Result<CssRule<'arena>, ParseError> {
+) -> Result<CssRule<'arena>, Error> {
     // two wire levels: the `Rule` and its `Block` (the depth limit's count)
     parser.nested(2, |p| parse_rule_body(p, nested))
 }
@@ -73,7 +73,7 @@ pub(crate) fn parse_rule<'arena>(
 fn parse_rule_body<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     nested: bool,
-) -> Result<CssRule<'arena>, ParseError> {
+) -> Result<CssRule<'arena>, Error> {
     // Ahead of the capture: this offset becomes the rule's AND its prelude's `start`, both
     // of which sit past a boundary whitespace run in `parseCss` (see
     // `skip_boundary_whitespace`). Two of the three callers reach here having already
@@ -181,7 +181,7 @@ fn parse_rule_body<'arena>(
 /// that byte head declines. Leaves the parser on the value's first token, which
 /// `parse_declaration` then re-seats past (the value is scanned, never tokenized), so
 /// nothing lexed here survives except the head's three facts.
-fn lex_declaration_head(parser: &mut CssParser<'_, '_>) -> Result<DeclarationHead, ParseError> {
+fn lex_declaration_head(parser: &mut CssParser<'_, '_>) -> Result<DeclarationHead, Error> {
     parser.advance()?;
 
     // The property→colon gap is an `allow_whitespace()` juncture: `read_declaration` ends
@@ -223,7 +223,7 @@ fn assert_token_head_agrees(
 /// Parse a CSS declaration: `property: value;`
 pub(crate) fn parse_declaration<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<CssDeclaration<'arena>, ParseError> {
+) -> Result<CssDeclaration<'arena>, Error> {
     let start = parser.base_offset() + parser.current_start();
 
     // Parse property

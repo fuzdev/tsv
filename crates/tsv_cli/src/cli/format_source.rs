@@ -31,10 +31,7 @@ use crate::cli::input::ParserType;
 /// allocates a fresh, source-pre-sized AST arena and a fresh doc arena per call. A
 /// driver that formats many sources should reuse both across them via
 /// [`format_source_in`] (see the `format` command's worker loop).
-pub fn format_source(
-    source: &str,
-    parser_type: ParserType,
-) -> Result<String, tsv_lang::ParseError> {
+pub fn format_source(source: &str, parser_type: ParserType) -> Result<String, tsv_lang::Error> {
     format_source_with_source_type(source, parser_type, None)
 }
 
@@ -50,7 +47,7 @@ pub fn format_source_with_source_type(
     source: &str,
     parser_type: ParserType,
     goal: Option<tsv_ts::Goal>,
-) -> Result<String, tsv_lang::ParseError> {
+) -> Result<String, tsv_lang::Error> {
     // The arena owns the internal AST; it lives only for the parse+format here
     // (`format` returns an owned `String`, so nothing borrowed escapes). Pre-sized
     // to the source so the parse pays one chunk alloc, not a doubling tail.
@@ -71,7 +68,7 @@ pub fn format_source_with_source_type(
 /// (each retaining the largest chunk across files) instead of allocating fresh
 /// arenas per file.
 ///
-/// The error is the `ParseError` itself rather than its text, so a caller printing it can
+/// The error is the `Error` itself rather than its text, so a caller printing it can
 /// still tell a parse error from the kinds that are not one — the size cap and the Svelte
 /// refusal (`cli::out::exit_with_parse_error`).
 ///
@@ -83,7 +80,7 @@ pub(crate) fn format_source_in(
     goal: Option<tsv_ts::Goal>,
     arena: &bumpalo::Bump,
     doc_arena: &tsv_lang::doc::arena::DocArena,
-) -> Result<String, tsv_lang::ParseError> {
+) -> Result<String, tsv_lang::Error> {
     // The format path's line-terminator fold, ahead of the parse — the seam every consumer
     // of this module inherits (the `format` command and every `tsv_debug` audit), so a
     // printer never sees a `<CR>` and the doc-build's line splits agree with the output

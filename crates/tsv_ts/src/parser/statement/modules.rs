@@ -2,7 +2,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::super::Parser;
 use super::DecoratorListKind;
@@ -43,10 +43,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// by all three oracles). Asked at both export arms so the `declare` and bare
     /// spellings cannot drift apart — which they had, tsv accepting `export declare
     /// global { }` while rejecting `export global { }`, a split neither oracle makes.
-    fn require_exported_global_body(
-        &self,
-        declaration: &Statement<'arena>,
-    ) -> Result<(), ParseError> {
+    fn require_exported_global_body(&self, declaration: &Statement<'arena>) -> Result<(), Error> {
         if let StatementKind::TSModuleDeclaration(module) = &declaration.kind
             && module.global
             && module.body.is_none()
@@ -83,7 +80,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_export_declaration(
         &mut self,
         context: ModuleItemContext,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, Error> {
         let (start, _) = self.current_pos();
 
         // `export` declarations are reachable only via `ModuleItem`, and a Script goal has
@@ -361,10 +358,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - `export default function foo() {}`
     /// - `export default class {}`
     /// - `export default class Foo {}`
-    fn parse_export_default_declaration(
-        &mut self,
-        start: u32,
-    ) -> Result<Statement<'arena>, ParseError> {
+    fn parse_export_default_declaration(&mut self, start: u32) -> Result<Statement<'arena>, Error> {
         // Consume 'default' keyword
         debug_assert!(matches!(
             self.current_kind(),
@@ -545,10 +539,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// caller's precisely because the positions differ: most sites have just consumed
     /// an `as` and say so, while the export specifier's LOCAL name has nothing in
     /// front of it.
-    fn parse_module_export_name(
-        &mut self,
-        what: &str,
-    ) -> Result<ModuleExportName<'arena>, ParseError> {
+    fn parse_module_export_name(&mut self, what: &str) -> Result<ModuleExportName<'arena>, Error> {
         if matches!(self.current_kind(), TokenKind::String) {
             Ok(ModuleExportName::Literal(self.parse_string_literal()?))
         } else {
@@ -591,7 +582,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Consume the current identifier-or-keyword token as an `Identifier`. Used
     /// for the `as` word(s) in the type-only specifier state machine (a keyword
     /// token, never escaped). Assumes [`Parser::at_keyword_or_ident`].
-    fn take_keyword_or_ident(&mut self) -> Result<Identifier<'arena>, ParseError> {
+    fn take_keyword_or_ident(&mut self) -> Result<Identifier<'arena>, Error> {
         let (start, end) = self.current_pos();
         let Some(name) = self.try_identifier_name() else {
             return Err(self.error_expected("identifier in specifier"));
@@ -609,7 +600,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_specifier_rename_target(
         &mut self,
         is_import: bool,
-    ) -> Result<(ModuleExportName<'arena>, usize), ParseError> {
+    ) -> Result<(ModuleExportName<'arena>, usize), Error> {
         if is_import {
             let (start, end) = self.current_pos();
             let Some(name) = self.try_binding_name() else {
@@ -637,7 +628,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_type_modifier_name(
         &mut self,
         is_import: bool,
-    ) -> Result<(Identifier<'arena>, usize), ParseError> {
+    ) -> Result<(Identifier<'arena>, usize), Error> {
         let (start, end) = self.current_pos();
         let name = if is_import && self.peek_at_as_keyword() {
             self.try_identifier_name()
@@ -674,7 +665,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_type_specifier_parts(
         &mut self,
         is_import: bool,
-    ) -> Result<TypeSpecifierParts<'arena>, ParseError> {
+    ) -> Result<TypeSpecifierParts<'arena>, Error> {
         // The leading `type` is consumed as the tentative name (acorn's
         // `node.imported/local = parseModuleExportName()`); the state machine may
         // reassign `left` to a later token if `type` turns out to be the modifier.
@@ -754,7 +745,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: u32,
         export_kind: ExportKind,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, Error> {
         // Consume '*'
         debug_assert!(matches!(self.current_kind(), TokenKind::Star));
         self.advance()?;
@@ -799,7 +790,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: u32,
         export_kind: ExportKind,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, Error> {
         // Consume '{'
         debug_assert!(matches!(self.current_kind(), TokenKind::BraceOpen));
         self.advance()?;
@@ -900,7 +891,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `default` locals this production has always accepted.
     fn parse_export_specifier_names(
         &mut self,
-    ) -> Result<(ModuleExportName<'arena>, ModuleExportName<'arena>, u32), ParseError> {
+    ) -> Result<(ModuleExportName<'arena>, ModuleExportName<'arena>, u32), Error> {
         let local = self.parse_module_export_name("identifier in export specifier")?;
         let exported = if self.at_as_keyword() {
             self.advance()?; // consume 'as'
@@ -931,7 +922,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// syntax error, see `input_invalid_keyword_no_binding`).
     fn parse_import_specifier_names(
         &mut self,
-    ) -> Result<(ModuleExportName<'arena>, Identifier<'arena>, u32), ParseError> {
+    ) -> Result<(ModuleExportName<'arena>, Identifier<'arena>, u32), Error> {
         let (imp_start, imp_end) = self.current_pos();
         let imported = if matches!(self.current_kind(), TokenKind::String) {
             ModuleExportName::Literal(self.parse_string_literal()?)
@@ -1005,7 +996,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &self,
         context: ModuleItemContext,
         position: usize,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         self.check_module_item_goal(context, "import", position)
     }
 
@@ -1021,7 +1012,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_import_declaration(
         &mut self,
         context: ModuleItemContext,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, Error> {
         let (start, _) = self.current_pos();
 
         // NOTE: the `Goal::Script` gate is NOT here, on the keyword — see
@@ -1315,7 +1306,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// keep it).
     fn parse_import_attributes(
         &mut self,
-    ) -> Result<Option<&'arena [ImportAttribute<'arena>]>, ParseError> {
+    ) -> Result<Option<&'arena [ImportAttribute<'arena>]>, Error> {
         // The `WithClause`'s own `with` token. It is the reserved word (a `ReservedWord`
         // barred from every name position — see `KeywordKind::With`), spelled out by this
         // production rather than read as an identifier, so match the keyword token.
@@ -1428,7 +1419,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         name: IdentName<'arena>,
         import_kind: ImportKind,
         is_export: bool,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, Error> {
         // Already have: import <identifier>
         // Current token is `=`
         self.advance()?; // consume `=`

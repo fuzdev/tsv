@@ -1,7 +1,7 @@
 // Fragment and text parsing
 
 use crate::ast::*;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::parser_impl::SvelteParser;
 
@@ -10,7 +10,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// Stores the original source text; HTML entities decode lazily via
     /// `Text::data` with text-content rules (`TextDecoding::Fragment`).
-    pub(crate) fn parse_text(&self, start: usize, end: usize) -> Result<Text, ParseError> {
+    pub(crate) fn parse_text(&self, start: usize, end: usize) -> Result<Text, Error> {
         let span = Span {
             start: start as u32,
             end: end as u32,
@@ -22,7 +22,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// The current token is TokenKind::Comment, which includes the full
     /// <!-- ... --> delimiters. We extract just the content field.
-    pub(crate) fn parse_comment(&mut self) -> Result<HtmlComment, ParseError> {
+    pub(crate) fn parse_comment(&mut self) -> Result<HtmlComment, Error> {
         let start = self.current_start();
         let end = self.current_end();
 

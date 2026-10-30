@@ -73,16 +73,16 @@ hold — [the helper](#linecolumn-reconstruction-helper-npmlocationsjs)).
 across a worker — whose span is shaped like a wire node's. A parse failure (every family) is
 `{kind: 'parse', message, frame, start, end, loc}`: `message` the one-line summary (a line
 terminator it quotes from the source spelled `<U+XXXX>`), `frame` the
-`line:col` header with the excerpted line, then the caret line (`ParseError::report`'s
-`summary` / `frame` — the Rust `ParseError` text is exactly `` `${message}\n${frame}` ``, the
+`line:col` header with the excerpted line, then the caret line (`Error::report`'s
+`summary` / `frame` — the Rust `Error` text is exactly `` `${message}\n${frame}` ``, the
 header printing `loc.start` — [docs/cli.md §Parse errors](../../docs/cli.md#parse-errors));
-`start` / `end` the UTF-16 offsets a wire node would carry (`ParseError::report` — a parse
+`start` / `end` the UTF-16 offsets a wire node would carry (`Error::report` — a parse
 error knows a point, not a span, so `end === start`), and `loc` their
 `{start: {line, column}, end: {line, column}}` under the document's line rule, so `loc` is
 `create_locator(source, {language}).loc_of(error)`. A format's refusal of a source that parses
 is `{kind: 'refused', message, frame, start, end, loc}`, the same shape over the refused
 character: `format_svelte` refuses a lone CR inside an in-tag `//` comment, which the format's
-CR fold would end early (`tsv_svelte::__private::parse_folded`, a `ParseError::refusal` — no syntax error,
+CR fold would end early (`tsv_svelte::__private::parse_folded`, an `Error::refusal` — no syntax error,
 its span the CR). The strip adds its own `'unsupported'` (below).
 
 **The engines build it and RETURN it.** A failure the source causes is no exception: each

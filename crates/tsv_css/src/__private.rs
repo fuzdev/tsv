@@ -31,7 +31,7 @@ pub fn parse_folded<'arena>(
 ///
 /// # Returns
 /// * `Ok(CssStyleSheet)` - Parsed AST with nodes and value comments
-/// * `Err(ParseError)` - Parse error positioned in the parent file
+/// * `Err(Error)` - Parse error positioned in the parent file
 ///
 /// `arena` owns the returned AST's nodes (shared with the host document's arena
 /// when CSS is embedded in a Svelte `<style>`).
@@ -39,8 +39,8 @@ pub fn parse_folded<'arena>(
 /// # Errors
 ///
 /// An error is positioned in the parent file (`base_offset` included) but carries no
-/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
-/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does): a
+/// point — [`Error::wire_point`] is `None` — until the host fills its context over
+/// the whole document ([`Error::with_context`], as `tsv_svelte::parse` does): a
 /// context taken over `source`, a slice, would read that position against the wrong text.
 pub fn parse_embedded<'arena>(
     source: &str,

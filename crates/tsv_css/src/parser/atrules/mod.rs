@@ -11,7 +11,7 @@ pub(super) use super::CssParser;
 
 use crate::ast::*;
 use crate::lexer::TokenKind;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use self::preludes::{
     ConditionReader, parse_condition_query, parse_container_prelude, parse_custom_selector_prelude,
@@ -60,7 +60,7 @@ pub(super) fn is_boolean_operator(parser: &CssParser<'_, '_>) -> bool {
 pub(crate) fn parse_atrule<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     nested_in_rule: bool,
-) -> Result<CssAtrule<'arena>, ParseError> {
+) -> Result<CssAtrule<'arena>, Error> {
     // two wire levels: the `Atrule` and its `Block` (the depth limit's count)
     parser.nested(2, |p| parse_atrule_body(p, nested_in_rule))
 }
@@ -69,7 +69,7 @@ pub(crate) fn parse_atrule<'arena>(
 fn parse_atrule_body<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     nested_in_rule: bool,
-) -> Result<CssAtrule<'arena>, ParseError> {
+) -> Result<CssAtrule<'arena>, Error> {
     let start = parser.span_pos(parser.current_start());
 
     // Expect @ symbol
@@ -245,7 +245,7 @@ fn parse_atrule_body<'arena>(
 pub(super) fn reconsume_prelude_as_raw<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     prelude_start_raw: usize,
-) -> Result<PreludeValue<'arena>, ParseError> {
+) -> Result<PreludeValue<'arena>, Error> {
     // Re-read from the prelude's first token, so its ends are observed over all of it. The
     // registry keeps everything the abandoned reader registered (the truncation is to its own
     // length): only the cursor moves. Every token is taken verbatim, so the output length at a
@@ -299,7 +299,7 @@ fn parse_atrule_block<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     atrule_name: &str,
     nested_in_rule: bool,
-) -> Result<CssAtruleBlock<'arena>, ParseError> {
+) -> Result<CssAtruleBlock<'arena>, Error> {
     let start = parser.span_pos(parser.current_start());
 
     // Expect {
@@ -404,7 +404,7 @@ fn parse_block_child<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     allow_relative_selectors: bool,
     atrule_name: &str,
-) -> Result<CssBlockChild<'arena>, ParseError> {
+) -> Result<CssBlockChild<'arena>, Error> {
     if super::declarations::is_nested_rule_start(parser)? {
         Ok(CssBlockChild::Rule(super::declarations::parse_rule(
             parser,

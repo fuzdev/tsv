@@ -461,8 +461,8 @@ impl<'a> FoldedSource<'a> {
     /// Whether the fold rewrote a **lone** `<CR>` — one not opening a `<CR><LF>` pair — to
     /// `<LF>`. A `<CR><LF>` is one line break under every line rule tsv reads, so folding it
     /// moves no line; a lone `<CR>` is a line break only where the rule says so, which a
-    /// Svelte document's markup does not (`tsv_svelte::__private::parse_folded` reads this to
-    /// decide whether the author's own bytes need a parse of their own). Taken by the fold's own
+    /// Svelte document's markup does not (the Svelte format entry reads this to decide
+    /// whether the author's own bytes need a parse of their own). Taken by the fold's own
     /// pass, so a source with no `<CR>` answers `false` without a scan.
     pub fn folded_lone_cr(&self) -> bool {
         self.folded_lone_cr
@@ -483,7 +483,7 @@ impl<'a> FoldedSource<'a> {
     /// Parse [`Self::text`] with `parse`, an error mapped back onto the text the fold was
     /// applied to ([`Self::unfold_error`]) — so a format error reports the position, and
     /// prints the header and excerpt, of the caller's own source, as a parse of that source
-    /// would ([`crate::ParseError::wire_point`]). Every format entry point that folds parses
+    /// would ([`crate::Error::wire_point`]). Every format entry point that folds parses
     /// through this, which is what keeps the unfold from being skipped.
     ///
     /// # Errors
@@ -499,7 +499,7 @@ impl<'a> FoldedSource<'a> {
     /// Map an error from a parse of [`Self::text`] back onto the text the fold was applied
     /// to. The error is returned untouched when the fold changed nothing.
     #[must_use]
-    pub(crate) fn unfold_error(&self, error: crate::ParseError) -> crate::ParseError {
+    pub(crate) fn unfold_error(&self, error: crate::Error) -> crate::Error {
         match self.text {
             Cow::Borrowed(_) => error,
             Cow::Owned(_) => error.unfold(self.original),
@@ -3308,7 +3308,7 @@ mod tests {
     }
 
     /// The fold says whether it rewrote a LONE `<CR>` — one not opening a `<CR><LF>` — the
-    /// fact `tsv_svelte::__private::parse_folded` keys its refusal check on, so a CRLF-only
+    /// fact the Svelte format entry keys its refusal check on, so a CRLF-only
     /// document pays nothing.
     #[test]
     fn the_fold_says_whether_it_rewrote_a_lone_cr() {

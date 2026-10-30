@@ -6,7 +6,7 @@ use crate::ast::{
     ArrowFunctionBody, ArrowFunctionExpression, Expression, ExpressionKind, Identifier,
 };
 use crate::lexer::TokenKind;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::Parser;
 use super::expression::alloc_expr;
@@ -27,7 +27,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Consume the arrow's `=>` and return the byte offset of its `=` (the arrow
     /// token start), so builders can record it on the node instead of the printer
     /// re-scanning source for it.
-    fn expect_arrow(&mut self) -> Result<u32, ParseError> {
+    fn expect_arrow(&mut self) -> Result<u32, Error> {
         if self.check(&TokenKind::Arrow) && self.had_line_terminator {
             return Err(self.error_msg("Line terminator not permitted before '=>'"));
         }
@@ -70,7 +70,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// shares: the parenthesized reading hands the same body to the alternate's
     /// arrow, which fails on it again. A head without an annotation parses straight,
     /// so a body error there keeps its message. The one error handed back instead of
-    /// rewound is a **goal gate** ([`ParseError::is_goal_gated`]): it fires on an
+    /// rewound is a **goal gate** ([`Error::is_goal_gated`]): it fires on an
     /// `import.meta` token the parenthesized reading has to consume as well, so the
     /// file is no script either way, and rewinding would trade the one mark the format
     /// fallback reads for a position-only error further on.
@@ -94,8 +94,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_arrow_or_rewind(
         &mut self,
         head: ArrowHead,
-        parse: fn(&mut Self) -> Result<&'arena Expression<'arena>, ParseError>,
-    ) -> Result<Option<&'arena Expression<'arena>>, ParseError> {
+        parse: fn(&mut Self) -> Result<&'arena Expression<'arena>, Error>,
+    ) -> Result<Option<&'arena Expression<'arena>>, Error> {
         if !self.arrow_return_type_barred() || !head.has_return_type(self.source.as_bytes()) {
             return parse(self).map(Some);
         }
@@ -110,8 +110,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_annotated_arrow_in_consequent(
         &mut self,
         head: ArrowHead,
-        parse: fn(&mut Self) -> Result<&'arena Expression<'arena>, ParseError>,
-    ) -> Result<Option<&'arena Expression<'arena>>, ParseError> {
+        parse: fn(&mut Self) -> Result<&'arena Expression<'arena>, Error>,
+    ) -> Result<Option<&'arena Expression<'arena>>, Error> {
         if head.commits_to_signature(self.source.as_bytes()) {
             return self.with_arrow_return_type_allowed(parse).map(Some);
         }
@@ -179,7 +179,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse generic arrow function: `<T>() => ...`, `<T, U extends V>() => ...`
     pub(super) fn parse_generic_arrow_function(
         &mut self,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, Error> {
         let (start, _) = self.current_pos();
 
         // Parse type parameters: <T, U extends V, ...>
@@ -230,7 +230,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The body is one wire level below the arrow (the depth limit's count,
     /// [`Parser::nested`]): the recursion `a => b => c` passes no grouping delimiter. A block
     /// body enters it with the body's own levels, in one count.
-    fn parse_arrow_body(&mut self) -> Result<ArrowFunctionBody<'arena>, ParseError> {
+    fn parse_arrow_body(&mut self) -> Result<ArrowFunctionBody<'arena>, Error> {
         if self.check(&TokenKind::BraceOpen) {
             // A block body is a `FunctionBody` (`[+In]`) — `in` is the binary
             // operator even when this arrow sits in a for-header init — and a fresh
@@ -273,9 +273,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Note: Single parameter without parens (`x => expr`) is handled by
     /// `parse_single_param_arrow_function()`.
-    pub(super) fn parse_arrow_function(
-        &mut self,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    pub(super) fn parse_arrow_function(&mut self) -> Result<&'arena Expression<'arena>, Error> {
         let (start, _) = self.current_pos();
 
         // Capture paren position before parsing params
@@ -320,7 +318,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse single-parameter arrow function without parentheses: `x => expr`
     pub(super) fn parse_single_param_arrow_function(
         &mut self,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, Error> {
         let (start, _) = self.current_pos();
 
         // Parse the single parameter: a plain identifier, a contextual type keyword
@@ -376,7 +374,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_async_arrow_function_after_async(
         &mut self,
         start: usize,
-    ) -> Result<&'arena Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, Error> {
         // Check for type parameters: `async <T>() => ...`
         let type_parameters = self.parse_optional_type_parameters()?;
 

@@ -20,12 +20,12 @@ mod whitespace;
 // Re-export commonly used types
 use __private::{format_folded_in, parse_folded};
 pub use ast::{CssDeclaration, CssNode, CssRule, CssStyleSheet};
-pub use tsv_lang::{ErrorReport, ParseError, Result, WirePoint};
+pub use tsv_lang::{Error, ErrorReport, Result, WirePoint};
 
 /// The coordinates a CSS document's positions are reported in — `parseCss`'s: a leading
 /// BOM **elided** (`parseCss` strips it before parsing, so every offset indexes the
 /// BOM-less string), and `\n` alone ending a line. The wire writer's tables and every
-/// parse error's point (`ParseError::wire_point`, and the `line:col` its message prints)
+/// parse error's point (`Error::wire_point`, and the `line:col` its message prints)
 /// read this one statement.
 pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinates {
     lines: tsv_lang::LineRule::Lf,
@@ -39,7 +39,7 @@ pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinate
 ///
 /// # Returns
 /// * `Ok(CssStyleSheet)` - Parsed AST with nodes and value comments
-/// * `Err(ParseError)` - Parse error with position and context
+/// * `Err(Error)` - Parse error with position and context
 ///
 /// # Example
 /// ```
@@ -53,7 +53,7 @@ pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinate
 /// `arena` owns every AST node of the returned [`CssStyleSheet`]
 /// (caller-owns-`Bump`); the stylesheet borrows from it for `'arena`.
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<CssStyleSheet<'arena>> {
-    ParseError::ensure_source_fits(source)?;
+    Error::ensure_source_fits(source)?;
     parser::parse_css(source, 0, 0, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 

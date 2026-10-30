@@ -3,9 +3,8 @@
 use super::comments;
 use super::escapes;
 use super::ident::{is_id_continue, is_id_start};
-use super::lex_err;
 use super::token::{Token, TokenKind, WordLookup, keyword_at, keyword_at_in_word, long_keyword};
-use tsv_lang::ParseError;
+use tsv_lang::Error;
 
 /// The one message for a `NumericLiteralSeparator` inside a leading-zero literal —
 /// raised both for a `_` directly after the `0` (`0_0`) and for one inside the
@@ -421,7 +420,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Lift an error this lexer produced into the coordinates of the document it will be
-    /// rendered against (`ParseError::shift_position`).
+    /// rendered against (`Error::shift_position`).
     ///
     /// Applied at each entry point that PRODUCES an error — [`Lexer::next_token_into`],
     /// [`Lexer::read_regex_literal`], [`Lexer::continue_template_from_brace`] — and
@@ -430,7 +429,7 @@ impl<'a> Lexer<'a> {
     /// altogether.
     #[cold]
     #[inline(never)]
-    fn host_err(&self, err: ParseError) -> ParseError {
+    fn host_err(&self, err: Error) -> Error {
         err.shift_position(self.base_offset)
     }
 
@@ -551,7 +550,7 @@ impl<'a> Lexer<'a> {
 
     /// Seek to a specific position and re-lex from there.
     /// Used when splitting compound tokens like `>=` into `>` + `=`.
-    pub fn seek_and_next_token(&mut self, position: usize) -> Result<Token, ParseError> {
+    pub fn seek_and_next_token(&mut self, position: usize) -> Result<Token, Error> {
         self.set_position(position);
         self.next_token()
     }
@@ -635,7 +634,7 @@ impl<'a> Lexer<'a> {
         bytes: &'a [u8],
         start: usize,
         dst: &mut Token,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         // An index, not a `get`: the handoff proved `start` in bounds where the run's trip
         // count below cannot see it, and without the proof the run takes an extra
         // instruction a byte. The index restates it once, ahead of the run.
@@ -674,7 +673,7 @@ impl<'a> Lexer<'a> {
         start: usize,
         end: usize,
         dst: &mut Token,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         let Some(name) = self.bytes.get(start..end) else {
             return self.next_token_dispatch_at(start, dst);
         };
@@ -697,7 +696,7 @@ impl<'a> Lexer<'a> {
     /// left there, so they would take callee-saved ones, and the front a frame.
     #[cold]
     #[inline(never)]
-    fn next_token_dispatch_at(&mut self, start: usize, dst: &mut Token) -> Result<(), ParseError> {
+    fn next_token_dispatch_at(&mut self, start: usize, dst: &mut Token) -> Result<(), Error> {
         let bytes = self.bytes;
         self.next_token_dispatch(bytes, start, bytes[start], dst)
     }
@@ -751,11 +750,7 @@ impl<'a> Lexer<'a> {
     ///
     /// The decoded name is parked in the lexer's `decode_scratch` when escapes are present
     /// (read back through `decoded_str`). Prettier normalizes these to their decoded form.
-    fn scan_identifier_into(
-        &mut self,
-        first_char: char,
-        dst: &mut Token,
-    ) -> Result<(), ParseError> {
+    fn scan_identifier_into(&mut self, first_char: char, dst: &mut Token) -> Result<(), Error> {
         let start = self.position;
         // None until an actual escape is decoded; `decoded.is_some()` ⇔ has-escapes.
         let mut decoded: Option<String> = None;
@@ -764,7 +759,7 @@ impl<'a> Lexer<'a> {
             // First char is a unicode escape
             if let Some((ch, len)) = try_decode_unicode_escape(self.bytes, self.position) {
                 if !is_id_start(ch) {
-                    return Err(lex_err(
+                    return Err(Error::lex(
                         format!("Invalid identifier start character from unicode escape: '{ch}'"),
                         start,
                     ));
@@ -775,7 +770,7 @@ impl<'a> Lexer<'a> {
                     self.advance();
                 }
             } else {
-                return Err(lex_err("Invalid unicode escape in identifier", start));
+                return Err(Error::lex("Invalid unicode escape in identifier", start));
             }
         } else {
             // A non-ASCII start char: the raw token is not plain ASCII.
@@ -892,7 +887,7 @@ impl<'a> Lexer<'a> {
     /// over-acceptances acorn flags as "Numeric separator is not allowed …".
     /// Returns whether at least one digit was consumed (callers enforce the
     /// "≥1 digit after a radix prefix" rule).
-    fn scan_digits(&mut self, is_valid_digit: impl Fn(char) -> bool) -> Result<bool, ParseError> {
+    fn scan_digits(&mut self, is_valid_digit: impl Fn(char) -> bool) -> Result<bool, Error> {
         // Digits and `_` are ASCII, so a byte scan suffices: a non-ASCII byte
         // (`b as char` ∈ U+0080..=U+00FF) is never a valid digit, so the predicate
         // breaks the loop just as it would on any other terminator.
@@ -905,7 +900,7 @@ impl<'a> Lexer<'a> {
                     .byte_ahead(1)
                     .is_some_and(|n| is_valid_digit(n as char));
                 if !prev_was_digit || !next_is_digit {
-                    return Err(lex_err(
+                    return Err(Error::lex(
                         "Numeric separator '_' must appear between two digits",
                         self.position,
                     ));
@@ -927,7 +922,7 @@ impl<'a> Lexer<'a> {
     /// Handles: 123, 1.5, 1e3, 1.5e-2, 1_000, 1.e1. Returns whether the literal
     /// is integer-form (no fractional part and no exponent) — the only decimal
     /// shape a BigInt `n` suffix may follow (`1.5n` / `1e3n` are rejected).
-    fn scan_decimal_number(&mut self) -> Result<bool, ParseError> {
+    fn scan_decimal_number(&mut self) -> Result<bool, Error> {
         // `s` starts at the char after a `.`. Returns true when `s` begins a valid
         // exponent (`e`/`E`, optional sign, then a digit) — i.e. `1.e1` is one number.
         fn is_exponent_start(s: &str) -> bool {
@@ -1002,12 +997,7 @@ impl<'a> Lexer<'a> {
     /// rejection is the parser's, taken where the token becomes a node. The
     /// separator forms (`0_0`) are the exception — they are a syntax error in every
     /// mode, so they error here.
-    fn scan_number_into(
-        &mut self,
-        start: usize,
-        first: u8,
-        dst: &mut Token,
-    ) -> Result<(), ParseError> {
+    fn scan_number_into(&mut self, start: usize, first: u8, dst: &mut Token) -> Result<(), Error> {
         // Radix literals (`0x`/`0b`/`0o`) are always integer-form, so a BigInt
         // `n` suffix is always allowed after them; a decimal literal allows `n`
         // only when it carries no fraction and no exponent.
@@ -1019,7 +1009,7 @@ impl<'a> Lexer<'a> {
                     self.advance(); // consume '0'
                     self.advance(); // consume 'x'
                     if !self.scan_digits(|c| c.is_ascii_hexdigit())? {
-                        return Err(lex_err("Missing hexadecimal digits after '0x'", start));
+                        return Err(Error::lex("Missing hexadecimal digits after '0x'", start));
                     }
                 }
                 Some(b'b' | b'B') => {
@@ -1027,7 +1017,7 @@ impl<'a> Lexer<'a> {
                     self.advance(); // consume '0'
                     self.advance(); // consume 'b'
                     if !self.scan_digits(|c| c == '0' || c == '1')? {
-                        return Err(lex_err("Missing binary digits after '0b'", start));
+                        return Err(Error::lex("Missing binary digits after '0b'", start));
                     }
                 }
                 Some(b'o' | b'O') => {
@@ -1035,7 +1025,7 @@ impl<'a> Lexer<'a> {
                     self.advance(); // consume '0'
                     self.advance(); // consume 'o'
                     if !self.scan_digits(|c| ('0'..='7').contains(&c))? {
-                        return Err(lex_err("Missing octal digits after '0o'", start));
+                        return Err(Error::lex("Missing octal digits after '0o'", start));
                     }
                 }
                 Some(b'0'..=b'9') => {
@@ -1064,7 +1054,7 @@ impl<'a> Lexer<'a> {
                         }
                     }
                     if self.cur_byte() == Some(b'_') {
-                        return Err(lex_err(LEGACY_SEPARATOR_MSG, start));
+                        return Err(Error::lex(LEGACY_SEPARATOR_MSG, start));
                     }
                     if !all_octal {
                         // Demoted to decimal, so a fraction and an exponent are
@@ -1087,7 +1077,7 @@ impl<'a> Lexer<'a> {
                     // productions carry no `[Sep]` parameter), so a `_` immediately
                     // after a leading `0` is rejected. Unlike the leading-zero digit
                     // forms above this holds in *every* mode, so it stays a lex error.
-                    return Err(lex_err(LEGACY_SEPARATOR_MSG, start));
+                    return Err(Error::lex(LEGACY_SEPARATOR_MSG, start));
                 }
                 _ => {
                     // Regular number or float starting with 0 (e.g. `0`, `0.5`,
@@ -1130,7 +1120,10 @@ impl<'a> Lexer<'a> {
             None => false,
         };
         if id_start_follows {
-            return Err(lex_err("Identifier directly after number", self.position));
+            return Err(Error::lex(
+                "Identifier directly after number",
+                self.position,
+            ));
         }
 
         *dst = self.make_token(TokenKind::Number, start);
@@ -1149,12 +1142,7 @@ impl<'a> Lexer<'a> {
     /// costs twelve instructions and five branches per byte, vectorizing at none of them
     /// — the escape arm resumes the run, which makes the stride data-dependent.
     /// `has_escapes` gates the (rare) decode pass.
-    fn scan_string_into(
-        &mut self,
-        start: usize,
-        quote: u8,
-        dst: &mut Token,
-    ) -> Result<(), ParseError> {
+    fn scan_string_into(&mut self, start: usize, quote: u8, dst: &mut Token) -> Result<(), Error> {
         self.advance(); // consume opening quote
         let content_start = self.position;
 
@@ -1172,7 +1160,7 @@ impl<'a> Lexer<'a> {
             // being multi-byte they never match these ASCII tests anyway.
             if p >= len || bytes[p] == b'\n' || bytes[p] == b'\r' {
                 self.position = p;
-                return Err(lex_err("Unterminated string literal", start));
+                return Err(Error::lex("Unterminated string literal", start));
             }
             if bytes[p] == quote {
                 let content_end = p;
@@ -1261,7 +1249,7 @@ impl<'a> Lexer<'a> {
 
     /// Lex the next token directly into `*dst` — the hot advance path. Writing
     /// through the caller's slot (`&mut self.current`) instead of returning a
-    /// `Result<Token, ParseError>` elides the round trip the by-value return
+    /// `Result<Token, Error>` elides the round trip the by-value return
     /// makes through the caller's frame (the intermediate `Token` built,
     /// returned through a slot, then reloaded and re-scattered into the
     /// parser's field). [`Lexer::next_token`] is the thin by-value wrapper every
@@ -1274,7 +1262,7 @@ impl<'a> Lexer<'a> {
     /// The error path is lifted into host coordinates here, at the producer
     /// ([`Lexer::host_err`]); the scan itself works in — and reports in — the lexer's own.
     #[inline]
-    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), Error> {
         self.has_decoded = false;
         self.had_line_terminator = false;
         self.next_token_into_local(dst)
@@ -1308,7 +1296,7 @@ impl<'a> Lexer<'a> {
     /// returns early. A payload kind yielded by the match is not free even where it is
     /// rare: the arms merge into one value, so every punctuation token then copies the
     /// payload bytes through the merged stack temporary into `dst`.
-    fn next_token_into_local(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+    fn next_token_into_local(&mut self, dst: &mut Token) -> Result<(), Error> {
         let bytes = self.bytes;
         let Some(first) = self.skip_ascii_whitespace(bytes) else {
             let end = self.position as u32;
@@ -1642,7 +1630,7 @@ impl<'a> Lexer<'a> {
         bytes: &'a [u8],
         pos: usize,
         dst: &mut Token,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         let (start, crossed) = skip_whitespace_general(self.source, pos);
         if start == pos {
             return self.next_token_dispatch(bytes, pos, bytes[pos], dst);
@@ -1670,7 +1658,7 @@ impl<'a> Lexer<'a> {
         start: usize,
         first: u8,
         dst: &mut Token,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         match first {
             // An ASCII-led name the front did not settle (see `scan_ascii_identifier_into`).
             b if is_ascii_id_start(b) => {
@@ -1697,7 +1685,7 @@ impl<'a> Lexer<'a> {
                     return self.scan_identifier_into('\\', dst);
                 }
                 // Not a valid identifier start - error.
-                Err(lex_err("Unexpected character: '\\'", start))
+                Err(Error::lex("Unexpected character: '\\'", start))
             }
             quote @ (b'\'' | b'"') => self.scan_string_into(start, quote, dst),
             b'/' => {
@@ -1732,10 +1720,10 @@ impl<'a> Lexer<'a> {
             // `is_id_start` check — the one token-start decode.)
             b if b >= 0x80 => match self.cur_char() {
                 Some(ch) if is_id_start(ch) => self.scan_identifier_into(ch, dst),
-                Some(ch) => Err(lex_err(format!("Unexpected character: '{ch}'"), start)),
-                None => Err(lex_err("Unexpected character", start)),
+                Some(ch) => Err(Error::lex(format!("Unexpected character: '{ch}'"), start)),
+                None => Err(Error::lex("Unexpected character", start)),
             },
-            b => Err(lex_err(
+            b => Err(Error::lex(
                 format!("Unexpected character: '{}'", b as char),
                 start,
             )),
@@ -1763,7 +1751,7 @@ impl<'a> Lexer<'a> {
     /// [`Lexer::seek_and_next_token`]'s compound-token split), and `debug_token_stream`.
     /// The advance path and `Parser::prime` use [`Lexer::next_token_into`] to write the
     /// parser's current token in place.
-    pub fn next_token(&mut self) -> Result<Token, ParseError> {
+    pub fn next_token(&mut self) -> Result<Token, Error> {
         let mut tok = Token {
             kind: TokenKind::Eof,
             start: 0,
@@ -1831,7 +1819,7 @@ impl<'a> Lexer<'a> {
     /// - TemplateHead: Start of template with `${` interpolation
     /// - TemplateMiddle: Middle section between interpolations (}...${)
     /// - TemplateTail: End section after last interpolation (}...`)
-    fn read_template_into(&mut self, start: usize, dst: &mut Token) -> Result<(), ParseError> {
+    fn read_template_into(&mut self, start: usize, dst: &mut Token) -> Result<(), Error> {
         self.advance(); // consume opening ` or }
 
         let content_start = self.position;
@@ -1839,7 +1827,7 @@ impl<'a> Lexer<'a> {
 
         let kind = match stop {
             TemplateStop::Eof => {
-                return Err(lex_err("Unterminated template literal", start));
+                return Err(Error::lex("Unterminated template literal", start));
             }
             // Determine token type based on whether we started with ` or }. (This
             // entry point is only reached on a leading `` ` ``, so `is_head` is
@@ -1895,16 +1883,13 @@ impl<'a> Lexer<'a> {
     ///
     /// A producer, so it lifts its error into host coordinates ([`Lexer::host_err`]).
     #[inline]
-    pub fn read_regex_literal(&mut self, slash_start: usize) -> Result<(Token, usize), ParseError> {
+    pub fn read_regex_literal(&mut self, slash_start: usize) -> Result<(Token, usize), Error> {
         self.read_regex_literal_local(slash_start)
             .map_err(|err| self.host_err(err))
     }
 
     /// [`Lexer::read_regex_literal`]'s scan, reporting at its position in `self.source`.
-    fn read_regex_literal_local(
-        &mut self,
-        slash_start: usize,
-    ) -> Result<(Token, usize), ParseError> {
+    fn read_regex_literal_local(&mut self, slash_start: usize) -> Result<(Token, usize), Error> {
         // A regex token never carries a decoded value; clear any left from the
         // previous token so the parser's `decoded_str()` after this lex sees `None`.
         self.has_decoded = false;
@@ -1929,7 +1914,7 @@ impl<'a> Lexer<'a> {
         loop {
             match self.cur_byte() {
                 None => {
-                    return Err(lex_err(
+                    return Err(Error::lex(
                         "Unterminated regular expression literal",
                         slash_start,
                     ));
@@ -1937,13 +1922,13 @@ impl<'a> Lexer<'a> {
                 // Line terminators are not allowed in a regex — checked BEFORE the
                 // `escaped` arm so even `\<LS>` errors (matching the original order).
                 Some(b'\n' | b'\r') => {
-                    return Err(lex_err(
+                    return Err(Error::lex(
                         "Unterminated regular expression literal",
                         slash_start,
                     ));
                 }
                 Some(b) if b >= 0x80 && self.at_line_separator() => {
-                    return Err(lex_err(
+                    return Err(Error::lex(
                         "Unterminated regular expression literal",
                         slash_start,
                     ));
@@ -1980,7 +1965,7 @@ impl<'a> Lexer<'a> {
 
         // Check for empty pattern (would be a comment)
         if pattern.is_empty() {
-            return Err(lex_err(
+            return Err(Error::lex(
                 "Regular expression literal cannot be empty (use /(?:)/ for empty pattern)",
                 slash_start,
             ));
@@ -2037,22 +2022,19 @@ impl<'a> Lexer<'a> {
     ///
     /// A producer, so it lifts its error into host coordinates ([`Lexer::host_err`]).
     #[inline]
-    pub fn continue_template_from_brace(&mut self, brace_end: usize) -> Result<Token, ParseError> {
+    pub fn continue_template_from_brace(&mut self, brace_end: usize) -> Result<Token, Error> {
         self.continue_template_from_brace_local(brace_end)
             .map_err(|err| self.host_err(err))
     }
 
     /// [`Lexer::continue_template_from_brace`]'s scan, reporting at its position in
     /// `self.source`.
-    fn continue_template_from_brace_local(
-        &mut self,
-        brace_end: usize,
-    ) -> Result<Token, ParseError> {
+    fn continue_template_from_brace_local(&mut self, brace_end: usize) -> Result<Token, Error> {
         // Standalone token-producing entry point — clear the out-of-band decoded slot
         // so `decoded_str()` reflects only the segment produced here (set below on escapes).
         self.has_decoded = false;
         if self.template_depth == 0 {
-            return Err(lex_err(
+            return Err(Error::lex(
                 "continue_template called outside template context",
                 self.position,
             ));
@@ -2069,7 +2051,7 @@ impl<'a> Lexer<'a> {
 
         let kind = match stop {
             TemplateStop::Eof => {
-                return Err(lex_err("Unterminated template literal", brace_start));
+                return Err(Error::lex("Unterminated template literal", brace_start));
             }
             TemplateStop::Backtick => TokenKind::TemplateTail,
             TemplateStop::Interpolation => {
@@ -2099,7 +2081,7 @@ impl<'a> Lexer<'a> {
     /// Only valid at the start of the file (position 0).
     /// Reads until end of line or end of file.
     /// Returns as a Comment token with is_block: false.
-    fn read_hashbang_into(&mut self, start: usize, dst: &mut Token) -> Result<(), ParseError> {
+    fn read_hashbang_into(&mut self, start: usize, dst: &mut Token) -> Result<(), Error> {
         // Skip #!
         self.advance(); // #
         self.advance(); // !
@@ -2513,7 +2495,7 @@ mod tests {
 
     /// One comment token [`model_trivia`] reads — kind, span, and whether a line terminator
     /// came between it and the token before it — or the error that ends the stream.
-    type TriviaItem = Result<(TokenKind, u32, u32, bool), ParseError>;
+    type TriviaItem = Result<(TokenKind, u32, u32, bool), Error>;
 
     /// The trivia ECMAScript reads from byte `pos` of `src` — WhiteSpace, LineTerminators,
     /// `//` and `/* */` comments, and a hashbang at byte 0 — restated from the grammar's
@@ -2551,7 +2533,7 @@ mod tests {
                 (false, line_end(pos))
             } else if src[pos..].starts_with("/*") {
                 let Some(close) = src[pos + 2..].find("*/") else {
-                    items.push(Err(lex_err("Unterminated block comment", pos)));
+                    items.push(Err(Error::lex("Unterminated block comment", pos)));
                     return (items, pos, crossed);
                 };
                 (true, pos + 2 + close + 2)
@@ -2724,7 +2706,7 @@ mod tests {
                     .expect("a rejected follower is a char");
                 assert_eq!(
                     result.map(|t| t.kind),
-                    Err(lex_err(format!("Unexpected character: '{ch}'"), pos)),
+                    Err(Error::lex(format!("Unexpected character: '{ch}'"), pos)),
                     "{source:?}"
                 );
             }

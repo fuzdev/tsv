@@ -93,7 +93,7 @@ fn parse_to_json(
     parser_type: ParserType,
     goal: tsv_ts::Goal,
     locations: bool,
-) -> Result<Vec<u8>, tsv_lang::ParseError> {
+) -> Result<Vec<u8>, tsv_lang::Error> {
     // Every output rides a byte writer — `convert_ast_json_bytes`
     // (the span-only wire, the default) or `convert_ast_json_bytes_with_locations` (the `loc`
     // wire, `--locations`) — with no intermediate tree, and no output UTF-8

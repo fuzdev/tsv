@@ -4,7 +4,7 @@ use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
 use crate::parser::statement::DecoratorListKind;
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Error, Span};
 
 use super::{Checkpoint, Parser};
 
@@ -13,7 +13,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Accepts both regular identifiers and contextual keywords (`from`, `as`, etc.).
     /// Does NOT handle parameter property modifiers (`public`, `private`, `readonly`).
-    fn parse_simple_param(&mut self) -> Result<Expression<'arena>, ParseError> {
+    fn parse_simple_param(&mut self) -> Result<Expression<'arena>, Error> {
         let (param_start, param_end) = self.current_pos();
         let name = self
             .try_param_name()
@@ -124,7 +124,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// target (`let [(a)] = x`), and the refinement cannot see a paren the internal AST
     /// has dropped. The record is cut back to where this pattern found it once the
     /// refinement has read it.
-    pub(super) fn parse_binding_pattern(&mut self) -> Result<Expression<'arena>, ParseError> {
+    pub(super) fn parse_binding_pattern(&mut self) -> Result<Expression<'arena>, Error> {
         let mark = self.grouping_parens.len();
         let literal = self.with_context_flag(
             |p| &mut p.record_grouping_parens,
@@ -172,7 +172,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_destructured_binding(
         &mut self,
         allow_optional: bool,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, Error> {
         let mut pattern = self.parse_binding_pattern()?;
 
         // Optional marker `?` (parameter position only), between the pattern and
@@ -223,7 +223,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_rest_param_tail(
         &mut self,
         arg_end: u32,
-    ) -> Result<(bool, Option<TSTypeAnnotation<'arena>>, u32), ParseError> {
+    ) -> Result<(bool, Option<TSTypeAnnotation<'arena>>, u32), Error> {
         let optional = self.eat(TokenKind::Question)?;
         if self.check(&TokenKind::Colon) {
             let ta = self.parse_type_annotation()?;
@@ -258,7 +258,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `package`), so `function f(private) {}` is a parameter *named* `private`,
     /// which tsc parses and prettier formats. tsc draws the line with exactly this
     /// lookahead (`canFollowModifier`), and only acorn rejects.
-    fn eat_param_modifier_keyword(&mut self, kw: &str) -> Result<bool, ParseError> {
+    fn eat_param_modifier_keyword(&mut self, kw: &str) -> Result<bool, Error> {
         if matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == kw
             && self.peek_starts_parameter_binding()
@@ -280,7 +280,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Consumes both opening and closing parentheses.
     pub(super) fn parse_parameter_list(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
+    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, Error> {
         self.parse_parameter_list_inner(true, 1)
     }
 
@@ -299,7 +299,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// normally defers a checker-raised rule.
     pub(super) fn parse_parameter_list_no_decorators(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
+    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, Error> {
         self.parse_parameter_list_inner(false, 1)
     }
 
@@ -314,7 +314,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// pattern at the rest, a parameter property's binding inside the property.
     pub(super) fn parse_signature_parameter_list(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
+    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, Error> {
         self.parse_parameter_list_inner(false, 0)
     }
 
@@ -341,7 +341,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         allow_decorators: bool,
         parameter_levels: u32,
-    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
+    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, Error> {
         self.expect(&TokenKind::ParenOpen)?;
         self.enter_grouping()?;
 
@@ -404,7 +404,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         allow_decorators: bool,
         parameter_levels: u32,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, Error> {
         // Parameter decorators: `@dec1 @dec2 <param>`. Parsed up front so the
         // parameter body below can be any binding form — a parameter property
         // (`@dec private a`) or a destructuring pattern (`@dec { a }: T`), not
@@ -642,7 +642,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         is_getter: bool,
         params: &[Expression<'arena>],
         allow_this_param: bool,
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         let mut expected = if is_getter { 0 } else { 1 };
         if allow_this_param && params.first().is_some_and(|p| self.is_this_param(p)) {
             expected += 1;
@@ -681,7 +681,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &self,
         kind: MethodKind,
         params: &[Expression<'arena>],
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         let is_getter = matches!(kind, MethodKind::Get);
         self.check_accessor_param_arity(is_getter, params, false)?;
         if !is_getter {
@@ -713,7 +713,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn check_signature_params(
         &self,
         params: &[Expression<'arena>],
-    ) -> Result<(), ParseError> {
+    ) -> Result<(), Error> {
         for param in params {
             if !matches!(
                 param.kind,

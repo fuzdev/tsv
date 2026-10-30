@@ -349,8 +349,8 @@ macro_rules! parse_ast_for_format {
 /// per-thread doc arena — a parse error mapped back onto the caller's source
 /// (`tsv_lang::printing::FoldedSource::parse_with`) and then through `$map_err`, each
 /// binding's own error type (a message string, a located failure, a JS value). A Svelte
-/// refusal (`tsv_lang::ParseError::refusal`) takes the same road; a binding that reports a
-/// span reads the refusal's own (`ParseError::report`, `refused` set) and marks it a refusal,
+/// refusal (`tsv_lang::Error::refusal`) takes the same road; a binding that reports a
+/// span reads the refusal's own (`Error::report`, `refused` set) and marks it a refusal,
 /// never a parse failure.
 ///
 /// Expands to `Result<String, _>` inside the caller's `with_*_arena` closures, so the
