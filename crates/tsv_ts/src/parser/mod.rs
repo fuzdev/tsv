@@ -1179,22 +1179,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// ([`Parser::count_operand_pairs`], [`Parser::self_pair`]).
     #[inline]
     pub(super) fn printer_pair(&mut self) -> Result<(), ParseError> {
-        if self.spine.try_pair(&self.depth) {
-            Ok(())
-        } else {
-            Err(self.too_deep(DepthLimit::Nesting))
-        }
+        self.spine
+            .try_pair(&self.depth)
+            .map_err(|limit| self.too_deep(limit))
     }
 
     /// Count a wire level the parse finds only above an operand it has already read — an
-    /// assignment over its target — which no top-down [`Parser::nested`] charge can reach.
-    /// It is carried as a printer pair is ([`SpineCount::try_pair`]): framed, added up
-    /// within the frame, and checked on top of the deepest nesting the frame has reached —
-    /// the operand's own, and the right side's parsed after it, which the level does not
-    /// sit above (an overcharge on a right-nested assignment chain).
+    /// assignment over its target — which no top-down [`Parser::nested`] charge can reach:
+    /// the operand's deepest node sits a level lower than it was counted, so the frame's
+    /// deepest nesting is raised to `operand_peak` — the frame's [`DepthBudget::peak`] once
+    /// the operand was read, which holds the operand's own — plus one
+    /// ([`DepthBudget::try_raise_peak`]). The right side parsed after
+    /// the operand is not under the level, so a right-nested assignment chain is charged
+    /// its own depth, not a level per assignment on top of it.
     #[inline]
-    pub(super) fn level_above_operand(&mut self) -> Result<(), ParseError> {
-        self.printer_pair()
+    pub(super) fn level_above_operand(&mut self, operand_peak: u32) -> Result<(), ParseError> {
+        self.depth
+            .try_raise_peak(operand_peak + 1, &self.spine)
+            .map_err(|limit| self.too_deep(limit))
     }
 
     /// Run `f` — the parse of an expression starting at the current token — as a pair-free

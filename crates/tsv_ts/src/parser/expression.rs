@@ -1309,6 +1309,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // error, read before the operator is consumed while `prev_token_end` still
         // closes the left side.
         self.check_bare_assignment_left(left, expr_start)?;
+        // the deepest nesting the frame has reached by the end of the target, the target's
+        // own among it, which the assignment's level sits above
+        let target_peak = self.depth.peak();
         self.advance()?; // consume assignment operator
 
         // Parse right-hand side (assignment is right-associative, so same precedence):
@@ -1341,15 +1344,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         // one wire level: the assignment over its target, read before the operator said it
-        // was one (the depth limit's count) — none over a bare name, which nests nothing,
-        // the wire-only tree's grouping pairs looked through so it counts no more than the
+        // was one (the depth limit's count), raising the deepest nesting to the frame's at the
+        // end of the target, plus one — none over a bare name, which nests nothing, the
+        // wire-only tree's grouping pairs looked through so it counts no more than the
         // paren-free parse
         let mut target = &left_pattern;
         while let ExpressionKind::ParenthesizedExpression(paren) = &target.kind {
             target = paren.expression;
         }
         if !matches!(target.kind, ExpressionKind::Identifier(_)) {
-            self.level_above_operand()?;
+            self.level_above_operand(target_peak)?;
         }
 
         let span = Span::new(expr_start as u32, end);

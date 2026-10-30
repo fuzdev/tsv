@@ -321,10 +321,11 @@ counter bounds both shapes a walk recurses through:
   accepted input's wire nests past the limit, and for the calibrated shapes that it sits at
   it. An assignment over a target other than a bare name (`a[k] = x`, `({ [k]: a } = x)`)
   is one more level, found only once its `=` is read, when the target is already parsed:
-  it is charged then, as a printer's pair is (below) — framed, added up within its frame,
-  and checked against the deepest nesting the frame has reached: the target's, and the
-  right side's too, which the level does not sit above, so a right-nested chain of them
-  (`a.b = c.d = …`, `f(a[k] = f(…))`) is accepted well short of its wire's depth. An
+  it raises the deepest nesting its frame has reached to the deepest the frame had reached
+  by the end of the target, plus one, which every check after it charges, as it charges a
+  printer's pairs (below). The right side, parsed after the target, is not under that
+  level, so a right-nested chain of them (`a.b = c.d = …`) is charged its own depth, as
+  any other nesting is. An
   optional chain's `ChainExpression` is the one wire node no walk recurses through
   (the wire writer emits it inline, and no other walk's tree holds it), so it is charged
   nothing. A CSS declaration value is a string on the wire but a tree to the

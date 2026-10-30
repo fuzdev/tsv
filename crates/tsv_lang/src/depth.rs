@@ -131,8 +131,10 @@ impl DepthLimit {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DepthBudget {
     nesting: u32,
-    /// The deepest level entered in the open frame, once past [`NESTING_FLOOR`]; at least
-    /// the nesting the frame started at ([`DepthBudget::take_peak`]).
+    /// The deepest level entered in the open frame, once at [`NESTING_FLOOR`] or past it; at
+    /// least the nesting the frame started at ([`DepthBudget::take_peak`]). Below the floor
+    /// it may lag the levels entered, which every charge floors
+    /// ([`DepthBudget::charged_nesting`], [`DepthBudget::try_raise_peak`]).
     peak: u32,
 }
 
@@ -170,7 +172,7 @@ impl DepthBudget {
     pub fn try_enter_beside(&mut self, units: u32, beside: u32) -> bool {
         let nesting = self.nesting + units;
         let total = nesting + beside;
-        if total > NESTING_FLOOR && !self.enter_deep(total) {
+        if total >= NESTING_FLOOR && !self.enter_deep(total) {
             return false;
         }
         self.nesting = nesting;
@@ -183,10 +185,11 @@ impl DepthBudget {
     #[must_use]
     pub fn check_beside(&mut self, beside: u32) -> bool {
         let total = self.nesting + beside;
-        total <= NESTING_FLOOR || self.enter_deep(total)
+        total < NESTING_FLOOR || self.enter_deep(total)
     }
 
-    /// A level past [`NESTING_FLOOR`]: the limit's test, and the deepest level so far.
+    /// A level at [`NESTING_FLOOR`] or past it: the limit's test, and the deepest level so
+    /// far.
     #[cold]
     #[inline(never)]
     fn enter_deep(&mut self, total: u32) -> bool {
@@ -214,13 +217,15 @@ impl DepthBudget {
         self.peak.max(NESTING_FLOOR)
     }
 
-    /// Whether the open frame has reached past [`NESTING_FLOOR`] — below it, opening a
-    /// frame of the deepest level ([`DepthBudget::take_peak`]) would change nothing a
-    /// charge reads, since every charge is at least the floor.
+    /// Whether the open frame has reached [`NESTING_FLOOR`] — below it, opening a frame of
+    /// the deepest level ([`DepthBudget::take_peak`]) would change nothing a charge reads,
+    /// since every charge is at least the floor; at it, the frame is opened, since a level
+    /// raised above an operand ([`DepthBudget::try_raise_peak`]) reads the deepest level
+    /// before flooring it.
     #[inline]
     #[must_use]
     pub fn is_deep(&self) -> bool {
-        self.peak > NESTING_FLOOR
+        self.peak >= NESTING_FLOOR
     }
 
     /// Open a frame of the deepest level, as [`SpineCount::take`] opens one of the spine
@@ -241,6 +246,33 @@ impl DepthBudget {
     pub fn fold_peak(&mut self, outer: u32) {
         self.peak = self.peak.max(outer);
     }
+
+    /// The deepest level the open frame has reached so far, once at [`NESTING_FLOOR`] or
+    /// past it (below the floor it may lag the levels entered) — read before a parser
+    /// learns that what it has just parsed sits one wire level lower than it was counted
+    /// ([`DepthBudget::try_raise_peak`]).
+    #[inline]
+    #[must_use]
+    pub fn peak(&self) -> u32 {
+        self.peak
+    }
+
+    /// Raise the open frame's deepest level to at least `level`: a wire level the parse
+    /// finds only above an operand it has already read — an assignment over its target —
+    /// puts that operand's deepest node one level lower than it was counted, so the frame
+    /// has reached `level`, its [`DepthBudget::peak`] before the operator plus one. The
+    /// level sits above the operand alone, so nothing parsed after it (the assignment's
+    /// right side) is charged it. `Err` names the limit the raised level would pass, with
+    /// `spine`'s printer pairs on top: [`NESTING_LIMIT`], or [`SPINE_LIMIT`] with the
+    /// frame's links beside it ([`SpineCount::try_link`]) — nothing raised. The caller
+    /// turns it into [`ParseError::too_deep`].
+    #[inline]
+    pub fn try_raise_peak(&mut self, level: u32, spine: &SpineCount) -> Result<(), DepthLimit> {
+        let peak = self.peak.max(level);
+        spine.fits_nesting(peak.max(NESTING_FLOOR))?;
+        self.peak = peak;
+        Ok(())
+    }
 }
 
 /// The spine count of the open frame, in spine units ([`SPINE_LIMIT`]): every link in the
@@ -254,9 +286,9 @@ impl DepthBudget {
 /// nesting; so a pair is charged as one ([`SpineCount::try_pair`]), on top of the frame's
 /// deepest nesting against [`NESTING_LIMIT`] and on top of its charged nesting in every
 /// link's spine check — the reparse of the output then counts no more than the parse of
-/// the input did. A parser charges the same way a wire level it finds only above an
-/// operand it has already read (an assignment over its target), which no top-down
-/// [`DepthBudget`] count can reach.
+/// the input did. A wire level the parse finds only above an operand it has already read
+/// (an assignment over its target), which no top-down [`DepthBudget`] count can reach, is
+/// charged by raising the frame's deepest level instead ([`DepthBudget::try_raise_peak`]).
 ///
 /// The two counts share one word, the units in its low half and the pairs in its high
 /// half, so a link's common case — no pair in the frame and the count far from the limit
@@ -319,20 +351,33 @@ impl SpineCount {
             <= SPINE_LIMIT
     }
 
-    /// Add a pair the printer will add (see the type's docs); `false` (with nothing added)
-    /// where the frame's pairs with `budget`'s charged nesting would pass [`NESTING_LIMIT`],
-    /// or its links with that nesting and the pairs charged would pass [`SPINE_LIMIT`]. The
-    /// caller turns a `false` into [`ParseError::too_deep`].
+    /// Add a pair the printer will add (see the type's docs). `Err` (with nothing added)
+    /// names the limit the pair would pass: [`NESTING_LIMIT`], by the frame's pairs with
+    /// `budget`'s charged nesting, or [`SPINE_LIMIT`], by its links with that nesting and
+    /// the pairs charged — a chain's length, though the pair is what tipped it. The caller
+    /// turns it into [`ParseError::too_deep`].
     #[inline]
-    #[must_use]
-    pub fn try_pair(&mut self, budget: &DepthBudget) -> bool {
-        let pairs = self.pairs() + 1;
-        let nesting = budget.charged_nesting() + pairs;
-        if nesting > NESTING_LIMIT || self.units() + nesting * NESTING_SPINE_WEIGHT > SPINE_LIMIT {
-            return false;
+    pub fn try_pair(&mut self, budget: &DepthBudget) -> Result<(), DepthLimit> {
+        let with_pair = Self::of(self.units(), self.pairs() + 1);
+        with_pair.fits_nesting(budget.charged_nesting())?;
+        *self = with_pair;
+        Ok(())
+    }
+
+    /// Whether the frame's count fits with `charged` levels of nesting under its pairs: the
+    /// pairs on top of it within [`NESTING_LIMIT`], and its links beside the two, charged
+    /// at [`NESTING_SPINE_WEIGHT`] a level, within [`SPINE_LIMIT`]. `Err` names the limit
+    /// passed.
+    #[inline]
+    fn fits_nesting(self, charged: u32) -> Result<(), DepthLimit> {
+        let nesting = charged + self.pairs();
+        if nesting > NESTING_LIMIT {
+            Err(DepthLimit::Nesting)
+        } else if self.units() + nesting * NESTING_SPINE_WEIGHT > SPINE_LIMIT {
+            Err(DepthLimit::Spine)
+        } else {
+            Ok(())
         }
-        *self = Self::of(self.units(), pairs);
-        true
     }
 
     /// Whether the frame's count has run past a few dozen units — the point past which a
@@ -519,11 +564,15 @@ mod tests {
         let budget = DepthBudget::default();
         let mut spine = SpineCount::default();
         for _ in 0..NESTING_LIMIT - NESTING_FLOOR {
-            assert!(spine.try_pair(&budget));
+            assert_eq!(spine.try_pair(&budget), Ok(()));
         }
-        assert!(!spine.try_pair(&budget), "past the nesting limit");
+        assert_eq!(
+            spine.try_pair(&budget),
+            Err(DepthLimit::Nesting),
+            "past the nesting limit"
+        );
         let mut spine = SpineCount::default();
-        assert!(spine.try_pair(&budget));
+        assert_eq!(spine.try_pair(&budget), Ok(()));
         let room = SPINE_LIMIT - (NESTING_FLOOR + 1) * NESTING_SPINE_WEIGHT;
         for _ in 0..room {
             assert!(spine.try_link(1, &budget));
@@ -532,7 +581,11 @@ mod tests {
             !spine.try_link(1, &budget),
             "the pair is charged to the link"
         );
-        assert!(!spine.try_pair(&budget), "and the link to the pair");
+        assert_eq!(
+            spine.try_pair(&budget),
+            Err(DepthLimit::Spine),
+            "and the link to the pair, which passes the spine limit"
+        );
     }
 
     /// Pairs fold like links: siblings take the greater, and no frame decision reads them.
@@ -541,13 +594,83 @@ mod tests {
         let budget = DepthBudget::default();
         let mut spine = SpineCount::default();
         for _ in 0..100 {
-            assert!(spine.try_pair(&budget));
+            assert_eq!(spine.try_pair(&budget), Ok(()));
         }
         assert!(!spine.runs_long(), "pairs never open a frame");
         let outer = spine.take();
-        assert!(spine.try_pair(&budget));
+        assert_eq!(spine.try_pair(&budget), Ok(()));
         spine.fold(outer);
         assert_eq!(spine.pairs(), 100);
+    }
+
+    /// A level found above an operand raises the frame's deepest level to the operand's
+    /// plus one, without charging what was parsed after the operand: a right-nested run of
+    /// them is charged its own depth once, not a level each on top of it.
+    #[test]
+    fn a_level_above_an_operand_raises_the_deepest_level() {
+        let mut budget = DepthBudget::default();
+        let spine = SpineCount::default();
+        assert!(budget.try_enter(100));
+        let operand = budget.peak();
+        assert!(
+            budget.try_enter(50),
+            "the right side, deeper than the operand"
+        );
+        budget.leave(150);
+        assert_eq!(budget.try_raise_peak(operand + 1, &spine), Ok(()));
+        assert_eq!(
+            budget.charged_nesting(),
+            150,
+            "the right side's is the deeper"
+        );
+        assert_eq!(budget.try_raise_peak(151, &spine), Ok(()));
+        assert_eq!(budget.charged_nesting(), 151);
+        assert_eq!(
+            budget.try_raise_peak(NESTING_LIMIT + 1, &spine),
+            Err(DepthLimit::Nesting)
+        );
+        assert_eq!(
+            budget.charged_nesting(),
+            151,
+            "a refused raise raises nothing"
+        );
+    }
+
+    /// The raised level is charged with the frame's pairs on top, and to its links.
+    #[test]
+    fn a_raised_level_is_charged_with_the_pairs_and_links() {
+        let mut budget = DepthBudget::default();
+        let mut spine = SpineCount::default();
+        assert_eq!(spine.try_pair(&budget), Ok(()));
+        assert_eq!(
+            budget.try_raise_peak(NESTING_LIMIT, &spine),
+            Err(DepthLimit::Nesting),
+            "the pair sits on top of the raised level"
+        );
+        assert_eq!(budget.try_raise_peak(NESTING_LIMIT - 1, &spine), Ok(()));
+        let mut budget = DepthBudget::default();
+        let room = SPINE_LIMIT - (NESTING_FLOOR + 1) * NESTING_SPINE_WEIGHT;
+        let mut spine = SpineCount::default();
+        for _ in 0..room {
+            assert!(spine.try_link(1, &budget));
+        }
+        assert_eq!(
+            budget.try_raise_peak(NESTING_FLOOR + 2, &spine),
+            Err(DepthLimit::Spine),
+            "a flat chain refuses the level with the length limit"
+        );
+        assert_eq!(budget.try_raise_peak(NESTING_FLOOR + 1, &spine), Ok(()));
+    }
+
+    /// A level at the floor is recorded, so a level found above it raises past the floor,
+    /// and the frame counts as deep, so a sibling's frame opens rather than read it.
+    #[test]
+    fn the_floor_level_itself_is_recorded() {
+        let mut budget = DepthBudget::default();
+        assert!(budget.try_enter(NESTING_FLOOR));
+        budget.leave(NESTING_FLOOR);
+        assert_eq!(budget.peak(), NESTING_FLOOR);
+        assert!(budget.is_deep());
     }
 
     /// Levels kept beside the budget count toward the limit and the deepest level alike.

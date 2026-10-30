@@ -1003,3 +1003,40 @@ fn a_module_past_the_limit_is_not_read_as_a_script() {
     });
     assert!(error.is_too_deep(), "{error}");
 }
+
+/// A sibling statement costs an assignment after it nothing: the level an assignment finds
+/// above its target raises its own statement's deepest level, never a sibling's, so the
+/// longest target chain a statement accepts alone it accepts after any sibling — one at
+/// every nesting around the floor, or a run of assignments as long.
+#[test]
+fn an_assignment_is_charged_its_own_statements_target() {
+    let chain = |links: usize| format!("a{} = 0;\n", rep(".b", links));
+    let accepts = |source: String| {
+        on_thread("floor sibling".to_owned(), SEARCH_STACK, move || {
+            parse(Lang::Ts, &source)
+        })
+        .is_ok()
+    };
+    let (mut lo, mut hi) = (1, SPINE_LIMIT as usize);
+    while hi - lo > 1 {
+        let mid = lo + (hi - lo) / 2;
+        if accepts(chain(mid)) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    let floor = NESTING_FLOOR as usize;
+    for levels in floor - 4..=floor + 4 {
+        // a sibling statement that deep, and a run of that many sibling assignments, each
+        // raising the level an unframed statement list hands the next one
+        let deep = format!("x = {}0{};\n", rep("[", levels), rep("]", levels));
+        let run = rep("a.b = 0;\n", levels);
+        for (kind, sibling) in [("deep", deep), ("run", run)] {
+            assert!(
+                accepts(format!("{sibling}{}", chain(lo))),
+                "a {kind} sibling of {levels} shortens the chain an assignment accepts"
+            );
+        }
+    }
+}
