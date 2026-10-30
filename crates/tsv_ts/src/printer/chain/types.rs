@@ -481,5 +481,5 @@ impl<'a> ChainGroup<'a> {
 // the document, so a field that widened it back would silently restore the
 // per-push move this shape exists to remove, with output byte-identical and no
 // test able to see it. 64-bit only (the count is pointer-width-relative).
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<ChainGroup<'static>>() == 16);

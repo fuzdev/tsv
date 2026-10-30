@@ -116,4 +116,5 @@ pub struct Token {
 // the parser's in-place write of it (`next_token_into`) stays one 16-byte store per
 // token. `TokenKind`'s widest payload is `String { quote: char }` (align 4), so `kind`
 // is 8 bytes + two `u32` spans = 16.
+#[cfg(test)]
 const _: () = assert!(size_of::<Token>() == 16);

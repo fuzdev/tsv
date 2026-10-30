@@ -608,8 +608,9 @@ reference (`Expression`'s five widest variants, `TSType`'s three, `Statement`'s 
 declaration heads), and a by-value field that only copies a node out of the arena
 borrows it instead (`Property`, `VariableDeclarator`, every `Expression`-holding statement
 head). The `size_of` asserts beside the AST pin those widths, so a variant that widens an
-enum fails the build instead of quietly eating the limits' margin; the margin itself is
-graded by `tests/depth_limit.rs`.
+enum fails the test build (`cargo test`) instead of quietly eating the limits' margin (each
+is rustc's layout, so `cfg(test)`-only; the wasm32 widths are pinned in `tsv_wasm`); the
+margin itself is graded by `tests/depth_limit.rs`.
 
 ## Multi-File Formatting
 

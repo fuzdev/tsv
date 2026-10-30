@@ -749,7 +749,15 @@ every fallible return — those rows are starred). `--min` / `--top` / `--group`
 trim it; `--json` for scripting. It complements the in-crate
 `const _: () = assert!(size_of::<T>() == N)` guards rather than replacing them:
 those pin the few widths a change must not move, and this makes the rest
-*visible*, so a type that grows shows up as a row that moved.
+*visible*, so a type that grows shows up as a row that moved. An exact width is
+rustc's layout rather than a guarantee, so those guards compile in the test build
+only (`cargo test` fails on a moved pin, a consumer's build never does), and the
+wasm32 widths are pinned in `tsv_wasm`, compiled for wasm32 by `build:packages`;
+only the niche guards a `#[repr(transparent)]` guarantees (`ParseError` and its
+`Result<()>`, `Option<GroupId>`) stay in every build. The `<=` bounds (`ShareEntry`,
+`PeeledTail`), upper bounds a smaller layout still satisfies, are test-build guards too:
+at zero slack, a toolchain that lays either out wider must fail `cargo test`, not a
+consumer's build.
 
 `ast_census` counts, per node kind, what a parse over a corpus actually builds.
 `--bytes` joins each row against that board by name and prints `count × size`,

@@ -147,36 +147,37 @@ pub use expressions::{
 // dispatch; the variant payloads shed their own spans to pay for the header, which is
 // why both widths hold at 72.
 //
-// Pinned so a variant that widens any of them shows up as a failed build rather
-// than as a silently thinner depth-limit margin and a fatter element slot. The counts are
+// Pinned so a variant that widens any of them shows up as a failed test build rather
+// than as a silently thinner depth-limit margin and a fatter element slot. Each is rustc's
+// layout, not a guarantee, so it compiles under `cfg(test)` only: a toolchain that lays them
+// out differently fails `cargo test` here, never a consumer's build. The counts are
 // pointer-width-relative and the doc's measurements are x86-64; `Expression` and
 // `Statement` are also pinned on wasm32 (a 4 B pointer; `Expression`'s payload is 8 B
-// aligned, `Statement`'s 4 B), and each one's `Option` must stay niche-packed on both.
-#[cfg(target_pointer_width = "64")]
+// aligned, `Statement`'s 4 B) in `tsv_wasm`, the crate compiled for wasm32, and each one's
+// `Option` must stay niche-packed on both.
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<Expression<'static>>() == 72);
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<ExpressionKind<'static>>() == 64);
-#[cfg(target_pointer_width = "32")]
-const _: () = assert!(size_of::<Expression<'static>>() == 48);
+#[cfg(test)]
 const _: () = assert!(size_of::<Option<Expression<'static>>>() == size_of::<Expression<'static>>());
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<Statement<'static>>() == 72);
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<StatementKind<'static>>() == 64);
-#[cfg(target_pointer_width = "32")]
-const _: () = assert!(size_of::<Statement<'static>>() == 48);
+#[cfg(test)]
 const _: () = assert!(size_of::<Option<Statement<'static>>>() == size_of::<Statement<'static>>());
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<Property<'static>>() == 32);
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<ObjectProperty<'static>>() == 32);
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<ObjectPatternProperty<'static>>() == 40);
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<VariableDeclarator<'static>>() == 32);
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<SwitchCase<'static>>() == 32);
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<TSType<'static>>() == 80);
 
 //
@@ -522,4 +523,4 @@ impl<'arena> PrivateIdentifier<'arena> {
 // file are the OTHER HALF of that trade, not a contradiction of it: the inline form
 // buys read locality and pays stack at every recursion level (`docs/cli.md` §Recursion
 // Depth), and pinning the two widths is what makes a variant that widens either enum
-// fail the build instead of silently eating the depth limits' margin.
+// fail the test build instead of silently eating the depth limits' margin.

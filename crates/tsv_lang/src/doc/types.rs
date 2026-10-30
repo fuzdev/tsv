@@ -28,10 +28,11 @@ pub struct DocContext {
 }
 
 // `DocContext` is stored **inline** in `DocNode::WithContext`, whose size is `const`-asserted per
-// target — 16 B on wasm32, the tightest budget and the one the shipped npm packages build under.
-// Nothing in `deno task check` builds wasm32, so without this assert a context that outgrows the
-// budget passes every gate and fails only at `deno task build:packages` (it already did once:
-// growing the context blew the `DocNode` assert, invisibly to the whole gate chain).
+// target — 16 B on wasm32, the tightest budget and the one the shipped npm packages build under
+// (that pin, and this struct's own wasm32 one, live in `tsv_wasm`, the one crate compiled for
+// wasm32). Nothing in `deno task check` builds wasm32, so without this assert a context that
+// outgrows the budget passes every gate and fails only at `deno task build:packages` (it already
+// did once: growing the context blew the `DocNode` assert, invisibly to the whole gate chain).
 //
 // This pins the cost **here**, natively, where a field would be added. `WithContext`'s payload is
 // `DocId` + this struct = 8 B, comfortably under wasm32's 16 B budget with room for the enum tag.
@@ -41,9 +42,10 @@ pub struct DocContext {
 //
 // Note this is the ONLY budget in play — `WithContext` is not what sizes `DocNode` on either
 // target. See the `DocNode` size assert in `arena.rs` for the variants that actually are.
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(size_of::<DocContext>() == 4);
-#[cfg(target_pointer_width = "32")]
+//
+// Every exact size pin here is rustc's layout, not a guarantee, so it compiles in the test
+// build only: a layout change fails `cargo test`, never a consumer's build.
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<DocContext>() == 4);
 
 impl DocContext {

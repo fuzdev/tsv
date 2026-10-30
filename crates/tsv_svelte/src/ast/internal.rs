@@ -1478,7 +1478,7 @@ fn narrow_lang_value(value: Cow<'_, str>) -> Cow<'_, str> {
 /// `facts` rides in the tail padding beside `kind`, so the parse-time classification costs no
 /// extra `Element` size. Guards that property against a future field reorder that would spill it.
 /// 64-bit only — the slice fields are half-width on wasm32, a different layout.
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<Element<'static>>() == 56);
 
 /// Svelte Attribute - element attribute
@@ -2067,11 +2067,11 @@ pub struct Style<'arena> {
 // allocation (`docs/architecture.md` §Nested AST, the second density rule). `SnippetBlock`
 // sets `FragmentNode`'s width. 64-bit only — pointers and slices are half-width on
 // wasm32, a different layout.
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<FragmentNode<'static>>() == 120);
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<AttributeNode<'static>>() == 72);
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<ExpressionTag<'static>>() == 16);
 
 #[cfg(test)]

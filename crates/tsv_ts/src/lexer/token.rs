@@ -552,7 +552,8 @@ pub struct Token {
 // Guards the hot-path invariant: `Token` is a 16-byte POD with no heap-owning field,
 // so the parser's in-place write of it stays one 16-byte store. Anything that re-bloats
 // it — re-adding a `String`/`Box` field, widening `start`/`end` to `usize` — fails the
-// build here.
+// test build here (an exact rustc layout, so never a consumer's build).
+#[cfg(test)]
 const _: () = assert!(size_of::<Token>() == 16);
 
 /// The reserved-word set — the independent oracle the SWAR matcher is validated

@@ -62,6 +62,9 @@ struct ShareEntry {
     tag: u8,
 }
 
+// rustc's layout, at zero slack, so a test-build bound: a toolchain that lays it out wider
+// fails `cargo test`, never a consumer's build
+#[cfg(test)]
 const _: () = assert!(size_of::<ShareEntry>() <= 16);
 
 impl ShareEntry {

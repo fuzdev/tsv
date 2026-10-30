@@ -90,6 +90,7 @@ pub struct Token {
 // Guards the hot-path invariant: `Token` is a small POD with no heap-owning field, so the
 // in-place write (`next_token_into`) stays a few plain stores per token. 12 bytes (not the
 // TS/CSS 16): the fieldless `TokenKind` is 1 byte, whereas theirs carries a `char` payload.
+#[cfg(test)]
 const _: () = assert!(size_of::<Token>() == 12);
 
 /// The ASCII half of [`Lexer::scan_name_run`]'s character class, one entry per byte: the

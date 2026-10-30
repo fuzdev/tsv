@@ -123,9 +123,10 @@ impl DocId {
 /// allocate the group it names; [`Self::doc`] is the node to place in the tree, and the
 /// readers ([`DocArena::if_break_with_id`], [`DocArena::indent_if_break`]) take the id.
 /// Held as the bare index — node 0 is the prelude's empty text (`seed_prelude`), never a
-/// group — so `Option<GroupId>` is four bytes and a keyed `IfBreak` stays within
-/// [`DocNode`]'s size.
+/// group — so `Option<GroupId>` is four bytes (a guarantee, through `#[repr(transparent)]`
+/// over a `NonZeroU32`) and a keyed `IfBreak` stays within [`DocNode`]'s size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(transparent)]
 pub struct GroupId(NonZeroU32);
 
 const _: () = assert!(size_of::<Option<GroupId>>() == 4);
@@ -427,8 +428,9 @@ const _: () = assert!(!std::mem::needs_drop::<DocNode>());
 // A variant that bloats it would silently regress that locality with no other signal, so pin the
 // size — a change here is a deliberate decision, not an accident. The size is pointer-width
 // dependent (the `AlignRoot { n: usize }` and `DocText::Static(&str)` fat-pointer payloads), so it is
-// pinned per target: 24 B on 64-bit (the native flagship) and 16 B on wasm32 (the shipped WASM
-// bundles, where the locality/allocator budget matters most).
+// pinned per target: 24 B on 64-bit (the native flagship, here, in the test build) and 16 B on
+// wasm32 (the shipped WASM bundles, where the locality/allocator budget matters most; pinned in
+// `tsv_wasm`, which `build:packages` compiles for wasm32).
 //
 // ⚠️ The drivers are **`Text`** on 64-bit (a `DocText` is 24 B, from `Static`'s fat pointer plus
 // its width slot) and **`Group`** on wasm32 (16 B). `WithContext` is *not* one on either target
@@ -449,10 +451,8 @@ const _: () = assert!(!std::mem::needs_drop::<DocNode>());
 // `Text` test IS the fold; see the comments there for the measurements, and for why the same
 // peel is a REGRESSION in `subtree_layout_fill`, whose commonest kind sits ABOVE the fold. The
 // rule is that a peel pays only where the peeled kind is the fold's own range.
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<DocNode>() == 24);
-#[cfg(target_pointer_width = "32")]
-const _: () = assert!(size_of::<DocNode>() == 16);
 
 /// The render-time indentation state of a command — Prettier's `Indent`
 /// (`document/printer/indent.js`) specialized to tsv's usage.
@@ -675,6 +675,7 @@ const COMMAND_MODE_BREAK: u32 = 1 << 31;
 // word: widen it and every push, pop and look-ahead read costs two. All fields
 // are fixed-width (no pointers), so the size is target-independent, and the
 // packed [`RenderIndent`] plus the mode bit holds to 8 on native and wasm32.
+#[cfg(test)]
 const _: () = assert!(size_of::<ArenaCommand>() == 8);
 
 // `indent_mode` is printed as the two logical values it packs, so the derived

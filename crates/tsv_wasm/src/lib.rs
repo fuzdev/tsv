@@ -50,8 +50,8 @@ use tsv_arena::{parse_convert, parse_internal};
 // The one parse-error type, shared by every language crate: each re-exports
 // `tsv_lang::ParseError` (and the `ErrorReport` its `report` returns, whose span is two
 // `WirePoint`s), so the shared error helpers below take a Svelte or CSS failure as readily as
-// a TypeScript one. Named through `tsv_ts` only because this crate takes no `tsv_lang` edge of
-// its own.
+// a TypeScript one. Named through `tsv_ts`, as the language surface spells it; this crate's
+// own `tsv_lang` edge serves the wasm32 layout pins alone (`layout`).
 #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 use tsv_ts::ParseError;
 
@@ -731,6 +731,10 @@ lang_bindings!(
     format_css,
     tsv_css,
 );
+
+// The wasm32 layout pins: compiled for the shipped bundles' target only.
+#[cfg(target_arch = "wasm32")]
+mod layout;
 
 #[cfg(all(test, any(feature = "parse", feature = "format", feature = "strip")))]
 mod tests {

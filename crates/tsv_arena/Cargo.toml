@@ -10,8 +10,9 @@ repository.workspace = true
 bumpalo.workspace = true
 # Only the `format` feature needs tsv_lang — `with_doc_arena`'s `DocArena` type and
 # `parse_format!`'s line-terminator fold (reached through the hidden `__tsv_lang`
-# re-export, so the bindings need no tsv_lang edge of their own) — so the dep is
-# optional and pulled by `format`: a parse-only binding gets just `with_ast_arena`.
+# re-export, so the bindings' code needs no tsv_lang edge for it; tsv_wasm keeps one for
+# its wasm32 layout pins) — so the dep is optional and pulled by `format`: a parse-only
+# binding gets just `with_ast_arena`.
 tsv_lang = { workspace = true, optional = true }
 
 [features]

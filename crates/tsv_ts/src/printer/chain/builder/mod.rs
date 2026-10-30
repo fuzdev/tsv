@@ -470,9 +470,11 @@ struct PeeledTail<'a, 'p> {
 // buffer sized for a worst case — would silently restore ~424 bytes to every level
 // of a nested member chain, with output byte-identical and no test able to see it.
 // 64-bit only (the count is pointer-width-relative). An upper bound, not an exact
-// size: a consumer's graph can enable smallvec's `union` feature (deno_core's
-// serde_v8 does), which shrinks every `SmallVec`, and tsv must still build there.
-#[cfg(target_pointer_width = "64")]
+// size: smallvec's `union` feature (deno_core's serde_v8 turns it on in a consumer's
+// graph) shrinks every `SmallVec`, and the bound still holds there. rustc's layout, at
+// zero slack, so a test-build bound: a toolchain change fails `cargo test`, never a
+// consumer's build.
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<PeeledTail<'static, 'static>>() <= 184);
 
 /// Split off the trailing member tail — every node AFTER the chain's last call,

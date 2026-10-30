@@ -321,6 +321,7 @@ pub struct ErrorReport {
 /// `Display` and `Debug` forward to the inner kind, so rendered messages and debug output
 /// are exactly what the enum produces.
 #[derive(Clone, PartialEq, Eq)]
+#[repr(transparent)]
 pub struct ParseError(Box<Payload>);
 
 /// What a [`ParseError`] boxes: the error, and the one fact about it its message does
@@ -340,12 +341,14 @@ struct Payload {
 }
 
 // The whole point of the newtype — guard it. `Box` is non-null, so the niche also carries
-// `Result<(), ParseError>` down to a bare pointer.
+// `Result<(), ParseError>` down to a bare pointer. `#[repr(transparent)]` makes both a layout
+// guarantee rather than rustc's choice, which is why these two hold in every build.
 const _: () = assert!(size_of::<ParseError>() == size_of::<*const ()>());
 const _: () = assert!(size_of::<Result<()>>() == size_of::<*const ()>());
 // The payload size the rationale above (and `with_context`'s move) is stated in, on a
-// 64-bit target: an inline error would cost every small `Result` this many bytes.
-#[cfg(target_pointer_width = "64")]
+// 64-bit target: an inline error would cost every small `Result` this many bytes. An exact
+// rustc layout, so it is pinned in the test build only.
+#[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<ParseErrorKind>() == 96);
 
 impl fmt::Display for ParseError {
