@@ -151,7 +151,9 @@ the file only so a diagnostic can name it.
 - **gitignore(5) pattern format** — the same grammar prettier matches via its
   `ignore` dependency: `!` negation (last-match-wins), `/` anchoring,
   trailing-`/` dir-only, `**` (leading/trailing/interior), `*`/`?`/`[...]`
-  within a segment, `#` comments, escapes, trailing-space trimming. Reference:
+  within a segment, `#` comments, escapes, trailing-space trimming. A pattern with
+  several `**` matches by forward reachability, O(pattern × path) segment matches,
+  rather than trying every split point of every `**`. Reference:
   https://git-scm.com/docs/gitignore#_pattern_format
 - **Ancestor-aware** — `is_ignored` evaluates a path's ancestors top-down, so a
   file under a matched directory (`build/`) is reported ignored without the

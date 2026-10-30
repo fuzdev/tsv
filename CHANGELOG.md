@@ -19,6 +19,7 @@ Each `## Unreleased` section must be non-empty and carry a
   overflowing the host's stack
 - fix: formatting deeply nested ternaries, callbacks, member chains and parenthesized
   conditional types no longer takes time and memory exponential in the nesting depth
+- fix: an ignore pattern with several `**` no longer takes exponential time to match
 - fix: parser and formatter fixes across TypeScript edge cases, comment placement and layout
 
 ## 0.7.1

@@ -16,6 +16,7 @@
 // crate's other test modules.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -386,6 +387,48 @@ fn escaped_slash_after_double_star_and_star_runs_match_git() {
     );
 }
 
+/// Patterns holding several `**`, matched by forward reachability rather than a
+/// split-point search: leading, interior, adjacent and trailing double stars, each
+/// consuming zero or more directories (a trailing one at least one), against paths
+/// that align every way, plus a deep miss.
+#[test]
+fn several_double_stars_match_git() {
+    let deep_miss = format!("{}/x.ts", ["d"; 24].join("/"));
+    assert_matches_git(
+        "multi_starstar",
+        &[(
+            "",
+            "m/**/n/**/o.ts\n**/p/**/q.ts\nr/**/**/s.ts\n**/t/**\nu/**/v/**/\n**/d/**/d/**/d/**/d/**/d/**/d/**/e/\n",
+        )],
+        &[
+            ("m/n/o.ts", false),
+            ("m/x/n/o.ts", false),
+            ("m/n/y/o.ts", false),
+            ("m/x/y/n/z/o.ts", false),
+            ("m/o.ts", false),
+            ("m/n/x/n/o.ts", false),
+            ("p/q.ts", false),
+            ("x/p/q.ts", false),
+            ("x/p/y/q.ts", false),
+            ("x/p/y/p/z/q.ts", false),
+            ("q.ts", false),
+            ("p/x.ts", false),
+            ("r/s.ts", false),
+            ("r/x/y/s.ts", false),
+            ("t", true),
+            ("t/x.ts", false),
+            ("x/t/y/z.ts", false),
+            ("u/v/x.ts", false),
+            ("u/v/w", true),
+            ("u/a/v/b/c.ts", false),
+            ("u/v.ts", false),
+            ("d/d/d/d/d/d/e/x.ts", false),
+            ("d/d/d/d/d/e/x.ts", false),
+            (&deep_miss, false),
+        ],
+    );
+}
+
 /// A bare `\r` ends the file's last line the way it ends a CRLF one: git reads the
 /// file as if it closed with a newline, so the final rule applies.
 #[test]
@@ -430,5 +473,71 @@ fn windows_representability_pins_the_skipped_names() {
         "esc",
     ] {
         assert!(windows_representable(name), "{name:?} should still grade");
+    }
+}
+
+/// Seeded random rule sets of several `**` each — anchored or floating, directory-only
+/// or not, negated or not, with `?`, classes and `*` in the neighbouring segments —
+/// against random directory trees, every candidate graded by git.
+#[test]
+fn seeded_double_star_rules_match_git() {
+    let mut seed: u64 = 0x5eed;
+    let mut below = |n: usize| {
+        seed = seed
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        usize::try_from(seed >> 33).unwrap_or(0) % n
+    };
+    let segment_alphabet = ["**", "**", "a", "b", "*", "?", "[ab]", "[!a]", "c*", "*b"];
+    let name_alphabet = ["a", "b", "c", "ab", "ba", "cb"];
+    for case in 0..12 {
+        let mut rules = String::new();
+        for _ in 0..=below(3) {
+            let len = 2 + below(6);
+            let mut segments: Vec<&str> = (0..len)
+                .map(|_| segment_alphabet[below(segment_alphabet.len())])
+                .collect();
+            let first = below(len);
+            segments[first] = "**";
+            segments[(first + 1 + below(len - 1)) % len] = "**";
+            if below(5) == 0 {
+                rules.push('!');
+            }
+            if below(3) == 0 {
+                rules.push('/');
+            }
+            rules.push_str(&segments.join("/"));
+            if below(3) == 0 {
+                rules.push('/');
+            }
+            rules.push('\n');
+        }
+        // a consistent tree: every ancestor a directory, no path both a file and a dir
+        let mut kinds: BTreeMap<String, bool> = BTreeMap::new();
+        for _ in 0..30 {
+            let depth = 1 + below(6);
+            let names: Vec<&str> = (0..depth)
+                .map(|_| name_alphabet[below(name_alphabet.len())])
+                .collect();
+            let is_dir = below(2) == 0;
+            let path = names.join("/");
+            let ancestors: Vec<String> = (1..depth).map(|k| names[..k].join("/")).collect();
+            let conflicts = ancestors.iter().any(|a| kinds.get(a) == Some(&false))
+                || kinds.get(&path).is_some_and(|d| *d != is_dir)
+                || (!is_dir && kinds.keys().any(|k| k.starts_with(&format!("{path}/"))));
+            if conflicts {
+                continue;
+            }
+            for ancestor in ancestors {
+                kinds.insert(ancestor, true);
+            }
+            kinds.insert(path, is_dir);
+        }
+        let candidates: Vec<(&str, bool)> = kinds.iter().map(|(p, d)| (p.as_str(), *d)).collect();
+        assert_matches_git(
+            &format!("seeded_starstar_{case}"),
+            &[("", &rules)],
+            &candidates,
+        );
     }
 }

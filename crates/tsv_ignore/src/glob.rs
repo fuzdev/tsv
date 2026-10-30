@@ -228,9 +228,10 @@ pub(crate) fn match_segments(pat: &[Seg], path: &[PathSeg<'_>]) -> bool {
             // floating `**/name` case (every plain pattern parses to a leading
             // `**`) was O(depth) match attempts against a deep path.
             if rest.iter().any(|s| matches!(s, Seg::DoubleStar)) {
-                // another `**` ahead: fall back to the general split-point search
-                // (`rest` is non-empty here, so `**` may still consume zero)
-                (0..=path.len()).any(|i| match_segments(rest, &path[i..]))
+                // another `**` ahead: every split point of every `**` is a candidate,
+                // which a recursive search tries exponentially often — answer it in
+                // one bounded pass instead
+                match_reachable(pat, path)
             } else if rest.is_empty() {
                 // a *trailing* `**` matches everything inside the anchor (≥ 1
                 // segment), never the anchor dir itself — so a later `!foo/keep.ts`
@@ -250,6 +251,50 @@ pub(crate) fn match_segments(pat: &[Seg], path: &[PathSeg<'_>]) -> bool {
     }
 }
 
+/// [`match_segments`] for a pattern holding several `**`, as forward reachability:
+/// after `pat[..i]`, which path prefixes `path[..j]` can it have consumed? A glob
+/// segment advances each reachable `j` by one where it matches `path[j]`; a `**`
+/// reaches every `j` at or past the earliest reachable one (strictly past it for a
+/// *trailing* `**`, which matches at least one segment). The pattern matches when the
+/// whole path is reachable after its last segment.
+///
+/// O(pattern × path) segment matches, where trying every split point of every `**`
+/// recursively is exponential in the `**` count — a `.gitignore` line like
+/// `**/a/**/a/…/b/` against a deep path, once per ancestor prefix discovery walks,
+/// would otherwise hang the walk. Same answers, by the exhaustive differential in this
+/// module's tests.
+fn match_reachable(pat: &[Seg], path: &[PathSeg<'_>]) -> bool {
+    // `cur[j]`: the segments consumed so far can match exactly `path[..j]`
+    let mut cur = vec![false; path.len() + 1];
+    let mut next = vec![false; path.len() + 1];
+    cur[0] = true;
+    for (i, seg) in pat.iter().enumerate() {
+        next.fill(false);
+        match seg {
+            Seg::DoubleStar => {
+                let at_least = usize::from(i + 1 == pat.len());
+                if let Some(earliest) = cur.iter().position(|&r| r) {
+                    for r in next.iter_mut().skip(earliest + at_least) {
+                        *r = true;
+                    }
+                }
+            }
+            Seg::Glob(toks) => {
+                for (j, seg) in path.iter().enumerate() {
+                    if cur[j] && glob_seg_match(toks, seg) {
+                        next[j + 1] = true;
+                    }
+                }
+            }
+        }
+        std::mem::swap(&mut cur, &mut next);
+        if !cur.contains(&true) {
+            return false;
+        }
+    }
+    cur[path.len()]
+}
+
 /// Matches one path segment against a segment's tokens. Classic two-pointer
 /// glob match with single-star backtracking; segments are short so this is
 /// cheap.
@@ -262,6 +307,8 @@ pub(crate) fn match_segments(pat: &[Seg], path: &[PathSeg<'_>]) -> bool {
 /// pre-collected `Vec<char>` did; `seg.ascii` is loop-invariant, so the decode
 /// branch unswitches rather than running per character.
 fn glob_seg_match(toks: &[Tok], seg: &PathSeg<'_>) -> bool {
+    #[cfg(test)]
+    tests::GLOB_SEG_MATCHES.with(|n| n.set(n.get() + 1));
     let bytes = seg.text.as_bytes();
     let mut ti = 0;
     let mut si = 0;
@@ -313,4 +360,185 @@ fn glob_seg_match(toks: &[Tok], seg: &PathSeg<'_>) -> bool {
         ti += 1;
     }
     ti == toks.len()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PathSeg, Seg, glob_seg_match, match_segments, parse_segment};
+    use std::cell::Cell;
+
+    thread_local! {
+        /// How many single-segment glob matches this thread has run — the matcher's
+        /// unit of work, counted so a complexity bound is graded without a clock.
+        pub(super) static GLOB_SEG_MATCHES: Cell<usize> = const { Cell::new(0) };
+    }
+
+    /// The glob-segment matches `f` runs.
+    fn count_matches(f: impl FnOnce() -> bool) -> (bool, usize) {
+        let before = GLOB_SEG_MATCHES.with(Cell::get);
+        let result = f();
+        (result, GLOB_SEG_MATCHES.with(Cell::get) - before)
+    }
+
+    /// The plain recursive matcher: every split point of every `**` tried in turn.
+    /// Exponential in the `**` count, so only the reference the reachability pass is
+    /// graded against.
+    fn match_segments_reference(pat: &[Seg], path: &[PathSeg<'_>]) -> bool {
+        match pat.split_first() {
+            None => path.is_empty(),
+            Some((Seg::DoubleStar, rest)) => {
+                if rest.iter().any(|s| matches!(s, Seg::DoubleStar)) {
+                    (0..=path.len()).any(|i| match_segments_reference(rest, &path[i..]))
+                } else if rest.is_empty() {
+                    !path.is_empty()
+                } else {
+                    rest.len() <= path.len()
+                        && match_segments_reference(rest, &path[path.len() - rest.len()..])
+                }
+            }
+            Some((Seg::Glob(toks), rest)) => match path.split_first() {
+                Some((head, tail)) if glob_seg_match(toks, head) => {
+                    match_segments_reference(rest, tail)
+                }
+                _ => false,
+            },
+        }
+    }
+
+    fn segs(pattern: &[&str]) -> Vec<Seg> {
+        pattern
+            .iter()
+            .map(|s| parse_segment(s).expect("a valid segment"))
+            .collect()
+    }
+
+    /// Every sequence of `len` items drawn from `alphabet`, for each `len` up to `max`.
+    fn sequences<'a>(alphabet: &[&'a str], max: usize) -> Vec<Vec<&'a str>> {
+        let mut all = vec![Vec::new()];
+        let mut level = vec![Vec::new()];
+        for _ in 0..max {
+            level = level
+                .iter()
+                .flat_map(|prefix: &Vec<&str>| {
+                    alphabet.iter().map(move |item| {
+                        let mut seq = prefix.clone();
+                        seq.push(*item);
+                        seq
+                    })
+                })
+                .collect();
+            all.extend(level.iter().cloned());
+        }
+        all
+    }
+
+    #[test]
+    fn reachability_agrees_with_the_recursive_reference_exhaustively() {
+        // every pattern of up to six segments over `**`, two literals and `*`, against
+        // every path of up to six segments over the literals: each `**` placement
+        // (leading, interior, trailing, adjacent pairs) meets every alignment
+        let patterns = sequences(&["**", "a", "b", "*"], 6);
+        let paths = sequences(&["a", "b"], 6);
+        let mut multi = 0;
+        for pattern in &patterns {
+            let pat = segs(pattern);
+            if pat.iter().filter(|s| matches!(s, Seg::DoubleStar)).count() >= 2 {
+                multi += 1;
+            }
+            for path in &paths {
+                let path: Vec<PathSeg<'_>> = path.iter().map(|s| PathSeg::new(s)).collect();
+                assert_eq!(
+                    match_segments(&pat, &path),
+                    match_segments_reference(&pat, &path),
+                    "pattern {pattern:?} against {path:?}",
+                );
+            }
+        }
+        // the multi-`**` branch is what changed, so the domain must reach it
+        assert!(multi > 1000, "only {multi} multi-`**` patterns");
+    }
+
+    #[test]
+    fn many_double_stars_match_in_bounded_work() {
+        // `**/a/` six times then a `b` that never matches: the recursive search tries
+        // every split point of every `**`; reachability runs at most one glob match
+        // per pattern segment per path segment
+        let mut pattern = ["**", "a"].repeat(6);
+        pattern.push("b");
+        let pat = segs(&pattern);
+        let path: Vec<PathSeg<'_>> = (0..24).map(|_| PathSeg::new("a")).collect();
+        let bound = pat.len() * path.len();
+        let (matched, work) = count_matches(|| match_segments(&pat, &path));
+        assert!(!matched);
+        assert!(work <= bound, "{work} glob matches, bound {bound}");
+        // the bound discriminates: the reference blows through it at this size
+        let (reference, reference_work) = count_matches(|| match_segments_reference(&pat, &path));
+        assert!(!reference);
+        assert!(
+            reference_work > 100 * bound,
+            "the reference ran only {reference_work} glob matches"
+        );
+    }
+
+    #[test]
+    fn many_double_stars_in_a_gitignore_stay_bounded_across_ancestors() {
+        // the shipped query: one rule, every ancestor prefix of a deep path walked — at a
+        // size the recursive search still finishes, so a regression fails the bound
+        // rather than hanging the suite
+        let double_stars = 6;
+        let mut rule = "**/a/".repeat(double_stars);
+        rule.push_str("b/");
+        let rule_segments = 2 * double_stars + 1;
+        let mut stack = crate::IgnoreStack::new();
+        stack.push_gitignore("", &rule);
+        let depth = 24;
+        let path = format!("{}/x.ts", vec!["a"; depth].join("/"));
+        let (ignored, work) = count_matches(|| stack.is_ignored(&path, false));
+        assert!(!ignored);
+        // per ancestor prefix of `k` segments, at most one match per rule segment per
+        // path segment
+        let bound: usize = (1..=depth).map(|k| rule_segments * k).sum();
+        assert!(work <= bound, "{work} glob matches, bound {bound}");
+    }
+
+    /// A seeded linear congruential generator — deterministic, dependency-free.
+    struct Lcg(u64);
+
+    impl Lcg {
+        fn below(&mut self, n: usize) -> usize {
+            self.0 = self
+                .0
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            usize::try_from(self.0 >> 33).unwrap_or(0) % n
+        }
+    }
+
+    #[test]
+    fn reachability_agrees_with_the_recursive_reference_on_random_cases() {
+        // past the exhaustive domain: longer patterns and paths, and every token kind in
+        // the segments around a `**` (`?`, classes, negated classes, `]` as a member,
+        // star-only runs that parse as `**`)
+        let pattern_alphabet = [
+            "**", "**", "***", "a", "b", "*", "?", "[ab]", "[!a]", "c*", "*b", "[a-c]", "a?",
+            "[]a]",
+        ];
+        let path_alphabet = ["a", "b", "c", "ab", "ba", "cb", "]"];
+        let mut rng = Lcg(0x5eed);
+        for _ in 0..100_000 {
+            let pattern: Vec<&str> = (0..=rng.below(8))
+                .map(|_| pattern_alphabet[rng.below(pattern_alphabet.len())])
+                .collect();
+            let path: Vec<&str> = (0..rng.below(10))
+                .map(|_| path_alphabet[rng.below(path_alphabet.len())])
+                .collect();
+            let pat = segs(&pattern);
+            let path_segs: Vec<PathSeg<'_>> = path.iter().map(|s| PathSeg::new(s)).collect();
+            assert_eq!(
+                match_segments(&pat, &path_segs),
+                match_segments_reference(&pat, &path_segs),
+                "pattern {pattern:?} against {path:?}",
+            );
+        }
+    }
 }
