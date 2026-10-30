@@ -1,6 +1,5 @@
 // Function-related expression writers.
 
-use super::super::super::internal;
 use super::expressions::{ChainState, ExprFlags, write_expression, write_expressions};
 use super::statements::write_block_statement;
 use super::{
@@ -8,6 +7,7 @@ use super::{
     write_identifier_with_optional, write_or_null, write_return_type_field,
     write_type_arguments_field, write_type_parameters_field,
 };
+use crate::ast;
 use tsv_lang::Span;
 
 /// Emits an `ArrowFunctionExpression` node.
@@ -26,7 +26,7 @@ use tsv_lang::Span;
 ///   `<T>(…) => …` reading grafts them onto the finished arrow).
 pub(super) fn write_arrow_function_expression(
     w: &mut JsonWriter,
-    arrow: &internal::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -63,10 +63,10 @@ pub(super) fn write_arrow_function_expression(
     close_node(w, "ArrowFunctionExpression", span, ctx);
 }
 
-fn write_arrow_body(w: &mut JsonWriter, body: &internal::ArrowFunctionBody<'_>, ctx: &Ctx<'_>) {
+fn write_arrow_body(w: &mut JsonWriter, body: &ast::ArrowFunctionBody<'_>, ctx: &Ctx<'_>) {
     match body {
-        internal::ArrowFunctionBody::Expression(expr) => write_expression(w, expr, ctx),
-        internal::ArrowFunctionBody::BlockStatement(block) => write_block_statement(w, block, ctx),
+        ast::ArrowFunctionBody::Expression(expr) => write_expression(w, expr, ctx),
+        ast::ArrowFunctionBody::BlockStatement(block) => write_block_statement(w, block, ctx),
     }
 }
 
@@ -77,7 +77,7 @@ fn write_arrow_body(w: &mut JsonWriter, body: &internal::ArrowFunctionBody<'_>, 
 /// the finished `parseMethod` node, so it serializes after `body`.
 pub(super) fn write_function_expression(
     w: &mut JsonWriter,
-    func: &internal::FunctionExpression<'_>,
+    func: &ast::FunctionExpression<'_>,
     ctx: &Ctx<'_>,
     type_params_last: bool,
 ) {
@@ -106,7 +106,7 @@ pub(super) fn write_function_expression(
 /// `parseNewCallee` before the argument list is parsed.
 pub(super) fn write_new_expression(
     w: &mut JsonWriter,
-    new_expr: &internal::NewExpression<'_>,
+    new_expr: &ast::NewExpression<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -123,7 +123,7 @@ pub(super) fn write_new_expression(
 /// and `force_optional` for acorn-typescript's `?.<T>(...)` path, which marks the callee
 /// node itself optional; the decorator spine strip walks call → callee.
 pub(super) fn call_callee_flags(
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     callee_chain: ChainState,
     strip_optional: bool,
 ) -> ExprFlags {
@@ -143,7 +143,7 @@ pub(super) fn call_callee_flags(
 /// wins over force (`true`), which wins over the computed value.
 pub(super) fn write_call_expression_tail(
     w: &mut JsonWriter,
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     span: Span,
     ctx: &Ctx<'_>,
     callee_chain: ChainState,
@@ -185,7 +185,7 @@ pub(super) fn write_call_expression_tail(
 /// walks member → object (its object's flags are the chain walk's).
 pub(super) fn write_member_expression_tail(
     w: &mut JsonWriter,
-    member: &internal::MemberExpression<'_>,
+    member: &ast::MemberExpression<'_>,
     span: Span,
     ctx: &Ctx<'_>,
     force_optional: bool,
@@ -222,7 +222,7 @@ pub(super) fn write_member_expression_tail(
 /// Emits a `ConditionalExpression` node.
 pub(super) fn write_conditional_expression(
     w: &mut JsonWriter,
-    cond: &internal::ConditionalExpression<'_>,
+    cond: &ast::ConditionalExpression<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -239,7 +239,7 @@ pub(super) fn write_conditional_expression(
 /// Emits an `AwaitExpression` node.
 pub(super) fn write_await_expression(
     w: &mut JsonWriter,
-    await_expr: &internal::AwaitExpression<'_>,
+    await_expr: &ast::AwaitExpression<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -253,7 +253,7 @@ pub(super) fn write_await_expression(
 /// (nullable).
 pub(super) fn write_yield_expression(
     w: &mut JsonWriter,
-    yield_expr: &internal::YieldExpression<'_>,
+    yield_expr: &ast::YieldExpression<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {

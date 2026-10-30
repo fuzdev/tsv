@@ -3,7 +3,7 @@
 // Maintains ONE source string throughout entire parse tree to avoid position drift.
 // Tracks (start, end) ranges within that source instead of creating substrings.
 
-use crate::ast::internal::CssValue;
+use crate::ast::CssValue;
 use crate::parser::value::cursor::ValueCursor;
 use crate::parser::value::lists::{ValueSeparator, classify_separators};
 use crate::parser::value::scan::{

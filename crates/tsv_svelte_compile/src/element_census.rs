@@ -56,7 +56,7 @@
 use std::collections::HashMap;
 
 use tsv_lang::Span;
-use tsv_svelte::ast::internal::{
+use tsv_svelte::ast::{
     AttributeNode, EachBlock, Element, ElementKind, Fragment, FragmentNode, Root, SpecialElement,
     SpecialElementKind,
 };

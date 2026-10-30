@@ -1,6 +1,5 @@
 // Statement dispatcher and simple statements.
 
-use super::super::super::internal;
 use super::control_flow::{
     write_break_statement, write_continue_statement, write_do_while_statement,
     write_for_in_statement, write_for_of_statement, write_for_statement, write_if_statement,
@@ -23,6 +22,7 @@ use super::{
     write_export_kind_field, write_identifier_plain, write_import_kind_field, write_literal,
     write_or_null,
 };
+use crate::ast;
 use tsv_lang::Span;
 
 /// The `export` keyword's start, skipping comments so an `export` inside one
@@ -54,7 +54,7 @@ fn export_start(source: &str, span_start: u32, class_is_decorated: bool) -> u32 
 /// omits the field under acorn.
 fn write_attributes_field(
     w: &mut JsonWriter,
-    attributes: Option<&[internal::ImportAttribute<'_>]>,
+    attributes: Option<&[ast::ImportAttribute<'_>]>,
     ctx: &Ctx<'_>,
 ) {
     match attributes {
@@ -71,9 +71,9 @@ fn write_attributes_field(
 }
 
 /// Emit a `Statement`, dispatching on its variant.
-pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>, ctx: &Ctx<'_>) {
+pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx: &Ctx<'_>) {
     match &stmt.kind {
-        internal::StatementKind::ExpressionStatement(expr_stmt) => {
+        ast::StatementKind::ExpressionStatement(expr_stmt) => {
             node_header(w, "ExpressionStatement", stmt.span, ctx);
             w.raw(",\"expression\":");
             write_expression(w, expr_stmt.expression, ctx);
@@ -87,34 +87,34 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>
             }
             close_node(w, "ExpressionStatement", stmt.span, ctx);
         }
-        internal::StatementKind::VariableDeclaration(var_decl) => {
+        ast::StatementKind::VariableDeclaration(var_decl) => {
             write_variable_declaration(w, var_decl, ctx, false);
         }
-        internal::StatementKind::TSTypeAliasDeclaration(type_alias) => {
+        ast::StatementKind::TSTypeAliasDeclaration(type_alias) => {
             write_type_alias_declaration(w, type_alias, stmt.span, ctx);
         }
-        internal::StatementKind::ReturnStatement(ret) => {
+        ast::StatementKind::ReturnStatement(ret) => {
             node_header(w, "ReturnStatement", stmt.span, ctx);
             w.raw(",\"argument\":");
             write_or_null(w, ret.argument.as_ref(), |w, e| write_expression(w, e, ctx));
             close_node(w, "ReturnStatement", stmt.span, ctx);
         }
-        internal::StatementKind::BlockStatement(block) => {
+        ast::StatementKind::BlockStatement(block) => {
             write_block_statement(w, block, ctx);
         }
-        internal::StatementKind::FunctionDeclaration(func_decl) => {
+        ast::StatementKind::FunctionDeclaration(func_decl) => {
             write_function_declaration(w, func_decl, ctx);
         }
-        internal::StatementKind::ClassDeclaration(class_decl) => {
+        ast::StatementKind::ClassDeclaration(class_decl) => {
             write_class_declaration(w, class_decl, ctx, false);
         }
-        internal::StatementKind::ExportNamedDeclaration(export_decl) => {
-            let is_type_export = matches!(export_decl.export_kind, internal::ExportKind::Type);
+        ast::StatementKind::ExportNamedDeclaration(export_decl) => {
+            let is_type_export = matches!(export_decl.export_kind, ast::ExportKind::Type);
             let start = export_start(
                 ctx.source,
                 stmt.span.start,
-                matches!(export_decl.declaration, Some(internal::Statement {
-                    kind: internal::StatementKind::ClassDeclaration(class),
+                matches!(export_decl.declaration, Some(ast::Statement {
+                    kind: ast::StatementKind::ClassDeclaration(class),
                     ..
                 })
                     if class.decorators.is_some()),
@@ -137,21 +137,21 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>
             write_attributes_field(w, export_decl.attributes, ctx);
             close_node(w, "ExportNamedDeclaration", export_span, ctx);
         }
-        internal::StatementKind::ExportDefaultDeclaration(export_decl) => {
+        ast::StatementKind::ExportDefaultDeclaration(export_decl) => {
             let start = export_start(
                 ctx.source,
                 stmt.span.start,
-                matches!(&export_decl.declaration, internal::ExportDefaultValue::ClassDeclaration(class)
+                matches!(&export_decl.declaration, ast::ExportDefaultValue::ClassDeclaration(class)
                     if class.decorators.is_some()),
             );
             let export_span = Span::new(start, stmt.span.end);
             node_header(w, "ExportDefaultDeclaration", export_span, ctx);
-            write_export_kind_field(w, internal::ExportKind::Value, ctx);
+            write_export_kind_field(w, ast::ExportKind::Value, ctx);
             w.raw(",\"declaration\":");
             write_export_default_value(w, &export_decl.declaration, ctx);
             close_node(w, "ExportDefaultDeclaration", export_span, ctx);
         }
-        internal::StatementKind::ExportAllDeclaration(export_decl) => {
+        ast::StatementKind::ExportAllDeclaration(export_decl) => {
             node_header(w, "ExportAllDeclaration", stmt.span, ctx);
             write_export_kind_field(w, export_decl.export_kind, ctx);
             w.raw(",\"exported\":");
@@ -163,19 +163,19 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>
             write_attributes_field(w, export_decl.attributes, ctx);
             close_node(w, "ExportAllDeclaration", stmt.span, ctx);
         }
-        internal::StatementKind::TSExportAssignment(export_assign) => {
+        ast::StatementKind::TSExportAssignment(export_assign) => {
             node_header(w, "TSExportAssignment", stmt.span, ctx);
             w.raw(",\"expression\":");
             write_expression(w, &export_assign.expression, ctx);
             close_node(w, "TSExportAssignment", stmt.span, ctx);
         }
-        internal::StatementKind::TSNamespaceExportDeclaration(ns_export) => {
+        ast::StatementKind::TSNamespaceExportDeclaration(ns_export) => {
             node_header(w, "TSNamespaceExportDeclaration", stmt.span, ctx);
             w.raw(",\"id\":");
             write_identifier_plain(w, &ns_export.id, ctx);
             close_node(w, "TSNamespaceExportDeclaration", stmt.span, ctx);
         }
-        internal::StatementKind::ImportDeclaration(import_decl) => {
+        ast::StatementKind::ImportDeclaration(import_decl) => {
             node_header(w, "ImportDeclaration", stmt.span, ctx);
             write_import_kind_field(w, import_decl.import_kind, ctx);
             if let Some(phase) = import_decl.phase.as_str() {
@@ -191,12 +191,12 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>
             write_attributes_field(w, import_decl.attributes, ctx);
             close_node(w, "ImportDeclaration", stmt.span, ctx);
         }
-        internal::StatementKind::TSImportEqualsDeclaration(import_eq) => {
+        ast::StatementKind::TSImportEqualsDeclaration(import_eq) => {
             node_header(w, "TSImportEqualsDeclaration", stmt.span, ctx);
             w.raw(",\"importKind\":");
             w.token(match import_eq.import_kind {
-                internal::ImportKind::Value => "value",
-                internal::ImportKind::Type => "type",
+                ast::ImportKind::Value => "value",
+                ast::ImportKind::Type => "type",
             });
             w.raw(",\"isExport\":");
             w.bool(import_eq.is_export);
@@ -204,74 +204,74 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>
             write_identifier_plain(w, &import_eq.id, ctx);
             w.raw(",\"moduleReference\":");
             match &import_eq.module_reference {
-                internal::TSModuleReference::ExternalModuleReference(ext_ref) => {
+                ast::TSModuleReference::ExternalModuleReference(ext_ref) => {
                     node_header(w, "TSExternalModuleReference", ext_ref.span, ctx);
                     w.raw(",\"expression\":");
                     write_literal(w, &ext_ref.expression, ctx);
                     close_node(w, "TSExternalModuleReference", ext_ref.span, ctx);
                 }
-                internal::TSModuleReference::EntityName(entity_name) => {
+                ast::TSModuleReference::EntityName(entity_name) => {
                     write_entity_name(w, entity_name, ctx);
                 }
             }
             close_node(w, "TSImportEqualsDeclaration", stmt.span, ctx);
         }
         // Control flow statements
-        internal::StatementKind::IfStatement(if_stmt) => {
+        ast::StatementKind::IfStatement(if_stmt) => {
             write_if_statement(w, if_stmt, stmt.span, ctx);
         }
-        internal::StatementKind::ForStatement(for_stmt) => {
+        ast::StatementKind::ForStatement(for_stmt) => {
             write_for_statement(w, for_stmt, stmt.span, ctx);
         }
-        internal::StatementKind::ForInStatement(for_in) => {
+        ast::StatementKind::ForInStatement(for_in) => {
             write_for_in_statement(w, for_in, stmt.span, ctx);
         }
-        internal::StatementKind::ForOfStatement(for_of) => {
+        ast::StatementKind::ForOfStatement(for_of) => {
             write_for_of_statement(w, for_of, stmt.span, ctx);
         }
-        internal::StatementKind::WhileStatement(while_stmt) => {
+        ast::StatementKind::WhileStatement(while_stmt) => {
             write_while_statement(w, while_stmt, stmt.span, ctx);
         }
-        internal::StatementKind::DoWhileStatement(do_while) => {
+        ast::StatementKind::DoWhileStatement(do_while) => {
             write_do_while_statement(w, do_while, stmt.span, ctx);
         }
-        internal::StatementKind::WithStatement(with_stmt) => {
+        ast::StatementKind::WithStatement(with_stmt) => {
             write_with_statement(w, with_stmt, stmt.span, ctx);
         }
-        internal::StatementKind::SwitchStatement(switch_stmt) => {
+        ast::StatementKind::SwitchStatement(switch_stmt) => {
             write_switch_statement(w, switch_stmt, stmt.span, ctx);
         }
-        internal::StatementKind::TryStatement(try_stmt) => {
+        ast::StatementKind::TryStatement(try_stmt) => {
             write_try_statement(w, try_stmt, stmt.span, ctx);
         }
-        internal::StatementKind::ThrowStatement(throw_stmt) => {
+        ast::StatementKind::ThrowStatement(throw_stmt) => {
             write_throw_statement(w, throw_stmt, stmt.span, ctx);
         }
-        internal::StatementKind::BreakStatement(break_stmt) => {
+        ast::StatementKind::BreakStatement(break_stmt) => {
             write_break_statement(w, break_stmt, stmt.span, ctx);
         }
-        internal::StatementKind::ContinueStatement(continue_stmt) => {
+        ast::StatementKind::ContinueStatement(continue_stmt) => {
             write_continue_statement(w, continue_stmt, stmt.span, ctx);
         }
-        internal::StatementKind::LabeledStatement(labeled) => {
+        ast::StatementKind::LabeledStatement(labeled) => {
             write_labeled_statement(w, labeled, stmt.span, ctx);
         }
-        internal::StatementKind::EmptyStatement(_) => {
+        ast::StatementKind::EmptyStatement(_) => {
             write_bare_node(w, "EmptyStatement", stmt.span, ctx);
         }
-        internal::StatementKind::DebuggerStatement(_) => {
+        ast::StatementKind::DebuggerStatement(_) => {
             write_bare_node(w, "DebuggerStatement", stmt.span, ctx);
         }
-        internal::StatementKind::TSInterfaceDeclaration(iface) => {
+        ast::StatementKind::TSInterfaceDeclaration(iface) => {
             write_interface_declaration(w, iface, ctx, false);
         }
-        internal::StatementKind::TSDeclareFunction(func) => {
+        ast::StatementKind::TSDeclareFunction(func) => {
             write_declare_function(w, func, ctx, false);
         }
-        internal::StatementKind::TSEnumDeclaration(enum_decl) => {
+        ast::StatementKind::TSEnumDeclaration(enum_decl) => {
             write_enum_declaration(w, enum_decl, stmt.span, ctx);
         }
-        internal::StatementKind::TSModuleDeclaration(module_decl) => {
+        ast::StatementKind::TSModuleDeclaration(module_decl) => {
             write_module_declaration(w, module_decl, ctx);
         }
     }
@@ -282,7 +282,7 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>
 /// (only when true).
 pub(super) fn write_module_declaration(
     w: &mut JsonWriter,
-    decl: &internal::TSModuleDeclaration<'_>,
+    decl: &ast::TSModuleDeclaration<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TSModuleDeclaration", decl.span, ctx);
@@ -291,19 +291,19 @@ pub(super) fn write_module_declaration(
     }
     w.raw(",\"id\":");
     match &decl.id {
-        internal::TSModuleName::Identifier(id) => write_identifier_plain(w, id, ctx),
-        internal::TSModuleName::Literal(lit) => write_literal(w, lit, ctx),
+        ast::TSModuleName::Identifier(id) => write_identifier_plain(w, id, ctx),
+        ast::TSModuleName::Literal(lit) => write_literal(w, lit, ctx),
     }
     if let Some(body) = &decl.body {
         w.raw(",\"body\":");
         match body {
-            internal::TSModuleDeclarationBody::TSModuleBlock(block) => {
+            ast::TSModuleDeclarationBody::TSModuleBlock(block) => {
                 node_header(w, "TSModuleBlock", block.span, ctx);
                 w.raw(",\"body\":");
                 write_array(w, block.body, |w, s| write_statement(w, s, ctx));
                 close_node(w, "TSModuleBlock", block.span, ctx);
             }
-            internal::TSModuleDeclarationBody::TSModuleDeclaration(nested) => {
+            ast::TSModuleDeclarationBody::TSModuleDeclaration(nested) => {
                 write_module_declaration(w, nested, ctx);
             }
         }
@@ -317,7 +317,7 @@ pub(super) fn write_module_declaration(
 /// Emits a `BlockStatement` node.
 pub(super) fn write_block_statement(
     w: &mut JsonWriter,
-    block: &internal::BlockStatement<'_>,
+    block: &ast::BlockStatement<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "BlockStatement", block.span, ctx);
@@ -340,21 +340,21 @@ pub(super) fn write_block_statement(
 /// by construction (and inert where there is no `declare` to place).
 fn write_exported_declaration(
     w: &mut JsonWriter,
-    stmt: &internal::Statement<'_>,
+    stmt: &ast::Statement<'_>,
     ctx: &Ctx<'_>,
     is_type_export: bool,
 ) {
     match &stmt.kind {
-        internal::StatementKind::VariableDeclaration(var_decl) => {
+        ast::StatementKind::VariableDeclaration(var_decl) => {
             write_variable_declaration(w, var_decl, ctx, true);
         }
-        internal::StatementKind::ClassDeclaration(class_decl) => {
+        ast::StatementKind::ClassDeclaration(class_decl) => {
             write_class_declaration(w, class_decl, ctx, is_type_export);
         }
-        internal::StatementKind::TSInterfaceDeclaration(iface) => {
+        ast::StatementKind::TSInterfaceDeclaration(iface) => {
             write_interface_declaration(w, iface, ctx, true);
         }
-        internal::StatementKind::TSDeclareFunction(func) => {
+        ast::StatementKind::TSDeclareFunction(func) => {
             write_declare_function(w, func, ctx, true);
         }
         _ => write_statement(w, stmt, ctx),
@@ -370,7 +370,7 @@ fn write_exported_declaration(
 /// depends on `exported`.
 pub(super) fn write_variable_declaration(
     w: &mut JsonWriter,
-    var_decl: &internal::VariableDeclaration<'_>,
+    var_decl: &ast::VariableDeclaration<'_>,
     ctx: &Ctx<'_>,
     exported: bool,
 ) {
@@ -393,11 +393,11 @@ pub(super) fn write_variable_declaration(
     // One literal per kind, so each appends the whole field at once rather
     // than a runtime-length copy of `as_str()`.
     match var_decl.kind {
-        internal::VariableDeclarationKind::Const => w.raw(",\"kind\":\"const\""),
-        internal::VariableDeclarationKind::Let => w.raw(",\"kind\":\"let\""),
-        internal::VariableDeclarationKind::Var => w.raw(",\"kind\":\"var\""),
-        internal::VariableDeclarationKind::Using => w.raw(",\"kind\":\"using\""),
-        internal::VariableDeclarationKind::AwaitUsing => w.raw(",\"kind\":\"await using\""),
+        ast::VariableDeclarationKind::Const => w.raw(",\"kind\":\"const\""),
+        ast::VariableDeclarationKind::Let => w.raw(",\"kind\":\"let\""),
+        ast::VariableDeclarationKind::Var => w.raw(",\"kind\":\"var\""),
+        ast::VariableDeclarationKind::Using => w.raw(",\"kind\":\"using\""),
+        ast::VariableDeclarationKind::AwaitUsing => w.raw(",\"kind\":\"await using\""),
     }
     if var_decl.declare && exported {
         w.raw(",\"declare\":true");

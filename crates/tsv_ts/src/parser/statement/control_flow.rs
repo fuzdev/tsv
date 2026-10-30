@@ -1,6 +1,6 @@
 // Control flow statement parsing (if, for, while, switch, try, throw, break, continue, labeled)
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
 use tsv_lang::{ParseError, Span};

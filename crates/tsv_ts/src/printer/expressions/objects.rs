@@ -7,7 +7,7 @@
 // - String key normalization (unquote valid identifiers)
 // - Blank line preservation between properties
 
-use crate::ast::internal::{self, Expression, ExpressionKind, Literal, LiteralValue};
+use crate::ast::{self, Expression, ExpressionKind, Literal, LiteralValue};
 use crate::printer::comments::ValueGap;
 use crate::printer::expressions::assignment::{AssignmentLeft, RhsCommentInfo};
 use crate::printer::expressions::literals::is_valid_js_identifier;
@@ -58,7 +58,7 @@ impl LiteralRole {
     pub(in crate::printer) fn printed_end(self, expr: &Expression<'_>) -> u32 {
         match (self, &expr.kind) {
             (Self::CompoundTarget, ExpressionKind::AssignmentExpression(assign))
-                if assign.operator == internal::AssignmentOperator::Assign =>
+                if assign.operator == ast::AssignmentOperator::Assign =>
             {
                 assign.right.printed_end()
             }
@@ -66,15 +66,12 @@ impl LiteralRole {
         }
     }
 
-    /// [`Self::printed_end`] for an object property: [`internal::ObjectProperty::value_end`],
+    /// [`Self::printed_end`] for an object property: [`ast::ObjectProperty::value_end`],
     /// with the value read in this role.
-    pub(in crate::printer) fn property_printed_end(
-        self,
-        prop: &internal::ObjectProperty<'_>,
-    ) -> u32 {
+    pub(in crate::printer) fn property_printed_end(self, prop: &ast::ObjectProperty<'_>) -> u32 {
         match prop {
-            internal::ObjectProperty::Property(p) => self.printed_end(p.value),
-            internal::ObjectProperty::SpreadElement(_) => prop.value_end(),
+            ast::ObjectProperty::Property(p) => self.printed_end(p.value),
+            ast::ObjectProperty::SpreadElement(_) => prop.value_end(),
         }
     }
 }
@@ -88,7 +85,7 @@ pub(in crate::printer) fn is_compound_target_value(expr: &Expression<'_>) -> boo
     match &expr.kind {
         ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_) => true,
         ExpressionKind::AssignmentExpression(assign) => {
-            assign.operator == internal::AssignmentOperator::Assign
+            assign.operator == ast::AssignmentOperator::Assign
         }
         _ => false,
     }
@@ -97,11 +94,11 @@ pub(in crate::printer) fn is_compound_target_value(expr: &Expression<'_>) -> boo
 /// Whether a [`LiteralRole::CompoundTarget`] object breaks for a nested pattern —
 /// prettier's `shouldBreak` for an `ObjectPattern` (`print/object.js`): some property's
 /// value is directly an object or array pattern. A default (`a: [b] = c`) is not one.
-fn compound_target_object_breaks(obj: &internal::ObjectExpression<'_>) -> bool {
+fn compound_target_object_breaks(obj: &ast::ObjectExpression<'_>) -> bool {
     obj.properties.iter().any(|prop| {
         matches!(
             prop,
-            internal::ObjectProperty::Property(p)
+            ast::ObjectProperty::Property(p)
                 if matches!(
                     p.value.kind,
                     ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_)
@@ -116,7 +113,7 @@ impl<'a> Printer<'a> {
     /// Handles comments between properties, blank line preservation, and trailing comments.
     pub(in crate::printer) fn build_object_doc(
         &self,
-        obj: &internal::ObjectExpression<'_>,
+        obj: &ast::ObjectExpression<'_>,
         obj_span: Span,
     ) -> DocId {
         self.build_object_doc_as(obj, obj_span, LiteralRole::Expression)
@@ -125,7 +122,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_object_doc`] in a [`LiteralRole`].
     pub(in crate::printer) fn build_object_doc_as(
         &self,
-        obj: &internal::ObjectExpression<'_>,
+        obj: &ast::ObjectExpression<'_>,
         obj_span: Span,
         role: LiteralRole,
     ) -> DocId {
@@ -153,7 +150,7 @@ impl<'a> Printer<'a> {
             let property_spans: SmallVec<[_; 8]> = obj
                 .properties
                 .iter()
-                .map(internal::ObjectProperty::span)
+                .map(ast::ObjectProperty::span)
                 .collect();
             match role {
                 LiteralRole::Expression => self.has_standalone_block_comment(
@@ -472,7 +469,7 @@ impl<'a> Printer<'a> {
     /// Produces: `{\n  prop,\n}` with actual hardlines.
     pub(in crate::printer) fn build_object_doc_expanded(
         &self,
-        obj: &internal::ObjectExpression<'_>,
+        obj: &ast::ObjectExpression<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -519,13 +516,13 @@ impl<'a> Printer<'a> {
     /// queries in `build_property_doc`.
     fn build_object_property_doc(
         &self,
-        prop: &internal::ObjectProperty<'_>,
+        prop: &ast::ObjectProperty<'_>,
         has_comments: bool,
         role: LiteralRole,
     ) -> DocId {
         match prop {
-            internal::ObjectProperty::Property(p) => self.build_property_doc(p, has_comments, role),
-            internal::ObjectProperty::SpreadElement(s) => self.build_spread_doc(s),
+            ast::ObjectProperty::Property(p) => self.build_property_doc(p, has_comments, role),
+            ast::ObjectProperty::SpreadElement(s) => self.build_spread_doc(s),
         }
     }
 
@@ -570,10 +567,10 @@ impl<'a> Printer<'a> {
     /// [`LiteralRole::property_printed_end`] read through a `:`→value head freeze: a frozen
     /// value's verbatim slice prints its whole span, the value shell included, so the trailing
     /// run starts past it ([`Self::property_value_frozen_span`]).
-    fn property_printed_end(&self, prop: &internal::ObjectProperty<'_>, role: LiteralRole) -> u32 {
+    fn property_printed_end(&self, prop: &ast::ObjectProperty<'_>, role: LiteralRole) -> u32 {
         let printed_end = role.property_printed_end(prop);
         match prop {
-            internal::ObjectProperty::Property(p)
+            ast::ObjectProperty::Property(p)
                 if !p.shorthand
                     && printed_end != prop.value_end()
                     && self
@@ -589,11 +586,11 @@ impl<'a> Printer<'a> {
     /// Whether `span` lies in some regular property's key→`:` gap.
     fn comment_in_property_key_colon_gap(
         &self,
-        obj: &internal::ObjectExpression<'_>,
+        obj: &ast::ObjectExpression<'_>,
         span: Span,
     ) -> bool {
         obj.properties.iter().any(|prop| match prop {
-            internal::ObjectProperty::Property(p) if !p.shorthand && !p.method => {
+            ast::ObjectProperty::Property(p) if !p.shorthand && !p.method => {
                 let key_region_end = self.property_key_region_end(p);
                 key_region_end <= span.start && span.end <= self.find_colon_after(key_region_end)
             }
@@ -603,7 +600,7 @@ impl<'a> Printer<'a> {
 
     /// Where a regular property's KEY region ends: past the `]` of a computed key, else at
     /// the key's own end — the `key_region_end` [`Self::build_property_doc`] scans from.
-    fn property_key_region_end(&self, prop: &internal::Property<'_>) -> u32 {
+    fn property_key_region_end(&self, prop: &ast::Property<'_>) -> u32 {
         if prop.computed {
             self.find_closing_bracket_after(prop.key.span().end) + 1
         } else {
@@ -618,7 +615,7 @@ impl<'a> Printer<'a> {
     /// unprinted.
     fn property_value_frozen_span(
         &self,
-        prop: &internal::Property<'_>,
+        prop: &ast::Property<'_>,
         key_region_end: u32,
     ) -> Option<Span> {
         if !self.has_format_ignore {
@@ -639,7 +636,7 @@ impl<'a> Printer<'a> {
     /// lookups are skipped (canonical reference: `build_params_doc_with_comments`).
     fn build_property_doc(
         &self,
-        prop: &internal::Property<'_>,
+        prop: &ast::Property<'_>,
         has_comments: bool,
         role: LiteralRole,
     ) -> DocId {
@@ -666,8 +663,8 @@ impl<'a> Printer<'a> {
         // Add getter/setter prefix if applicable, preserving comments between
         // keyword and name (e.g., `get /* c */ a()`)
         let key_doc = match prop.kind {
-            internal::PropertyKind::Get | internal::PropertyKind::Set => {
-                let kind_text = if matches!(prop.kind, internal::PropertyKind::Get) {
+            ast::PropertyKind::Get | ast::PropertyKind::Set => {
+                let kind_text = if matches!(prop.kind, ast::PropertyKind::Get) {
                     "get "
                 } else {
                     "set "
@@ -683,14 +680,11 @@ impl<'a> Printer<'a> {
                 kw_parts.push(key_doc);
                 d.concat(&kw_parts)
             }
-            internal::PropertyKind::Init => key_doc,
+            ast::PropertyKind::Init => key_doc,
         };
 
         // Handle getter/setter vs method vs regular property
-        if matches!(
-            prop.kind,
-            internal::PropertyKind::Get | internal::PropertyKind::Set
-        ) {
+        if matches!(prop.kind, ast::PropertyKind::Get | ast::PropertyKind::Set) {
             // Getter/setter: `get x() {}` or `set x(v) {}`
             if let ExpressionKind::FunctionExpression(func) = &prop.value.kind {
                 let func_doc = self.build_function_doc_body(func);

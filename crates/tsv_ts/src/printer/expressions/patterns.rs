@@ -9,7 +9,7 @@
 
 use super::assignment::{AssignmentLeft, RhsCommentInfo};
 use super::objects::LiteralRole;
-use crate::ast::internal::{
+use crate::ast::{
     self, ArrowFunctionBody, AssignmentOperator, Expression, ExpressionKind, ObjectPatternProperty,
 };
 use crate::printer::comments::ValueGap;
@@ -45,7 +45,7 @@ enum AssignmentContext {
 /// rather than running on over a `?` / `: T` the pattern's span swallowed. The array
 /// literal's twin is `array_gap_end`; each container names its own end once and the walk
 /// past the holes is shared.
-fn array_pattern_gap_end(arr: &internal::ArrayPattern<'_>, i: usize, body_end: u32) -> u32 {
+fn array_pattern_gap_end(arr: &ast::ArrayPattern<'_>, i: usize, body_end: u32) -> u32 {
     next_real_element_start(arr.elements, i).unwrap_or(body_end)
 }
 
@@ -74,7 +74,7 @@ struct PatternTail<'a> {
     /// Just past the closing `}`/`]` — see [`Printer::pattern_body_end`].
     body_end: u32,
     optional: bool,
-    type_annotation: Option<&'a internal::TSTypeAnnotation<'a>>,
+    type_annotation: Option<&'a ast::TSTypeAnnotation<'a>>,
     /// The pattern is a HUGGED sole parameter ([`Printer::build_hugged_object_pattern_doc`]),
     /// so an object-type literal annotating it prints without a group of its own too.
     hugged: bool,
@@ -129,7 +129,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an assignment expression
     pub(super) fn build_assignment_doc(
         &self,
-        assign: &internal::AssignmentExpression<'_>,
+        assign: &ast::AssignmentExpression<'_>,
         span: Span,
     ) -> DocId {
         // Assignment RHS — an `ancestorNameMap` value position.
@@ -142,7 +142,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an assignment expression with chain context
     fn build_assignment_doc_with_context(
         &self,
-        assign: &internal::AssignmentExpression<'_>,
+        assign: &ast::AssignmentExpression<'_>,
         assign_span: Span,
         context: AssignmentContext,
     ) -> DocId {
@@ -483,7 +483,7 @@ impl<'a> Printer<'a> {
             ExpressionKind::AssignmentExpression(assign)
                 if assign.operator == AssignmentOperator::Assign =>
             {
-                let pattern = internal::AssignmentPattern {
+                let pattern = ast::AssignmentPattern {
                     left: assign.left,
                     right: assign.right,
                     decorators: None,
@@ -515,7 +515,7 @@ impl<'a> Printer<'a> {
         &self,
         span: Span,
         optional: bool,
-        type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
+        type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
         last_content_end: u32,
         closing: u8,
     ) -> u32 {
@@ -542,7 +542,7 @@ impl<'a> Printer<'a> {
     /// spelling, paired with the tail it bounds.
     fn object_pattern_tail<'t>(
         &self,
-        obj: &'t internal::ObjectPattern<'_>,
+        obj: &'t ast::ObjectPattern<'_>,
         span: Span,
     ) -> PatternTail<'t> {
         let optional = obj.optional;
@@ -569,7 +569,7 @@ impl<'a> Printer<'a> {
     /// starts at the last REAL element — the commas past it are structure.
     fn array_pattern_tail<'t>(
         &self,
-        arr: &'t internal::ArrayPattern<'_>,
+        arr: &'t ast::ArrayPattern<'_>,
         span: Span,
     ) -> PatternTail<'t> {
         let optional = arr.optional;
@@ -642,7 +642,7 @@ impl<'a> Printer<'a> {
     /// 2. The pattern exceeds print width (width-based expansion)
     pub(super) fn build_object_pattern_doc(
         &self,
-        obj: &internal::ObjectPattern<'_>,
+        obj: &ast::ObjectPattern<'_>,
         span: Span,
     ) -> DocId {
         self.build_object_pattern_doc_with_context(obj, span, PatternContext::Standalone)
@@ -651,7 +651,7 @@ impl<'a> Printer<'a> {
     /// Build object pattern doc with explicit context
     pub(super) fn build_object_pattern_doc_with_context(
         &self,
-        obj: &internal::ObjectPattern<'_>,
+        obj: &ast::ObjectPattern<'_>,
         obj_span: Span,
         context: PatternContext,
     ) -> DocId {
@@ -669,7 +669,7 @@ impl<'a> Printer<'a> {
     /// expands on its own (nesting, comments, blank lines) keep their layout.
     pub(in crate::printer) fn build_hugged_object_pattern_doc(
         &self,
-        obj: &internal::ObjectPattern<'_>,
+        obj: &ast::ObjectPattern<'_>,
         obj_span: Span,
     ) -> DocId {
         self.build_object_pattern_doc_grouped(
@@ -684,7 +684,7 @@ impl<'a> Printer<'a> {
     /// for the hugged sole parameter ([`Self::build_hugged_object_pattern_doc`]).
     fn build_object_pattern_doc_grouped(
         &self,
-        obj: &internal::ObjectPattern<'_>,
+        obj: &ast::ObjectPattern<'_>,
         obj_span: Span,
         context: PatternContext,
         own_group: bool,
@@ -995,7 +995,7 @@ impl<'a> Printer<'a> {
     /// Returns (has_line_comments, has_blank_lines) in a single pass.
     fn object_pattern_formatting_hints(
         &self,
-        obj: &internal::ObjectPattern<'_>,
+        obj: &ast::ObjectPattern<'_>,
         obj_span: Span,
         boundary: u32,
         has_comments: bool,
@@ -1018,7 +1018,7 @@ impl<'a> Printer<'a> {
     /// after properties) forces expansion, matching prettier.
     fn object_pattern_has_own_line_block_comments(
         &self,
-        obj: &internal::ObjectPattern<'_>,
+        obj: &ast::ObjectPattern<'_>,
         obj_span: Span,
         boundary: u32,
     ) -> bool {
@@ -1032,7 +1032,7 @@ impl<'a> Printer<'a> {
     /// Build doc for empty object pattern: `{}` with optional `?` + type annotation
     fn build_empty_object_pattern_doc(
         &self,
-        obj: &internal::ObjectPattern<'_>,
+        obj: &ast::ObjectPattern<'_>,
         obj_span: Span,
     ) -> DocId {
         // Bound the comment scan to the braces (before any `?`/`: Type`), mirroring
@@ -1047,7 +1047,7 @@ impl<'a> Printer<'a> {
     /// Build expanded doc for object pattern with hardlines (always multiline)
     fn build_expanded_object_pattern_doc(
         &self,
-        obj: &internal::ObjectPattern<'_>,
+        obj: &ast::ObjectPattern<'_>,
         span: Span,
         tail: PatternTail<'_>,
     ) -> DocId {
@@ -1315,7 +1315,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an array pattern
     pub(super) fn build_array_pattern_doc(
         &self,
-        arr: &internal::ArrayPattern<'_>,
+        arr: &ast::ArrayPattern<'_>,
         arr_span: Span,
     ) -> DocId {
         if arr.elements.is_empty() {
@@ -1387,7 +1387,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for empty array pattern: `[]` with optional type annotation
-    fn build_empty_array_pattern_doc(&self, arr: &internal::ArrayPattern<'_>, span: Span) -> DocId {
+    fn build_empty_array_pattern_doc(&self, arr: &ast::ArrayPattern<'_>, span: Span) -> DocId {
         // For array patterns with a `?` / type annotation, the body ends at the `]`
         let tail = self.array_pattern_tail(arr, span);
 
@@ -1403,7 +1403,7 @@ impl<'a> Printer<'a> {
     /// skipped (render + fits would still walk it). Byte-identical.
     fn build_grouped_array_pattern_doc(
         &self,
-        arr: &internal::ArrayPattern<'_>,
+        arr: &ast::ArrayPattern<'_>,
         span: Span,
         tail: PatternTail<'_>,
         has_comments: bool,
@@ -1495,7 +1495,7 @@ impl<'a> Printer<'a> {
     /// Build expanded array pattern doc (always multiline)
     fn build_expanded_array_pattern_doc(
         &self,
-        arr: &internal::ArrayPattern<'_>,
+        arr: &ast::ArrayPattern<'_>,
         arr_span: Span,
         tail: PatternTail<'_>,
     ) -> DocId {
@@ -1647,7 +1647,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an assignment pattern
     pub(super) fn build_assignment_pattern_doc(
         &self,
-        pattern: &internal::AssignmentPattern<'_>,
+        pattern: &ast::AssignmentPattern<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -1824,7 +1824,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a rest element
-    pub(super) fn build_rest_element_doc(&self, rest: &internal::RestElement<'_>) -> DocId {
+    pub(super) fn build_rest_element_doc(&self, rest: &ast::RestElement<'_>) -> DocId {
         let d = self.d();
         // Comments between `...` and the argument (e.g., `.../* c */ args`). Skipped on
         // the comment-free path — rest/spread elements are everywhere (`f(...xs)`,

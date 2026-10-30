@@ -51,7 +51,7 @@
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression, AssignmentOperator,
     AssignmentPattern, BinaryOperator, BlockStatement, CatchClause, ClassBody, ClassDeclaration,
     ClassExpression, ClassMember, Expression, ExpressionKind, ForInOfLeft, ForInit,
@@ -268,7 +268,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         &mut self,
         stmt: &Statement<'arena>,
     ) -> Result<Option<Statement<'arena>>, CompileError> {
-        use tsv_ts::ast::internal as ast;
+        use tsv_ts::ast;
         // The header span: a rebuilt statement keeps the original's.
         let span = stmt.span;
         Ok(match &stmt.kind {
@@ -562,7 +562,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         Ok(match init {
             ForInit::VariableDeclaration(decl) => {
                 map_slice!(self, decl.declarations, variable_declarator).map(|declarations| {
-                    ForInit::VariableDeclaration(tsv_ts::ast::internal::VariableDeclaration {
+                    ForInit::VariableDeclaration(tsv_ts::ast::VariableDeclaration {
                         declarations,
                         ..decl.clone()
                     })
@@ -579,7 +579,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         Ok(match left {
             ForInOfLeft::VariableDeclaration(decl) => {
                 map_slice!(self, decl.declarations, variable_declarator).map(|declarations| {
-                    ForInOfLeft::VariableDeclaration(tsv_ts::ast::internal::VariableDeclaration {
+                    ForInOfLeft::VariableDeclaration(tsv_ts::ast::VariableDeclaration {
                         declarations,
                         ..decl.clone()
                     })
@@ -639,8 +639,8 @@ impl<'arena> StoreRewriter<'_, 'arena> {
 
     fn variable_declarator(
         &mut self,
-        declarator: &tsv_ts::ast::internal::VariableDeclarator<'arena>,
-    ) -> Result<Option<tsv_ts::ast::internal::VariableDeclarator<'arena>>, CompileError> {
+        declarator: &tsv_ts::ast::VariableDeclarator<'arena>,
+    ) -> Result<Option<tsv_ts::ast::VariableDeclarator<'arena>>, CompileError> {
         // The `id` is a binding pattern — its binding NAMES are not reads, but a
         // default (`let { a = $count } = …`) is, so recurse a pattern for its
         // defaults. A plain-identifier binding (`let d = …`) has no read
@@ -664,7 +664,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         if id.is_none() && init.is_none() {
             return Ok(None);
         }
-        Ok(Some(tsv_ts::ast::internal::VariableDeclarator {
+        Ok(Some(tsv_ts::ast::VariableDeclarator {
             id: id.map_or(declarator.id, |id| &*self.b.arena.alloc(id)),
             init: init.map_or(declarator.init, |init| {
                 init.map(|init| &*self.b.arena.alloc(init))
@@ -830,7 +830,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         &mut self,
         expr: &Expression<'arena>,
     ) -> Result<Option<Expression<'arena>>, CompileError> {
-        use tsv_ts::ast::internal as ast;
+        use tsv_ts::ast;
         Ok(match &expr.kind {
             // ── The store / derived leaves ─────────────────────────────────
             ExpressionKind::Identifier(id) => match self.store_base(id) {
@@ -1088,7 +1088,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             ExpressionKind::ArrayPattern(pattern) => map_slice!(self, pattern.elements, opt_expr)
                 .map(|elements| Expression {
                     span: expr.span,
-                    kind: ExpressionKind::ArrayPattern(tsv_ts::ast::internal::ArrayPattern {
+                    kind: ExpressionKind::ArrayPattern(ast::ArrayPattern {
                         elements,
                         ..pattern.clone()
                     }),
@@ -1199,7 +1199,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             }
             ObjectProperty::SpreadElement(spread) => {
                 self.expr_ref(spread.argument)?.map(|argument| {
-                    ObjectProperty::SpreadElement(tsv_ts::ast::internal::SpreadElement {
+                    ObjectProperty::SpreadElement(tsv_ts::ast::SpreadElement {
                         argument,
                         span: spread.span,
                     })
@@ -1335,7 +1335,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
 
     fn update(
         &mut self,
-        update: &tsv_ts::ast::internal::UpdateExpression<'arena>,
+        update: &tsv_ts::ast::UpdateExpression<'arena>,
         span: Span,
     ) -> Result<Option<Expression<'arena>>, CompileError> {
         // A bare `$name++` / `++$name` store update.
@@ -1363,7 +1363,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         }
         Ok(self.expr_ref(update.argument)?.map(|argument| Expression {
             span,
-            kind: ExpressionKind::UpdateExpression(tsv_ts::ast::internal::UpdateExpression {
+            kind: ExpressionKind::UpdateExpression(tsv_ts::ast::UpdateExpression {
                 argument,
                 ..update.clone()
             }),

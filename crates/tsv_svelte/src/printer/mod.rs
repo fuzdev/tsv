@@ -29,7 +29,7 @@ mod nodes;
 mod script_style;
 mod text;
 
-use crate::ast::internal::{self, FragmentNode};
+use crate::ast::{self, FragmentNode};
 use nodes::AttrGaps;
 use smallvec::SmallVec;
 use std::cell::{Cell, OnceCell, RefCell};
@@ -91,7 +91,7 @@ impl HoistedSection {
     }
 
     /// The section's span in `root`, `None` when the component has no such section.
-    fn span_in(self, root: &internal::Root<'_>) -> Option<Span> {
+    fn span_in(self, root: &ast::Root<'_>) -> Option<Span> {
         match self {
             Self::Options => root.options.as_ref().map(|s| s.span),
             Self::ModuleScript => root.module.as_ref().map(|s| s.span),
@@ -173,7 +173,7 @@ type FrozenSections = [bool; 4];
 
 /// The four root sections in canonical print order ([`HoistedSection::ALL`]), each with its
 /// span when the component has it.
-fn root_sections(root: &internal::Root<'_>) -> [(Option<Span>, HoistedSection); 4] {
+fn root_sections(root: &ast::Root<'_>) -> [(Option<Span>, HoistedSection); 4] {
     HoistedSection::ALL.map(|section| (section.span_in(root), section))
 }
 
@@ -256,7 +256,7 @@ struct CommentScan<'r> {
 }
 
 impl<'r> CommentScan<'r> {
-    fn new(fragment: &internal::Fragment<'_>, ranges: &'r IgnoreRanges) -> Self {
+    fn new(fragment: &ast::Fragment<'_>, ranges: &'r IgnoreRanges) -> Self {
         let nodes = &fragment.nodes;
         let mut next_barrier = vec![None; nodes.len()];
         let mut barrier = None;
@@ -292,7 +292,7 @@ enum RangeMarker {
 /// scan, the comment-classification barrier and the lifted-run rewrite all read) and the
 /// region-end trail's exclusion ask it here, so they cannot drift on which comments count as
 /// markers. A free function (not a method) because [`IgnoreRanges::new`] needs `source` alone.
-fn range_marker(comment: &internal::HtmlComment, source: &str) -> Option<RangeMarker> {
+fn range_marker(comment: &ast::HtmlComment, source: &str) -> Option<RangeMarker> {
     let content = comment.content(source);
     if is_format_ignore_range_start(content) {
         Some(RangeMarker::Start)
@@ -465,7 +465,7 @@ pub(crate) struct Printer<'a> {
     /// correctly).
     block_dangle_allowed: Cell<bool>,
     /// The nesting the printer's own parse of a nested `<script>` / `<style>` body starts
-    /// from ([`internal::Root::nested_raw_text_nesting`]), so that parse shares the
+    /// from ([`ast::Root::nested_raw_text_nesting`]), so that parse shares the
     /// document's depth budget.
     pub(crate) nested_raw_text_nesting: Cell<u32>,
     /// Whether the fragment being built is a `<textarea>`'s content — RCDATA, which Svelte
@@ -573,7 +573,7 @@ pub(crate) fn without_fused_source_spans<R>(f: impl FnOnce() -> R) -> R {
 /// `extra.is_none()` is the load-bearing clause: a typed block binding (`{#each xs as x: T}`)
 /// keeps its span on the bare name with the annotation as a sibling, so nothing about the
 /// span says the node prints more than its name.
-fn plain_reference_span(id: &tsv_ts::ast::internal::Identifier<'_>) -> Option<Span> {
+fn plain_reference_span(id: &tsv_ts::ast::Identifier<'_>) -> Option<Span> {
     (id.name_plain_ascii
         && id.escaped_name.is_none()
         && !id.optional
@@ -1573,17 +1573,13 @@ impl<'a> Printer<'a> {
 }
 
 /// Format a Svelte AST back to source code
-pub(crate) fn format_svelte(root: &internal::Root<'_>, source: &str) -> String {
+pub(crate) fn format_svelte(root: &ast::Root<'_>, source: &str) -> String {
     let arena = DocArena::for_source(source);
     format_svelte_in(root, source, &arena)
 }
 
 /// Format a Svelte AST into a caller-provided doc arena (the reuse path).
-pub(crate) fn format_svelte_in(
-    root: &internal::Root<'_>,
-    source: &str,
-    arena: &DocArena,
-) -> String {
+pub(crate) fn format_svelte_in(root: &ast::Root<'_>, source: &str, arena: &DocArena) -> String {
     let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
     format_root(
         root,
@@ -1599,7 +1595,7 @@ pub(crate) fn format_svelte_in(
 /// [`format_svelte_in`] over a document the caller folded ahead of the parse: the line
 /// verdict comes from the fold's own pass (`LineBreaks::of_folded`), not a second walk.
 pub(crate) fn format_svelte_folded_in(
-    root: &internal::Root<'_>,
+    root: &ast::Root<'_>,
     folded: &tsv_lang::printing::FoldedSource<'_>,
     arena: &DocArena,
 ) -> String {
@@ -1665,7 +1661,7 @@ impl Known {
 /// ([`format_lifted_runs`]); or, for a document whose template tail the reorder would expose
 /// to the parse's end-of-document trim, the respelled source ([`format_respelled_tail`]).
 fn format_root<'a>(
-    root: &internal::Root<'_>,
+    root: &ast::Root<'_>,
     source: &'a str,
     line_breaks: LineBreaks<'a>,
     arena: &'a DocArena,
@@ -1778,7 +1774,7 @@ fn format_root<'a>(
 /// (`tsv_lang::printing::encode_leading_zwnbsp`).
 fn print_document(
     mut printer: Printer<'_>,
-    root: &internal::Root<'_>,
+    root: &ast::Root<'_>,
     sections: &HoistedComments,
     frozen: FrozenSections,
 ) -> String {
@@ -1803,7 +1799,7 @@ fn print_document(
 /// `FileTooLarge`), which the few added bytes can cross — nothing proves that. Whatever the
 /// failure, the original is then printed unrespelled.
 fn format_respelled_tail(
-    root: &internal::Root<'_>,
+    root: &ast::Root<'_>,
     source: &str,
     at: usize,
     ch: char,
@@ -1858,7 +1854,7 @@ fn format_respelled_tail(
 /// proves that. Whatever the failure, the original is then printed with its runs where they
 /// stand (`sections` is its classification).
 fn format_lifted_runs(
-    root: &internal::Root<'_>,
+    root: &ast::Root<'_>,
     source: &str,
     lifted: &str,
     arena: &DocArena,
@@ -1903,7 +1899,7 @@ fn format_lifted_runs(
 /// `{#await}` / `{#key}` / `{#snippet}` block bodies). The print-once comment ledger reads
 /// only the span, so no `HtmlComment` need be manufactured into a `Comment`.
 #[cfg(feature = "comment_check")]
-fn collect_html_comment_spans(fragment: &internal::Fragment<'_>, out: &mut Vec<Span>) {
+fn collect_html_comment_spans(fragment: &ast::Fragment<'_>, out: &mut Vec<Span>) {
     for node in fragment.nodes {
         match node {
             FragmentNode::Comment(comment) => out.push(comment.span),
@@ -2004,7 +2000,7 @@ impl<'a> Printer<'a> {
     /// it where it stands) and still freezes the section below it.
     fn section_is_frozen(
         &self,
-        fragment: &internal::Fragment<'_>,
+        fragment: &ast::Fragment<'_>,
         section: Span,
         hoisted: &[Span],
     ) -> bool {
@@ -2025,7 +2021,7 @@ impl<'a> Printer<'a> {
 
     /// Every section's freeze verdict ([`Self::section_is_frozen`]) — `<svelte:options>`
     /// takes none, since it always prints normalized.
-    fn frozen_sections(&self, root: &internal::Root<'_>) -> FrozenSections {
+    fn frozen_sections(&self, root: &ast::Root<'_>) -> FrozenSections {
         let hoisted: SmallVec<[Span; 4]> = root_sections(root)
             .into_iter()
             .filter_map(|(span, _)| span)
@@ -2038,7 +2034,7 @@ impl<'a> Printer<'a> {
 
     /// The root fragment's [`IgnoreRanges`], paired on first ask and kept for the document —
     /// every reader asks of the one root this printer formats.
-    fn ignore_ranges(&self, root_fragment: &internal::Fragment<'_>) -> &IgnoreRanges {
+    fn ignore_ranges(&self, root_fragment: &ast::Fragment<'_>) -> &IgnoreRanges {
         let ranges = self
             .ignore_ranges
             .get_or_init(|| IgnoreRanges::new(root_fragment.nodes, self.source));
@@ -2058,9 +2054,9 @@ impl<'a> Printer<'a> {
     /// leads that node, not a section), and a **format-ignore range marker** — see
     /// [`range_marker`]'s role in the scan below.
     fn classify_fragment_comment(
-        comment: &internal::HtmlComment,
+        comment: &ast::HtmlComment,
         comment_idx: usize,
-        root: &internal::Root<'_>,
+        root: &ast::Root<'_>,
         scan: &CommentScan<'_>,
     ) -> Option<HoistedSection> {
         // format-ignore-start/end mark ranges within the template —
@@ -2119,7 +2115,7 @@ impl<'a> Printer<'a> {
     /// `extractRegionEndTrailAfterHoistedEnd`), asked the plugin's way — of each hoisted END,
     /// not of each comment, so a document's template comments pay nothing for it. The one
     /// byte the two readings differ on is the form feed: the plugin's whitespace gate is
-    /// `[\t\n\f\r ]`, [`internal::is_collapsible_ws`] deliberately lacks `\f`.
+    /// `[\t\n\f\r ]`, [`ast::is_collapsible_ws`] deliberately lacks `\f`.
     ///
     /// A candidate only: the plugin's precedence is its evaluation order, and `print_root`
     /// applies it against the classification. A `#endregion` that a FOLLOWING `<script>` or
@@ -2131,7 +2127,7 @@ impl<'a> Printer<'a> {
     /// to the template (`None`) or to [`HoistedSection::Options`]. Range markers and comments
     /// inside a frozen range are excluded for the same reasons the leading classification
     /// excludes them.
-    fn region_end_trails(&self, root: &internal::Root<'_>) -> [Option<usize>; 4] {
+    fn region_end_trails(&self, root: &ast::Root<'_>) -> [Option<usize>; 4] {
         let nodes = &root.fragment.nodes;
         let bytes = self.source.as_bytes();
         root_sections(root).map(|(span, _)| {
@@ -2148,9 +2144,7 @@ impl<'a> Printer<'a> {
                 return None;
             };
             let start = comment.span.start as usize;
-            (bytes[end..start]
-                .iter()
-                .all(|&b| internal::is_collapsible_ws(b))
+            (bytes[end..start].iter().all(|&b| ast::is_collapsible_ws(b))
                 && is_region_end_marker(comment.content(self.source))
                 && range_marker(comment, self.source).is_none()
                 && !self.ignore_ranges(&root.fragment).contains(idx))
@@ -2163,9 +2157,9 @@ impl<'a> Printer<'a> {
     /// asserted under the fixture suite, skipped (never a panic — this is the shipped printer)
     /// in a release build.
     fn fragment_comment<'f>(
-        fragment: &'f internal::Fragment<'_>,
+        fragment: &'f ast::Fragment<'_>,
         idx: usize,
-    ) -> Option<&'f internal::HtmlComment> {
+    ) -> Option<&'f ast::HtmlComment> {
         let comment = match &fragment.nodes[idx] {
             FragmentNode::Comment(comment) => Some(comment),
             _ => None,
@@ -2178,7 +2172,7 @@ impl<'a> Printer<'a> {
     /// `prev_end` (the previous comment, or the section's closing tag for a region-end trail)
     /// and the comment survives, then the comment, then the line break. The one emitter behind
     /// every comment a section prints around itself.
-    fn print_comment_line(&mut self, comment: &internal::HtmlComment, prev_end: Option<u32>) {
+    fn print_comment_line(&mut self, comment: &ast::HtmlComment, prev_end: Option<u32>) {
         if let Some(end) = prev_end
             && text::has_authored_blank_line(
                 &self.source[end as usize..comment.span.start as usize],
@@ -2195,7 +2189,7 @@ impl<'a> Printer<'a> {
     fn print_comment_run(
         &mut self,
         comment_indices: &[usize],
-        fragment: &internal::Fragment<'_>,
+        fragment: &ast::Fragment<'_>,
     ) -> Option<u32> {
         let mut prev_end: Option<u32> = None;
         for &i in comment_indices {
@@ -2214,7 +2208,7 @@ impl<'a> Printer<'a> {
     fn print_region_end_trail(
         &mut self,
         trail: Option<usize>,
-        fragment: &internal::Fragment<'_>,
+        fragment: &ast::Fragment<'_>,
         section_end: u32,
     ) {
         if let Some(idx) = trail
@@ -2243,7 +2237,7 @@ impl<'a> Printer<'a> {
     fn print_section_comments(
         &mut self,
         comment_indices: &[usize],
-        fragment: &internal::Fragment<'_>,
+        fragment: &ast::Fragment<'_>,
         section_start: u32,
     ) -> bool {
         let Some(last_end) = self.print_comment_run(comment_indices, fragment) else {
@@ -2262,7 +2256,7 @@ impl<'a> Printer<'a> {
     /// confirmed against the classification (the plugin's precedence — see
     /// [`Self::region_end_trails`]); each candidate names one section and each section at most
     /// one candidate, so a confirmed trail is written exactly once.
-    fn hoisted_comments(&self, root: &internal::Root<'_>) -> HoistedComments {
+    fn hoisted_comments(&self, root: &ast::Root<'_>) -> HoistedComments {
         let trails = self.region_end_trails(root);
         let mut sections = HoistedComments::default();
         let scan = CommentScan::new(&root.fragment, self.ignore_ranges(&root.fragment));
@@ -2303,7 +2297,7 @@ impl<'a> Printer<'a> {
     /// move is tsv's, so the respell completes it.
     fn template_tail_respell(
         &self,
-        root: &internal::Root<'_>,
+        root: &ast::Root<'_>,
         sections: &HoistedComments,
     ) -> Option<(usize, char)> {
         if root.css.is_some() {
@@ -2323,7 +2317,7 @@ impl<'a> Printer<'a> {
             }
         }
         let (idx, text) = tail?;
-        let content = internal::trim_end_collapsible_ws(text.raw(self.source));
+        let content = ast::trim_end_collapsible_ws(text.raw(self.source));
         let ch = content.chars().next_back()?;
         if !crate::whitespace::is_end_trimmed_content(ch) {
             return None;
@@ -2356,7 +2350,7 @@ impl<'a> Printer<'a> {
     /// the freeze.
     fn style_trailing_comments(
         &self,
-        root: &internal::Root<'_>,
+        root: &ast::Root<'_>,
         sections: &HoistedComments,
     ) -> Vec<usize> {
         let mut run: Vec<usize> = Vec::new();
@@ -2397,7 +2391,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::region_end_trails`]).
     fn print_root(
         &mut self,
-        root: &internal::Root<'_>,
+        root: &ast::Root<'_>,
         sections: &HoistedComments,
         frozen: FrozenSections,
     ) {
@@ -2505,7 +2499,7 @@ impl<'a> Printer<'a> {
     /// ordinary `read_attribute` like any other, comments included, so it goes through the
     /// same [`Printer::push_attrs_with_comments`] the pipeline uses. Doc-based from there on,
     /// for width-aware wrapping.
-    fn print_svelte_options(&mut self, options: &internal::SvelteOptions<'_>) {
+    fn print_svelte_options(&mut self, options: &ast::SvelteOptions<'_>) {
         let d = self.d();
         // Built before the empty check, not after: the attribute list can be empty and still
         // carry comments (`<svelte:options /* c */ />`), and an early return keyed on
@@ -2576,7 +2570,7 @@ impl<'a> Printer<'a> {
     ///   `format-ignore` is handled by the shared builder itself.)
     fn print_root_fragment(
         &mut self,
-        fragment: &internal::Fragment<'_>,
+        fragment: &ast::Fragment<'_>,
         skip_indices: &[usize],
         hoisted: &[Span],
     ) {
@@ -2706,7 +2700,7 @@ impl<'a> Printer<'a> {
     /// The verbatim doc for a `format-ignore` range slice, with every **hoisted section** cut out.
     ///
     /// A `<script>` / `<style>` / `<svelte:options>` written inside the range is not a fragment
-    /// node — it is lifted onto [`internal::Root`] and printed at its canonical position — but
+    /// node — it is lifted onto [`ast::Root`] and printed at its canonical position — but
     /// this slice is *raw source* between the two markers, which still holds its bytes. Emitting
     /// them verbatim prints the section **twice**, and the result is not a valid component:
     /// tsv's own parser rejects it (`Duplicate instance script found` / `Duplicate style tag
@@ -2915,7 +2909,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Format an HTML comment: <!-- content -->
-    fn print_comment(&mut self, comment: &internal::HtmlComment) {
+    fn print_comment(&mut self, comment: &ast::HtmlComment) {
         // The hoisted-section (direct-write) emit path for a `<!-- -->` comment, recorded at
         // the write like `tsv_css`'s `print_css_comment`; the template path is the doc-tagged
         // `build_html_comment_doc`. Registered by span in `format_svelte_in`. See

@@ -8,7 +8,7 @@
 // - Template literal types: `\`prefix${T}suffix\``
 
 use super::Printer;
-use crate::ast::internal::{TSLiteralType, TSType, TemplateElement, TemplateLiteralType};
+use crate::ast::{TSLiteralType, TSType, TemplateElement, TemplateLiteralType};
 use crate::printer::ignore::is_freeze_target;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;

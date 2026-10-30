@@ -3,7 +3,7 @@
 // Switch head, case labels, and case-body layout with comment handling.
 
 use super::{HeadChainGrouping, OpenParenLineBlockComment};
-use crate::ast::internal::{self, StatementKind};
+use crate::ast::{self, StatementKind};
 use crate::printer::expressions::blocks::{OrphanSemiCursor, StatementBlankScan};
 use crate::printer::statements::StatementContext;
 use crate::printer::{
@@ -23,7 +23,7 @@ impl<'a> Printer<'a> {
     /// when the `switch (discriminant) {` line exceeds print width.
     pub(in crate::printer::statements) fn build_switch_statement_doc(
         &self,
-        stmt: &internal::SwitchStatement<'_>,
+        stmt: &ast::SwitchStatement<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -243,7 +243,7 @@ impl<'a> Printer<'a> {
     /// Where the case's head ends — past the test expression, or past the `default`
     /// keyword — which is where the head→`:` gap opens. The one anchor both the label
     /// scan and the label emitter measure that gap from.
-    fn case_head_end(case: &internal::SwitchCase<'_>) -> u32 {
+    fn case_head_end(case: &ast::SwitchCase<'_>) -> u32 {
         case.test.as_ref().map_or_else(
             || case.span.start + "default".len() as u32,
             |test| test.span().end,
@@ -251,7 +251,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the end position of a case label (position after the colon)
-    fn get_case_label_end(&self, case: &internal::SwitchCase<'_>) -> u32 {
+    fn get_case_label_end(&self, case: &ast::SwitchCase<'_>) -> u32 {
         // Find the label ':' after the head, skipping any ':' inside a comment in the gap
         // (`case 1 /* : */:`, `default /* : */:`). With no comment the colon follows the
         // head immediately, which is also the fallback if the scan finds nothing.
@@ -282,7 +282,7 @@ impl<'a> Printer<'a> {
     /// nothing leads and the claim stays whole.
     fn build_switch_case_doc_inner(
         &self,
-        case: &internal::SwitchCase<'_>,
+        case: &ast::SwitchCase<'_>,
         inline_comment_boundary: u32,
         next_case_start: Option<u32>,
         body_has_comments: bool,

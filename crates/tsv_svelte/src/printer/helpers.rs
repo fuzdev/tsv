@@ -1,7 +1,7 @@
 //! Fragment analysis and child printing helpers
 
 use super::Printer;
-use crate::ast::internal::{Fragment, FragmentNode, is_collapsible_ws, text_edge_ws};
+use crate::ast::{Fragment, FragmentNode, is_collapsible_ws, text_edge_ws};
 
 impl<'a> Printer<'a> {
     /// Check if a fragment's content is inline (huggable at both ends).

@@ -14,7 +14,7 @@ Depends only on `tsv_lang` (see [`tsv_lang/CLAUDE.md`](../tsv_lang/CLAUDE.md)). 
 
 See [../../CLAUDE.md §Canonical References](../../CLAUDE.md#canonical-references) and [../../CLAUDE.md §Strictness](../../CLAUDE.md#strictness-module-strict-script-by-directive). The tsc oracle is operationalized by the `conformance:ts-repo` gate — the bucket ladder, the ledgers, and the reject-vs-defer line each verdict names: [../../docs/conformance_tsc.md](../../docs/conformance_tsc.md).
 
-Standard `ast/` (internal + convert), `lexer/`, `parser/`, `printer/` layout — see [../../CLAUDE.md §Project Structure](../../CLAUDE.md#project-structure). Module catalog lives in the root.
+Standard `ast/` (the internal AST + `convert`), `lexer/`, `parser/`, `printer/` layout — see [../../CLAUDE.md §Project Structure](../../CLAUDE.md#project-structure). Module catalog lives in the root.
 
 ## Public API
 

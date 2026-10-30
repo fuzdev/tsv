@@ -71,7 +71,7 @@ use super::statement_tail::StatementTerminator;
 use super::types::TrailingBlock;
 use super::types::helpers::{TypeParenRule, outermost_paren, paren_shell_gaps};
 use super::unwrap_parenthesized;
-use crate::ast::internal::{self, Comment, TSType};
+use crate::ast::{self, Comment, TSType};
 use smallvec::smallvec;
 use std::borrow::Borrow;
 use tsv_lang::doc::DocBuf;
@@ -461,7 +461,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_frozen_annotation_head_doc(
         &self,
         gap_start: u32,
-        annotation: &internal::TSTypeAnnotation<'_>,
+        annotation: &ast::TSTypeAnnotation<'_>,
     ) -> Option<DocId> {
         if !self.has_format_ignore {
             return None;
@@ -486,7 +486,7 @@ impl<'a> Printer<'a> {
         &self,
         gap_start: u32,
         marker: Option<u8>,
-        annotation: Option<&internal::TSTypeAnnotation<'_>>,
+        annotation: Option<&ast::TSTypeAnnotation<'_>>,
     ) -> Option<(DocId, u32)> {
         if !self.has_format_ignore {
             return None;
@@ -556,7 +556,7 @@ impl<'a> Printer<'a> {
     /// reads to freeze its stripped inner cannot come apart.
     pub(in crate::printer) fn paren_shell_routed_inner<'t>(
         &self,
-        shell: &'t internal::TSParenthesizedType<'t>,
+        shell: &'t ast::TSParenthesizedType<'t>,
     ) -> Option<&'t TSType<'t>> {
         if !self.has_format_ignore {
             return None;
@@ -619,7 +619,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn param_frozen_span(
         &self,
         open_paren: Option<u32>,
-        params: &[internal::Expression<'_>],
+        params: &[ast::Expression<'_>],
         i: usize,
     ) -> Option<Span> {
         if !self.has_format_ignore {
@@ -677,7 +677,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn left_spine_operand_frozen_span(
         &self,
         node_start: u32,
-        operand: &internal::Expression<'_>,
+        operand: &ast::Expression<'_>,
     ) -> Option<Span> {
         self.gap_frozen_span(node_start, operand.span())
     }
@@ -706,7 +706,7 @@ impl<'a> Printer<'a> {
     /// re-running this across a conditional group's candidates is sound.
     pub(in crate::printer) fn wrap_frozen_position_pair(
         &self,
-        operand: &internal::Expression<'_>,
+        operand: &ast::Expression<'_>,
         pair: FrozenOperandPair,
         doc: DocId,
     ) -> DocId {
@@ -731,7 +731,7 @@ impl<'a> Printer<'a> {
     /// positions. The slice half is [`Self::frozen_slice_absorbs_left_binding_suffix`].
     fn frozen_operand_pair_needed(
         &self,
-        operand: &internal::Expression<'_>,
+        operand: &ast::Expression<'_>,
         pair: FrozenOperandPair,
     ) -> bool {
         match pair {
@@ -792,7 +792,7 @@ impl<'a> Printer<'a> {
     /// every joining tail, frozen or not.
     fn frozen_slice_absorbs_left_binding_suffix(
         &self,
-        operand: &internal::Expression<'_>,
+        operand: &ast::Expression<'_>,
         ctx: ParenContext,
     ) -> bool {
         if !self.frozen_new_slice_absorbs_tail(operand) {
@@ -810,7 +810,7 @@ impl<'a> Printer<'a> {
                 joins_a_trailing_angle_bracket(parent_op)
                     && matches!(
                         &operand.kind,
-                        internal::ExpressionKind::NewExpression(new_expr)
+                        ast::ExpressionKind::NewExpression(new_expr)
                             if new_expr.type_arguments.is_some()
                     )
             }
@@ -834,9 +834,9 @@ impl<'a> Printer<'a> {
     /// the slice ENDS in and which one the tail OPENS with.
     pub(in crate::printer) fn frozen_new_slice_absorbs_tail(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
     ) -> bool {
-        let internal::ExpressionKind::NewExpression(new_expr) = &expr.kind else {
+        let ast::ExpressionKind::NewExpression(new_expr) = &expr.kind else {
             return false;
         };
         let head_end = new_expr
@@ -859,7 +859,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_left_spine_operand_doc(
         &self,
         node_start: u32,
-        operand: &internal::Expression<'_>,
+        operand: &ast::Expression<'_>,
         pair: FrozenOperandPair,
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
@@ -883,7 +883,7 @@ impl<'a> Printer<'a> {
         &self,
         can_freeze: bool,
         node_start: u32,
-        operand: &internal::Expression<'_>,
+        operand: &ast::Expression<'_>,
         pair: FrozenOperandPair,
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
@@ -926,7 +926,7 @@ impl<'a> Printer<'a> {
     /// doc reads nothing).
     pub(in crate::printer) fn frozen_chain_base_span(
         &self,
-        base: &internal::Expression<'_>,
+        base: &ast::Expression<'_>,
     ) -> Option<Span> {
         self.frozen_chain_base
             .get()
@@ -987,7 +987,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_value_head_doc(
         &self,
         gap_start: u32,
-        value: &internal::Expression<'_>,
+        value: &ast::Expression<'_>,
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
         match self.value_head_frozen_span(gap_start, value.span()) {
@@ -1021,7 +1021,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_statement_head_doc(
         &self,
         gap_start: u32,
-        stmt: &internal::Statement<'_>,
+        stmt: &ast::Statement<'_>,
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
         match self.gap_frozen_span(gap_start, stmt.span()) {
@@ -1061,7 +1061,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn args_frozen_span(
         &self,
         container_start: u32,
-        args: &[&internal::Expression<'_>],
+        args: &[&ast::Expression<'_>],
         i: usize,
     ) -> Option<Span> {
         if !self.has_format_ignore {
@@ -1083,7 +1083,7 @@ impl<'a> Printer<'a> {
     /// element's end — or at `container_start` when every earlier slot is a hole. That
     /// anchor rule is why this is spelled here beside [`Self::list_item_frozen`], the
     /// other home of the gap-anchor convention, rather than at the element loops.
-    pub(in crate::printer) fn element_frozen_span<'e, E: Borrow<internal::Expression<'e>>>(
+    pub(in crate::printer) fn element_frozen_span<'e, E: Borrow<ast::Expression<'e>>>(
         &self,
         container_start: u32,
         elements: &[Option<E>],
@@ -1201,7 +1201,7 @@ impl<'a> Printer<'a> {
     /// header-body, `export`-head and detached-terminator spellings).
     pub(in crate::printer) fn build_frozen_statement_doc(
         &self,
-        stmt: &internal::Statement<'_>,
+        stmt: &ast::Statement<'_>,
     ) -> DocId {
         let (frozen, terminated) = self.frozen_statement_slice(stmt);
         let doc = self.build_frozen_node_doc(frozen);
@@ -1234,7 +1234,7 @@ impl<'a> Printer<'a> {
     /// following statement needs — `const a = x // c⏎;` + `(y) => 1;` welds to
     /// `const a  =  x // c;`, which no longer parses at all. There the whole node freezes as
     /// authored, terminator included, which is both lossless and the only reparsable answer.
-    fn frozen_statement_slice(&self, stmt: &internal::Statement<'_>) -> (Span, bool) {
+    fn frozen_statement_slice(&self, stmt: &ast::Statement<'_>) -> (Span, bool) {
         let span = stmt.span();
         let terminator = Self::statement_terminator(stmt);
         if terminator == StatementTerminator::Never {
@@ -1317,7 +1317,7 @@ impl<'a> Printer<'a> {
     /// spelled the bare pair here.
     pub(in crate::printer) fn build_frozen_value_doc(
         &self,
-        value: &internal::Expression<'_>,
+        value: &ast::Expression<'_>,
         frozen: Span,
         ctx: ParenContext,
     ) -> DocId {
@@ -1355,7 +1355,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn build_frozen_arg_doc(
         &self,
-        arg: &internal::Expression<'_>,
+        arg: &ast::Expression<'_>,
         frozen: Span,
     ) -> DocId {
         self.build_frozen_value_doc(arg, frozen, ParenContext::Argument)
@@ -1389,11 +1389,11 @@ impl<'a> Printer<'a> {
     /// [`Self::build_frozen_node_doc`] directly.
     pub(in crate::printer) fn build_frozen_expression_doc(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         frozen: Span,
     ) -> DocId {
         let doc = self.build_frozen_node_doc(frozen);
-        if matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_)) {
+        if matches!(expr.kind, ast::ExpressionKind::SequenceExpression(_)) {
             self.d().parens(doc)
         } else {
             doc
@@ -1422,7 +1422,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_arg_item_doc(
         &self,
         container_start: u32,
-        args: &[&internal::Expression<'_>],
+        args: &[&ast::Expression<'_>],
         i: usize,
     ) -> DocId {
         if !self.has_format_ignore {

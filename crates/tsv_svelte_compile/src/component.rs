@@ -20,11 +20,11 @@ use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
-use tsv_svelte::ast::internal::{
+use tsv_svelte::ast::{
     Attribute, AttributeNode, AttributeValue, Element, ElementKind, Fragment, FragmentNode,
     SpecialElement, SpecialElementKind,
 };
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ArrayExpression, BlockStatement, Expression, ExpressionKind, ObjectExpression, ObjectProperty,
     Property, Statement,
 };

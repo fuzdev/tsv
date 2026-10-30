@@ -15,7 +15,7 @@
 //! specialized doc builders for each value type.
 
 use super::{Printer, value_normalization};
-use crate::ast::internal::{Color, CssValue, StringCooked};
+use crate::ast::{Color, CssValue, StringCooked};
 use crate::keyword_set::ascii_keyword_set;
 use crate::lexer::hyphen_starts_own_token;
 use crate::number::sign_starts_number;

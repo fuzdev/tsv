@@ -18,7 +18,7 @@
 //! where `inherited` is html). A `<svelte:element>`'s xmlns/ancestor namespace
 //! resolution is likewise approximated (its runtime tag is unknown).
 
-use tsv_svelte::ast::internal::{
+use tsv_svelte::ast::{
     AwaitBlock, Element, ElementKind, FragmentNode, IfBlock, SpecialElementKind,
 };
 

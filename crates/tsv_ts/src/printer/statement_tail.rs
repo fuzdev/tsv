@@ -6,7 +6,7 @@
 
 use super::Printer;
 use super::comments::ends_no_trivia;
-use crate::ast::internal;
+use crate::ast;
 use crate::lexer::{is_es_line_terminator, is_es_whitespace};
 use tsv_lang::Span;
 
@@ -46,7 +46,7 @@ impl<'a> Printer<'a> {
     /// `shouldIgnoredNodePrintSemicolon`. A header kind resolves through its TAIL statement
     /// the way prettier does: a statement's terminator is its tail's.
     pub(in crate::printer) fn statement_terminator(
-        mut stmt: &internal::Statement<'_>,
+        mut stmt: &ast::Statement<'_>,
     ) -> StatementTerminator {
         loop {
             match Self::own_statement_terminator(stmt) {
@@ -82,11 +82,11 @@ impl<'a> Printer<'a> {
     /// DROP (every `l: a();`), each found by the gap-injection audit rather than by a
     /// fixture — the authoring is one no formatted document contains.
     fn delegated_statement<'s, 'arena>(
-        stmt: &'s internal::Statement<'arena>,
-    ) -> Option<&'s internal::Statement<'arena>> {
+        stmt: &'s ast::Statement<'arena>,
+    ) -> Option<&'s ast::Statement<'arena>> {
         match &stmt.kind {
-            internal::StatementKind::ExportNamedDeclaration(decl) => decl.declaration,
-            internal::StatementKind::LabeledStatement(stmt) => Some(stmt.body),
+            ast::StatementKind::ExportNamedDeclaration(decl) => decl.declaration,
+            ast::StatementKind::LabeledStatement(stmt) => Some(stmt.body),
             _ => None,
         }
     }
@@ -102,30 +102,30 @@ impl<'a> Printer<'a> {
     /// lowering the enclosing list's cursor over it would claim a comment that body already
     /// prints (a DOUBLE-PRINT).
     fn own_statement_terminator<'s, 'arena>(
-        stmt: &'s internal::Statement<'arena>,
-    ) -> Result<StatementTerminator, &'s internal::Statement<'arena>> {
+        stmt: &'s ast::Statement<'arena>,
+    ) -> Result<StatementTerminator, &'s ast::Statement<'arena>> {
         Ok(match &stmt.kind {
-            internal::StatementKind::VariableDeclaration(_)
-            | internal::StatementKind::BreakStatement(_)
-            | internal::StatementKind::ContinueStatement(_)
-            | internal::StatementKind::DebuggerStatement(_) => StatementTerminator::Always,
-            internal::StatementKind::ExpressionStatement(_)
-            | internal::StatementKind::ReturnStatement(_)
-            | internal::StatementKind::ThrowStatement(_)
-            | internal::StatementKind::DoWhileStatement(_)
-            | internal::StatementKind::ImportDeclaration(_)
-            | internal::StatementKind::ExportNamedDeclaration(_)
-            | internal::StatementKind::ExportDefaultDeclaration(_)
-            | internal::StatementKind::ExportAllDeclaration(_) => StatementTerminator::IfAuthored,
-            internal::StatementKind::IfStatement(s) => {
+            ast::StatementKind::VariableDeclaration(_)
+            | ast::StatementKind::BreakStatement(_)
+            | ast::StatementKind::ContinueStatement(_)
+            | ast::StatementKind::DebuggerStatement(_) => StatementTerminator::Always,
+            ast::StatementKind::ExpressionStatement(_)
+            | ast::StatementKind::ReturnStatement(_)
+            | ast::StatementKind::ThrowStatement(_)
+            | ast::StatementKind::DoWhileStatement(_)
+            | ast::StatementKind::ImportDeclaration(_)
+            | ast::StatementKind::ExportNamedDeclaration(_)
+            | ast::StatementKind::ExportDefaultDeclaration(_)
+            | ast::StatementKind::ExportAllDeclaration(_) => StatementTerminator::IfAuthored,
+            ast::StatementKind::IfStatement(s) => {
                 return Err(s.alternate.unwrap_or(s.consequent));
             }
-            internal::StatementKind::ForStatement(s) => return Err(s.body),
-            internal::StatementKind::ForInStatement(s) => return Err(s.body),
-            internal::StatementKind::ForOfStatement(s) => return Err(s.body),
-            internal::StatementKind::WhileStatement(s) => return Err(s.body),
-            internal::StatementKind::WithStatement(s) => return Err(s.body),
-            internal::StatementKind::LabeledStatement(s) => return Err(s.body),
+            ast::StatementKind::ForStatement(s) => return Err(s.body),
+            ast::StatementKind::ForInStatement(s) => return Err(s.body),
+            ast::StatementKind::ForOfStatement(s) => return Err(s.body),
+            ast::StatementKind::WhileStatement(s) => return Err(s.body),
+            ast::StatementKind::WithStatement(s) => return Err(s.body),
+            ast::StatementKind::LabeledStatement(s) => return Err(s.body),
             _ => StatementTerminator::Never,
         })
     }
@@ -154,7 +154,7 @@ impl<'a> Printer<'a> {
     /// ⚠️ The trim is over WHITESPACE ONLY — **a comment is content** here, where prettier
     /// measures its comment-STRIPPED text. The two readers absorb that difference the same
     /// way and for the same reason, each stated at its own site.
-    pub(in crate::printer) fn statement_content_end(&self, stmt: &internal::Statement<'_>) -> u32 {
+    pub(in crate::printer) fn statement_content_end(&self, stmt: &ast::Statement<'_>) -> u32 {
         let span = stmt.span();
         if Self::statement_terminator(stmt) == StatementTerminator::Never {
             return span.end;
@@ -199,7 +199,7 @@ impl<'a> Printer<'a> {
     /// A kind the table calls [`StatementTerminator::Never`] has no terminator to eject at all.
     pub(in crate::printer) fn statement_hands_off_terminator_gap(
         &self,
-        mut stmt: &internal::Statement<'_>,
+        mut stmt: &ast::Statement<'_>,
     ) -> bool {
         // Walk to the statement that actually prints the `;` — through every DELEGATING
         // wrapper, and through every clause-bearing HEADER to its tail-most clause body
@@ -213,11 +213,8 @@ impl<'a> Printer<'a> {
             // (`export default function main(): void;`) is printed by its own signature
             // printer, which keeps the gap. Reading it as one kind double-printed every
             // ambient default overload.
-            if let internal::StatementKind::ExportDefaultDeclaration(decl) = &stmt.kind {
-                return matches!(
-                    decl.declaration,
-                    internal::ExportDefaultValue::Expression(_)
-                );
+            if let ast::StatementKind::ExportDefaultDeclaration(decl) = &stmt.kind {
+                return matches!(decl.declaration, ast::ExportDefaultValue::Expression(_));
             }
             let inner = match Self::delegated_statement(stmt) {
                 Some(inner) => inner,
@@ -272,10 +269,7 @@ impl<'a> Printer<'a> {
     /// but what stops it is the first byte, walking back, that is neither whitespace nor the
     /// last byte of a comment, so a comment INSIDE the statement's content (`fn(/* c */)`) is
     /// never reached — the `)` ends the walk first.
-    pub(in crate::printer) fn statement_comment_claim_end(
-        &self,
-        stmt: &internal::Statement<'_>,
-    ) -> u32 {
+    pub(in crate::printer) fn statement_comment_claim_end(&self, stmt: &ast::Statement<'_>) -> u32 {
         let span = stmt.span();
         if !self.statement_hands_off_terminator_gap(stmt) {
             return span.end;
@@ -404,7 +398,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn with_statement_tail<T>(
         &self,
-        value: Option<&internal::Expression<'_>>,
+        value: Option<&ast::Expression<'_>>,
         build: impl FnOnce() -> T,
     ) -> (T, Option<u32>) {
         let outer = self.arm_statement_tail(value.map(|value| value.span().end));
@@ -471,7 +465,7 @@ impl<'a> Printer<'a> {
     /// region included, so claiming it too would print it twice. Asked only past the comment
     /// gate, so the scans cost nothing in the common case.
     #[inline]
-    fn statement_tail_region(&self, expr: &internal::Expression<'_>, end: u32) -> Option<Span> {
+    fn statement_tail_region(&self, expr: &ast::Expression<'_>, end: u32) -> Option<Span> {
         if !self.statement_tail_bytes_admit(end) {
             return None;
         }
@@ -499,11 +493,7 @@ impl<'a> Printer<'a> {
     /// [`Self::statement_tail_region`] past its byte gate, out of line.
     #[cold]
     #[inline(never)]
-    fn statement_tail_region_walk(
-        &self,
-        expr: &internal::Expression<'_>,
-        end: u32,
-    ) -> Option<Span> {
+    fn statement_tail_region_walk(&self, expr: &ast::Expression<'_>, end: u32) -> Option<Span> {
         let start = self.right_spine_printed_end_with(expr, true);
         if start >= end || !self.has_comments_to_emit_between(start, end) {
             return None;
@@ -570,7 +560,7 @@ impl<'a> Printer<'a> {
     /// holds a run of same-line blocks.
     pub(in crate::printer) fn shell_statement_tail_region(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         boundary_end: u32,
         retains_parens: bool,
     ) -> Option<Span> {

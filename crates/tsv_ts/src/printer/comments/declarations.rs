@@ -6,7 +6,7 @@
 // heritage clauses (`extends` / `implements`).
 
 use super::{CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer};
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::analysis;
 use crate::printer::types::ShiftRescan;
 use smallvec::{SmallVec, smallvec};
@@ -27,7 +27,7 @@ use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comment
 pub(crate) enum ContinuationValue<'e, 'ast> {
     /// An ordinary expression value. Its span start bounds the gap, and its doc may lead
     /// with a comment it OWNS — which no gap lookup can see.
-    Expression(&'e internal::Expression<'ast>),
+    Expression(&'e ast::Expression<'ast>),
     /// A value that owns no comment and is not an expression — a type alias's RHS, whose
     /// gap is bounded by the start alone.
     Opaque(u32),
@@ -111,7 +111,7 @@ impl HeritageKeyword {
 /// and methods — see [`Printer::push_class_member_modifiers_doc`].
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ClassMemberModifiers {
-    pub accessibility: Option<internal::Accessibility>,
+    pub accessibility: Option<ast::Accessibility>,
     pub is_static: bool,
     pub r#abstract: bool,
     pub r#override: bool,
@@ -308,7 +308,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_identifier_head_doc(
         &self,
         parts: &mut DocBuf,
-        id: &internal::Identifier<'_>,
+        id: &ast::Identifier<'_>,
     ) -> u32 {
         parts.push(self.identifier_name_doc(id));
         let search_end = id.type_annotation().map_or(id.span.end, |ta| ta.span.start);
@@ -747,7 +747,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_binding_type_annotation_doc(
         &self,
         marker_end: u32,
-        type_ann: &internal::TSTypeAnnotation<'_>,
+        type_ann: &ast::TSTypeAnnotation<'_>,
         wrap: bool,
     ) -> DocId {
         self.build_binding_type_annotation_doc_with(marker_end, type_ann, || {
@@ -778,7 +778,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_binding_type_annotation_doc_with(
         &self,
         marker_end: u32,
-        type_ann: &internal::TSTypeAnnotation<'_>,
+        type_ann: &ast::TSTypeAnnotation<'_>,
         build_annotation: impl FnOnce() -> DocId,
     ) -> DocId {
         let d = self.d();
@@ -822,7 +822,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_rest_element_tail_doc(
         &self,
         parts: &mut DocBuf,
-        rest: &internal::RestElement<'_>,
+        rest: &ast::RestElement<'_>,
         wrap: bool,
     ) {
         let binding_end = rest.argument.span().end;
@@ -1441,7 +1441,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_signature_head_comments_opt(
         &self,
         start: u32,
-        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
         no_type_params_end: u32,
     ) -> Option<DocId> {
         self.build_name_to_type_params_comments_opt(
@@ -1470,7 +1470,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         start: u32,
-        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
         no_type_params_end: u32,
     ) {
         if let Some(comments) =
@@ -1553,7 +1553,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_heritage_clause_doc(
         &self,
         keyword: HeritageKeyword,
-        items: &[internal::TSInterfaceHeritage<'_>],
+        items: &[ast::TSInterfaceHeritage<'_>],
         group_mode: bool,
         keyword_start: Option<u32>,
     ) -> DocId {
@@ -1764,7 +1764,7 @@ impl<'a> Printer<'a> {
     /// the parameter list's.
     pub(crate) fn type_params_paren_gap(
         &self,
-        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
     ) -> Option<(u32, u32)> {
         let tp = type_parameters?;
         find_char_skipping_comments(
@@ -2092,7 +2092,7 @@ impl<'a> Printer<'a> {
 }
 
 /// End position of a heritage item (after type arguments if present).
-fn heritage_item_end(item: &internal::TSInterfaceHeritage<'_>) -> u32 {
+fn heritage_item_end(item: &ast::TSInterfaceHeritage<'_>) -> u32 {
     item.type_arguments
         .as_ref()
         .map_or_else(|| item.expression.span().end, |ta| ta.span.end)

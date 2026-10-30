@@ -1,6 +1,6 @@
 // Expression parsing using Pratt parser for operator precedence
 
-use crate::ast::internal::{
+use crate::ast::{
     AssignmentExpression, AssignmentOperator, AwaitExpression, BinaryExpression, BinaryOperator,
     BlockStatement, CallExpression, CommentBoundPair, CommentBoundPairKind, ConditionalExpression,
     Expression, ExpressionKind, IdentName, Identifier, ImportExpression, ImportPhase, Literal,

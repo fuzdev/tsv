@@ -45,7 +45,7 @@
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia, skip_trivia_run};
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression, AssignmentPattern, BlockStatement,
     CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassMember, EmptyStatement,
     ExportDefaultValue, ExportKind, Expression, ExpressionKind, ForInOfLeft, ForInit,
@@ -211,10 +211,7 @@ fn unsupported<T>(reason: Refusal) -> Result<T, CompileError> {
 /// and hangs the annotation off it as a sibling. Taking the max covers both
 /// span models, so the erased region is never empty (an empty one would record
 /// no refusal window at all).
-fn tail_end(
-    span: Span,
-    type_annotation: Option<&tsv_ts::ast::internal::TSTypeAnnotation<'_>>,
-) -> u32 {
+fn tail_end(span: Span, type_annotation: Option<&tsv_ts::ast::TSTypeAnnotation<'_>>) -> u32 {
     span.end
         .max(type_annotation.map_or(0, |annotation| annotation.span.end))
 }
@@ -264,7 +261,7 @@ struct ClassHead<'a, 'arena> {
     /// End of the `extends` expression, when there is one.
     super_class_end: Option<u32>,
     super_type_parameters: Option<Span>,
-    implements: &'a [tsv_ts::ast::internal::TSInterfaceHeritage<'arena>],
+    implements: &'a [tsv_ts::ast::TSInterfaceHeritage<'arena>],
 }
 
 /// What a class erasure produces, once resolved against the original — the
@@ -477,12 +474,10 @@ impl<'arena> Eraser<'arena, '_> {
                 None => StmtOut::Keep,
                 Some(expression) => StmtOut::Replace(Statement {
                     span,
-                    kind: StatementKind::ExpressionStatement(
-                        tsv_ts::ast::internal::ExpressionStatement {
-                            expression,
-                            ..stmt.clone()
-                        },
-                    ),
+                    kind: StatementKind::ExpressionStatement(tsv_ts::ast::ExpressionStatement {
+                        expression,
+                        ..stmt.clone()
+                    }),
                 }),
             },
             StatementKind::ReturnStatement(stmt) => match stmt.argument {
@@ -490,11 +485,9 @@ impl<'arena> Eraser<'arena, '_> {
                     None => StmtOut::Keep,
                     Some(argument) => StmtOut::Replace(Statement {
                         span,
-                        kind: StatementKind::ReturnStatement(
-                            tsv_ts::ast::internal::ReturnStatement {
-                                argument: Some(argument),
-                            },
-                        ),
+                        kind: StatementKind::ReturnStatement(tsv_ts::ast::ReturnStatement {
+                            argument: Some(argument),
+                        }),
                     }),
                 },
                 None => StmtOut::Keep,
@@ -563,7 +556,7 @@ impl<'arena> Eraser<'arena, '_> {
                 StmtOut::Replace(Statement {
                     span,
                     kind: StatementKind::ImportDeclaration(self.arena.alloc(
-                        tsv_ts::ast::internal::ImportDeclaration {
+                        tsv_ts::ast::ImportDeclaration {
                             specifiers: kept.into_bump_slice(),
                             ..(*decl).clone()
                         },
@@ -591,7 +584,7 @@ impl<'arena> Eraser<'arena, '_> {
                         StmtOut::Replace(new) => StmtOut::Replace(Statement {
                             span,
                             kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(
-                                tsv_ts::ast::internal::ExportNamedDeclaration {
+                                tsv_ts::ast::ExportNamedDeclaration {
                                     declaration: Some(self.arena.alloc(new)),
                                     ..(*decl).clone()
                                 },
@@ -608,7 +601,7 @@ impl<'arena> Eraser<'arena, '_> {
                     return Ok(StmtOut::Keep);
                 }
                 let mark = self.regions.len();
-                let mut kept: BumpVec<'arena, tsv_ts::ast::internal::ExportSpecifier<'arena>> =
+                let mut kept: BumpVec<'arena, tsv_ts::ast::ExportSpecifier<'arena>> =
                     BumpVec::with_capacity_in(decl.specifiers.len(), self.arena);
                 for spec in decl.specifiers {
                     if spec.export_kind == ExportKind::Type {
@@ -625,7 +618,7 @@ impl<'arena> Eraser<'arena, '_> {
                 StmtOut::Replace(Statement {
                     span,
                     kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(
-                        tsv_ts::ast::internal::ExportNamedDeclaration {
+                        tsv_ts::ast::ExportNamedDeclaration {
                             specifiers: kept.into_bump_slice(),
                             ..(*decl).clone()
                         },
@@ -656,9 +649,10 @@ impl<'arena> Eraser<'arena, '_> {
                     None => StmtOut::Keep,
                     Some(declaration) => StmtOut::Replace(Statement {
                         span,
-                        kind: StatementKind::ExportDefaultDeclaration(self.arena.alloc(
-                            tsv_ts::ast::internal::ExportDefaultDeclaration { declaration },
-                        )),
+                        kind: StatementKind::ExportDefaultDeclaration(
+                            self.arena
+                                .alloc(tsv_ts::ast::ExportDefaultDeclaration { declaration }),
+                        ),
                     }),
                 }
             }
@@ -683,7 +677,7 @@ impl<'arena> Eraser<'arena, '_> {
                 }
                 StmtOut::Replace(Statement {
                     span,
-                    kind: StatementKind::IfStatement(tsv_ts::ast::internal::IfStatement {
+                    kind: StatementKind::IfStatement(tsv_ts::ast::IfStatement {
                         test: test.unwrap_or(stmt.test),
                         consequent: consequent.unwrap_or(stmt.consequent),
                         alternate: alternate.unwrap_or(stmt.alternate),
@@ -709,7 +703,7 @@ impl<'arena> Eraser<'arena, '_> {
                 }
                 StmtOut::Replace(Statement {
                     span,
-                    kind: StatementKind::ForStatement(tsv_ts::ast::internal::ForStatement {
+                    kind: StatementKind::ForStatement(tsv_ts::ast::ForStatement {
                         init: match init {
                             Some(v) => v.map(|x| &*self.arena.alloc(x)),
                             None => stmt.init,
@@ -735,7 +729,7 @@ impl<'arena> Eraser<'arena, '_> {
                 }
                 StmtOut::Replace(Statement {
                     span,
-                    kind: StatementKind::ForInStatement(tsv_ts::ast::internal::ForInStatement {
+                    kind: StatementKind::ForInStatement(tsv_ts::ast::ForInStatement {
                         left: match left {
                             Some(x) => self.arena.alloc(x),
                             None => stmt.left,
@@ -757,7 +751,7 @@ impl<'arena> Eraser<'arena, '_> {
                 }
                 StmtOut::Replace(Statement {
                     span,
-                    kind: StatementKind::ForOfStatement(tsv_ts::ast::internal::ForOfStatement {
+                    kind: StatementKind::ForOfStatement(tsv_ts::ast::ForOfStatement {
                         left: match left {
                             Some(x) => self.arena.alloc(x),
                             None => stmt.left,
@@ -779,7 +773,7 @@ impl<'arena> Eraser<'arena, '_> {
                 }
                 StmtOut::Replace(Statement {
                     span,
-                    kind: StatementKind::WhileStatement(tsv_ts::ast::internal::WhileStatement {
+                    kind: StatementKind::WhileStatement(tsv_ts::ast::WhileStatement {
                         test: test.unwrap_or(stmt.test),
                         body: body.unwrap_or(stmt.body),
                     }),
@@ -796,7 +790,7 @@ impl<'arena> Eraser<'arena, '_> {
                 }
                 StmtOut::Replace(Statement {
                     span,
-                    kind: StatementKind::WithStatement(tsv_ts::ast::internal::WithStatement {
+                    kind: StatementKind::WithStatement(tsv_ts::ast::WithStatement {
                         object: object.unwrap_or(stmt.object),
                         body: body.unwrap_or(stmt.body),
                     }),
@@ -810,12 +804,10 @@ impl<'arena> Eraser<'arena, '_> {
                 }
                 StmtOut::Replace(Statement {
                     span,
-                    kind: StatementKind::DoWhileStatement(
-                        tsv_ts::ast::internal::DoWhileStatement {
-                            body: body.unwrap_or(stmt.body),
-                            test: test.unwrap_or(stmt.test),
-                        },
-                    ),
+                    kind: StatementKind::DoWhileStatement(tsv_ts::ast::DoWhileStatement {
+                        body: body.unwrap_or(stmt.body),
+                        test: test.unwrap_or(stmt.test),
+                    }),
                 })
             }
             StatementKind::SwitchStatement(stmt) => {
@@ -826,7 +818,7 @@ impl<'arena> Eraser<'arena, '_> {
                 }
                 StmtOut::Replace(Statement {
                     span,
-                    kind: StatementKind::SwitchStatement(tsv_ts::ast::internal::SwitchStatement {
+                    kind: StatementKind::SwitchStatement(tsv_ts::ast::SwitchStatement {
                         discriminant: discriminant.unwrap_or(stmt.discriminant),
                         cases: cases.unwrap_or(stmt.cases),
                     }),
@@ -847,7 +839,7 @@ impl<'arena> Eraser<'arena, '_> {
                 }
                 StmtOut::Replace(Statement {
                     span,
-                    kind: StatementKind::TryStatement(tsv_ts::ast::internal::TryStatement {
+                    kind: StatementKind::TryStatement(tsv_ts::ast::TryStatement {
                         block: block.unwrap_or_else(|| stmt.block.clone()),
                         handler: match handler {
                             Some(v) => v.map(|x| &*self.arena.alloc(x)),
@@ -861,21 +853,17 @@ impl<'arena> Eraser<'arena, '_> {
                 None => StmtOut::Keep,
                 Some(argument) => StmtOut::Replace(Statement {
                     span,
-                    kind: StatementKind::ThrowStatement(tsv_ts::ast::internal::ThrowStatement {
-                        argument,
-                    }),
+                    kind: StatementKind::ThrowStatement(tsv_ts::ast::ThrowStatement { argument }),
                 }),
             },
             StatementKind::LabeledStatement(stmt) => match self.statement_ref(stmt.body)? {
                 None => StmtOut::Keep,
                 Some(body) => StmtOut::Replace(Statement {
                     span,
-                    kind: StatementKind::LabeledStatement(
-                        tsv_ts::ast::internal::LabeledStatement {
-                            body,
-                            ..stmt.clone()
-                        },
-                    ),
+                    kind: StatementKind::LabeledStatement(tsv_ts::ast::LabeledStatement {
+                        body,
+                        ..stmt.clone()
+                    }),
                 }),
             },
 
@@ -1217,7 +1205,7 @@ impl<'arena> Eraser<'arena, '_> {
     fn class_parts(
         &mut self,
         head: &ClassHead<'_, 'arena>,
-        decorators: Option<&'arena [tsv_ts::ast::internal::Decorator<'arena>]>,
+        decorators: Option<&'arena [tsv_ts::ast::Decorator<'arena>]>,
         super_class: Option<&'arena Expression<'arena>>,
         body: &ClassBody<'arena>,
     ) -> Result<Option<ClassParts<'arena>>, CompileError> {
@@ -1503,7 +1491,7 @@ impl<'arena> Eraser<'arena, '_> {
     /// are a plain-JS parse error. Never erased, never emitted.
     fn refuse_decorators(
         &self,
-        decorators: Option<&'arena [tsv_ts::ast::internal::Decorator<'arena>]>,
+        decorators: Option<&'arena [tsv_ts::ast::Decorator<'arena>]>,
     ) -> Result<(), CompileError> {
         if decorators.is_some_and(|list| !list.is_empty()) {
             return unsupported(Refusal::Decorator);
@@ -1668,14 +1656,12 @@ impl<'arena> Eraser<'arena, '_> {
                 } else {
                     Some(Expression {
                         span: expr.span,
-                        kind: ExpressionKind::CallExpression(
-                            tsv_ts::ast::internal::CallExpression {
-                                callee: callee.unwrap_or(call.callee),
-                                type_arguments: None,
-                                arguments: arguments.unwrap_or(call.arguments),
-                                ..call.clone()
-                            },
-                        ),
+                        kind: ExpressionKind::CallExpression(tsv_ts::ast::CallExpression {
+                            callee: callee.unwrap_or(call.callee),
+                            type_arguments: None,
+                            arguments: arguments.unwrap_or(call.arguments),
+                            ..call.clone()
+                        }),
                     })
                 }
             }
@@ -1690,7 +1676,7 @@ impl<'arena> Eraser<'arena, '_> {
                 } else {
                     Some(Expression {
                         span: expr.span,
-                        kind: ExpressionKind::NewExpression(tsv_ts::ast::internal::NewExpression {
+                        kind: ExpressionKind::NewExpression(tsv_ts::ast::NewExpression {
                             callee: callee.unwrap_or(new.callee),
                             type_arguments: None,
                             arguments: arguments.unwrap_or(new.arguments),
@@ -1710,7 +1696,7 @@ impl<'arena> Eraser<'arena, '_> {
                     Some(Expression {
                         span: expr.span,
                         kind: ExpressionKind::TaggedTemplateExpression(self.arena.alloc(
-                            tsv_ts::ast::internal::TaggedTemplateExpression {
+                            tsv_ts::ast::TaggedTemplateExpression {
                                 tag: tag.unwrap_or(tagged.tag),
                                 type_arguments: None,
                                 quasi: quasi.unwrap_or_else(|| tagged.quasi.clone()),
@@ -1742,18 +1728,16 @@ impl<'arena> Eraser<'arena, '_> {
             ExpressionKind::ObjectExpression(obj) => {
                 map_slice!(self, obj.properties, object_property).map(|properties| Expression {
                     span: expr.span,
-                    kind: ExpressionKind::ObjectExpression(
-                        tsv_ts::ast::internal::ObjectExpression {
-                            properties,
-                            ..obj.clone()
-                        },
-                    ),
+                    kind: ExpressionKind::ObjectExpression(tsv_ts::ast::ObjectExpression {
+                        properties,
+                        ..obj.clone()
+                    }),
                 })
             }
             ExpressionKind::ArrayExpression(arr) => {
                 map_slice!(self, arr.elements, opt_expr_element).map(|elements| Expression {
                     span: expr.span,
-                    kind: ExpressionKind::ArrayExpression(tsv_ts::ast::internal::ArrayExpression {
+                    kind: ExpressionKind::ArrayExpression(tsv_ts::ast::ArrayExpression {
                         elements,
                         ..arr.clone()
                     }),
@@ -1761,7 +1745,7 @@ impl<'arena> Eraser<'arena, '_> {
             }
             ExpressionKind::UnaryExpression(unary) => {
                 self.expr_ref(unary.argument)?.map(|argument| {
-                    Expression::from_unary_expression(tsv_ts::ast::internal::UnaryExpression {
+                    Expression::from_unary_expression(tsv_ts::ast::UnaryExpression {
                         argument,
                         ..unary.clone()
                     })
@@ -1770,12 +1754,10 @@ impl<'arena> Eraser<'arena, '_> {
             ExpressionKind::UpdateExpression(update) => {
                 self.expr_ref(update.argument)?.map(|argument| Expression {
                     span: expr.span,
-                    kind: ExpressionKind::UpdateExpression(
-                        tsv_ts::ast::internal::UpdateExpression {
-                            argument,
-                            ..update.clone()
-                        },
-                    ),
+                    kind: ExpressionKind::UpdateExpression(tsv_ts::ast::UpdateExpression {
+                        argument,
+                        ..update.clone()
+                    }),
                 })
             }
             ExpressionKind::BinaryExpression(binary) => {
@@ -1786,17 +1768,15 @@ impl<'arena> Eraser<'arena, '_> {
                 } else {
                     Some(Expression {
                         span: expr.span,
-                        kind: ExpressionKind::BinaryExpression(
-                            tsv_ts::ast::internal::BinaryExpression {
-                                left: left.unwrap_or(binary.left),
-                                right: right.unwrap_or(binary.right),
-                                // `relexes_as_type_arguments` rides along: it is a claim about
-                                // the SOURCE bytes this rewrite invalidates, and inheriting is the
-                                // SAFE direction — a stale `true` costs a redundant paren pair, a
-                                // stale `false` an output nothing reparses.
-                                ..binary.clone()
-                            },
-                        ),
+                        kind: ExpressionKind::BinaryExpression(tsv_ts::ast::BinaryExpression {
+                            left: left.unwrap_or(binary.left),
+                            right: right.unwrap_or(binary.right),
+                            // `relexes_as_type_arguments` rides along: it is a claim about
+                            // the SOURCE bytes this rewrite invalidates, and inheriting is the
+                            // SAFE direction — a stale `true` costs a redundant paren pair, a
+                            // stale `false` an output nothing reparses.
+                            ..binary.clone()
+                        }),
                     })
                 }
             }
@@ -1808,13 +1788,11 @@ impl<'arena> Eraser<'arena, '_> {
                 } else {
                     Some(Expression {
                         span: expr.span,
-                        kind: ExpressionKind::MemberExpression(
-                            tsv_ts::ast::internal::MemberExpression {
-                                object: object.unwrap_or(member.object),
-                                property: property.unwrap_or(member.property),
-                                ..member.clone()
-                            },
-                        ),
+                        kind: ExpressionKind::MemberExpression(tsv_ts::ast::MemberExpression {
+                            object: object.unwrap_or(member.object),
+                            property: property.unwrap_or(member.property),
+                            ..member.clone()
+                        }),
                     })
                 }
             }
@@ -1828,7 +1806,7 @@ impl<'arena> Eraser<'arena, '_> {
                     Some(Expression {
                         span: expr.span,
                         kind: ExpressionKind::ConditionalExpression(
-                            tsv_ts::ast::internal::ConditionalExpression {
+                            tsv_ts::ast::ConditionalExpression {
                                 test: test.unwrap_or(cond.test),
                                 consequent: consequent.unwrap_or(cond.consequent),
                                 alternate: alternate.unwrap_or(cond.alternate),
@@ -1839,7 +1817,7 @@ impl<'arena> Eraser<'arena, '_> {
             }
             ExpressionKind::SpreadElement(spread) => {
                 self.expr_ref(spread.argument)?.map(|argument| {
-                    Expression::from_spread_element(tsv_ts::ast::internal::SpreadElement {
+                    Expression::from_spread_element(tsv_ts::ast::SpreadElement {
                         argument,
                         span: spread.span,
                     })
@@ -1851,7 +1829,7 @@ impl<'arena> Eraser<'arena, '_> {
             ExpressionKind::AwaitExpression(node) => {
                 self.expr_ref(node.argument)?.map(|argument| Expression {
                     span: expr.span,
-                    kind: ExpressionKind::AwaitExpression(tsv_ts::ast::internal::AwaitExpression {
+                    kind: ExpressionKind::AwaitExpression(tsv_ts::ast::AwaitExpression {
                         argument,
                     }),
                 })
@@ -1859,7 +1837,7 @@ impl<'arena> Eraser<'arena, '_> {
             ExpressionKind::YieldExpression(node) => match node.argument {
                 Some(argument) => self.expr_ref(argument)?.map(|argument| Expression {
                     span: expr.span,
-                    kind: ExpressionKind::YieldExpression(tsv_ts::ast::internal::YieldExpression {
+                    kind: ExpressionKind::YieldExpression(tsv_ts::ast::YieldExpression {
                         argument: Some(argument),
                         ..node.clone()
                     }),
@@ -1869,9 +1847,9 @@ impl<'arena> Eraser<'arena, '_> {
             ExpressionKind::SequenceExpression(seq) => {
                 map_slice!(self, seq.expressions, expr_element).map(|expressions| Expression {
                     span: expr.span,
-                    kind: ExpressionKind::SequenceExpression(
-                        tsv_ts::ast::internal::SequenceExpression { expressions },
-                    ),
+                    kind: ExpressionKind::SequenceExpression(tsv_ts::ast::SequenceExpression {
+                        expressions,
+                    }),
                 })
             }
             ExpressionKind::AssignmentExpression(assign) => {
@@ -1883,7 +1861,7 @@ impl<'arena> Eraser<'arena, '_> {
                     Some(Expression {
                         span: expr.span,
                         kind: ExpressionKind::AssignmentExpression(
-                            tsv_ts::ast::internal::AssignmentExpression {
+                            tsv_ts::ast::AssignmentExpression {
                                 left: left.unwrap_or(assign.left),
                                 right: right.unwrap_or(assign.right),
                                 ..assign.clone()
@@ -1903,13 +1881,11 @@ impl<'arena> Eraser<'arena, '_> {
                 } else {
                     Some(Expression {
                         span: expr.span,
-                        kind: ExpressionKind::ImportExpression(
-                            tsv_ts::ast::internal::ImportExpression {
-                                source: source.unwrap_or(import.source),
-                                options: options.unwrap_or(import.options),
-                                ..import.clone()
-                            },
-                        ),
+                        kind: ExpressionKind::ImportExpression(tsv_ts::ast::ImportExpression {
+                            source: source.unwrap_or(import.source),
+                            options: options.unwrap_or(import.options),
+                            ..import.clone()
+                        }),
                     })
                 }
             }
@@ -1981,7 +1957,7 @@ impl<'arena> Eraser<'arena, '_> {
         &mut self,
         span: Span,
         optional: bool,
-        type_annotation: Option<&tsv_ts::ast::internal::TSTypeAnnotation<'arena>>,
+        type_annotation: Option<&tsv_ts::ast::TSTypeAnnotation<'arena>>,
     ) {
         if !optional && type_annotation.is_none() {
             return;
@@ -2007,7 +1983,7 @@ impl<'arena> Eraser<'arena, '_> {
     /// `constructor(x)`.
     fn parameter_property(
         &mut self,
-        node: &tsv_ts::ast::internal::TSParameterProperty<'arena>,
+        node: &tsv_ts::ast::TSParameterProperty<'arena>,
         span: Span,
     ) -> Result<Expression<'arena>, CompileError> {
         if self.constructor_params && (node.readonly || node.accessibility.is_some()) {
@@ -2087,7 +2063,7 @@ impl<'arena> Eraser<'arena, '_> {
             ObjectProperty::Property(prop) => self.property(prop)?.map(ObjectProperty::Property),
             ObjectProperty::SpreadElement(spread) => {
                 self.expr_ref(spread.argument)?.map(|argument| {
-                    ObjectProperty::SpreadElement(tsv_ts::ast::internal::SpreadElement {
+                    ObjectProperty::SpreadElement(tsv_ts::ast::SpreadElement {
                         argument,
                         span: spread.span,
                     })

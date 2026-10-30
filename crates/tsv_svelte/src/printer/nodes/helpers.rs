@@ -5,7 +5,7 @@
 // used in inline run grouping and multiline formatting decisions.
 
 use super::blocks_doc::AwaitShorthand;
-use crate::ast::internal::{EachBlock, EachKey, Fragment, FragmentNode};
+use crate::ast::{EachBlock, EachKey, Fragment, FragmentNode};
 use crate::printer::{CommentRun, HeadExpr, Printer};
 use smallvec::{SmallVec, smallvec};
 use std::borrow::Borrow;
@@ -662,7 +662,7 @@ impl<'a> Printer<'a> {
     fn append_pattern_type_annotation(
         &self,
         pattern: DocId,
-        type_annotation: Option<&tsv_ts::ast::internal::TSTypeAnnotation<'_>>,
+        type_annotation: Option<&tsv_ts::ast::TSTypeAnnotation<'_>>,
     ) -> DocId {
         let Some(annotation) = type_annotation else {
             return pattern;
@@ -1060,7 +1060,7 @@ fn element_printed_end(interior: Option<Span>, end: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::{has_any_expanding_blocks, is_control_flow_block, is_expanding_control_flow_block};
-    use crate::ast::internal::FragmentNode;
+    use crate::ast::FragmentNode;
 
     /// Parse a Svelte template and return its top-level fragment nodes. The
     /// nodes borrow the caller-owned `arena`, so each test holds the `Bump`.

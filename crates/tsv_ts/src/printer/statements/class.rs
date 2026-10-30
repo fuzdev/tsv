@@ -1,7 +1,7 @@
 // Class declaration printing for TypeScript
 
 use super::Printer;
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
 use crate::printer::comments::ValueGap;
@@ -32,10 +32,7 @@ struct PropertyValueFacts {
 impl<'a> Printer<'a> {
     /// Build a Doc for a class declaration
     #[inline]
-    pub(super) fn build_class_declaration_doc(
-        &self,
-        decl: &internal::ClassDeclaration<'_>,
-    ) -> DocId {
+    pub(super) fn build_class_declaration_doc(&self, decl: &ast::ClassDeclaration<'_>) -> DocId {
         self.build_class_declaration_doc_inner(decl, true)
     }
 
@@ -46,7 +43,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn build_class_declaration_without_decorators_doc(
         &self,
-        decl: &internal::ClassDeclaration<'_>,
+        decl: &ast::ClassDeclaration<'_>,
     ) -> DocId {
         self.build_class_declaration_doc_inner(decl, false)
     }
@@ -60,7 +57,7 @@ impl<'a> Printer<'a> {
     /// comment authored there is dropped.
     pub(in crate::printer) fn class_declaration_keyword_start(
         &self,
-        decl: &internal::ClassDeclaration<'_>,
+        decl: &ast::ClassDeclaration<'_>,
     ) -> u32 {
         let first_keyword = if decl.declare {
             "declare"
@@ -81,7 +78,7 @@ impl<'a> Printer<'a> {
     ///   Set to false when decorators are printed separately (e.g., before `export`).
     fn build_class_declaration_doc_inner(
         &self,
-        decl: &internal::ClassDeclaration<'_>,
+        decl: &ast::ClassDeclaration<'_>,
         include_decorators: bool,
     ) -> DocId {
         let d = self.d();
@@ -266,7 +263,7 @@ impl<'a> Printer<'a> {
     /// (`body_prettier_ignore_head_prettier_divergence`).
     pub(in crate::printer) fn build_class_body_doc(
         &self,
-        body: &internal::ClassBody<'_>,
+        body: &ast::ClassBody<'_>,
         frozen: Option<Span>,
     ) -> DocId {
         let d = self.d();
@@ -314,7 +311,7 @@ impl<'a> Printer<'a> {
                     floor: MemberFloor::PastStraySemicolons,
                 },
             },
-            internal::ClassMember::span,
+            ast::ClassMember::span,
             |member| member.span().end,
             |member, _deferred| self.build_class_member_doc(member),
         );
@@ -330,16 +327,12 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a class member
-    fn build_class_member_doc(&self, member: &internal::ClassMember<'_>) -> DocId {
+    fn build_class_member_doc(&self, member: &ast::ClassMember<'_>) -> DocId {
         match member {
-            internal::ClassMember::MethodDefinition(method) => {
-                self.build_method_definition_doc(method)
-            }
-            internal::ClassMember::PropertyDefinition(prop) => {
-                self.build_property_definition_doc(prop)
-            }
-            internal::ClassMember::StaticBlock(block) => self.build_static_block_doc(block),
-            internal::ClassMember::IndexSignature(sig) => self.build_index_signature_doc(sig),
+            ast::ClassMember::MethodDefinition(method) => self.build_method_definition_doc(method),
+            ast::ClassMember::PropertyDefinition(prop) => self.build_property_definition_doc(prop),
+            ast::ClassMember::StaticBlock(block) => self.build_static_block_doc(block),
+            ast::ClassMember::IndexSignature(sig) => self.build_index_signature_doc(sig),
         }
     }
 
@@ -348,7 +341,7 @@ impl<'a> Printer<'a> {
     /// the `static`/`readonly` modifiers and every in-bracket comment gap) and
     /// appends the trailing `;`, matching the interface caller. An own-line comment
     /// in the value-type→`;` gap defers past the `;` (prettier).
-    fn build_index_signature_doc(&self, sig: &internal::TSIndexSignature<'_>) -> DocId {
+    fn build_index_signature_doc(&self, sig: &ast::TSIndexSignature<'_>) -> DocId {
         let mut deferred = DocBuf::new();
         let member = self.build_index_signature_member_doc(sig, &mut deferred);
         self.build_member_with_semicolon_doc(member, deferred)
@@ -361,7 +354,7 @@ impl<'a> Printer<'a> {
     // and its `in_program_or_block=false` carve-out) — a second such divergent
     // property would need a second bolt-on. Worth a real `StaticBlock`-native path
     // (or an explicit node-kind tag) if that happens.
-    fn build_static_block_doc(&self, block: &internal::StaticBlock<'_>) -> DocId {
+    fn build_static_block_doc(&self, block: &ast::StaticBlock<'_>) -> DocId {
         let d = self.d();
         // Decorators (inline or own-line as authored, like any member's). The block's
         // own span opens at its first decorator, so the `BlockStatement` wrapper starts
@@ -370,7 +363,7 @@ impl<'a> Printer<'a> {
         let static_start = self.member_decorator_boundary(block.decorators, block.span.start);
         let decorators_doc = self.build_class_member_decorators_doc(block.decorators, static_start);
         // Create a BlockStatement wrapper to reuse existing doc building logic
-        let block_stmt = internal::BlockStatement {
+        let block_stmt = ast::BlockStatement {
             body: block.body,
             span: Span::new(static_start, block.span.end),
         };
@@ -400,11 +393,11 @@ impl<'a> Printer<'a> {
     /// A method, `get` / `set` accessor or constructor key is not a field key and takes the
     /// object-key rule ([`Self::build_property_key_doc`]), which unquotes a valid
     /// identifier.
-    fn build_field_key_doc(&self, key: &internal::Expression<'_>) -> DocId {
+    fn build_field_key_doc(&self, key: &ast::Expression<'_>) -> DocId {
         match &key.kind {
-            internal::ExpressionKind::Literal(
-                lit @ internal::Literal {
-                    value: internal::LiteralValue::String(_),
+            ast::ExpressionKind::Literal(
+                lit @ ast::Literal {
+                    value: ast::LiteralValue::String(_),
                     ..
                 },
             ) => self.build_string_literal_doc(lit),
@@ -413,7 +406,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a property definition
-    fn build_property_definition_doc(&self, prop: &internal::PropertyDefinition<'_>) -> DocId {
+    fn build_property_definition_doc(&self, prop: &ast::PropertyDefinition<'_>) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
 
@@ -492,9 +485,9 @@ impl<'a> Printer<'a> {
         // The modifier's marker byte, derived once so the freeze below and the emission
         // that follows it can never disagree about which marker this property carries.
         let marker = match prop.modifier {
-            internal::PropertyModifier::None => None,
-            internal::PropertyModifier::Optional => Some(b'?'),
-            internal::PropertyModifier::Definite => Some(b'!'),
+            ast::PropertyModifier::None => None,
+            ast::PropertyModifier::Optional => Some(b'?'),
+            ast::PropertyModifier::Definite => Some(b'!'),
         };
 
         // An alone-on-line format-ignore directive in the key→marker gap precedes the whole
@@ -585,11 +578,7 @@ impl<'a> Printer<'a> {
     /// unparenthesized, **unfrozen** value where the ordinary arm below printed a
     /// parenthesized, frozen one: `p = // c⏎bbb = ccc` against `p = /* c */ (bbb  =  ccc)`,
     /// the directive's whole effect gone at the first spelling.
-    fn property_value_facts(
-        &self,
-        value: &internal::Expression<'_>,
-        eq_pos: u32,
-    ) -> PropertyValueFacts {
+    fn property_value_facts(&self, value: &ast::Expression<'_>, eq_pos: u32) -> PropertyValueFacts {
         PropertyValueFacts {
             frozen: self.value_head_frozen_span(eq_pos + 1, value.span()),
             position_parens: self.needs_parens(value, super::ParenContext::DefaultValue),
@@ -602,7 +591,7 @@ impl<'a> Printer<'a> {
     /// chooser takes the bare expression).
     fn build_property_value_doc(
         &self,
-        value: &internal::Expression<'_>,
+        value: &ast::Expression<'_>,
         facts: PropertyValueFacts,
     ) -> DocId {
         // Every arm reaching here emits its own `= value` shell instead of routing
@@ -640,7 +629,7 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         before_eq: u32,
         eq_pos: u32,
-        value: &internal::Expression<'_>,
+        value: &ast::Expression<'_>,
         facts: PropertyValueFacts,
     ) {
         let d = self.d();
@@ -744,7 +733,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a method definition
-    fn build_method_definition_doc(&self, method: &internal::MethodDefinition<'_>) -> DocId {
+    fn build_method_definition_doc(&self, method: &ast::MethodDefinition<'_>) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
 
@@ -788,10 +777,10 @@ impl<'a> Printer<'a> {
 
         // Get/set for accessors
         match method.kind {
-            internal::MethodKind::Get => {
+            ast::MethodKind::Get => {
                 self.push_member_keyword_doc(&mut parts, "get ", &mut cursor, key_start);
             }
-            internal::MethodKind::Set => {
+            ast::MethodKind::Set => {
                 self.push_member_keyword_doc(&mut parts, "set ", &mut cursor, key_start);
             }
             _ => {}

@@ -5,7 +5,7 @@
 // `parser/type_members.rs`; declarations that *introduce* types (alias,
 // interface, enum, namespace, declare) live in `statement/type_declarations.rs`.
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 

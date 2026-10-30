@@ -12,7 +12,7 @@
 // `ElementKind`, `ElementContext`) are defined here and used by both.
 
 use super::fragment_doc::LeadingEdge;
-use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
+use crate::ast::{self, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
 use crate::printer::classification::element::has_raw_content;
 use smallvec::{SmallVec, smallvec};
@@ -89,7 +89,7 @@ impl ElementKind {
 
 /// The element-shaped inputs the shared analyze → layout → build pipeline reads.
 ///
-/// [`internal::Element`] and [`internal::SpecialElement`] are distinct AST types that print
+/// [`ast::Element`] and [`ast::SpecialElement`] are distinct AST types that print
 /// the same shape: a name, attributes, a fragment, and an open/close tag pair. Projecting
 /// both onto one view lets the layout decisions (multiline-ness, boundary modes, hugging)
 /// live in a single place. A `special_doc.rs` carrying its own hug predicates and its own
@@ -116,7 +116,7 @@ pub(super) struct ElementParts<'arena> {
 
 /// Everything the printer derives from an element's tag NAME.
 ///
-/// Unpacked from the parse-time `Element::facts` ([`TagFacts`](internal::TagFacts)) by
+/// Unpacked from the parse-time `Element::facts` ([`TagFacts`](ast::TagFacts)) by
 /// `classify_tag`, so the printer re-derives nothing per element — one field read, no
 /// per-element `String`. Emission is a span-identity `source_span` slice of the tag name.
 ///
@@ -251,7 +251,7 @@ impl ThisClaim {
     pub(in crate::printer) fn new(
         name_end: u32,
         value: Span,
-        attrs: &[internal::AttributeNode<'_>],
+        attrs: &[ast::AttributeNode<'_>],
     ) -> Self {
         let head_gap_end = attrs
             .iter()
@@ -354,7 +354,7 @@ pub(super) struct ElementContext {
 /// (the children, the tags). Carried whole so a caller that must decide a role before building
 /// (the G2 glued run) prepares each element once and builds only the arm it takes.
 pub(super) struct PreparedElement<'e> {
-    pub(super) element: &'e internal::Element<'e>,
+    pub(super) element: &'e ast::Element<'e>,
     pub(super) class: TagClass,
     pub(super) parts: ElementParts<'e>,
     pub(super) ctx: ElementContext,
@@ -411,7 +411,7 @@ impl PreparedElement<'_> {
 ///
 /// Two variants, not three: this drives the **parser** dispatch below, which genuinely has
 /// only two arms. The *language* question has a third position (`<template>`) and lives on
-/// [`internal::EmbeddedLang`], which this maps into rather than re-deriving.
+/// [`ast::EmbeddedLang`], which this maps into rather than re-deriving.
 #[derive(Debug, Clone, Copy)]
 pub(super) enum RawTextKind {
     Style,
@@ -421,10 +421,10 @@ pub(super) enum RawTextKind {
 impl RawTextKind {
     /// This tag's position in the freeze rule — the owner of its formattable-name set. See
     /// docs/conformance_prettier_svelte.md §Foreign-language embedded bodies.
-    fn lang(self) -> internal::EmbeddedLang {
+    fn lang(self) -> ast::EmbeddedLang {
         match self {
-            Self::Style => internal::EmbeddedLang::Style,
-            Self::Script => internal::EmbeddedLang::Script,
+            Self::Style => ast::EmbeddedLang::Style,
+            Self::Script => ast::EmbeddedLang::Script,
         }
     }
 }
@@ -460,7 +460,7 @@ impl<'a> Printer<'a> {
 
     /// Unpack an element's parse-time name facts (`Element::facts`) into the printer's per-tag
     /// view. The single classifier — both element entry points go through it, so they cannot drift.
-    pub(super) fn classify_tag(&self, element: &internal::Element<'_>) -> TagClass {
+    pub(super) fn classify_tag(&self, element: &ast::Element<'_>) -> TagClass {
         let facts = element.facts;
         // Element kind, matching prettier-plugin-svelte's isInlineElement = !isBlockElement:
         // elements NOT in the block list (table cells included) use inline formatting.
@@ -492,7 +492,7 @@ impl<'a> Printer<'a> {
     /// Project a regular element onto the shared [`ElementParts`] view.
     pub(super) fn element_parts<'e>(
         &self,
-        element: &'e internal::Element<'e>,
+        element: &'e ast::Element<'e>,
         class: TagClass,
     ) -> ElementParts<'e> {
         ElementParts {
@@ -514,9 +514,9 @@ impl<'a> Printer<'a> {
     /// 1. Analyze: Compute all formatting-relevant properties
     /// 2. Classify: Determine layout strategy (void, empty, hug modes, etc.)
     /// 3. Build: Construct doc based on layout
-    pub(super) fn build_element_doc(&self, element: &internal::Element<'_>) -> DocId {
+    pub(super) fn build_element_doc(&self, element: &ast::Element<'_>) -> DocId {
         let class = self.classify_tag(element);
-        let is_html = element.kind == internal::ElementKind::Html;
+        let is_html = element.kind == ast::ElementKind::Html;
 
         // Build attribute docs (needed for all paths)
         let attrs = self.build_element_attrs_doc(
@@ -563,7 +563,7 @@ impl<'a> Printer<'a> {
     /// and whose attribute docs are already built: its parts, analysis and layout.
     fn prepare_element<'e>(
         &self,
-        element: &'e internal::Element<'e>,
+        element: &'e ast::Element<'e>,
         class: TagClass,
         attr_docs: DocBuf,
     ) -> PreparedElement<'e> {
@@ -596,7 +596,7 @@ impl<'a> Printer<'a> {
     /// Phase 3 of [`Self::build_element_doc`]: the element's ordinary doc, built from its layout.
     fn build_element_layout_doc(
         &self,
-        element: &internal::Element<'_>,
+        element: &ast::Element<'_>,
         class: TagClass,
         parts: &ElementParts<'_>,
         ctx: &ElementContext,
@@ -654,7 +654,7 @@ impl<'a> Printer<'a> {
     /// Children are not built here: each role builds them once, for the arm it takes.
     pub(super) fn prepare_sibling_element<'e>(
         &self,
-        element: &'e internal::Element<'e>,
+        element: &'e ast::Element<'e>,
     ) -> Option<PreparedElement<'e>> {
         let class = self.classify_tag(element);
         if class.raw_text.is_some()
@@ -663,7 +663,7 @@ impl<'a> Printer<'a> {
         {
             return None;
         }
-        let is_html = element.kind == internal::ElementKind::Html;
+        let is_html = element.kind == ast::ElementKind::Html;
         // Every layout below puts the `>` behind a line of this list's own group, so a
         // trailing `//`'s `break_parent` moves it off the comment's line unaided.
         let attr_docs = self
@@ -688,7 +688,7 @@ impl<'a> Printer<'a> {
     /// dangle state, so there is no role for it to play here.
     pub(super) fn build_inline_element_close_gt_dangle(
         &self,
-        element: &internal::Element<'_>,
+        element: &ast::Element<'_>,
     ) -> Option<DocId> {
         // Every state reads the flat hug-both (`Soft`) content layout; any other shape keeps
         // the element and its `>` intact.
@@ -1054,14 +1054,14 @@ impl<'a> Printer<'a> {
     /// multiline, `>` and `</tag>` go on separate lines (matching Prettier behavior).
     fn build_empty_element_doc(
         &self,
-        element: &internal::Element<'_>,
+        element: &ast::Element<'_>,
         opening_tag: DocId,
         has_attrs: bool,
         kind: ElementKind,
     ) -> DocId {
         let d = self.d();
         let name_doc = d.source_span(element.name_span, self.source);
-        let is_html = element.kind == internal::ElementKind::Html;
+        let is_html = element.kind == ast::ElementKind::Html;
         let closing = d.concat(&[d.text("></"), name_doc, d.text(">")]);
 
         if has_attrs && (kind.is_inline() || kind.is_component()) {
@@ -1116,7 +1116,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for a `<template>` element in a frozen language (e.g., `lang="pug"`).
     /// Content is preserved raw — we can't format non-HTML template languages.
     /// Format: `<template lang="pug">\n{raw content}\n</template>`
-    fn build_frozen_template_doc(&self, element: &internal::Element<'_>) -> DocId {
+    fn build_frozen_template_doc(&self, element: &ast::Element<'_>) -> DocId {
         let d = self.d();
         let name_doc = d.source_span(element.name_span, self.source);
 
@@ -1179,7 +1179,7 @@ impl<'a> Printer<'a> {
     fn build_raw_content_element_doc(
         &self,
         kind: RawTextKind,
-        element: &internal::Element<'_>,
+        element: &ast::Element<'_>,
         attr_docs: DocBuf,
     ) -> DocId {
         let d = self.d();
@@ -1408,7 +1408,7 @@ impl<'a> Printer<'a> {
     /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
     pub(super) fn build_element_attrs_doc(
         &self,
-        attrs: &[internal::AttributeNode<'_>],
+        attrs: &[ast::AttributeNode<'_>],
         separator: DocId,
         name_end: u32,
         open_tag_end: u32,
@@ -1451,7 +1451,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn push_attrs_with_comments(
         &self,
         docs: &mut DocBuf,
-        attrs: &[internal::AttributeNode<'_>],
+        attrs: &[ast::AttributeNode<'_>],
         separator: DocId,
         gaps: AttrGaps,
         is_html: bool,

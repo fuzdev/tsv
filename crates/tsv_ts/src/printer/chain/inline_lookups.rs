@@ -33,7 +33,7 @@
 use super::analysis::{child_stops_optional_chain, member_lookup_node};
 use super::printing::{member_lookup_group, print_node};
 use super::types::{ChainGroup, ChainNode};
-use crate::ast::internal::{Expression, ExpressionKind, MemberExpression};
+use crate::ast::{Expression, ExpressionKind, MemberExpression};
 use crate::printer::Printer;
 use std::cell::Cell;
 use tsv_lang::Span;

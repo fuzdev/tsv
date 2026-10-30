@@ -19,7 +19,7 @@
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ClassBody, ClassDeclaration, ClassMember, Expression, ExpressionKind, PropertyDefinition,
     Statement, StatementKind, VariableDeclaration, VariableDeclarator,
 };

@@ -12,7 +12,7 @@ use super::helpers::{
     unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer, TrailingBlock};
-use crate::ast::internal::{
+use crate::ast::{
     Comment, TSIntersectionType, TSParenthesizedType, TSType, TSTypeLiteral, TSUnionType,
 };
 use crate::printer::CommentVec;

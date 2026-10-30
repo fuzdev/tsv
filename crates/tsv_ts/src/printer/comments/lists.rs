@@ -7,7 +7,7 @@
 // multiline lists.
 
 use super::{CommentVec, LeadingGlue, Printer, TrailingLineRef};
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::statements::TerminatorGap;
 use crate::printer::{next_printed_stmt, next_printed_stmt_start, statement_gap_floor};
 use tsv_lang::Span;
@@ -194,7 +194,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_leading_comments_multiline`].
     pub(crate) fn build_list_element_group_from_comments<'c>(
         &self,
-        comments: impl Iterator<Item = &'c internal::Comment>,
+        comments: impl Iterator<Item = &'c ast::Comment>,
         element_start: u32,
         element: DocId,
     ) -> DocId {
@@ -257,7 +257,7 @@ impl<'a> Printer<'a> {
         let run_end = self.closer_trailing_run_end(start, end);
         let mut prev_end = start;
         // The comment emitted last, for the glue question in the own-line arm.
-        let mut prev_comment: Option<&internal::Comment> = None;
+        let mut prev_comment: Option<&ast::Comment> = None;
         for comment in self.comments_to_emit_between(start, end) {
             if comment.span.end <= run_end {
                 parts.push(self.build_trailing_comment_doc(comment));
@@ -404,7 +404,7 @@ impl<'a> Printer<'a> {
     /// split instead: follow same-line predecessors comment by comment until the line
     /// bottoms out at real content (anchor line) or at an own-line / multiline
     /// predecessor (not).
-    fn comment_on_gap_anchor_line(&self, span_start: u32, comment: &internal::Comment) -> bool {
+    fn comment_on_gap_anchor_line(&self, span_start: u32, comment: &ast::Comment) -> bool {
         let mut c = comment;
         loop {
             if !self.comment_follows_content_on_its_line(c) {
@@ -444,7 +444,7 @@ impl<'a> Printer<'a> {
         &self,
         span_start: u32,
         span_end: u32,
-    ) -> Option<&'a internal::Comment> {
+    ) -> Option<&'a ast::Comment> {
         let bytes = self.source.as_bytes();
         if span_end == 0 || !matches!(bytes.get(span_end as usize - 1), Some(b';' | b',')) {
             return None;
@@ -547,7 +547,7 @@ impl<'a> Printer<'a> {
     /// emitted end, reaches the same spelling through [`Self::statement_claim_end_with`].
     pub(crate) fn statement_claim_end(
         &self,
-        body: &[internal::Statement<'_>],
+        body: &[ast::Statement<'_>],
         index: usize,
         tail_target: Option<u32>,
     ) -> u32 {
@@ -564,7 +564,7 @@ impl<'a> Printer<'a> {
     /// the same statement a second time is the cost this saves.
     pub(crate) fn statement_claim_end_with(
         &self,
-        body: &[internal::Statement<'_>],
+        body: &[ast::Statement<'_>],
         index: usize,
         tail_target: Option<u32>,
         emitted_end: impl FnOnce() -> u32,
@@ -603,7 +603,7 @@ impl<'a> Printer<'a> {
     /// is read only when nothing was raised.
     fn statement_gap_scan_start(
         &self,
-        body: &[internal::Statement<'_>],
+        body: &[ast::Statement<'_>],
         index: usize,
         emitted_end: impl FnOnce() -> u32,
     ) -> u32 {
@@ -630,11 +630,7 @@ impl<'a> Printer<'a> {
     /// a comment in the terminator gap is already inside the slice (a cataloged divergence,
     /// `docs/conformance_prettier_ignore.md` §Format-ignore directive). Handing it to the list
     /// as well prints it TWICE. The freeze is the caller's verdict, so the caller states it.
-    pub(crate) fn statement_emitted_end(
-        &self,
-        stmt: &internal::Statement<'_>,
-        frozen: bool,
-    ) -> u32 {
+    pub(crate) fn statement_emitted_end(&self, stmt: &ast::Statement<'_>, frozen: bool) -> u32 {
         if frozen {
             stmt.span().end
         } else {
@@ -731,7 +727,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_statement_trailing_run(
         &self,
         parts: &mut DocBuf,
-        body: &[internal::Statement<'_>],
+        body: &[ast::Statement<'_>],
         index: usize,
         list_end: u32,
         frozen: bool,
@@ -858,7 +854,7 @@ impl<'a> Printer<'a> {
         &self,
         after_pos: u32,
         upper_bound: u32,
-    ) -> impl Iterator<Item = &'a internal::Comment> {
+    ) -> impl Iterator<Item = &'a ast::Comment> {
         self.trailing_same_line_comments_through(after_pos, upper_bound, u32::MAX)
     }
 
@@ -874,7 +870,7 @@ impl<'a> Printer<'a> {
         after_pos: u32,
         upper_bound: u32,
         printed_tail: u32,
-    ) -> impl Iterator<Item = &'a internal::Comment> {
+    ) -> impl Iterator<Item = &'a ast::Comment> {
         let mut line = TrailingLineRef::new(after_pos, printed_tail);
         self.comments_to_emit_between(after_pos, upper_bound)
             .take_while(move |comment| line.take(self, comment))
@@ -963,7 +959,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_leading_comments_before(
         &self,
         parts: &mut DocBuf,
-        comments: &[&internal::Comment],
+        comments: &[&ast::Comment],
         target_start: u32,
     ) {
         self.push_leading_comment_run(
@@ -993,7 +989,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_orphaned_comment_run(
         &self,
         parts: &mut DocBuf,
-        comments: &[&internal::Comment],
+        comments: &[&ast::Comment],
         gap_end: u32,
     ) {
         let Some((last, leading)) = comments.split_last() else {
@@ -1105,7 +1101,7 @@ impl<'a> Printer<'a> {
         // The comment this run emitted last, for the glue question below. `None` after a
         // skipped one: that comment is on the page but not on THIS run's line, so a
         // comment glued to it in source has nothing here to glue to.
-        let mut prev_emitted: Option<&internal::Comment> = None;
+        let mut prev_emitted: Option<&ast::Comment> = None;
 
         for comment in self.comments_to_emit_between(prev_end, body_end) {
             if self.comment_already_trailed(anchor, comment, claims_trailing, None) {
@@ -1164,7 +1160,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_dangling_comment_run<'c>(
         &self,
         parts: &mut DocBuf,
-        comments: impl IntoIterator<Item = &'c internal::Comment>,
+        comments: impl IntoIterator<Item = &'c ast::Comment>,
     ) {
         let d = self.d();
         for (i, comment) in comments.into_iter().enumerate() {
@@ -1187,11 +1183,11 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_trailing_comment_run<'c>(
         &self,
         parts: &mut DocBuf,
-        comments: impl IntoIterator<Item = &'c internal::Comment>,
+        comments: impl IntoIterator<Item = &'c ast::Comment>,
         scan_from: u32,
     ) {
         let mut prev_pos = scan_from;
-        let mut prev_comment: Option<&internal::Comment> = None;
+        let mut prev_comment: Option<&ast::Comment> = None;
         for comment in comments {
             self.push_trailing_run_separator(parts, prev_comment, prev_pos, comment.span.start);
             parts.push(self.build_comment_doc(comment));
@@ -1354,7 +1350,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn comment_on_delimiter_line(
         &self,
         delim_pos: u32,
-        comment: &internal::Comment,
+        comment: &ast::Comment,
     ) -> bool {
         self.is_same_line(delim_pos, comment.span.start)
     }
@@ -1626,7 +1622,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn append_signature_end_comments(
         &self,
         parts: &mut DocBuf,
-        return_type: Option<&internal::TSTypeAnnotation<'_>>,
+        return_type: Option<&ast::TSTypeAnnotation<'_>>,
         paren_pos: Option<u32>,
         span_end: u32,
         deferred: &mut DocBuf,
@@ -2080,7 +2076,7 @@ impl<'a> Printer<'a> {
         } else {
             start
         };
-        let mut prev_comment: Option<&internal::Comment> = None;
+        let mut prev_comment: Option<&ast::Comment> = None;
         // Whether the deferred run has been opened — the `first_break` axis is about the
         // break INTO the run, so it is spent once and never on a later comment. Tracked
         // rather than read off `prev_comment`, which the anchor-line arm also sets, or off
@@ -2189,11 +2185,7 @@ impl<'a> Printer<'a> {
     /// separates the two. Every other shape (single-line, and a *preserved* multi-line
     /// block, whose interior is verbatim by definition) reprints as its span, so it keeps
     /// the one-text-node form and the space fuses into it.
-    fn inline_block_comment_doc(
-        &self,
-        comment: &'a internal::Comment,
-        side: InlineBlockSide,
-    ) -> DocId {
+    fn inline_block_comment_doc(&self, comment: &'a ast::Comment, side: InlineBlockSide) -> DocId {
         let d = self.d();
         if self.block_comment_is_indentable(comment) {
             let comment_doc = self.build_comment_doc(comment);

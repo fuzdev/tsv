@@ -1,6 +1,5 @@
 // Object, array, template, and pattern writers.
 
-use super::super::super::internal;
 use super::declarations::write_decorators_field;
 use super::expressions::{write_expression, write_expressions};
 use super::functions::write_function_expression;
@@ -8,6 +7,7 @@ use super::{
     Ctx, JsonWriter, close_node, node_header, node_header_wide_end, write_array,
     write_type_annotation_field,
 };
+use crate::ast;
 use tsv_lang::Span;
 
 /// The header of a destructuring pattern (`ObjectPattern` / `ArrayPattern`).
@@ -21,7 +21,7 @@ pub(super) fn pattern_header(
     w: &mut JsonWriter,
     node_type: &'static str,
     span: Span,
-    type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
+    type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
     ctx: &Ctx<'_>,
 ) {
     match type_annotation {
@@ -33,7 +33,7 @@ pub(super) fn pattern_header(
 /// Emits a `TemplateLiteral` node. Field order: `expressions`, `quasis`.
 pub(super) fn write_template_literal(
     w: &mut JsonWriter,
-    template: &internal::TemplateLiteral<'_>,
+    template: &ast::TemplateLiteral<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TemplateLiteral", template.span, ctx);
@@ -49,7 +49,7 @@ pub(super) fn write_template_literal(
 /// `` ` `` or `${`). `cooked` is null for invalid escapes in tagged templates.
 pub(super) fn write_template_element(
     w: &mut JsonWriter,
-    element: &internal::TemplateElement<'_>,
+    element: &ast::TemplateElement<'_>,
     ctx: &Ctx<'_>,
 ) {
     let adjusted_start = element.span.start + 1;
@@ -67,9 +67,9 @@ pub(super) fn write_template_element(
     w.string(element.trv(ctx.source));
     w.raw(",\"cooked\":");
     match element.cooked {
-        internal::TemplateCooked::Verbatim => w.string(element.trv(ctx.source)),
-        internal::TemplateCooked::Decoded(decoded) => w.string(decoded),
-        internal::TemplateCooked::Invalid => w.null(),
+        ast::TemplateCooked::Verbatim => w.string(element.trv(ctx.source)),
+        ast::TemplateCooked::Decoded(decoded) => w.string(decoded),
+        ast::TemplateCooked::Invalid => w.null(),
     }
     w.raw_pick(element.tail, b"},\"tail\":true", b"},\"tail\":false");
     close_node(w, "TemplateElement", adjusted_span, ctx);
@@ -79,15 +79,15 @@ pub(super) fn write_template_element(
 /// (only when true), `typeAnnotation?`, `decorators?` (parameter position).
 pub(super) fn write_object_pattern(
     w: &mut JsonWriter,
-    obj: &internal::ObjectPattern<'_>,
+    obj: &ast::ObjectPattern<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
     pattern_header(w, "ObjectPattern", span, obj.type_annotation.as_ref(), ctx);
     w.raw(",\"properties\":");
     write_array(w, obj.properties, |w, p| match p {
-        internal::ObjectPatternProperty::Property(p) => write_property(w, p, ctx),
-        internal::ObjectPatternProperty::RestElement(r) => write_rest_element(w, r, ctx),
+        ast::ObjectPatternProperty::Property(p) => write_property(w, p, ctx),
+        ast::ObjectPatternProperty::RestElement(r) => write_rest_element(w, r, ctx),
     });
     if obj.optional {
         w.raw(",\"optional\":true");
@@ -98,11 +98,7 @@ pub(super) fn write_object_pattern(
 }
 
 /// Emits a `RestElement` node.
-pub(super) fn write_rest_element(
-    w: &mut JsonWriter,
-    rest: &internal::RestElement<'_>,
-    ctx: &Ctx<'_>,
-) {
+pub(super) fn write_rest_element(w: &mut JsonWriter, rest: &ast::RestElement<'_>, ctx: &Ctx<'_>) {
     node_header(w, "RestElement", rest.span, ctx);
     w.raw(",\"argument\":");
     write_expression(w, rest.argument, ctx);
@@ -121,7 +117,7 @@ pub(super) fn write_rest_element(
 /// (`parseGetterSetter`) and generic object methods (`m<T>() {}`, the
 /// `parsePropertyValue` override). Vanilla acorn (`ctx.vanilla_acorn`) assigns
 /// `value` first everywhere.
-pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, ctx: &Ctx<'_>) {
+pub(super) fn write_property(w: &mut JsonWriter, prop: &ast::Property<'_>, ctx: &Ctx<'_>) {
     node_header(w, "Property", prop.span, ctx);
     // `method` and `computed` are nearly always `false`, so the common shape is
     // one literal per `shorthand` value, the four keys folded in.
@@ -145,9 +141,9 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, 
         );
     }
     write_expression(w, prop.key, ctx);
-    let getset = !matches!(prop.kind, internal::PropertyKind::Init);
+    let getset = !matches!(prop.kind, ast::PropertyKind::Init);
     let generic_method = prop.method
-        && matches!(&prop.value.kind, internal::ExpressionKind::FunctionExpression(f)
+        && matches!(&prop.value.kind, ast::ExpressionKind::FunctionExpression(f)
             if f.type_parameters.is_some());
     if (getset || generic_method) && !ctx.vanilla_acorn {
         w.raw(",\"kind\":\"");
@@ -160,7 +156,7 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, 
         // Nearly every property is `init`, so that kind appends the whole
         // field as one literal rather than a runtime-length copy of `as_str()`.
         match prop.kind {
-            internal::PropertyKind::Init => w.raw(",\"kind\":\"init\""),
+            ast::PropertyKind::Init => w.raw(",\"kind\":\"init\""),
             kind => {
                 w.raw(",\"kind\":\"");
                 w.raw(kind.as_str());
@@ -179,12 +175,12 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, 
 /// `AssignmentPattern` on the wire: acorn reads every `{ a = 1 }` through
 /// `parseMaybeDefault`, whatever the literal becomes. The internal literal keeps the
 /// `=` assignment it was parsed as; a pattern property already holds the pattern.
-fn write_property_value(w: &mut JsonWriter, prop: &internal::Property<'_>, ctx: &Ctx<'_>) {
-    let method_value = prop.method || !matches!(prop.kind, internal::PropertyKind::Init);
+fn write_property_value(w: &mut JsonWriter, prop: &ast::Property<'_>, ctx: &Ctx<'_>) {
+    let method_value = prop.method || !matches!(prop.kind, ast::PropertyKind::Init);
     match (&prop.value, method_value) {
         (
-            internal::Expression {
-                kind: internal::ExpressionKind::FunctionExpression(f),
+            ast::Expression {
+                kind: ast::ExpressionKind::FunctionExpression(f),
                 ..
             },
             true,
@@ -192,13 +188,13 @@ fn write_property_value(w: &mut JsonWriter, prop: &internal::Property<'_>, ctx: 
             write_function_expression(w, f, ctx, true);
         }
         (
-            internal::Expression {
-                kind: internal::ExpressionKind::AssignmentExpression(assign),
+            ast::Expression {
+                kind: ast::ExpressionKind::AssignmentExpression(assign),
                 span,
             },
             false,
         ) if prop.shorthand => {
-            debug_assert_eq!(assign.operator, internal::AssignmentOperator::Assign);
+            debug_assert_eq!(assign.operator, ast::AssignmentOperator::Assign);
             node_header(w, "AssignmentPattern", *span, ctx);
             w.raw(",\"left\":");
             write_expression(w, assign.left, ctx);
@@ -215,7 +211,7 @@ fn write_property_value(w: &mut JsonWriter, prop: &internal::Property<'_>, ctx: 
 /// quirk widens it to the whole parameter property).
 pub(super) fn write_assignment_pattern(
     w: &mut JsonWriter,
-    pattern: &internal::AssignmentPattern<'_>,
+    pattern: &ast::AssignmentPattern<'_>,
     ctx: &Ctx<'_>,
     span: Span,
 ) {

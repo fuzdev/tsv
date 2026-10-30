@@ -42,7 +42,7 @@
 
 use bumpalo::Bump;
 use tsv_lang::Span;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression, AssignmentOperator,
     BinaryExpression, BinaryOperator, BlockStatement, CallExpression, Expression, ExpressionKind,
     ExpressionStatement, FunctionDeclaration, IdentName, Identifier, IfStatement,
@@ -530,7 +530,7 @@ impl<'arena> Builder<'arena> {
         let end = self.mint("]").end;
         Expression {
             span: Span::new(start, end),
-            kind: ExpressionKind::ArrayExpression(tsv_ts::ast::internal::ArrayExpression {
+            kind: ExpressionKind::ArrayExpression(tsv_ts::ast::ArrayExpression {
                 elements,
                 spread_trailing_comma: false,
             }),

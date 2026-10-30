@@ -18,7 +18,7 @@ use specifier_list::SpecifierListSpans;
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 pub(super) use super::{Printer, build_entity_name_doc};
 
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::calls::PartitionedComments;
 use crate::printer::comments::left_spine_shell_is_comment_free;
 use crate::printer::needs_parens::{LeftmostText, export_default_needs_parens};
@@ -41,7 +41,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript export assignment
     pub(super) fn build_export_assignment_doc(
         &self,
-        decl: &internal::TSExportAssignment<'_>,
+        decl: &ast::TSExportAssignment<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -122,7 +122,7 @@ impl<'a> Printer<'a> {
     /// When the line exceeds print_width (100 chars), wraps to multiline format.
     pub(super) fn build_export_named_declaration_doc(
         &self,
-        decl: &internal::ExportNamedDeclaration<'_>,
+        decl: &ast::ExportNamedDeclaration<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -150,7 +150,7 @@ impl<'a> Printer<'a> {
             // they print in the source order rather than through the plain
             // keyword→declaration continuation.
             if frozen.is_none()
-                && let internal::StatementKind::ClassDeclaration(class) = &declaration.kind
+                && let ast::StatementKind::ClassDeclaration(class) = &declaration.kind
                 && let Some(doc) =
                     self.build_export_named_decorated_class_doc(span, class, export_keyword_end)
             {
@@ -174,7 +174,7 @@ impl<'a> Printer<'a> {
         } else {
             // export { x, y as z } or export { x } from "y"
             // Check if the overall export is type-only
-            let is_type_export = decl.export_kind == internal::ExportKind::Type;
+            let is_type_export = decl.export_kind == ast::ExportKind::Type;
 
             let mut parts = if is_type_export {
                 // Split the keyword so a type-only re-export (empty `{}` or named
@@ -325,7 +325,7 @@ impl<'a> Printer<'a> {
     fn build_export_named_decorated_class_doc(
         &self,
         span: Span,
-        class: &internal::ClassDeclaration<'_>,
+        class: &ast::ClassDeclaration<'_>,
         export_keyword_end: u32,
     ) -> Option<DocId> {
         let d = self.d();
@@ -386,7 +386,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an export default declaration
     pub(super) fn build_export_default_declaration_doc(
         &self,
-        decl: &internal::ExportDefaultDeclaration<'_>,
+        decl: &ast::ExportDefaultDeclaration<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -428,7 +428,7 @@ impl<'a> Printer<'a> {
         // fixed point one pass away. A run behind a line the value's own group may break
         // takes this gap's own separator instead, glued.
         let (value_doc, left_spine_run) = match &decl.declaration {
-            internal::ExportDefaultValue::Expression(expr)
+            ast::ExportDefaultValue::Expression(expr)
                 if !left_spine_shell_is_comment_free(self.source, expr.span().start) =>
             {
                 self.export_default_leading_edge(expr, value_doc)
@@ -447,8 +447,8 @@ impl<'a> Printer<'a> {
         // (`export default⏎/** @type {T} */⏎(x).b + q` joined on pass 2). Not under a
         // sequence, which prints its own `(` ahead of the cast.
         if left_spine_run
-            || matches!(&decl.declaration, internal::ExportDefaultValue::Expression(expr)
-                if !matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_))
+            || matches!(&decl.declaration, ast::ExportDefaultValue::Expression(expr)
+                if !matches!(expr.kind, ast::ExpressionKind::SequenceExpression(_))
                     && self.is_own_line_jsdoc_cast(expr))
             || self
                 .keyword_value_hang_doc(keyword_end, decl_start, || value_doc)
@@ -482,7 +482,7 @@ impl<'a> Printer<'a> {
     /// arrow's parameter `(`, or to anything else — is an ordinary block.
     fn export_default_leading_edge(
         &self,
-        value: &internal::Expression<'_>,
+        value: &ast::Expression<'_>,
         value_doc: DocId,
     ) -> (DocId, bool) {
         let d = self.d();
@@ -514,14 +514,14 @@ impl<'a> Printer<'a> {
     /// only the expression's own doc is swapped.
     fn build_export_default_value_doc(
         &self,
-        decl: &internal::ExportDefaultDeclaration<'_>,
+        decl: &ast::ExportDefaultDeclaration<'_>,
         span: Span,
         keyword_end: u32,
         value_span: Span,
     ) -> DocId {
         let d = self.d();
         match &decl.declaration {
-            internal::ExportDefaultValue::Expression(expr) => {
+            ast::ExportDefaultValue::Expression(expr) => {
                 // A multi-line comment the value owns prints outside the value's own group (the
                 // keyword gap's run never sees it), beneath the clarity parens added below.
                 let mut expr_doc = self.build_value_head_doc(keyword_end, expr, || {
@@ -585,19 +585,19 @@ impl<'a> Printer<'a> {
                 parts.extend(after);
                 d.concat(&parts)
             }
-            internal::ExportDefaultValue::FunctionDeclaration(func) => self
+            ast::ExportDefaultValue::FunctionDeclaration(func) => self
                 .build_declaration_value_head_doc(keyword_end, value_span, || {
                     self.build_function_declaration_doc(func)
                 }),
-            internal::ExportDefaultValue::TSDeclareFunction(func) => self
+            ast::ExportDefaultValue::TSDeclareFunction(func) => self
                 .build_declaration_value_head_doc(keyword_end, value_span, || {
                     self.build_declare_function_doc(func, None)
                 }),
-            internal::ExportDefaultValue::ClassDeclaration(class) => self
+            ast::ExportDefaultValue::ClassDeclaration(class) => self
                 .build_declaration_value_head_doc(keyword_end, value_span, || {
                     self.build_class_declaration_doc(class)
                 }),
-            internal::ExportDefaultValue::TSInterfaceDeclaration(iface) => self
+            ast::ExportDefaultValue::TSInterfaceDeclaration(iface) => self
                 .build_declaration_value_head_doc(keyword_end, value_span, || {
                     self.build_interface_declaration_doc(iface)
                 }),
@@ -616,11 +616,11 @@ impl<'a> Printer<'a> {
     /// line, the (always own-line) decorators, and NO trailing `;`.
     fn build_export_default_decorated_doc(
         &self,
-        decl: &internal::ExportDefaultDeclaration<'_>,
+        decl: &ast::ExportDefaultDeclaration<'_>,
         span: Span,
     ) -> Option<DocId> {
         let d = self.d();
-        if let internal::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration {
+        if let ast::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration {
             let export_start =
                 self.find_keyword_after_decorators(class.decorators, "export", span.start);
             let dec_doc = self.build_decorators_doc(class.decorators, export_start)?;
@@ -645,9 +645,9 @@ impl<'a> Printer<'a> {
             ]));
         }
 
-        let internal::ExportDefaultValue::Expression(internal::Expression {
+        let ast::ExportDefaultValue::Expression(ast::Expression {
             span: class_span,
-            kind: internal::ExpressionKind::ClassExpression(class_expr),
+            kind: ast::ExpressionKind::ClassExpression(class_expr),
         }) = &decl.declaration
         else {
             return None;
@@ -701,11 +701,11 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an export all declaration
     pub(super) fn build_export_all_declaration_doc(
         &self,
-        decl: &internal::ExportAllDeclaration<'_>,
+        decl: &ast::ExportAllDeclaration<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
-        let is_type = decl.export_kind == internal::ExportKind::Type;
+        let is_type = decl.export_kind == ast::ExportKind::Type;
         let export_end = span.start + MODULE_KW_LEN;
         // The `*` token, after the keyword(s) and before any `as`/`from`.
         let star_limit = decl
@@ -779,7 +779,7 @@ impl<'a> Printer<'a> {
     fn push_import_header_keyword(
         &self,
         parts: &mut DocBuf,
-        decl: &internal::ImportDeclaration<'_>,
+        decl: &ast::ImportDeclaration<'_>,
         span: Span,
         keyword: &'static str,
     ) {
@@ -798,7 +798,7 @@ impl<'a> Printer<'a> {
     /// When the line exceeds print_width (100 chars), wraps to multiline format.
     pub(super) fn build_import_declaration_doc(
         &self,
-        decl: &internal::ImportDeclaration<'_>,
+        decl: &ast::ImportDeclaration<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -806,13 +806,13 @@ impl<'a> Printer<'a> {
         let has_empty_braces = self.has_empty_named_braces(decl, span);
 
         // Check if this is a type-only import
-        let is_type_import = decl.import_kind == internal::ImportKind::Type;
+        let is_type_import = decl.import_kind == ast::ImportKind::Type;
 
         // Collect specifiers
         let mut has_default = false;
         // Inline up to 8 named specifiers (covers the common import) before spilling.
-        let mut named_specs: SmallVec<[&internal::ImportNamedSpecifier<'_>; 8]> = SmallVec::new();
-        let mut default_name = internal::IdentName {
+        let mut named_specs: SmallVec<[&ast::ImportNamedSpecifier<'_>; 8]> = SmallVec::new();
+        let mut default_name = ast::IdentName {
             escaped: None,
             raw_len: 0,
             plain_ascii: true,
@@ -820,21 +820,21 @@ impl<'a> Printer<'a> {
         let mut default_name_start = 0u32;
         let mut default_spec_start = 0u32;
         let mut default_spec_end = 0u32;
-        let mut namespace_spec: Option<&internal::ImportNamespaceSpecifier<'_>> = None;
+        let mut namespace_spec: Option<&ast::ImportNamespaceSpecifier<'_>> = None;
 
         for spec in decl.specifiers {
             match spec {
-                internal::ImportSpecifier::Default(default_spec) => {
+                ast::ImportSpecifier::Default(default_spec) => {
                     has_default = true;
                     default_name = default_spec.local.ident_name();
                     default_name_start = default_spec.local.span.start;
                     default_spec_start = default_spec.span.start;
                     default_spec_end = default_spec.span.end;
                 }
-                internal::ImportSpecifier::Named(named_spec) => {
+                ast::ImportSpecifier::Named(named_spec) => {
                     named_specs.push(named_spec);
                 }
-                internal::ImportSpecifier::Namespace(ns_spec) => {
+                ast::ImportSpecifier::Namespace(ns_spec) => {
                     namespace_spec = Some(ns_spec);
                 }
             }
@@ -918,7 +918,7 @@ impl<'a> Printer<'a> {
                 // An import namespace binding is always an identifier; wrap it to share
                 // the `ModuleExportName`-based renderer — and the whole star emitter —
                 // with the export-all side.
-                let binding = internal::ModuleExportName::Identifier(ns_spec.local.clone());
+                let binding = ast::ModuleExportName::Identifier(ns_spec.local.clone());
                 self.push_namespace_star_binding(
                     &mut parts,
                     gap_start,
@@ -1052,7 +1052,7 @@ impl<'a> Printer<'a> {
     /// Build doc for `import x = require("y")` or `import x = A.B`
     pub(super) fn build_import_equals_declaration_doc(
         &self,
-        decl: &internal::TSImportEqualsDeclaration<'_>,
+        decl: &ast::TSImportEqualsDeclaration<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -1068,7 +1068,7 @@ impl<'a> Printer<'a> {
             words.push("export");
         }
         words.push("import");
-        if matches!(decl.import_kind, internal::ImportKind::Type) {
+        if matches!(decl.import_kind, ast::ImportKind::Type) {
             words.push("type");
         }
         parts.push(self.build_keyword_header_doc(
@@ -1083,12 +1083,12 @@ impl<'a> Printer<'a> {
         // continuation — a line comment there indents the reference, and every break
         // *inside* it has to land at that level too.
         let (module_ref_start, ref_end, module_ref_doc) = match &decl.module_reference {
-            internal::TSModuleReference::ExternalModuleReference(ext) => (
+            ast::TSModuleReference::ExternalModuleReference(ext) => (
                 ext.span.start,
                 ext.span.end,
                 self.build_external_module_reference_doc(ext),
             ),
-            internal::TSModuleReference::EntityName(entity) => (
+            ast::TSModuleReference::EntityName(entity) => (
                 entity.span().start,
                 entity.span().end,
                 build_entity_name_doc(self, entity),
@@ -1160,7 +1160,7 @@ impl<'a> Printer<'a> {
     /// split around (`trailingComma: 'none'`), which is exactly that helper's premise.
     fn build_external_module_reference_doc(
         &self,
-        ext_ref: &internal::TSExternalModuleReference<'_>,
+        ext_ref: &ast::TSExternalModuleReference<'_>,
     ) -> DocId {
         let d = self.d();
         // From the end of the `require` KEYWORD, not from a computed `(`: `require(` is a
@@ -1238,7 +1238,7 @@ impl<'a> Printer<'a> {
     /// `export as namespace Foo;` — TypeScript UMD global export declaration.
     pub(super) fn build_namespace_export_declaration_doc(
         &self,
-        decl: &internal::TSNamespaceExportDeclaration<'_>,
+        decl: &ast::TSNamespaceExportDeclaration<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();

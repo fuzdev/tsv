@@ -8,7 +8,7 @@
 //!   (`utilities/should-flatten.js`)
 //! - `needsParentheses` (`parentheses/needs-parentheses.js`)
 
-use super::internal::BinaryOperator;
+use super::BinaryOperator;
 
 /// Operator precedence level (higher = tighter binding)
 pub type PrecedenceLevel = u8;

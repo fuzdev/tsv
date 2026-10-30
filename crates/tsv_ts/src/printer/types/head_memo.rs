@@ -28,7 +28,7 @@ use std::cell::{Cell, RefCell};
 use tsv_lang::FxHashMap;
 
 use super::{EdgeRun, HeadRegion, Printer};
-use crate::ast::internal::TSType;
+use crate::ast::TSType;
 
 /// The visits an outermost descent takes before it memoizes: the descent real code makes
 /// is a handful of links, and one that outlives this many memoizes the rest of the call,

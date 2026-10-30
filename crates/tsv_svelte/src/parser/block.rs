@@ -2,7 +2,7 @@
 //
 // Handles: {#if}, {#each}, {#await}, {#key} blocks
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::{ElementParent, ParsedElement};
 use crate::whitespace::is_svelte_ws;
@@ -267,7 +267,7 @@ fn await_head_clause(after_expr: &str) -> Option<(AwaitClause, &str)> {
 /// wrapper that produced no such statement, which the caller reports as an error.
 fn snippet_signature<'arena>(
     program: &tsv_ts::Program<'arena>,
-) -> Option<&'arena tsv_ts::ast::internal::FunctionDeclaration<'arena>> {
+) -> Option<&'arena tsv_ts::ast::FunctionDeclaration<'arena>> {
     match program.body.first().map(|stmt| &stmt.kind) {
         Some(tsv_ts::StatementKind::FunctionDeclaration(func)) => Some(*func),
         _ => None,

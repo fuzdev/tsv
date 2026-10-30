@@ -13,7 +13,7 @@
 // declaration crosses it — so it lives in `pre_body.rs`; the class header takes
 // its resolution (`pre_body_gap`) and supplies only the group-relative separator.
 
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::CommentSpacing;
 use crate::printer::HeritageKeyword;
 use crate::printer::Printer;
@@ -117,11 +117,11 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn class_heritage_positions(
         &self,
         span_start: u32,
-        id: Option<&internal::Identifier<'_>>,
-        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
-        super_class: Option<&internal::Expression<'_>>,
-        super_type_parameters: Option<&internal::TSTypeParameterInstantiation<'_>>,
-        implements: &[internal::TSInterfaceHeritage<'_>],
+        id: Option<&ast::Identifier<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        super_class: Option<&ast::Expression<'_>>,
+        super_type_parameters: Option<&ast::TSTypeParameterInstantiation<'_>>,
+        implements: &[ast::TSInterfaceHeritage<'_>],
     ) -> ClassHeritagePositions {
         let pre_heritage_end = type_parameters.map_or_else(
             || id.map_or(span_start + "class".len() as u32, |id| id.span.end),
@@ -178,9 +178,9 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn class_header_layout(
         &self,
         positions: &ClassHeritagePositions,
-        super_class: Option<&internal::Expression<'_>>,
-        super_type_parameters: Option<&internal::TSTypeParameterInstantiation<'_>>,
-        implements: &[internal::TSInterfaceHeritage<'_>],
+        super_class: Option<&ast::Expression<'_>>,
+        super_type_parameters: Option<&ast::TSTypeParameterInstantiation<'_>>,
+        implements: &[ast::TSInterfaceHeritage<'_>],
     ) -> ClassHeaderLayout {
         // The extends→`implements` gap exists only with both clauses present, which is
         // already `count > 1` in the structural rule — so that arm can only ever add to
@@ -213,7 +213,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn push_class_type_params(
         &self,
         parts: &mut DocBuf,
-        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
         gap: ClassTypeParamsGap,
     ) {
         let Some(type_params) = type_parameters else {
@@ -269,9 +269,9 @@ impl<'a> Printer<'a> {
     /// computed position data (avoids duplicate binary searches).
     pub(in crate::printer) fn should_class_group_mode(
         &self,
-        super_class: Option<&internal::Expression<'_>>,
-        super_type_parameters: Option<&internal::TSTypeParameterInstantiation<'_>>,
-        implements: &[internal::TSInterfaceHeritage<'_>],
+        super_class: Option<&ast::Expression<'_>>,
+        super_type_parameters: Option<&ast::TSTypeParameterInstantiation<'_>>,
+        implements: &[ast::TSInterfaceHeritage<'_>],
     ) -> bool {
         let mut count = if super_class.is_some() { 1 } else { 0 };
         count += implements.len();
@@ -280,10 +280,7 @@ impl<'a> Printer<'a> {
         }
         if let Some(super_class) = super_class
             && super_type_parameters.is_none()
-            && matches!(
-                super_class.kind,
-                internal::ExpressionKind::MemberExpression(_)
-            )
+            && matches!(super_class.kind, ast::ExpressionKind::MemberExpression(_))
         {
             return true;
         }
@@ -299,8 +296,8 @@ impl<'a> Printer<'a> {
     /// type-argument builder (the same one the `implements` clause uses).
     pub(in crate::printer) fn build_class_extends_doc(
         &self,
-        super_class: Option<&internal::Expression<'_>>,
-        super_type_parameters: Option<&internal::TSTypeParameterInstantiation<'_>>,
+        super_class: Option<&ast::Expression<'_>>,
+        super_type_parameters: Option<&ast::TSTypeParameterInstantiation<'_>>,
         extends_keyword_start: Option<u32>,
     ) -> Option<DocId> {
         let d = self.d();
@@ -371,8 +368,8 @@ impl<'a> Printer<'a> {
     /// `extends f<T>` and stop at the second `<` ([`super::SecondTypeArgs::Heritage`]).
     fn build_super_class_doc(
         &self,
-        super_class: &internal::Expression<'_>,
-        super_type_parameters: Option<&internal::TSTypeParameterInstantiation<'_>>,
+        super_class: &ast::Expression<'_>,
+        super_type_parameters: Option<&ast::TSTypeParameterInstantiation<'_>>,
     ) -> DocId {
         // The ordinary dispatch — a binary superclass takes the continuation-indent
         // default. The parens below are the PRINTER's and stay outside the operand's own
@@ -388,7 +385,7 @@ impl<'a> Printer<'a> {
             // stays inline in flat parens.
             if matches!(
                 &super_class.kind,
-                internal::ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c)
+                ast::ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c)
             ) {
                 self.build_break_open_parens(doc)
             } else {
@@ -404,7 +401,7 @@ impl<'a> Printer<'a> {
     /// and inter-item comments).
     pub(in crate::printer) fn build_class_implements_doc(
         &self,
-        implements: &[internal::TSInterfaceHeritage<'_>],
+        implements: &[ast::TSInterfaceHeritage<'_>],
         group_mode: bool,
         implements_keyword_start: Option<u32>,
     ) -> Option<DocId> {
@@ -439,7 +436,7 @@ impl<'a> Printer<'a> {
         positions: &ClassHeritagePositions,
         extends_doc: Option<DocId>,
         implements_doc: Option<DocId>,
-        implements: &[internal::TSInterfaceHeritage<'_>],
+        implements: &[ast::TSInterfaceHeritage<'_>],
         options: ClassHeaderOptions,
     ) -> DocId {
         let d = self.d();

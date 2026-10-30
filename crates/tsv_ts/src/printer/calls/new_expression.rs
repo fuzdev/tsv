@@ -24,7 +24,7 @@ use super::arg_wrapping::{
     wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::chain::{child_stops_optional_chain, tag_paren_leading_start};
 use crate::printer::expressions::functions::{arrow_signature_refuses_hug, prepend_leading};
 use crate::printer::needs_parens::instantiation_operand_is_sealed_chain;
@@ -53,7 +53,7 @@ impl<'a> Printer<'a> {
     /// keeps its line instead of being pulled up to trail `new`.
     pub(super) fn build_new_doc_with_wrapping(
         &self,
-        new_expr: &internal::NewExpression<'_>,
+        new_expr: &ast::NewExpression<'_>,
         new_expr_span: Span,
     ) -> DocId {
         let d = self.d();
@@ -117,11 +117,7 @@ impl<'a> Printer<'a> {
     /// [`fn@crate::printer::needs_parens`] — the unfrozen callee must keep printing bare.
     /// The left-spine positions ask that same predicate for the suffixes THEY print past a
     /// frozen slice (`.k`, `[0]`, `(1)`, `!`, `` `t` ``).
-    fn build_frozen_new_callee_doc(
-        &self,
-        callee: &internal::Expression<'_>,
-        frozen: Span,
-    ) -> DocId {
+    fn build_frozen_new_callee_doc(&self, callee: &ast::Expression<'_>, frozen: Span) -> DocId {
         // The position's pair also covers a call the callee holds bare
         // ([`Self::new_callee_holds_bare_call`]) — one pair either way.
         let doc = if self.new_callee_holds_bare_call(callee) {
@@ -142,7 +138,7 @@ impl<'a> Printer<'a> {
     /// already emitted `new` and the gap's continuation supplies the separator.
     fn build_new_doc_after_keyword(
         &self,
-        new_expr: &internal::NewExpression<'_>,
+        new_expr: &ast::NewExpression<'_>,
         span: Span,
         keyword: DocId,
         frozen: Option<Span>,
@@ -242,7 +238,7 @@ impl<'a> Printer<'a> {
     /// taken it so the caller can hang this whole doc under the run.
     fn build_new_args_doc(
         &self,
-        new_expr: &internal::NewExpression<'_>,
+        new_expr: &ast::NewExpression<'_>,
         new_expr_span: Span,
         callee_with_types: DocId,
         paren_open: u32,
@@ -357,7 +353,7 @@ impl<'a> Printer<'a> {
             let arg0 = new_expr.arguments[0];
             if new_has_comments
                 && !single_arg_leading_on_page_comment
-                && let internal::ExpressionKind::ArrowFunctionExpression(_) = &arg0.kind
+                && let ast::ExpressionKind::ArrowFunctionExpression(_) = &arg0.kind
                 && let Some(gap_break) = last_arg_arrow_gap_break(self, arg0)
             {
                 return build_arrow_gap_break_single_arg_doc(
@@ -384,8 +380,8 @@ impl<'a> Printer<'a> {
                 // ([`ArgOpener::lone_hug_ladder`]), always with its middle state — prettier's
                 // flat-parameter rule gates on `isCallExpression(parent)`, and a `new` is not
                 // one, so a `new`'s callback keeps a breakable parameter list at every width.
-                internal::Expression {
-                    kind: internal::ExpressionKind::FunctionExpression(_),
+                ast::Expression {
+                    kind: ast::ExpressionKind::FunctionExpression(_),
                     ..
                 } if !single_arg_leading_on_page_comment => {
                     let arg_doc = self.build_expression_doc(new_expr.arguments[0]);
@@ -393,8 +389,8 @@ impl<'a> Printer<'a> {
                         .lone_hug_ladder(d, arg_doc, false);
                 }
                 // Block arrow (or expandable arrow chain): use conditional_group to let Doc decide hug vs wrap
-                internal::Expression {
-                    kind: internal::ExpressionKind::ArrowFunctionExpression(arrow),
+                ast::Expression {
+                    kind: ast::ExpressionKind::ArrowFunctionExpression(arrow),
                     ..
                 } if !arrow.body.is_expression() || could_expand_arrow_chain(arrow) => {
                     let arg0 = &new_expr.arguments[0];
@@ -460,11 +456,11 @@ impl<'a> Printer<'a> {
                 }
                 // Expression-body arrow: break at => not at (
                 // Mirrors call_formatting.rs expression arrow handling
-                internal::Expression {
-                    kind: internal::ExpressionKind::ArrowFunctionExpression(arrow),
+                ast::Expression {
+                    kind: ast::ExpressionKind::ArrowFunctionExpression(arrow),
                     ..
                 } if arrow.body.is_expression() => {
-                    if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
+                    if let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
                         // Expandable body (ternary): conditional parens
                         // Flat: `new Xy((x) => (x ? y : z))`
                         // Break: `new Xy((x) =>\n  x ? y : z,\n)`
@@ -814,11 +810,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a new expression (for nested contexts)
-    pub(crate) fn build_new_doc(
-        &self,
-        new_expr: &internal::NewExpression<'_>,
-        span: Span,
-    ) -> DocId {
+    pub(crate) fn build_new_doc(&self, new_expr: &ast::NewExpression<'_>, span: Span) -> DocId {
         self.build_new_doc_with_wrapping(new_expr, span)
     }
 
@@ -845,9 +837,9 @@ impl<'a> Printer<'a> {
     /// harmless redundancy.
     pub(in crate::printer) fn new_callee_holds_bare_call(
         &self,
-        mut callee: &internal::Expression<'_>,
+        mut callee: &ast::Expression<'_>,
     ) -> bool {
-        use internal::ExpressionKind as E;
+        use ast::ExpressionKind as E;
         // A loop down the spine, not a recursion: a chain is as long as the spine limit lets
         // it be, and a frame per link is what the stack contract prices
         loop {

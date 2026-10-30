@@ -7,9 +7,7 @@
 use super::super::symbols::SymbolFlags;
 use super::{DeclInput, SymbolBinder};
 use crate::ids::NodeId;
-use tsv_ts::ast::internal::{
-    Expression, ExpressionKind, ObjectExpression, ObjectProperty, PropertyKind,
-};
+use tsv_ts::ast::{Expression, ExpressionKind, ObjectExpression, ObjectProperty, PropertyKind};
 
 impl<'a> SymbolBinder<'a> {
     // --- expressions (nested scopes) -----------------------------------------
@@ -27,10 +25,10 @@ impl<'a> SymbolBinder<'a> {
                 self.with_function_scope(a.type_parameters.as_ref(), |b| {
                     b.bind_params(a.params);
                     match &a.body {
-                        tsv_ts::ast::internal::ArrowFunctionBody::Expression(e) => {
+                        tsv_ts::ast::ArrowFunctionBody::Expression(e) => {
                             b.visit_expression(e);
                         }
-                        tsv_ts::ast::internal::ArrowFunctionBody::BlockStatement(block) => {
+                        tsv_ts::ast::ArrowFunctionBody::BlockStatement(block) => {
                             b.bind_statement_list(block.body, true);
                         }
                     }

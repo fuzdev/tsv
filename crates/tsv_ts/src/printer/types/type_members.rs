@@ -9,7 +9,7 @@
 
 use super::CommentSpacing;
 use super::Printer;
-use crate::ast::internal::{self, TSTypeElement};
+use crate::ast::{self, TSTypeElement};
 use crate::printer::LeadingGlue;
 use crate::printer::analysis::skip_identifier_at;
 use smallvec::smallvec;
@@ -35,7 +35,7 @@ impl<'a> Printer<'a> {
     /// no-comment path.
     pub(crate) fn build_property_signature_member_doc(
         &self,
-        prop: &internal::TSPropertySignature<'_>,
+        prop: &ast::TSPropertySignature<'_>,
         deferred: &mut DocBuf,
     ) -> DocId {
         let d = self.d();
@@ -130,7 +130,7 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         after_marker: u32,
         optional: bool,
-        type_ann: &internal::TSTypeAnnotation<'_>,
+        type_ann: &ast::TSTypeAnnotation<'_>,
     ) {
         if let Some(frozen) = self.build_frozen_annotation_head_doc(after_marker, type_ann) {
             parts.push(frozen);
@@ -186,7 +186,7 @@ impl<'a> Printer<'a> {
     /// emitted twice. Then `>`→`(` and signature end→`;`.
     pub(crate) fn build_method_signature_member_doc(
         &self,
-        method: &internal::TSMethodSignature<'_>,
+        method: &ast::TSMethodSignature<'_>,
         deferred: &mut DocBuf,
     ) -> DocId {
         let d = self.d();
@@ -198,20 +198,20 @@ impl<'a> Printer<'a> {
         let mut cursor = method.span.start;
         if method.readonly {
             self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, key_start);
-            if matches!(method.kind, internal::MethodKind::Method) {
+            if matches!(method.kind, ast::MethodKind::Method) {
                 let name_bound = self.computed_key_name_bound(cursor, key_start, method.computed);
                 self.push_pre_name_comments_doc(&mut parts, cursor, name_bound);
             }
         }
         match method.kind {
-            internal::MethodKind::Get => self.push_accessor_keyword_doc(
+            ast::MethodKind::Get => self.push_accessor_keyword_doc(
                 &mut parts,
                 "get ",
                 cursor,
                 key_start,
                 method.computed,
             ),
-            internal::MethodKind::Set => self.push_accessor_keyword_doc(
+            ast::MethodKind::Set => self.push_accessor_keyword_doc(
                 &mut parts,
                 "set ",
                 cursor,
@@ -286,7 +286,7 @@ impl<'a> Printer<'a> {
     /// printers (the interface caller appends `;`).
     pub(crate) fn build_call_signature_member_doc(
         &self,
-        call: &internal::TSCallSignatureDeclaration<'_>,
+        call: &ast::TSCallSignatureDeclaration<'_>,
         deferred: &mut DocBuf,
     ) -> DocId {
         self.build_call_or_construct_signature_doc(
@@ -304,7 +304,7 @@ impl<'a> Printer<'a> {
     /// type-element printers (the interface caller appends `;`).
     pub(crate) fn build_construct_signature_member_doc(
         &self,
-        ctor: &internal::TSConstructSignatureDeclaration<'_>,
+        ctor: &ast::TSConstructSignatureDeclaration<'_>,
         deferred: &mut DocBuf,
     ) -> DocId {
         self.build_call_or_construct_signature_doc(
@@ -330,10 +330,10 @@ impl<'a> Printer<'a> {
     /// trailing space and line comments a hardline.
     fn build_call_or_construct_signature_doc(
         &self,
-        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
-        params: &[internal::Expression<'_>],
-        return_type: Option<&internal::TSTypeAnnotation<'_>>,
-        span: internal::Span,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        params: &[ast::Expression<'_>],
+        return_type: Option<&ast::TSTypeAnnotation<'_>>,
+        span: ast::Span,
         new_keyword_end: Option<u32>,
         deferred: &mut DocBuf,
     ) -> DocId {
@@ -435,9 +435,9 @@ impl<'a> Printer<'a> {
     fn push_member_type_params_and_signature(
         &self,
         parts: &mut DocBuf,
-        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
-        params: &[internal::Expression<'_>],
-        return_type: Option<&internal::TSTypeAnnotation<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        params: &[ast::Expression<'_>],
+        return_type: Option<&ast::TSTypeAnnotation<'_>>,
         paren_pos: Option<u32>,
     ) {
         let d = self.d();
@@ -544,7 +544,7 @@ impl<'a> Printer<'a> {
     /// — is delegated to the shared `build_type_annotation_doc`.
     pub(in crate::printer) fn build_index_signature_member_doc(
         &self,
-        idx: &internal::TSIndexSignature<'_>,
+        idx: &ast::TSIndexSignature<'_>,
         deferred: &mut DocBuf,
     ) -> DocId {
         let d = self.d();
@@ -776,16 +776,16 @@ impl<'a> Printer<'a> {
 /// (`Printer::string_key_unquotes` refuses it). A property signature, a class or object
 /// method and every other key unquote through `Printer::build_type_member_key_doc` as usual.
 fn method_signature_new_key<'m, 'arena>(
-    method: &'m internal::TSMethodSignature<'arena>,
+    method: &'m ast::TSMethodSignature<'arena>,
     source: &str,
-) -> Option<&'m internal::Literal<'arena>> {
+) -> Option<&'m ast::Literal<'arena>> {
     if method.computed {
         return None;
     }
     match &method.key.kind {
-        internal::ExpressionKind::Literal(
-            lit @ internal::Literal {
-                value: internal::LiteralValue::String(cooked),
+        ast::ExpressionKind::Literal(
+            lit @ ast::Literal {
+                value: ast::LiteralValue::String(cooked),
                 ..
             },
         ) if cooked.resolve(lit.span, source) == "new" => Some(lit),

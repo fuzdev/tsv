@@ -8,7 +8,7 @@ use super::super::*;
 use super::FlowBuilder;
 use super::predicates::*;
 use crate::binder::{NodeKind, addr_of, expression_addr_kind};
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ArrowFunctionBody, AssignmentOperator, BinaryExpression, BinaryOperator, ClassExpression,
     ConditionalExpression, Decorator, Expression, ExpressionKind, FunctionExpression, Identifier,
     ObjectPatternProperty, ObjectProperty, Property, UnaryOperator,
@@ -286,7 +286,7 @@ impl<'a> FlowBuilder<'a> {
 
     fn visit_arrow(
         &mut self,
-        a: &tsv_ts::ast::internal::ArrowFunctionExpression<'_>,
+        a: &tsv_ts::ast::ArrowFunctionExpression<'_>,
         node_id: NodeId,
         is_iife: bool,
     ) {
@@ -426,7 +426,7 @@ impl<'a> FlowBuilder<'a> {
     fn bind_member_expression_flow(
         &mut self,
         expr: &Expression<'_>,
-        m: &tsv_ts::ast::internal::MemberExpression<'_>,
+        m: &tsv_ts::ast::MemberExpression<'_>,
     ) {
         // The access flow write (binder.go:618): non-leaf, reachable-
         // only, gated on `isNarrowableReference`.
@@ -439,10 +439,7 @@ impl<'a> FlowBuilder<'a> {
     }
 
     #[inline]
-    fn bind_prefix_unary_expression_flow(
-        &mut self,
-        u: &tsv_ts::ast::internal::UnaryExpression<'_>,
-    ) {
+    fn bind_prefix_unary_expression_flow(&mut self, u: &tsv_ts::ast::UnaryExpression<'_>) {
         // `bindPrefixUnaryExpressionFlow` (binder.go:2174): swap the
         // condition targets around the operand so `!x` narrows inversely.
         // The pre/post swaps are symmetric — any sub-binder restores the
@@ -472,7 +469,7 @@ impl<'a> FlowBuilder<'a> {
     }
 
     #[inline]
-    fn bind_call_expression_flow(&mut self, c: &tsv_ts::ast::internal::CallExpression<'_>) {
+    fn bind_call_expression_flow(&mut self, c: &tsv_ts::ast::CallExpression<'_>) {
         use ExpressionKind as E;
         // IIFE detection (`GetImmediatelyInvokedFunctionExpression`,
         // utilities.go:1834; `bindCallExpressionFlow`, binder.go:2419):
@@ -509,7 +506,7 @@ impl<'a> FlowBuilder<'a> {
     }
 
     #[inline]
-    fn visit_new_expression(&mut self, n: &tsv_ts::ast::internal::NewExpression<'_>) {
+    fn visit_new_expression(&mut self, n: &tsv_ts::ast::NewExpression<'_>) {
         self.visit_expression(n.callee);
         for a in n.arguments {
             self.visit_expression(a);
@@ -517,10 +514,7 @@ impl<'a> FlowBuilder<'a> {
     }
 
     #[inline]
-    fn visit_tagged_template_expression(
-        &mut self,
-        t: &tsv_ts::ast::internal::TaggedTemplateExpression<'_>,
-    ) {
+    fn visit_tagged_template_expression(&mut self, t: &tsv_ts::ast::TaggedTemplateExpression<'_>) {
         self.visit_expression(t.tag);
         for e in t.quasi.expressions {
             self.visit_expression(e);
@@ -528,7 +522,7 @@ impl<'a> FlowBuilder<'a> {
     }
 
     #[inline]
-    fn bind_sequence_expression_flow(&mut self, s: &tsv_ts::ast::internal::SequenceExpression<'_>) {
+    fn bind_sequence_expression_flow(&mut self, s: &tsv_ts::ast::SequenceExpression<'_>) {
         // `bindBinaryExpressionFlow` comma branch: each operand's value
         // is discarded (statement-like), so a top-level dotted-name call
         // is a potential assertion — apply maybe-call per operand
@@ -548,7 +542,7 @@ impl<'a> FlowBuilder<'a> {
     fn bind_logical_assignment_expression_flow(
         &mut self,
         expr: &Expression<'_>,
-        a: &tsv_ts::ast::internal::AssignmentExpression<'_>,
+        a: &tsv_ts::ast::AssignmentExpression<'_>,
     ) {
         // `bindBinaryExpressionFlow` logical compound-assignment branch.
         let is_and = a.operator == AssignmentOperator::LogicalAndAssign;
@@ -557,10 +551,7 @@ impl<'a> FlowBuilder<'a> {
     }
 
     #[inline]
-    fn bind_assignment_expression_flow(
-        &mut self,
-        a: &tsv_ts::ast::internal::AssignmentExpression<'_>,
-    ) {
+    fn bind_assignment_expression_flow(&mut self, a: &tsv_ts::ast::AssignmentExpression<'_>) {
         // `bindBinaryExpressionFlow` assignment branch (binder.go:2249) —
         // bind operands, then the target's `Assignment` mutation.
         self.visit_expression(a.left);
@@ -569,7 +560,7 @@ impl<'a> FlowBuilder<'a> {
     }
 
     #[inline]
-    fn visit_object_pattern(&mut self, op: &tsv_ts::ast::internal::ObjectPattern<'_>) {
+    fn visit_object_pattern(&mut self, op: &tsv_ts::ast::ObjectPattern<'_>) {
         self.visit_decorators(op.decorators);
         for prop in op.properties {
             self.visit_object_pattern_property(prop);
@@ -577,7 +568,7 @@ impl<'a> FlowBuilder<'a> {
     }
 
     #[inline]
-    fn visit_array_pattern(&mut self, ap: &tsv_ts::ast::internal::ArrayPattern<'_>) {
+    fn visit_array_pattern(&mut self, ap: &tsv_ts::ast::ArrayPattern<'_>) {
         self.visit_decorators(ap.decorators);
         for el in ap.elements.iter().flatten() {
             self.visit_expression(el);
@@ -585,14 +576,14 @@ impl<'a> FlowBuilder<'a> {
     }
 
     #[inline]
-    fn visit_assignment_pattern(&mut self, a: &tsv_ts::ast::internal::AssignmentPattern<'_>) {
+    fn visit_assignment_pattern(&mut self, a: &tsv_ts::ast::AssignmentPattern<'_>) {
         self.visit_decorators(a.decorators);
         self.visit_expression(a.left);
         self.visit_expression(a.right);
     }
 
     #[inline]
-    fn visit_import_expression(&mut self, i: &tsv_ts::ast::internal::ImportExpression<'_>) {
+    fn visit_import_expression(&mut self, i: &tsv_ts::ast::ImportExpression<'_>) {
         self.visit_expression(i.source);
         if let Some(o) = i.options {
             self.visit_expression(o);
@@ -625,8 +616,7 @@ impl<'a> FlowBuilder<'a> {
     }
 
     fn visit_object_expr_property(&mut self, pr: &Property<'_>) {
-        let is_method_or_accessor =
-            pr.method || pr.kind != tsv_ts::ast::internal::PropertyKind::Init;
+        let is_method_or_accessor = pr.method || pr.kind != tsv_ts::ast::PropertyKind::Init;
         if let (
             true,
             Expression {

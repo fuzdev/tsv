@@ -19,7 +19,7 @@ const _: () = assert!(size_of::<DocContext>() == 4);
 const _: () = assert!(size_of::<DocNode>() == 16);
 // The hot AST enums: a 4 B pointer, `Expression`'s payload 8 B aligned and `Statement`'s
 // 4 B, and each one's `Option` niche-packed. See the native pins in `tsv_ts`'s
-// `ast/internal/mod.rs`.
+// `ast/mod.rs`.
 const _: () = assert!(size_of::<Expression<'static>>() == 48);
 const _: () = assert!(size_of::<Option<Expression<'static>>>() == size_of::<Expression<'static>>());
 const _: () = assert!(size_of::<Statement<'static>>() == 48);

@@ -23,11 +23,11 @@
 //! See [`crate::transform_server`] for the orchestration, and
 //! [`crate::attr_refs`] for the shared traversals these ride.
 
-use tsv_svelte::ast::internal::{
+use tsv_svelte::ast::{
     Attribute, AttributeNode, AttributeValue, Fragment, FragmentNode, SpecialElement,
     SpecialElementKind, StyleDirectiveValue,
 };
-use tsv_ts::ast::internal::Expression;
+use tsv_ts::ast::Expression;
 
 use crate::analyze::NameSet;
 use crate::attr_refs::{TemplateItem, each_child_fragment, each_template_item};

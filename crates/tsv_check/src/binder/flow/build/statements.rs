@@ -9,7 +9,7 @@ use super::predicates::*;
 use super::{ActiveLabelEntry, FlowBuilder};
 use crate::binder::{NodeKind, addr_of, statement_kind};
 use smallvec::SmallVec;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     BreakStatement, ClassDeclaration, ClassMember, ContinueStatement, Decorator, DoWhileStatement,
     Expression, ExpressionKind, ForInOfLeft, ForInit, ForStatement, FunctionDeclaration,
     Identifier, IfStatement, LabeledStatement, MethodDefinition, MethodKind, ObjectPatternProperty,
@@ -900,8 +900,8 @@ impl<'a> FlowBuilder<'a> {
         self.exit_container(saved, false, true, true, anchor, is_ctor);
     }
 
-    fn visit_module(&mut self, m: &tsv_ts::ast::internal::TSModuleDeclaration<'_>) {
-        use tsv_ts::ast::internal::TSModuleName;
+    fn visit_module(&mut self, m: &tsv_ts::ast::TSModuleDeclaration<'_>) {
+        use tsv_ts::ast::TSModuleName;
         if let TSModuleName::Identifier(name) = &m.id {
             self.visit_identifier(name);
         }
@@ -921,8 +921,8 @@ impl<'a> FlowBuilder<'a> {
         }
     }
 
-    fn visit_export_default(&mut self, e: &tsv_ts::ast::internal::ExportDefaultDeclaration<'_>) {
-        use tsv_ts::ast::internal::ExportDefaultValue as V;
+    fn visit_export_default(&mut self, e: &tsv_ts::ast::ExportDefaultDeclaration<'_>) {
+        use tsv_ts::ast::ExportDefaultValue as V;
         match &e.declaration {
             V::Expression(expr) => self.visit_expression(expr),
             V::FunctionDeclaration(f) => {

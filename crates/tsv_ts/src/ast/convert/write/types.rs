@@ -1,6 +1,5 @@
 // TypeScript type writers.
 
-use super::super::super::internal;
 use super::declarations::{write_decorators_field, write_type_parameter};
 use super::expressions::{write_expression, write_expressions};
 use super::patterns::write_template_element;
@@ -10,14 +9,15 @@ use super::{
     write_name_field, write_or_null, write_type_annotation_field, write_type_arguments_field,
     write_type_parameters_field,
 };
-use internal::TSKeywordKind;
+use crate::ast;
+use ast::TSKeywordKind;
 
 /// Emits a `TSTypeAnnotation` node. A Svelte block pattern's top-level
 /// annotation (`ctx.pattern_ann_span`) is its own comment island
 /// (`ctx.annotation_comments`), since Svelte reads it with a second acorn parse.
 pub(super) fn write_type_annotation(
     w: &mut JsonWriter,
-    type_annotation: &internal::TSTypeAnnotation<'_>,
+    type_annotation: &ast::TSTypeAnnotation<'_>,
     ctx: &Ctx<'_>,
 ) {
     let annotation_ctx;
@@ -37,42 +37,42 @@ pub(super) fn write_type_annotation(
 }
 
 /// Emit a `TSType`, dispatching on its variant.
-pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx: &Ctx<'_>) {
+pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ctx<'_>) {
     match ts_type {
-        internal::TSType::Keyword(kw) => write_keyword_type(w, kw, ctx),
-        internal::TSType::Literal(lit) => write_literal_type(w, lit, ctx),
-        internal::TSType::Array(arr) => {
+        ast::TSType::Keyword(kw) => write_keyword_type(w, kw, ctx),
+        ast::TSType::Literal(lit) => write_literal_type(w, lit, ctx),
+        ast::TSType::Array(arr) => {
             node_header(w, "TSArrayType", arr.span, ctx);
             w.raw(",\"elementType\":");
             write_type(w, arr.element_type, ctx);
             close_node(w, "TSArrayType", arr.span, ctx);
         }
-        internal::TSType::Union(u) => {
+        ast::TSType::Union(u) => {
             node_header(w, "TSUnionType", u.span, ctx);
             w.raw(",\"types\":");
             write_array(w, u.types, |w, t| write_type(w, t, ctx));
             close_node(w, "TSUnionType", u.span, ctx);
         }
-        internal::TSType::Intersection(i) => {
+        ast::TSType::Intersection(i) => {
             node_header(w, "TSIntersectionType", i.span, ctx);
             w.raw(",\"types\":");
             write_array(w, i.types, |w, t| write_type(w, t, ctx));
             close_node(w, "TSIntersectionType", i.span, ctx);
         }
-        internal::TSType::TypeReference(r) => {
+        ast::TSType::TypeReference(r) => {
             node_header(w, "TSTypeReference", r.span, ctx);
             w.raw(",\"typeName\":");
             write_entity_name(w, &r.type_name, ctx);
             write_type_arguments_field(w, r.type_arguments.as_ref(), ctx);
             close_node(w, "TSTypeReference", r.span, ctx);
         }
-        internal::TSType::TypeLiteral(t) => {
+        ast::TSType::TypeLiteral(t) => {
             node_header(w, "TSTypeLiteral", t.span, ctx);
             w.raw(",\"members\":");
             write_array(w, t.members, |w, m| write_type_element(w, m, ctx));
             close_node(w, "TSTypeLiteral", t.span, ctx);
         }
-        internal::TSType::Function(f) => {
+        ast::TSType::Function(f) => {
             node_header(w, "TSFunctionType", f.span, ctx);
             write_type_parameters_field(w, f.type_parameters.as_ref(), ctx);
             w.raw(",\"parameters\":");
@@ -81,7 +81,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
             write_type_annotation(w, &f.return_type, ctx);
             close_node(w, "TSFunctionType", f.span, ctx);
         }
-        internal::TSType::Constructor(c) => {
+        ast::TSType::Constructor(c) => {
             node_header(w, "TSConstructorType", c.span, ctx);
             w.raw(",\"abstract\":");
             w.bool(c.abstract_);
@@ -92,19 +92,19 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
             write_type_annotation(w, &c.return_type, ctx);
             close_node(w, "TSConstructorType", c.span, ctx);
         }
-        internal::TSType::Tuple(t) => {
+        ast::TSType::Tuple(t) => {
             node_header(w, "TSTupleType", t.span, ctx);
             w.raw(",\"elementTypes\":");
             write_array(w, t.element_types, |w, e| write_type(w, e, ctx));
             close_node(w, "TSTupleType", t.span, ctx);
         }
-        internal::TSType::Parenthesized(p) => {
+        ast::TSType::Parenthesized(p) => {
             node_header(w, "TSParenthesizedType", p.span, ctx);
             w.raw(",\"typeAnnotation\":");
             write_type(w, p.type_annotation, ctx);
             close_node(w, "TSParenthesizedType", p.span, ctx);
         }
-        internal::TSType::TypePredicate(p) => {
+        ast::TSType::TypePredicate(p) => {
             node_header(w, "TSTypePredicate", p.span, ctx);
             w.raw(",\"parameterName\":");
             if p.parameter_name.name(ctx.source) == "this" {
@@ -135,7 +135,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
             }
             close_node(w, "TSTypePredicate", p.span, ctx);
         }
-        internal::TSType::Conditional(c) => {
+        ast::TSType::Conditional(c) => {
             node_header(w, "TSConditionalType", c.span, ctx);
             w.raw(",\"checkType\":");
             write_type(w, c.check_type, ctx);
@@ -147,7 +147,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
             write_type(w, c.false_type, ctx);
             close_node(w, "TSConditionalType", c.span, ctx);
         }
-        internal::TSType::Mapped(m) => {
+        ast::TSType::Mapped(m) => {
             node_header(w, "TSMappedType", m.span, ctx);
             if let Some(modifier) = m.readonly {
                 w.raw(",\"readonly\":");
@@ -174,7 +174,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
             }
             close_node(w, "TSMappedType", m.span, ctx);
         }
-        internal::TSType::TypeOperator(o) => {
+        ast::TSType::TypeOperator(o) => {
             node_header(w, "TSTypeOperator", o.span, ctx);
             w.raw(",\"operator\":");
             w.token(o.operator.as_str());
@@ -182,21 +182,21 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
             write_type(w, o.type_annotation, ctx);
             close_node(w, "TSTypeOperator", o.span, ctx);
         }
-        internal::TSType::Import(i) => write_import_type(w, i, ctx),
-        internal::TSType::TypeQuery(q) => {
+        ast::TSType::Import(i) => write_import_type(w, i, ctx),
+        ast::TSType::TypeQuery(q) => {
             node_header(w, "TSTypeQuery", q.span, ctx);
             w.raw(",\"exprName\":");
             match &q.expr_name {
-                internal::TSTypeQueryExprName::EntityName(entity) => match entity {
-                    internal::TSEntityName::Identifier(id) => write_identifier_plain(w, id, ctx),
-                    internal::TSEntityName::QualifiedName(qn) => write_qualified_name(w, qn, ctx),
+                ast::TSTypeQueryExprName::EntityName(entity) => match entity {
+                    ast::TSEntityName::Identifier(id) => write_identifier_plain(w, id, ctx),
+                    ast::TSEntityName::QualifiedName(qn) => write_qualified_name(w, qn, ctx),
                 },
-                internal::TSTypeQueryExprName::Import(i) => write_import_type(w, i, ctx),
+                ast::TSTypeQueryExprName::Import(i) => write_import_type(w, i, ctx),
             }
             write_type_arguments_field(w, q.type_arguments.as_ref(), ctx);
             close_node(w, "TSTypeQuery", q.span, ctx);
         }
-        internal::TSType::IndexedAccess(i) => {
+        ast::TSType::IndexedAccess(i) => {
             node_header(w, "TSIndexedAccessType", i.span, ctx);
             w.raw(",\"objectType\":");
             write_type(w, i.object_type, ctx);
@@ -204,19 +204,19 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
             write_type(w, i.index_type, ctx);
             close_node(w, "TSIndexedAccessType", i.span, ctx);
         }
-        internal::TSType::Rest(r) => {
+        ast::TSType::Rest(r) => {
             node_header(w, "TSRestType", r.span, ctx);
             w.raw(",\"typeAnnotation\":");
             write_type(w, r.type_annotation, ctx);
             close_node(w, "TSRestType", r.span, ctx);
         }
-        internal::TSType::Optional(o) => {
+        ast::TSType::Optional(o) => {
             node_header(w, "TSOptionalType", o.span, ctx);
             w.raw(",\"typeAnnotation\":");
             write_type(w, o.type_annotation, ctx);
             close_node(w, "TSOptionalType", o.span, ctx);
         }
-        internal::TSType::NamedTupleMember(n) => {
+        ast::TSType::NamedTupleMember(n) => {
             // Field order: `label`, `optional`, `elementType` — acorn-typescript stamps
             // the label first, reading it before the `?` it may carry.
             node_header(w, "TSNamedTupleMember", n.span, ctx);
@@ -228,13 +228,13 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
             write_type(w, n.element_type, ctx);
             close_node(w, "TSNamedTupleMember", n.span, ctx);
         }
-        internal::TSType::Infer(i) => {
+        ast::TSType::Infer(i) => {
             node_header(w, "TSInferType", i.span, ctx);
             w.raw(",\"typeParameter\":");
             write_type_parameter(w, &i.type_parameter, ctx);
             close_node(w, "TSInferType", i.span, ctx);
         }
-        internal::TSType::ThisType(t) => {
+        ast::TSType::ThisType(t) => {
             write_bare_node(w, "TSThisType", t.span, ctx);
         }
     }
@@ -242,18 +242,18 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
 
 /// Emit a mapped-type modifier (`TSMappedTypeModifier`): `true`, `"+"`, or
 /// `"-"`.
-fn write_mapped_type_modifier(w: &mut JsonWriter, m: internal::TSMappedTypeModifier) {
+fn write_mapped_type_modifier(w: &mut JsonWriter, m: ast::TSMappedTypeModifier) {
     match m {
-        internal::TSMappedTypeModifier::True => w.raw("true"),
-        internal::TSMappedTypeModifier::Plus => w.raw("\"+\""),
-        internal::TSMappedTypeModifier::Minus => w.raw("\"-\""),
+        ast::TSMappedTypeModifier::True => w.raw("true"),
+        ast::TSMappedTypeModifier::Plus => w.raw("\"+\""),
+        ast::TSMappedTypeModifier::Minus => w.raw("\"-\""),
     }
 }
 
 /// Emits a `TSImportType` node (used in both type position and
 /// `typeof import(...)`). Field order: `argument`, `options?`, `qualifier?`,
 /// `typeArguments?`.
-fn write_import_type(w: &mut JsonWriter, i: &internal::TSImportType<'_>, ctx: &Ctx<'_>) {
+fn write_import_type(w: &mut JsonWriter, i: &ast::TSImportType<'_>, ctx: &Ctx<'_>) {
     node_header(w, "TSImportType", i.span, ctx);
     w.raw(",\"argument\":");
     write_literal(w, &i.argument, ctx);
@@ -270,9 +270,9 @@ fn write_import_type(w: &mut JsonWriter, i: &internal::TSImportType<'_>, ctx: &C
 }
 
 /// Emits a `TSLiteralType` node.
-fn write_literal_type(w: &mut JsonWriter, lit: &internal::TSLiteralType<'_>, ctx: &Ctx<'_>) {
+fn write_literal_type(w: &mut JsonWriter, lit: &ast::TSLiteralType<'_>, ctx: &Ctx<'_>) {
     match lit {
-        internal::TSLiteralType::TemplateLiteral(template) => {
+        ast::TSLiteralType::TemplateLiteral(template) => {
             node_header(w, "TSLiteralType", template.span, ctx);
             w.raw(",\"literal\":");
             // A template-literal type: node type "TemplateLiteral", but its
@@ -286,19 +286,19 @@ fn write_literal_type(w: &mut JsonWriter, lit: &internal::TSLiteralType<'_>, ctx
             close_node(w, "TemplateLiteral", template.span, ctx);
             close_node(w, "TSLiteralType", template.span, ctx);
         }
-        internal::TSLiteralType::String(literal)
-        | internal::TSLiteralType::Number(literal)
-        | internal::TSLiteralType::BigInt(literal) => {
+        ast::TSLiteralType::String(literal)
+        | ast::TSLiteralType::Number(literal)
+        | ast::TSLiteralType::BigInt(literal) => {
             node_header(w, "TSLiteralType", literal.span, ctx);
             w.raw(",\"literal\":");
             write_literal(w, literal, ctx);
             close_node(w, "TSLiteralType", literal.span, ctx);
         }
-        internal::TSLiteralType::UnaryExpression(unary) => {
+        ast::TSLiteralType::UnaryExpression(unary) => {
             // Negative number types like `-1`; the parser guarantees the
             // argument is a Literal.
             #[expect(clippy::unreachable)]
-            let internal::ExpressionKind::Literal(arg_lit) = &unary.argument.kind else {
+            let ast::ExpressionKind::Literal(arg_lit) = &unary.argument.kind else {
                 unreachable!(
                     "parser only creates TSLiteralType::UnaryExpression with Literal argument"
                 )
@@ -321,7 +321,7 @@ fn write_literal_type(w: &mut JsonWriter, lit: &internal::TSLiteralType<'_>, ctx
 /// Emit a keyword type: keyword nodes are bare; boolean literal types
 /// (`true`/`false` as types) emit a `TSLiteralType` with a synthesized
 /// `Literal`.
-fn write_keyword_type(w: &mut JsonWriter, kw: &internal::TSKeywordType, ctx: &Ctx<'_>) {
+fn write_keyword_type(w: &mut JsonWriter, kw: &ast::TSKeywordType, ctx: &Ctx<'_>) {
     match kw.kind {
         TSKeywordKind::True | TSKeywordKind::False => {
             let is_true = matches!(kw.kind, TSKeywordKind::True);
@@ -341,19 +341,15 @@ fn write_keyword_type(w: &mut JsonWriter, kw: &internal::TSKeywordType, ctx: &Ct
 }
 
 /// Emit an entity name (an `Identifier` or a `TSQualifiedName`).
-pub(super) fn write_entity_name(
-    w: &mut JsonWriter,
-    name: &internal::TSEntityName<'_>,
-    ctx: &Ctx<'_>,
-) {
+pub(super) fn write_entity_name(w: &mut JsonWriter, name: &ast::TSEntityName<'_>, ctx: &Ctx<'_>) {
     match name {
-        internal::TSEntityName::Identifier(id) => write_identifier_plain(w, id, ctx),
-        internal::TSEntityName::QualifiedName(qn) => write_qualified_name(w, qn, ctx),
+        ast::TSEntityName::Identifier(id) => write_identifier_plain(w, id, ctx),
+        ast::TSEntityName::QualifiedName(qn) => write_qualified_name(w, qn, ctx),
     }
 }
 
 /// Emits a `TSQualifiedName` node (`left`, `right`).
-fn write_qualified_name(w: &mut JsonWriter, qn: &internal::TSQualifiedName<'_>, ctx: &Ctx<'_>) {
+fn write_qualified_name(w: &mut JsonWriter, qn: &ast::TSQualifiedName<'_>, ctx: &Ctx<'_>) {
     node_header(w, "TSQualifiedName", qn.span, ctx);
     w.raw(",\"left\":");
     write_entity_name(w, &qn.left, ctx);
@@ -365,7 +361,7 @@ fn write_qualified_name(w: &mut JsonWriter, qn: &internal::TSQualifiedName<'_>, 
 /// Emits a `TSTypeParameterInstantiation` node.
 pub(super) fn write_type_parameter_instantiation(
     w: &mut JsonWriter,
-    params: &internal::TSTypeParameterInstantiation<'_>,
+    params: &ast::TSTypeParameterInstantiation<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TSTypeParameterInstantiation", params.span, ctx);
@@ -375,9 +371,9 @@ pub(super) fn write_type_parameter_instantiation(
 }
 
 /// Emit a `TSTypeElement` (property/method/call/construct/index signature).
-fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ctx: &Ctx<'_>) {
+fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement<'_>, ctx: &Ctx<'_>) {
     match elem {
-        internal::TSTypeElement::PropertySignature(p) => {
+        ast::TSTypeElement::PropertySignature(p) => {
             // Field order: `readonly` (only when true), `computed?`, `key`,
             // `optional` (only when true), `typeAnnotation?`.
             node_header(w, "TSPropertySignature", p.span, ctx);
@@ -386,7 +382,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ct
             }
             // acorn quirk: omits `computed` when the key is the `new` keyword
             // and the signature is neither computed nor readonly.
-            let is_new_key = matches!(&p.key.kind, internal::ExpressionKind::Identifier(id)
+            let is_new_key = matches!(&p.key.kind, ast::ExpressionKind::Identifier(id)
                 if id.name(ctx.source) == "new");
             if !p.computed && !p.readonly && is_new_key {
                 w.raw(",\"key\":");
@@ -404,7 +400,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ct
             write_type_annotation_field(w, p.type_annotation.as_ref(), ctx);
             close_node(w, "TSPropertySignature", p.span, ctx);
         }
-        internal::TSTypeElement::MethodSignature(m) => {
+        ast::TSTypeElement::MethodSignature(m) => {
             // Field order: `readonly` (only when true), `computed`, `key`, then
             // per kind — a get/set signature's `kind` is assigned between the
             // two `parsePropertyName` calls (right after the key); a plain
@@ -423,14 +419,11 @@ fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ct
             w.bool(m.computed);
             w.raw(",\"key\":");
             write_expression(w, &m.key, ctx);
-            let getset = matches!(
-                m.kind,
-                internal::MethodKind::Get | internal::MethodKind::Set
-            );
+            let getset = matches!(m.kind, ast::MethodKind::Get | ast::MethodKind::Set);
             if getset {
                 w.raw(",\"kind\":");
                 w.token(match m.kind {
-                    internal::MethodKind::Get => "get",
+                    ast::MethodKind::Get => "get",
                     _ => "set",
                 });
             }
@@ -446,7 +439,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ct
             }
             close_node(w, "TSMethodSignature", m.span, ctx);
         }
-        internal::TSTypeElement::CallSignature(c) => {
+        ast::TSTypeElement::CallSignature(c) => {
             write_signature_declaration(
                 w,
                 "TSCallSignatureDeclaration",
@@ -457,7 +450,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ct
                 ctx,
             );
         }
-        internal::TSTypeElement::ConstructSignature(c) => {
+        ast::TSTypeElement::ConstructSignature(c) => {
             write_signature_declaration(
                 w,
                 "TSConstructSignatureDeclaration",
@@ -468,7 +461,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ct
                 ctx,
             );
         }
-        internal::TSTypeElement::IndexSignature(i) => write_index_signature(w, i, ctx),
+        ast::TSTypeElement::IndexSignature(i) => write_index_signature(w, i, ctx),
     }
 }
 
@@ -478,9 +471,9 @@ fn write_signature_declaration(
     w: &mut JsonWriter,
     node_type: &'static str,
     span: tsv_lang::Span,
-    type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
-    params: &[internal::Expression<'_>],
-    return_type: Option<&internal::TSTypeAnnotation<'_>>,
+    type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+    params: &[ast::Expression<'_>],
+    return_type: Option<&ast::TSTypeAnnotation<'_>>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, node_type, span, ctx);
@@ -496,7 +489,7 @@ fn write_signature_declaration(
 /// true), `parameters`, `typeAnnotation`, `decorators` (a class member's, only when present).
 pub(super) fn write_index_signature(
     w: &mut JsonWriter,
-    sig: &internal::TSIndexSignature<'_>,
+    sig: &ast::TSIndexSignature<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TSIndexSignature", sig.span, ctx);
@@ -542,7 +535,7 @@ pub(super) fn write_index_signature(
 /// node, so the field's position depends on `exported`.
 pub(super) fn write_interface_declaration(
     w: &mut JsonWriter,
-    iface: &internal::TSInterfaceDeclaration<'_>,
+    iface: &ast::TSInterfaceDeclaration<'_>,
     ctx: &Ctx<'_>,
     exported: bool,
 ) {
@@ -587,7 +580,7 @@ pub(super) fn write_interface_declaration(
 /// stamps the finished node, so the field's position depends on `exported`.
 pub(super) fn write_declare_function(
     w: &mut JsonWriter,
-    func: &internal::TSDeclareFunction<'_>,
+    func: &ast::TSDeclareFunction<'_>,
     ctx: &Ctx<'_>,
     exported: bool,
 ) {
@@ -613,7 +606,7 @@ pub(super) fn write_declare_function(
 /// (each: `id`, `initializer?`).
 pub(super) fn write_enum_declaration(
     w: &mut JsonWriter,
-    enum_decl: &internal::TSEnumDeclaration<'_>,
+    enum_decl: &ast::TSEnumDeclaration<'_>,
     span: tsv_lang::Span,
     ctx: &Ctx<'_>,
 ) {
@@ -631,8 +624,8 @@ pub(super) fn write_enum_declaration(
         node_header(w, "TSEnumMember", member.span, ctx);
         w.raw(",\"id\":");
         match &member.id {
-            internal::TSEnumMemberId::Identifier(id) => write_identifier_plain(w, id, ctx),
-            internal::TSEnumMemberId::String(lit) => write_literal(w, lit, ctx),
+            ast::TSEnumMemberId::Identifier(id) => write_identifier_plain(w, id, ctx),
+            ast::TSEnumMemberId::String(lit) => write_literal(w, lit, ctx),
         }
         if let Some(init) = &member.initializer {
             w.raw(",\"initializer\":");

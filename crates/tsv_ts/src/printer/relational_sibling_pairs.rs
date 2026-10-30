@@ -4,7 +4,7 @@
 
 use super::Printer;
 use super::expressions::functions::has_leftmost_arrow_body_parens;
-use crate::ast::internal::{
+use crate::ast::{
     ArrowFunctionBody, ArrowFunctionExpression, BinaryExpression, BinaryOperator, Decorator,
     Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, UnaryExpression,
     UnaryOperator,

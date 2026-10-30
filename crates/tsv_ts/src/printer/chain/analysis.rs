@@ -8,7 +8,7 @@
 use super::builder::{build_chain_doc, mark_long_curried_calls};
 use super::printing::chain_gap_share_any;
 use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
-use crate::ast::internal::{self, Expression, ExpressionKind, IdentName};
+use crate::ast::{self, Expression, ExpressionKind, IdentName};
 use crate::printer::calls::{call_paren_open, is_memberish, sole_template_on_its_own_line};
 use crate::printer::comments::{paren_pair_keeps_leading_run, paren_shell_close_after};
 use crate::printer::{
@@ -104,7 +104,7 @@ fn linearize_chain<'a>(expr: &'a Expression<'_>, input: LinearizeInput<'_>) -> C
 ///
 /// Returns whether the chain holds a long-curried pair ([`finalize_chain_nodes`]).
 pub fn linearize_chain_from_call_into<'a>(
-    call: &'a internal::CallExpression<'_>,
+    call: &'a ast::CallExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -123,7 +123,7 @@ pub fn linearize_chain_from_call_into<'a>(
 ///
 /// Returns whether the chain holds a long-curried pair ([`finalize_chain_nodes`]).
 pub fn linearize_chain_from_member_into<'a>(
-    member: &'a internal::MemberExpression<'_>,
+    member: &'a ast::MemberExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -148,7 +148,7 @@ pub fn linearize_chain_from_member_into<'a>(
 /// trailing-comment branch), so only the comment-free case arrives here. Nested
 /// non-nulls go through the walk's own step ([`non_null_step`]), which does gate.
 pub fn linearize_chain_from_non_null_into<'a>(
-    non_null: &'a internal::TSNonNullExpression<'_>,
+    non_null: &'a ast::TSNonNullExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -412,7 +412,7 @@ fn mark_own_call_layout(nodes: &mut [ChainNode<'_>], printer: &Printer<'_>) -> b
 /// `printMemberChain` redirect below it.
 fn template_preempts_chain_redirect(
     printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     span: Span,
 ) -> bool {
     call.arguments.len() == 1
@@ -543,7 +543,7 @@ pub fn chain_paren_leading_gap(expr: &Expression<'_>, comments: &[Comment]) -> O
 /// A member's object keeps the pair — and with it the leading run — when the object
 /// is a parenthesized optional chain this access seals (`( // c⏎a?.b).ddd`).
 pub(crate) fn member_object_paren_leading_start(
-    member: &internal::MemberExpression<'_>,
+    member: &ast::MemberExpression<'_>,
     span: Span,
 ) -> Option<u32> {
     child_stops_optional_chain(span.start, member.optional, member.object).then_some(span.start)
@@ -553,7 +553,7 @@ pub(crate) fn member_object_paren_leading_start(
 /// and the IIFE — a function or arrow, the one callee kind prettier prints the run
 /// inside the parens for ([`paren_pair_keeps_leading_run`]).
 pub(crate) fn call_callee_paren_leading_start(
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     span: Span,
 ) -> Option<u32> {
     (child_stops_optional_chain(span.start, call.optional, call.callee)
@@ -570,7 +570,7 @@ pub(crate) fn call_callee_paren_leading_start(
 /// beside its siblings, and in their shape, because it is the same question and the
 /// family answering it in one place is the point ([`chain_paren_leading_gap`]).
 pub(crate) fn tag_paren_leading_start(
-    tagged: &internal::TaggedTemplateExpression<'_>,
+    tagged: &ast::TaggedTemplateExpression<'_>,
     span: Span,
 ) -> Option<u32> {
     (child_stops_optional_chain(span.start, false, tagged.tag)
@@ -582,7 +582,7 @@ pub(crate) fn tag_paren_leading_start(
 /// optional chain, and a shell RETAINED for a `//` in the operand→`!` gap — see the
 /// linearizer's arm, whose condition this is.
 fn non_null_operand_paren_leading_start(
-    non_null: &internal::TSNonNullExpression<'_>,
+    non_null: &ast::TSNonNullExpression<'_>,
     span: Span,
     comments: &[Comment],
 ) -> Option<u32> {
@@ -626,7 +626,7 @@ enum PendingLink<'a> {
     /// A call: push its node, after handing an IIFE callee base its leading `(` where the
     /// walk descended into the callee ([`finish_call_callee`]).
     Call {
-        call: &'a internal::CallExpression<'a>,
+        call: &'a ast::CallExpression<'a>,
         span: Span,
         /// Whether the walk descended into the callee — `false` where the callee stopped it as
         /// a base of its own ([`call_callee_step`]).
@@ -634,13 +634,13 @@ enum PendingLink<'a> {
     },
     /// A member: push its lookup node ([`linearize_member_node`]).
     Member {
-        member: &'a internal::MemberExpression<'a>,
+        member: &'a ast::MemberExpression<'a>,
         span: Span,
     },
     /// A non-null assertion whose operand did not keep the pair the `!` closes
     /// ([`non_null_step`]): push its `!` ([`finish_non_null`]).
     NonNull {
-        non_null: &'a internal::TSNonNullExpression<'a>,
+        non_null: &'a ast::TSNonNullExpression<'a>,
         span: Span,
     },
 }
@@ -838,7 +838,7 @@ enum NonNullStep<'a> {
 #[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
 #[inline(always)]
 fn non_null_step<'a>(
-    non_null: &'a internal::TSNonNullExpression<'_>,
+    non_null: &'a ast::TSNonNullExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -884,7 +884,7 @@ fn non_null_step<'a>(
 #[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
 #[inline(always)]
 fn finish_non_null(
-    non_null: &internal::TSNonNullExpression<'_>,
+    non_null: &ast::TSNonNullExpression<'_>,
     span: Span,
     nodes: &mut ChainNodeVec<'_>,
 ) {
@@ -916,7 +916,7 @@ fn finish_non_null(
 /// an instantiation object (`(A<T>).x`) becomes a parenthesized base there by the
 /// `ChainBase` rule, its type args kept.
 fn linearize_member_object<'a>(
-    member: &'a internal::MemberExpression<'_>,
+    member: &'a ast::MemberExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -932,7 +932,7 @@ fn linearize_member_object<'a>(
 #[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
 #[inline(always)]
 fn member_object_step<'a>(
-    member: &'a internal::MemberExpression<'_>,
+    member: &'a ast::MemberExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -969,8 +969,8 @@ fn member_object_step<'a>(
 /// [`get_chain_base_start`]. A reader that answered on its own would print the list in the
 /// wrong place or lose the comments between the expression and the `<`.
 pub(crate) fn transparent_instantiation_callee<'a>(
-    call: &'a internal::CallExpression<'a>,
-) -> Option<&'a internal::TSInstantiationExpression<'a>> {
+    call: &'a ast::CallExpression<'a>,
+) -> Option<&'a ast::TSInstantiationExpression<'a>> {
     match &call.callee.kind {
         ExpressionKind::TSInstantiationExpression(inst) if call.type_arguments.is_none() => {
             Some(inst)
@@ -1000,7 +1000,7 @@ pub(crate) fn transparent_instantiation_callee<'a>(
 /// pass; and the callee gap reads that pair's trailing gap past the callee's end, which
 /// is the `>`.
 pub(crate) fn transparent_callee_sealed_chain<'a>(
-    call: &'a internal::CallExpression<'a>,
+    call: &'a ast::CallExpression<'a>,
 ) -> Option<(&'a Expression<'a>, u32)> {
     let inst = transparent_instantiation_callee(call)?;
     let open = call.callee.span().start;
@@ -1014,7 +1014,7 @@ pub(crate) fn transparent_callee_sealed_chain<'a>(
 /// does one instantiated by a transparent instantiation callee
 /// ([`transparent_callee_sealed_chain`]). All other callees are walked on.
 fn linearize_call_callee<'a>(
-    call: &'a internal::CallExpression<'_>,
+    call: &'a ast::CallExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -1031,7 +1031,7 @@ fn linearize_call_callee<'a>(
 #[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
 #[inline(always)]
 fn call_callee_step<'a>(
-    call: &'a internal::CallExpression<'_>,
+    call: &'a ast::CallExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -1062,11 +1062,7 @@ fn call_callee_step<'a>(
 /// is linearized.
 #[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
 #[inline(always)]
-fn finish_call_callee(
-    call: &internal::CallExpression<'_>,
-    span: Span,
-    nodes: &mut ChainNodeVec<'_>,
-) {
+fn finish_call_callee(call: &ast::CallExpression<'_>, span: Span, nodes: &mut ChainNodeVec<'_>) {
     // An IIFE callee reached through the chain (`( // c⏎() => {})().p`) owns its own
     // leading gap, exactly as the bare-callee path does: the pair is required and
     // prettier keeps the run inside it. A function or arrow is never itself a chain,
@@ -1089,7 +1085,7 @@ fn finish_call_callee(
 /// Built by the linearizer's own step, over an empty run: the stripped-paren gap it would
 /// record names an earlier member node, and there is none.
 pub(super) fn member_lookup_node<'a>(
-    member: &'a internal::MemberExpression<'_>,
+    member: &'a ast::MemberExpression<'_>,
     member_span: Span,
     input: LinearizeInput<'_>,
 ) -> ChainNode<'a> {
@@ -1109,7 +1105,7 @@ pub(super) fn member_lookup_node<'a>(
 /// A step of `linearize_spine`, shared with
 /// `linearize_chain_from_member_into`.
 fn linearize_member_node<'a>(
-    member: &'a internal::MemberExpression<'_>,
+    member: &'a ast::MemberExpression<'_>,
     member_span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -1726,7 +1722,7 @@ fn get_chain_base_start<'a>(mut expr: &'a Expression<'a>) -> u32 {
 mod tests {
     use super::*;
     use crate::PrinterInputs;
-    use crate::ast::internal::{CallExpression, Identifier, MemberExpression};
+    use crate::ast::{CallExpression, Identifier, MemberExpression};
     use bumpalo::Bump;
     use tsv_lang::doc::arena::DocArena;
     use tsv_lang::printing::LineBreaks;
@@ -2120,7 +2116,7 @@ mod tests {
             let program = crate::parse(source, &arena).expect("parses");
             let mut roots = Vec::new();
             for statement in program.body {
-                if let internal::StatementKind::ExpressionStatement(statement) = &statement.kind {
+                if let ast::StatementKind::ExpressionStatement(statement) = &statement.kind {
                     chain_roots(statement.expression, &mut roots);
                 }
             }

@@ -46,7 +46,7 @@ pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_com
 
 use super::chain::{self, ChainCall, call_callee_paren_leading_start};
 use super::{ArrowChainContext, ParenContext, Printer, SecondTypeArgs, is_curried_arrow_chain};
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::expressions::functions::callback_signature_refuses_hug;
 use arg_comments::{any_arg_empty_line, any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
@@ -164,7 +164,7 @@ impl CalleeGap {
     /// window ([`Printer::args_frozen_span`]). Separate from [`Self::start`] so a caller
     /// can't accidentally open the window at the callee and swallow the type arguments'
     /// own comments.
-    pub(super) fn paren_open(&self, call: &internal::CallExpression<'_>) -> u32 {
+    pub(super) fn paren_open(&self, call: &ast::CallExpression<'_>) -> u32 {
         // On a split gap the argument side opens AT the `(` — the pre-paren half is the
         // callee side's ([`Self::paren_split`]), and opening before it would hand these
         // windows a comment the head has already emitted. Opening *at* the paren rather than
@@ -185,7 +185,7 @@ impl CalleeGap {
 /// call is handed to it.
 pub(super) fn callee_gap(
     printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     span: Span,
 ) -> CalleeGap {
     if !call.optional && call_callee_paren_leading_start(call, span).is_none() {
@@ -218,11 +218,7 @@ pub(super) fn callee_gap(
 /// The derivation behind [`callee_gap`] — the one definition of every field, out of line
 /// for the calls its inline tests cannot answer.
 #[inline(never)]
-fn callee_gap_wide(
-    printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
-    span: Span,
-) -> CalleeGap {
+fn callee_gap_wide(printer: &Printer<'_>, call: &ast::CallExpression<'_>, span: Span) -> CalleeGap {
     let callee_end = call.callee.span().end;
     let owned_pair = call_callee_paren_leading_start(call, span).is_some();
     let trailing_gap = printer.owned_pair_trailing_gap(callee_end, owned_pair);
@@ -250,7 +246,7 @@ fn callee_gap_wide(
 /// derive [`CalleeGap::paren_split`] — which cannot be read off the struct that is still being
 /// built — and [`CalleeGap::paren_open`] is this plus that split. Written out twice, the two
 /// disagreed the moment either grew a clause, which is the failure that struct's doc names.
-fn args_side_start(call: &internal::CallExpression<'_>, start_after_optional: u32) -> u32 {
+fn args_side_start(call: &ast::CallExpression<'_>, start_after_optional: u32) -> u32 {
     call.type_arguments
         .as_ref()
         .map_or(start_after_optional, |ta| ta.span.end)
@@ -275,7 +271,7 @@ fn args_side_start(call: &internal::CallExpression<'_>, start_after_optional: u3
 /// written after the `(` sits in both windows and keeps it.
 fn call_paren_split(
     printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     gap_start: u32,
 ) -> Option<(u32, u32)> {
     if call.optional {
@@ -303,7 +299,7 @@ fn call_paren_split(
 pub(super) fn paren_split_for(
     printer: &Printer<'_>,
     gap_start: u32,
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
 ) -> Option<(u32, u32)> {
     let first_arg_start = arguments.first()?.span().start;
     if printer.gap_known_comment_free(gap_start, first_arg_start) {
@@ -323,7 +319,7 @@ pub(super) fn paren_split_for(
 pub(super) fn paren_split_for_outlined(
     printer: &Printer<'_>,
     gap_start: u32,
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
 ) -> Option<(u32, u32)> {
     paren_split_for(printer, gap_start, arguments)
 }
@@ -341,7 +337,7 @@ fn split_paren_wide(
     printer: &Printer<'_>,
     gap_start: u32,
     first_arg_start: u32,
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
 ) -> Option<u32> {
     let paren = printer.find_char_outside_comments(gap_start, first_arg_start, b'(')?;
     if !printer.has_line_comments_between(gap_start, paren) {
@@ -390,7 +386,7 @@ fn split_strands_directive(
     printer: &Printer<'_>,
     gap_start: u32,
     arg_side_start: u32,
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
 ) -> bool {
     !arguments.is_empty()
         && printer.args_frozen_span(gap_start, arguments, 0).is_some()
@@ -403,7 +399,7 @@ fn split_strands_directive(
 /// where the callee→`(` gap splits, from which [`CalleeGap::start`] then opens.
 fn call_optional(
     printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     span: Span,
     start: u32,
 ) -> CallOptional {
@@ -469,7 +465,7 @@ pub(super) fn optional_callee_gap_doc(printer: &Printer<'_>, gap: CalleeGap) -> 
 /// bypass tests and the test-call predicate, neither of which builds a callee doc.
 pub(super) fn call_paren_open(
     printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     span: Span,
 ) -> u32 {
     callee_gap(printer, call, span).paren_open(call)
@@ -482,14 +478,14 @@ pub(super) fn call_paren_open(
 /// out-of-line copy otherwise, a call per ask for what is usually one or two kind tests.
 #[expect(clippy::inline_always)]
 #[inline(always)]
-pub(in crate::printer) fn chain_has_calls(mut expr: &internal::Expression<'_>) -> bool {
+pub(in crate::printer) fn chain_has_calls(mut expr: &ast::Expression<'_>) -> bool {
     loop {
         expr = match &expr.kind {
-            internal::ExpressionKind::CallExpression(_) => return true,
-            internal::ExpressionKind::MemberExpression(member) => member.object,
-            internal::ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
-            internal::ExpressionKind::AwaitExpression(await_expr) => await_expr.argument,
-            internal::ExpressionKind::YieldExpression(yield_expr) => match yield_expr.argument {
+            ast::ExpressionKind::CallExpression(_) => return true,
+            ast::ExpressionKind::MemberExpression(member) => member.object,
+            ast::ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+            ast::ExpressionKind::AwaitExpression(await_expr) => await_expr.argument,
+            ast::ExpressionKind::YieldExpression(yield_expr) => match yield_expr.argument {
                 Some(argument) => argument,
                 None => return false,
             },
@@ -512,7 +508,7 @@ pub(super) enum CalleeParens<'a> {
     /// `(x ? y : z)()` — the pair welds to the argument list and the operand takes its
     /// ordinary doc. Prettier's answer for every callee kind but the two below: a ternary,
     /// an `await`, an optional chain and a sequence callee all weld.
-    Welded(&'a internal::Expression<'a>),
+    Welded(&'a ast::Expression<'a>),
     /// `(⏎\tx as T⏎)()` — prettier's `printBinaryCastExpression`
     /// (print/binary-cast-expression.js) gives an `as` / `satisfies` cast its own hanging
     /// group in exactly two positions: the callee of a call or `new`, and the OBJECT of a
@@ -526,14 +522,14 @@ pub(super) enum CalleeParens<'a> {
     /// shape and found byte-identical over the whole fixture suite and the whole gates corpus.
     /// The outside-the-parens helper stays for the callers that have no choice — the ones
     /// whose `(` / `)` a different seam emits, so only a body is theirs to wrap.
-    Cast(&'a internal::Expression<'a>),
+    Cast(&'a ast::Expression<'a>),
     /// `(⏎\ta &&⏎\tb⏎)()` — prettier's binaryish EARLY RETURN, `key === "callee" &&
     /// isCallOrNewExpression(parent)` (`printBinaryishExpression`, `print/binaryish.js`), taken ahead of `shouldNotIndent`
     /// and so ahead of every indent question: `group([indent([softline, ...parts]),
     /// softline])` over FLAT parts. The operand is therefore the ungrouped chain — the
     /// paren group alone decides whether to break after `(` — and not the
     /// continuation-indented default a binaryish value takes everywhere else.
-    Binary(&'a internal::BinaryExpression<'a>, Span),
+    Binary(&'a ast::BinaryExpression<'a>, Span),
 }
 
 impl<'a> CalleeParens<'a> {
@@ -547,7 +543,7 @@ impl<'a> CalleeParens<'a> {
     /// caller holding one for a bare callee would emit parens the grammar never asked for.
     pub(super) fn of(
         printer: &Printer<'_>,
-        callee: &'a internal::Expression<'a>,
+        callee: &'a ast::Expression<'a>,
         context: ParenContext,
         second_type_args: Option<SecondTypeArgs>,
     ) -> Option<Self> {
@@ -560,9 +556,9 @@ impl<'a> CalleeParens<'a> {
             return None;
         }
         Some(match &callee.kind {
-            internal::ExpressionKind::TSAsExpression(_)
-            | internal::ExpressionKind::TSSatisfiesExpression(_) => Self::Cast(callee),
-            internal::ExpressionKind::BinaryExpression(binary) => Self::Binary(binary, callee.span),
+            ast::ExpressionKind::TSAsExpression(_)
+            | ast::ExpressionKind::TSSatisfiesExpression(_) => Self::Cast(callee),
+            ast::ExpressionKind::BinaryExpression(binary) => Self::Binary(binary, callee.span),
             _ => Self::Welded(callee),
         })
     }
@@ -603,7 +599,7 @@ impl<'a> CalleeParens<'a> {
 /// Whether an arrow's expression `body` is one of the two kinds prettier's `couldExpandArg`
 /// hugs to the call's parentheses directly (a call — through a trailing `!` too — or a
 /// conditional), rather than breaking the call's arguments out around the arrow.
-pub(in crate::printer) fn arrow_body_hugs_call_parens(body: &internal::Expression<'_>) -> bool {
+pub(in crate::printer) fn arrow_body_hugs_call_parens(body: &ast::Expression<'_>) -> bool {
     arg_predicates::arrow_body_is_call_through_non_null(body)
         || arg_predicates::is_ternary_arrow_body(body)
 }
@@ -620,11 +616,10 @@ pub(in crate::printer) fn arrow_body_hugs_call_parens(body: &internal::Expressio
 /// (`docs/conformance_prettier_ts.md` §Non-null callee in a member chain). A `!` over a call
 /// (`fnnn(x)!(…)`) is a curried call instead, which [`Printer::build_call_doc`] routes ahead of
 /// the chain as it routes the same call without the `!` ([`callee_is_curried_member_chain_call`]).
-pub(in crate::printer) fn is_memberish(expr: &internal::Expression<'_>) -> bool {
+pub(in crate::printer) fn is_memberish(expr: &ast::Expression<'_>) -> bool {
     matches!(
         expr.kind,
-        internal::ExpressionKind::MemberExpression(_)
-            | internal::ExpressionKind::TSNonNullExpression(_)
+        ast::ExpressionKind::MemberExpression(_) | ast::ExpressionKind::TSNonNullExpression(_)
     )
 }
 
@@ -639,9 +634,9 @@ pub(in crate::printer) fn is_memberish(expr: &internal::Expression<'_>) -> bool 
 /// chain's last group, where the chain's layout decides their lists too
 /// ([`Printer::build_curried_member_chain_call_doc`] keeps them out). A curried run on any
 /// other callee (`f(a)(b)`) has no member chain to stop, and stays one chain group.
-fn curried_run_roots_in_member_chain(callee: &internal::CallExpression<'_>) -> bool {
+fn curried_run_roots_in_member_chain(callee: &ast::CallExpression<'_>) -> bool {
     let mut call = callee;
-    while let internal::ExpressionKind::CallExpression(inner) = &call.callee.kind {
+    while let ast::ExpressionKind::CallExpression(inner) = &call.callee.kind {
         call = inner;
     }
     is_memberish(call.callee)
@@ -655,14 +650,14 @@ fn curried_run_roots_in_member_chain(callee: &internal::CallExpression<'_>) -> b
 /// `printCallExpression`'s `group([callee, args])` exactly as a call on `c(x)` does: the member
 /// chain ends at the innermost call either way. tsv lays the two out alike — a `!` asserts a
 /// type and nothing else — which here is prettier's layout too.
-fn callee_is_curried_member_chain_call(callee: &internal::Expression<'_>) -> bool {
+fn callee_is_curried_member_chain_call(callee: &ast::Expression<'_>) -> bool {
     let mut callee = callee;
-    while let internal::ExpressionKind::TSNonNullExpression(non_null) = &callee.kind {
+    while let ast::ExpressionKind::TSNonNullExpression(non_null) = &callee.kind {
         callee = non_null.expression;
     }
     matches!(
         &callee.kind,
-        internal::ExpressionKind::CallExpression(inner) if curried_run_roots_in_member_chain(inner)
+        ast::ExpressionKind::CallExpression(inner) if curried_run_roots_in_member_chain(inner)
     )
 }
 
@@ -671,14 +666,14 @@ fn callee_is_curried_member_chain_call(callee: &internal::Expression<'_>) -> boo
 /// [`Printer::spine_first_call_prints_whole`] and the parser's depth limit
 /// ([`call_may_print_whole`]) share.
 fn spine_first_call<'e>(
-    expr: &'e internal::Expression<'e>,
-) -> Option<(&'e internal::CallExpression<'e>, Span)> {
+    expr: &'e ast::Expression<'e>,
+) -> Option<(&'e ast::CallExpression<'e>, Span)> {
     let mut expr = expr;
     loop {
         expr = match &expr.kind {
-            internal::ExpressionKind::MemberExpression(member) => member.object,
-            internal::ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
-            internal::ExpressionKind::CallExpression(call) => return Some((call, expr.span)),
+            ast::ExpressionKind::MemberExpression(member) => member.object,
+            ast::ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+            ast::ExpressionKind::CallExpression(call) => return Some((call, expr.span)),
             _ => return None,
         };
     }
@@ -696,12 +691,12 @@ fn spine_first_call<'e>(
 /// The parser's question (`Parser::member_link_units`, `Parser::settle_call_link`),
 /// asked of the printer's own predicates so the depth limit prices the walk the printer
 /// takes.
-pub(crate) fn call_may_print_whole(operand: &internal::Expression<'_>, spine: bool) -> bool {
+pub(crate) fn call_may_print_whole(operand: &ast::Expression<'_>, spine: bool) -> bool {
     let call = if spine {
         spine_first_call(operand).map(|(call, _)| call)
     } else {
         match &operand.kind {
-            internal::ExpressionKind::CallExpression(call) => Some(call),
+            ast::ExpressionKind::CallExpression(call) => Some(call),
             _ => None,
         }
     };
@@ -717,10 +712,10 @@ pub(crate) fn call_may_print_whole(operand: &internal::Expression<'_>, spine: bo
 /// the question for a call that prints its callee whole: the plain call's head arms
 /// [`Printer::long_curried_target`] with it, and the curried-callback route in
 /// [`Printer::build_call_doc`], which builds the callee without that head, declines on it.
-fn callee_is_long_curried(call: &internal::CallExpression<'_>) -> bool {
+fn callee_is_long_curried(call: &ast::CallExpression<'_>) -> bool {
     matches!(
         &call.callee.kind,
-        internal::ExpressionKind::CallExpression(inner)
+        ast::ExpressionKind::CallExpression(inner)
             if !call.arguments.is_empty() && inner.arguments.len() > call.arguments.len()
     )
 }
@@ -746,7 +741,7 @@ impl<'a> Printer<'a> {
     #[inline(always)]
     pub(in crate::printer) fn call_takes_template_bypass(
         &self,
-        call: &internal::CallExpression<'_>,
+        call: &ast::CallExpression<'_>,
         span: Span,
     ) -> bool {
         // The shape test comes first: it reads the argument list alone, where the rest
@@ -760,7 +755,7 @@ impl<'a> Printer<'a> {
     #[inline(never)]
     fn call_takes_template_bypass_beyond_shape(
         &self,
-        call: &internal::CallExpression<'_>,
+        call: &ast::CallExpression<'_>,
         span: Span,
     ) -> bool {
         let paren_open = call_paren_open(self, call, span);
@@ -791,7 +786,7 @@ impl<'a> Printer<'a> {
     /// callee spine merely CONTAINS such a call still linearizes it — `printMemberChain`
     /// absorbs the templates, and the curried calls, once a call of its own opens the chain
     /// (`` …o(`⏎b⏎`).p(x) ``, `…fnnn(x)(z).p()`).
-    fn spine_first_call_prints_whole(&self, expr: &internal::Expression<'_>) -> bool {
+    fn spine_first_call_prints_whole(&self, expr: &ast::Expression<'_>) -> bool {
         spine_first_call(expr).is_some_and(|(call, span)| {
             callee_is_curried_member_chain_call(call.callee)
                 || self.call_takes_template_bypass(call, span)
@@ -822,7 +817,7 @@ impl<'a> Printer<'a> {
     /// this route does not print. The linearized chain places all of them.
     pub(in crate::printer) fn build_whole_call_operand_doc(
         &self,
-        operand: &internal::Expression<'_>,
+        operand: &ast::Expression<'_>,
         span: Span,
         parent_optional: bool,
     ) -> Option<DocId> {
@@ -859,7 +854,7 @@ impl<'a> Printer<'a> {
     #[inline(never)]
     fn build_whole_call_member_doc(
         &self,
-        member: &internal::MemberExpression<'_>,
+        member: &ast::MemberExpression<'_>,
         span: Span,
     ) -> Option<DocId> {
         let object_doc = self.build_whole_call_operand_doc(member.object, span, member.optional)?;
@@ -877,7 +872,7 @@ impl<'a> Printer<'a> {
     #[inline(never)]
     fn build_curried_member_chain_call_doc(
         &self,
-        call: &internal::CallExpression<'_>,
+        call: &ast::CallExpression<'_>,
         span: Span,
     ) -> DocId {
         self.is_expression_statement.set(false);
@@ -888,7 +883,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a call expression with argument wrapping (not chain-aware)
     pub(super) fn build_call_doc_with_wrapping(
         &self,
-        call: &internal::CallExpression<'_>,
+        call: &ast::CallExpression<'_>,
         span: Span,
     ) -> DocId {
         call_formatting::build_call_doc_with_wrapping(self, call, span)
@@ -902,7 +897,7 @@ impl<'a> Printer<'a> {
     ///
     /// Simple calls like `obj.method()` use the simple call path unless they have
     /// comments between member segments.
-    pub(super) fn build_call_doc(&self, call: &internal::CallExpression<'_>, span: Span) -> DocId {
+    pub(super) fn build_call_doc(&self, call: &ast::CallExpression<'_>, span: Span) -> DocId {
         // A curried call on a member chain (`a.b().c(x)(y)`, `a.b().c(x)!(y)`) is not a link of
         // that chain.
         if callee_is_curried_member_chain_call(call.callee) {
@@ -914,12 +909,12 @@ impl<'a> Printer<'a> {
         //
         // Skip when the inner call has array/object args — those may force multiline,
         // and the chain formatter handles that correctly via group(oneLine).
-        if let internal::ExpressionKind::CallExpression(inner) = &call.callee.kind {
+        if let ast::ExpressionKind::CallExpression(inner) = &call.callee.kind {
             let inner_has_multiline_arg = inner.arguments.iter().any(|arg| {
                 matches!(
                     arg.kind,
-                    internal::ExpressionKind::ArrayExpression(_)
-                        | internal::ExpressionKind::ObjectExpression(_)
+                    ast::ExpressionKind::ArrayExpression(_)
+                        | ast::ExpressionKind::ObjectExpression(_)
                 )
             });
             let any_arg_empty_line = any_arg_empty_line(call.arguments, self);
@@ -1083,11 +1078,7 @@ impl<'a> Printer<'a> {
     /// 1. Linearize AST into flat list of chain nodes
     /// 2. Group nodes by natural break points
     /// 3. Build doc with conditionalGroup for oneLine/expanded alternatives
-    pub(super) fn build_member_doc(
-        &self,
-        member: &internal::MemberExpression<'_>,
-        span: Span,
-    ) -> DocId {
+    pub(super) fn build_member_doc(&self, member: &ast::MemberExpression<'_>, span: Span) -> DocId {
         // A format-ignore directive attached to this member access (in the gap between
         // the object and the property) makes prettier print the entire member
         // expression verbatim from source — preserving inner call args (numbers,
@@ -1105,9 +1096,9 @@ impl<'a> Printer<'a> {
         // test and no call.
         if matches!(
             member.object.kind,
-            internal::ExpressionKind::CallExpression(_)
-                | internal::ExpressionKind::MemberExpression(_)
-                | internal::ExpressionKind::TSNonNullExpression(_)
+            ast::ExpressionKind::CallExpression(_)
+                | ast::ExpressionKind::MemberExpression(_)
+                | ast::ExpressionKind::TSNonNullExpression(_)
         ) && let Some(doc) = self.build_whole_call_member_doc(member, span)
         {
             return doc;
@@ -1134,14 +1125,14 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a dynamic import expression: `import('module')` or `import('module', options)`
     pub(super) fn build_import_expression_doc(
         &self,
-        import_expr: &internal::ImportExpression<'_>,
+        import_expr: &ast::ImportExpression<'_>,
         span: Span,
     ) -> DocId {
         import_expr::build_import_expression_doc(self, import_expr, span)
     }
 
     /// Build a Doc for a meta property: `import.meta`, `new.target`
-    pub(super) fn build_meta_property_doc(&self, meta: &internal::MetaProperty<'_>) -> DocId {
+    pub(super) fn build_meta_property_doc(&self, meta: &ast::MetaProperty<'_>) -> DocId {
         import_expr::build_meta_property_doc(self, meta)
     }
 
@@ -1150,7 +1141,7 @@ impl<'a> Printer<'a> {
     /// Uses proper group wrapping so args can break independently from the chain.
     pub(super) fn build_call_args_doc_for_chain(
         &self,
-        call: &internal::CallExpression<'_>,
+        call: &ast::CallExpression<'_>,
         span: Span,
         facts: ChainCall,
     ) -> DocId {
@@ -1160,7 +1151,7 @@ impl<'a> Printer<'a> {
     /// The doc a chain call prints ahead of its `(` ([`chain_args::chain_call_head_doc`]).
     pub(in crate::printer) fn chain_call_head_doc(
         &self,
-        call: &internal::CallExpression<'_>,
+        call: &ast::CallExpression<'_>,
         span: Span,
     ) -> Option<DocId> {
         chain_args::chain_call_head_doc(self, call, callee_gap(self, call, span))
@@ -1171,7 +1162,7 @@ impl<'a> Printer<'a> {
     /// Used for the "args expanded, chain inline" state in conditionalGroup.
     pub(super) fn build_call_args_doc_for_chain_expanded(
         &self,
-        call: &internal::CallExpression<'_>,
+        call: &ast::CallExpression<'_>,
         span: Span,
         facts: ChainCall,
     ) -> DocId {

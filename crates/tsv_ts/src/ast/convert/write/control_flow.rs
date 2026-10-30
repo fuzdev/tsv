@@ -1,17 +1,17 @@
 // Control flow statement writers.
 
-use super::super::super::internal;
 use super::expressions::write_expression;
 use super::statements::{write_block_statement, write_statement, write_variable_declaration};
 use super::{
     Ctx, JsonWriter, close_node, node_header, write_array, write_identifier_plain, write_or_null,
 };
+use crate::ast;
 use tsv_lang::Span;
 
 /// Emits an `IfStatement` node.
 pub(super) fn write_if_statement(
     w: &mut JsonWriter,
-    if_stmt: &internal::IfStatement<'_>,
+    if_stmt: &ast::IfStatement<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -30,17 +30,17 @@ pub(super) fn write_if_statement(
 /// Emits a `ForStatement` node. `init`/`test`/`update` are nullable.
 pub(super) fn write_for_statement(
     w: &mut JsonWriter,
-    for_stmt: &internal::ForStatement<'_>,
+    for_stmt: &ast::ForStatement<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "ForStatement", span, ctx);
     w.raw(",\"init\":");
     match &for_stmt.init {
-        Some(internal::ForInit::VariableDeclaration(decl)) => {
+        Some(ast::ForInit::VariableDeclaration(decl)) => {
             write_variable_declaration(w, decl, ctx, false);
         }
-        Some(internal::ForInit::Expression(expr)) => write_expression(w, expr, ctx),
+        Some(ast::ForInit::Expression(expr)) => write_expression(w, expr, ctx),
         None => w.null(),
     }
     w.raw(",\"test\":");
@@ -57,19 +57,19 @@ pub(super) fn write_for_statement(
 }
 
 /// Emit a `for`-`in`/`for`-`of` `left` (an untagged declaration-or-pattern).
-fn write_for_in_of_left(w: &mut JsonWriter, left: &internal::ForInOfLeft<'_>, ctx: &Ctx<'_>) {
+fn write_for_in_of_left(w: &mut JsonWriter, left: &ast::ForInOfLeft<'_>, ctx: &Ctx<'_>) {
     match left {
-        internal::ForInOfLeft::VariableDeclaration(decl) => {
+        ast::ForInOfLeft::VariableDeclaration(decl) => {
             write_variable_declaration(w, decl, ctx, false);
         }
-        internal::ForInOfLeft::Pattern(expr) => write_expression(w, expr, ctx),
+        ast::ForInOfLeft::Pattern(expr) => write_expression(w, expr, ctx),
     }
 }
 
 /// Emits a `ForInStatement` node.
 pub(super) fn write_for_in_statement(
     w: &mut JsonWriter,
-    for_in: &internal::ForInStatement<'_>,
+    for_in: &ast::ForInStatement<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -87,7 +87,7 @@ pub(super) fn write_for_in_statement(
 /// `body`.
 pub(super) fn write_for_of_statement(
     w: &mut JsonWriter,
-    for_of: &internal::ForOfStatement<'_>,
+    for_of: &ast::ForOfStatement<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -106,7 +106,7 @@ pub(super) fn write_for_of_statement(
 /// Emits a `WhileStatement` node.
 pub(super) fn write_while_statement(
     w: &mut JsonWriter,
-    while_stmt: &internal::WhileStatement<'_>,
+    while_stmt: &ast::WhileStatement<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -121,7 +121,7 @@ pub(super) fn write_while_statement(
 /// Emits a `WithStatement` node. Field order: `object`, `body`.
 pub(super) fn write_with_statement(
     w: &mut JsonWriter,
-    with_stmt: &internal::WithStatement<'_>,
+    with_stmt: &ast::WithStatement<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -136,7 +136,7 @@ pub(super) fn write_with_statement(
 /// Emits a `DoWhileStatement` node. Field order: `body`, `test`.
 pub(super) fn write_do_while_statement(
     w: &mut JsonWriter,
-    do_while: &internal::DoWhileStatement<'_>,
+    do_while: &ast::DoWhileStatement<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -151,7 +151,7 @@ pub(super) fn write_do_while_statement(
 /// Emits a `SwitchStatement` node (each case a `SwitchCase`).
 pub(super) fn write_switch_statement(
     w: &mut JsonWriter,
-    switch_stmt: &internal::SwitchStatement<'_>,
+    switch_stmt: &ast::SwitchStatement<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -177,7 +177,7 @@ pub(super) fn write_switch_statement(
 /// `finalizer` are nullable, as is the catch clause's `param`.
 pub(super) fn write_try_statement(
     w: &mut JsonWriter,
-    try_stmt: &internal::TryStatement<'_>,
+    try_stmt: &ast::TryStatement<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -203,7 +203,7 @@ pub(super) fn write_try_statement(
 /// Emits a `ThrowStatement` node.
 pub(super) fn write_throw_statement(
     w: &mut JsonWriter,
-    throw_stmt: &internal::ThrowStatement<'_>,
+    throw_stmt: &ast::ThrowStatement<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -216,7 +216,7 @@ pub(super) fn write_throw_statement(
 /// Emits a `BreakStatement` node. `label` is nullable.
 pub(super) fn write_break_statement(
     w: &mut JsonWriter,
-    break_stmt: &internal::BreakStatement<'_>,
+    break_stmt: &ast::BreakStatement<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -231,7 +231,7 @@ pub(super) fn write_break_statement(
 /// Emits a `ContinueStatement` node. `label` is nullable.
 pub(super) fn write_continue_statement(
     w: &mut JsonWriter,
-    continue_stmt: &internal::ContinueStatement<'_>,
+    continue_stmt: &ast::ContinueStatement<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -246,7 +246,7 @@ pub(super) fn write_continue_statement(
 /// Emits a `LabeledStatement` node.
 pub(super) fn write_labeled_statement(
     w: &mut JsonWriter,
-    labeled: &internal::LabeledStatement<'_>,
+    labeled: &ast::LabeledStatement<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {

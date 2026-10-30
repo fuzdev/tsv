@@ -22,7 +22,7 @@
 //!
 //! The corpus cannot stand in: over the real-code corpus no name needs an escape.
 
-use tsv_svelte::ast::internal::{AttributeNode, Element, ElementKind, FragmentNode, Root};
+use tsv_svelte::ast::{AttributeNode, Element, ElementKind, FragmentNode, Root};
 
 /// Every `"name":` string field in the wire, read off the BYTES: each literal must be
 /// exactly `serde_json`'s spelling of the value it decodes to. Returns the decoded values.

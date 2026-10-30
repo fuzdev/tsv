@@ -2,7 +2,7 @@
 
 use super::Printer;
 use super::helpers::{is_huggable_type, is_simple_type_arg, union_has_brace_member};
-use crate::ast::internal::{self, TSType};
+use crate::ast::{self, TSType};
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
 
@@ -87,7 +87,7 @@ impl<'a> Printer<'a> {
     /// gaps below are comment-free, so neither is searched.
     pub(in crate::printer) fn build_single_type_arg_inline(
         &self,
-        args: &internal::TSTypeParameterInstantiation<'_>,
+        args: &ast::TSTypeParameterInstantiation<'_>,
         has_comments: bool,
     ) -> DocId {
         let type_doc = self.build_type_doc(args.params[0]);
@@ -101,7 +101,7 @@ impl<'a> Printer<'a> {
     /// slice), so every single-argument hug path honors it.
     pub(in crate::printer) fn build_single_type_arg_inline_with(
         &self,
-        args: &internal::TSTypeParameterInstantiation<'_>,
+        args: &ast::TSTypeParameterInstantiation<'_>,
         has_comments: bool,
         type_doc: DocId,
     ) -> DocId {
@@ -146,7 +146,7 @@ impl<'a> Printer<'a> {
     /// window answer; `false` proves both gaps empty without a search.
     pub(in crate::printer) fn single_type_arg_run_breaks_after(
         &self,
-        args: &internal::TSTypeParameterInstantiation<'_>,
+        args: &ast::TSTypeParameterInstantiation<'_>,
         has_comments: bool,
     ) -> bool {
         if !has_comments {
@@ -245,7 +245,7 @@ impl<'a> Printer<'a> {
     /// break anyway has no unbreakable form and keeps the ordinary group.
     pub(in crate::printer) fn build_nullable_union_type_args_doc(
         &self,
-        args: &internal::TSTypeParameterInstantiation<'_>,
+        args: &ast::TSTypeParameterInstantiation<'_>,
         has_comments: bool,
         rescan: ShiftRescan,
     ) -> DocId {
@@ -276,7 +276,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn value_with_nullable_union_broken(
         &self,
         value_doc: DocId,
-        args: &internal::TSTypeParameterInstantiation<'_>,
+        args: &ast::TSTypeParameterInstantiation<'_>,
     ) -> Option<DocId> {
         let d = self.d();
         let builds: smallvec::SmallVec<[(DocId, DocId); 2]> = self
@@ -310,7 +310,7 @@ impl<'a> Printer<'a> {
     /// (and its trivia scans) on the same answer.
     pub(in crate::printer) fn type_arguments_force_expansion(
         &self,
-        args: &internal::TSTypeParameterInstantiation<'_>,
+        args: &ast::TSTypeParameterInstantiation<'_>,
         has_comments: bool,
     ) -> bool {
         if !has_comments {
@@ -385,7 +385,7 @@ impl<'a> Printer<'a> {
     /// Every caller names it, so a new position cannot default into the glued form.
     pub(in crate::printer) fn build_type_arguments_doc(
         &self,
-        args: &internal::TSTypeParameterInstantiation<'_>,
+        args: &ast::TSTypeParameterInstantiation<'_>,
         rescan: ShiftRescan,
     ) -> DocId {
         let d = self.d();
@@ -442,7 +442,7 @@ impl<'a> Printer<'a> {
     /// everything past that decision is one body, so neither can drift from the other.
     pub(in crate::printer) fn build_type_arguments_group_doc(
         &self,
-        args: &internal::TSTypeParameterInstantiation<'_>,
+        args: &ast::TSTypeParameterInstantiation<'_>,
         has_comments: bool,
         rescan: ShiftRescan,
     ) -> DocId {
@@ -453,7 +453,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_type_arguments_group_doc`]'s list without its group.
     fn build_type_arguments_list_doc(
         &self,
-        args: &internal::TSTypeParameterInstantiation<'_>,
+        args: &ast::TSTypeParameterInstantiation<'_>,
         has_comments: bool,
         rescan: ShiftRescan,
     ) -> DocId {
@@ -497,7 +497,7 @@ impl<'a> Printer<'a> {
     /// function for why a leading-only paren shell must not reach here.
     pub(in crate::printer) fn build_type_arguments_doc_with_line_comments(
         &self,
-        args: &internal::TSTypeParameterInstantiation<'_>,
+        args: &ast::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
         let is_multi = args.params.len() > 1;
         let param_at = |i: usize| self.leading_paren_unwrapped(args.params[i]);

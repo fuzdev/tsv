@@ -3,7 +3,7 @@
 // Top-level orchestration: statement iteration with blank-line preservation,
 // leading/trailing comment placement, and format-ignore raw emission.
 
-use crate::ast::internal;
+use crate::ast;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -16,7 +16,7 @@ impl<'a> Printer<'a> {
     /// Delegates to `build_program_doc` to build the doc tree, then renders it.
     /// This is the same path used by Svelte's `<script>` formatting, ensuring
     /// consistent behavior (e.g., trailing whitespace trimming in comments).
-    pub(crate) fn print_program(&mut self, program: &internal::Program<'_>) {
+    pub(crate) fn print_program(&mut self, program: &ast::Program<'_>) {
         let doc = self.build_program_doc(program);
         self.write_arena_doc(doc);
     }
@@ -33,7 +33,7 @@ impl<'a> Printer<'a> {
     /// - Leading comments with proper spacing
     /// - Trailing same-line comments using line_suffix
     /// - Program trailing comments after the last statement
-    pub(crate) fn build_program_doc(&self, program: &internal::Program<'_>) -> DocId {
+    pub(crate) fn build_program_doc(&self, program: &ast::Program<'_>) -> DocId {
         let d = self.d();
         let (body, has_output) = self.build_program_body_doc(program);
         // Trailing newline (only if there's content — empty files stay empty)
@@ -50,7 +50,7 @@ impl<'a> Printer<'a> {
     /// The shape an embedder wants when it places the body between delimiters of its own —
     /// a `<script>` nested in Svelte markup, whose closing tag supplies the line break the
     /// program would otherwise end with.
-    pub(crate) fn build_program_body_doc(&self, program: &internal::Program<'_>) -> (DocId, bool) {
+    pub(crate) fn build_program_body_doc(&self, program: &ast::Program<'_>) -> (DocId, bool) {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
 

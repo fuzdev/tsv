@@ -87,11 +87,11 @@
 //! between `end` and the closing constant, [`Ctx::head`] / [`Ctx::tail`] write the same burst
 //! piecewise with the `loc` field in place.
 
-use super::super::internal;
 use super::{
     WireComment, convert_prelude_to_string, raw_selector_name, selector_contains_invalid,
     split_declaration_svelte_compat, strip_css_comments_collecting, trim_wire_end, trim_wire_start,
 };
+use crate::ast;
 use std::borrow::Cow;
 use tsv_lang::{JsonWriter, Span, Wire, WirePositions, WireTables, write_array, write_or_null};
 
@@ -214,7 +214,7 @@ impl Ctx<'_> {
 /// the coordinates `crate::WIRE_COORDINATES` states. (An embedded `<style>` takes the
 /// Svelte writer's positions.)
 pub(crate) fn write_stylesheet_file_bytes(
-    stylesheet: &internal::CssStyleSheet<'_>,
+    stylesheet: &ast::CssStyleSheet<'_>,
     source: &str,
     wire: Wire,
 ) -> Vec<u8> {
@@ -237,7 +237,7 @@ pub(crate) fn write_stylesheet_file_bytes(
 /// Svelte document's).
 pub fn write_css_children(
     w: &mut JsonWriter,
-    stylesheet: &internal::CssStyleSheet<'_>,
+    stylesheet: &ast::CssStyleSheet<'_>,
     source: &str,
     positions: WirePositions<'_>,
 ) -> CssComments {
@@ -284,11 +284,7 @@ fn write_keyed_string<const K: usize>(w: &mut JsonWriter, lead: &[u8; K], s: &st
 
 /// The standalone `StyleSheetFile` root: `type`, `start` (0), `end` (source
 /// length), `children`, `comments`.
-fn write_stylesheet_file(
-    w: &mut JsonWriter,
-    stylesheet: &internal::CssStyleSheet<'_>,
-    ctx: &Ctx<'_>,
-) {
+fn write_stylesheet_file(w: &mut JsonWriter, stylesheet: &ast::CssStyleSheet<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"StyleSheetFile\",\"start\":");
     w.span_start_end(ctx.positions, 0, ctx.source.len() as u32);
     w.raw(",\"children\":");
@@ -331,7 +327,7 @@ pub struct CssComments(Vec<WireComment>);
 /// sets it.
 fn write_children(
     w: &mut JsonWriter,
-    stylesheet: &internal::CssStyleSheet<'_>,
+    stylesheet: &ast::CssStyleSheet<'_>,
     ctx: &Ctx<'_>,
 ) -> CssComments {
     let mut out = Vec::new();
@@ -364,13 +360,13 @@ fn write_comments(w: &mut JsonWriter, comments: &CssComments, ctx: &Ctx<'_>) {
 /// Emit a CSS node (a `Rule` or an `Atrule`).
 fn write_node(
     w: &mut JsonWriter,
-    node: &internal::CssNode<'_>,
+    node: &ast::CssNode<'_>,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
     match node {
-        internal::CssNode::Rule(rule) => write_rule(w, rule, ctx, comments),
-        internal::CssNode::Atrule(atrule) => write_atrule(w, atrule, ctx, comments),
+        ast::CssNode::Rule(rule) => write_rule(w, rule, ctx, comments),
+        ast::CssNode::Atrule(atrule) => write_atrule(w, atrule, ctx, comments),
     }
 }
 
@@ -382,7 +378,7 @@ fn write_node(
 /// alone — is an append of its own, since which one it is varies by document.
 fn write_rule(
     w: &mut JsonWriter,
-    rule: &internal::CssRule<'_>,
+    rule: &ast::CssRule<'_>,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
@@ -403,7 +399,7 @@ fn write_rule(
 /// constructs the two literals differently). `Atrule` carries no `metadata`.
 fn write_atrule(
     w: &mut JsonWriter,
-    atrule: &internal::CssAtrule<'_>,
+    atrule: &ast::CssAtrule<'_>,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
@@ -446,7 +442,7 @@ fn write_atrule(
 // which the CSS fixtures and the parse-corpus gate stand on, so it wants its own
 // change and its own verdict on that claim.
 fn collect_prelude_comments(
-    atrule: &internal::CssAtrule<'_>,
+    atrule: &ast::CssAtrule<'_>,
     source: &str,
     comments: &mut Vec<WireComment>,
 ) {
@@ -464,12 +460,12 @@ fn collect_prelude_comments(
 fn write_block(
     w: &mut JsonWriter,
     block_span: Span,
-    children: &[internal::CssBlockChild<'_>],
+    children: &[ast::CssBlockChild<'_>],
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
     comments.extend(children.iter().filter_map(|c| match c {
-        internal::CssBlockChild::Comment(c) => Some(WireComment {
+        ast::CssBlockChild::Comment(c) => Some(WireComment {
             span: c.span,
             position: None,
         }),
@@ -487,7 +483,7 @@ fn write_block(
         b"",
         children
             .iter()
-            .filter(|c| !matches!(c, internal::CssBlockChild::Comment(_))),
+            .filter(|c| !matches!(c, ast::CssBlockChild::Comment(_))),
         |w, c| write_block_child(w, c, ctx, comments),
     );
     w.raw("]}");
@@ -495,16 +491,16 @@ fn write_block(
 
 fn write_block_child(
     w: &mut JsonWriter,
-    child: &internal::CssBlockChild<'_>,
+    child: &ast::CssBlockChild<'_>,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
     match child {
-        internal::CssBlockChild::Declaration(d) => write_declaration(w, d, ctx, comments),
-        internal::CssBlockChild::Rule(r) => write_rule(w, r, ctx, comments),
-        internal::CssBlockChild::Atrule(a) => write_atrule(w, a, ctx, comments),
+        ast::CssBlockChild::Declaration(d) => write_declaration(w, d, ctx, comments),
+        ast::CssBlockChild::Rule(r) => write_rule(w, r, ctx, comments),
+        ast::CssBlockChild::Atrule(a) => write_atrule(w, a, ctx, comments),
         // Comments are filtered out before this call (see `write_block`).
-        internal::CssBlockChild::Comment(_) => {}
+        ast::CssBlockChild::Comment(_) => {}
     }
 }
 
@@ -528,10 +524,7 @@ struct DeclarationSplit<'a> {
     value_start: u32,
 }
 
-fn split_declaration<'a>(
-    decl: &internal::CssDeclaration<'_>,
-    source: &'a str,
-) -> DeclarationSplit<'a> {
+fn split_declaration<'a>(decl: &ast::CssDeclaration<'_>, source: &'a str) -> DeclarationSplit<'a> {
     let content_end = decl
         .important_end
         .map_or(decl.span.end, |e| e.max(decl.span.end));
@@ -568,7 +561,7 @@ fn split_declaration<'a>(
 /// keeps each recorded `position` indexing the very `value` emitted here.
 fn write_declaration(
     w: &mut JsonWriter,
-    decl: &internal::CssDeclaration<'_>,
+    decl: &ast::CssDeclaration<'_>,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
@@ -595,23 +588,19 @@ fn write_declaration(
 
 /// Emits a `SelectorList` node (rule preludes — parsed non-forgivingly, no
 /// `Invalid`).
-fn write_selector_list(w: &mut JsonWriter, sl: &internal::SelectorList<'_>, ctx: &Ctx<'_>) {
+fn write_selector_list(w: &mut JsonWriter, sl: &ast::SelectorList<'_>, ctx: &Ctx<'_>) {
     write_selector_list_inner(w, sl, ctx, false);
 }
 
 /// Emits a `SelectorList` node for pseudo-class args — drops complex selectors
 /// containing a forgiving-parse `Invalid`.
-fn write_selector_list_filtered(
-    w: &mut JsonWriter,
-    sl: &internal::SelectorList<'_>,
-    ctx: &Ctx<'_>,
-) {
+fn write_selector_list_filtered(w: &mut JsonWriter, sl: &ast::SelectorList<'_>, ctx: &Ctx<'_>) {
     write_selector_list_inner(w, sl, ctx, true);
 }
 
 fn write_selector_list_inner(
     w: &mut JsonWriter,
-    sl: &internal::SelectorList<'_>,
+    sl: &ast::SelectorList<'_>,
     ctx: &Ctx<'_>,
     filter_invalid: bool,
 ) {
@@ -634,7 +623,7 @@ fn write_selector_list_inner(
 }
 
 /// Emits a `ComplexSelector` node.
-fn write_complex_selector(w: &mut JsonWriter, c: &internal::ComplexSelector<'_>, ctx: &Ctx<'_>) {
+fn write_complex_selector(w: &mut JsonWriter, c: &ast::ComplexSelector<'_>, ctx: &Ctx<'_>) {
     ctx.head(
         w,
         b"{\"type\":\"ComplexSelector\",\"start\":",
@@ -658,7 +647,7 @@ fn write_complex_selector(w: &mut JsonWriter, c: &internal::ComplexSelector<'_>,
 /// The trailing `start`/`end` burst is one in-place window, led by the `]` that
 /// closes `selectors` and stopping before `metadata` for `write_rule`'s reason (module
 /// doc, §The `start`/`end` bursts).
-fn write_relative_selector(w: &mut JsonWriter, r: &internal::RelativeSelector<'_>, ctx: &Ctx<'_>) {
+fn write_relative_selector(w: &mut JsonWriter, r: &ast::RelativeSelector<'_>, ctx: &Ctx<'_>) {
     // The combinator-less head — the first compound of every selector — is one literal
     // through the `selectors` array's `[`.
     match (&r.combinator, &r.combinator_span) {
@@ -686,9 +675,9 @@ fn write_combinator(w: &mut JsonWriter, name: &'static str, span: Span, ctx: &Ct
 }
 
 /// Emit a simple selector (type/universal/class/id/nesting/attribute/pseudo/percentage).
-fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'_>, ctx: &Ctx<'_>) {
+fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector<'_>, ctx: &Ctx<'_>) {
     match simple {
-        internal::SimpleSelector::Type {
+        ast::SimpleSelector::Type {
             namespace_span,
             span,
         } => {
@@ -707,29 +696,29 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             };
             write_type_selector(w, &name, *namespace_span, *span, ctx);
         }
-        internal::SimpleSelector::Universal {
+        ast::SimpleSelector::Universal {
             namespace_span,
             span,
         } => {
             write_type_selector(w, "*", *namespace_span, *span, ctx);
         }
-        internal::SimpleSelector::Class { span } => {
+        ast::SimpleSelector::Class { span } => {
             // Past the `.` AND any comment glued to it (`./* c */cls`) — never a bare `1`.
             let name_start = crate::comments::class_name_start(ctx.source.as_bytes(), span.start);
             let name = raw_selector_name(ctx.source, *span, (name_start - span.start) as usize);
             w.raw("{\"type\":\"ClassSelector\",\"name\":");
             write_named_selector(w, &name, *span, ctx);
         }
-        internal::SimpleSelector::Id { span } => {
+        ast::SimpleSelector::Id { span } => {
             let name = raw_selector_name(ctx.source, *span, 1);
             w.raw("{\"type\":\"IdSelector\",\"name\":");
             write_named_selector(w, &name, *span, ctx);
         }
-        internal::SimpleSelector::Nesting { span } => {
+        ast::SimpleSelector::Nesting { span } => {
             w.raw("{\"type\":\"NestingSelector\",\"name\":");
             write_named_selector(w, "&", *span, ctx);
         }
-        internal::SimpleSelector::Attribute {
+        ast::SimpleSelector::Attribute {
             namespace_span,
             name_span,
             matcher,
@@ -741,7 +730,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             let matcher = *matcher;
             // Svelte's `value` is the raw token with a string's quotes stripped —
             // escapes stay encoded (`[a=x\27]` → `x\27`), so no decode here.
-            let value = value_span.map(|s| internal::attribute_value_text(ctx.source, s));
+            let value = value_span.map(|s| ast::attribute_value_text(ctx.source, s));
             let flags = *flags;
             // Half-decoded from the prefix's own span, like every other selector name —
             // `*` and the empty prefix fall out of the same slice.
@@ -764,7 +753,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             }
             w.raw("}");
         }
-        internal::SimpleSelector::PseudoClass {
+        ast::SimpleSelector::PseudoClass {
             args,
             name_end,
             span,
@@ -781,7 +770,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             w.span_start_end_field(ctx.positions, span.start, span.end);
             w.raw("}");
         }
-        internal::SimpleSelector::PseudoElement {
+        ast::SimpleSelector::PseudoElement {
             args,
             name_end,
             span,
@@ -810,7 +799,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             }
             w.raw("}");
         }
-        internal::SimpleSelector::Percentage { value, span } => {
+        ast::SimpleSelector::Percentage { value, span } => {
             let value_str = if value.fract() == 0.0 {
                 format!("{}%", *value as i64)
             } else {
@@ -821,7 +810,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             w.span_start_end_field(ctx.positions, span.start, span.end);
             w.raw("}");
         }
-        internal::SimpleSelector::Nth { span } => {
+        ast::SimpleSelector::Nth { span } => {
             // An An+B term inside pseudo-class args. parseCss stores the value
             // verbatim (the raw source slice — never operator-normalized like the
             // printer's output). For an `An+B of S` term the span folds in the
@@ -838,7 +827,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
         // `write_selector_list_filtered`); the non-filtering path (rule preludes)
         // never contains them.
         #[expect(clippy::unreachable)]
-        internal::SimpleSelector::Invalid { .. } => {
+        ast::SimpleSelector::Invalid { .. } => {
             unreachable!("Invalid selectors should be filtered in write_selector_list_filtered")
         }
     }
@@ -897,9 +886,9 @@ fn write_named_selector(w: &mut JsonWriter, name: &str, span: Span, ctx: &Ctx<'_
 
 /// Emit a functional pseudo-class's or pseudo-element's args (an `Nth` node, a
 /// nested `SelectorList`, or a `::part()` ident run projected onto one).
-fn write_pseudo_args(w: &mut JsonWriter, args: &internal::PseudoClassArgs<'_>, ctx: &Ctx<'_>) {
+fn write_pseudo_args(w: &mut JsonWriter, args: &ast::PseudoClassArgs<'_>, ctx: &Ctx<'_>) {
     match args {
-        internal::PseudoClassArgs::Nth {
+        ast::PseudoClassArgs::Nth {
             value,
             of_selector,
             value_span,
@@ -933,10 +922,10 @@ fn write_pseudo_args(w: &mut JsonWriter, args: &internal::PseudoClassArgs<'_>, c
                 w.raw("}");
             });
         }
-        internal::PseudoClassArgs::SelectorList { selectors, .. } => {
+        ast::PseudoClassArgs::SelectorList { selectors, .. } => {
             write_selector_list_filtered(w, selectors, ctx);
         }
-        internal::PseudoClassArgs::Part { ident_spans, .. } => {
+        ast::PseudoClassArgs::Part { ident_spans, .. } => {
             write_part_args(w, ident_spans, ctx);
         }
     }

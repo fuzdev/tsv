@@ -23,10 +23,10 @@
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
-use tsv_svelte::ast::internal::{
+use tsv_svelte::ast::{
     Attribute, AttributeValue, ClassDirective, StyleDirective, StyleDirectiveValue,
 };
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ArrayExpression, Expression, ExpressionKind, LiteralValue, ObjectExpression, ObjectProperty,
     Property,
 };

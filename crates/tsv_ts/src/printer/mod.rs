@@ -85,7 +85,7 @@ use needs_parens::{
 use types::unwrap_parenthesized;
 
 use crate::PrinterInputs;
-use crate::ast::internal;
+use crate::ast;
 use std::cell::{Cell, RefCell};
 use tsv_lang::{
     CommentFreeWindow, EmbedContext, FxHashSet, OutputBuffer, Span, TAB_WIDTH,
@@ -304,7 +304,7 @@ pub struct Printer<'a> {
     /// Original source code (for extracting raw values, preserving escape sequences, etc.)
     pub(crate) source: &'a str,
     /// Comments from the program (for printing leading/trailing comments)
-    pub(crate) comments: &'a [internal::Comment],
+    pub(crate) comments: &'a [ast::Comment],
     /// Whether any comment in this document is owned by a node (`owned_by_node`).
     /// Document-level presence flag (from `PrinterInputs`), computed once per document
     /// — never here, per that field's doc (the `.svelte` per-`{expr}` trap). Gates the
@@ -1127,7 +1127,7 @@ impl<'a> Printer<'a> {
     /// applies there. Positions that already route through [`fn@needs_parens`] (call
     /// args, object values, binary operands, …) get the same wrap via that path.
     #[inline]
-    pub(crate) fn wrap_for_init_in(&self, expr: &internal::Expression<'_>, doc: DocId) -> DocId {
+    pub(crate) fn wrap_for_init_in(&self, expr: &ast::Expression<'_>, doc: DocId) -> DocId {
         if self.for_init_in_needs_parens(expr) {
             self.arena.parens(doc)
         } else {
@@ -1140,7 +1140,7 @@ impl<'a> Printer<'a> {
     /// its own (the assignment RHS): the verdict [`Self::wrap_for_init_in`] wraps by, and
     /// what such a seam hands the value-gap hoist as its pair
     /// ([`Self::hoisted_owned_value_gap_run_opt`]).
-    pub(crate) fn for_init_in_needs_parens(&self, expr: &internal::Expression<'_>) -> bool {
+    pub(crate) fn for_init_in_needs_parens(&self, expr: &ast::Expression<'_>) -> bool {
         self.in_for_init.get() && is_in_binary(expr)
     }
 
@@ -1171,13 +1171,12 @@ impl<'a> Printer<'a> {
     /// wrapper.)
     pub(crate) fn wrap_frozen_for_init_in(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         frozen: Span,
         already_parenthesized: bool,
         doc: DocId,
     ) -> DocId {
-        let self_parenthesizing =
-            matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_));
+        let self_parenthesizing = matches!(expr.kind, ast::ExpressionKind::SequenceExpression(_));
         if self.in_for_init.get()
             && !already_parenthesized
             && !self_parenthesizing
@@ -1231,14 +1230,14 @@ impl<'a> Printer<'a> {
     /// is what a verbatim slice decides.
     pub(crate) fn frozen_slice_hands_header_a_bare_in(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         slice_end: u32,
     ) -> bool {
-        use internal::ExpressionKind as E;
+        use ast::ExpressionKind as E;
         if is_in_binary(expr) {
             return true;
         }
-        let mut reaches = |child: &internal::Expression<'_>| {
+        let mut reaches = |child: &ast::Expression<'_>| {
             !self.frozen_slice_child_is_parenthesized(child, slice_end)
                 && self.frozen_slice_hands_header_a_bare_in(child, slice_end)
         };
@@ -1248,8 +1247,8 @@ impl<'a> Printer<'a> {
             E::BinaryExpression(binary) => reaches(binary.left) || reaches(binary.right),
             E::ConditionalExpression(cond) => reaches(cond.test) || reaches(cond.alternate),
             E::ArrowFunctionExpression(arrow) => match &arrow.body {
-                internal::ArrowFunctionBody::Expression(body) => reaches(body),
-                internal::ArrowFunctionBody::BlockStatement(_) => false,
+                ast::ArrowFunctionBody::Expression(body) => reaches(body),
+                ast::ArrowFunctionBody::BlockStatement(_) => false,
             },
             // `yield AssignmentExpression[?In]`, `yield*` alike; a bare `yield` has none.
             E::YieldExpression(yield_expr) => yield_expr.argument.is_some_and(reaches),
@@ -1267,7 +1266,7 @@ impl<'a> Printer<'a> {
     /// the bound is load-bearing.
     fn frozen_slice_child_is_parenthesized(
         &self,
-        child: &internal::Expression<'_>,
+        child: &ast::Expression<'_>,
         slice_end: u32,
     ) -> bool {
         next_significant_byte(self.source, child.span().end, slice_end)
@@ -1286,7 +1285,7 @@ impl<'a> Printer<'a> {
     /// and prints the pairs such a region keeps where the author wrote them
     /// ([`Self::region_keeps_authored_pair`]).
     #[inline]
-    pub(crate) fn needs_parens(&self, expr: &internal::Expression<'_>, ctx: ParenContext) -> bool {
+    pub(crate) fn needs_parens(&self, expr: &ast::Expression<'_>, ctx: ParenContext) -> bool {
         (needs_parens(expr, ctx, self.in_for_init.get())
             && !self.clarity_pair_is_withheld(expr, ctx)
             && !self.region_withholds_assignment_pair(expr, ctx))
@@ -1301,11 +1300,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::region_keeps_shell`]).
     #[cold]
     #[inline(never)]
-    fn region_keeps_authored_pair(
-        &self,
-        expr: &internal::Expression<'_>,
-        ctx: ParenContext,
-    ) -> bool {
+    fn region_keeps_authored_pair(&self, expr: &ast::Expression<'_>, ctx: ParenContext) -> bool {
         self.relational_sibling_pair_is_kept(expr)
             || (matches!(
                 ctx,
@@ -1323,7 +1318,7 @@ impl<'a> Printer<'a> {
     #[inline]
     fn region_withholds_assignment_pair(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         ctx: ParenContext,
     ) -> bool {
         self.has_region_source_marks.get()
@@ -1334,7 +1329,7 @@ impl<'a> Printer<'a> {
                     | ParenContext::TemplateLiteralExpression
                     | ParenContext::ArrowBody
             )
-            && matches!(expr.kind, internal::ExpressionKind::AssignmentExpression(_))
+            && matches!(expr.kind, ast::ExpressionKind::AssignmentExpression(_))
             && self.region_withholds_pair(expr)
     }
 
@@ -1346,12 +1341,11 @@ impl<'a> Printer<'a> {
     /// The chain linearizer answers the same question for a base that is its first
     /// call's callee, off the same marks ([`Self::linearize_input`]).
     #[cold]
-    fn clarity_pair_is_withheld(&self, expr: &internal::Expression<'_>, ctx: ParenContext) -> bool {
+    fn clarity_pair_is_withheld(&self, expr: &ast::Expression<'_>, ctx: ParenContext) -> bool {
         let takes_a_clarity_pair = match ctx {
             ParenContext::BinaryLeft { .. } | ParenContext::BinaryRight { .. } => matches!(
                 expr.kind,
-                internal::ExpressionKind::AwaitExpression(_)
-                    | internal::ExpressionKind::BinaryExpression(_)
+                ast::ExpressionKind::AwaitExpression(_) | ast::ExpressionKind::BinaryExpression(_)
             ),
             ParenContext::Callee | ParenContext::TaggedTemplateTag => is_called_function(expr),
             _ => false,
@@ -1372,7 +1366,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn withhold_clarity_pairs_behind_region_close(
         &self,
-        expr: &internal::BinaryExpression<'_>,
+        expr: &ast::BinaryExpression<'_>,
     ) {
         if expr.may_close_type_arguments {
             self.record_withheld_clarity_pairs(expr);
@@ -1382,7 +1376,7 @@ impl<'a> Printer<'a> {
     /// [`Self::withhold_clarity_pairs_behind_region_close`]'s recording, out of line: a
     /// comparison behind an open `<` region is the rare one.
     #[cold]
-    fn record_withheld_clarity_pairs(&self, close: &internal::BinaryExpression<'_>) {
+    fn record_withheld_clarity_pairs(&self, close: &ast::BinaryExpression<'_>) {
         let withheld =
             clarity_pairs_behind_region_close(close, self.in_for_init.get(), |operand| {
                 self.source_holds_pair_around(operand)
@@ -1397,7 +1391,7 @@ impl<'a> Printer<'a> {
     /// only where one side of `expr` is its parent's own token, so a `(` right before and
     /// a `)` right after are a pair around `expr` itself or around a run of pairs that
     /// begins and ends on it.
-    fn source_holds_pair_around(&self, expr: &internal::Expression<'_>) -> bool {
+    fn source_holds_pair_around(&self, expr: &ast::Expression<'_>) -> bool {
         paren_shell_close_after(self.source, expr.span().end).is_some()
             && self.prev_significant_byte(expr.span().start) == Some(b'(')
     }
@@ -1409,7 +1403,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(crate) fn needs_parens_at_operand_end(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         ctx: ParenContext,
     ) -> bool {
         self.needs_parens(expr, ctx) || self.is_dividend_tail(expr)
@@ -1418,11 +1412,10 @@ impl<'a> Printer<'a> {
     /// Whether `expr` is a function or class expression a division's left operand ends on
     /// ([`Self::dividend_tail_targets`]).
     #[inline]
-    pub(crate) fn is_dividend_tail(&self, expr: &internal::Expression<'_>) -> bool {
+    pub(crate) fn is_dividend_tail(&self, expr: &ast::Expression<'_>) -> bool {
         matches!(
             expr.kind,
-            internal::ExpressionKind::FunctionExpression(_)
-                | internal::ExpressionKind::ClassExpression(_)
+            ast::ExpressionKind::FunctionExpression(_) | ast::ExpressionKind::ClassExpression(_)
         ) && self.dividend_tail_targets.is_marked(expr.span())
     }
 
@@ -1457,7 +1450,7 @@ impl<'a> Printer<'a> {
     /// [`instantiation_keeps_pair_before_type_args`] over this printer's source.
     pub(crate) fn instantiation_keeps_pair(
         &self,
-        head: &internal::Expression<'_>,
+        head: &ast::Expression<'_>,
         follow: SecondTypeArgs,
     ) -> bool {
         instantiation_keeps_pair_before_type_args(self.source, head, follow)
@@ -1660,7 +1653,7 @@ impl<'a> Printer<'a> {
     /// positions would read each other's entries.
     pub(crate) fn chain_share_key(
         &self,
-        node: &internal::Expression<'_>,
+        node: &ast::Expression<'_>,
         builder: ShareTag,
     ) -> Option<ShareKey> {
         self.chain_share_key_of(node, node.span(), builder)
@@ -1764,7 +1757,7 @@ impl<'a> Printer<'a> {
     /// - At least one type param has nested generics OR is a conditional type
     ///
     /// Example: `Map<string, Array<number>>` - Map has 2 params, second has nested generic
-    pub(crate) fn id_has_complex_type_annotation(&self, expr: &internal::Expression<'_>) -> bool {
+    pub(crate) fn id_has_complex_type_annotation(&self, expr: &ast::Expression<'_>) -> bool {
         crate::pattern_type_annotation(expr)
             .is_some_and(|ann| self.type_has_complex_annotation(ann.type_annotation))
     }
@@ -1775,9 +1768,9 @@ impl<'a> Printer<'a> {
     /// prettier's AST holds no `TSParenthesizedType`, so its predicate sees the reference /
     /// conditional directly, and a shell the output strips must not flip the layout
     /// (`(A extends B ? C : D)` as an argument, `(Map<…>)` around the annotation).
-    fn type_has_complex_annotation(&self, ts_type: &internal::TSType<'_>) -> bool {
+    fn type_has_complex_annotation(&self, ts_type: &ast::TSType<'_>) -> bool {
         match unwrap_parenthesized(ts_type) {
-            internal::TSType::TypeReference(type_ref) => {
+            ast::TSType::TypeReference(type_ref) => {
                 // Must have >1 type argument
                 let type_args = match &type_ref.type_arguments {
                     Some(args) => &args.params,
@@ -1798,13 +1791,13 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if a type has nested type parameters or is a conditional type
-    fn type_has_nested_generics(&self, ts_type: &internal::TSType<'_>) -> bool {
+    fn type_has_nested_generics(&self, ts_type: &ast::TSType<'_>) -> bool {
         match unwrap_parenthesized(ts_type) {
-            internal::TSType::TypeReference(type_ref) => {
+            ast::TSType::TypeReference(type_ref) => {
                 // Has type arguments means nested generics
                 type_ref.type_arguments.is_some()
             }
-            internal::TSType::Conditional(_) => true,
+            ast::TSType::Conditional(_) => true,
             _ => false,
         }
     }
@@ -1818,7 +1811,7 @@ impl<'a> Printer<'a> {
     /// Example: `type Foo<T extends string, U = number> = ...`
     pub(crate) fn type_alias_has_complex_params(
         &self,
-        type_params: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        type_params: Option<&ast::TSTypeParameterDeclaration<'_>>,
     ) -> bool {
         let params = match type_params {
             Some(p) => &p.params,
@@ -1850,21 +1843,18 @@ impl<'a> Printer<'a> {
     /// A compound operator's object LITERAL left answers it too, as the pattern prettier's
     /// parser reads there ([`Printer::build_compound_target_doc`]): a renamed property, or a
     /// shorthand with a default, which the literal holds as an `=` assignment.
-    pub(crate) fn is_complex_destructuring_target(&self, expr: &internal::Expression<'_>) -> bool {
-        if let internal::ExpressionKind::ObjectExpression(obj) = &expr.kind {
+    pub(crate) fn is_complex_destructuring_target(&self, expr: &ast::Expression<'_>) -> bool {
+        if let ast::ExpressionKind::ObjectExpression(obj) = &expr.kind {
             return obj.properties.len() > 2
                 && obj.properties.iter().any(|prop| match prop {
-                    internal::ObjectProperty::Property(p) => {
+                    ast::ObjectProperty::Property(p) => {
                         !p.shorthand
-                            || matches!(
-                                p.value.kind,
-                                internal::ExpressionKind::AssignmentExpression(_)
-                            )
+                            || matches!(p.value.kind, ast::ExpressionKind::AssignmentExpression(_))
                     }
-                    internal::ObjectProperty::SpreadElement(_) => false,
+                    ast::ObjectProperty::SpreadElement(_) => false,
                 });
         }
-        let internal::ExpressionKind::ObjectPattern(obj) = &expr.kind else {
+        let ast::ExpressionKind::ObjectPattern(obj) = &expr.kind else {
             return false;
         };
 
@@ -1875,15 +1865,15 @@ impl<'a> Printer<'a> {
         // At least one property has a default value or is not shorthand
         obj.properties.iter().any(|prop| {
             match prop {
-                internal::ObjectPatternProperty::Property(p) => {
+                ast::ObjectPatternProperty::Property(p) => {
                     // Has default if value is AssignmentPattern
                     let has_default =
-                        matches!(p.value.kind, internal::ExpressionKind::AssignmentPattern(_));
+                        matches!(p.value.kind, ast::ExpressionKind::AssignmentPattern(_));
                     // Not shorthand if key != value
                     let not_shorthand = !p.shorthand;
                     has_default || not_shorthand
                 }
-                internal::ObjectPatternProperty::RestElement(_) => false,
+                ast::ObjectPatternProperty::RestElement(_) => false,
             }
         })
     }
@@ -1982,7 +1972,7 @@ impl<'a> Printer<'a> {
         &self,
         start: u32,
         end: u32,
-    ) -> impl Iterator<Item = &'a internal::Comment> {
+    ) -> impl Iterator<Item = &'a ast::Comment> {
         tsv_lang::comments_to_emit_from(
             self.comment_free_gap.comments(),
             self.first_index_between(start, end),
@@ -2003,7 +1993,7 @@ impl<'a> Printer<'a> {
         &self,
         start: u32,
         end: u32,
-    ) -> impl Iterator<Item = &'a internal::Comment> {
+    ) -> impl Iterator<Item = &'a ast::Comment> {
         tsv_lang::comments_on_page_from(
             self.comment_free_gap.comments(),
             self.first_index_between(start, end),
@@ -2024,7 +2014,7 @@ impl<'a> Printer<'a> {
         &self,
         start: u32,
         end: u32,
-    ) -> impl Iterator<Item = &'a internal::Comment> {
+    ) -> impl Iterator<Item = &'a ast::Comment> {
         tsv_lang::comments_in_source_from(
             self.comment_free_gap.comments(),
             self.first_index_between(start, end),
@@ -2042,7 +2032,7 @@ impl<'a> Printer<'a> {
     /// closes on `/`, which no such trim steps over, so it can only end at `lo` itself; only a
     /// line comment's tail can straddle it. Comments never overlap, so at most one qualifies:
     /// the last one ending at or before `hi`.
-    pub(crate) fn comment_ending_within(&self, lo: u32, hi: u32) -> Option<&'a internal::Comment> {
+    pub(crate) fn comment_ending_within(&self, lo: u32, hi: u32) -> Option<&'a ast::Comment> {
         let idx = self.comments.partition_point(|c| c.span.end <= hi);
         let comment = self.comments.get(idx.checked_sub(1)?)?;
         (comment.span.end >= lo).then_some(comment)
@@ -2059,7 +2049,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn comments_in_source_after(
         &self,
         pos: u32,
-    ) -> impl Iterator<Item = &'a internal::Comment> {
+    ) -> impl Iterator<Item = &'a ast::Comment> {
         tsv_lang::comments_in_source_from(
             self.comment_free_gap.comments(),
             self.search_comments_from(pos),
@@ -2186,8 +2176,8 @@ impl<'a> Printer<'a> {
     /// reads the gap ([`Printer::claimed_right_spine_run`]). Every reader of a member gap
     /// opens it here.
     #[inline]
-    pub(crate) fn member_gap_start(&self, object: &internal::Expression<'_>) -> u32 {
-        use internal::ExpressionKind as K;
+    pub(crate) fn member_gap_start(&self, object: &ast::Expression<'_>) -> u32 {
+        use ast::ExpressionKind as K;
         // Only the walk's own heads can end in a binary's shells: most member objects are
         // none of them, and every member linearization asks.
         if matches!(
@@ -2206,7 +2196,7 @@ impl<'a> Printer<'a> {
 
     /// [`Self::member_gap_start`] for an object the walk can descend, out of line.
     #[inline(never)]
-    fn member_gap_start_after_spine(&self, object: &internal::Expression<'_>) -> u32 {
+    fn member_gap_start_after_spine(&self, object: &ast::Expression<'_>) -> u32 {
         let end = object.span().end;
         // Only a comment inside the object can be claimed, and most objects hold none.
         if !self.has_comments_to_emit_between(object.span().start, end) {
@@ -2228,10 +2218,7 @@ impl<'a> Printer<'a> {
     /// (`yield (x)`, `() => (x)`, `x = (y = …)`) ends the walk at the parent's end — whether
     /// that shell prints is its parent printer's decision, not re-derived here — so a comment
     /// in a shell below it still defers (a known gap); a kept pair ends it at the pair's `)`.
-    pub(in crate::printer) fn right_spine_printed_end(
-        &self,
-        expr: &internal::Expression<'_>,
-    ) -> u32 {
+    pub(in crate::printer) fn right_spine_printed_end(&self, expr: &ast::Expression<'_>) -> u32 {
         self.right_spine_printed_end_with(expr, false)
     }
 
@@ -2241,10 +2228,10 @@ impl<'a> Printer<'a> {
     /// ([`Printer::with_statement_tail`]).
     pub(in crate::printer) fn right_spine_printed_end_with(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         stop_at_printed_pair: bool,
     ) -> u32 {
-        use internal::ExpressionKind as K;
+        use ast::ExpressionKind as K;
         let mut expr = expr;
         loop {
             let next = match &expr.kind {
@@ -2256,18 +2243,18 @@ impl<'a> Printer<'a> {
                     Err(close) => return close,
                 },
                 K::ArrowFunctionExpression(arrow) => match arrow.body {
-                    internal::ArrowFunctionBody::Expression(body)
+                    ast::ArrowFunctionBody::Expression(body)
                         if stop_at_printed_pair
                             && matches!(body.kind, K::ConditionalExpression(_)) =>
                     {
                         return expr.span().end;
                     }
-                    internal::ArrowFunctionBody::Expression(body) => body,
-                    internal::ArrowFunctionBody::BlockStatement(_) => return expr.span().end,
+                    ast::ArrowFunctionBody::Expression(body) => body,
+                    ast::ArrowFunctionBody::BlockStatement(_) => return expr.span().end,
                 },
                 K::ConditionalExpression(conditional) => conditional.alternate,
                 K::AssignmentExpression(assignment) => assignment.right,
-                K::YieldExpression(internal::YieldExpression {
+                K::YieldExpression(ast::YieldExpression {
                     argument: Some(argument),
                     ..
                 }) => argument,
@@ -2367,7 +2354,7 @@ impl<'a> Printer<'a> {
     /// comment (`export default /* c⏎d */ (⏎v)`), hanging the value where the bare spelling and
     /// prettier keep it on the comment's line — so the paren spelling's first pass and its
     /// reparse took two different layouts.
-    pub(crate) fn comment_hangs_next(&self, c: &internal::Comment, next: u32) -> bool {
+    pub(crate) fn comment_hangs_next(&self, c: &ast::Comment, next: u32) -> bool {
         !c.is_block
             || (c.multiline && next > c.span.end && !self.comment_hugs_next(c))
             || self.is_honored_directive(c)
@@ -2583,7 +2570,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn value_hangs_under_operator(
         &self,
         indentable_leads_value: bool,
-        value: &internal::Expression<'_>,
+        value: &ast::Expression<'_>,
     ) -> bool {
         indentable_leads_value
             || self.is_own_line_jsdoc_cast(value)
@@ -2626,7 +2613,7 @@ impl<'a> Printer<'a> {
         &self,
         start: u32,
         end: u32,
-        pred: impl Fn(&internal::Comment) -> bool,
+        pred: impl Fn(&ast::Comment) -> bool,
     ) -> bool {
         self.comments_in_source_between(start, end).any(pred)
     }
@@ -2645,7 +2632,7 @@ impl<'a> Printer<'a> {
         &self,
         start: u32,
         end: u32,
-        pred: impl Fn(&internal::Comment, u32) -> bool,
+        pred: impl Fn(&ast::Comment, u32) -> bool,
     ) -> bool {
         let mut comments = self.comments_in_source_between(start, end).peekable();
         while let Some(c) = comments.next() {
@@ -2667,7 +2654,7 @@ impl<'a> Printer<'a> {
     /// includes what no item span covers — a **stripped paren shell**'s `)` and a
     /// list's own **comma** — which is exactly why the element-comma seam asks it
     /// ([`Self::collect_trailing_comments`], `docs/comments.md` §The element-comma seam).
-    pub(crate) fn comment_follows_content_on_its_line(&self, comment: &internal::Comment) -> bool {
+    pub(crate) fn comment_follows_content_on_its_line(&self, comment: &ast::Comment) -> bool {
         !has_newline_before_position(self.source, comment.span.start)
     }
 
@@ -2743,7 +2730,7 @@ impl<'a> Printer<'a> {
     ///
     /// A convergence state's build reads one block comment as own-line whatever the
     /// source holds ([`AssumedBreak::OwnLineComment`]).
-    pub(crate) fn is_own_line_comment(&self, comment: &internal::Comment) -> bool {
+    pub(crate) fn is_own_line_comment(&self, comment: &ast::Comment) -> bool {
         !comment.is_block
             || !self.comment_follows_content_on_its_line(comment)
             || self.assumed_break.get() == Some(AssumedBreak::OwnLineComment(comment.span.start))
@@ -2761,7 +2748,7 @@ impl<'a> Printer<'a> {
     /// genuine newline in the output, so `fits` must see it), where prettier emits one
     /// opaque string. That difference is deliberate and lives in the renderer; the
     /// *layout* question is this one.
-    pub(crate) fn block_comment_is_indentable(&self, comment: &internal::Comment) -> bool {
+    pub(crate) fn block_comment_is_indentable(&self, comment: &ast::Comment) -> bool {
         tsv_lang::is_indentable_block(self.source, comment)
     }
 
@@ -2792,7 +2779,7 @@ impl<'a> Printer<'a> {
     /// splits after `c1` alone.
     pub(crate) fn block_comment_isolated_own_line(
         &self,
-        comment: &internal::Comment,
+        comment: &ast::Comment,
         next: u32,
     ) -> bool {
         comment.is_block
@@ -2818,7 +2805,7 @@ impl<'a> Printer<'a> {
     /// disjunct, not via any newline scan — so this never collapses one, and reading
     /// the name as "own line means a newline precedes it" is a mistake that has been
     /// made. Open the definition before reasoning about a line comment here.
-    pub(crate) fn comment_cannot_glue_to_operator(&self, comment: &internal::Comment) -> bool {
+    pub(crate) fn comment_cannot_glue_to_operator(&self, comment: &ast::Comment) -> bool {
         comment.multiline || self.is_own_line_comment(comment)
     }
 
@@ -2906,7 +2893,7 @@ impl<'a> Printer<'a> {
     /// callers — a grouping paren is no node, so an argument's or a type item's span never
     /// swallows one — and differ exactly where the destructuring patterns' element ends
     /// past a stripped shell, which is why they narrow it
-    /// ([`crate::ast::internal::Expression::printed_end`]). Handing back the node span
+    /// ([`crate::ast::Expression::printed_end`]). Handing back the node span
     /// there counts a shell-interior comment as the element's, and it reaches no gate at
     /// all while the seam emits it.
     pub(crate) fn has_own_line_block_comments_in_bracket_list<T, F>(
@@ -3231,7 +3218,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn matching_close_paren_of_params(
         &self,
         open: u32,
-        params: &[internal::Expression<'_>],
+        params: &[ast::Expression<'_>],
     ) -> Option<u32> {
         self.close_paren_after_params(
             open,
@@ -3319,7 +3306,7 @@ impl<'a> Printer<'a> {
     /// Returns `fallback` if there are no decorators or the keyword isn't found.
     pub(crate) fn find_keyword_after_decorators(
         &self,
-        decorators: Option<&[internal::Decorator<'_>]>,
+        decorators: Option<&[ast::Decorator<'_>]>,
         keyword: &str,
         fallback: u32,
     ) -> u32 {
@@ -3381,7 +3368,7 @@ impl<'a> Printer<'a> {
     /// corpus, three of which hold a non-ASCII byte.
     pub(in crate::printer) fn ident_name_doc(
         &self,
-        name: internal::IdentName<'_>,
+        name: ast::IdentName<'_>,
         name_start: u32,
     ) -> DocId {
         let d = self.d();
@@ -3412,7 +3399,7 @@ impl<'a> Printer<'a> {
 
     /// [`Self::ident_name_doc`] for an `Identifier` node (the name is the
     /// leading token of the node span).
-    pub(in crate::printer) fn identifier_name_doc(&self, id: &internal::Identifier<'_>) -> DocId {
+    pub(in crate::printer) fn identifier_name_doc(&self, id: &ast::Identifier<'_>) -> DocId {
         self.ident_name_doc(id.ident_name(), id.span.start)
     }
 
@@ -3421,7 +3408,7 @@ impl<'a> Printer<'a> {
     /// arena string (so an escaped name still compares decoded).
     pub(in crate::printer) fn with_ident_name_at<R>(
         &self,
-        name: internal::IdentName<'_>,
+        name: ast::IdentName<'_>,
         name_start: u32,
         f: impl FnOnce(&str) -> R,
     ) -> R {
@@ -3436,7 +3423,7 @@ impl<'a> Printer<'a> {
     /// [`Self::with_ident_name_at`] for an `Identifier` node.
     pub(in crate::printer) fn with_ident_name<R>(
         &self,
-        id: &internal::Identifier<'_>,
+        id: &ast::Identifier<'_>,
         f: impl FnOnce(&str) -> R,
     ) -> R {
         self.with_ident_name_at(id.ident_name(), id.span.start, f)

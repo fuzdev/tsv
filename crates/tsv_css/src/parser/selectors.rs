@@ -1,5 +1,5 @@
 use super::CssParser;
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::TokenKind;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;

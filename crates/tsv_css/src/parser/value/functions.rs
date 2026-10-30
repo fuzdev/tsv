@@ -1,5 +1,5 @@
 use super::parser::ValueParser;
-use crate::ast::internal::CssValue;
+use crate::ast::CssValue;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;

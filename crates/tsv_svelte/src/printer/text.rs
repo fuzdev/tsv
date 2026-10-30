@@ -27,7 +27,7 @@
 //! range end, a range marker between a section comment and its section. Don't introduce it: a
 //! caller that "knows" its string is pure whitespace is one refactor away from being wrong. The
 //! near miss to watch for is a caller that has already sliced an edge run
-//! ([`crate::ast::internal::text_edge_ws`]) and counts newlines in *that* — correct only because
+//! ([`crate::ast::text_edge_ws`]) and counts newlines in *that* — correct only because
 //! the slice is pure whitespace by construction, which is the same one refactor away. Ask the
 //! seam predicate instead; it takes the whole `raw` and does its own scoping.
 //!
@@ -73,7 +73,7 @@ pub(crate) fn has_authored_blank_line(raw: &str) -> bool {
 /// Kept as its own scan rather than folded into its siblings. Both folds are correct and both
 /// were measured to GROW `.text` (`objcopy -O binary --only-section=.text target/corpus/tsv`,
 /// against this pair): delegating to
-/// `has_authored_blank_line(internal::text_edge_ws(raw, true))` costs +128 bytes, and one
+/// `has_authored_blank_line(ast::text_edge_ws(raw, true))` costs +128 bytes, and one
 /// `const LEADING_ONLY: bool` scan behind two wrappers costs +112 — `#[inline]` recovers
 /// neither. The same behaviour-neutral-but-not-code-neutral trade the `is_horizontal_ws` note
 /// below records, and declined for the same reason, [`has_trailing_blank_line`] included. What
@@ -130,12 +130,12 @@ pub(crate) fn has_trailing_blank_line(raw: &str) -> bool {
 
 /// Whether `b` is **horizontal** collapsible whitespace — whitespace that does not end a line.
 ///
-/// [`crate::ast::internal::is_collapsible_ws`] minus the line feed (`[ \t\r]`). The callers are
+/// [`crate::ast::is_collapsible_ws`] minus the line feed (`[ \t\r]`). The callers are
 /// the three run scans above: does this byte let the newline run continue rather than end it. A
 /// form feed is content, so it breaks the run — an FF between two newlines is not a blank line,
 /// matching the compiler's own class (`regex_not_whitespace` = `/[^ \t\r\n]/`).
 ///
-/// Spelled as the explicit set rather than `internal::is_collapsible_ws(b) && b != b'\n'` — the same set,
+/// Spelled as the explicit set rather than `ast::is_collapsible_ws(b) && b != b'\n'` — the same set,
 /// in the form the scans' `match` arms want.
 ///
 /// A second spelling of this set lives on `text_starts_with_linebreak` in `fragment_doc.rs`. It is

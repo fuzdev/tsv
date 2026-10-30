@@ -1,6 +1,6 @@
 // Class declaration parsing
 
-use crate::ast::internal::{
+use crate::ast::{
     Accessibility, BlockStatement, ClassBody, ClassDeclaration, ClassExpression, ClassMember,
     Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind, ExportNamedDeclaration,
     Expression, ExpressionKind, FunctionExpression, Identifier, Literal, LiteralValue,

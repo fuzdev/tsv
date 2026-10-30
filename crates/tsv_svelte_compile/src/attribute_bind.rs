@@ -20,8 +20,8 @@
 //! See [`crate::transform_server`] for the orchestration.
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_svelte::ast::internal::{Attribute, AttributeNode, AttributeValue, BindDirective, Element};
-use tsv_ts::ast::internal::{BinaryOperator, Expression, ExpressionKind, Property};
+use tsv_svelte::ast::{Attribute, AttributeNode, AttributeValue, BindDirective, Element};
+use tsv_ts::ast::{BinaryOperator, Expression, ExpressionKind, Property};
 
 use crate::attribute::escape_html_attr;
 use crate::body_builder::BodyBuilder;

@@ -12,7 +12,7 @@
 // production asking the same question, and answering it twice would let the two drift.
 
 use super::Printer;
-use crate::ast::internal::{self, Expression, ExpressionKind};
+use crate::ast::{self, Expression, ExpressionKind};
 use crate::printer::chain::{chain_mid_chain_paren_gaps, find_bracket_position};
 use crate::printer::comments::left_spine_shell_is_comment_free;
 use crate::printer::expressions::operators::SeqLayout;
@@ -602,7 +602,7 @@ impl<'a> Printer<'a> {
 
     /// The token a member gap ends at, for [`Self::argument_gap_hangs`]: the property's
     /// first printed byte — past a private name's `#`, which prints with the `.`.
-    fn member_gap_token(&self, member: &internal::MemberExpression<'_>) -> u32 {
+    fn member_gap_token(&self, member: &ast::MemberExpression<'_>) -> u32 {
         let prop_start = member.property.span().start;
         prop_start + u32::from(self.source.as_bytes().get(prop_start as usize) == Some(&b'#'))
     }
@@ -751,7 +751,7 @@ impl<'a> Printer<'a> {
         &self,
         gap_start: GapStart,
         end: u32,
-        counts: impl Fn(&internal::Comment) -> bool,
+        counts: impl Fn(&ast::Comment) -> bool,
     ) -> bool {
         // At a node, a comment leads exactly when the gap's trail scan does not take it
         // (`tsv_lang::GapTrailScan`, the chain gap emitter's reading), so a comment the

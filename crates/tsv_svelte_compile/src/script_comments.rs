@@ -10,8 +10,8 @@
 //! See [`crate::transform_server`] for the orchestration that calls this, and
 //! `../../docs/checklist_svelte_compiler.md` for the probed boundaries.
 
-use tsv_svelte::ast::internal::{ElementKind, FragmentNode, Root};
-use tsv_ts::ast::internal::{
+use tsv_svelte::ast::{ElementKind, FragmentNode, Root};
+use tsv_ts::ast::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ExpressionKind,
     ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, StatementKind,
     VariableDeclaration,

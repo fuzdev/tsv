@@ -6,7 +6,7 @@
 // - Source scanning helpers
 
 use super::Printer;
-use crate::ast::internal::{
+use crate::ast::{
     self, TSIntersectionType, TSKeywordKind, TSLiteralType, TSParenthesizedType, TSType,
     TSUnionType,
 };
@@ -27,7 +27,7 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 /// Returns false for single simple type args (like `Promise<void>`) - these should
 /// let function params break first rather than breaking the return type.
 pub(super) fn type_args_should_wrap_for_return_type(
-    args: &internal::TSTypeParameterInstantiation<'_>,
+    args: &ast::TSTypeParameterInstantiation<'_>,
 ) -> bool {
     // Multiple type args can break between them
     if args.params.len() > 1 {
@@ -592,7 +592,7 @@ pub(super) fn is_constrained_infer(ts_type: &TSType<'_>) -> bool {
 /// not reparse. Pinned by `types/infer/constrained_extends_parens`'s
 /// `unformatted_inner_parens` variant, which authors the parens on the *infer*
 /// rather than on the function type.
-fn return_type_is_constrained_infer(return_type: &internal::TSTypeAnnotation<'_>) -> bool {
+fn return_type_is_constrained_infer(return_type: &ast::TSTypeAnnotation<'_>) -> bool {
     let mut ty = unwrap_parenthesized(return_type.type_annotation);
     if let TSType::TypePredicate(pred) = ty {
         match pred.type_annotation {
@@ -678,14 +678,14 @@ pub(super) fn type_needs_parens_in_union_or_intersection(
 /// Asked of the AST, never the source: a `{` inside a string-literal type, a template
 /// type's text or a comment opens nothing that breaks.
 pub(in crate::printer) fn type_literal_members_hold_brace_type(
-    literal: &internal::TSTypeLiteral<'_>,
+    literal: &ast::TSTypeLiteral<'_>,
 ) -> bool {
     literal.members.iter().any(type_element_holds_brace_type)
 }
 
 /// [`type_literal_members_hold_brace_type`] for one member.
-fn type_element_holds_brace_type(member: &internal::TSTypeElement<'_>) -> bool {
-    use internal::TSTypeElement;
+fn type_element_holds_brace_type(member: &ast::TSTypeElement<'_>) -> bool {
+    use ast::TSTypeElement;
     match member {
         TSTypeElement::PropertySignature(p) => {
             annotation_holds_brace_type(p.type_annotation.as_ref())
@@ -708,39 +708,37 @@ fn type_element_holds_brace_type(member: &internal::TSTypeElement<'_>) -> bool {
     }
 }
 
-fn annotation_holds_brace_type(annotation: Option<&internal::TSTypeAnnotation<'_>>) -> bool {
+fn annotation_holds_brace_type(annotation: Option<&ast::TSTypeAnnotation<'_>>) -> bool {
     annotation.is_some_and(|a| type_holds_brace_type(a.type_annotation))
 }
 
 fn signature_holds_brace_type(
-    type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
-    params: &[internal::Expression<'_>],
-    return_type: Option<&internal::TSTypeAnnotation<'_>>,
+    type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+    params: &[ast::Expression<'_>],
+    return_type: Option<&ast::TSTypeAnnotation<'_>>,
 ) -> bool {
     type_parameters.is_some_and(type_parameters_hold_brace_type)
         || params.iter().any(param_holds_brace_type)
         || annotation_holds_brace_type(return_type)
 }
 
-fn type_parameters_hold_brace_type(decl: &internal::TSTypeParameterDeclaration<'_>) -> bool {
+fn type_parameters_hold_brace_type(decl: &ast::TSTypeParameterDeclaration<'_>) -> bool {
     decl.params.iter().any(type_parameter_holds_brace_type)
 }
 
-fn type_parameter_holds_brace_type(param: &internal::TSTypeParameter<'_>) -> bool {
+fn type_parameter_holds_brace_type(param: &ast::TSTypeParameter<'_>) -> bool {
     param.constraint.is_some_and(type_holds_brace_type)
         || param.default.is_some_and(type_holds_brace_type)
 }
 
-fn type_arguments_hold_brace_type(
-    args: Option<&internal::TSTypeParameterInstantiation<'_>>,
-) -> bool {
+fn type_arguments_hold_brace_type(args: Option<&ast::TSTypeParameterInstantiation<'_>>) -> bool {
     args.is_some_and(|args| args.params.iter().any(|ty| type_holds_brace_type(ty)))
 }
 
 /// A signature parameter's annotation. A destructuring pattern itself is not a brace type:
 /// its width break does not read back as authored, so only its annotation is walked.
-fn param_holds_brace_type(param: &internal::Expression<'_>) -> bool {
-    use internal::ExpressionKind;
+fn param_holds_brace_type(param: &ast::Expression<'_>) -> bool {
+    use ast::ExpressionKind;
     match &param.kind {
         ExpressionKind::Identifier(id) => annotation_holds_brace_type(id.type_annotation()),
         ExpressionKind::ObjectPattern(p) => annotation_holds_brace_type(p.type_annotation.as_ref()),
@@ -791,7 +789,7 @@ fn type_holds_brace_type(ty: &TSType<'_>) -> bool {
         TSType::Import(i) => type_arguments_hold_brace_type(i.type_arguments.as_ref()),
         TSType::TypeQuery(q) => {
             type_arguments_hold_brace_type(q.type_arguments.as_ref())
-                || matches!(&q.expr_name, internal::TSTypeQueryExprName::Import(i)
+                || matches!(&q.expr_name, ast::TSTypeQueryExprName::Import(i)
                     if type_arguments_hold_brace_type(i.type_arguments.as_ref()))
         }
         TSType::IndexedAccess(i) => {

@@ -1,6 +1,6 @@
 // Svelte parser - main entry point for parsing .svelte files
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::{ElementParent, ParsedElement, RootOnlyMetaTag};
 use crate::whitespace::{is_svelte_ws, skip_svelte_ws, svelte_ws_width_at};

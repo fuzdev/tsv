@@ -6,10 +6,10 @@
 // `ElementLayout`, `ElementKind`, `ElementContext`) live in `element_doc.rs`
 // alongside the build half that also consumes them.
 
-use crate::ast::internal::{FragmentNode, trim_end_collapsible_ws, trim_start_collapsible_ws};
+use crate::ast::{FragmentNode, trim_end_collapsible_ws, trim_start_collapsible_ws};
 use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
-use tsv_ts::ast::internal::{Expression, ExpressionKind};
+use tsv_ts::ast::{Expression, ExpressionKind};
 
 use super::element_doc::{
     BoundaryMode, ElementContext, ElementKind, ElementLayout, ElementParts, MultilineCause,

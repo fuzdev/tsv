@@ -5,7 +5,7 @@
 // - print_group: Group printing (with optional expansion and comment skipping)
 
 use super::types::{ChainGroup, ChainNode, NonNullGap, is_numeric_index};
-use crate::ast::internal::{self, Expression, ExpressionKind};
+use crate::ast::{self, Expression, ExpressionKind};
 use crate::printer::expressions::ChainBaseTernary;
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::{
@@ -787,7 +787,7 @@ struct MemberSpans {
 /// `add_comments_and_break` handles the first member of each rest group.
 fn print_member_access(
     printer: &Printer<'_>,
-    property: internal::IdentName<'_>,
+    property: ast::IdentName<'_>,
     spans: MemberSpans,
     optional: bool,
     is_private: bool,

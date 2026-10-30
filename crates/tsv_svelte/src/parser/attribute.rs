@@ -2,13 +2,13 @@
 
 use bumpalo::collections::Vec as BumpVec;
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::{
     brace_interior_start, char_at, is_svelte_ws, name_run_end, skip_svelte_ws,
 };
 use tsv_lang::{ParseError, Span};
-use tsv_ts::ast::internal::{Expression, IdentName, Identifier};
+use tsv_ts::ast::{Expression, IdentName, Identifier};
 
 use super::expression_tag::{
     SequenceLocation, scan_head_to_matching_brace, scan_to_matching_brace,

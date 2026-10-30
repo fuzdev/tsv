@@ -31,7 +31,7 @@ mod selectors;
 pub mod value_normalization;
 mod values;
 
-use crate::ast::internal::{Comment, CssBlockChild, CssDeclaration, CssNode, CssStyleSheet};
+use crate::ast::{Comment, CssBlockChild, CssDeclaration, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, TokenKind};
 use tsv_lang::{
     CommentFreeWindow, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, comments_to_emit_from,

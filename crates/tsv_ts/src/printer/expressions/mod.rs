@@ -34,7 +34,7 @@ mod template_literal;
 pub(in crate::printer) use self::conditional::ChainBaseTernary;
 
 use self::operators::{ChainOperator, OperatorBuf, SeqLayout};
-use crate::ast::internal::{BinaryExpression, Expression, ExpressionKind, TSType};
+use crate::ast::{BinaryExpression, Expression, ExpressionKind, TSType};
 use crate::printer::ShareTag;
 use crate::printer::comments::{AsiOperandShell, CommentFilter, CommentSpacing};
 use crate::printer::ignore::FrozenOperandPair;
@@ -140,7 +140,7 @@ impl<'a> Printer<'a> {
     // Out of line so the dispatch front stays frameless: inlined, this arm's registers
     // are saved on entry to the front, ahead of its kind test, by every kind.
     #[inline(never)]
-    fn build_identifier_expression_doc(&self, id: &crate::ast::internal::Identifier<'_>) -> DocId {
+    fn build_identifier_expression_doc(&self, id: &crate::ast::Identifier<'_>) -> DocId {
         // A variable reference — no `?`, no binding extra — is its name alone, the
         // answer `build_identifier_doc`'s own fast path gives, taken here without paying
         // that function's frame.
@@ -545,7 +545,7 @@ impl<'a> Printer<'a> {
     /// goes with it. Pinned by `typescript/syntax/comments/jsdoc_type_cast_leading_run_blank`.
     fn build_comment_bound_pair_lead_doc(
         &self,
-        cast: &crate::ast::internal::CommentBoundPair<'_>,
+        cast: &crate::ast::CommentBoundPair<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -607,7 +607,7 @@ impl<'a> Printer<'a> {
     /// inner and the closing `)`.
     fn build_comment_bound_pair_doc(
         &self,
-        cast: &crate::ast::internal::CommentBoundPair<'_>,
+        cast: &crate::ast::CommentBoundPair<'_>,
         cast_span: Span,
     ) -> DocId {
         let d = self.d();
@@ -891,7 +891,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript angle-bracket type assertion: `<Type>expr`
     fn build_ts_type_assertion_doc(
         &self,
-        type_assert: &crate::ast::internal::TSTypeAssertion<'_>,
+        type_assert: &crate::ast::TSTypeAssertion<'_>,
         type_assert_span: Span,
     ) -> DocId {
         let d = self.d();
@@ -1513,7 +1513,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript instantiation expression
     fn build_ts_instantiation_doc(
         &self,
-        inst_expr: &crate::ast::internal::TSInstantiationExpression<'_>,
+        inst_expr: &crate::ast::TSInstantiationExpression<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -1556,7 +1556,7 @@ impl<'a> Printer<'a> {
     /// The builder and this read the same context, so they cannot part on the pair.
     pub(crate) fn instantiation_operand_prints_pair(
         &self,
-        inst_expr: &crate::ast::internal::TSInstantiationExpression<'_>,
+        inst_expr: &crate::ast::TSInstantiationExpression<'_>,
         span: Span,
     ) -> bool {
         self.needs_parens(
@@ -1572,7 +1572,7 @@ impl<'a> Printer<'a> {
     /// join the chain.
     pub(crate) fn instantiation_operand_context(
         &self,
-        inst_expr: &crate::ast::internal::TSInstantiationExpression<'_>,
+        inst_expr: &crate::ast::TSInstantiationExpression<'_>,
         span: Span,
     ) -> ParenContext {
         let second_list_pair =
@@ -1593,7 +1593,7 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_ts_non_null_doc(
         &self,
-        non_null_expr: &crate::ast::internal::TSNonNullExpression<'_>,
+        non_null_expr: &crate::ast::TSNonNullExpression<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -1779,7 +1779,7 @@ impl<'a> Printer<'a> {
         let mut levels: SmallVec<
             [(
                 &Expression<'_>,
-                &crate::ast::internal::TSNonNullExpression<'_>,
+                &crate::ast::TSNonNullExpression<'_>,
                 Option<DocId>,
             ); 4],
         > = SmallVec::new();
@@ -1817,7 +1817,7 @@ impl<'a> Printer<'a> {
     fn close_commented_non_null_doc(
         &self,
         operand_doc: DocId,
-        non_null: &crate::ast::internal::TSNonNullExpression<'_>,
+        non_null: &crate::ast::TSNonNullExpression<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -2159,7 +2159,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript parameter property
     fn build_ts_parameter_property_doc(
         &self,
-        param_prop: &crate::ast::internal::TSParameterProperty<'_>,
+        param_prop: &crate::ast::TSParameterProperty<'_>,
         param_prop_span: Span,
     ) -> DocId {
         let mut parts: DocBuf = DocBuf::new();

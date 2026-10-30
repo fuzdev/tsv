@@ -9,7 +9,7 @@ use super::super::comments::ParenLeadingValue;
 use super::arg_comments::{PartitionedComments, should_force_expansion_for_comments};
 use super::arg_predicates::{is_expandable_object, is_hook_callback_with_deps};
 use super::arg_wrapping::try_hug_multiline_template_arg;
-use crate::ast::internal;
+use crate::ast;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -17,11 +17,11 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// The phase keyword of a phased dynamic import (`source` / `defer`), or `None` for a
 /// plain `import(`.
-fn import_phase_word(phase: internal::ImportPhase) -> Option<&'static str> {
+fn import_phase_word(phase: ast::ImportPhase) -> Option<&'static str> {
     match phase {
-        internal::ImportPhase::None => None,
-        internal::ImportPhase::Source => Some("source"),
-        internal::ImportPhase::Defer => Some("defer"),
+        ast::ImportPhase::None => None,
+        ast::ImportPhase::Source => Some("source"),
+        ast::ImportPhase::Defer => Some("defer"),
     }
 }
 
@@ -46,7 +46,7 @@ fn import_phase_word(phase: internal::ImportPhase) -> Option<&'static str> {
 /// and the scan starts mid-comment, missing it. That was the drop.
 fn build_import_head_doc(
     printer: &Printer<'_>,
-    import_expr: &internal::ImportExpression<'_>,
+    import_expr: &ast::ImportExpression<'_>,
     import_expr_span: Span,
 ) -> (DocId, u32) {
     let d = printer.d();
@@ -282,7 +282,7 @@ pub(in crate::printer) fn build_import_args_comment_layout(
 /// - Only the options object expands with its properties indented
 pub(super) fn build_import_expression_doc(
     printer: &Printer<'_>,
-    import_expr: &internal::ImportExpression<'_>,
+    import_expr: &ast::ImportExpression<'_>,
     span: Span,
 ) -> DocId {
     let d = printer.d();
@@ -318,7 +318,7 @@ pub(super) fn build_import_expression_doc(
 /// empty doc when the head→`(` gap's pre-paren half has taken it.
 fn build_import_args_doc(
     printer: &Printer<'_>,
-    import_expr: &internal::ImportExpression<'_>,
+    import_expr: &ast::ImportExpression<'_>,
     span: Span,
     head: DocId,
     leading_scan_start: u32,
@@ -482,7 +482,7 @@ fn build_import_args_doc(
 /// A qualified name (`ns.Type`) is the same shape and shares that printer.
 pub(super) fn build_meta_property_doc(
     printer: &Printer<'_>,
-    meta: &internal::MetaProperty<'_>,
+    meta: &ast::MetaProperty<'_>,
 ) -> DocId {
     printer.build_dotted_pair_doc(
         printer.identifier_name_doc(&meta.meta),

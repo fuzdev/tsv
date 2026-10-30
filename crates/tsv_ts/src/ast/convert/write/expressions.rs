@@ -1,6 +1,5 @@
 // Expression dispatcher: emit each `Expression` variant's wire JSON.
 
-use super::super::super::internal;
 use super::declarations::write_class_expression;
 use super::functions::{
     call_callee_flags, write_arrow_function_expression, write_await_expression,
@@ -17,6 +16,7 @@ use super::{
     write_bare_node, write_identifier_parts, write_identifier_plain, write_literal,
     write_name_field, write_type_annotation_field, write_type_arguments_field,
 };
+use crate::ast;
 use smallvec::SmallVec;
 use tsv_lang::Span;
 
@@ -69,7 +69,7 @@ pub(super) struct ExprFlags {
 }
 
 /// Emit an expression's wire JSON in a fresh context (not inside a chain).
-pub(super) fn write_expression(w: &mut JsonWriter, expr: &internal::Expression<'_>, ctx: &Ctx<'_>) {
+pub(super) fn write_expression(w: &mut JsonWriter, expr: &ast::Expression<'_>, ctx: &Ctx<'_>) {
     write_expression_inner(w, expr, ctx, ExprFlags::default());
 }
 
@@ -77,7 +77,7 @@ pub(super) fn write_expression(w: &mut JsonWriter, expr: &internal::Expression<'
 /// holes) — the writer's most common list shape.
 pub(super) fn write_expressions<'a, 'arena: 'a>(
     w: &mut JsonWriter,
-    items: impl IntoIterator<Item = &'a internal::Expression<'arena>>,
+    items: impl IntoIterator<Item = &'a ast::Expression<'arena>>,
     ctx: &Ctx<'_>,
 ) {
     write_array(w, items, |w, e| write_expression(w, e, ctx));
@@ -89,7 +89,7 @@ pub(super) fn write_expressions<'a, 'arena: 'a>(
 /// this plus the last-in-body mark acorn's trailing rule reads.
 fn write_expression_holes<'a, 'arena: 'a>(
     w: &mut JsonWriter,
-    items: impl IntoIterator<Item = &'a Option<internal::Expression<'arena>>>,
+    items: impl IntoIterator<Item = &'a Option<ast::Expression<'arena>>>,
     ctx: &Ctx<'_>,
 ) {
     write_array(w, items, |w, e| match e {
@@ -112,21 +112,21 @@ fn write_expression_holes<'a, 'arena: 'a>(
 #[inline(never)]
 pub(super) fn write_expression_inner(
     w: &mut JsonWriter,
-    expr: &internal::Expression<'_>,
+    expr: &ast::Expression<'_>,
     ctx: &Ctx<'_>,
     flags: ExprFlags,
 ) {
     match &expr.kind {
-        internal::ExpressionKind::Literal(lit) => write_literal(w, lit, ctx),
+        ast::ExpressionKind::Literal(lit) => write_literal(w, lit, ctx),
         // A variable reference — no `?` (its own or a forced one), no binding extra — is
         // the bare node `write_identifier_plain` writes, in a smaller frame than the
         // general form.
-        internal::ExpressionKind::Identifier(id)
+        ast::ExpressionKind::Identifier(id)
             if id.extra.is_none() && !id.optional && !flags.force_optional =>
         {
             write_identifier_plain(w, id, ctx);
         }
-        internal::ExpressionKind::Identifier(id) => {
+        ast::ExpressionKind::Identifier(id) => {
             write_expression_identifier(w, id, flags.force_optional, ctx);
         }
         _ => write_expression_full_dispatch(w, expr, ctx, flags),
@@ -145,7 +145,7 @@ pub(super) fn write_expression_inner(
 fn write_comment_bound_pair_paren_frame(
     w: &mut JsonWriter,
     span: Span,
-    inner: &internal::Expression<'_>,
+    inner: &ast::Expression<'_>,
     ctx: &Ctx<'_>,
     flags: ExprFlags,
     attach: &CommentAttach<'_>,
@@ -162,7 +162,7 @@ fn write_comment_bound_pair_paren_frame(
 #[inline(never)]
 fn write_expression_identifier(
     w: &mut JsonWriter,
-    id: &internal::Identifier<'_>,
+    id: &ast::Identifier<'_>,
     force_optional: bool,
     ctx: &Ctx<'_>,
 ) {
@@ -186,27 +186,27 @@ fn write_expression_identifier(
 #[inline(never)]
 fn write_binary_chain(
     w: &mut JsonWriter,
-    binary: &internal::BinaryExpression<'_>,
+    binary: &ast::BinaryExpression<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
     // LogicalExpression for `&&`/`||`/`??`, BinaryExpression otherwise.
-    fn node_type(operator: internal::BinaryOperator) -> &'static str {
+    fn node_type(operator: ast::BinaryOperator) -> &'static str {
         match operator {
-            internal::BinaryOperator::AmpersandAmpersand
-            | internal::BinaryOperator::PipePipe
-            | internal::BinaryOperator::QuestionQuestion => "LogicalExpression",
+            ast::BinaryOperator::AmpersandAmpersand
+            | ast::BinaryOperator::PipePipe
+            | ast::BinaryOperator::QuestionQuestion => "LogicalExpression",
             _ => "BinaryExpression",
         }
     }
-    let mut spine: SmallVec<[(&internal::BinaryExpression<'_>, Span); 8]> = SmallVec::new();
+    let mut spine: SmallVec<[(&ast::BinaryExpression<'_>, Span); 8]> = SmallVec::new();
     let (mut node, mut node_span) = (binary, span);
     loop {
         node_header(w, node_type(node.operator), node_span, ctx);
         w.raw(",\"left\":");
         spine.push((node, node_span));
         match &node.left.kind {
-            internal::ExpressionKind::BinaryExpression(left) => {
+            ast::ExpressionKind::BinaryExpression(left) => {
                 node_span = node.left.span;
                 node = left;
             }
@@ -232,7 +232,7 @@ fn write_binary_chain(
 #[inline(never)]
 fn write_expression_full_dispatch(
     w: &mut JsonWriter,
-    expr: &internal::Expression<'_>,
+    expr: &ast::Expression<'_>,
     ctx: &Ctx<'_>,
     flags: ExprFlags,
 ) {
@@ -240,7 +240,7 @@ fn write_expression_full_dispatch(
         // JSDoc cast is internal-only: emit the inner expression (paren-free
         // public AST). `chain: ChainState::Unresolved` — the cast's parens seal any chain;
         // force/strip pass through (they act on the converted inner).
-        internal::ExpressionKind::CommentBoundPair(cast) => {
+        ast::ExpressionKind::CommentBoundPair(cast) => {
             let flags = ExprFlags {
                 // The cast's parens seal the chain, so the inner
                 // expression inherits no verdict — `/** @type {T} */
@@ -259,7 +259,7 @@ fn write_expression_full_dispatch(
         // Preserved grouping parens (snippet parameters): emit the wrapper with
         // its paren-covering span, then the inner expression. Only produced under
         // the parser's `preserve_parens` mode, so it never appears elsewhere.
-        internal::ExpressionKind::ParenthesizedExpression(paren) => {
+        ast::ExpressionKind::ParenthesizedExpression(paren) => {
             node_header(w, "ParenthesizedExpression", expr.span, ctx);
             w.raw(",\"expression\":");
             write_expression(w, paren.expression, ctx);
@@ -268,18 +268,18 @@ fn write_expression_full_dispatch(
         // Unreachable through the front (this function's only caller), which answers both
         // kinds first; kept so the match stays total. Leaf behavior belongs in the front
         // and the shared writers, or it never runs.
-        internal::ExpressionKind::Literal(lit) => write_literal(w, lit, ctx),
-        internal::ExpressionKind::Identifier(id) => {
+        ast::ExpressionKind::Literal(lit) => write_literal(w, lit, ctx),
+        ast::ExpressionKind::Identifier(id) => {
             write_expression_identifier(w, id, flags.force_optional, ctx);
         }
-        internal::ExpressionKind::PrivateIdentifier(pid) => {
+        ast::ExpressionKind::PrivateIdentifier(pid) => {
             node_header(w, "PrivateIdentifier", expr.span, ctx);
             // The name excludes the leading `#` (the public shape): the
             // trailing `raw_len` bytes of the span.
             write_name_field(w, pid.name, expr.span.end - pid.name.raw_len as u32, ctx);
             close_node(w, "PrivateIdentifier", expr.span, ctx);
         }
-        internal::ExpressionKind::ObjectExpression(obj) => {
+        ast::ExpressionKind::ObjectExpression(obj) => {
             node_header(w, "ObjectExpression", expr.span, ctx);
             w.raw(",\"properties\":");
             super::write_body_array(w, obj.properties, ctx, |w, p| {
@@ -287,7 +287,7 @@ fn write_expression_full_dispatch(
             });
             close_node(w, "ObjectExpression", expr.span, ctx);
         }
-        internal::ExpressionKind::ArrayExpression(arr) => {
+        ast::ExpressionKind::ArrayExpression(arr) => {
             node_header(w, "ArrayExpression", expr.span, ctx);
             w.raw(",\"elements\":");
             super::write_body_array_holes(w, arr.elements, ctx, |w, e| {
@@ -295,7 +295,7 @@ fn write_expression_full_dispatch(
             });
             close_node(w, "ArrayExpression", expr.span, ctx);
         }
-        internal::ExpressionKind::UnaryExpression(unary) => {
+        ast::ExpressionKind::UnaryExpression(unary) => {
             node_header(w, "UnaryExpression", unary.span, ctx);
             w.raw(",\"operator\":\"");
             w.raw(unary.operator.as_str());
@@ -305,7 +305,7 @@ fn write_expression_full_dispatch(
             write_expression(w, unary.argument, ctx);
             close_node(w, "UnaryExpression", unary.span, ctx);
         }
-        internal::ExpressionKind::UpdateExpression(update) => {
+        ast::ExpressionKind::UpdateExpression(update) => {
             node_header(w, "UpdateExpression", expr.span, ctx);
             w.raw(",\"operator\":\"");
             w.raw(update.operator.as_str());
@@ -317,37 +317,37 @@ fn write_expression_full_dispatch(
             write_expression(w, update.argument, ctx);
             close_node(w, "UpdateExpression", expr.span, ctx);
         }
-        internal::ExpressionKind::BinaryExpression(binary) => {
+        ast::ExpressionKind::BinaryExpression(binary) => {
             write_binary_chain(w, binary, expr.span, ctx);
         }
-        internal::ExpressionKind::ArrowFunctionExpression(arrow) => {
+        ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
             write_arrow_function_expression(w, arrow, expr.span, ctx);
         }
-        internal::ExpressionKind::FunctionExpression(func) => {
+        ast::ExpressionKind::FunctionExpression(func) => {
             write_function_expression(w, func, ctx, false);
         }
-        internal::ExpressionKind::ClassExpression(class_expr) => {
+        ast::ExpressionKind::ClassExpression(class_expr) => {
             write_class_expression(w, class_expr, expr.span, ctx);
         }
-        internal::ExpressionKind::SpreadElement(spread) => {
+        ast::ExpressionKind::SpreadElement(spread) => {
             node_header(w, "SpreadElement", spread.span, ctx);
             w.raw(",\"argument\":");
             write_expression(w, spread.argument, ctx);
             close_node(w, "SpreadElement", spread.span, ctx);
         }
-        internal::ExpressionKind::CallExpression(_)
-        | internal::ExpressionKind::MemberExpression(_)
-        | internal::ExpressionKind::TSNonNullExpression(_) => write_chain(w, expr, ctx, flags),
-        internal::ExpressionKind::NewExpression(new_expr) => {
+        ast::ExpressionKind::CallExpression(_)
+        | ast::ExpressionKind::MemberExpression(_)
+        | ast::ExpressionKind::TSNonNullExpression(_) => write_chain(w, expr, ctx, flags),
+        ast::ExpressionKind::NewExpression(new_expr) => {
             write_new_expression(w, new_expr, expr.span, ctx);
         }
-        internal::ExpressionKind::ConditionalExpression(cond) => {
+        ast::ExpressionKind::ConditionalExpression(cond) => {
             write_conditional_expression(w, cond, expr.span, ctx);
         }
-        internal::ExpressionKind::TemplateLiteral(template) => {
+        ast::ExpressionKind::TemplateLiteral(template) => {
             write_template_literal(w, template, ctx);
         }
-        internal::ExpressionKind::TaggedTemplateExpression(tagged) => {
+        ast::ExpressionKind::TaggedTemplateExpression(tagged) => {
             node_header(w, "TaggedTemplateExpression", expr.span, ctx);
             w.raw(",\"tag\":");
             write_expression(w, tagged.tag, ctx);
@@ -356,19 +356,19 @@ fn write_expression_full_dispatch(
             write_type_arguments_field(w, tagged.type_arguments.as_ref(), ctx);
             close_node(w, "TaggedTemplateExpression", expr.span, ctx);
         }
-        internal::ExpressionKind::AwaitExpression(await_expr) => {
+        ast::ExpressionKind::AwaitExpression(await_expr) => {
             write_await_expression(w, await_expr, expr.span, ctx);
         }
-        internal::ExpressionKind::YieldExpression(yield_expr) => {
+        ast::ExpressionKind::YieldExpression(yield_expr) => {
             write_yield_expression(w, yield_expr, expr.span, ctx);
         }
-        internal::ExpressionKind::SequenceExpression(seq) => {
+        ast::ExpressionKind::SequenceExpression(seq) => {
             node_header(w, "SequenceExpression", expr.span, ctx);
             w.raw(",\"expressions\":");
             write_expressions(w, seq.expressions.iter().copied(), ctx);
             close_node(w, "SequenceExpression", expr.span, ctx);
         }
-        internal::ExpressionKind::RegexLiteral(regex) => {
+        ast::ExpressionKind::RegexLiteral(regex) => {
             // Regex uses "Literal" type in acorn/Svelte AST; `value` is `{}`.
             node_header(w, "Literal", expr.span, ctx);
             w.raw(",\"value\":{},\"raw\":");
@@ -381,13 +381,13 @@ fn write_expression_full_dispatch(
             w.raw("}");
             close_node(w, "Literal", expr.span, ctx);
         }
-        internal::ExpressionKind::ThisExpression(_) => {
+        ast::ExpressionKind::ThisExpression(_) => {
             write_bare_node(w, "ThisExpression", expr.span, ctx);
         }
-        internal::ExpressionKind::Super(_) => {
+        ast::ExpressionKind::Super(_) => {
             write_bare_node(w, "Super", expr.span, ctx);
         }
-        internal::ExpressionKind::AssignmentExpression(assign) => {
+        ast::ExpressionKind::AssignmentExpression(assign) => {
             // The `=` left keeps its type-assertion wrapper (`(x as T) = 1` →
             // `TSAsExpression`): acorn-typescript's `toAssignable` validates through the
             // assertion but preserves the node. A JSDoc cast is not an assertion node at
@@ -401,10 +401,10 @@ fn write_expression_full_dispatch(
             write_expression(w, assign.right, ctx);
             close_node(w, "AssignmentExpression", expr.span, ctx);
         }
-        internal::ExpressionKind::ObjectPattern(obj) => {
+        ast::ExpressionKind::ObjectPattern(obj) => {
             write_object_pattern(w, obj, expr.span, ctx);
         }
-        internal::ExpressionKind::ArrayPattern(arr) => {
+        ast::ExpressionKind::ArrayPattern(arr) => {
             super::patterns::pattern_header(
                 w,
                 "ArrayPattern",
@@ -421,13 +421,13 @@ fn write_expression_full_dispatch(
             super::declarations::write_decorators_field(w, arr.decorators, ctx);
             close_node(w, "ArrayPattern", expr.span, ctx);
         }
-        internal::ExpressionKind::AssignmentPattern(pattern) => {
+        ast::ExpressionKind::AssignmentPattern(pattern) => {
             write_assignment_pattern(w, pattern, ctx, expr.span);
         }
-        internal::ExpressionKind::RestElement(rest) => {
+        ast::ExpressionKind::RestElement(rest) => {
             write_rest_element(w, rest, ctx);
         }
-        internal::ExpressionKind::TSTypeAssertion(type_assert) => {
+        ast::ExpressionKind::TSTypeAssertion(type_assert) => {
             node_header(w, "TSTypeAssertion", expr.span, ctx);
             w.raw(",\"typeAnnotation\":");
             write_type(w, type_assert.type_annotation, ctx);
@@ -435,7 +435,7 @@ fn write_expression_full_dispatch(
             write_expression(w, type_assert.expression, ctx);
             close_node(w, "TSTypeAssertion", expr.span, ctx);
         }
-        internal::ExpressionKind::TSAsExpression(as_expr) => {
+        ast::ExpressionKind::TSAsExpression(as_expr) => {
             node_header(w, "TSAsExpression", expr.span, ctx);
             w.raw(",\"expression\":");
             write_expression(w, as_expr.expression, ctx);
@@ -443,7 +443,7 @@ fn write_expression_full_dispatch(
             write_type(w, as_expr.type_annotation, ctx);
             close_node(w, "TSAsExpression", expr.span, ctx);
         }
-        internal::ExpressionKind::TSSatisfiesExpression(sat_expr) => {
+        ast::ExpressionKind::TSSatisfiesExpression(sat_expr) => {
             node_header(w, "TSSatisfiesExpression", expr.span, ctx);
             w.raw(",\"expression\":");
             write_expression(w, sat_expr.expression, ctx);
@@ -451,7 +451,7 @@ fn write_expression_full_dispatch(
             write_type(w, sat_expr.type_annotation, ctx);
             close_node(w, "TSSatisfiesExpression", expr.span, ctx);
         }
-        internal::ExpressionKind::TSInstantiationExpression(inst_expr) => {
+        ast::ExpressionKind::TSInstantiationExpression(inst_expr) => {
             node_header(w, "TSInstantiationExpression", expr.span, ctx);
             w.raw(",\"expression\":");
             write_expression_inner(
@@ -470,7 +470,7 @@ fn write_expression_full_dispatch(
             write_type_parameter_instantiation(w, &inst_expr.type_arguments, ctx);
             close_node(w, "TSInstantiationExpression", expr.span, ctx);
         }
-        internal::ExpressionKind::ImportExpression(import_expr) => {
+        ast::ExpressionKind::ImportExpression(import_expr) => {
             node_header(w, "ImportExpression", expr.span, ctx);
             w.raw(",\"source\":");
             write_expression(w, import_expr.source, ctx);
@@ -497,7 +497,7 @@ fn write_expression_full_dispatch(
             }
             close_node(w, "ImportExpression", expr.span, ctx);
         }
-        internal::ExpressionKind::MetaProperty(meta) => {
+        ast::ExpressionKind::MetaProperty(meta) => {
             node_header(w, "MetaProperty", expr.span, ctx);
             w.raw(",\"meta\":");
             write_identifier_plain(w, &meta.meta, ctx);
@@ -505,16 +505,16 @@ fn write_expression_full_dispatch(
             write_identifier_plain(w, &meta.property, ctx);
             close_node(w, "MetaProperty", expr.span, ctx);
         }
-        internal::ExpressionKind::TSParameterProperty(param_prop) => {
+        ast::ExpressionKind::TSParameterProperty(param_prop) => {
             // acorn quirk: when the parameter is an AssignmentPattern whose left
             // has no type annotation, its span/loc expand to include the
             // accessibility modifier keyword (the whole parameter property).
             let param = param_prop.parameter.unwrap_comment_bound_pairs();
-            let override_ap = if let internal::ExpressionKind::AssignmentPattern(ap) = &param.kind {
+            let override_ap = if let ast::ExpressionKind::AssignmentPattern(ap) = &param.kind {
                 let has_type_ann = match &ap.left.unwrap_comment_bound_pairs().kind {
-                    internal::ExpressionKind::Identifier(id) => id.type_annotation().is_some(),
-                    internal::ExpressionKind::ArrayPattern(arr) => arr.type_annotation.is_some(),
-                    internal::ExpressionKind::ObjectPattern(obj) => obj.type_annotation.is_some(),
+                    ast::ExpressionKind::Identifier(id) => id.type_annotation().is_some(),
+                    ast::ExpressionKind::ArrayPattern(arr) => arr.type_annotation.is_some(),
+                    ast::ExpressionKind::ObjectPattern(obj) => obj.type_annotation.is_some(),
                     _ => false,
                 };
                 (!has_type_ann).then_some(ap)
@@ -547,13 +547,13 @@ fn write_expression_full_dispatch(
 /// the child its walk continues into.
 enum ChainTail<'e> {
     Call {
-        call: &'e internal::CallExpression<'e>,
+        call: &'e ast::CallExpression<'e>,
         callee_chain: ChainState,
         force: bool,
         strip: bool,
     },
     Member {
-        member: &'e internal::MemberExpression<'e>,
+        member: &'e ast::MemberExpression<'e>,
         force: bool,
         strip: bool,
     },
@@ -570,17 +570,12 @@ enum ChainTail<'e> {
 /// its parent hands it exactly as the recursion did (`needs_chain_wrap`, `child_chain`,
 /// `flags_after_wrap`).
 #[inline(never)]
-fn write_chain(
-    w: &mut JsonWriter,
-    expr: &internal::Expression<'_>,
-    ctx: &Ctx<'_>,
-    flags: ExprFlags,
-) {
+fn write_chain(w: &mut JsonWriter, expr: &ast::Expression<'_>, ctx: &Ctx<'_>, flags: ExprFlags) {
     let mut tails: SmallVec<[(ChainTail<'_>, Span, bool); 8]> = SmallVec::new();
     let (mut expr, mut flags) = (expr, flags);
     loop {
         let (child, child_flags, tail) = match &expr.kind {
-            internal::ExpressionKind::CallExpression(call) => {
+            ast::ExpressionKind::CallExpression(call) => {
                 let needs_chain = needs_chain_wrap(expr, flags);
                 let callee_chain = child_chain(
                     expr.span.start,
@@ -611,7 +606,7 @@ fn write_chain(
                     ),
                 )
             }
-            internal::ExpressionKind::MemberExpression(member) => {
+            ast::ExpressionKind::MemberExpression(member) => {
                 let needs_chain = needs_chain_wrap(expr, flags);
                 let object_chain = child_chain(
                     expr.span.start,
@@ -645,7 +640,7 @@ fn write_chain(
                     ),
                 )
             }
-            internal::ExpressionKind::TSNonNullExpression(non_null) => {
+            ast::ExpressionKind::TSNonNullExpression(non_null) => {
                 let needs_chain = needs_chain_wrap(expr, flags);
                 // A parenthesized inner chain seals at the parens, so the paren-aware
                 // child check applies like it does for calls/members.
@@ -726,7 +721,7 @@ fn open_chain_link(
 ///
 /// Only an [`ChainState::Unresolved`] node walks: the other two states are the
 /// parent handing down an answer already established.
-fn needs_chain_wrap(expr: &internal::Expression<'_>, flags: ExprFlags) -> bool {
+fn needs_chain_wrap(expr: &ast::Expression<'_>, flags: ExprFlags) -> bool {
     flags.chain == ChainState::Unresolved && expr.has_optional_in_chain()
 }
 
@@ -766,10 +761,10 @@ fn flags_after_wrap(flags: ExprFlags, needs_chain: bool) -> (bool, bool) {
 }
 
 /// Emit an object-literal property (a `Property` or a `SpreadElement`).
-fn write_object_property(w: &mut JsonWriter, prop: &internal::ObjectProperty<'_>, ctx: &Ctx<'_>) {
+fn write_object_property(w: &mut JsonWriter, prop: &ast::ObjectProperty<'_>, ctx: &Ctx<'_>) {
     match prop {
-        internal::ObjectProperty::Property(p) => write_property(w, p, ctx),
-        internal::ObjectProperty::SpreadElement(s) => {
+        ast::ObjectProperty::Property(p) => write_property(w, p, ctx),
+        ast::ObjectProperty::SpreadElement(s) => {
             node_header(w, "SpreadElement", s.span, ctx);
             w.raw(",\"argument\":");
             write_expression(w, s.argument, ctx);

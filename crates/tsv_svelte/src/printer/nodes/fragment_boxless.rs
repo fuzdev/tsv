@@ -13,7 +13,7 @@
 // backward pass ([`FragmentGlue`]), then read by position.
 
 use super::helpers::is_control_flow_block;
-use crate::ast::internal::{ElementKind, FragmentNode, Root};
+use crate::ast::{ElementKind, FragmentNode, Root};
 use crate::printer::Printer;
 use std::rc::Rc;
 

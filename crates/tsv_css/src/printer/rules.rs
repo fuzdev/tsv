@@ -15,12 +15,12 @@
 //! `print_css_block_children` (see `mod.rs`), also used by at-rule blocks.
 
 use super::Printer;
-use crate::ast::internal;
+use crate::ast;
 use crate::whitespace::Edge;
 
 impl<'a> Printer<'a> {
     /// Format a CSS rule (selector + declarations block)
-    pub(super) fn print_css_rule(&mut self, rule: &internal::CssRule<'_>) {
+    pub(super) fn print_css_rule(&mut self, rule: &ast::CssRule<'_>) {
         // Format selector (uses selectors module). A trailing hex-escape terminator
         // (`.\1F600 ` before `{`) is dropped at the selector leaf, so the block
         // separator below can't double it.
@@ -43,9 +43,7 @@ impl<'a> Printer<'a> {
         // claim above already printed them in place. block_span.start is the position of the
         // opening brace, so a leading child whose span precedes it is a pre-brace comment.
         let mut start_index = 0;
-        while let Some(internal::CssBlockChild::Comment(comment)) =
-            rule.declarations.get(start_index)
-        {
+        while let Some(ast::CssBlockChild::Comment(comment)) = rule.declarations.get(start_index) {
             if comment.span.start >= rule.block_span.start {
                 break;
             }

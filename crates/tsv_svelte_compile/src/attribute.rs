@@ -20,8 +20,8 @@
 //! [`crate::attribute_bind`] for the `bind:` half.
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_svelte::ast::internal::{Attribute, AttributeValue};
-use tsv_ts::ast::internal::{Expression, ExpressionKind, LiteralValue, Property};
+use tsv_svelte::ast::{Attribute, AttributeValue};
+use tsv_ts::ast::{Expression, ExpressionKind, LiteralValue, Property};
 
 use crate::analyze::{evaluate, stringify_value};
 use crate::body_builder::BodyBuilder;

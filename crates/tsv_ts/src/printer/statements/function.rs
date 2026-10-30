@@ -2,7 +2,7 @@
 
 use super::super::types::function_types::group_params_if_should;
 use super::Printer;
-use crate::ast::internal;
+use crate::ast;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -70,9 +70,9 @@ impl<'a> Printer<'a> {
     /// the `)` (falling back to `body_start` if the paren can't be located).
     pub(in crate::printer) fn build_callable_signature_doc(
         &self,
-        params: &[internal::Expression<'_>],
-        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
-        return_type: Option<&internal::TSTypeAnnotation<'_>>,
+        params: &[ast::Expression<'_>],
+        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        return_type: Option<&ast::TSTypeAnnotation<'_>>,
         params_start: u32,
         body_start: u32,
     ) -> (DocId, u32) {
@@ -107,9 +107,9 @@ impl<'a> Printer<'a> {
     /// `(params_doc, return_type_doc, sig_end)`.
     pub(in crate::printer) fn build_signature_params_return(
         &self,
-        params: &[internal::Expression<'_>],
-        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
-        return_type: Option<&internal::TSTypeAnnotation<'_>>,
+        params: &[ast::Expression<'_>],
+        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        return_type: Option<&ast::TSTypeAnnotation<'_>>,
         params_start: u32,
         body_start: u32,
     ) -> (DocId, Option<DocId>, u32) {
@@ -244,7 +244,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a function declaration
     pub(super) fn build_function_declaration_doc(
         &self,
-        decl: &internal::FunctionDeclaration<'_>,
+        decl: &ast::FunctionDeclaration<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();

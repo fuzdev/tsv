@@ -1,6 +1,6 @@
 // Function/method parameter and destructuring-pattern parsing.
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
 use crate::parser::statement::DecoratorListKind;

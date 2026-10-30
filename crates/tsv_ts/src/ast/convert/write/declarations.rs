@@ -1,6 +1,5 @@
 // Type alias, function, and class declaration writers.
 
-use super::super::super::internal;
 use super::expressions::{
     ChainState, ExprFlags, write_expression, write_expression_inner, write_expressions,
 };
@@ -13,6 +12,7 @@ use super::{
     write_identifier_plain, write_identifier_with_optional, write_name_field, write_or_null,
     write_return_type_field, write_type_annotation_field, write_type_parameters_field,
 };
+use crate::ast;
 use tsv_lang::Span;
 use tsv_lang::source_scan::{self, TriviaProfile};
 
@@ -20,11 +20,7 @@ use tsv_lang::source_scan::{self, TriviaProfile};
 /// spine omits `optional`; a parenthesized `@(expr)` rides the full expression
 /// parser and keeps it. Parens are stripped from the expression, so the only
 /// signal is the span gap.
-pub(super) fn write_decorator(
-    w: &mut JsonWriter,
-    decorator: &internal::Decorator<'_>,
-    ctx: &Ctx<'_>,
-) {
+pub(super) fn write_decorator(w: &mut JsonWriter, decorator: &ast::Decorator<'_>, ctx: &Ctx<'_>) {
     let parenthesized = decorator.span.end > decorator.expression.span().end;
     node_header(w, "Decorator", decorator.span, ctx);
     w.raw(",\"expression\":");
@@ -47,7 +43,7 @@ pub(super) fn write_decorator(
 /// (`Option<Vec>` with skip-if-none: present ⇒ emitted, even empty).
 pub(super) fn write_decorators_field(
     w: &mut JsonWriter,
-    decorators: Option<&[internal::Decorator<'_>]>,
+    decorators: Option<&[ast::Decorator<'_>]>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(decs) = decorators {
@@ -60,7 +56,7 @@ pub(super) fn write_decorators_field(
 /// `typeParameters?`, `typeAnnotation`, `declare` (only when true).
 pub(super) fn write_type_alias_declaration(
     w: &mut JsonWriter,
-    type_alias: &internal::TSTypeAliasDeclaration<'_>,
+    type_alias: &ast::TSTypeAliasDeclaration<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -81,7 +77,7 @@ pub(super) fn write_type_alias_declaration(
 /// `params`, `returnType?`, `body`.
 pub(super) fn write_function_declaration(
     w: &mut JsonWriter,
-    func_decl: &internal::FunctionDeclaration<'_>,
+    func_decl: &ast::FunctionDeclaration<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "FunctionDeclaration", func_decl.span, ctx);
@@ -107,7 +103,7 @@ pub(super) fn write_function_declaration(
 /// internal byte offsets (the same-line scan byte-indexes `source`).
 fn super_class_wrap_span(
     type_params_span: Option<Span>,
-    super_class: Option<&internal::Expression<'_>>,
+    super_class: Option<&ast::Expression<'_>>,
     super_type_parameters_end: Option<u32>,
     source: &str,
 ) -> Option<Span> {
@@ -126,8 +122,8 @@ fn super_class_wrap_span(
 /// the wrap decision. Shared by class declarations and expressions.
 fn write_super_class_fields(
     w: &mut JsonWriter,
-    super_class: Option<&internal::Expression<'_>>,
-    super_type_parameters: Option<&internal::TSTypeParameterInstantiation<'_>>,
+    super_class: Option<&ast::Expression<'_>>,
+    super_type_parameters: Option<&ast::TSTypeParameterInstantiation<'_>>,
     type_params_span: Option<Span>,
     ctx: &Ctx<'_>,
 ) {
@@ -176,7 +172,7 @@ fn write_super_class_fields(
 /// never a type export for any other reason, so the two are the same fact.
 pub(super) fn write_class_declaration(
     w: &mut JsonWriter,
-    class_decl: &internal::ClassDeclaration<'_>,
+    class_decl: &ast::ClassDeclaration<'_>,
     ctx: &Ctx<'_>,
     declare_stamped_by_export: bool,
 ) {
@@ -213,7 +209,7 @@ pub(super) fn write_class_declaration(
 /// Emits a `ClassExpression` node (no `declare` field).
 pub(super) fn write_class_expression(
     w: &mut JsonWriter,
-    class_expr: &internal::ClassExpression<'_>,
+    class_expr: &ast::ClassExpression<'_>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -244,7 +240,7 @@ pub(super) fn write_class_expression(
 /// field.
 fn write_implements_field(
     w: &mut JsonWriter,
-    implements: &[internal::TSInterfaceHeritage<'_>],
+    implements: &[ast::TSInterfaceHeritage<'_>],
     ctx: &Ctx<'_>,
 ) {
     if implements.is_empty() {
@@ -257,17 +253,17 @@ fn write_implements_field(
 }
 
 /// Emits a `ClassBody` node (dispatching each `ClassMember`).
-fn write_class_body(w: &mut JsonWriter, body: &internal::ClassBody<'_>, ctx: &Ctx<'_>) {
+fn write_class_body(w: &mut JsonWriter, body: &ast::ClassBody<'_>, ctx: &Ctx<'_>) {
     node_header(w, "ClassBody", body.span, ctx);
     w.raw(",\"body\":");
     write_array(w, body.body, |w, m| match m {
-        internal::ClassMember::MethodDefinition(method) => {
+        ast::ClassMember::MethodDefinition(method) => {
             write_method_definition(w, method, ctx);
         }
-        internal::ClassMember::PropertyDefinition(prop) => {
+        ast::ClassMember::PropertyDefinition(prop) => {
             write_property_definition(w, prop, ctx);
         }
-        internal::ClassMember::StaticBlock(block) => {
+        ast::ClassMember::StaticBlock(block) => {
             node_header(w, "StaticBlock", block.span, ctx);
             w.raw(",\"body\":");
             write_array(w, block.body, |w, s| write_statement(w, s, ctx));
@@ -276,7 +272,7 @@ fn write_class_body(w: &mut JsonWriter, body: &internal::ClassBody<'_>, ctx: &Ct
             write_decorators_field(w, block.decorators, ctx);
             close_node(w, "StaticBlock", block.span, ctx);
         }
-        internal::ClassMember::IndexSignature(sig) => {
+        ast::ClassMember::IndexSignature(sig) => {
             write_index_signature(w, sig, ctx);
         }
     });
@@ -290,13 +286,13 @@ struct MemberModifier {
     fragment: &'static str,
 }
 
-const fn accessibility_modifier(acc: internal::Accessibility) -> MemberModifier {
+const fn accessibility_modifier(acc: ast::Accessibility) -> MemberModifier {
     MemberModifier {
         keyword: acc.as_str(),
         fragment: match acc {
-            internal::Accessibility::Public => ",\"accessibility\":\"public\"",
-            internal::Accessibility::Private => ",\"accessibility\":\"private\"",
-            internal::Accessibility::Protected => ",\"accessibility\":\"protected\"",
+            ast::Accessibility::Public => ",\"accessibility\":\"public\"",
+            ast::Accessibility::Private => ",\"accessibility\":\"private\"",
+            ast::Accessibility::Protected => ",\"accessibility\":\"protected\"",
         },
     }
 }
@@ -375,7 +371,7 @@ fn write_modifiers_in_source_order(
 
 /// The modifier scan window's start: past the decorators when present (they
 /// precede the modifiers), else the member's own start.
-fn modifier_scan_start(decorators: Option<&[internal::Decorator<'_>]>, span: Span) -> u32 {
+fn modifier_scan_start(decorators: Option<&[ast::Decorator<'_>]>, span: Span) -> u32 {
     decorators
         .and_then(<[_]>::last)
         .map_or(span.start, |d| d.span.end)
@@ -387,11 +383,7 @@ fn modifier_scan_start(decorators: Option<&[internal::Decorator<'_>]>, span: Spa
 /// `typeParameters?` (moved here from the FunctionExpression, acorn
 /// convention), `value`, `decorators?` (attached to the finished member, so
 /// they serialize last).
-fn write_method_definition(
-    w: &mut JsonWriter,
-    method: &internal::MethodDefinition<'_>,
-    ctx: &Ctx<'_>,
-) {
+fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition<'_>, ctx: &Ctx<'_>) {
     node_header(w, "MethodDefinition", method.span, ctx);
     let mut mods = [
         method.r#abstract.then_some(MemberModifier {
@@ -463,7 +455,7 @@ fn write_method_definition(
 /// `decorators?` (attached to the finished member, so they serialize last).
 fn write_property_definition(
     w: &mut JsonWriter,
-    prop: &internal::PropertyDefinition<'_>,
+    prop: &ast::PropertyDefinition<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "PropertyDefinition", prop.span, ctx);
@@ -502,10 +494,10 @@ fn write_property_definition(
     w.bool(prop.computed);
     w.raw(",\"key\":");
     write_expression(w, &prop.key, ctx);
-    if matches!(prop.modifier, internal::PropertyModifier::Optional) {
+    if matches!(prop.modifier, ast::PropertyModifier::Optional) {
         w.raw(",\"optional\":true");
     }
-    if matches!(prop.modifier, internal::PropertyModifier::Definite) {
+    if matches!(prop.modifier, ast::PropertyModifier::Definite) {
         w.raw(",\"definite\":true");
     }
     write_type_annotation_field(w, prop.type_annotation.as_ref(), ctx);
@@ -520,7 +512,7 @@ fn write_property_definition(
 /// space).
 pub(super) fn write_type_parameter_declaration(
     w: &mut JsonWriter,
-    params: &internal::TSTypeParameterDeclaration<'_>,
+    params: &ast::TSTypeParameterDeclaration<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TSTypeParameterDeclaration", params.span, ctx);
@@ -545,7 +537,7 @@ pub(super) fn write_type_parameter_declaration(
 /// exactly why nothing else guards it.
 pub(super) fn write_type_parameter(
     w: &mut JsonWriter,
-    param: &internal::TSTypeParameter<'_>,
+    param: &ast::TSTypeParameter<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TSTypeParameter", param.span, ctx);
@@ -571,7 +563,7 @@ pub(super) fn write_type_parameter(
 /// `TSQualifiedName`, matching `extends`), plus `typeParameters?`.
 fn write_expression_with_type_arguments(
     w: &mut JsonWriter,
-    heritage: &internal::TSInterfaceHeritage<'_>,
+    heritage: &ast::TSInterfaceHeritage<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TSExpressionWithTypeArguments", heritage.span, ctx);

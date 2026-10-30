@@ -722,7 +722,7 @@ body, a closed call) as controls, by
 printed form would join — and the printer holds a tree, so it is answered in the parser and
 carried on the node: `is_type_arguments_start` runs a second, relaxed reading
 (`TypeArgScan::Relex`) at the `<` the parse declined, and the result rides
-`internal::BinaryExpression::relexes_as_type_arguments` to the one arm that reads it, in
+`ast::BinaryExpression::relexes_as_type_arguments` to the one arm that reads it, in
 `needs_parens_binary_operand`. It is taken at the **`>`**, not at the `<` — the verdict is a
 fact about the join of the two tokens, and a `<` with no `>` over it is every ordinary
 comparison in the language, which must pay nothing for a rule about a shape it is not in.

@@ -8,7 +8,7 @@ use tsv_cli::cli::input::ParserType;
 use tsv_lang::{
     is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
 };
-use tsv_svelte::ast::internal::{Element, Fragment, FragmentNode, TextDecoding};
+use tsv_svelte::ast::{Element, Fragment, FragmentNode, TextDecoding};
 
 use crate::audit::excerpt::first_line_diff;
 use crate::audit::sweep::{PristineSweep, sort_findings_by_path, sweep_pristine};

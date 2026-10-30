@@ -14,7 +14,7 @@
 // source paren is still stripped and any number collapse to exactly one.
 
 use super::Printer;
-use crate::ast::internal::{self, Expression, ExpressionKind};
+use crate::ast::{self, Expression, ExpressionKind};
 use crate::printer::is_string_literal;
 use crate::printer::needs_parens::{
     LeftmostText, leftmost_no_lookahead, leftmost_no_lookahead_reached,
@@ -256,7 +256,7 @@ impl<'a> Printer<'a> {
     /// `build_expression_statement_doc`, so a real directive never reaches here.
     pub(in crate::printer::statements) fn needs_avoid_directive_parens(
         &self,
-        stmt: &internal::ExpressionStatement<'_>,
+        stmt: &ast::ExpressionStatement<'_>,
         in_program_or_block: bool,
     ) -> bool {
         in_program_or_block && is_string_literal(stmt.expression)

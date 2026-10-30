@@ -22,7 +22,7 @@
 //! [`crate::store_rewrite`] for the *script*-position analog of this walk.
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ArrayExpression, BinaryExpression, CallExpression, ConditionalExpression, Expression,
     ExpressionKind, MemberExpression, NewExpression, SequenceExpression, SpreadElement,
     TemplateLiteral, UnaryExpression,

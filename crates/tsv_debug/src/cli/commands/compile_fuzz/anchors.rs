@@ -69,7 +69,7 @@
 //! - **`css_ident_ends`** — the end of an ASCII ident run introduced by `:`, `::`,
 //!   `.`, or `#` inside `<style>`. A source scan over the CSS content span.
 
-use tsv_svelte::ast::internal::{
+use tsv_svelte::ast::{
     AttributeNode, AttributeValue, Fragment, FragmentNode, Root, ScriptContext, SpecialElementKind,
 };
 

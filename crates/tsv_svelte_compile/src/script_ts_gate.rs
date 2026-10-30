@@ -8,8 +8,8 @@
 //! sequence, and [`crate::erase`] for the erasure these gate.
 
 use tsv_lang::Span;
-use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, Root};
-use tsv_ts::ast::internal::Statement;
+use tsv_svelte::ast::{AttributeNode, AttributeValue, Root};
+use tsv_ts::ast::Statement;
 
 use crate::attr_refs::{TemplateItem, each_template_item};
 use crate::transform_server::unsupported;

@@ -65,9 +65,7 @@ use crate::ids::{FileId, NodeId};
 use crate::merge::FileMerge;
 use tsv_lang::{FxHashMap, Span};
 use tsv_ts::ast::Program;
-use tsv_ts::ast::internal::{
-    Expression, ExpressionKind, Statement, StatementKind, TSModuleReference,
-};
+use tsv_ts::ast::{Expression, ExpressionKind, Statement, StatementKind, TSModuleReference};
 
 /// The pre-order node kinds the SoA walk assigns — one variant per tsv_ts AST enum
 /// variant the walk ids (the program root, then statements, expressions, types, and
@@ -810,7 +808,7 @@ mod tests {
         // address (value at struct offset 0), yet each resolves to its own id
         // through the `(address, NodeKind)` key. Both look-ups hit the same
         // address; only the kind tells them apart.
-        use tsv_ts::ast::internal::ClassMember;
+        use tsv_ts::ast::ClassMember;
         let arena = Bump::new();
         let src = "class C { m() {} }";
         let program = tsv_ts::parse(src, &arena).expect("parse");

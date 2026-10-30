@@ -2,7 +2,7 @@
 // the builders for parenthesized, single-param, generic, and async arrows. The
 // Pratt kernel in `expression.rs` calls into these; they never call back into it.
 
-use crate::ast::internal::{
+use crate::ast::{
     ArrowFunctionBody, ArrowFunctionExpression, Expression, ExpressionKind, Identifier,
 };
 use crate::lexer::TokenKind;

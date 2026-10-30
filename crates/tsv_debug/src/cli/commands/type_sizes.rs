@@ -31,7 +31,7 @@
 //! enumerates a module's types at compile time. It is mechanical to refresh:
 //!
 //! ```sh
-//! grep -h "^pub enum \|^pub struct " crates/tsv_ts/src/ast/internal/*.rs \
+//! grep -h "^pub enum \|^pub struct " crates/tsv_ts/src/ast/*.rs \
 //!   | sed "s/^pub \(enum\|struct\) \([A-Za-z0-9_]*\)\(<'[a-z]*>\)\?.*/\2\3/"
 //! ```
 //!
@@ -226,9 +226,9 @@ fn print_json(rows: &[TypeRow]) {
 /// question the ladder asks.
 #[expect(clippy::too_many_lines)]
 pub(crate) fn board() -> Vec<TypeRow> {
-    use tsv_css::ast::internal as css;
-    use tsv_svelte::ast::internal as svelte;
-    use tsv_ts::ast::internal as ts;
+    use tsv_css::ast as css;
+    use tsv_svelte::ast as svelte;
+    use tsv_ts::ast as ts;
 
     let mut out = Vec::new();
 

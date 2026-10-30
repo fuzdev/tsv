@@ -3,7 +3,7 @@
 // {@html}, {@const}, {@debug}, {@render} and the {const}/{let} declaration tags — tag
 // layout, the {@const} initializer break rules, and the declaration tag's own terminator.
 
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::{CommentRun, HeadExpr, HeadLayout, Printer};
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -33,7 +33,7 @@ impl<'a> Printer<'a> {
     /// An assignment's clarity parens (`{@html (a = b)}`) are applied inside
     /// [`Printer::build_expression_with_comments_doc`], so they land inside a frozen head's
     /// break rather than around it.
-    pub(super) fn build_html_tag_doc(&self, tag: &internal::HtmlTag<'_>) -> DocId {
+    pub(super) fn build_html_tag_doc(&self, tag: &ast::HtmlTag<'_>) -> DocId {
         // Build expression doc with surrounding comments
         // Span range: after "{@html " to before "}"
         let head = self.build_expression_with_comments_doc(
@@ -46,7 +46,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for {@const declaration}
-    pub(super) fn build_const_tag_doc(&self, tag: &internal::ConstTag<'_>) -> DocId {
+    pub(super) fn build_const_tag_doc(&self, tag: &ast::ConstTag<'_>) -> DocId {
         self.build_assignment_tag_doc(AT_CONST_TAG_OPEN, tag.id, tag.init, tag.span)
     }
 
@@ -68,7 +68,7 @@ impl<'a> Printer<'a> {
     /// the same [`Printer::trailing_comment_docs`] every sibling tag uses, and the `;`
     /// goes after it. Cataloged as
     /// [declaration_terminator_comment](../../../../../tests/fixtures/svelte/tags/declaration/declaration_terminator_comment_prettier_divergence/).
-    pub(super) fn build_declaration_tag_doc(&self, tag: &internal::DeclarationTag<'_>) -> DocId {
+    pub(super) fn build_declaration_tag_doc(&self, tag: &ast::DeclarationTag<'_>) -> DocId {
         let d = self.d();
         let decl = &tag.declaration;
         // The gap is named by `tsv_ts`, not spelled here: it is the same range the statement
@@ -443,7 +443,7 @@ impl<'a> Printer<'a> {
     /// the previous identifier, one after it leads the next. Without the split a
     /// pre-comma comment (`{@debug x /* c */, y}`) falls through both
     /// per-identifier buckets and is dropped.
-    pub(super) fn build_debug_tag_doc(&self, tag: &internal::DebugTag<'_>) -> DocId {
+    pub(super) fn build_debug_tag_doc(&self, tag: &ast::DebugTag<'_>) -> DocId {
         let d = self.d();
 
         // Every gap below is read with `comments_in_source_between` — the **in-source** axis
@@ -608,7 +608,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for {@render snippet(args)}
-    pub(super) fn build_render_tag_doc(&self, tag: &internal::RenderTag<'_>) -> DocId {
+    pub(super) fn build_render_tag_doc(&self, tag: &ast::RenderTag<'_>) -> DocId {
         // Build expression doc with surrounding comments
         // Span range: after "{@render " to before "}"
         let head = self.build_expression_with_comments_doc(

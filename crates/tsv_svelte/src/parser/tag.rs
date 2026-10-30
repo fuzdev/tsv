@@ -2,7 +2,7 @@
 //
 // Handles: {@html}, {@const}, {@debug}, {@render} tags and {const}/{let} declaration tags
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::TriviaProfile;

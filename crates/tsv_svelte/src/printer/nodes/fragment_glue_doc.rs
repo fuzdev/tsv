@@ -10,7 +10,7 @@
 use super::element_doc::{BoundaryMode, PreparedElement};
 use super::fragment_doc::LeadingEdge;
 use super::helpers::is_control_flow_block;
-use crate::ast::internal::{FragmentNode, is_collapsible_ws_char};
+use crate::ast::{FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
 use smallvec::SmallVec;
 use tsv_lang::doc::arena::DocId;

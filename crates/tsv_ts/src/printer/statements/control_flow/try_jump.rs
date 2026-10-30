@@ -1,7 +1,7 @@
 // try/catch/finally, throw, break/continue, and labeled statement printing
 
 use super::{HeadChainGrouping, OpenParenLineBlockComment};
-use crate::ast::internal::{self, StatementKind};
+use crate::ast::{self, StatementKind};
 use crate::printer::statements::StatementContext;
 use crate::printer::statements::TerminatorGap;
 use crate::printer::{CommentVec, LeadingGlue, Printer};
@@ -76,8 +76,8 @@ impl<'a> Printer<'a> {
     fn append_catch_clause_body(
         &self,
         parts: &mut DocBuf,
-        stmt: &internal::TryStatement<'_>,
-        handler: &internal::CatchClause<'_>,
+        stmt: &ast::TryStatement<'_>,
+        handler: &ast::CatchClause<'_>,
     ) {
         let d = self.d();
         let catch_keyword_end = handler.span.start + "catch".len() as u32;
@@ -129,7 +129,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_try_statement_doc(
         &self,
-        stmt: &internal::TryStatement<'_>,
+        stmt: &ast::TryStatement<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -195,7 +195,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_throw_statement_doc(
         &self,
-        stmt: &internal::ThrowStatement<'_>,
+        stmt: &ast::ThrowStatement<'_>,
         span: Span,
         gap: TerminatorGap,
     ) -> DocId {
@@ -204,7 +204,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_break_statement_doc(
         &self,
-        stmt: &internal::BreakStatement<'_>,
+        stmt: &ast::BreakStatement<'_>,
         span: Span,
         gap: TerminatorGap,
     ) -> DocId {
@@ -213,7 +213,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_continue_statement_doc(
         &self,
-        stmt: &internal::ContinueStatement<'_>,
+        stmt: &ast::ContinueStatement<'_>,
         span: Span,
         gap: TerminatorGap,
     ) -> DocId {
@@ -225,7 +225,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         span: Span,
-        label: Option<&internal::Identifier<'_>>,
+        label: Option<&ast::Identifier<'_>>,
         gap: TerminatorGap,
     ) -> DocId {
         let d = self.d();
@@ -260,7 +260,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_labeled_statement_doc(
         &self,
-        stmt: &internal::LabeledStatement<'_>,
+        stmt: &ast::LabeledStatement<'_>,
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();

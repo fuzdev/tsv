@@ -22,7 +22,7 @@
 //!
 //! See [`crate::transform_server`] for the orchestration these gate.
 
-use tsv_svelte::ast::internal::SpecialElementKind;
+use tsv_svelte::ast::SpecialElementKind;
 
 /// Declares the special-element handled-or-refused table ONCE, expanding it into
 /// the three things that must agree: a label constant per refused kind, the

@@ -1,6 +1,6 @@
 // Expression tag parsing
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::{BlockOrTagMarker, TokenKind};
 use tsv_lang::{ParseError, Span};
 

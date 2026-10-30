@@ -56,7 +56,7 @@ fn span_of(node: &serde_json::Value) -> Option<(usize, usize)> {
 /// A **frozen-language `<script>` body** (a `lang`/`type` outside the JS/TS family) is
 /// deliberately not a region: the printer freezes it verbatim, so its blank/comment policy is
 /// the author's bytes, outside the formatted-output model these audits assert. The question is
-/// asked with the printer's own predicate (`internal::EmbeddedLang::Script.is_frozen`) rather
+/// asked with the printer's own predicate (`ast::EmbeddedLang::Script.is_frozen`) rather
 /// than a wire-shape copy of it — a copy drifts silently, and this audit would go on probing a
 /// body the printer had started freezing (every injected comment "surviving" verbatim, proving
 /// nothing) or stop probing one it still formats (a coverage hole nothing reports). (Nested
@@ -142,7 +142,7 @@ struct InternalRegions {
 /// whitelist is needed because **tsv rejects there too**, so `Formatted::Rejected` filters
 /// them exactly as it does a word interior. The same covers `{⟨⟩#if` and `{#⟨⟩if`.
 fn svelte_internal_regions(source: &str) -> InternalRegions {
-    use tsv_svelte::ast::internal::{
+    use tsv_svelte::ast::{
         AttributeNode, EmbeddedLang, Fragment, FragmentNode, SpecialElementKind,
     };
 
@@ -742,7 +742,7 @@ mod tests {
     /// The `lang`/`type` spellings the region walk must answer, and — the point of the
     /// table — what the **printer** does with each one.
     ///
-    /// The walk asks `internal::EmbeddedLang::Script.is_frozen`, the printer's own predicate,
+    /// The walk asks `ast::EmbeddedLang::Script.is_frozen`, the printer's own predicate,
     /// so the two cannot disagree by construction. This table is the standing proof that the
     /// *coupling* is the right one: each case asserts the region walk and the formatter reach
     /// the same verdict, with the formatter's verdict read off its OUTPUT rather than off any

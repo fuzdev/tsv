@@ -5,7 +5,7 @@
 // trailing line/block comment docs (`line_suffix` vs inline).
 
 use super::Printer;
-use crate::ast::internal;
+use crate::ast;
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing;
@@ -48,7 +48,7 @@ impl<'a> Printer<'a> {
     /// For multi-line block comments:
     /// - JSDoc comments (/**) always use hardline to apply context indent
     /// - Other comments: if continuation lines had indentation, use hardline; otherwise literalline
-    pub(crate) fn build_comment_doc(&self, comment: &internal::Comment) -> DocId {
+    pub(crate) fn build_comment_doc(&self, comment: &ast::Comment) -> DocId {
         let d = self.d();
         let content = comment.content(self.source);
         let doc = if comment.is_block {
@@ -114,7 +114,7 @@ impl<'a> Printer<'a> {
     /// member (NBSP, U+FEFF, a form feed, the U+2000 family) passed straight through it and
     /// rode out in tsv's output where prettier deletes it. Trimming the SPAN rather than the
     /// text keeps the emit allocation-free; the ledger still tags the comment's full span.
-    fn line_comment_span(&self, comment: &internal::Comment) -> Span {
+    fn line_comment_span(&self, comment: &ast::Comment) -> Span {
         let text = comment.span.extract(self.source);
         Span {
             start: comment.span.start,
@@ -245,7 +245,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::build_trailing_comment_doc_own_line`]): a **block** takes it too where
     /// the run it belongs to has already deferred, since an inline emission there would
     /// render *ahead* of the buffered text and reorder the pair (`append_trailing_paren_comments`).
-    pub(crate) fn build_trailing_line_comment_doc(&self, comment: &internal::Comment) -> DocId {
+    pub(crate) fn build_trailing_line_comment_doc(&self, comment: &ast::Comment) -> DocId {
         let d = self.d();
         d.line_suffix(d.concat(&[d.text(" "), self.build_comment_doc(comment)]))
     }
@@ -257,7 +257,7 @@ impl<'a> Printer<'a> {
     /// long trailing comment never forces a preceding group (e.g. a member's union
     /// type) to break. Shared by every spot that trails a comment on a member or
     /// inner type without semicolon-relative positioning.
-    pub(crate) fn build_trailing_comment_doc(&self, comment: &internal::Comment) -> DocId {
+    pub(crate) fn build_trailing_comment_doc(&self, comment: &ast::Comment) -> DocId {
         if comment.is_block {
             let d = self.d();
             d.concat(&[d.text(" "), self.build_comment_doc(comment)])
@@ -284,7 +284,7 @@ impl<'a> Printer<'a> {
     /// Applies to a block comment as well as a line one: what is being preserved is the
     /// author's line, not an end-of-line hazard. The `line_suffix` is inert for a block
     /// that trails on the same line — that one keeps the inline form above.
-    pub(crate) fn build_trailing_comment_doc_own_line(&self, comment: &internal::Comment) -> DocId {
+    pub(crate) fn build_trailing_comment_doc_own_line(&self, comment: &ast::Comment) -> DocId {
         self.d()
             .line_suffix(self.deferred_own_line_comment_inner(comment, false))
     }
@@ -304,7 +304,7 @@ impl<'a> Printer<'a> {
     /// at column 0.
     pub(crate) fn build_trailing_comment_doc_own_line_blank(
         &self,
-        comment: &internal::Comment,
+        comment: &ast::Comment,
         blank_above: bool,
     ) -> DocId {
         self.d()
@@ -316,11 +316,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_trailing_comment_doc_own_line_blank`]'s) riding INSIDE the
     /// suffix ahead of the comment. One builder so the blank rule cannot drift
     /// between the plain and dedented spellings.
-    fn deferred_own_line_comment_inner(
-        &self,
-        comment: &internal::Comment,
-        blank_above: bool,
-    ) -> DocId {
+    fn deferred_own_line_comment_inner(&self, comment: &ast::Comment, blank_above: bool) -> DocId {
         let d = self.d();
         if blank_above {
             d.concat(&[d.hardline(), d.hardline(), self.build_comment_doc(comment)])
@@ -348,7 +344,7 @@ impl<'a> Printer<'a> {
     /// the wrap safe here.
     pub(crate) fn build_clause_tail_comment_doc(
         &self,
-        comment: &internal::Comment,
+        comment: &ast::Comment,
         blank_above: bool,
         dedent: u8,
     ) -> DocId {

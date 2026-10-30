@@ -22,12 +22,12 @@
 
 use std::collections::{HashMap, HashSet};
 
-use tsv_svelte::ast::internal::{
+use tsv_svelte::ast::{
     AttributeNode, AwaitBlock, ConstTag, DebugTag, DeclarationTag, EachBlock, Element, Fragment,
     FragmentNode, HtmlTag, IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement,
     SpecialElementKind,
 };
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ArrowFunctionBody, ClassBody, ClassMember, Expression, ExpressionKind, ForInOfLeft, ForInit,
     FunctionExpression, Identifier, ObjectPatternProperty, ObjectProperty, Statement,
     StatementKind, VariableDeclaration,

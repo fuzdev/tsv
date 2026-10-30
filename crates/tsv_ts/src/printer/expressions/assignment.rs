@@ -13,7 +13,7 @@
 //
 // - prettier/src/language-js/print/assignment.js
 
-use crate::ast::internal::{self, AssignmentOperator, Expression, ExpressionKind};
+use crate::ast::{self, AssignmentOperator, Expression, ExpressionKind};
 use crate::printer::calls::chain_has_calls;
 use crate::printer::chain::{chain_paren_leading_gap, find_bracket_position};
 use crate::printer::class_expr_has_decorators;
@@ -267,14 +267,14 @@ pub fn choose_layout(
 /// non-empty array, or JSX element on the right side. These cases should NOT use
 /// BreakAfterOperator — the RHS handles its own expansion.
 ///
-/// The right operand asked about is [`internal::BinaryExpression::rebalanced_right`], not
+/// The right operand asked about is [`ast::BinaryExpression::rebalanced_right`], not
 /// `binary.right`: prettier normalizes a same-operator right-nested logical tree away at
 /// PARSE time, so `a ?? (b ?? [1])` is `(a ?? b) ?? [1]` at every question the printer asks.
 /// Reading `binary.right` here is what made the paren-nested authoring diverge AND rewrite
 /// its own output on a second pass (`logical/inline_chain_paren_nested_long`).
 ///
 /// Prettier ref: `shouldInlineLogicalExpression` (`print/binaryish.js`)
-pub fn should_inline_logical_expression(binary: &internal::BinaryExpression<'_>) -> bool {
+pub fn should_inline_logical_expression(binary: &ast::BinaryExpression<'_>) -> bool {
     if !binary.operator.is_logical() {
         return false;
     }
@@ -320,7 +320,7 @@ pub fn is_curried_arrow_chain(expr: &Expression<'_>) -> bool {
     if let ExpressionKind::ArrowFunctionExpression(arrow) = &expr.kind {
         matches!(
             &arrow.body,
-            internal::ArrowFunctionBody::Expression(body)
+            ast::ArrowFunctionBody::Expression(body)
                 if matches!(body.kind, ExpressionKind::ArrowFunctionExpression(_))
         )
     } else {
@@ -343,7 +343,7 @@ pub fn is_curried_arrow_chain(expr: &Expression<'_>) -> bool {
 /// declines on it is the assignment RHS, where `choose_layout` answers the same question
 /// with `AssignmentLayout::BreakAfterOperator` and so renders the break itself — see
 /// `should_use_arrow_chain_layout`.
-pub fn arrow_chain_should_break(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
+pub fn arrow_chain_should_break(arrow: &ast::ArrowFunctionExpression<'_>) -> bool {
     // Check this arrow for breaking conditions:
     // 1. return_type AND has params
     // 2. type_params (generics)
@@ -362,7 +362,7 @@ pub fn arrow_chain_should_break(arrow: &internal::ArrowFunctionExpression<'_>) -
     }
 
     // Check inner arrow if body is an arrow
-    if let internal::ArrowFunctionBody::Expression(body) = &arrow.body
+    if let ast::ArrowFunctionBody::Expression(body) = &arrow.body
         && let ExpressionKind::ArrowFunctionExpression(inner) = &body.kind
     {
         return arrow_chain_should_break(inner);
@@ -447,10 +447,10 @@ fn unwrap_expression<'a>(mut expr: &'a Expression<'a>) -> &'a Expression<'a> {
 /// The function answers `true` for every call whose `<…>` doc force-breaks, which keeps
 /// the `is_poorly_breakable_chain` debug_assert sound.
 fn is_call_with_complex_type_arguments(
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     printer: &Printer<'_>,
 ) -> bool {
-    use internal::TSType;
+    use ast::TSType;
     let Some(type_args) = &call.type_arguments else {
         return false;
     };
@@ -549,7 +549,7 @@ impl Printer<'_> {
             }
         };
         let type_args = call.type_arguments.as_ref()?;
-        let [internal::TSType::Mapped(mapped)] = type_args.params else {
+        let [ast::TSType::Mapped(mapped)] = type_args.params else {
             return None;
         };
         if !gap_comment_free() || call.optional {
@@ -816,9 +816,7 @@ fn is_short_arg(expr: &Expression<'_>, source: &str) -> bool {
         ExpressionKind::RegexLiteral(regex) => regex.pattern(source).len() <= threshold,
 
         // Prettier: printString(getRaw(node), options).length <= threshold (line 460)
-        ExpressionKind::Literal(lit)
-            if matches!(lit.value, internal::LiteralValue::String { .. }) =>
-        {
+        ExpressionKind::Literal(lit) if matches!(lit.value, ast::LiteralValue::String { .. }) => {
             format_string_literal_from_ast(lit, source).len() <= threshold
         }
 
@@ -887,9 +885,7 @@ fn chain_has_multiline_string_arg(mut expr: &Expression<'_>, source: &str) -> bo
 fn arg_is_multiline_string(expr: &Expression<'_>, source: &str) -> bool {
     match &expr.kind {
         ExpressionKind::UnaryExpression(unary) => arg_is_multiline_string(unary.argument, source),
-        ExpressionKind::Literal(lit)
-            if matches!(lit.value, internal::LiteralValue::String { .. }) =>
-        {
+        ExpressionKind::Literal(lit) if matches!(lit.value, ast::LiteralValue::String { .. }) => {
             let raw = lit.span.extract(source);
             raw.contains('\n') || raw.contains('\r')
         }
@@ -908,7 +904,7 @@ fn arg_is_multiline_string(expr: &Expression<'_>, source: &str) -> bool {
 /// Uses the comment region between the callee end and call span end to find any comments
 /// in the argument area (covers leading, trailing, and inter-argument comments).
 fn call_arg_has_comments(
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     span: Span,
     printer: &Printer<'_>,
 ) -> bool {
@@ -976,8 +972,8 @@ pub fn is_simple_value(expr: &Expression<'_>) -> bool {
         &expr.kind,
         ExpressionKind::Literal(lit) if matches!(
             lit.value,
-            internal::LiteralValue::Boolean(_)
-            | internal::LiteralValue::Number(_)
+            ast::LiteralValue::Boolean(_)
+            | ast::LiteralValue::Number(_)
         )
     ) || matches!(
         expr.kind,

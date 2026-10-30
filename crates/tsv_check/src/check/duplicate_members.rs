@@ -34,7 +34,7 @@ use crate::diag::{Category, Diagnostic};
 use crate::ids::FileId;
 use crate::span_scan::{bracket_end, bracket_start};
 use tsv_lang::{FxHashMap, Span};
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ClassMember, Expression, ExpressionKind, Literal, LiteralValue, MethodKind, TSTypeElement,
     TSTypeParameterDeclaration,
 };

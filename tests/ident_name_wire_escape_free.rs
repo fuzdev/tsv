@@ -276,8 +276,8 @@ fn a_synthesized_directive_name_is_escaped() {
 /// channel itself must say which names are not.
 #[test]
 fn a_directive_name_claims_span_identity_only_when_clean() {
-    use tsv_svelte::ast::internal::{AttributeNode, FragmentNode};
-    use tsv_ts::ast::internal::ExpressionKind;
+    use tsv_svelte::ast::{AttributeNode, FragmentNode};
+    use tsv_ts::ast::ExpressionKind;
     for directive in ["class", "bind"] {
         for (name, clean) in [
             ("a\\b", false),

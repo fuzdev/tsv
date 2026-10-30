@@ -47,7 +47,7 @@ use crate::options::{CheckOptions, Tristate};
 use smallvec::SmallVec;
 use tsv_lang::{Comment, Span};
 use tsv_ts::ast::Program;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ArrowFunctionBody, ClassMember, Decorator, ExportDefaultValue, Expression, ExpressionKind,
     ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, StatementKind,
     TSModuleDeclaration, TSModuleDeclarationBody,

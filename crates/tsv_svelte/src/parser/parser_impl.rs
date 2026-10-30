@@ -1,6 +1,6 @@
 // SvelteParser struct and helper methods
 
-use crate::ast::internal::{self, FragmentNode};
+use crate::ast::{self, FragmentNode};
 use crate::lexer::{Lexer, Token, TokenKind};
 use crate::parser::element::tag_name_end;
 use bumpalo::Bump;
@@ -59,8 +59,8 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     pub(crate) expression_comments: Vec<Comment>,
     /// The wire-only parameter lists of the `{#snippet}` heads that hold a grouping pair,
     /// in read order — which is source order, since a head is read before its body. See
-    /// [`internal::SnippetWireParameters`].
-    pub(crate) snippet_wire_parameters: BumpVec<'arena, internal::SnippetWireParameters<'arena>>,
+    /// [`ast::SnippetWireParameters`].
+    pub(crate) snippet_wire_parameters: BumpVec<'arena, ast::SnippetWireParameters<'arena>>,
     /// True while the nearest *element* ancestor is `<svelte:head>` — mirrors Svelte's
     /// `parent_is_head` (`1-parse/state/element.js`): set entering a head's children, reset by a
     /// nested RegularElement/Component, transparent through other special elements and blocks.
@@ -75,12 +75,12 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// `parser.meta_tags`, which makes a second one in the component a parse error.
     pub(crate) root_only_meta_tags_seen: u8,
     /// Set on reading a raw-text element nested in the markup — see
-    /// [`internal::Root::holds_nested_raw_text`]. Never cleared: a speculative read that is
+    /// [`ast::Root::holds_nested_raw_text`]. Never cleared: a speculative read that is
     /// later rewound can only leave it set for a document that holds none, which costs the
     /// printer the analysis the flag gates and changes no answer.
     pub(crate) holds_nested_raw_text: bool,
     /// The deepest markup nesting a nested raw-text element was read at — the depth the
-    /// printer's own parse of its body starts from ([`internal::Root::nested_raw_text_nesting`]).
+    /// printer's own parse of its body starts from ([`ast::Root::nested_raw_text_nesting`]).
     pub(crate) nested_raw_text_nesting: u32,
     /// The document's depth count against `tsv_lang`'s nesting limit ([`DepthBudget`]):
     /// the markup's own nesting, which every embedded TypeScript or CSS parse starts from
@@ -769,7 +769,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// One value rather than a mark per ledger because the ledgers fail differently
     /// and only one of the failures is loud: a comment registered twice is printed
-    /// twice, while a repeated [`internal::SnippetWireParameters`] entry is a second list
+    /// twice, while a repeated [`ast::SnippetWireParameters`] entry is a second list
     /// under one key that the writer's binary search may or may not pick — so rewinding
     /// one and forgetting the other reads as correct until the entries stop being
     /// identical.

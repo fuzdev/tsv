@@ -5,7 +5,7 @@
 
 use super::header_comments::is_only_whitespace_and_comments;
 use super::{MODULE_KW_LEN, MODULE_TYPE_KW_LEN, Printer};
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::statements::TerminatorGap;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -78,7 +78,7 @@ impl<'a> Printer<'a> {
     /// `import { /* c */ } from 'x'`, `import { // c\n } from 'x'`.
     pub(super) fn has_empty_named_braces(
         &self,
-        decl: &internal::ImportDeclaration<'_>,
+        decl: &ast::ImportDeclaration<'_>,
         span: Span,
     ) -> bool {
         // A surviving named specifier PROVES the braces are non-empty — decide
@@ -92,7 +92,7 @@ impl<'a> Printer<'a> {
         if decl
             .specifiers
             .iter()
-            .any(|spec| matches!(spec, internal::ImportSpecifier::Named(_)))
+            .any(|spec| matches!(spec, ast::ImportSpecifier::Named(_)))
         {
             return false;
         }
@@ -146,11 +146,11 @@ impl<'a> Printer<'a> {
     /// inside the specifier list.
     pub(super) fn import_header_end(
         &self,
-        decl: &internal::ImportDeclaration<'_>,
+        decl: &ast::ImportDeclaration<'_>,
         span: Span,
         search_end: u32,
     ) -> u32 {
-        let is_type = decl.import_kind == internal::ImportKind::Type;
+        let is_type = decl.import_kind == ast::ImportKind::Type;
         let base = self.module_header_end(is_type, span.start, search_end);
         // Skip the phase keyword (`source`/`defer`) for the import-phase proposals so
         // the default-binding / namespace comment scan starts after it.
@@ -175,11 +175,11 @@ impl<'a> Printer<'a> {
     /// specifier start to avoid matching `type` inside the specifier list.
     pub(super) fn export_header_end(
         &self,
-        decl: &internal::ExportNamedDeclaration<'_>,
+        decl: &ast::ExportNamedDeclaration<'_>,
         span: Span,
         search_end: u32,
     ) -> u32 {
-        let is_type = decl.export_kind == internal::ExportKind::Type;
+        let is_type = decl.export_kind == ast::ExportKind::Type;
         self.module_header_end(is_type, span.start, search_end)
     }
 
@@ -447,8 +447,8 @@ impl<'a> Printer<'a> {
         declaration_is_type_only: bool,
         specifier_is_type: bool,
         specifier_start: u32,
-        left: &internal::ModuleExportName<'_>,
-        right: &internal::ModuleExportName<'_>,
+        left: &ast::ModuleExportName<'_>,
+        right: &ast::ModuleExportName<'_>,
     ) -> DocId {
         let d = self.d();
         let (left_span, right_span) = (left.span(), right.span());
@@ -503,28 +503,25 @@ impl<'a> Printer<'a> {
     /// Build a doc for a `ModuleExportName`: a bare identifier emits its symbol;
     /// a string name (`'str'`) emits a quote-normalized string literal (preserved
     /// as a string — prettier keeps the form, never stripping to a bare identifier).
-    pub(super) fn build_module_export_name_doc(
-        &self,
-        name: &internal::ModuleExportName<'_>,
-    ) -> DocId {
+    pub(super) fn build_module_export_name_doc(&self, name: &ast::ModuleExportName<'_>) -> DocId {
         match name {
-            internal::ModuleExportName::Identifier(id) => self.identifier_name_doc(id),
-            internal::ModuleExportName::Literal(lit) => self.build_literal_doc(lit),
+            ast::ModuleExportName::Identifier(id) => self.identifier_name_doc(id),
+            ast::ModuleExportName::Literal(lit) => self.build_literal_doc(lit),
         }
     }
 
     /// Build a doc for a single import specifier
     pub(super) fn build_import_specifier_doc(
         &self,
-        named_spec: &internal::ImportNamedSpecifier<'_>,
+        named_spec: &ast::ImportNamedSpecifier<'_>,
         is_type_import: bool,
     ) -> DocId {
         // The local binding is always an identifier; wrap it so it shares the
         // `ModuleExportName`-based renamed-specifier renderer with the imported name.
-        let local = internal::ModuleExportName::Identifier(named_spec.local.clone());
+        let local = ast::ModuleExportName::Identifier(named_spec.local.clone());
         self.build_renamed_specifier_doc(
             is_type_import,
-            named_spec.import_kind == internal::ImportKind::Type,
+            named_spec.import_kind == ast::ImportKind::Type,
             named_spec.span.start,
             &named_spec.imported,
             &local,
@@ -534,12 +531,12 @@ impl<'a> Printer<'a> {
     /// Build a doc for a single export specifier
     pub(super) fn build_export_specifier_doc(
         &self,
-        spec: &internal::ExportSpecifier<'_>,
+        spec: &ast::ExportSpecifier<'_>,
         is_type_export: bool,
     ) -> DocId {
         self.build_renamed_specifier_doc(
             is_type_export,
-            spec.export_kind == internal::ExportKind::Type,
+            spec.export_kind == ast::ExportKind::Type,
             spec.span.start,
             &spec.local,
             &spec.exported,

@@ -29,7 +29,7 @@ use super::arg_wrapping::{
 use super::expand_last::{ArgOwner, try_expand_last_arg};
 use super::module_paths::{get_module_path_chain_break, is_module_path_no_break};
 use super::test_patterns::{build_test_callee_flat_doc, is_test_call, test_call_flat_gaps_clear};
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::comments::ShareSite;
 use crate::printer::expressions::functions::{
     arrow_signature_refuses_hug, callback_signature_refuses_hug,
@@ -69,7 +69,7 @@ use tsv_lang::doc::arena::DocId;
 /// and the shape is unchanged.
 pub(super) fn build_call_doc_with_wrapping(
     printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     span: Span,
 ) -> DocId {
     let d = printer.d();
@@ -99,11 +99,7 @@ struct CallHead {
     ungroup_args: bool,
 }
 
-fn build_call_head(
-    printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
-    span: Span,
-) -> CallHead {
+fn build_call_head(printer: &Printer<'_>, call: &ast::CallExpression<'_>, span: Span) -> CallHead {
     let d = printer.d();
 
     // Read before the callee is built, which re-arms the target for the callee's own span.
@@ -305,7 +301,7 @@ enum TestCall {
 /// `?.`-fusion verdicts), never for its doc.
 fn build_call_args_doc(
     printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     span: Span,
     callee: DocId,
     head: &CallHead,
@@ -726,7 +722,7 @@ fn push_lone_arg_trailing_comments(
 /// trailing comments, which defer to the general comment path — so the caller falls through.
 fn try_single_arg_comment_paths(
     printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     span: Span,
     callee: DocId,
     paren_open: u32,
@@ -847,7 +843,7 @@ fn try_single_arg_comment_paths(
 /// through to standard wrapping.
 fn try_single_arg_hug(
     printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     callee: DocId,
 ) -> Option<DocId> {
     let d = printer.d();
@@ -872,7 +868,7 @@ fn try_single_arg_hug(
     // A signature that will break still wins: that layout renders the signature's head on the
     // callee's line, which the break makes impossible, so the helper refuses the state for
     // every callee spelling and the block-arrow arm's own refusal keeps it.
-    if let internal::ExpressionKind::ArrowFunctionExpression(_) = &arg.kind
+    if let ast::ExpressionKind::ArrowFunctionExpression(_) = &arg.kind
         && let Some(gap_break) = last_arg_arrow_gap_break(printer, arg)
     {
         return Some(build_arrow_gap_break_single_arg_doc(
@@ -891,7 +887,7 @@ fn try_single_arg_hug(
         // Expandable arrow chains: `() => () => { block }`, `() => () => ({obj})`
         // are treated identically to block-body arrows. Matches prettier's
         // couldExpandArg recursive check with arrowChainRecursion=true.
-        internal::ExpressionKind::ArrowFunctionExpression(arrow)
+        ast::ExpressionKind::ArrowFunctionExpression(arrow)
             if !arrow.body.is_expression() || could_expand_arrow_chain(arrow) =>
         {
             return Some(build_block_arrow_hug_states(
@@ -906,7 +902,7 @@ fn try_single_arg_hug(
         //
         // A signature that refuses the hug refuses it outright: every hug state renders the
         // callee and the signature's head on one line, which the break makes impossible.
-        internal::ExpressionKind::FunctionExpression(_) => {
+        ast::ExpressionKind::FunctionExpression(_) => {
             let arg_doc = printer.build_expression_doc(arg);
             let opener = ArgOpener::callee(d, callee);
             if callback_signature_refuses_hug(printer, arg, 1) {
@@ -941,8 +937,8 @@ fn try_single_arg_hug(
         // body cannot reach here, since [`could_expand_arrow_chain`] claims it for the first
         // arm above. (Probed: 0 hits over 15.5k real files and the whole fixture suite, which
         // is what the guard's complement already says.)
-        internal::ExpressionKind::ArrowFunctionExpression(arrow) => {
-            if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
+        ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
+            if let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
                 // Expandable body (ternary): use conditional parens
                 // Prettier's "expand last arg" pattern:
                 // - Flat: `map((x) => (x ? y : z))` - parens prevent `<=` ambiguity
@@ -974,8 +970,8 @@ fn try_single_arg_hug(
     }
 
     // Wrap callback with width-aware breaking
-    if let internal::ExpressionKind::ArrowFunctionExpression(arrow) = &call.arguments[0].kind {
-        if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
+    if let ast::ExpressionKind::ArrowFunctionExpression(arrow) = &call.arguments[0].kind {
+        if let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
             // Prettier keeps `fn((x) =>` together (sig on opening line) when the
             // body is a call expression (looking through a trailing non-null `!`,
             // per prettier's `stripChainElementWrappers`). couldExpandArg keys on
@@ -1021,9 +1017,9 @@ fn try_single_arg_hug(
 fn build_block_arrow_hug_states(
     printer: &Printer<'_>,
     callee: DocId,
-    arrow: &internal::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression<'_>,
     span: Span,
-    arg: &internal::Expression<'_>,
+    arg: &ast::Expression<'_>,
 ) -> DocId {
     let d = printer.d();
     let build = || printer.build_expression_doc(arg);
@@ -1072,9 +1068,9 @@ fn build_block_arrow_hug_states(
 fn build_ternary_arrow_hug_states(
     printer: &Printer<'_>,
     callee: DocId,
-    arg: &internal::Expression<'_>,
-    arrow: &internal::ArrowFunctionExpression<'_>,
-    body_expr: &internal::Expression<'_>,
+    arg: &ast::Expression<'_>,
+    arrow: &ast::ArrowFunctionExpression<'_>,
+    body_expr: &ast::Expression<'_>,
 ) -> DocId {
     let d = printer.d();
     let sig_doc = build_arrow_sig_doc(printer, arrow, arg.span);
@@ -1098,7 +1094,7 @@ fn build_ternary_arrow_hug_states(
 /// so the caller falls through to the blank-line / default layout.
 fn build_call_with_arg_comments(
     printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     span: Span,
     callee: DocId,
     paren_open: u32,

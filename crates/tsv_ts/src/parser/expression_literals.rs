@@ -1,7 +1,7 @@
 // Object and array literal parsing (`{ ... }` and `[ ... ]`), plus the method
 // body shared by object-literal method shorthand and getters/setters.
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 

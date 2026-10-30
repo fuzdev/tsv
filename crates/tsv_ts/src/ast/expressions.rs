@@ -965,7 +965,7 @@ impl PropertyKind {
 /// 160 B to 32. It costs no allocation: the parser's expression spine already
 /// returns an arena-allocated `&Expression`, so an inline slot
 /// was a copy *out of* the arena rather than the place the node lives — see the
-/// density note in `internal::mod` and `Parser::parse_assignment_expression_ref`.
+/// density note in `ast/mod.rs` and `Parser::parse_assignment_expression_ref`.
 #[derive(Debug, Clone)]
 pub struct Property<'arena> {
     pub key: &'arena Expression<'arena>,

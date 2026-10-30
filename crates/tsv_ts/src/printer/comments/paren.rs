@@ -7,7 +7,7 @@
 // chain base.
 
 use super::{CommentSpacing, CommentVec, LeadingGlue, Printer, RunLeadingBlank, ShareSite};
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::ParenContext;
 use crate::printer::chain::{
     chain_mid_chain_paren_gaps, chain_paren_leading_gap, tag_paren_leading_start,
@@ -110,8 +110,8 @@ pub(crate) struct ParenLeadingValue {
 /// the operand, [`AsiOperandShell::Bare`]) and never hoist it, so the hoisting walk takes
 /// their operand only where it prints first and bare — a question about the printed form,
 /// answered by `Printer::bare_cast_operand`, not by this structural table.
-fn left_side_child<'e>(expr: &'e internal::Expression<'e>) -> Option<&'e internal::Expression<'e>> {
-    use internal::ExpressionKind;
+fn left_side_child<'e>(expr: &'e ast::Expression<'e>) -> Option<&'e ast::Expression<'e>> {
+    use ast::ExpressionKind;
     Some(match &expr.kind {
         ExpressionKind::CallExpression(call) => call.callee,
         ExpressionKind::MemberExpression(member) => member.object,
@@ -144,11 +144,11 @@ fn left_side_child<'e>(expr: &'e internal::Expression<'e>) -> Option<&'e interna
 /// A sequence answers `false`: its operands ride the sequence's OWN envelope, so an operand
 /// never prints a pair of its own — the sequence's envelope is the CALLER's to notice.
 fn left_side_child_is_parenthesized(
-    expr: &internal::Expression<'_>,
-    child: &internal::Expression<'_>,
+    expr: &ast::Expression<'_>,
+    child: &ast::Expression<'_>,
     in_for_init: bool,
 ) -> bool {
-    use internal::ExpressionKind;
+    use ast::ExpressionKind;
     let ctx = match &expr.kind {
         ExpressionKind::MemberExpression(_) => ParenContext::ChainBase,
         ExpressionKind::CallExpression(_) => ParenContext::Callee,
@@ -177,8 +177,8 @@ fn left_side_child_is_parenthesized(
 ///
 /// An embedder asks it where its own syntax gives a leading `/` another meaning: a Svelte
 /// `{…}` tag in text position reads `{/` as a block close, so `{/a/.test(s)}` does not parse.
-pub(crate) fn leading_regex_start(expr: &internal::Expression<'_>) -> Option<u32> {
-    use internal::ExpressionKind;
+pub(crate) fn leading_regex_start(expr: &ast::Expression<'_>) -> Option<u32> {
+    use ast::ExpressionKind;
     let mut node = expr;
     loop {
         match &node.kind {
@@ -210,10 +210,10 @@ pub(crate) fn leading_regex_start(expr: &internal::Expression<'_>) -> Option<u32
 /// [`leading_regex_start`], and the relational-chain rule's search for a kept shell
 /// (`needs_parens`'s `relational_region_opens_on_a_kept_shell`).
 pub(in crate::printer) fn printed_left_spine_step<'e>(
-    node: &'e internal::Expression<'e>,
+    node: &'e ast::Expression<'e>,
     in_for_init: bool,
-) -> Option<(&'e internal::Expression<'e>, bool)> {
-    use internal::ExpressionKind;
+) -> Option<(&'e ast::Expression<'e>, bool)> {
+    use ast::ExpressionKind;
     Some(match &node.kind {
         ExpressionKind::TSAsExpression(cast) => (
             cast.expression,
@@ -256,7 +256,7 @@ pub(in crate::printer) fn printed_left_spine_step<'e>(
 /// take for the leading edge: both edges lie inside the sequence's own span, so no
 /// enclosing gap can see them and whoever prints the operands owes them.
 ///
-/// ⚠️ **Not [`crate::ast::internal::Expression::printed_end`], and the two are not
+/// ⚠️ **Not [`crate::ast::Expression::printed_end`], and the two are not
 /// interchangeable.** That one answers the same shape of question — where does this node's
 /// doc stop printing — over a DISJOINT node set (an `AssignmentPattern`, whose span
 /// swallows the shell erased from its VALUE) and for a different consumer: it is the anchor
@@ -270,9 +270,9 @@ pub(in crate::printer) fn printed_left_spine_step<'e>(
 /// an object value or a call argument whose value is a sequence has no emitter for the shell
 /// erased from its LAST operand, so the comment written there floats out of the pair
 /// (`[(x, (y /* t */))]` → `[(x, y) /* t */]`).
-fn shell_content_end(expr: &internal::Expression<'_>) -> u32 {
+fn shell_content_end(expr: &ast::Expression<'_>) -> u32 {
     match &expr.kind {
-        internal::ExpressionKind::SequenceExpression(seq) => seq
+        ast::ExpressionKind::SequenceExpression(seq) => seq
             .expressions
             .last()
             .map_or_else(|| expr.span().end, |last| last.span().end),
@@ -280,11 +280,11 @@ fn shell_content_end(expr: &internal::Expression<'_>) -> u32 {
     }
 }
 
-pub(crate) fn paren_pair_keeps_leading_run(expr: &internal::Expression<'_>) -> bool {
+pub(crate) fn paren_pair_keeps_leading_run(expr: &ast::Expression<'_>) -> bool {
     matches!(
         expr.kind,
-        internal::ExpressionKind::ArrowFunctionExpression(_)
-            | internal::ExpressionKind::FunctionExpression(_)
+        ast::ExpressionKind::ArrowFunctionExpression(_)
+            | ast::ExpressionKind::FunctionExpression(_)
     )
 }
 
@@ -378,7 +378,7 @@ pub(crate) fn left_spine_shell_is_comment_free(source: &str, start: u32) -> bool
 /// printed. Exact — a span opens on a token — so the structural left-spine walks skip
 /// themselves on it ([`Printer::left_spine_printed_start`],
 /// [`Printer::build_value_with_left_spine_owned_comment`]).
-pub(super) fn left_spine_has_no_shell(source: &str, expr: &internal::Expression<'_>) -> bool {
+pub(super) fn left_spine_has_no_shell(source: &str, expr: &ast::Expression<'_>) -> bool {
     source.as_bytes().get(expr.span().start as usize) != Some(&b'(')
 }
 
@@ -403,7 +403,7 @@ pub(crate) struct LeftSpineClaim {
 pub(crate) struct HoistedLeftSpine<'p, 'a, 'e>(Option<LeftSpineSteps<'p, 'a, 'e>>);
 
 impl<'e> Iterator for HoistedLeftSpine<'_, '_, 'e> {
-    type Item = (&'e internal::Expression<'e>, &'e internal::Expression<'e>);
+    type Item = (&'e ast::Expression<'e>, &'e ast::Expression<'e>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let step = self.0.as_mut()?.next();
@@ -423,8 +423,8 @@ impl<'e> Iterator for HoistedLeftSpine<'_, '_, 'e> {
 /// its run ahead of the chain's head.
 #[derive(Clone, Copy)]
 pub(crate) struct LeftSpineStep<'e> {
-    pub(crate) node: &'e internal::Expression<'e>,
-    pub(crate) child: &'e internal::Expression<'e>,
+    pub(crate) node: &'e ast::Expression<'e>,
+    pub(crate) child: &'e ast::Expression<'e>,
     pub(crate) mid_chain: bool,
 }
 
@@ -438,8 +438,8 @@ pub(crate) struct LeftSpineStep<'e> {
 /// step inside it has a comment in its shell to ask about.
 pub(crate) struct LeftSpineSteps<'p, 'a, 'e> {
     printer: &'p Printer<'a>,
-    node: Option<&'e internal::Expression<'e>>,
-    chain_root: Option<&'e internal::Expression<'e>>,
+    node: Option<&'e ast::Expression<'e>>,
+    chain_root: Option<&'e ast::Expression<'e>>,
     mid_chain_gaps: Option<SmallVec<[(u32, u32); 2]>>,
 }
 
@@ -452,8 +452,7 @@ impl<'e> Iterator for LeftSpineSteps<'_, '_, 'e> {
         let mut mid_chain = false;
         if matches!(
             node.kind,
-            internal::ExpressionKind::MemberExpression(_)
-                | internal::ExpressionKind::CallExpression(_)
+            ast::ExpressionKind::MemberExpression(_) | ast::ExpressionKind::CallExpression(_)
         ) {
             let root = *self.chain_root.get_or_insert(node);
             let (shell_start, child_start) = (node.span().start, child.span().start);
@@ -470,7 +469,7 @@ impl<'e> Iterator for LeftSpineSteps<'_, '_, 'e> {
                     })
                     .contains(&(shell_start, child_start));
         } else if !(self.chain_root.is_some()
-            && matches!(node.kind, internal::ExpressionKind::TSNonNullExpression(_)))
+            && matches!(node.kind, ast::ExpressionKind::TSNonNullExpression(_)))
         {
             // A `!` under a member or call is a link of the same chain (the linearizer
             // takes it as a `ChainNode::NonNull`), so the links below it are still read
@@ -567,9 +566,9 @@ impl<'a> Printer<'a> {
     /// reparse).
     pub(crate) fn hoisted_left_side_child<'e>(
         &self,
-        expr: &'e internal::Expression<'e>,
-    ) -> Option<&'e internal::Expression<'e>> {
-        use internal::ExpressionKind;
+        expr: &'e ast::Expression<'e>,
+    ) -> Option<&'e ast::Expression<'e>> {
+        use ast::ExpressionKind;
         if let Some(operand) = self.bare_cast_operand(expr) {
             return Some(operand);
         }
@@ -630,9 +629,9 @@ impl<'a> Printer<'a> {
     /// pair keeps the run ([`chain_paren_leading_gap`]).
     fn chain_flattened_non_null_operand<'e>(
         &self,
-        child: &'e internal::Expression<'e>,
-    ) -> Option<&'e internal::Expression<'e>> {
-        let internal::ExpressionKind::TSNonNullExpression(non_null) = &child.kind else {
+        child: &'e ast::Expression<'e>,
+    ) -> Option<&'e ast::Expression<'e>> {
+        let ast::ExpressionKind::TSNonNullExpression(non_null) = &child.kind else {
             return None;
         };
         (chain_paren_leading_gap(child, self.comments).is_none()
@@ -651,9 +650,9 @@ impl<'a> Printer<'a> {
     /// stands — the operand's run is then held inside it.
     fn bare_cast_operand<'e>(
         &self,
-        expr: &'e internal::Expression<'e>,
-    ) -> Option<&'e internal::Expression<'e>> {
-        use internal::ExpressionKind;
+        expr: &'e ast::Expression<'e>,
+    ) -> Option<&'e ast::Expression<'e>> {
+        use ast::ExpressionKind;
         let (operand, boundary) = match &expr.kind {
             ExpressionKind::TSAsExpression(cast) => {
                 (cast.expression, cast.type_annotation.span().start)
@@ -695,8 +694,8 @@ impl<'a> Printer<'a> {
     /// `statements/return_throw/operand_paren_required_inner_pair_multiline_block_prettier_divergence`.
     pub(crate) fn left_shell_paren_is_emitted(
         &self,
-        expr: &internal::Expression<'_>,
-        child: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
+        child: &ast::Expression<'_>,
     ) -> bool {
         // No shell between them at all, so there is no pair to re-emit. The predicate below
         // asks only whether the CHILD prints parenthesized at its position, which is a
@@ -712,7 +711,7 @@ impl<'a> Printer<'a> {
     /// expression" asker takes, so none of them reads a shell the chain prints mid-chain.
     pub(crate) fn hoisted_left_spine<'p, 'e>(
         &'p self,
-        expr: &'e internal::Expression<'e>,
+        expr: &'e ast::Expression<'e>,
     ) -> HoistedLeftSpine<'p, 'a, 'e> {
         HoistedLeftSpine(Some(self.left_spine_steps(expr)))
     }
@@ -725,7 +724,7 @@ impl<'a> Printer<'a> {
     /// does a comment the head's leaf OWNS, wherever on the spine it sits.
     pub(crate) fn left_spine_steps<'p, 'e>(
         &'p self,
-        expr: &'e internal::Expression<'e>,
+        expr: &'e ast::Expression<'e>,
     ) -> LeftSpineSteps<'p, 'a, 'e> {
         LeftSpineSteps {
             printer: self,
@@ -749,9 +748,9 @@ impl<'a> Printer<'a> {
     /// the outer chain prints in (`return ((/* d */⏎ a) + 1) * 2` keeps `/* d */` on the
     /// keyword's line while it fits, and on a line of its own inside the return's pair
     /// once that breaks).
-    pub(crate) fn left_spine_group_start(&self, node: &internal::Expression<'_>) -> Option<u32> {
+    pub(crate) fn left_spine_group_start(&self, node: &ast::Expression<'_>) -> Option<u32> {
         match &node.kind {
-            internal::ExpressionKind::BinaryExpression(binary) => {
+            ast::ExpressionKind::BinaryExpression(binary) => {
                 let mut link = binary;
                 while let Some(left) = self.flattenable_left(link) {
                     link = left;
@@ -767,7 +766,7 @@ impl<'a> Printer<'a> {
     /// source opens a line for (the leading emitter's hardline), or a multi-line block,
     /// whose interior forces the group open. A glued single-line block takes the soft
     /// `line`, which the fitting group keeps flat.
-    pub(crate) fn comment_takes_line_in_group(&self, comment: &internal::Comment) -> bool {
+    pub(crate) fn comment_takes_line_in_group(&self, comment: &ast::Comment) -> bool {
         !comment.is_block
             || comment.multiline
             || has_newline_before_position(self.source, comment.span.start)
@@ -778,8 +777,8 @@ impl<'a> Printer<'a> {
     /// ([`Self::left_shell_paren_is_emitted`] states the difference).
     pub(crate) fn stripped_left_side_child<'e>(
         &self,
-        expr: &'e internal::Expression<'e>,
-    ) -> Option<&'e internal::Expression<'e>> {
+        expr: &'e ast::Expression<'e>,
+    ) -> Option<&'e ast::Expression<'e>> {
         let child = self.hoisted_left_side_child(expr)?;
         (!self.left_shell_paren_is_emitted(expr, child)).then_some(child)
     }
@@ -796,8 +795,8 @@ impl<'a> Printer<'a> {
     /// that pair and never travels ([`Self::left_shell_paren_is_emitted`]).
     pub(crate) fn stripped_left_spine_leaf<'e>(
         &self,
-        expr: &'e internal::Expression<'e>,
-    ) -> &'e internal::Expression<'e> {
+        expr: &'e ast::Expression<'e>,
+    ) -> &'e ast::Expression<'e> {
         let mut node = expr;
         while let Some(child) = self.stripped_left_side_child(node) {
             node = child;
@@ -822,10 +821,7 @@ impl<'a> Printer<'a> {
     /// comment breaks its line there at all. The member object→property gap is not this
     /// walk's: a comment there is the chain's own business
     /// (`Printer::has_line_comments_in_member_chain`).
-    pub(crate) fn left_spine_shell_has_own_line_comment(
-        &self,
-        expr: &internal::Expression<'_>,
-    ) -> bool {
+    pub(crate) fn left_spine_shell_has_own_line_comment(&self, expr: &ast::Expression<'_>) -> bool {
         if left_spine_shell_is_comment_free(self.source, expr.span().start) {
             return false;
         }
@@ -869,17 +865,14 @@ impl<'a> Printer<'a> {
     /// Asked at every operator→value seam, so the common answer is one byte: a value that
     /// does not open on a `(` has no shell ([`left_spine_has_no_shell`]).
     #[inline]
-    pub(crate) fn left_spine_indentable_leads_value(
-        &self,
-        value: &internal::Expression<'_>,
-    ) -> bool {
+    pub(crate) fn left_spine_indentable_leads_value(&self, value: &ast::Expression<'_>) -> bool {
         !left_spine_has_no_shell(self.source, value)
             && self.left_spine_indentable_leads_value_walk(value)
     }
 
     /// [`Self::left_spine_indentable_leads_value`] past its one-byte gate.
     #[inline(never)]
-    fn left_spine_indentable_leads_value_walk(&self, value: &internal::Expression<'_>) -> bool {
+    fn left_spine_indentable_leads_value_walk(&self, value: &ast::Expression<'_>) -> bool {
         if left_spine_shell_is_comment_free(self.source, value.span().start) {
             return false;
         }
@@ -898,7 +891,7 @@ impl<'a> Printer<'a> {
     /// Where this expression's doc STARTS PRINTING: past every stripped grouping paren on
     /// its left spine, which is the leftmost leaf [`Self::hoisted_left_spine`] reaches.
     ///
-    /// The start twin of [`internal::Expression::printed_end`], and the same difference read
+    /// The start twin of [`ast::Expression::printed_end`], and the same difference read
     /// from the other end — a region holding nothing but the `(`s the printer erases,
     /// whitespace, and any comment inside them. Unlike `printed_end` it is not a pure AST
     /// question: whether a pair is stripped or RETAINED depends on `needs_parens` and on what
@@ -914,7 +907,7 @@ impl<'a> Printer<'a> {
     /// must know the run is coming). ⚠️ For the **layout** half of that question only — an
     /// emitter must keep bounding its scan at `span().start`, since the node's own doc prints
     /// the hoisted run and claiming it again DOUBLE-PRINTS it.
-    pub(crate) fn left_spine_printed_start(&self, expr: &internal::Expression<'_>) -> u32 {
+    pub(crate) fn left_spine_printed_start(&self, expr: &ast::Expression<'_>) -> u32 {
         if left_spine_has_no_shell(self.source, expr) {
             return expr.span().start;
         }
@@ -968,7 +961,7 @@ impl<'a> Printer<'a> {
         &self,
         node: Span,
         start: u32,
-        child: &internal::Expression<'_>,
+        child: &ast::Expression<'_>,
         child_in_pair: impl FnOnce() -> bool,
     ) -> Option<LeftSpineClaim> {
         if left_spine_has_no_shell(self.source, child) {
@@ -983,7 +976,7 @@ impl<'a> Printer<'a> {
         &self,
         node: Span,
         start: u32,
-        child: &internal::Expression<'_>,
+        child: &ast::Expression<'_>,
         child_in_pair: impl FnOnce() -> bool,
     ) -> Option<LeftSpineClaim> {
         if left_spine_shell_is_comment_free(self.source, child.span().start)
@@ -1004,17 +997,17 @@ impl<'a> Printer<'a> {
             // (`Printer::build_ts_non_null_doc`).
             if !matches!(
                 node.kind,
-                internal::ExpressionKind::MemberExpression(_)
-                    | internal::ExpressionKind::CallExpression(_)
-                    | internal::ExpressionKind::TSNonNullExpression(_)
-                    | internal::ExpressionKind::BinaryExpression(_)
-                    | internal::ExpressionKind::TaggedTemplateExpression(_)
-                    | internal::ExpressionKind::ConditionalExpression(_)
-                    | internal::ExpressionKind::SequenceExpression(_)
-                    | internal::ExpressionKind::TSAsExpression(_)
-                    | internal::ExpressionKind::TSSatisfiesExpression(_)
-                    | internal::ExpressionKind::UpdateExpression(_)
-                    | internal::ExpressionKind::TSInstantiationExpression(_)
+                ast::ExpressionKind::MemberExpression(_)
+                    | ast::ExpressionKind::CallExpression(_)
+                    | ast::ExpressionKind::TSNonNullExpression(_)
+                    | ast::ExpressionKind::BinaryExpression(_)
+                    | ast::ExpressionKind::TaggedTemplateExpression(_)
+                    | ast::ExpressionKind::ConditionalExpression(_)
+                    | ast::ExpressionKind::SequenceExpression(_)
+                    | ast::ExpressionKind::TSAsExpression(_)
+                    | ast::ExpressionKind::TSSatisfiesExpression(_)
+                    | ast::ExpressionKind::UpdateExpression(_)
+                    | ast::ExpressionKind::TSInstantiationExpression(_)
             ) {
                 break;
             }
@@ -1423,8 +1416,8 @@ impl<'a> Printer<'a> {
     }
 
     /// Append the NODE's share of a stripped-paren interior — a spread's
-    /// ([`internal::SpreadElement::paren_interior`]) or a destructuring-assignment rest's
-    /// ([`internal::RestElement::paren_interior`]) — excluding own-line comments, which
+    /// ([`ast::SpreadElement::paren_interior`]) or a destructuring-assignment rest's
+    /// ([`ast::RestElement::paren_interior`]) — excluding own-line comments, which
     /// are the parent list's share (array/call/object literal, array/object pattern).
     ///
     /// The node's doc prints only what shares the argument's line: same-line blocks
@@ -1488,7 +1481,7 @@ impl<'a> Printer<'a> {
     /// every same-line block and same-line `//` prints twice.
     ///
     /// `interior` is `None` for an element with no stripped-paren interior (anything but a
-    /// spread or a rest — [`internal::Expression::paren_interior`]), whose share is empty.
+    /// spread or a rest — [`ast::Expression::paren_interior`]), whose share is empty.
     pub(crate) fn paren_interior_own_line_comments(
         &self,
         interior: Option<Span>,
@@ -1562,7 +1555,7 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         interior: Option<Span>,
         site: ShareSite,
-        run: impl IntoIterator<Item = &'c internal::Comment>,
+        run: impl IntoIterator<Item = &'c ast::Comment>,
     ) -> bool {
         self.push_element_share_and_run_with_blanks(parts, interior, site, true, run)
     }
@@ -1576,7 +1569,7 @@ impl<'a> Printer<'a> {
         interior: Option<Span>,
         site: ShareSite,
         preserve_blanks: bool,
-        run: impl IntoIterator<Item = &'c internal::Comment>,
+        run: impl IntoIterator<Item = &'c ast::Comment>,
     ) -> bool {
         let share = self.paren_interior_own_line_comments(interior);
         let line_ends_in_line_comment = share.last().map_or_else(
@@ -1665,7 +1658,7 @@ impl<'a> Printer<'a> {
     /// `next_start` is the next item's start.
     pub(crate) fn run_leads_next_item(
         &self,
-        run: &[&internal::Comment],
+        run: &[&ast::Comment],
         comma: Option<u32>,
         next_start: u32,
     ) -> bool {
@@ -1704,7 +1697,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_run_leading_next_item(
         &self,
         parts: &mut DocBuf,
-        run: &[&internal::Comment],
+        run: &[&ast::Comment],
         next_start: u32,
     ) {
         let d = self.d();
@@ -1757,7 +1750,7 @@ impl<'a> Printer<'a> {
     /// (the same reach `any_comment_forces_expansion` already has per argument).
     pub(crate) fn any_paren_interior_forces_expansion(
         &self,
-        elements: &[&internal::Expression<'_>],
+        elements: &[&ast::Expression<'_>],
     ) -> bool {
         elements
             .iter()
@@ -1827,7 +1820,7 @@ impl<'a> Printer<'a> {
         };
         let comments = self.paren_interior_own_line_comments(Some(interior));
         let mut prev_end = interior.start;
-        let mut prev_comment: Option<&internal::Comment> = None;
+        let mut prev_comment: Option<&ast::Comment> = None;
         for comment in &comments {
             // The glue question and the author-blank question are separate, so the
             // predicate is asked directly rather than through `push_trailing_run_separator`,
@@ -1944,7 +1937,7 @@ impl<'a> Printer<'a> {
     /// would pull the statement's own terminator-gap comments inside the parens.
     fn build_shell_sequence_doc(
         &self,
-        seq: &internal::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression<'_>,
         span: Span,
         expr_end: u32,
         boundary_end: u32,
@@ -2030,14 +2023,14 @@ impl<'a> Printer<'a> {
     fn redundant_shell_holds_line_spanning_owned_comment(
         &self,
         leading_start: u32,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         operand_ctx: ParenContext,
     ) -> bool {
         // A SEQUENCE's own parens ARE the grouping — `needs_parens` says false because the
         // sequence's printer emits them itself, not because the pair is redundant — so the
         // comment is already inside a pair that prints flat around it and nothing is at risk
         // (`const s1 = (/* c⏎d */ b, c) as T;`).
-        !matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_))
+        !matches!(expr.kind, ast::ExpressionKind::SequenceExpression(_))
             && !self.needs_parens(expr, operand_ctx)
             && self
                 .comments_in_source_between(leading_start, expr.span().start)
@@ -2093,7 +2086,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_asi_operand_shell_doc(
         &self,
         node_start: u32,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         boundary_end: u32,
         operand_ctx: ParenContext,
     ) -> AsiOperandShell {
@@ -2134,9 +2127,7 @@ impl<'a> Printer<'a> {
             // the cast takes a pair of its own (`y && (/* c */ (a, b) as T)` hoists the
             // comment out of that pair on the next pass). So this state composes the pair
             // itself, flat, with the operands riding bare — the expanded shell's layering.
-            if let (internal::ExpressionKind::SequenceExpression(seq), Some(run)) =
-                (&expr.kind, run)
-            {
+            if let (ast::ExpressionKind::SequenceExpression(seq), Some(run)) = (&expr.kind, run) {
                 let d = self.d();
                 let mut pair: DocBuf = smallvec![
                     d.text("("),
@@ -2167,7 +2158,7 @@ impl<'a> Printer<'a> {
         let close = self.collapsed_grouping_close(expr_end, boundary_end);
         let inner_end = close.map_or(boundary_end, |c| c + 1);
 
-        if matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_)) && !has_leading {
+        if matches!(expr.kind, ast::ExpressionKind::SequenceExpression(_)) && !has_leading {
             let seq =
                 self.build_expression_doc_keep_paren_comments(expr, inner_end, SeqLayout::Aligned);
             return AsiOperandShell::Shell(self.append_shell_outside_run(seq, close, boundary_end));
@@ -2199,7 +2190,7 @@ impl<'a> Printer<'a> {
             // Bare: the shell composed below IS the sequence's required pair. Its own
             // printer takes the owned-comment claim ([`Self::build_sequence_doc_bare`] →
             // the run form), so this arm needs none.
-            internal::ExpressionKind::SequenceExpression(seq) => {
+            ast::ExpressionKind::SequenceExpression(seq) => {
                 self.build_sequence_doc_bare(seq, expr.span, expr_end)
             }
             // A MULTI-LINE block the operand OWNS prints just inside this shell's `(`,
@@ -2650,7 +2641,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_shell_operand_doc(
         &self,
         node_start: u32,
-        target: &internal::Expression<'_>,
+        target: &ast::Expression<'_>,
         context: ParenContext,
     ) -> DocId {
         self.build_shell_operand_doc_with(node_start, target, context, || {
@@ -2664,7 +2655,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_shell_operand_doc_with(
         &self,
         node_start: u32,
-        target: &internal::Expression<'_>,
+        target: &ast::Expression<'_>,
         context: ParenContext,
         build: impl FnOnce() -> DocId,
     ) -> DocId {
@@ -2750,7 +2741,7 @@ impl<'a> Printer<'a> {
     /// [`Self::shell_closes_for_clause`].
     pub(crate) fn build_expression_doc_with_paren_comments(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         boundary_end: u32,
         position_parens: bool,
     ) -> DocId {
@@ -2802,7 +2793,7 @@ impl<'a> Printer<'a> {
     /// `boundary` of `None` is a position with no shell, which supplied nothing.
     pub(crate) fn shell_supplies_for_init_pair(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         boundary: Option<u32>,
     ) -> bool {
         boundary.is_some_and(|end| {
@@ -2826,7 +2817,7 @@ impl<'a> Printer<'a> {
     /// about the GAP, not about what renders between the parens.
     pub(crate) fn build_frozen_value_shell_doc(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         frozen: Span,
         boundary_end: u32,
         position_parens: bool,
@@ -2851,7 +2842,7 @@ impl<'a> Printer<'a> {
     /// never wraps there however the position answers `needs_parens`).
     pub(crate) fn shell_value_keeps_own_parens(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         boundary_end: u32,
         position_parens: bool,
     ) -> bool {
@@ -2876,12 +2867,8 @@ impl<'a> Printer<'a> {
     /// spelled once, for both retention predicates: giving it to only one had a sequence
     /// value answer "the shell is forced open" where nothing had retained a shell, which
     /// changed the operator's layout under a comment that still deferred past the `;`.
-    fn value_shell_pair_in_question(
-        &self,
-        expr: &internal::Expression<'_>,
-        boundary_end: u32,
-    ) -> bool {
-        !matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_))
+    fn value_shell_pair_in_question(&self, expr: &ast::Expression<'_>, boundary_end: u32) -> bool {
+        !matches!(expr.kind, ast::ExpressionKind::SequenceExpression(_))
             && self.has_trailing_paren_comments(expr.span().end, boundary_end)
     }
 
@@ -2897,7 +2884,7 @@ impl<'a> Printer<'a> {
     /// seam (`parenthesize_ternary_branch`) rather than through here.
     pub(crate) fn wrap_value_position_parens(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         boundary_end: u32,
         position_parens: bool,
         inner: DocId,
@@ -2982,7 +2969,7 @@ impl<'a> Printer<'a> {
     /// retains no shell here, so it forces none open either.
     pub(in crate::printer) fn value_shell_forced_open(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         boundary_end: u32,
     ) -> bool {
         self.value_shell_pair_in_question(expr, boundary_end)
@@ -3024,7 +3011,7 @@ impl<'a> Printer<'a> {
     /// renders between the parens.
     pub(crate) fn build_for_init_value_doc(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         boundary_end: u32,
         position_parens: bool,
         frozen: Option<Span>,
@@ -3053,7 +3040,7 @@ impl<'a> Printer<'a> {
     /// the one the clause's `build_elem` would.
     pub(crate) fn build_for_clause_operand_doc(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         boundary_end: u32,
         frozen: Option<Span>,
     ) -> DocId {
@@ -3065,11 +3052,7 @@ impl<'a> Printer<'a> {
     /// expression doc. Both spellings supply a self-parenthesizing value's own required
     /// pair ([`Self::build_frozen_expression_doc`] is `build_expression_doc`'s twin in
     /// exactly that), so the arms that return it need no sequence case of their own.
-    fn build_shell_inner_doc(
-        &self,
-        expr: &internal::Expression<'_>,
-        frozen: Option<Span>,
-    ) -> DocId {
+    fn build_shell_inner_doc(&self, expr: &ast::Expression<'_>, frozen: Option<Span>) -> DocId {
         match frozen {
             Some(frozen) => self.build_frozen_expression_doc(expr, frozen),
             None => self.build_expression_doc(expr),
@@ -3110,13 +3093,13 @@ impl<'a> Printer<'a> {
     /// will, so it says so instead of looking for a shell that may not be there.
     pub(in crate::printer) fn shell_trailing_gap_start(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         boundary_end: u32,
         frozen: Option<Span>,
         printer_owns_grouping: bool,
     ) -> u32 {
         let span_end = expr.span().end;
-        let unfrozen = if matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_))
+        let unfrozen = if matches!(expr.kind, ast::ExpressionKind::SequenceExpression(_))
             && (printer_owns_grouping
                 || self
                     .collapsed_grouping_close(span_end, boundary_end)
@@ -3131,7 +3114,7 @@ impl<'a> Printer<'a> {
 
     fn build_shell_value_doc(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         boundary_end: u32,
         tail: ShellTail,
         position_parens: bool,
@@ -3181,7 +3164,7 @@ impl<'a> Printer<'a> {
         // `for` clause and its last operand — is prettier's default layout arm; the two
         // that hang (a `return`/`throw` argument, an arrow body) claim their sequence
         // before reaching here.
-        if let internal::ExpressionKind::SequenceExpression(seq) = &expr.kind {
+        if let ast::ExpressionKind::SequenceExpression(seq) = &expr.kind {
             // A FROZEN sequence prints verbatim, so the operand-per-line layout the
             // sequence builder chooses is not available to it — its required pair takes
             // the retained-shell rendering below instead, which is where this gap's
@@ -3243,12 +3226,12 @@ impl<'a> Printer<'a> {
     #[inline(never)]
     fn build_handed_shell_value_doc(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         expr_end: u32,
         boundary_end: u32,
         position_parens: bool,
     ) -> Option<DocId> {
-        if matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_)) {
+        if matches!(expr.kind, ast::ExpressionKind::SequenceExpression(_)) {
             return None;
         }
         let retains = self.shell_gap_retains_parens(expr_end, boundary_end, position_parens);
@@ -3265,7 +3248,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::shell_tail`]), read here so the caller cannot name it wrong.
     pub(in crate::printer) fn build_stripped_shell_tail_doc(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         expr_end: u32,
         boundary_end: u32,
         inner: impl FnOnce() -> DocId,
@@ -3312,7 +3295,7 @@ impl<'a> Printer<'a> {
     /// chained conditional is a root one, so `inner`'s chained geometry is not wanted there.
     fn build_stripped_shell_tail_doc_with(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         expr_end: u32,
         boundary_end: u32,
         tail: ShellTail,
@@ -3447,7 +3430,7 @@ impl<'a> Printer<'a> {
     /// own parens instead of adding a second pair.)
     pub(in crate::printer) fn build_expression_doc_keep_paren_comments(
         &self,
-        expr: &internal::Expression<'_>,
+        expr: &ast::Expression<'_>,
         boundary_end: u32,
         layout: SeqLayout,
     ) -> DocId {
@@ -3457,7 +3440,7 @@ impl<'a> Printer<'a> {
         // paren-restoring path below — `build_expression_doc` would emit its parens and
         // this method would re-wrap them (`() => ((1, 2, 3) /* c */)`). `layout` is the
         // caller's: an arrow body hangs its operands, the ASI-shell operands align.
-        if let internal::ExpressionKind::SequenceExpression(seq) = &expr.kind {
+        if let ast::ExpressionKind::SequenceExpression(seq) = &expr.kind {
             return self.build_shell_sequence_doc(seq, expr.span, expr_end, boundary_end, layout);
         }
 

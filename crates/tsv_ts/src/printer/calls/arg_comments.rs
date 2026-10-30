@@ -8,7 +8,7 @@
 use smallvec::SmallVec;
 
 use super::super::{LeadingGlue, Printer};
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::comments::ShareSite;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -54,7 +54,7 @@ impl<'a> Printer<'a> {
     pub(super) fn open_inter_arg_gap(
         &self,
         parts: &mut DocBuf,
-        prev_arg: &internal::Expression<'_>,
+        prev_arg: &ast::Expression<'_>,
         interior: Option<Span>,
         next_arg_start: u32,
     ) -> InterArgGap<'a> {
@@ -88,7 +88,7 @@ impl<'a> Printer<'a> {
     pub(super) fn arg_paren_interior(
         &self,
         container_start: u32,
-        args: &[&internal::Expression<'_>],
+        args: &[&ast::Expression<'_>],
         i: usize,
     ) -> Option<Span> {
         let interior = args[i].paren_interior()?;
@@ -107,7 +107,7 @@ impl<'a> Printer<'a> {
     /// counterpart of the entry-gate hole [`any_comment_forces_expansion`] closes.
     pub(super) fn inter_arg_gap_has_comments(
         &self,
-        prev_arg: &internal::Expression<'_>,
+        prev_arg: &ast::Expression<'_>,
         next_arg_start: u32,
     ) -> bool {
         self.has_comments_to_emit_between(prev_arg.span().end, next_arg_start)
@@ -248,14 +248,14 @@ pub(crate) fn skip_stripped_open_paren(source: &str, from: u32, to: u32) -> u32 
 /// argument a comment binds to, which is the shape of every bug this seam has produced.
 /// Callers take the partition.
 #[inline]
-fn is_comment_before_comma(comment: &internal::Comment, comma_pos: usize) -> bool {
+fn is_comment_before_comma(comment: &ast::Comment, comma_pos: usize) -> bool {
     (comment.span.start as usize) < comma_pos
 }
 
 /// Check if a comment is after the comma position — private for the reason on
 /// [`is_comment_before_comma`].
 #[inline]
-fn is_comment_after_comma(comment: &internal::Comment, comma_pos: usize) -> bool {
+fn is_comment_after_comma(comment: &ast::Comment, comma_pos: usize) -> bool {
     (comment.span.start as usize) > comma_pos
 }
 
@@ -321,7 +321,7 @@ pub(super) fn build_arg_gap_docs(
 
 /// Check if a call expression has comments between any of its arguments
 pub(super) fn has_inter_argument_comments(
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     printer: &Printer<'_>,
 ) -> bool {
     has_inter_argument_comments_slice(call.arguments, printer)
@@ -329,7 +329,7 @@ pub(super) fn has_inter_argument_comments(
 
 /// Check if there are comments between arguments in a slice
 pub(super) fn has_inter_argument_comments_slice(
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
     printer: &Printer<'_>,
 ) -> bool {
     if arguments.len() < 2 {
@@ -364,7 +364,7 @@ pub(super) fn has_inter_argument_comments_slice(
 /// `anyArgEmptyLine` at all (see `call_formatting.rs`, which asks `is_test_call` — the callee, not
 /// the layout).
 pub(super) fn any_arg_empty_line(
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
     printer: &Printer<'_>,
 ) -> bool {
     arguments
@@ -449,7 +449,7 @@ pub(super) fn should_force_expansion_for_comments(
 /// answers `false` here, which is what prettier's `hasComment(arg)` reports for it too.
 /// **On page**, since an owned annotation glued to an argument is a comment prettier sees.
 pub(super) fn any_arg_gap_has_comment_on_page(
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
     printer: &Printer<'_>,
     paren_open: u32,
     call_end: u32,
@@ -469,7 +469,7 @@ pub(super) fn any_arg_gap_has_comment_on_page(
 /// Returns true for line comments or standalone block comments (on their own line,
 /// not inline with either neighbor). Inline block comments do not force expansion.
 pub(super) fn any_comment_forces_expansion(
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     span: Span,
     printer: &Printer<'_>,
     paren_open: u32,
@@ -483,7 +483,7 @@ pub(super) fn any_comment_forces_expansion(
 /// asked [`has_inter_argument_comments_slice`] instead, which counts a same-line inline
 /// block (`new A(a /* c */, () => {…})`) and so broke out a list prettier keeps hugged.
 pub(super) fn any_comment_forces_expansion_slice(
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
     printer: &Printer<'_>,
     paren_open: u32,
     call_end: u32,
@@ -561,7 +561,7 @@ pub(super) fn any_comment_forces_expansion_slice(
 /// Used to prevent expand-last-arg layout when the last arg has comments,
 /// since prettier's shouldExpandLastArg returns false in that case.
 pub(super) fn last_arg_has_comments(
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
     printer: &Printer<'_>,
     call_end: u32,
     paren_open: u32,
@@ -614,7 +614,7 @@ pub(super) fn last_arg_has_comments(
 /// argument is on the page just like any other leading comment, so prettier's
 /// `shouldExpandFirstArg` refuses the hug for it too.
 pub(super) fn first_arg_has_any_comments(
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
     printer: &Printer<'_>,
     paren_open: u32,
 ) -> bool {
@@ -655,7 +655,7 @@ pub(super) fn first_arg_has_any_comments(
 /// either between the arg and its comma, or between the last arg and the closing paren.
 /// Example: `fn(a && b, // trailing)` - the `// trailing` is a trailing comment on `a && b`
 pub(super) fn has_trailing_comments_on_args(
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
     span: Span,
     printer: &Printer<'_>,
 ) -> bool {
@@ -666,7 +666,7 @@ pub(super) fn has_trailing_comments_on_args(
 ///
 /// Used by both CallExpression and NewExpression.
 pub(super) fn has_trailing_line_comments_slice(
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
     call_span_end: u32,
     printer: &Printer<'_>,
 ) -> bool {
@@ -763,7 +763,7 @@ pub(super) fn emit_first_arg_leading_comments(
 pub(super) fn emit_last_arg_trailing_comments(
     printer: &Printer<'_>,
     parts: &mut DocBuf,
-    last_arg: &internal::Expression<'_>,
+    last_arg: &ast::Expression<'_>,
     interior: Option<Span>,
     paren_close: u32,
 ) {
@@ -792,7 +792,7 @@ pub(super) fn emit_last_arg_trailing_comments(
 /// This is important for new expressions where block comments after arguments
 /// can also be lost if not handled properly.
 pub(super) fn has_trailing_comments_slice(
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
     call_span_end: u32,
     printer: &Printer<'_>,
 ) -> bool {
@@ -804,7 +804,7 @@ pub(super) fn has_trailing_comments_slice(
 /// Shared implementation for checking trailing comments on arguments.
 #[inline]
 fn has_trailing_comments_slice_impl<F>(
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
     call_span_end: u32,
     has_comments: F,
 ) -> bool
@@ -866,13 +866,13 @@ where
 /// This type adds the call-argument-specific emission (`emit_*`) and comma-relative
 /// helpers on top; only the emission differs per shape, which is intentional.
 pub(crate) struct PartitionedComments<'a> {
-    pub trailing_line: Option<&'a internal::Comment>,
-    pub trailing_block: SmallVec<[&'a internal::Comment; 2]>,
-    pub leading: SmallVec<[&'a internal::Comment; 2]>,
+    pub trailing_line: Option<&'a ast::Comment>,
+    pub trailing_block: SmallVec<[&'a ast::Comment; 2]>,
+    pub leading: SmallVec<[&'a ast::Comment; 2]>,
     /// A run displaced past the comma by the previous argument's stripped-paren interior
     /// that LEADS the next argument ([`Self::lead_run_blocks_behind_interior`]), printed
     /// ahead of `leading` by [`Self::emit_leading_comments_inline_aware`].
-    leads: SmallVec<[&'a internal::Comment; 2]>,
+    leads: SmallVec<[&'a ast::Comment; 2]>,
     /// Whether the previous argument's run follows its stripped-paren interior — the
     /// comma then sits against that argument, which moves where an author blank before the
     /// next argument is measured from ([`Self::has_blank_line_in_gap`]).
@@ -1023,13 +1023,13 @@ impl<'a> PartitionedComments<'a> {
     /// comment trail, everything past it leads. Shared by the two item-gap constructors so
     /// only the run's own rule differs between them.
     fn from_trailing_run(
-        run: impl Iterator<Item = &'a internal::Comment>,
+        run: impl Iterator<Item = &'a ast::Comment>,
         printer: &Printer<'a>,
         start: u32,
         end: u32,
     ) -> Self {
-        let mut trailing_line: Option<&'a internal::Comment> = None;
-        let mut trailing_block: SmallVec<[&'a internal::Comment; 2]> = SmallVec::new();
+        let mut trailing_line: Option<&'a ast::Comment> = None;
+        let mut trailing_block: SmallVec<[&'a ast::Comment; 2]> = SmallVec::new();
         let mut run_end = start;
         for comment in run {
             if comment.is_block {
@@ -1070,7 +1070,7 @@ impl<'a> PartitionedComments<'a> {
         let Some(comma_pos) = find_comma_pos(printer.source, self.start, self.end) else {
             return;
         };
-        let mut kept: SmallVec<[&'a internal::Comment; 2]> = SmallVec::new();
+        let mut kept: SmallVec<[&'a ast::Comment; 2]> = SmallVec::new();
         for comment in self.trailing_block.drain(..) {
             if is_comment_after_comma(comment, comma_pos)
                 && printer.comment_hugs_next_item(comment.span.end, self.end)
@@ -1108,7 +1108,7 @@ impl<'a> PartitionedComments<'a> {
     /// The gap's trailing RUN in source order — its same-line blocks, then the (at most
     /// one) same-line `//` the run ends at — for [`Printer::push_element_share_and_run`],
     /// which renders it behind an argument's stripped-paren interior.
-    pub(super) fn trailing_run(&self) -> impl Iterator<Item = &'a internal::Comment> + '_ {
+    pub(super) fn trailing_run(&self) -> impl Iterator<Item = &'a ast::Comment> + '_ {
         self.trailing_block
             .iter()
             .chain(self.trailing_line.iter())

@@ -25,7 +25,7 @@ use super::boundary_ws::closer_pos;
 use super::selectors::first_anchor;
 use super::value_normalization;
 use super::value_normalization::ValueReader;
-use crate::ast::internal;
+use crate::ast;
 use crate::whitespace::Edge;
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
@@ -114,7 +114,7 @@ fn first_line_width(text: &str) -> usize {
 
 /// Where an at-rule's prelude region ends: its block's `{`, or its statement's `;` — the far
 /// end of the gap after the prelude's last token.
-fn prelude_region_end(atrule: &internal::CssAtrule<'_>) -> u32 {
+fn prelude_region_end(atrule: &ast::CssAtrule<'_>) -> u32 {
     atrule
         .block
         .as_ref()
@@ -173,7 +173,7 @@ fn prelude_fill_context(reserve: usize) -> DocContext {
 
 impl<'a> Printer<'a> {
     /// Format a CSS at-rule (@media, @keyframes, @supports, etc.)
-    pub(super) fn print_css_atrule(&mut self, atrule: &internal::CssAtrule<'_>) {
+    pub(super) fn print_css_atrule(&mut self, atrule: &ast::CssAtrule<'_>) {
         // A block child's own `allow_comment_or_whitespace` juncture: the run before the `@`
         // was skipped by the parser and this head is rebuilt from parts, so nothing else can
         // carry it. A rule child gets the same claim from its selector's first compound
@@ -194,7 +194,7 @@ impl<'a> Printer<'a> {
 
         // Print prelude based on type
         match &atrule.prelude {
-            internal::PreludeValue::Values { values, span } if !values.is_empty() => {
+            ast::PreludeValue::Values { values, span } if !values.is_empty() => {
                 self.write(" ");
                 // Special handling for @import with media query (last value may need
                 // wrapping). At-rule names are case-insensitive (`@IMPORT` too).
@@ -218,7 +218,7 @@ impl<'a> Printer<'a> {
                     // where the normalization below is inert on it.
                     if is_import
                         && i == values.len() - 1
-                        && let internal::CssValue::Identifier {
+                        && let ast::CssValue::Identifier {
                             span: value_span, ..
                         } = value
                     {
@@ -256,7 +256,7 @@ impl<'a> Printer<'a> {
                 // `;`, where it holds a boundary run (`@import 'a.css' <NBSP>;`).
                 self.write_prelude_gap(prev_end, prelude_region_end(atrule), Edge::Flush);
             }
-            internal::PreludeValue::Raw { content, span } if !content.is_empty() => {
+            ast::PreludeValue::Raw { content, span } if !content.is_empty() => {
                 // `content` is already verbatim (internal whitespace + comments preserved,
                 // outer-trimmed, `url()` inner-trimmed) from the parser's non-normalized
                 // raw path, so it matches prettier as-is — no comment-spacing rewrite.
@@ -274,12 +274,12 @@ impl<'a> Printer<'a> {
                 self.write(" ");
                 self.write(content);
             }
-            internal::PreludeValue::Supports { condition, span } => {
+            ast::PreludeValue::Supports { condition, span } => {
                 // @supports conditions are declarations, so prettier normalizes
                 // their values (e.g. numbers); @container queries are left raw.
                 self.write_condition_prelude(ConditionKind::Supports, condition, *span, atrule);
             }
-            internal::PreludeValue::Container {
+            ast::PreludeValue::Container {
                 name,
                 condition,
                 span,
@@ -293,14 +293,14 @@ impl<'a> Printer<'a> {
                     atrule,
                 );
             }
-            internal::PreludeValue::Media { content, .. } if !content.is_empty() => {
+            ast::PreludeValue::Media { content, .. } if !content.is_empty() => {
                 self.write(" ");
                 self.print_media_prelude(content, atrule.block.is_some());
             }
-            internal::PreludeValue::CustomSelector { name, list, span } => {
+            ast::PreludeValue::CustomSelector { name, list, span } => {
                 self.write_custom_selector_prelude(*name, list, *span, atrule);
             }
-            internal::PreludeValue::Selectors { root, limit, .. } => {
+            ast::PreludeValue::Selectors { root, limit, .. } => {
                 self.write_scope_prelude(root.as_ref(), limit.as_ref(), atrule);
             }
             _ => {}
@@ -498,9 +498,9 @@ impl<'a> Printer<'a> {
     fn write_condition_prelude(
         &mut self,
         kind: ConditionKind<'_>,
-        condition: &internal::ConditionQuery<'_>,
+        condition: &ast::ConditionQuery<'_>,
         span: Span,
-        atrule: &internal::CssAtrule<'_>,
+        atrule: &ast::CssAtrule<'_>,
     ) {
         if condition.parts.is_empty() {
             // Bounds the prelude region rather than the condition: the span's end is the
@@ -549,8 +549,8 @@ impl<'a> Printer<'a> {
     fn print_condition_query(
         &mut self,
         kind: ConditionKind<'_>,
-        condition: &internal::ConditionQuery<'_>,
-        atrule: &internal::CssAtrule<'_>,
+        condition: &ast::ConditionQuery<'_>,
+        atrule: &ast::CssAtrule<'_>,
         prelude_span: Span,
     ) {
         // The partless prelude is `write_condition_prelude`'s, this function's one caller
@@ -616,7 +616,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_supports_condition_doc(
         &self,
         name: &str,
-        condition: &internal::ConditionQuery<'_>,
+        condition: &ast::ConditionQuery<'_>,
     ) -> DocId {
         let d = self.d();
         // A `supports()` argument is exactly one part; an empty query means the parse
@@ -630,7 +630,7 @@ impl<'a> Printer<'a> {
             // The first and last segments are `Text` by construction — the part opens
             // on the `(` and closes on the `)` — so the strip guards never fire.
             let peeled = match segment {
-                internal::ConditionSegment::Text(text) => {
+                ast::ConditionSegment::Text(text) => {
                     let mut text: &str = text;
                     if i == 0 {
                         text = text.strip_prefix('(').unwrap_or(text);
@@ -638,7 +638,7 @@ impl<'a> Printer<'a> {
                     if i == last {
                         text = text.strip_suffix(')').unwrap_or(text);
                     }
-                    internal::ConditionSegment::Text(text)
+                    ast::ConditionSegment::Text(text)
                 }
                 selectors => *selectors,
             };
@@ -666,11 +666,11 @@ impl<'a> Printer<'a> {
     fn build_condition_segment_doc(
         &self,
         kind: ConditionKind<'_>,
-        segment: &internal::ConditionSegment<'_>,
+        segment: &ast::ConditionSegment<'_>,
     ) -> DocId {
         let d = self.d();
         match segment {
-            internal::ConditionSegment::Text(text) => {
+            ast::ConditionSegment::Text(text) => {
                 if kind.normalizes() {
                     d.text_pooled(&value_normalization::normalize_value_text(
                         text,
@@ -686,7 +686,7 @@ impl<'a> Printer<'a> {
             // a pseudo-class's argument list claims them (a boundary run at either end —
             // `selector(a <NBSP>)` — included); `remove_lines` keeps the argument on the
             // prelude's line.
-            internal::ConditionSegment::Selectors { list, paren } => {
+            ast::ConditionSegment::Selectors { list, paren } => {
                 d.remove_lines(self.build_paren_selector_list_inner(list, *paren))
             }
         }
@@ -715,7 +715,7 @@ impl<'a> Printer<'a> {
     fn build_condition_query_doc(
         &self,
         kind: ConditionKind<'_>,
-        condition: &internal::ConditionQuery<'_>,
+        condition: &ast::ConditionQuery<'_>,
         name_end_pos: u32,
         (prelude_span, region_end): (Span, u32),
         reserve: usize,
@@ -723,7 +723,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let parts = condition.parts;
 
-        let content_doc = |part: &internal::ConditionPart<'_>| {
+        let content_doc = |part: &ast::ConditionPart<'_>| {
             let mut segments = DocBuf::with_capacity(part.segments.len());
             for segment in part.segments {
                 segments.push(self.build_condition_segment_doc(kind, segment));
@@ -735,7 +735,7 @@ impl<'a> Printer<'a> {
         // included, since a connector with no operand on its LEFT still binds the part on
         // its right (`@supports and (a: b)`, `@container name and (a: b)`). Split at that
         // run like every later gap, so its comments and runs stay on their authored side.
-        let leading_first = |part: &internal::ConditionPart<'_>| -> DocId {
+        let leading_first = |part: &ast::ConditionPart<'_>| -> DocId {
             let mut head = DocBuf::new();
             match part.connector {
                 None => self.push_condition_gap_ahead(&mut head, name_end_pos, part.span.start),
@@ -927,10 +927,10 @@ impl<'a> Printer<'a> {
     /// `None` when the query has neither, so a caller need not concat an empty doc.
     fn condition_tail_doc(
         &self,
-        last: &internal::ConditionPart<'_>,
+        last: &ast::ConditionPart<'_>,
         prelude_span: Span,
         region_end: u32,
-        condition: &internal::ConditionQuery<'_>,
+        condition: &ast::ConditionQuery<'_>,
     ) -> Option<DocId> {
         let d = self.d();
         let mut tail = DocBuf::new();
@@ -964,7 +964,7 @@ impl<'a> Printer<'a> {
     /// It can never collide with the tail gap's claim beside it. A comment inside the run
     /// is carried *by* the run (the parser un-registers it there), and the gap the claim
     /// reads starts where the run ends.
-    fn trailing_operators_doc(&self, condition: &internal::ConditionQuery<'_>) -> Option<DocId> {
+    fn trailing_operators_doc(&self, condition: &ast::ConditionQuery<'_>) -> Option<DocId> {
         let trailing_operators = condition.trailing_operators?;
         let d = self.d();
         Some(d.concat(&[d.text(" "), d.text_pooled(trailing_operators)]))
@@ -1059,9 +1059,9 @@ impl<'a> Printer<'a> {
     /// claims a boundary run the parser stepped there ([`Self::prelude_gap_text`]).
     fn write_scope_prelude(
         &mut self,
-        root: Option<&internal::ScopeClause<'_>>,
-        limit: Option<&internal::ScopeLimit<'_>>,
-        atrule: &internal::CssAtrule<'_>,
+        root: Option<&ast::ScopeClause<'_>>,
+        limit: Option<&ast::ScopeLimit<'_>>,
+        atrule: &ast::CssAtrule<'_>,
     ) {
         // Right bound of the pre-`{` gap: the block's `{`, or the `;` of a block-less
         // `@scope` (not valid CSS, but accepted like any prelude).
@@ -1179,9 +1179,9 @@ impl<'a> Printer<'a> {
     fn write_custom_selector_prelude(
         &mut self,
         name: Span,
-        list: &internal::SelectorList<'_>,
+        list: &ast::SelectorList<'_>,
         span: Span,
-        atrule: &internal::CssAtrule<'_>,
+        atrule: &ast::CssAtrule<'_>,
     ) {
         // Leading gap: from the at-rule name's end — the `@custom-selector` token can hold
         // no comment, so this never reaches into the name — to the `:--name`.

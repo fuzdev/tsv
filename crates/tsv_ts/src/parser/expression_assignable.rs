@@ -2,7 +2,7 @@
 // assignable pattern (`{a, b} = obj`, `[x] = arr`, arrow params). Pure AST
 // rewriting — no token consumption.
 
-use crate::ast::internal::{
+use crate::ast::{
     ArrayPattern, AssignmentOperator, AssignmentPattern, Expression, ExpressionKind, ObjectPattern,
     ObjectPatternProperty, ObjectProperty, Property, PropertyKind, RestElement, SpreadElement,
 };

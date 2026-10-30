@@ -14,7 +14,7 @@
 // is why the resolution is exposed as a pair as well as a finished doc. Deriving the run
 // or the verdict separately is what let the class header drift.
 
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::Printer;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -177,7 +177,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         sig_end: u32,
-        body: &internal::BlockStatement<'_>,
+        body: &ast::BlockStatement<'_>,
     ) {
         let (pre_body, frozen) = self.build_declaration_pre_body_doc(sig_end, body.span);
         parts.push(pre_body);

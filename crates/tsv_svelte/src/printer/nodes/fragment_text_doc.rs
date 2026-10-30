@@ -13,7 +13,7 @@
 
 use super::fragment_doc::{DeferredBoundary, LeadingEdge, text_starts_with_linebreak};
 use super::helpers::{is_control_flow_block, is_inline_content};
-use crate::ast::internal::{
+use crate::ast::{
     CollapsibleWord, FragmentNode, Text, collapsible_word_ranges, text_edge_newlines,
 };
 use crate::printer::Printer;

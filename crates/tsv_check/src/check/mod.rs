@@ -28,7 +28,7 @@ use crate::diag::Diagnostic;
 use crate::ids::FileId;
 use duplicate_members::MemberCtx;
 use tsv_ts::ast::Program;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ArrowFunctionBody, ClassBody, ClassMember, Decorator, ExportDefaultValue, Expression,
     ExpressionKind, ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement,
     StatementKind, TSInterfaceDeclaration, TSInterfaceHeritage, TSLiteralType, TSModuleDeclaration,

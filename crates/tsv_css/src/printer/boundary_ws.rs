@@ -161,7 +161,7 @@
 // the reader's cataloged query-level spacing, not a claim's.
 
 use super::Printer;
-use crate::ast::internal::CssBlockChild;
+use crate::ast::CssBlockChild;
 use crate::whitespace::{Comments, Edge, spell_run};
 use tsv_lang::Span;
 

@@ -26,12 +26,12 @@
 use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_svelte::ast::internal::{
+use tsv_svelte::ast::{
     AwaitBlock, ConstTag, EachBlock, Element, ElementKind, ExpressionTag, Fragment, FragmentNode,
     HtmlTag, IfBlock, KeyBlock, RenderTag, SnippetBlock, SpecialElement, SpecialElementKind,
     SpecialThis,
 };
-use tsv_ts::ast::internal::{Expression, Statement};
+use tsv_ts::ast::{Expression, Statement};
 
 use crate::analyze::{ScopeEntry, evaluate, stringify_value};
 use crate::blocks::{

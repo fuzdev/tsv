@@ -19,7 +19,7 @@ use super::arg_wrapping::{
     prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments,
 };
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::Printer;
 use crate::printer::expressions::functions::{
     arrow_signature_refuses_hug, callback_signature_refuses_hug,
@@ -51,13 +51,13 @@ impl ArgOwner {
     fn callback_signature_refuses_hug(
         self,
         printer: &Printer<'_>,
-        arg: &internal::Expression<'_>,
+        arg: &ast::Expression<'_>,
         arg_count: usize,
     ) -> bool {
         match self {
             Self::Call => callback_signature_refuses_hug(printer, arg, arg_count),
             Self::New => match &arg.kind {
-                internal::ExpressionKind::ArrowFunctionExpression(arrow) => {
+                ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
                     arrow_signature_refuses_hug(printer, arrow, arg.span)
                 }
                 _ => false,
@@ -90,7 +90,7 @@ impl ArgOwner {
 /// no state below can hug, and the caller's general path prints it whole.
 pub(super) fn try_expand_last_arg(
     printer: &Printer<'_>,
-    arguments: &[&internal::Expression<'_>],
+    arguments: &[&ast::Expression<'_>],
     callee: DocId,
     paren_open: u32,
     call_end: u32,
@@ -106,9 +106,9 @@ pub(super) fn try_expand_last_arg(
     let last_arg = arguments.last().copied();
     let last_is_function = matches!(
         last_arg,
-        Some(internal::Expression {
-            kind: internal::ExpressionKind::ArrowFunctionExpression(_)
-                | internal::ExpressionKind::FunctionExpression(_),
+        Some(ast::Expression {
+            kind: ast::ExpressionKind::ArrowFunctionExpression(_)
+                | ast::ExpressionKind::FunctionExpression(_),
             ..
         })
     );
@@ -122,13 +122,13 @@ pub(super) fn try_expand_last_arg(
     }
 
     let hug_eligible = match last_arg {
-        Some(internal::Expression {
+        Some(ast::Expression {
             span: arrow_span,
-            kind: internal::ExpressionKind::ArrowFunctionExpression(arrow),
+            kind: ast::ExpressionKind::ArrowFunctionExpression(arrow),
         }) => {
             could_expand_arrow_chain(arrow)
                 || match &arrow.body {
-                    internal::ArrowFunctionBody::Expression(body_expr) => {
+                    ast::ArrowFunctionBody::Expression(body_expr) => {
                         (arrow_body_is_call_through_non_null(body_expr)
                             || is_ternary_arrow_body(body_expr))
                             && !(has_comments
@@ -139,7 +139,7 @@ pub(super) fn try_expand_last_arg(
                                     body_expr,
                                 ))
                     }
-                    internal::ArrowFunctionBody::BlockStatement(_) => false,
+                    ast::ArrowFunctionBody::BlockStatement(_) => false,
                 }
         }
         _ => true,
@@ -169,15 +169,15 @@ pub(super) fn try_expand_last_arg(
     if arguments.len() == 2
         && matches!(
             arguments.first(),
-            Some(internal::Expression {
-                kind: internal::ExpressionKind::ArrowFunctionExpression(_),
+            Some(ast::Expression {
+                kind: ast::ExpressionKind::ArrowFunctionExpression(_),
                 ..
             })
         )
         && matches!(
             last_arg,
-            Some(internal::Expression {
-                kind: internal::ExpressionKind::ArrayExpression(_),
+            Some(ast::Expression {
+                kind: ast::ExpressionKind::ArrayExpression(_),
                 ..
             })
         )
@@ -267,10 +267,10 @@ pub(super) fn try_expand_last_arg(
     if last_is_function {
         // Expression arrow with a call / conditional body: the head arguments stay inline and
         // only the body breaks after `=>` (`fn({ a: 1 }, (x) =>⏎\tcall(x, …)⏎)`).
-        if let Some(internal::Expression { span: arrow_span, kind: internal::ExpressionKind::ArrowFunctionExpression(arrow) }) = last_arg
-            && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+        if let Some(ast::Expression { span: arrow_span, kind: ast::ExpressionKind::ArrowFunctionExpression(arrow) }) = last_arg
+            && let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body
             && (arrow_body_is_call_through_non_null(body_expr)
-                || matches!(body_expr.kind, internal::ExpressionKind::ConditionalExpression(_)))
+                || matches!(body_expr.kind, ast::ExpressionKind::ConditionalExpression(_)))
             // The reassembling arm's refusal pair, which holds at every one of these states —
             // and the same question the eligibility gate above already answered to let this
             // block be entered at all.
@@ -303,7 +303,7 @@ pub(super) fn try_expand_last_arg(
         // curried heads (`fn(arg, (x) => (y) => ({⏎\ta: x⏎}))`). `couldExpandArg` keys only on
         // the terminal's type, so a typed arrow expands the same way.
         if let Some(arg) = last_arg
-            && let internal::ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
+            && let ast::ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
             && arrow_body_expands_internally(arrow)
             // A break inside the signature — the hug renders the callee and the signature
             // run on one line. NOT the body-tail question its reassembling siblings ask

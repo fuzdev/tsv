@@ -4916,7 +4916,7 @@ const TYPE_ATTR = /(?<![\w-])type\s*=\s*(?:"([^"]*)"|'([^']*)')/;
 
 /**
  * The narrowed `lang`/`type` value an opening tag names, mirroring
- * `internal::lang_attribute`'s reader rules over raw tag text: `lang` outranks `type`
+ * `ast::lang_attribute`'s reader rules over raw tag text: `lang` outranks `type`
  * whatever their order, the value is trimmed and `text/`-stripped, and an empty value
  * names nothing (falls through to `type`). Entity-spelled values are not decoded here —
  * a corpus heuristic; such a tag goes unclaimed and its file stays `unknown`.
@@ -4938,7 +4938,7 @@ interface ForeignBodyRegion {
 }
 
 /**
- * Mirrors `internal::EmbeddedLang::formattable_langs`, per tag. A hand copy: this is a TS
+ * Mirrors `ast::EmbeddedLang::formattable_langs`, per tag. A hand copy: this is a TS
  * harness and cannot call the Rust predicate.
  *
  * ⚠️ The two drift directions are NOT symmetric, so keep this list in step in one direction

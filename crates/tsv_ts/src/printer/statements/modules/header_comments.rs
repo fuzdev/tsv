@@ -3,7 +3,7 @@
 // `from`/source rendering, and namespace `as` bindings.
 
 use super::Printer;
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::comments::CommentSpacing;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -103,7 +103,7 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         gap_start: u32,
         star_pos: u32,
-        binding: Option<&internal::ModuleExportName<'_>>,
+        binding: Option<&ast::ModuleExportName<'_>>,
     ) {
         let d = self.d();
         parts.push(self.gap_comment_continuation_tail(gap_start, star_pos, d.text("*")));
@@ -126,7 +126,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_as_binding_continuation(
         &self,
         left_end: u32,
-        binding: &internal::ModuleExportName<'_>,
+        binding: &ast::ModuleExportName<'_>,
     ) -> DocId {
         let d = self.d();
         let binding_start = binding.span().start;
@@ -261,7 +261,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_from_source_doc(
         &self,
         decl_start: u32,
-        source: &internal::Literal<'_>,
+        source: &ast::Literal<'_>,
         empty_brace_search_start: Option<u32>,
         content_end: Option<u32>,
     ) -> DocId {

@@ -2,7 +2,7 @@
 
 use bumpalo::collections::Vec as BumpVec;
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::{char_at, is_svelte_ws, name_run_end};
 use tsv_lang::{ParseError, Span};
@@ -1093,7 +1093,7 @@ mod tests {
         is_root_slot_meta_tag, is_valid_element_local_name, is_valid_element_name,
         is_valid_tag_name, tag_name_end,
     };
-    use crate::ast::internal::is_component_name;
+    use crate::ast::is_component_name;
 
     /// The run ends at `(\s|\/|>)` or EOF and at **nothing else**, so whatever the lexer's
     /// narrower identifier scan stopped at is still part of the name — that is the whole

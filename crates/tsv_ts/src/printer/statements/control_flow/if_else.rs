@@ -4,7 +4,7 @@
 // comment-handling variants, and else-clause layout helpers.
 
 use super::HeadChainGrouping;
-use crate::ast::internal::{self, Statement, StatementKind};
+use crate::ast::{self, Statement, StatementKind};
 use crate::printer::Printer;
 use crate::printer::statements::StatementContext;
 use tsv_lang::Span;
@@ -252,7 +252,7 @@ impl<'a> Printer<'a> {
     /// whole statement is grouped.
     fn build_if_head_and_consequent(
         &self,
-        stmt: &internal::IfStatement<'_>,
+        stmt: &ast::IfStatement<'_>,
         span: Span,
         ctx: StatementContext,
     ) -> DocBuf {
@@ -330,7 +330,7 @@ impl<'a> Printer<'a> {
     /// group either — [`Self::build_else_adjust_clause`] carries its own.
     pub(in crate::printer::statements) fn build_if_statement_doc(
         &self,
-        stmt: &internal::IfStatement<'_>,
+        stmt: &ast::IfStatement<'_>,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {

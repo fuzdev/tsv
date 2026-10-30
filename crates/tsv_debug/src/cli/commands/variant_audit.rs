@@ -104,7 +104,7 @@ use crate::audit::vacuity::{check_graded_nonzero, check_pinned_min};
 use crate::cli::CliError;
 use crate::fixtures::{self, FixtureFiles};
 use argh::FromArgs;
-use tsv_svelte::ast::internal::is_collapsible_ws_char;
+use tsv_svelte::ast::is_collapsible_ws_char;
 
 /// Audit that `_compact` / `_spaces` variants move whitespace the way their names claim.
 #[derive(FromArgs, Debug)]

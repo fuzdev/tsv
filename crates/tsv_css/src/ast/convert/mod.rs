@@ -26,7 +26,7 @@
 // collecting them there rather than in a second pass is what keeps their offsets
 // indexing the string they describe.
 
-use super::internal;
+use crate::ast;
 use std::borrow::Cow;
 use tsv_lang::Span;
 use tsv_lang::is_js_whitespace;
@@ -303,11 +303,11 @@ fn starts_with_url_open(s: &str) -> bool {
 /// whitespace preserved, then trimmed). Applied to all source-extracted variants;
 /// `Values` is built from parsed tokens that never contained comments.
 pub(super) fn convert_prelude_to_string<'src>(
-    prelude: &internal::PreludeValue<'_>,
+    prelude: &ast::PreludeValue<'_>,
     source: &'src str,
 ) -> Cow<'src, str> {
     match prelude {
-        internal::PreludeValue::Values { span, .. } => {
+        ast::PreludeValue::Values { span, .. } => {
             // Extract the prelude verbatim from source and strip comments, matching
             // Svelte (which removes `/* ... */` from the `@import` prelude string while
             // preserving the surrounding whitespace, then trims). Extracting from the
@@ -322,27 +322,25 @@ pub(super) fn convert_prelude_to_string<'src>(
         // and `@namespace url(  x  )` → `url(  x  )`. The internal `content` string is a
         // normalized (printer-facing) form; the AST must stay source-faithful, like the
         // `Media`/`Supports`/`Container`/`Values` branches.
-        internal::PreludeValue::Raw { span, .. } => strip_css_comments(span.extract(source)),
+        ast::PreludeValue::Raw { span, .. } => strip_css_comments(span.extract(source)),
         // @scope selector lists: `[(root)]? [to (limit)]?`. Extracted verbatim from
         // `span` for fidelity (a bare `@scope` has a zero-width span → `""`), like the
         // sibling raw/condition branches.
-        internal::PreludeValue::Selectors { span, .. } => strip_css_comments(span.extract(source)),
+        ast::PreludeValue::Selectors { span, .. } => strip_css_comments(span.extract(source)),
         // `@custom-selector`: the span is the raw reader's, so the routed and the
         // verbatim-fallback preludes emit the same bytes.
-        internal::PreludeValue::CustomSelector { span, .. } => {
-            strip_css_comments(span.extract(source))
-        }
-        internal::PreludeValue::Supports { span, .. } => strip_css_comments(span.extract(source)),
-        internal::PreludeValue::Container { span, .. } => strip_css_comments(span.extract(source)),
-        internal::PreludeValue::Media { span, .. } => strip_css_comments(span.extract(source)),
+        ast::PreludeValue::CustomSelector { span, .. } => strip_css_comments(span.extract(source)),
+        ast::PreludeValue::Supports { span, .. } => strip_css_comments(span.extract(source)),
+        ast::PreludeValue::Container { span, .. } => strip_css_comments(span.extract(source)),
+        ast::PreludeValue::Media { span, .. } => strip_css_comments(span.extract(source)),
     }
 }
 
 /// Check if a complex selector contains Invalid simple selectors (from forgiving parsing)
-pub(super) fn selector_contains_invalid(complex: &internal::ComplexSelector<'_>) -> bool {
+pub(super) fn selector_contains_invalid(complex: &ast::ComplexSelector<'_>) -> bool {
     for relative in complex.children {
         for simple in relative.selectors {
-            if matches!(simple, internal::SimpleSelector::Invalid { .. }) {
+            if matches!(simple, ast::SimpleSelector::Invalid { .. }) {
                 return true;
             }
         }

@@ -1,4 +1,4 @@
-use crate::ast::internal::CssValue;
+use crate::ast::CssValue;
 use crate::number::starts_number;
 use tsv_lang::Span;
 

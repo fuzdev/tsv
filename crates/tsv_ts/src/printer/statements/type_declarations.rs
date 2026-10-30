@@ -2,7 +2,7 @@
 // plus shared entity-name helpers
 
 use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
-use crate::ast::internal::{self, TSType};
+use crate::ast::{self, TSType};
 use crate::printer::statements::function::FunctionHeadModifier;
 use crate::printer::types::helpers::{
     is_negative_literal, type_needs_parens_for_array_element,
@@ -44,7 +44,7 @@ fn is_generic_type(ts_type: &TSType<'_>) -> bool {
 /// Check if we should break before the conditional type in a type alias.
 /// Returns true if either checkType or extendsType has type parameters.
 /// This matches prettier's `shouldBreakBeforeConditionalType` in assignment.js.
-fn should_break_before_conditional_type(conditional: &internal::TSConditionalType<'_>) -> bool {
+fn should_break_before_conditional_type(conditional: &ast::TSConditionalType<'_>) -> bool {
     is_generic_type(conditional.check_type) || is_generic_type(conditional.extends_type)
 }
 
@@ -67,7 +67,7 @@ fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType<'_>) -> bo
         // `typeof import(...)` hugs the `=` for the same reason — the import
         // call inside the type query provides the internal break.
         TSType::TypeQuery(q) => {
-            matches!(q.expr_name, internal::TSTypeQueryExprName::Import(_))
+            matches!(q.expr_name, ast::TSTypeQueryExprName::Import(_))
         }
         // TypeReference with type arguments has internal breaking via `<>`
         TSType::TypeReference(r) => r.type_arguments.is_some(),
@@ -134,7 +134,7 @@ impl<'a> Printer<'a> {
     /// ```
     pub(super) fn build_type_alias_declaration_doc(
         &self,
-        decl: &internal::TSTypeAliasDeclaration<'_>,
+        decl: &ast::TSTypeAliasDeclaration<'_>,
         span: Span,
         clause_tail: Option<u8>,
     ) -> DocId {
@@ -333,7 +333,7 @@ impl<'a> Printer<'a> {
             TSType::Intersection(x) if x.types.len() == 1 => {
                 self.value_owns_its_comment_break(x.types[0])
             }
-            TSType::Literal(internal::TSLiteralType::TemplateLiteral(t)) => {
+            TSType::Literal(ast::TSLiteralType::TemplateLiteral(t)) => {
                 self.template_literal_type_breaks_for_comment(t)
             }
             _ => false,
@@ -342,7 +342,7 @@ impl<'a> Printer<'a> {
 
     fn build_type_alias_eq_value_doc(
         &self,
-        decl: &internal::TSTypeAliasDeclaration<'_>,
+        decl: &ast::TSTypeAliasDeclaration<'_>,
         eq_pos: u32,
         has_complex_params: bool,
         lead_space: bool,
@@ -611,7 +611,7 @@ impl<'a> Printer<'a> {
             };
             // The intersection arms build their own hanging doc — under the same pair,
             // since the intersection's first member is a descent link of that seam.
-            let build_intersection = |i: &internal::TSIntersectionType<'_>| -> DocId {
+            let build_intersection = |i: &ast::TSIntersectionType<'_>| -> DocId {
                 self.with_stripped_shell_value(
                     head.claimed_shell,
                     decl.type_annotation,
@@ -843,7 +843,7 @@ impl<'a> Printer<'a> {
                 } else if comment_driven_break
                     || matches!(
                         value_type,
-                        TSType::Literal(internal::TSLiteralType::TemplateLiteral(_))
+                        TSType::Literal(ast::TSLiteralType::TemplateLiteral(_))
                     )
                 {
                     // Break after `=` with a hanging indent, for two kinds:
@@ -887,7 +887,7 @@ impl<'a> Printer<'a> {
     /// Uses group mode when extends has multiple items - heritage breaks when group breaks.
     pub(super) fn build_interface_declaration_doc(
         &self,
-        decl: &internal::TSInterfaceDeclaration<'_>,
+        decl: &ast::TSInterfaceDeclaration<'_>,
     ) -> DocId {
         let d = self.d();
 
@@ -1054,7 +1054,7 @@ impl<'a> Printer<'a> {
     /// Build doc for declare function with wrapping support for type parameters
     pub(super) fn build_declare_function_doc(
         &self,
-        decl: &internal::TSDeclareFunction<'_>,
+        decl: &ast::TSDeclareFunction<'_>,
         clause_tail: Option<u8>,
     ) -> DocId {
         let d = self.d();
@@ -1154,7 +1154,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for entity name
-    pub(crate) fn build_entity_name_doc(&self, name: &internal::TSEntityName<'_>) -> DocId {
+    pub(crate) fn build_entity_name_doc(&self, name: &ast::TSEntityName<'_>) -> DocId {
         // Delegate to standalone function - doesn't need printer state
         build_entity_name_doc(self, name)
     }
@@ -1167,7 +1167,7 @@ impl<'a> Printer<'a> {
     /// trailing-comment divergence). Pass `None` to keep the default behavior.
     fn build_type_elements_doc(
         &self,
-        members: &[internal::TSTypeElement<'_>],
+        members: &[ast::TSTypeElement<'_>],
         body_start: u32,
         body_end: u32,
         delimiter_pull_pos: Option<u32>,
@@ -1200,7 +1200,7 @@ impl<'a> Printer<'a> {
                     floor: MemberFloor::MemberEnd,
                 },
             },
-            internal::TSTypeElement::span,
+            ast::TSTypeElement::span,
             |member| member.span().end,
             |member, _deferred| self.build_type_element_doc(member),
         );
@@ -1209,7 +1209,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for a single type element
-    fn build_type_element_doc(&self, elem: &internal::TSTypeElement<'_>) -> DocId {
+    fn build_type_element_doc(&self, elem: &ast::TSTypeElement<'_>) -> DocId {
         // Every member doc is shared with the type-literal printer (via the same
         // dispatcher); the only difference is the interface member carries its own
         // `;`, with any own-line comment in the member→`;` gap deferred past it.
@@ -1232,7 +1232,7 @@ impl<'a> Printer<'a> {
     /// ```
     pub(super) fn build_enum_declaration_doc(
         &self,
-        decl: &internal::TSEnumDeclaration<'_>,
+        decl: &ast::TSEnumDeclaration<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -1407,15 +1407,15 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for a single enum member
-    fn build_enum_member_doc(&self, member: &internal::TSEnumMember<'_>) -> DocId {
+    fn build_enum_member_doc(&self, member: &ast::TSEnumMember<'_>) -> DocId {
         let d = self.d();
         // Member id (identifier or string literal)
         let id_doc = match &member.id {
-            internal::TSEnumMemberId::Identifier(id) => self.identifier_name_doc(id),
+            ast::TSEnumMemberId::Identifier(id) => self.identifier_name_doc(id),
             // A string member name takes the as-needed key rule every other key follows:
             // `'b'` prints `b`, while `'d-2'` and an escape-bearing `'\x62'` keep their quotes.
-            internal::TSEnumMemberId::String(lit) => {
-                if let internal::LiteralValue::String(cooked) = &lit.value {
+            ast::TSEnumMemberId::String(lit) => {
+                if let ast::LiteralValue::String(cooked) = &lit.value {
                     let content = cooked.resolve(lit.span, self.source);
                     self.build_string_literal_key_doc(lit, content)
                 } else {
@@ -1572,7 +1572,7 @@ impl<'a> Printer<'a> {
     /// ```
     pub(super) fn build_module_declaration_doc(
         &self,
-        decl: &internal::TSModuleDeclaration<'_>,
+        decl: &ast::TSModuleDeclaration<'_>,
         clause_tail: Option<u8>,
     ) -> DocId {
         self.build_module_declaration_doc_inner(decl, true, clause_tail)
@@ -1582,7 +1582,7 @@ impl<'a> Printer<'a> {
     /// `is_root` is true for the outermost declaration (prints `namespace` keyword)
     fn build_module_declaration_doc_inner(
         &self,
-        decl: &internal::TSModuleDeclaration<'_>,
+        decl: &ast::TSModuleDeclaration<'_>,
         is_root: bool,
         clause_tail: Option<u8>,
     ) -> DocId {
@@ -1611,8 +1611,8 @@ impl<'a> Printer<'a> {
                 // Word by word, so `declare`'s gap before the head keyword keeps its
                 // comment rather than folding into the keyword→name scan that follows.
                 let head: &[&'static str] = match decl.kind {
-                    internal::TSModuleDeclarationKind::Namespace => &["namespace"],
-                    internal::TSModuleDeclarationKind::Module => &["module"],
+                    ast::TSModuleDeclarationKind::Namespace => &["namespace"],
+                    ast::TSModuleDeclarationKind::Module => &["module"],
                 };
                 let name_start = decl.id.span().start;
                 let (keyword_doc, keyword_end) = self.build_declaration_head_doc(
@@ -1639,8 +1639,8 @@ impl<'a> Printer<'a> {
         // Module/namespace name (if not global)
         if !decl.global {
             let name_doc = match &decl.id {
-                internal::TSModuleName::Identifier(id) => self.identifier_name_doc(id),
-                internal::TSModuleName::Literal(lit) => self.build_literal_doc(lit),
+                ast::TSModuleName::Identifier(id) => self.identifier_name_doc(id),
+                ast::TSModuleName::Literal(lit) => self.build_literal_doc(lit),
             };
             // A dotted namespace (`namespace Outer.Inner {}`) pairs this name with the
             // nested one, and both gaps around that `.` are positions an author can
@@ -1648,7 +1648,7 @@ impl<'a> Printer<'a> {
             // the gaps together (it needs the left doc, hence holding it until here).
             // Pushing name + `d.text(".")` scans neither gap and drops what's in it.
             match &decl.body {
-                Some(internal::TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
+                Some(ast::TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
                     let name_end = decl.id.span().end;
                     parts.push(self.build_dotted_pair_doc(
                         name_doc,
@@ -1663,7 +1663,7 @@ impl<'a> Printer<'a> {
 
         // Body (may be None for shorthand: `declare module 'name';`)
         match &decl.body {
-            Some(internal::TSModuleDeclarationBody::TSModuleBlock(block)) => {
+            Some(ast::TSModuleDeclarationBody::TSModuleBlock(block)) => {
                 // Handle comments between name and body: namespace D /* comment */ {
                 // `decl.id` is the name, or `global` where that keyword is both.
                 let name_end = decl.id.span().end;
@@ -1732,7 +1732,7 @@ impl<'a> Printer<'a> {
                     parts.push(d.text("}"));
                 }
             }
-            Some(internal::TSModuleDeclarationBody::TSModuleDeclaration(_)) => {
+            Some(ast::TSModuleDeclarationBody::TSModuleDeclaration(_)) => {
                 // A dotted namespace (`namespace Outer.Inner {}`) is emitted with the
                 // name above — the `.` and both its gaps belong to that pair, and only
                 // that path holds the left doc the shared printer needs. A `global`

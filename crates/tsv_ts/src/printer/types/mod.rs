@@ -54,7 +54,7 @@ pub(super) use super::StandaloneGlue;
 pub(super) use super::comments::BlankRule;
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
-use crate::ast::internal::{TSImportType, TSIntersectionType, TSParenthesizedType, TSType};
+use crate::ast::{TSImportType, TSIntersectionType, TSParenthesizedType, TSType};
 use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
 use crate::printer::ignore::{RoutedScope, is_freeze_target};
 use crate::printer::{CommentVec, ShellLeadingRun, ShellPair};

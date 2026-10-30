@@ -12,7 +12,7 @@
 //! Both over-refuse on purpose; the direction matters, because a missed binding
 //! is a MISMATCH while an extra refusal is merely a gap.
 
-use tsv_ts::ast::internal::{LiteralValue, Statement};
+use tsv_ts::ast::{LiteralValue, Statement};
 
 use crate::analyze::{
     RUNE_BASES, RuneInit, classify_rune_init, pattern_binding_names,
@@ -313,7 +313,7 @@ fn stem_declaration<'arena>(
 /// Unlike [`crate::script_decls::plain_identifier_name`] this never returns
 /// `None`: a binding whose name this check cannot read is a binding it would
 /// MISS, and a missed binding is an under-refusal.
-fn identifier_name(id: &tsv_ts::ast::internal::Identifier<'_>, source: &str) -> String {
+fn identifier_name(id: &tsv_ts::ast::Identifier<'_>, source: &str) -> String {
     id.name(source).to_string()
 }
 

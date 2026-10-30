@@ -52,11 +52,11 @@ use crate::script_decls::{
 use crate::snippet::SnippetAnalysis;
 use crate::text_class::js_trim;
 use crate::transform_server::unsupported;
-use tsv_svelte::ast::internal::{
+use tsv_svelte::ast::{
     Attribute, AttributeNode, AttributeValue, EachBlock, ElementKind, Fragment, FragmentNode, Root,
     SpecialElementKind,
 };
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ExportNamedDeclaration, Expression, ExpressionKind, LiteralValue, ModuleExportName, Statement,
     StatementKind,
 };
@@ -752,9 +752,9 @@ pub(crate) fn export_named_has_default_specifier(
 /// The oracle's `specifier.exported.type === 'Identifier' ? .name === 'default'
 /// : .value === 'default'` (`ExportNamedDeclaration.js:17-19`): an identifier
 /// `default` or a string-literal `"default"` export name. Both sides decode
-/// exactly — the identifier via [`tsv_ts::ast::internal::Identifier::name`] (so an
+/// exactly — the identifier via [`tsv_ts::ast::Identifier::name`] (so an
 /// escaped alias `default` is caught) and the string via
-/// [`StringCooked::resolve`](tsv_ts::ast::internal::StringCooked::resolve) — so
+/// [`StringCooked::resolve`](tsv_ts::ast::StringCooked::resolve) — so
 /// the comparison matches the oracle's post-decode `.name`/`.value` on every form.
 fn module_export_name_is_default(name: &ModuleExportName<'_>, source: &str) -> bool {
     match name {

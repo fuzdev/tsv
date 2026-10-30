@@ -4,7 +4,7 @@
 // These sections contain TypeScript/JS and CSS respectively,
 // which are formatted using their dedicated printers.
 
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::Printer;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::doc::{self, DocBuf, DocContext, arena::DocId};
@@ -18,7 +18,7 @@ impl<'a> Printer<'a> {
     /// Uses Doc-based integration instead of string post-processing. The Doc system
     /// naturally handles template literals correctly: `indent(doc)` only affects `Line` docs
     /// (hardline, softline, line), not newlines inside `text()` which output as-is.
-    pub(super) fn print_script(&mut self, script: &internal::Script<'_>) {
+    pub(super) fn print_script(&mut self, script: &ast::Script<'_>) {
         // Check if script had any original content (including whitespace)
         let had_content = script.content.span.start != script.content.span.end;
 
@@ -31,8 +31,8 @@ impl<'a> Printer<'a> {
         // frozen scripts. The AST is ignored, but the body still PARSED (canonical Svelte
         // runs acorn on every script body regardless of `lang`, and so does tsv), so its JS
         // comments are registered on the print-once ledger and the slice must declare
-        // them. See `internal::EmbeddedLang` for the allowlist.
-        if internal::EmbeddedLang::Script.is_frozen(script.attributes, self.source) {
+        // them. See `ast::EmbeddedLang` for the allowlist.
+        if ast::EmbeddedLang::Script.is_frozen(script.attributes, self.source) {
             return self.write_frozen_section("script", script.content.span);
         }
 
@@ -103,7 +103,7 @@ impl<'a> Printer<'a> {
     /// Formats the `<style>` tag with its CSS content.
     /// The CSS is formatted using the CSS printer with indentation.
     /// For non-CSS languages (less, scss, etc.), content is preserved raw.
-    pub(super) fn print_style(&mut self, style: &internal::Style<'_>) {
+    pub(super) fn print_style(&mut self, style: &ast::Style<'_>) {
         // Check if there was any original content (including whitespace)
         let had_content = style.content_span.start != style.content_span.end;
 
@@ -113,8 +113,8 @@ impl<'a> Printer<'a> {
         // A frozen-language body freezes: the author's bytes ride out verbatim between the
         // two delimiter lines — the same shape the `<script>` and `<template>` freezes give
         // their bodies, and prettier's `preformattedBody`. The shared gate reads the DECODED
-        // value (`lang="&#99;ss"` is css) — see `internal::EmbeddedLang`.
-        if internal::EmbeddedLang::Style.is_frozen(style.attributes, self.source) {
+        // value (`lang="&#99;ss"` is css) — see `ast::EmbeddedLang`.
+        if ast::EmbeddedLang::Style.is_frozen(style.attributes, self.source) {
             return self.write_frozen_section("style", style.content_span);
         }
 
@@ -180,7 +180,7 @@ impl<'a> Printer<'a> {
     /// builder. Every other tag head, including `<svelte:options>`, goes through
     /// `Printer::push_attrs_with_comments`, which probes the gaps. Do not reach for this one
     /// from a head whose attributes come from the ordinary `read_attribute`.
-    fn build_section_attrs_doc(&self, attributes: &[internal::AttributeNode<'_>]) -> DocId {
+    fn build_section_attrs_doc(&self, attributes: &[ast::AttributeNode<'_>]) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::with_capacity(attributes.len() * 2);
         for attr in attributes {
@@ -203,7 +203,7 @@ impl<'a> Printer<'a> {
     fn write_section_opening_tag(
         &mut self,
         tag_name: &str,
-        attributes: &[internal::AttributeNode<'_>],
+        attributes: &[ast::AttributeNode<'_>],
         has_content: bool,
     ) {
         if attributes.is_empty() {

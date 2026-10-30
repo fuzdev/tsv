@@ -827,7 +827,7 @@ pub fn attach_pattern_type_annotation<'arena>(
             // Re-bind the identifier's binding extra with the parsed type
             // annotation (preserving any decorators already present).
             let decorators = id.decorators();
-            id.extra = Some(arena.alloc(ast::internal::IdentifierParamExtra {
+            id.extra = Some(arena.alloc(ast::IdentifierParamExtra {
                 type_annotation: Some(ta),
                 decorators,
             }));
@@ -1127,7 +1127,7 @@ pub fn build_expression_doc(
 /// the host builds is still counted in the list.
 pub fn build_bare_sequence_operand_docs(
     arena: &DocArena,
-    sequence: &ast::internal::SequenceExpression<'_>,
+    sequence: &ast::SequenceExpression<'_>,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
     mut build: impl FnMut(usize) -> bool,
@@ -1593,8 +1593,8 @@ pub use printer::buffer_stats::{
 // or are named via the short `tsv_ts::Foo` path by external consumers (`Statement` and
 // its variant half `StatementKind`, `ObjectProperty`, `ObjectPatternProperty` — currently
 // only by tsv_svelte). All other AST types remain accessible through the full
-// `tsv_ts::ast::internal::Foo` path.
-pub use ast::internal::{
+// `tsv_ts::ast::Foo` path.
+pub use ast::{
     Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, Program, Statement,
     StatementKind, TSTypeAnnotation, TSTypeParameterDeclaration, VariableDeclaration,
 };

@@ -1,6 +1,5 @@
 // Import and export specifier writers.
 
-use super::super::super::internal;
 use super::declarations::{write_class_declaration, write_function_declaration};
 use super::expressions::write_expression;
 use super::types::{write_declare_function, write_interface_declaration};
@@ -8,22 +7,23 @@ use super::{
     Ctx, JsonWriter, close_node, node_header, write_export_kind_field, write_identifier_plain,
     write_import_kind_field, write_literal,
 };
+use crate::ast;
 
 /// Emit an import specifier (`ImportDefaultSpecifier` / `ImportSpecifier` /
 /// `ImportNamespaceSpecifier`).
 pub(super) fn write_import_specifier(
     w: &mut JsonWriter,
-    spec: &internal::ImportSpecifier<'_>,
+    spec: &ast::ImportSpecifier<'_>,
     ctx: &Ctx<'_>,
 ) {
     match spec {
-        internal::ImportSpecifier::Default(default_spec) => {
+        ast::ImportSpecifier::Default(default_spec) => {
             node_header(w, "ImportDefaultSpecifier", default_spec.span, ctx);
             w.raw(",\"local\":");
             write_identifier_plain(w, &default_spec.local, ctx);
             close_node(w, "ImportDefaultSpecifier", default_spec.span, ctx);
         }
-        internal::ImportSpecifier::Named(named_spec) => {
+        ast::ImportSpecifier::Named(named_spec) => {
             node_header(w, "ImportSpecifier", named_spec.span, ctx);
             w.raw(",\"imported\":");
             write_module_export_name(w, &named_spec.imported, ctx);
@@ -32,7 +32,7 @@ pub(super) fn write_import_specifier(
             write_import_kind_field(w, named_spec.import_kind, ctx);
             close_node(w, "ImportSpecifier", named_spec.span, ctx);
         }
-        internal::ImportSpecifier::Namespace(ns_spec) => {
+        ast::ImportSpecifier::Namespace(ns_spec) => {
             node_header(w, "ImportNamespaceSpecifier", ns_spec.span, ctx);
             w.raw(",\"local\":");
             write_identifier_plain(w, &ns_spec.local, ctx);
@@ -44,14 +44,14 @@ pub(super) fn write_import_specifier(
 /// Emits an `ImportAttribute` node.
 pub(super) fn write_import_attribute(
     w: &mut JsonWriter,
-    attr: &internal::ImportAttribute<'_>,
+    attr: &ast::ImportAttribute<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "ImportAttribute", attr.span, ctx);
     w.raw(",\"key\":");
     match &attr.key {
-        internal::ImportAttributeKey::Identifier(id) => write_identifier_plain(w, id, ctx),
-        internal::ImportAttributeKey::Literal(lit) => write_literal(w, lit, ctx),
+        ast::ImportAttributeKey::Identifier(id) => write_identifier_plain(w, id, ctx),
+        ast::ImportAttributeKey::Literal(lit) => write_literal(w, lit, ctx),
     }
     w.raw(",\"value\":");
     write_literal(w, &attr.value, ctx);
@@ -62,7 +62,7 @@ pub(super) fn write_import_attribute(
 /// `exportKind?`.
 pub(super) fn write_export_specifier(
     w: &mut JsonWriter,
-    spec: &internal::ExportSpecifier<'_>,
+    spec: &ast::ExportSpecifier<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "ExportSpecifier", spec.span, ctx);
@@ -78,12 +78,12 @@ pub(super) fn write_export_specifier(
 /// string a `Literal` node.
 pub(super) fn write_module_export_name(
     w: &mut JsonWriter,
-    name: &internal::ModuleExportName<'_>,
+    name: &ast::ModuleExportName<'_>,
     ctx: &Ctx<'_>,
 ) {
     match name {
-        internal::ModuleExportName::Identifier(id) => write_identifier_plain(w, id, ctx),
-        internal::ModuleExportName::Literal(lit) => write_literal(w, lit, ctx),
+        ast::ModuleExportName::Identifier(id) => write_identifier_plain(w, id, ctx),
+        ast::ModuleExportName::Literal(lit) => write_literal(w, lit, ctx),
     }
 }
 
@@ -91,25 +91,25 @@ pub(super) fn write_module_export_name(
 /// declaration).
 pub(super) fn write_export_default_value(
     w: &mut JsonWriter,
-    value: &internal::ExportDefaultValue<'_>,
+    value: &ast::ExportDefaultValue<'_>,
     ctx: &Ctx<'_>,
 ) {
     match value {
-        internal::ExportDefaultValue::Expression(expr) => write_expression(w, expr, ctx),
-        internal::ExportDefaultValue::FunctionDeclaration(func) => {
+        ast::ExportDefaultValue::Expression(expr) => write_expression(w, expr, ctx),
+        ast::ExportDefaultValue::FunctionDeclaration(func) => {
             write_function_declaration(w, func, ctx);
         }
-        internal::ExportDefaultValue::TSDeclareFunction(func) => {
+        ast::ExportDefaultValue::TSDeclareFunction(func) => {
             // `declare` can't syntactically appear in an `export default`, so
             // the `exported` declare-position flag is inert here.
             write_declare_function(w, func, ctx, true);
         }
-        internal::ExportDefaultValue::ClassDeclaration(class) => {
+        ast::ExportDefaultValue::ClassDeclaration(class) => {
             // As with `TSDeclareFunction` above, `declare` can't syntactically appear
             // in an `export default`, so the declare-position flag is inert here.
             write_class_declaration(w, class, ctx, false);
         }
-        internal::ExportDefaultValue::TSInterfaceDeclaration(iface) => {
+        ast::ExportDefaultValue::TSInterfaceDeclaration(iface) => {
             write_interface_declaration(w, iface, ctx, true);
         }
     }

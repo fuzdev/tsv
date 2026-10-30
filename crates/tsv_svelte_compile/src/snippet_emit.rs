@@ -9,8 +9,8 @@
 use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_svelte::ast::internal::{RenderTag, SnippetBlock};
-use tsv_ts::ast::internal::{CallExpression, Expression, ExpressionKind, Statement};
+use tsv_svelte::ast::{RenderTag, SnippetBlock};
+use tsv_ts::ast::{CallExpression, Expression, ExpressionKind, Statement};
 
 use crate::analyze::{ScopeEntry, pattern_binding_names};
 use crate::body_builder::BodyBuilder;

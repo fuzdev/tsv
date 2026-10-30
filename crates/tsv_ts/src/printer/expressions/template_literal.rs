@@ -3,7 +3,7 @@
 // Builds docs for template literals (quasi/interpolation layout, alignment,
 // interpolation comments) and tagged template expressions.
 
-use crate::ast::internal::{Expression, ExpressionKind};
+use crate::ast::{Expression, ExpressionKind};
 use crate::printer::chain::tag_paren_leading_start;
 use crate::printer::comments::{CommentSpacing, LeftSpineStep, left_spine_shell_is_comment_free};
 use crate::printer::ignore::FrozenOperandPair;
@@ -30,7 +30,7 @@ impl<'a> Printer<'a> {
     ///   Matches Prettier's approach where these types keep their doc structure.
     pub(super) fn build_template_literal_doc(
         &self,
-        template: &crate::ast::internal::TemplateLiteral<'_>,
+        template: &crate::ast::TemplateLiteral<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
@@ -445,9 +445,9 @@ impl<'a> Printer<'a> {
     /// breaks, so its closer is a line end a run the value defers to its end can take.
     fn build_template_comments_and_expr_doc(
         &self,
-        leading_comments: &[&crate::ast::internal::Comment],
+        leading_comments: &[&crate::ast::Comment],
         expr_doc: DocId,
-        trailing_comments: &[&crate::ast::internal::Comment],
+        trailing_comments: &[&crate::ast::Comment],
         expr_start: u32,
         closer_breaks: bool,
     ) -> (DocId, bool) {
@@ -500,7 +500,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a tagged template expression
     pub(super) fn build_tagged_template_doc(
         &self,
-        tagged: &crate::ast::internal::TaggedTemplateExpression<'_>,
+        tagged: &crate::ast::TaggedTemplateExpression<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();

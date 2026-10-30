@@ -5,7 +5,7 @@
 //! identifiers).
 
 use super::super::*;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ArrayExpression, ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression,
     AssignmentExpression, AssignmentPattern, AwaitExpression, BinaryExpression, CallExpression,
     ClassExpression, CommentBoundPair, ConditionalExpression, Decorator, Expression,

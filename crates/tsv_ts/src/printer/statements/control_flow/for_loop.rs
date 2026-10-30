@@ -4,7 +4,7 @@
 // for-in/for-of left/right printing.
 
 use super::HeadChainGrouping;
-use crate::ast::internal::{self, Expression, ExpressionKind, Statement, StatementKind};
+use crate::ast::{self, Expression, ExpressionKind, Statement, StatementKind};
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::statements::StatementContext;
 use crate::printer::statements::variable::{DeclaratorEqGap, DeclaratorInitInputs};
@@ -221,7 +221,7 @@ impl<'a> Printer<'a> {
     /// This includes the body in the doc so the width calculation accounts for ` {`.
     fn build_for_statement_with_body_doc(
         &self,
-        stmt: &internal::ForStatement<'_>,
+        stmt: &ast::ForStatement<'_>,
         span: Span,
         parens: ForParens,
         ctx: StatementContext,
@@ -273,7 +273,7 @@ impl<'a> Printer<'a> {
     /// header has no locatable `)`.
     fn get_for_header_end(
         &self,
-        stmt: &internal::ForStatement<'_>,
+        stmt: &ast::ForStatement<'_>,
         span: Span,
         parens: ForParens,
     ) -> u32 {
@@ -313,7 +313,7 @@ impl<'a> Printer<'a> {
     /// separator rules above, which only make sense when the parens hold nothing else.
     fn build_for_empty_with_comments(
         &self,
-        stmt: &internal::ForStatement<'_>,
+        stmt: &ast::ForStatement<'_>,
         parens: ForParens,
         for_open: DocId,
     ) -> DocId {
@@ -430,7 +430,7 @@ impl<'a> Printer<'a> {
     /// `parens` is the header's paren pair, located once per statement ([`ForParens`]).
     fn build_for_header_doc(
         &self,
-        stmt: &internal::ForStatement<'_>,
+        stmt: &ast::ForStatement<'_>,
         span: Span,
         parens: ForParens,
         keyword_comments: Option<DocId>,
@@ -489,8 +489,8 @@ impl<'a> Printer<'a> {
         let spans = ForHeaderSpans {
             open_paren,
             init_start: stmt.init.as_ref().map(|i| match i {
-                internal::ForInit::VariableDeclaration(d) => d.span.start,
-                internal::ForInit::Expression(e) => e.span().start,
+                ast::ForInit::VariableDeclaration(d) => d.span.start,
+                ast::ForInit::Expression(e) => e.span().start,
             }),
             init_end,
             test_start: stmt.test.as_ref().map(|t| t.span().start),
@@ -804,7 +804,7 @@ impl<'a> Printer<'a> {
     /// keeps the scan O(header) rather than O(rest of file).
     fn find_for_semicolons(
         &self,
-        stmt: &internal::ForStatement<'_>,
+        stmt: &ast::ForStatement<'_>,
         open_paren: u32,
         close_paren: Option<u32>,
     ) -> (Option<u32>, Option<u32>) {
@@ -822,7 +822,7 @@ impl<'a> Printer<'a> {
     /// The end positions of the `init` and `test` clauses — the AST anchors the header's
     /// `;` separators are located from (see [`Self::find_for_semicolons`]). Derived in one
     /// place so the two scan call sites and the `ForHeaderSpans` build cannot disagree.
-    fn for_clause_ends(&self, stmt: &internal::ForStatement<'_>) -> (Option<u32>, Option<u32>) {
+    fn for_clause_ends(&self, stmt: &ast::ForStatement<'_>) -> (Option<u32>, Option<u32>) {
         (
             stmt.init.as_ref().map(|i| self.get_for_init_span_end(i)),
             stmt.test.as_ref().map(|t| t.span().end),
@@ -1035,7 +1035,7 @@ impl<'a> Printer<'a> {
     /// is gone rather than duplicated.
     fn build_for_sequence_clause_doc(
         &self,
-        seq: &internal::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression<'_>,
         seq_span: Span,
         build_elem: impl Fn(&Expression<'_>) -> DocId,
     ) -> DocId {
@@ -1198,7 +1198,7 @@ impl<'a> Printer<'a> {
     /// Build a complete for-in statement doc including the body
     pub(in crate::printer::statements) fn build_for_in_statement_doc(
         &self,
-        stmt: &internal::ForInStatement<'_>,
+        stmt: &ast::ForInStatement<'_>,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {
@@ -1210,7 +1210,7 @@ impl<'a> Printer<'a> {
     /// Build a complete for-of statement doc including the body
     pub(in crate::printer::statements) fn build_for_of_statement_doc(
         &self,
-        stmt: &internal::ForOfStatement<'_>,
+        stmt: &ast::ForOfStatement<'_>,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {
@@ -1237,7 +1237,7 @@ impl<'a> Printer<'a> {
     #[expect(clippy::too_many_arguments)] // one cohesive for-in/of assembly; a bundle would re-thread the same values
     fn build_for_in_of_statement_with_body_doc(
         &self,
-        left: &internal::ForInOfLeft<'_>,
+        left: &ast::ForInOfLeft<'_>,
         right: &Expression<'_>,
         body: &Statement<'_>,
         stmt_start: u32,
@@ -1377,7 +1377,7 @@ impl<'a> Printer<'a> {
     /// located, and `close_paren` follows the depth-tracked open paren.
     fn for_in_of_spans(
         &self,
-        left: &internal::ForInOfLeft<'_>,
+        left: &ast::ForInOfLeft<'_>,
         right: &Expression<'_>,
         keyword: &str,
         stmt_start: u32,
@@ -1670,18 +1670,18 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the end position of the left side of a for-in/for-of statement
-    fn get_for_in_of_left_end(&self, left: &internal::ForInOfLeft<'_>) -> u32 {
+    fn get_for_in_of_left_end(&self, left: &ast::ForInOfLeft<'_>) -> u32 {
         match left {
-            internal::ForInOfLeft::VariableDeclaration(decl) => decl.span.end,
-            internal::ForInOfLeft::Pattern(expr) => expr.span().end,
+            ast::ForInOfLeft::VariableDeclaration(decl) => decl.span.end,
+            ast::ForInOfLeft::Pattern(expr) => expr.span().end,
         }
     }
 
     /// Get the start position of the left side of a for-in/for-of statement
-    fn get_for_in_of_left_start(&self, left: &internal::ForInOfLeft<'_>) -> u32 {
+    fn get_for_in_of_left_start(&self, left: &ast::ForInOfLeft<'_>) -> u32 {
         match left {
-            internal::ForInOfLeft::VariableDeclaration(decl) => decl.span.start,
-            internal::ForInOfLeft::Pattern(expr) => expr.span().start,
+            ast::ForInOfLeft::VariableDeclaration(decl) => decl.span.start,
+            ast::ForInOfLeft::Pattern(expr) => expr.span().start,
         }
     }
 
@@ -1692,13 +1692,13 @@ impl<'a> Printer<'a> {
     /// skips the declaration kind so the keyword→binding gap (`const // c⏎x`) reads
     /// as a header-structural position while the binding pattern's own interior does
     /// not — see `for_in_of_header_gap_comment_forces_break`.
-    fn get_for_in_of_binding_start(&self, left: &internal::ForInOfLeft<'_>) -> u32 {
+    fn get_for_in_of_binding_start(&self, left: &ast::ForInOfLeft<'_>) -> u32 {
         match left {
-            internal::ForInOfLeft::VariableDeclaration(decl) => decl
+            ast::ForInOfLeft::VariableDeclaration(decl) => decl
                 .declarations
                 .first()
                 .map_or(decl.span.start, |declarator| declarator.id.span().start),
-            internal::ForInOfLeft::Pattern(expr) => expr.span().start,
+            ast::ForInOfLeft::Pattern(expr) => expr.span().start,
         }
     }
 
@@ -1728,7 +1728,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_for_statement_doc(
         &self,
-        stmt: &internal::ForStatement<'_>,
+        stmt: &ast::ForStatement<'_>,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {
@@ -1903,7 +1903,7 @@ impl<'a> Printer<'a> {
     /// interior gap is emitted by `build_keyword_words_doc`.
     fn build_for_decl_keyword_gap(
         &self,
-        decl: &internal::VariableDeclaration<'_>,
+        decl: &ast::VariableDeclaration<'_>,
         binding_start: u32,
         continuation: DocId,
     ) -> DocId {
@@ -1935,21 +1935,21 @@ impl<'a> Printer<'a> {
     /// this is spelled here rather than through [`Printer::build_frozen_expression_doc`]: a
     /// `SequenceExpression` clause prints BARE here (`for (a, b; ;)`), where that builder
     /// re-synthesizes the grouping pair every other position needs.
-    fn build_frozen_init_clause_doc(&self, init: &internal::ForInit<'_>, frozen: Span) -> DocId {
+    fn build_frozen_init_clause_doc(&self, init: &ast::ForInit<'_>, frozen: Span) -> DocId {
         let doc = self.build_frozen_node_doc(frozen);
         match init {
             // This clause IS the init; it needs no ambient flag to know it.
-            internal::ForInit::Expression(expr)
+            ast::ForInit::Expression(expr)
                 if self.frozen_slice_hands_header_a_bare_in(expr, frozen.end) =>
             {
                 self.d().parens(doc)
             }
-            internal::ForInit::Expression(_) => doc,
-            internal::ForInit::VariableDeclaration(_) => doc,
+            ast::ForInit::Expression(_) => doc,
+            ast::ForInit::VariableDeclaration(_) => doc,
         }
     }
 
-    fn build_for_init_doc(&self, init: &internal::ForInit<'_>) -> DocId {
+    fn build_for_init_doc(&self, init: &ast::ForInit<'_>) -> DocId {
         let d = self.d();
         // The init clause is `[~In]`: an `in` binary must be parenthesized so it
         // isn't read as the `for (x in y)` separator. Set for the whole init
@@ -1963,7 +1963,7 @@ impl<'a> Printer<'a> {
         // grouping shell's trailing comment rather than simply around the value.
         let saved_in_for_init = self.in_for_init.replace(true);
         let result = match init {
-            internal::ForInit::VariableDeclaration(decl) => {
+            ast::ForInit::VariableDeclaration(decl) => {
                 // The keyword→first-declarator gap carries a comment (`for (let /* c */
                 // i = 0; …)`) that must not be dropped — see `build_for_decl_keyword_gap`.
                 // Built here rather than through that helper because the declarator loop
@@ -2146,7 +2146,7 @@ impl<'a> Printer<'a> {
                     header
                 }
             }
-            internal::ForInit::Expression(expr) => {
+            ast::ForInit::Expression(expr) => {
                 // Sequence expressions in for loop init don't need outer parens
                 // e.g., `for (i = 0, j = 0; ...)` not `for ((i = 0, j = 0); ...)`.
                 // Same dispatch as build_for_update_doc, but each operand is `[~In]`
@@ -2189,7 +2189,7 @@ impl<'a> Printer<'a> {
     /// once here rather than per arm below.
     fn build_for_in_of_left_doc(
         &self,
-        left: &internal::ForInOfLeft<'_>,
+        left: &ast::ForInOfLeft<'_>,
         wrap_async_paren: bool,
         spans: &ForInOfSpans,
     ) -> DocId {
@@ -2202,8 +2202,8 @@ impl<'a> Printer<'a> {
         // for-in/of. Unlike `(async)`, the paren can belong to a node *inside* the clause
         // (`for ((let).a of x)`), so it is handed to that node rather than wrapped here.
         let let_target = match left {
-            internal::ForInOfLeft::Pattern(expr) => self.for_in_of_let_head_target(expr),
-            internal::ForInOfLeft::VariableDeclaration(_) => None,
+            ast::ForInOfLeft::Pattern(expr) => self.for_in_of_let_head_target(expr),
+            ast::ForInOfLeft::VariableDeclaration(_) => None,
         };
         if let Some(open) = spans.open_paren
             && let Some(frozen) =
@@ -2226,7 +2226,7 @@ impl<'a> Printer<'a> {
             };
         }
         match left {
-            internal::ForInOfLeft::VariableDeclaration(decl) => {
+            ast::ForInOfLeft::VariableDeclaration(decl) => {
                 let Some(declarator) = decl.declarations.first() else {
                     // A for-in/of head always binds something (`for (const of x)` is a
                     // parse error), so there is no declarator to bound a gap search at
@@ -2250,7 +2250,7 @@ impl<'a> Printer<'a> {
             // `for ((async) of x)` keeps parens around the bare `async` identifier
             // (the caller decides via `wrap_async_paren` — a non-await for-of, where
             // bare `for (async of x)` is a syntax error).
-            internal::ForInOfLeft::Pattern(expr) => {
+            ast::ForInOfLeft::Pattern(expr) => {
                 let doc = self
                     .with_expr_stmt_paren_target(let_target, || self.build_expression_doc(expr));
                 if wrap_async_paren { d.parens(doc) } else { doc }
@@ -2265,7 +2265,7 @@ impl<'a> Printer<'a> {
     /// `name === "async" && !parent.await && parent.type === "ForOfStatement"`).
     fn for_lhs_needs_async_paren(
         &self,
-        left: &internal::ForInOfLeft<'_>,
+        left: &ast::ForInOfLeft<'_>,
         keyword: &str,
         is_await: bool,
     ) -> bool {
@@ -2273,16 +2273,16 @@ impl<'a> Printer<'a> {
             && !is_await
             && matches!(
                 left,
-                internal::ForInOfLeft::Pattern(Expression { kind: ExpressionKind::Identifier(id), .. })
+                ast::ForInOfLeft::Pattern(Expression { kind: ExpressionKind::Identifier(id), .. })
                     if self.with_ident_name(id, |s| s == "async")
             )
     }
 
     /// Get the end position of a ForInit
-    fn get_for_init_span_end(&self, init: &internal::ForInit<'_>) -> u32 {
+    fn get_for_init_span_end(&self, init: &ast::ForInit<'_>) -> u32 {
         match init {
-            internal::ForInit::VariableDeclaration(decl) => decl.span.end,
-            internal::ForInit::Expression(expr) => expr.span().end,
+            ast::ForInit::VariableDeclaration(decl) => decl.span.end,
+            ast::ForInit::Expression(expr) => expr.span().end,
         }
     }
 }

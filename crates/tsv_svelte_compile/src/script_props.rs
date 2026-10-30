@@ -7,7 +7,7 @@
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     AssignmentPattern, Expression, ExpressionKind, ObjectPattern, ObjectPatternProperty, Property,
     RestElement,
 };

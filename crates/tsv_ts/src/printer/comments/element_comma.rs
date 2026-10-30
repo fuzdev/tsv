@@ -25,7 +25,7 @@
 // comment is not relocated across it.
 
 use super::{CommentVec, Printer, ShareSite};
-use crate::ast::internal::Expression;
+use crate::ast::Expression;
 use smallvec::SmallVec;
 use std::borrow::Borrow;
 use tsv_lang::Comment;
@@ -143,7 +143,7 @@ impl TrailingComments<'_> {
 
 impl<'a> Printer<'a> {
     /// Where a list element's trailing-comment scan starts: its PRINTED end
-    /// ([`crate::ast::internal::Expression::printed_end`], which carries the argument),
+    /// ([`crate::ast::Expression::printed_end`], which carries the argument),
     /// except under a format-ignore FREEZE, where it is the end of the frozen slice.
     ///
     /// The freeze arm is the whole reason this is a named question rather than a field

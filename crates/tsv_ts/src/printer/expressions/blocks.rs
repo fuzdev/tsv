@@ -10,7 +10,7 @@
 // By extracting to a separate module, we avoid code duplication across
 // expressions/ and statements/ modules.
 
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::comments::ends_no_trivia;
 use crate::printer::statements::StatementContext;
 use crate::printer::{CommentVec, Printer, is_effectively_empty_body};
@@ -114,7 +114,7 @@ impl StatementBlankScan {
         &mut self,
         printer: &Printer<'_>,
         prev_end: u32,
-        stmt: &internal::Statement<'_>,
+        stmt: &ast::Statement<'_>,
         frozen: bool,
     ) {
         self.printed(
@@ -160,7 +160,7 @@ impl StatementBlankScan {
         printer: &Printer<'_>,
         prev_end: u32,
         prev_stmt_end: Option<u32>,
-        leading_comments: &[&internal::Comment],
+        leading_comments: &[&ast::Comment],
         stmt_start: u32,
     ) -> bool {
         let run_start = leading_comments
@@ -362,7 +362,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn statement_content_tail_blank(
         &self,
-        stmt: &internal::Statement<'_>,
+        stmt: &ast::Statement<'_>,
         frozen: bool,
     ) -> bool {
         if self.statement_tail_is_bare(stmt) {
@@ -394,7 +394,7 @@ impl<'a> Printer<'a> {
     /// is frozen, keeps its terminator gap, or hands it to the list. A lone `;` (nothing
     /// before it in the span) is left to the walk rather than argued separately.
     #[inline]
-    fn statement_tail_is_bare(&self, stmt: &internal::Statement<'_>) -> bool {
+    fn statement_tail_is_bare(&self, stmt: &ast::Statement<'_>) -> bool {
         let span = stmt.span();
         let (start, end) = (span.start as usize, span.end as usize);
         let bytes = self.source.as_bytes();
@@ -410,11 +410,7 @@ impl<'a> Printer<'a> {
     /// remaining **78 (0.04%)** reach this walk.
     #[cold]
     #[inline(never)]
-    fn statement_content_tail_blank_walk(
-        &self,
-        stmt: &internal::Statement<'_>,
-        frozen: bool,
-    ) -> bool {
+    fn statement_content_tail_blank_walk(&self, stmt: &ast::Statement<'_>, frozen: bool) -> bool {
         let full_end = stmt.span().end;
         let content_end = self.statement_content_end(stmt);
         if content_end == full_end {
@@ -486,7 +482,7 @@ impl<'a> Printer<'a> {
     /// verdict.
     pub(in crate::printer) fn glued_run_blank_anchor(
         &self,
-        comments: &[&internal::Comment],
+        comments: &[&ast::Comment],
     ) -> Option<u32> {
         comments
             .last()
@@ -511,7 +507,7 @@ impl<'a> Printer<'a> {
     /// such seam past its end, so its slots always claim.
     pub(in crate::printer) fn orphan_semi_slot(
         &self,
-        body: &[internal::Statement<'_>],
+        body: &[ast::Statement<'_>],
         index: usize,
         list_end: u32,
         tail_target: Option<u32>,
@@ -589,7 +585,7 @@ impl<'a> Printer<'a> {
     /// directive-prologue eligible — see [`Printer::needs_avoid_directive_parens`].
     pub(in crate::printer) fn build_block_statement_doc(
         &self,
-        block: &internal::BlockStatement<'_>,
+        block: &ast::BlockStatement<'_>,
     ) -> DocId {
         self.build_block_statement_doc_core(block, false, true)
     }
@@ -599,7 +595,7 @@ impl<'a> Printer<'a> {
     /// Used in if/else contexts where empty blocks should not stay on one line.
     pub(in crate::printer) fn build_block_statement_expand_empty_doc(
         &self,
-        block: &internal::BlockStatement<'_>,
+        block: &ast::BlockStatement<'_>,
     ) -> DocId {
         self.build_block_statement_doc_core(block, true, true)
     }
@@ -613,7 +609,7 @@ impl<'a> Printer<'a> {
     /// see [`Printer::needs_avoid_directive_parens`].
     pub(in crate::printer) fn build_static_block_body_doc(
         &self,
-        block: &internal::BlockStatement<'_>,
+        block: &ast::BlockStatement<'_>,
     ) -> DocId {
         self.build_block_statement_doc_core(block, false, false)
     }
@@ -625,7 +621,7 @@ impl<'a> Printer<'a> {
     /// contained expression statements — see [`Printer::build_statement_doc`].
     fn build_block_statement_doc_core(
         &self,
-        block: &internal::BlockStatement<'_>,
+        block: &ast::BlockStatement<'_>,
         expand_empty: bool,
         in_program_or_block: bool,
     ) -> DocId {
@@ -643,7 +639,7 @@ impl<'a> Printer<'a> {
 
     fn build_block_statement_doc_inner(
         &self,
-        block: &internal::BlockStatement<'_>,
+        block: &ast::BlockStatement<'_>,
         expand_empty: bool,
         in_program_or_block: bool,
     ) -> DocId {
@@ -654,7 +650,7 @@ impl<'a> Printer<'a> {
     /// ([`Printer::push_dangling_comment_run`]). Only the run itself: the caller supplies
     /// the break before it (and any hoisted leading content above it) and the one before
     /// `}`.
-    fn build_inner_comments_for_empty_block(&self, block: &internal::BlockStatement<'_>) -> DocBuf {
+    fn build_inner_comments_for_empty_block(&self, block: &ast::BlockStatement<'_>) -> DocBuf {
         let block_start = block.span.start + 1; // After '{'
         let block_end = block.span.end - 1; // Before '}'
         let mut comment_parts = DocBuf::new();
@@ -670,7 +666,7 @@ impl<'a> Printer<'a> {
     /// This is the unified implementation for block statement doc building.
     fn build_block_body_doc(
         &self,
-        block: &internal::BlockStatement<'_>,
+        block: &ast::BlockStatement<'_>,
         expand_empty: bool,
         in_program_or_block: bool,
     ) -> DocId {
@@ -785,7 +781,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_statement_list_docs_into(
         &self,
         body_parts: &mut DocBuf,
-        body: &[internal::Statement<'_>],
+        body: &[ast::Statement<'_>],
         body_span: Span,
         has_leading: bool,
         delimiter_pull_pos: Option<u32>,
@@ -830,7 +826,7 @@ impl<'a> Printer<'a> {
             // `printStatementSequence` never prints them), but any comments
             // attached to one must survive — printed as orphaned comments
             // with nothing following them in this iteration to glue to.
-            if matches!(&stmt.kind, internal::StatementKind::EmptyStatement(_)) {
+            if matches!(&stmt.kind, ast::StatementKind::EmptyStatement(_)) {
                 let stmt_end = stmt.span().end;
                 // A block body has no seam past its end that could re-place a trailing run's
                 // comments, so every slot here claims — [`Printer::orphan_semi_slot`].

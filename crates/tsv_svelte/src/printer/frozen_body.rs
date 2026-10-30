@@ -1,7 +1,7 @@
 // The frozen verbatim body — one claim, one place.
 //
 // A body declared as a language tsv does not format at that position is the author's own
-// bytes (`internal::EmbeddedLang::is_frozen` decides which), and this module owns the shape
+// bytes (`ast::EmbeddedLang::is_frozen` decides which), and this module owns the shape
 // they ride out in: prettier's `preformattedBody`, spelled once for the two emitters that
 // need it — the top-level `<script>` / `<style>` WRITER (`script_style.rs`) and the doc path
 // for a nested raw-text element or a frozen `<template>` (`nodes/element_doc.rs`).

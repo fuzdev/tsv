@@ -48,7 +48,7 @@
 
 use super::text::has_authored_blank_line;
 use super::{HoistedComments, HoistedSection, Printer, push_char_reference, root_sections};
-use crate::ast::internal::{self, FragmentNode};
+use crate::ast::{self, FragmentNode};
 use smallvec::SmallVec;
 use tsv_lang::Span;
 
@@ -90,7 +90,7 @@ impl Separation {
     /// [`has_authored_blank_line`] reads when no content byte can sit between the two.
     fn of(segment: &str, edge: bool) -> Self {
         debug_assert!(
-            !edge || internal::is_collapsible_ws_str(segment),
+            !edge || ast::is_collapsible_ws_str(segment),
             "an edge segment is collapsible whitespace"
         );
         if edge && has_authored_blank_line(segment) {
@@ -128,8 +128,8 @@ fn group_end<T>(items: &[T], i: usize, joined: impl Fn(&T, &T) -> bool) -> usize
 /// The collapsible whitespace on either side of `first..last`: the run before it (stopping at
 /// `floor`) and the run after it.
 fn ws_edges(source: &str, floor: u32, first: u32, last: u32) -> (Span, Span) {
-    let before_len = internal::collapsible_ws_suffix_len(&source[floor as usize..first as usize]);
-    let after_len = internal::collapsible_ws_prefix_len(&source[last as usize..]);
+    let before_len = ast::collapsible_ws_suffix_len(&source[floor as usize..first as usize]);
+    let after_len = ast::collapsible_ws_prefix_len(&source[last as usize..]);
     (
         Span::new(first - before_len as u32, first),
         Span::new(last, last + after_len as u32),
@@ -138,7 +138,7 @@ fn ws_edges(source: &str, floor: u32, first: u32, last: u32) -> (Span, Span) {
 
 /// Whether nothing but collapsible whitespace sits between `a` and `b`.
 fn ws_only_between(source: &str, a: Span, b: Span) -> bool {
-    internal::is_collapsible_ws_str(&source[a.end as usize..b.start as usize])
+    ast::is_collapsible_ws_str(&source[a.end as usize..b.start as usize])
 }
 
 /// Whether `b` can continue a character reference an `&` has opened: a name's letters and
@@ -358,7 +358,7 @@ impl Printer<'_> {
     /// spelled as one too ([`glued_seam_respell`]).
     pub(super) fn lifted_runs_source(
         &self,
-        root: &internal::Root<'_>,
+        root: &ast::Root<'_>,
         sections: &HoistedComments,
     ) -> Option<String> {
         let mut runs = self.section_runs(root, sections);
@@ -487,7 +487,7 @@ impl Printer<'_> {
                 // it stood before a run the rewrite moved away — would be trimmed there by the
                 // next parse. Spelled as a reference it survives, as the template-tail respell
                 // spells it (`Printer::template_tail_respell`).
-                let content = internal::trim_end_collapsible_ws(&template);
+                let content = ast::trim_end_collapsible_ws(&template);
                 match content.chars().next_back() {
                     Some(ch) if crate::whitespace::is_end_trimmed_content(ch) => {
                         let at = content.len() - ch.len_utf8();
@@ -506,7 +506,7 @@ impl Printer<'_> {
     /// it.
     fn section_runs(
         &self,
-        root: &internal::Root<'_>,
+        root: &ast::Root<'_>,
         sections: &HoistedComments,
     ) -> SmallVec<[LiftedRun; 4]> {
         let nodes = &root.fragment.nodes;
@@ -543,7 +543,7 @@ impl Printer<'_> {
         section_span: Span,
         section: HoistedSection,
         sections: &HoistedComments,
-        fragment: &internal::Fragment<'_>,
+        fragment: &ast::Fragment<'_>,
     ) -> LiftedRun {
         let comments = &sections[section];
         let comment_span = |i: usize| Self::fragment_comment(fragment, i).map(|c| c.span);

@@ -17,7 +17,7 @@ use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use smallvec::SmallVec;
 
-use crate::ast::internal::{
+use crate::ast::{
     ArrowFunctionBody, ArrowFunctionExpression, BinaryExpression, BinaryOperator, BlockStatement,
     ClassBody, ClassDeclaration, ClassExpression, ClassMember, Decorator, ExportDefaultDeclaration,
     ExportDefaultValue, ExportKind, ExportNamedDeclaration, Expression, ExpressionKind,

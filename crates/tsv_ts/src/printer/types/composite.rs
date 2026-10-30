@@ -17,7 +17,7 @@ use super::{
     BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, TrailingBlock,
     UnionValueDoc,
 };
-use crate::ast::internal::{
+use crate::ast::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
 use crate::printer::comments::{ConditionalBranchPlacement, OwnLineBlock, TrailingBlank};
@@ -2475,13 +2475,13 @@ impl<'a> Printer<'a> {
     /// Build doc for type query expression name
     pub(super) fn build_type_query_expr_name_doc(
         &self,
-        expr_name: &internal::TSTypeQueryExprName<'_>,
+        expr_name: &ast::TSTypeQueryExprName<'_>,
     ) -> DocId {
         match expr_name {
-            internal::TSTypeQueryExprName::EntityName(entity) => self.build_entity_name_doc(entity),
+            ast::TSTypeQueryExprName::EntityName(entity) => self.build_entity_name_doc(entity),
             // `typeof import(...)` — identical to `TSType::Import`, including comment
             // preservation around the specifier, qualifier, and type arguments.
-            internal::TSTypeQueryExprName::Import(i) => self.build_import_type_doc(i),
+            ast::TSTypeQueryExprName::Import(i) => self.build_import_type_doc(i),
         }
     }
 }

@@ -5,7 +5,7 @@
 // - ChainNodeVec: Stack-friendly buffer for a linearized chain
 // - ChainGroup: Groups of nodes that stay together on the same line
 
-use crate::ast::internal::{self, IdentName, LiteralValue};
+use crate::ast::{self, IdentName, LiteralValue};
 use smallvec::SmallVec;
 use tsv_lang::Span;
 
@@ -84,7 +84,7 @@ pub enum ChainNode<'a> {
     /// parenthesized operand of a non-null assertion (`(x + y /* c */)!.foo`) so the
     /// comment is preserved where the author wrote it rather than dropped.
     Base {
-        expr: &'a internal::Expression<'a>,
+        expr: &'a ast::Expression<'a>,
         needs_parens: bool,
         /// Where the pair this base prints OPENS, when the base owns its own
         /// leading gap — the `(`→base run is this node's to emit rather than the
@@ -107,7 +107,7 @@ pub enum ChainNode<'a> {
     },
     /// Call expression: ()
     Call {
-        call: &'a internal::CallExpression<'a>,
+        call: &'a ast::CallExpression<'a>,
         /// The call's span (the span of the `Expression` holding `call`).
         span: Span,
         /// The facts about this call that only the CHAIN knows — see [`ChainCall`].
@@ -141,7 +141,7 @@ pub enum ChainNode<'a> {
     /// Computed member access: `[expr]`
     /// `bracket_end` is the position just before the closing `]` (for trailing comment detection)
     ComputedMember {
-        expr: &'a internal::Expression<'a>,
+        expr: &'a ast::Expression<'a>,
         optional: bool,
         object_end: u32,
         bracket_end: u32,
@@ -188,13 +188,13 @@ pub enum NonNullGap {
 /// (`computed_lookup_doc`), and `printMemberChain` (member-chain.js) lets a numeric lookup
 /// ride along in the current group where a non-numeric one opens a new one
 /// (`is_numeric_accessor`, used by `group_chain_nodes`).
-pub fn is_numeric_index(expr: &internal::Expression<'_>) -> bool {
-    matches!(&expr.kind, internal::ExpressionKind::Literal(lit) if matches!(lit.value, LiteralValue::Number(_)))
+pub fn is_numeric_index(expr: &ast::Expression<'_>) -> bool {
+    matches!(&expr.kind, ast::ExpressionKind::Literal(lit) if matches!(lit.value, LiteralValue::Number(_)))
 }
 
 impl<'a> ChainNode<'a> {
     /// Create a new base node
-    pub fn base(expr: &'a internal::Expression<'a>, needs_parens: bool) -> Self {
+    pub fn base(expr: &'a ast::Expression<'a>, needs_parens: bool) -> Self {
         Self::Base {
             expr,
             needs_parens,
@@ -208,7 +208,7 @@ impl<'a> ChainNode<'a> {
     /// optional chain reached without a `!` (`( // c⏎a?.b).ddd`,
     /// `( // c⏎a?.b)()`). `paren_leading_start` is the `(`, i.e. the enclosing
     /// member/call node's own start.
-    pub fn sealed_base(expr: &'a internal::Expression<'a>, paren_leading_start: u32) -> Self {
+    pub fn sealed_base(expr: &'a ast::Expression<'a>, paren_leading_start: u32) -> Self {
         Self::Base {
             expr,
             needs_parens: true,
@@ -226,7 +226,7 @@ impl<'a> ChainNode<'a> {
     /// inside them before `)` — the scan may find nothing (a comment-free sealed
     /// chain), in which case the printer renders bare parens.
     pub fn paren_base_before_non_null(
-        expr: &'a internal::Expression<'a>,
+        expr: &'a ast::Expression<'a>,
         paren_leading_start: u32,
         paren_comment_end: u32,
     ) -> Self {
@@ -240,7 +240,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Create a new call node
-    pub fn call(call: &'a internal::CallExpression<'a>, span: Span) -> Self {
+    pub fn call(call: &'a ast::CallExpression<'a>, span: Span) -> Self {
         Self::Call {
             call,
             span,
@@ -284,7 +284,7 @@ impl<'a> ChainNode<'a> {
 
     /// Create a new computed member node
     pub fn computed_member(
-        expr: &'a internal::Expression<'a>,
+        expr: &'a ast::Expression<'a>,
         optional: bool,
         object_end: u32,
         bracket_end: u32,
@@ -302,7 +302,7 @@ impl<'a> ChainNode<'a> {
     ///
     /// The bounds are derived here rather than at the call sites, so the two
     /// linearization entry points cannot hand the node different ones.
-    pub fn non_null(non_null: &internal::TSNonNullExpression<'_>, span: Span) -> Self {
+    pub fn non_null(non_null: &ast::TSNonNullExpression<'_>, span: Span) -> Self {
         Self::NonNull {
             gap: NonNullGap::Bang {
                 operand_end: non_null.expression.span().end,
@@ -442,7 +442,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Get the CallExpression if this is a Call node
-    pub fn as_call_expression(&self) -> Option<&'a internal::CallExpression<'a>> {
+    pub fn as_call_expression(&self) -> Option<&'a ast::CallExpression<'a>> {
         if let Self::Call { call, .. } = self {
             Some(call)
         } else {

@@ -7,7 +7,7 @@
 
 use super::printing::ComputedBracket;
 use super::types::ChainCall;
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::comments::CommentVec;
 use crate::printer::{CommentSpacing, Printer};
 use tsv_lang::doc::DocBuf;
@@ -19,7 +19,7 @@ impl<'a> Printer<'a> {
         self.arena
     }
 
-    pub(crate) fn ident_doc(&self, name: internal::IdentName<'_>, name_start: u32) -> DocId {
+    pub(crate) fn ident_doc(&self, name: ast::IdentName<'_>, name_start: u32) -> DocId {
         self.ident_name_doc(name, name_start)
     }
 
@@ -29,7 +29,7 @@ impl<'a> Printer<'a> {
 
     pub(crate) fn print_call_args(
         &self,
-        call: &internal::CallExpression<'_>,
+        call: &ast::CallExpression<'_>,
         span: Span,
         facts: ChainCall,
     ) -> DocId {
@@ -38,7 +38,7 @@ impl<'a> Printer<'a> {
 
     pub(crate) fn print_call_args_expanded(
         &self,
-        call: &internal::CallExpression<'_>,
+        call: &ast::CallExpression<'_>,
         span: Span,
         facts: ChainCall,
     ) -> DocId {
@@ -105,7 +105,7 @@ impl<'a> Printer<'a> {
         ))
     }
 
-    pub(crate) fn get_property_span(&self, expr: &internal::Expression<'_>) -> Span {
+    pub(crate) fn get_property_span(&self, expr: &ast::Expression<'_>) -> Span {
         expr.span()
     }
 

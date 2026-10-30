@@ -67,7 +67,7 @@
 use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     Expression, ExpressionKind, ObjectPatternProperty, Property, VariableDeclarator,
 };
 

@@ -38,12 +38,12 @@ Parse → Internal AST → [Format, Lint, Analyze]
 
 Each language crate separates these cleanly:
 
-- `ast/internal` — Optimized for manipulation (file or directory)
+- `ast` — the internal AST, optimized for manipulation (`ast/mod.rs`, plus submodules)
 - `ast/convert` (file or directory) — Emits the public wire JSON directly from
-  `internal`, in one walk (the writer), matching the canonical parser's JSON exactly
+  the internal AST, in one walk (the writer), matching the canonical parser's JSON exactly
   on the span-only wire (the `loc` wire is a superset — §`loc` lines)
 
-TypeScript uses directories (`internal/`, `convert/`) due to complexity. CSS and Svelte use a single `internal.rs` for AST types and a directory for conversion.
+TypeScript splits its AST types across `ast/`'s submodules (`expressions.rs`, `statements.rs`, `types.rs`, …) and its writer across `convert/write/`, due to complexity. CSS and Svelte define their AST types in `ast/mod.rs` itself, beside a `convert/` directory.
 
 Worked example — the writer emits the wire JSON straight from the clean, semantic internal node, applying the canonical quirks (here, `raw` reconstructed from source):
 
@@ -1037,7 +1037,7 @@ payload by `&'arena` reference:
   `for (;;)` is 0.05–0.22%. Rarity carries the enum from 544 B down to 96; the last
   step to **72 B** is the second rule below, plus its one deliberate exception.
 
-All three widths are pinned by `const` asserts in `ast/internal/mod.rs`, so a variant
+All three widths are pinned by `const` asserts in `ast/mod.rs`, so a variant
 that widens any of these enums fails the test build rather than silently fattening every
 slice element and thinning the depth limits' margin. The pins are rustc's layout, not a
 guarantee, so they compile under `cfg(test)` only and a toolchain that lays a type out
@@ -1176,7 +1176,7 @@ Share parser and AST across tools; let each tool add its own layers:
 │                    Shared Layer                     │
 │  - Lexer (tsv_*/lexer/)                            │
 │  - Parser (tsv_*/parser/)                          │
-│  - Internal AST (tsv_*/ast/internal/)              │
+│  - Internal AST (tsv_*/ast/)                       │
 │  - Wire-JSON writer (tsv_*/ast/convert/write*)     │
 │  - Comment helpers (tsv_lang/comment)              │
 └─────────────────────────────────────────────────────┘

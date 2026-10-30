@@ -1,6 +1,6 @@
 use super::CssParser;
 use super::decl_scan::{DeclarationHead, ScannedDeclaration};
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 

@@ -8,7 +8,7 @@
 
 use super::values::ValueCtx;
 use super::{Printer, value_normalization};
-use crate::ast::internal::{self, CssValue};
+use crate::ast::{self, CssValue};
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
 use tsv_lang::printing::{format_string_literal, visual_width};
@@ -135,7 +135,7 @@ fn property_is_font_shorthand(property: &str) -> bool {
 /// (`Printer::declaration_tail`) and the emit (`Printer::write_important_tail`).
 fn for_each_important_tail_piece(
     source: &str,
-    decl: &internal::CssDeclaration<'_>,
+    decl: &ast::CssDeclaration<'_>,
     mut emit: impl FnMut(&str),
 ) {
     let bytes = source.as_bytes();
@@ -174,7 +174,7 @@ impl<'a> Printer<'a> {
     /// (`for_each_important_tail_piece`) — so the wrap check counts exactly the bytes
     /// the emit appends. A value carrying `!important` therefore reserves the tail and
     /// wraps when it would overrun the print width, matching prettier.
-    fn declaration_tail(&self, decl: &internal::CssDeclaration<'_>) -> String {
+    fn declaration_tail(&self, decl: &ast::CssDeclaration<'_>) -> String {
         let mut out = String::new();
         if decl.is_important() {
             for_each_important_tail_piece(self.source, decl, |piece| out.push_str(piece));
@@ -194,7 +194,7 @@ impl<'a> Printer<'a> {
     /// the flag test and the `;\n` write inline; the tail is written piece by piece into
     /// the output from a cold body, with no intermediate `String`.
     #[inline]
-    fn write_declaration_end(&mut self, decl: &internal::CssDeclaration<'_>) {
+    fn write_declaration_end(&mut self, decl: &ast::CssDeclaration<'_>) {
         if decl.is_important() {
             self.write_important_tail(decl);
         }
@@ -204,7 +204,7 @@ impl<'a> Printer<'a> {
     /// [`Self::write_declaration_end`]'s `!important` arm.
     #[cold]
     #[inline(never)]
-    fn write_important_tail(&mut self, decl: &internal::CssDeclaration<'_>) {
+    fn write_important_tail(&mut self, decl: &ast::CssDeclaration<'_>) {
         let source = self.source;
         for_each_important_tail_piece(source, decl, |piece| self.write(piece));
     }
@@ -214,7 +214,7 @@ impl<'a> Printer<'a> {
     /// `write_declaration_end` re-emits both — preserving a comment *after* the bang
     /// (`blue !important /* y */;`) that a hand-rolled synthetic ` !important` would drop.
     /// Shared by the rule and at-rule block loops.
-    pub(super) fn write_format_ignore_declaration(&mut self, decl: &internal::CssDeclaration<'_>) {
+    pub(super) fn write_format_ignore_declaration(&mut self, decl: &ast::CssDeclaration<'_>) {
         self.write_indent();
         self.write_verbatim_span(self.frozen_slice_span(decl.span));
         self.write_declaration_end(decl);
@@ -245,10 +245,7 @@ impl<'a> Printer<'a> {
     /// authoring-dependent on a shape nothing else in CSS honors (`margin:⏎1px 2px`,
     /// `color:⏎red` and `translate(⏎1px,⏎2px)` all collapse), and which no fixture relied
     /// on. Pinned by `comma_separated`'s `unformatted_authored_break` variant.
-    fn multiline_plan<'v>(
-        &self,
-        decl: &'v internal::CssDeclaration<'v>,
-    ) -> Option<MultilinePlan<'v>> {
+    fn multiline_plan<'v>(&self, decl: &'v ast::CssDeclaration<'v>) -> Option<MultilinePlan<'v>> {
         // Only comma-separated values with multiple items.
         let values = match &decl.value {
             CssValue::CommaSeparated { values, .. } if values.len() > 1 => *values,
@@ -291,7 +288,7 @@ impl<'a> Printer<'a> {
     /// is postcss `raws.between` material, not value content.
     fn comma_list_should_break(
         &self,
-        decl: &internal::CssDeclaration<'_>,
+        decl: &ast::CssDeclaration<'_>,
         values: &[CssValue<'_>],
         content_start: Option<u32>,
     ) -> bool {
@@ -321,7 +318,7 @@ impl<'a> Printer<'a> {
     /// case — never pays the lex.
     fn hoistable_leading_run<'v>(
         &self,
-        decl: &internal::CssDeclaration<'_>,
+        decl: &ast::CssDeclaration<'_>,
         values: &'v [CssValue<'v>],
     ) -> Option<(Span, &'v [CssValue<'v>])> {
         let CssValue::List {
@@ -342,7 +339,7 @@ impl<'a> Printer<'a> {
     /// Gated on the O(1) `has_block_comment`, so a comment-free value never pays the lex.
     fn hoistable_leading_run_of<'v>(
         &self,
-        decl: &internal::CssDeclaration<'_>,
+        decl: &ast::CssDeclaration<'_>,
         members: &'v [CssValue<'v>],
     ) -> Option<(Span, &'v [CssValue<'v>])> {
         if !decl.has_block_comment {
@@ -398,7 +395,7 @@ impl<'a> Printer<'a> {
     ///
     /// Value comments aren't in the CSS AST, so a comment-bearing list isn't routed
     /// here (the dispatch guard); it stays on the source-extracting comment path.
-    fn print_decl_value_list(&mut self, decl: &internal::CssDeclaration<'_>) {
+    fn print_decl_value_list(&mut self, decl: &ast::CssDeclaration<'_>) {
         debug_assert!(
             matches!(
                 decl.value,
@@ -436,7 +433,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Format a CSS declaration (property: value;)
-    pub(super) fn print_css_declaration(&mut self, decl: &internal::CssDeclaration<'_>) {
+    pub(super) fn print_css_declaration(&mut self, decl: &ast::CssDeclaration<'_>) {
         // The `font` / custom-property gap rule is this declaration's, so it is set here
         // and cleared at the end rather than threaded through the value builders. Saved
         // and restored like `in_keyframes`, so a nested context cannot leak it.
@@ -453,7 +450,7 @@ impl<'a> Printer<'a> {
         self.value_scope = was_scope;
     }
 
-    fn print_css_declaration_in(&mut self, decl: &internal::CssDeclaration<'_>) {
+    fn print_css_declaration_in(&mut self, decl: &ast::CssDeclaration<'_>) {
         self.write_indent();
 
         // The block-child juncture's boundary run (`a {<NBSP>color: red }`,
@@ -543,10 +540,7 @@ impl<'a> Printer<'a> {
     /// The comment-free check is a byte compare on the value's first bytes; only a
     /// declaration that both carries a block comment (`has_block_comment`, O(1)) and opens
     /// its value with one pays the run lex.
-    fn progid_opaque_value(
-        &self,
-        decl: &internal::CssDeclaration<'_>,
-    ) -> Option<(Option<Span>, u32)> {
+    fn progid_opaque_value(&self, decl: &ast::CssDeclaration<'_>) -> Option<(Option<Span>, u32)> {
         fn starts_with_progid(text: &str) -> bool {
             text.as_bytes()
                 .get(..7)
@@ -579,7 +573,7 @@ impl<'a> Printer<'a> {
     /// the `;` is the one thing trimmed, as postcss's `raw()` trims it too.
     fn print_decl_progid_opaque(
         &mut self,
-        decl: &internal::CssDeclaration<'_>,
+        decl: &ast::CssDeclaration<'_>,
         run: Option<Span>,
         content_start: u32,
     ) {
@@ -630,7 +624,7 @@ impl<'a> Printer<'a> {
     /// already decided.
     fn print_decl_multiline<'v>(
         &mut self,
-        decl: &'v internal::CssDeclaration<'v>,
+        decl: &'v ast::CssDeclaration<'v>,
         plan: MultilinePlan<'v>,
     ) {
         self.write_broken_value_head(plan.hoisted);
@@ -653,7 +647,7 @@ impl<'a> Printer<'a> {
     /// hex color, a unit's case and a quote answer the same with a comment as without.
     fn print_decl_function(
         &mut self,
-        decl: &internal::CssDeclaration<'_>,
+        decl: &ast::CssDeclaration<'_>,
         decl_source: &str,
         name_span: Span,
         args: &[CssValue<'_>],
@@ -686,7 +680,7 @@ impl<'a> Printer<'a> {
     /// comments in the source's positions — never its number, hex, unit or quote spellings.
     fn print_decl_function_with_comments(
         &mut self,
-        decl: &internal::CssDeclaration<'_>,
+        decl: &ast::CssDeclaration<'_>,
         decl_source: &str,
         name_span: Span,
         args: &[CssValue<'_>],
@@ -752,7 +746,7 @@ impl<'a> Printer<'a> {
     /// break-after-the-colon group over a greedy element fill — via
     /// `build_comma_fill_doc_from_text`. The two are told apart by the AST's value kind, not
     /// the text: a comma inside a function's parens is not a list.
-    fn print_decl_with_comments(&mut self, decl: &internal::CssDeclaration<'_>, decl_source: &str) {
+    fn print_decl_with_comments(&mut self, decl: &ast::CssDeclaration<'_>, decl_source: &str) {
         let normalized =
             value_normalization::extract_value_with_comments(decl_source, decl.colon_pos());
         let is_comma_list =
@@ -828,7 +822,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Print declaration with string value
-    fn print_decl_string(&mut self, decl: &internal::CssDeclaration<'_>, decl_source: &str) {
+    fn print_decl_string(&mut self, decl: &ast::CssDeclaration<'_>, decl_source: &str) {
         // The original quote is the first byte of the string value's span (recovered
         // from source, not stored).
         let quote = self.source.as_bytes()[decl.value.span().start_usize()] as char;
@@ -855,14 +849,14 @@ impl<'a> Printer<'a> {
     /// value-kind flip (see `tests/css_property_comment_colon_idempotent.rs`).
     fn property_colon_needs_leading_space(
         &self,
-        decl: &internal::CssDeclaration<'_>,
+        decl: &ast::CssDeclaration<'_>,
         property: &str,
     ) -> bool {
         decl.has_block_comment && property.contains("/*")
     }
 
     /// Print declaration with default formatting
-    fn print_decl_default(&mut self, decl: &internal::CssDeclaration<'_>) {
+    fn print_decl_default(&mut self, decl: &ast::CssDeclaration<'_>) {
         // The property→colon separator's leading space (for a comment-bearing property)
         // is emitted once in `print_css_declaration`; every path writes the bare `: `.
         self.write(": ");
@@ -907,7 +901,7 @@ impl<'a> Printer<'a> {
     /// comment-free value uses — no text path, and nothing to keep in step with one.
     fn grid_multirow_plan<'v>(
         &self,
-        decl: &'v internal::CssDeclaration<'v>,
+        decl: &'v ast::CssDeclaration<'v>,
     ) -> Option<GridMultirowPlan<'v>> {
         if !Self::is_grid_row_property(decl.property) {
             return None;
@@ -999,7 +993,7 @@ impl<'a> Printer<'a> {
     /// `grid_row_opens_at`'s, the question the plan asked.
     fn print_decl_grid_multirow<'v>(
         &mut self,
-        decl: &'v internal::CssDeclaration<'v>,
+        decl: &'v ast::CssDeclaration<'v>,
         plan: GridMultirowPlan<'v>,
     ) {
         self.write_broken_value_head(plan.hoisted);

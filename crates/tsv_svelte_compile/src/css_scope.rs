@@ -38,13 +38,13 @@
 
 use std::collections::HashSet;
 
-use tsv_css::ast::internal::{
+use tsv_css::ast::{
     AttributeMatcher, Combinator, ComplexSelector, CssAtrule, CssBlockChild, CssDeclaration,
     CssNode, CssRule, PseudoClassArgs, RelativeSelector, SimpleSelector, attribute_value_text,
 };
 use tsv_lang::Span;
-use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, Element, SpecialElement, Style};
-use tsv_ts::ast::internal::{
+use tsv_svelte::ast::{AttributeNode, AttributeValue, Element, SpecialElement, Style};
+use tsv_ts::ast::{
     BinaryOperator, Expression, ExpressionKind, Literal, LiteralValue, ObjectProperty,
 };
 

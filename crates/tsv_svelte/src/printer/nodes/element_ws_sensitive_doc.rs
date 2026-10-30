@@ -17,7 +17,7 @@ use super::blocks_doc::{
 };
 use super::element_doc::{AttrListEmission, ElementAttrsDoc};
 use super::helpers::{HeadTail, each_expr_comment_end};
-use crate::ast::internal::{self, Fragment, FragmentNode, is_collapsible_ws_char};
+use crate::ast::{self, Fragment, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
 use crate::printer::classification::element::has_raw_content;
 use smallvec::smallvec;
@@ -118,7 +118,7 @@ impl<'a> Printer<'a> {
     /// unchanged.
     pub(super) fn build_whitespace_sensitive_element_doc(
         &self,
-        element: &internal::Element<'_>,
+        element: &ast::Element<'_>,
         attrs: ElementAttrsDoc,
     ) -> DocId {
         // A `<textarea>`'s content is RCDATA, read as a sequence (see
@@ -132,7 +132,7 @@ impl<'a> Printer<'a> {
 
     fn build_whitespace_sensitive_element_doc_inner(
         &self,
-        element: &internal::Element<'_>,
+        element: &ast::Element<'_>,
         attrs: ElementAttrsDoc,
     ) -> DocId {
         let ElementAttrsDoc {
@@ -576,7 +576,7 @@ impl<'a> Printer<'a> {
             // comes from the parent's collective wrap (build_whitespace_sensitive_content_doc),
             // so no per-node wrapper here. Handles <pre><code> where <code> inherits ws preservation.
             FragmentNode::Element(element) => {
-                let ws_is_html = element.kind == internal::ElementKind::Html;
+                let ws_is_html = element.kind == ast::ElementKind::Html;
                 // Always use whitespace-sensitive path when nested inside whitespace-sensitive elements
                 let attrs = self.build_element_attrs_doc(
                     element.attributes,
@@ -616,7 +616,7 @@ impl<'a> Printer<'a> {
     /// Emits block structure inline without added whitespace. Body nodes are
     /// formatted with whitespace-sensitive content formatting to preserve
     /// significant whitespace.
-    fn build_ws_sensitive_if_block_doc(&self, block: &internal::IfBlock<'_>) -> DocId {
+    fn build_ws_sensitive_if_block_doc(&self, block: &ast::IfBlock<'_>) -> DocId {
         let d = self.d();
         // Pass false for in_multiline_context: inside whitespace-sensitive elements,
         // block expressions must not wrap (adding line breaks changes visible content)
@@ -675,7 +675,7 @@ impl<'a> Printer<'a> {
     ///
     /// Emits block structure inline without added whitespace. Body nodes are
     /// formatted with whitespace-sensitive content formatting.
-    fn build_ws_sensitive_each_block_doc(&self, block: &internal::EachBlock<'_>) -> DocId {
+    fn build_ws_sensitive_each_block_doc(&self, block: &ast::EachBlock<'_>) -> DocId {
         let d = self.d();
         let expr_comment_end = each_expr_comment_end(block);
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
@@ -740,7 +740,7 @@ impl<'a> Printer<'a> {
     ///
     /// Every section decision reads [`SectionWhitespace::Preserved`]: here a whitespace-only
     /// section is rendered text, so only a section with no nodes may fold into the head or drop.
-    fn build_ws_sensitive_await_block_doc(&self, block: &internal::AwaitBlock<'_>) -> DocId {
+    fn build_ws_sensitive_await_block_doc(&self, block: &ast::AwaitBlock<'_>) -> DocId {
         let d = self.d();
         let sections = AwaitSections::classify(block, SectionWhitespace::Preserved);
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
@@ -782,7 +782,7 @@ impl<'a> Printer<'a> {
 
     /// Build a key block doc for whitespace-sensitive context (inside `<pre>`): the head may
     /// open around a comment, the body stays glued to its tags.
-    fn build_ws_sensitive_key_block_doc(&self, block: &internal::KeyBlock<'_>) -> DocId {
+    fn build_ws_sensitive_key_block_doc(&self, block: &ast::KeyBlock<'_>) -> DocId {
         let d = self.d();
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
         let head = self.build_block_head_expr(
@@ -801,7 +801,7 @@ impl<'a> Printer<'a> {
     /// Build a snippet block doc for whitespace-sensitive context (inside `<pre>`): the
     /// opening tag is the ordinary one (its parameters may open around a comment), the body
     /// stays glued to its tags.
-    fn build_ws_sensitive_snippet_block_doc(&self, block: &internal::SnippetBlock<'_>) -> DocId {
+    fn build_ws_sensitive_snippet_block_doc(&self, block: &ast::SnippetBlock<'_>) -> DocId {
         let d = self.d();
         let opening_doc = self.build_snippet_opening_doc(block);
         let body_doc = self.build_whitespace_sensitive_content_doc(block.body.nodes);

@@ -12,7 +12,7 @@
 //! Target-independent: this is a fact about the script's scope, not about what
 //! any transform emits.
 
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     Expression, ExpressionKind, ImportDeclaration, ImportSpecifier, Statement, StatementKind,
 };
 
@@ -33,7 +33,7 @@ pub(crate) enum VarScope {
 pub(crate) enum ScriptDeclaration<'arena> {
     /// A `var`/`let`/`const`/`using` declarator.
     Declarator {
-        declarator: &'arena tsv_ts::ast::internal::VariableDeclarator<'arena>,
+        declarator: &'arena tsv_ts::ast::VariableDeclarator<'arena>,
         /// Whether this declarator reached script scope by hoisting **through a
         /// POROUS scope** — a block, a for-head/body, a switch, a try/catch. The
         /// oracle re-declares such a `var` on the parent scope and passes NO
@@ -45,15 +45,15 @@ pub(crate) enum ScriptDeclaration<'arena> {
         initial_dropped: bool,
     },
     /// A `function name(…) {}` declaration's name.
-    Function(&'arena tsv_ts::ast::internal::Identifier<'arena>),
+    Function(&'arena tsv_ts::ast::Identifier<'arena>),
     /// A `class Name {}` declaration's name.
-    Class(&'arena tsv_ts::ast::internal::Identifier<'arena>),
+    Class(&'arena tsv_ts::ast::Identifier<'arena>),
     /// One `import` specifier's local name, with the declaration it came from —
     /// the oracle's `Binding.initial` for an import binding is the whole
     /// `ImportDeclaration`, and its `source` is what the `svelte/store` carve-out
     /// tests.
     Import {
-        local: &'arena tsv_ts::ast::internal::Identifier<'arena>,
+        local: &'arena tsv_ts::ast::Identifier<'arena>,
         declaration: &'arena ImportDeclaration<'arena>,
     },
 }
@@ -123,7 +123,7 @@ fn script_declarations_of<'arena, E>(
     porous: bool,
     f: &mut dyn FnMut(ScriptDeclaration<'arena>) -> Result<(), E>,
 ) -> Result<(), E> {
-    use tsv_ts::ast::internal::{ForInOfLeft, ForInit, VariableDeclarationKind};
+    use tsv_ts::ast::{ForInOfLeft, ForInit, VariableDeclarationKind};
 
     // Descending at all is only ever about collecting hoisted `var`s.
     let descend = matches!(var_scope, VarScope::WithHoistedVars);
@@ -305,7 +305,7 @@ fn script_declarations_of<'arena, E>(
 /// [`plain_identifier_name`] is its owned-`String` form. Centralized because the
 /// escaped-identifier handling here is a recurring bug class — one place to audit.
 pub(crate) fn plain_identifier_str<'s>(
-    id: &tsv_ts::ast::internal::Identifier<'_>,
+    id: &tsv_ts::ast::Identifier<'_>,
     source: &'s str,
 ) -> Option<&'s str> {
     if id.escaped_name.is_some() {
@@ -316,7 +316,7 @@ pub(crate) fn plain_identifier_str<'s>(
 }
 
 pub(crate) fn plain_identifier_name(
-    id: &tsv_ts::ast::internal::Identifier<'_>,
+    id: &tsv_ts::ast::Identifier<'_>,
     source: &str,
 ) -> Option<String> {
     plain_identifier_str(id, source).map(str::to_string)

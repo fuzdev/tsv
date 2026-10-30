@@ -11,7 +11,7 @@
 //! component's root body.
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_ts::ast::internal::{Expression, Statement};
+use tsv_ts::ast::{Expression, Statement};
 
 use crate::build::Builder;
 

@@ -6,7 +6,7 @@
 // - svelte:fragment, svelte:boundary
 // - slot, title
 
-use crate::ast::internal::{self, SpecialElementKind};
+use crate::ast::{self, SpecialElementKind};
 use crate::printer::Printer;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
@@ -25,10 +25,7 @@ impl<'a> Printer<'a> {
     /// multiline for block children (`<slot><div>a</div><div>b</div></slot>` on one line, where
     /// `<span>` expands), a special path that dangles its tag delimiters where regular elements
     /// are block-style.
-    pub(super) fn build_special_element_doc(
-        &self,
-        element: &internal::SpecialElement<'_>,
-    ) -> DocId {
+    pub(super) fn build_special_element_doc(&self, element: &ast::SpecialElement<'_>) -> DocId {
         let tag_name = element.kind.tag_name();
         let name = self.d().text(tag_name);
 
@@ -76,7 +73,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_special_close_gt_dangle`], so the two cannot disagree about the element
     /// they lay out.
     fn special_element_parts<'e>(
-        element: &'e internal::SpecialElement<'e>,
+        element: &'e ast::SpecialElement<'e>,
         name: DocId,
     ) -> ElementParts<'e> {
         ElementParts {
@@ -114,7 +111,7 @@ impl<'a> Printer<'a> {
     /// caller then builds its ordinary doc.
     pub(super) fn build_special_close_gt_dangle(
         &self,
-        element: &internal::SpecialElement<'_>,
+        element: &ast::SpecialElement<'_>,
     ) -> Option<DocId> {
         if element.kind.preserves_content_whitespace() {
             return None;
@@ -157,7 +154,7 @@ impl<'a> Printer<'a> {
     /// whole element to [`Printer::build_verbatim_content_doc`], off the same
     /// [`Printer::ws_sensitive_content_edges`] read `<pre>` / `<textarea>` use. So the `>`
     /// hugs the last list member and the closing tag dangles on the same terms they do —
-    /// `<title>` is inline by [`internal::SpecialElementKind::is_block`], which is what
+    /// `<title>` is inline by [`ast::SpecialElementKind::is_block`], which is what
     /// decides the dangle for the other two.
     ///
     /// Reaching for `build_opening_tag` here instead (whose `dedent(softline)` is the
@@ -177,7 +174,7 @@ impl<'a> Printer<'a> {
     fn build_title_content_doc(
         &self,
         name: DocId,
-        nodes: &[internal::FragmentNode<'_>],
+        nodes: &[ast::FragmentNode<'_>],
         attr_docs: &[DocId],
         emission: AttrListEmission,
     ) -> DocId {
@@ -220,7 +217,7 @@ impl<'a> Printer<'a> {
     /// pins the same kinds outside the family, where this builder does not run.
     pub(super) fn build_ws_sensitive_special_element_doc(
         &self,
-        element: &internal::SpecialElement<'_>,
+        element: &ast::SpecialElement<'_>,
     ) -> DocId {
         let nodes = element.fragment.nodes;
         if nodes.is_empty() {
@@ -257,7 +254,7 @@ impl<'a> Printer<'a> {
     /// so it needs a fixtures-first pass, not a delete.
     fn build_special_empty_doc(
         &self,
-        element: &internal::SpecialElement<'_>,
+        element: &ast::SpecialElement<'_>,
         tag_name: &'static str,
         attr_docs: &[DocId],
         ctx: &ElementContext,
@@ -321,7 +318,7 @@ impl<'a> Printer<'a> {
     /// (line-separated) layout, `d.text(" ")` for hug mode (space-separated).
     pub(super) fn build_special_element_attrs_doc(
         &self,
-        element: &internal::SpecialElement<'_>,
+        element: &ast::SpecialElement<'_>,
         separator: DocId,
     ) -> ElementAttrsDoc {
         // `<svelte:element>` / `<svelte:component>` carry their `this` binding in the kind
@@ -402,19 +399,19 @@ impl<'a> Printer<'a> {
     /// rather than being skipped. Rebuilding those gaps here instead would fork the
     /// leading-comment rule at yet another site — and skipping them drops every comment
     /// in its expression.
-    fn build_this_braced_doc(&self, tag: &internal::ExpressionTag<'_>) -> DocId {
+    fn build_this_braced_doc(&self, tag: &ast::ExpressionTag<'_>) -> DocId {
         let d = self.d();
         d.concat(&[d.text("this="), self.build_expression_tag_doc(tag)])
     }
 
     /// Build doc for a `<svelte:element>` `this=` binding (for inline doc building), which
     /// unlike the component's may also be a plain string.
-    fn build_this_attr_doc_for_inline(&self, this: &internal::SpecialThis<'_>) -> DocId {
+    fn build_this_attr_doc_for_inline(&self, this: &ast::SpecialThis<'_>) -> DocId {
         let d = self.d();
 
         let content = match this {
-            internal::SpecialThis::Braced(tag) => return self.build_this_braced_doc(tag),
-            internal::SpecialThis::Plain { content, .. } => content,
+            ast::SpecialThis::Braced(tag) => return self.build_this_braced_doc(tag),
+            ast::SpecialThis::Plain { content, .. } => content,
         };
 
         // `this="value"`: a plain HTML attribute, printed as one. Same delimiter rule as any

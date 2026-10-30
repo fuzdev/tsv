@@ -18,7 +18,7 @@ mod try_jump;
 
 use smallvec::SmallVec;
 
-use crate::ast::internal::{Expression, ExpressionKind, Statement, StatementKind, UnaryOperator};
+use crate::ast::{Expression, ExpressionKind, Statement, StatementKind, UnaryOperator};
 use crate::printer::statements::StatementContext;
 use crate::printer::{CommentVec, LeadingGlue, Printer};
 use tsv_lang::Comment;

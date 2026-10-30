@@ -45,11 +45,11 @@
 //! `this={…}`); every special element is refused at emission elsewhere, so its
 //! references, too, are only reachable through the dropped-fragment path.
 
-use tsv_svelte::ast::internal::{
+use tsv_svelte::ast::{
     AttributeNode, AttributeValue, Element, ElementKind, Fragment, FragmentNode, SpecialElement,
     SpecialElementKind, SpecialThis, StyleDirectiveValue,
 };
-use tsv_ts::ast::internal::Expression;
+use tsv_ts::ast::Expression;
 
 use crate::CompileError;
 

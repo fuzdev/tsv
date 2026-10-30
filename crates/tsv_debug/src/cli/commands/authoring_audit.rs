@@ -84,7 +84,7 @@ use std::path::{Path, PathBuf};
 
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
-use tsv_svelte::ast::internal::{FragmentNode, is_collapsible_ws_char, text_edge_ws};
+use tsv_svelte::ast::{FragmentNode, is_collapsible_ws_char, text_edge_ws};
 
 use crate::audit::excerpt::line_context;
 use crate::audit::panic_hook::SuppressedPanicHook;
@@ -382,7 +382,7 @@ fn push_boundary_forms(start: usize, end: usize, src: &str, kind: SiteKind, out:
 /// content, and its boundary is equally render-free — so it gets both site families.
 /// Inside `<pre>`/`<textarea>` the run is literal, so only the inter-sibling family applies.
 fn collect_block_fragment(
-    fragment: &tsv_svelte::ast::internal::Fragment<'_>,
+    fragment: &tsv_svelte::ast::Fragment<'_>,
     src: &str,
     ws_sig: bool,
     out: &mut Vec<Site>,
@@ -395,7 +395,7 @@ fn collect_block_fragment(
 
 /// Is this alternate the `{:else if …}` form — one nested `IfBlock` that spans the rest
 /// of the chain, closing tag included — rather than a real `{:else}` fragment?
-fn is_elseif_chain(alternate: &tsv_svelte::ast::internal::Fragment<'_>) -> bool {
+fn is_elseif_chain(alternate: &tsv_svelte::ast::Fragment<'_>) -> bool {
     matches!(alternate.nodes, [FragmentNode::IfBlock(b)] if b.elseif)
 }
 

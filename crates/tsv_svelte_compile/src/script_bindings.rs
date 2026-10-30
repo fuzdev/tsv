@@ -11,7 +11,7 @@
 //! exhaustive statement enumeration — so a new AST variant fails compilation
 //! rather than silently escaping the table.
 
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     Expression, ExpressionKind, ImportDeclaration, ImportSpecifier, LiteralValue, ModuleExportName,
     Statement, StatementKind, VariableDeclarator,
 };
@@ -51,7 +51,7 @@ use crate::{CompileError, Refusal, erase};
 /// whole-component analysis ([`crate::needs_context::analyze_component`]) and the
 /// binding table ([`analyze_script`]), not through any module-only rewrite.
 pub(crate) fn analyze_module_script<'arena>(
-    root: &tsv_svelte::ast::internal::Root<'arena>,
+    root: &tsv_svelte::ast::Root<'arena>,
     source: &str,
     arena: &'arena bumpalo::Bump,
     ts_document: bool,
@@ -415,7 +415,7 @@ fn analyze_declarator<'arena>(
             // `$derived.by(fn)`: the oracle evaluates through an expression-bodied
             // arrow's body (a block-bodied arrow is UNKNOWN). A destructured leaf
             // folds through that same body.
-            use tsv_ts::ast::internal::ArrowFunctionBody;
+            use tsv_ts::ast::ArrowFunctionBody;
             let initial = match &f.kind {
                 ExpressionKind::ArrowFunctionExpression(arrow) => match &arrow.body {
                     ArrowFunctionBody::Expression(body) => Initial::Expr(body),

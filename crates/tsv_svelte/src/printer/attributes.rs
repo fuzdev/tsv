@@ -9,14 +9,14 @@
 //
 // Uses Doc IR for all formatting - build_*_doc methods are the canonical implementations.
 
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::{CommentRun, HeadExpr, HeadLayout, Printer};
 use smallvec::smallvec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::printing::next_width_relevant_in;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, Span};
-use tsv_ts::ast::internal::{Expression, ExpressionKind};
+use tsv_ts::ast::{Expression, ExpressionKind};
 
 /// How a directive prints its expression value — the only axis the expression-valued
 /// directive builders differ on, so [`Printer::build_directive_doc`] serves them all.
@@ -97,7 +97,7 @@ const ATTACH_TAG_OPEN: &str = "{@attach ";
 /// Whether a SINGLE-LINE `raw` is trivially already-normalized, so
 /// [`normalize_class_text`] would return it unchanged: no tabs, no collapsible space
 /// runs, no trailing space. The caller answers the single-line half from the node's
-/// parse-time newline count ([`internal::Text::has_newline`]). Conservative — a `false`
+/// parse-time newline count ([`ast::Text::has_newline`]). Conservative — a `false`
 /// only means the `String` path runs (and decides for itself), so this can never change
 /// output; it only lets the common `class="a b c"` case skip the transient allocation.
 ///
@@ -505,25 +505,21 @@ impl<'a> Printer<'a> {
     /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
     pub(super) fn build_attribute_node_doc(
         &self,
-        node: &internal::AttributeNode<'_>,
+        node: &ast::AttributeNode<'_>,
         is_html: bool,
     ) -> DocId {
         match node {
-            internal::AttributeNode::Attribute(attr) => self.build_attribute_doc(attr, is_html),
-            internal::AttributeNode::SpreadAttribute(spread) => {
-                self.build_spread_attribute_doc(spread)
-            }
-            internal::AttributeNode::AttachTag(tag) => self.build_attach_tag_doc(tag),
-            internal::AttributeNode::OnDirective(d) => self.build_on_directive_doc(d),
-            internal::AttributeNode::BindDirective(d) => self.build_bind_directive_doc(d),
-            internal::AttributeNode::ClassDirective(d) => self.build_class_directive_doc(d),
-            internal::AttributeNode::StyleDirective(d) => self.build_style_directive_doc(d),
-            internal::AttributeNode::UseDirective(d) => self.build_use_directive_doc(d),
-            internal::AttributeNode::TransitionDirective(d) => {
-                self.build_transition_directive_doc(d)
-            }
-            internal::AttributeNode::AnimateDirective(d) => self.build_animate_directive_doc(d),
-            internal::AttributeNode::LetDirective(d) => self.build_let_directive_doc(d),
+            ast::AttributeNode::Attribute(attr) => self.build_attribute_doc(attr, is_html),
+            ast::AttributeNode::SpreadAttribute(spread) => self.build_spread_attribute_doc(spread),
+            ast::AttributeNode::AttachTag(tag) => self.build_attach_tag_doc(tag),
+            ast::AttributeNode::OnDirective(d) => self.build_on_directive_doc(d),
+            ast::AttributeNode::BindDirective(d) => self.build_bind_directive_doc(d),
+            ast::AttributeNode::ClassDirective(d) => self.build_class_directive_doc(d),
+            ast::AttributeNode::StyleDirective(d) => self.build_style_directive_doc(d),
+            ast::AttributeNode::UseDirective(d) => self.build_use_directive_doc(d),
+            ast::AttributeNode::TransitionDirective(d) => self.build_transition_directive_doc(d),
+            ast::AttributeNode::AnimateDirective(d) => self.build_animate_directive_doc(d),
+            ast::AttributeNode::LetDirective(d) => self.build_let_directive_doc(d),
         }
     }
 
@@ -534,11 +530,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a single attribute (name="value" or name or {shorthand})
     ///
     /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
-    pub(super) fn build_attribute_doc(
-        &self,
-        attr: &internal::Attribute<'_>,
-        is_html: bool,
-    ) -> DocId {
+    pub(super) fn build_attribute_doc(&self, attr: &ast::Attribute<'_>, is_html: bool) -> DocId {
         let d = self.d();
         if let Some(span) = self.attribute_source_span(attr, is_html) {
             return self.plain_source_span_doc(span);
@@ -564,7 +556,7 @@ impl<'a> Printer<'a> {
                 } else {
                     self.build_attribute_value_doc(&value_parts[0])
                 };
-                return if matches!(value_parts[0], internal::AttributeValue::ExpressionTag(_)) {
+                return if matches!(value_parts[0], ast::AttributeValue::ExpressionTag(_)) {
                     d.concat(&[name_doc, d.text("="), value_doc])
                 } else {
                     let (open, close) = self.attribute_value_delims(value_parts);
@@ -643,7 +635,7 @@ impl<'a> Printer<'a> {
     /// ([`plain_path_span`](super::plain_path_span) — plain ASCII with no escape, and with
     /// the `{` directly ahead of it it owns no comment), and
     /// [`Printer::is_shorthand_attribute`] says the general builder prints the shorthand.
-    fn attribute_source_span(&self, attr: &internal::Attribute<'_>, is_html: bool) -> Option<Span> {
+    fn attribute_source_span(&self, attr: &ast::Attribute<'_>, is_html: bool) -> Option<Span> {
         if !super::fuses_source_spans() {
             return None;
         }
@@ -652,7 +644,7 @@ impl<'a> Printer<'a> {
         let name = attr.name_span;
         let name_end = name.end as usize;
         match value {
-            [internal::AttributeValue::Text(text)] => {
+            [ast::AttributeValue::Text(text)] => {
                 let text = text.raw_span;
                 let close = text.end as usize;
                 let fuses = text.start as usize == name_end + 2
@@ -665,7 +657,7 @@ impl<'a> Printer<'a> {
                         && !class_text_is_normalized(&bytes[text.range()]));
                 fuses.then(|| Span::new(name.start, text.end + 1))
             }
-            [internal::AttributeValue::ExpressionTag(tag)] if tag.span == name => {
+            [ast::AttributeValue::ExpressionTag(tag)] if tag.span == name => {
                 let whole = attr.span;
                 let fuses = whole.start + 1 == name.start
                     && whole.end == name.end + 1
@@ -677,7 +669,7 @@ impl<'a> Printer<'a> {
                 );
                 fuses.then_some(whole)
             }
-            [internal::AttributeValue::ExpressionTag(tag)] if Self::tag_is_plain_path(tag) => {
+            [ast::AttributeValue::ExpressionTag(tag)] if Self::tag_is_plain_path(tag) => {
                 let tag = tag.span;
                 let fuses = tag.start as usize == name_end + 1
                     && bytes[name_end] == b'='
@@ -713,11 +705,11 @@ impl<'a> Printer<'a> {
     /// hold one — and the byte before the first part is that opening quote (an unquoted value
     /// opens past a `=` or whitespace, a single-quoted one past a `'`). Nearly every value in
     /// real markup is double-quoted, and the scan reads every byte of its text.
-    fn attribute_value_delims(&self, parts: &[internal::AttributeValue<'_>]) -> (DocId, DocId) {
+    fn attribute_value_delims(&self, parts: &[ast::AttributeValue<'_>]) -> (DocId, DocId) {
         let d = self.d();
         let value_start = match parts.first() {
-            Some(internal::AttributeValue::Text(text)) => text.raw_span.start,
-            Some(internal::AttributeValue::ExpressionTag(tag)) => tag.span.start,
+            Some(ast::AttributeValue::Text(text)) => text.raw_span.start,
+            Some(ast::AttributeValue::ExpressionTag(tag)) => tag.span.start,
             None => 0,
         };
         let opener = (value_start as usize).checked_sub(1);
@@ -744,13 +736,10 @@ impl<'a> Printer<'a> {
     /// Out of line: its scan keeps more live than the double-quoted answer needs, and inlined
     /// it would make every attribute save registers for a walk few of them take.
     #[inline(never)]
-    fn scanned_attribute_value_delims(
-        &self,
-        parts: &[internal::AttributeValue<'_>],
-    ) -> ValueDelims {
+    fn scanned_attribute_value_delims(&self, parts: &[ast::AttributeValue<'_>]) -> ValueDelims {
         let mut texts = parts.iter().filter_map(|part| match part {
-            internal::AttributeValue::Text(text) => Some(text.raw(self.source)),
-            internal::AttributeValue::ExpressionTag(_) => None,
+            ast::AttributeValue::Text(text) => Some(text.raw(self.source)),
+            ast::AttributeValue::ExpressionTag(_) => None,
         });
         // A value with no `"` takes the double quotes whatever else it holds, so the `'`
         // question is asked only of a value that has one. The `"` test walks a CLONE, so the
@@ -773,12 +762,10 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for an attribute value part — the VERBATIM rule every quoted value takes
     /// unless its host has a narrower one.
-    fn build_attribute_value_doc(&self, value: &internal::AttributeValue<'_>) -> DocId {
+    fn build_attribute_value_doc(&self, value: &ast::AttributeValue<'_>) -> DocId {
         match value {
-            internal::AttributeValue::Text(text) => self.build_attribute_text_doc(text, None),
-            internal::AttributeValue::ExpressionTag(expr_tag) => {
-                self.build_expression_tag_doc(expr_tag)
-            }
+            ast::AttributeValue::Text(text) => self.build_attribute_text_doc(text, None),
+            ast::AttributeValue::ExpressionTag(expr_tag) => self.build_expression_tag_doc(expr_tag),
         }
     }
 
@@ -789,11 +776,11 @@ impl<'a> Printer<'a> {
     /// Expression tags are passed through unchanged.
     fn build_class_attribute_value_doc(
         &self,
-        value: &internal::AttributeValue<'_>,
+        value: &ast::AttributeValue<'_>,
         is_last_part: bool,
     ) -> DocId {
         match value {
-            internal::AttributeValue::Text(text) => {
+            ast::AttributeValue::Text(text) => {
                 let raw = text.raw(self.source);
                 if !text.has_newline() && class_text_is_normalized(raw.as_bytes()) {
                     self.build_attribute_text_doc(text, None)
@@ -801,9 +788,7 @@ impl<'a> Printer<'a> {
                     self.build_normalized_class_text_doc(text, is_last_part)
                 }
             }
-            internal::AttributeValue::ExpressionTag(expr_tag) => {
-                self.build_expression_tag_doc(expr_tag)
-            }
+            ast::AttributeValue::ExpressionTag(expr_tag) => self.build_expression_tag_doc(expr_tag),
         }
     }
 
@@ -814,7 +799,7 @@ impl<'a> Printer<'a> {
     /// every one — needs, and inlined they would make every class value save registers for
     /// them.
     #[inline(never)]
-    fn build_normalized_class_text_doc(&self, text: &internal::Text, is_last_part: bool) -> DocId {
+    fn build_normalized_class_text_doc(&self, text: &ast::Text, is_last_part: bool) -> DocId {
         let normalized = normalize_class_text(text.raw(self.source), is_last_part);
         self.build_attribute_text_doc(text, Some(&normalized))
     }
@@ -839,7 +824,7 @@ impl<'a> Printer<'a> {
     /// [`directives/style/value_whitespace_prettier_divergence`](../../../../tests/fixtures/svelte/directives/style/value_whitespace_prettier_divergence/).
     ///
     /// ⚠️ The class is the host's render class,
-    /// [`is_collapsible_ws`](internal::is_collapsible_ws) — `[ \t\n\r]` — and **not** CSS's
+    /// [`is_collapsible_ws`](ast::is_collapsible_ws) — `[ \t\n\r]` — and **not** CSS's
     /// own (`is_css_whitespace`, which adds the form feed because §3.3 folds one to a newline
     /// before §4.2 ever sees it). Two authorities bear on "may this be respelled", and where
     /// they disagree tsv takes the narrower: a form feed is *content* to every instrument in
@@ -849,8 +834,8 @@ impl<'a> Printer<'a> {
     /// character no source holds and costs a zero-tolerance gate its emptiness, so a
     /// form-feed-bearing run joins the held half above. The *newline* test is `\n`-keyed, as
     /// prettier's `printWhitespace` is; the format path has already folded every `<CR>`.
-    fn push_style_value_part(&self, parts: &mut DocBuf, value: &internal::AttributeValue<'_>) {
-        if let internal::AttributeValue::Text(text) = value
+    fn push_style_value_part(&self, parts: &mut DocBuf, value: &ast::AttributeValue<'_>) {
+        if let ast::AttributeValue::Text(text) = value
             && text.is_collapsible_ws_only
             && text.has_newline()
         {
@@ -875,7 +860,7 @@ impl<'a> Printer<'a> {
     /// `respelled` is a rewrite of `text`'s raw bytes that keeps every one of its newlines (a
     /// `class` value's [`normalize_class_text`]); `None` prints the bytes themselves. Either
     /// way the newline question is the node's parse-time count, not a scan.
-    fn build_attribute_text_doc(&self, text: &internal::Text, respelled: Option<&str>) -> DocId {
+    fn build_attribute_text_doc(&self, text: &ast::Text, respelled: Option<&str>) -> DocId {
         if text.has_newline() {
             return self.build_multiline_attribute_text_doc(
                 respelled.unwrap_or_else(|| text.raw(self.source)),
@@ -910,7 +895,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a spread attribute: `{...expr}`
-    fn build_spread_attribute_doc(&self, spread: &internal::SpreadAttribute<'_>) -> DocId {
+    fn build_spread_attribute_doc(&self, spread: &ast::SpreadAttribute<'_>) -> DocId {
         self.build_braced_expression_doc(
             SPREAD_OPEN,
             spread.expression,
@@ -920,7 +905,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an attach tag: `{@attach expr}`
-    fn build_attach_tag_doc(&self, tag: &internal::AttachTag<'_>) -> DocId {
+    fn build_attach_tag_doc(&self, tag: &ast::AttachTag<'_>) -> DocId {
         self.build_braced_expression_doc(
             ATTACH_TAG_OPEN,
             tag.expression,
@@ -1015,7 +1000,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for on:event directive
-    fn build_on_directive_doc(&self, dir: &internal::OnDirective<'_>) -> DocId {
+    fn build_on_directive_doc(&self, dir: &ast::OnDirective<'_>) -> DocId {
         self.build_directive_doc(
             self.d().text("on:"),
             dir.name_span,
@@ -1027,7 +1012,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for bind:prop directive
-    fn build_bind_directive_doc(&self, dir: &internal::BindDirective<'_>) -> DocId {
+    fn build_bind_directive_doc(&self, dir: &ast::BindDirective<'_>) -> DocId {
         self.build_directive_doc(
             self.d().text("bind:"),
             dir.name_span,
@@ -1039,7 +1024,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for class:name directive
-    fn build_class_directive_doc(&self, dir: &internal::ClassDirective<'_>) -> DocId {
+    fn build_class_directive_doc(&self, dir: &ast::ClassDirective<'_>) -> DocId {
         self.build_directive_doc(
             self.d().text("class:"),
             dir.name_span,
@@ -1051,20 +1036,20 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for style:prop directive
-    fn build_style_directive_doc(&self, dir: &internal::StyleDirective<'_>) -> DocId {
+    fn build_style_directive_doc(&self, dir: &ast::StyleDirective<'_>) -> DocId {
         let d = self.d();
         let name = dir.name_span.extract(self.source);
         let mut parts = self.directive_head_parts(d.text("style:"), dir.name_span, dir.modifiers);
         match &dir.value {
-            internal::StyleDirectiveValue::True => {}
-            internal::StyleDirectiveValue::ExpressionTag(tag) => {
+            ast::StyleDirectiveValue::True => {}
+            ast::StyleDirectiveValue::ExpressionTag(tag) => {
                 // Only include expression if not shorthand (style:color={color} → style:color)
                 if !self.value_collapses_to_shorthand(tag.expression, name, Some(tag.span)) {
                     parts.push(d.text("="));
                     parts.push(self.build_expression_tag_doc(tag));
                 }
             }
-            internal::StyleDirectiveValue::Parts(value_parts) => {
+            ast::StyleDirectiveValue::Parts(value_parts) => {
                 // The same quoted-value assembly `build_attribute_doc`'s general path takes —
                 // shared delimiter choice, one doc per part — with the CSS policy for the parts.
                 let (open, close) = self.attribute_value_delims(value_parts);
@@ -1079,7 +1064,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for use:action directive
-    fn build_use_directive_doc(&self, dir: &internal::UseDirective<'_>) -> DocId {
+    fn build_use_directive_doc(&self, dir: &ast::UseDirective<'_>) -> DocId {
         self.build_directive_doc(
             self.d().text("use:"),
             dir.name_span,
@@ -1091,7 +1076,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for transition/in/out directive
-    fn build_transition_directive_doc(&self, dir: &internal::TransitionDirective<'_>) -> DocId {
+    fn build_transition_directive_doc(&self, dir: &ast::TransitionDirective<'_>) -> DocId {
         self.build_directive_doc(
             self.d().text(dir.direction.prefix_with_colon()),
             dir.name_span,
@@ -1103,7 +1088,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for animate:name directive
-    fn build_animate_directive_doc(&self, dir: &internal::AnimateDirective<'_>) -> DocId {
+    fn build_animate_directive_doc(&self, dir: &ast::AnimateDirective<'_>) -> DocId {
         self.build_directive_doc(
             self.d().text("animate:"),
             dir.name_span,
@@ -1115,7 +1100,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for let:name directive
-    fn build_let_directive_doc(&self, dir: &internal::LetDirective<'_>) -> DocId {
+    fn build_let_directive_doc(&self, dir: &ast::LetDirective<'_>) -> DocId {
         self.build_directive_doc(
             self.d().text("let:"),
             dir.name_span,
@@ -1486,7 +1471,7 @@ impl<'a> Printer<'a> {
     /// `value_sequence_trailing_comment` divergence fixture).
     fn build_bind_sequence_with_comments_doc(
         &self,
-        seq: &tsv_ts::ast::internal::SequenceExpression<'_>,
+        seq: &tsv_ts::ast::SequenceExpression<'_>,
         span: Span,
         tag_span: Span,
     ) -> DocId {
@@ -1544,10 +1529,7 @@ impl<'a> Printer<'a> {
     /// forced break in the surrounding `{ }` (a leading comment) doesn't break them — they
     /// break only when they overflow or carry an interior forced break (a mid line comment,
     /// a block-body arrow). Matches prettier.
-    fn build_bind_sequence_operands_doc(
-        &self,
-        seq: &tsv_ts::ast::internal::SequenceExpression<'_>,
-    ) -> DocId {
+    fn build_bind_sequence_operands_doc(&self, seq: &tsv_ts::ast::SequenceExpression<'_>) -> DocId {
         let d = self.d();
         let bytes = self.source.as_bytes();
         // Rule A: an honored directive in the comma gap freezes the operand after it. The
@@ -1605,7 +1587,7 @@ impl<'a> Printer<'a> {
     /// as its frozen slice, and a plain path as its own bytes.
     fn build_bind_operand_docs(
         &self,
-        seq: &tsv_ts::ast::internal::SequenceExpression<'_>,
+        seq: &tsv_ts::ast::SequenceExpression<'_>,
         frozen_at: impl Fn(usize) -> bool,
     ) -> Vec<DocId> {
         let built = tsv_ts::build_bare_sequence_operand_docs(
@@ -1655,7 +1637,7 @@ impl<'a> Printer<'a> {
     ///   condB &&
     ///   condC}
     /// ```
-    pub(super) fn build_expression_tag_doc(&self, tag: &internal::ExpressionTag<'_>) -> DocId {
+    pub(super) fn build_expression_tag_doc(&self, tag: &ast::ExpressionTag<'_>) -> DocId {
         self.build_expression_tag_doc_at(tag, TagSite::Sequence)
     }
 
@@ -1669,7 +1651,7 @@ impl<'a> Printer<'a> {
     /// fail. A comment printed ahead of the literal already keeps the `{` off the `/`
     /// (`{/* c */ /a/.test(s)}` parses), so it takes none. Prettier prints the bare form.
     /// See `docs/conformance_prettier_svelte.md` §Svelte: Regex-led expression tag.
-    pub(super) fn build_text_expression_tag_doc(&self, tag: &internal::ExpressionTag<'_>) -> DocId {
+    pub(super) fn build_text_expression_tag_doc(&self, tag: &ast::ExpressionTag<'_>) -> DocId {
         let site = if self.in_textarea_content() {
             TagSite::Sequence
         } else {
@@ -1687,16 +1669,12 @@ impl<'a> Printer<'a> {
     /// the path is the `{`, so it owns no comment either. What the general builder adds
     /// around a value never applies: the clarity pair is an assignment's, and the regex
     /// pair a regex-led value's. Every byte of the tag is then plain ASCII.
-    fn tag_is_plain_path(tag: &internal::ExpressionTag<'_>) -> bool {
+    fn tag_is_plain_path(tag: &ast::ExpressionTag<'_>) -> bool {
         super::plain_path_span(tag.expression)
             .is_some_and(|path| path.start == tag.span.start + 1 && path.end + 1 == tag.span.end)
     }
 
-    fn build_expression_tag_doc_at(
-        &self,
-        tag: &internal::ExpressionTag<'_>,
-        site: TagSite,
-    ) -> DocId {
+    fn build_expression_tag_doc_at(&self, tag: &ast::ExpressionTag<'_>, site: TagSite) -> DocId {
         let d = self.d();
         if Self::tag_is_plain_path(tag) && super::fuses_source_spans() {
             debug_assert!(
@@ -1742,10 +1720,10 @@ impl<'a> Printer<'a> {
     /// spelling (`name="{name}"`) parses to the same single tag and so collapses too.
     fn is_shorthand_attribute(
         &self,
-        attr: &internal::Attribute<'_>,
-        value_parts: &[internal::AttributeValue<'_>],
+        attr: &ast::Attribute<'_>,
+        value_parts: &[ast::AttributeValue<'_>],
     ) -> bool {
-        let [internal::AttributeValue::ExpressionTag(expr_tag)] = value_parts else {
+        let [ast::AttributeValue::ExpressionTag(expr_tag)] = value_parts else {
             return false;
         };
 
@@ -1889,7 +1867,7 @@ mod tests {
     /// the degenerate cases below are here to fail loudly if that ever stops being true.
     #[test]
     fn an_html_comment_span_reproduces_its_own_delimiters() {
-        use crate::ast::internal::FragmentNode;
+        use crate::ast::FragmentNode;
 
         let sources = [
             "<!--c-->",

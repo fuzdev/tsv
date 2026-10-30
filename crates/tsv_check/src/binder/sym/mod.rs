@@ -72,7 +72,7 @@ use crate::ids::{FileId, NodeId};
 use crate::merge::{FileMerge, MergeDecl, MergeSymbol, ModuleAug};
 use tsv_lang::{FxHashMap, Span};
 use tsv_ts::ast::Program;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ExportDefaultValue, Expression, ExpressionKind, Identifier, Literal, LiteralValue,
     ModuleExportName, Statement, StatementKind, TSTypeParameterDeclaration,
 };

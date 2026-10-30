@@ -35,7 +35,7 @@ use super::printing::{
     print_group, print_group_expanded, print_node_inner,
 };
 use super::types::{ChainGroup, ChainNode, ChainNodeVec};
-use crate::ast::internal::{ArrowFunctionBody, CallExpression, Expression, ExpressionKind};
+use crate::ast::{ArrowFunctionBody, CallExpression, Expression, ExpressionKind};
 use crate::printer::calls::{
     AssumedHugKind, AssumedParamHug, arrow_body_hugs_call_parens, is_memberish,
 };

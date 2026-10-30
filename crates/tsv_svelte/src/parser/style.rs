@@ -1,6 +1,6 @@
 // Style tag parsing
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 

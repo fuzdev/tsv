@@ -13,7 +13,7 @@
 
 use super::fragment_text_doc::TextChildContext;
 use super::helpers::{is_control_flow_block, is_inline_content};
-use crate::ast::internal::{self, FragmentNode};
+use crate::ast::{self, FragmentNode};
 use crate::printer::{Printer, text};
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -132,7 +132,7 @@ struct PendingFreeze {
 /// A byte loop rather than a `str` pattern: the class is three ASCII bytes, and a
 /// pattern-taking trim builds a searcher per ask at a site asked once per block child.
 ///
-/// [`is_collapsible_ws`]: crate::ast::internal::is_collapsible_ws
+/// [`is_collapsible_ws`]: crate::ast::is_collapsible_ws
 pub(super) fn text_starts_with_linebreak(raw: &str) -> bool {
     let bytes = raw.as_bytes();
     let mut i = 0;
@@ -657,9 +657,9 @@ impl<'a> Printer<'a> {
     /// own-line form compiles to `a b` — a different document. That is the standing "a glued
     /// boundary is never split" rule, and it is what bounds this one.
     ///
-    /// ⚠️ **`{@debug}` is excluded** ([`internal::FragmentNode::is_declaration`]): it is not a
+    /// ⚠️ **`{@debug}` is excluded** ([`ast::FragmentNode::is_declaration`]): it is not a
     /// declaration but a transient debugging aid, so it keeps the edge *trim* the same hoist
-    /// licenses — see [`internal::FragmentNode::is_hoisted_from_fragment`].
+    /// licenses — see [`ast::FragmentNode::is_hoisted_from_fragment`].
     ///
     /// See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
     ///
@@ -685,7 +685,7 @@ impl<'a> Printer<'a> {
     /// Whether the **whitespace-only separator** at `i` is a render-free *hoisted edge run* that
     /// the printer deletes outright — so no reader may take a layout signal from it either.
     ///
-    /// `clean_nodes` lifts a hoisted node ([`internal::FragmentNode::is_hoisted_from_fragment`])
+    /// `clean_nodes` lifts a hoisted node ([`ast::FragmentNode::is_hoisted_from_fragment`])
     /// out of the fragment BEFORE it trims, so whatever stands beside such a node IS the
     /// fragment's first or last node and the run between them is a fragment-EDGE run rather than
     /// an inter-sibling one: `<div><span>a</span> {@debug x}</div>` and
@@ -711,7 +711,7 @@ impl<'a> Printer<'a> {
     /// blank the trim consumed. The content-text half of that exclusion is already spelled as an
     /// index-vs-`content_bounds` test where such a gate reads a TEXT's edges; this is the same
     /// exclusion for the separator node, and the two cannot drift apart — all three readers ask
-    /// [`internal::FragmentNode::at_content_start`] / [`internal::FragmentNode::at_content_end`].
+    /// [`ast::FragmentNode::at_content_start`] / [`ast::FragmentNode::at_content_end`].
     ///
     /// ⚠️ **The render-free fact licenses the trim; it does not decide it.** Being deletable makes
     /// both spellings one document, so *some* form must be chosen — and the base rule's own
@@ -786,14 +786,14 @@ impl<'a> Printer<'a> {
         self.is_block_element_at(nodes, i) || self.is_own_line_declaration(nodes, i)
     }
 
-    /// Whether the node at `i` is a [global](internal::SpecialElementKind::is_global) `svelte:*`
+    /// Whether the node at `i` is a [global](ast::SpecialElementKind::is_global) `svelte:*`
     /// element — `<svelte:window>` / `<svelte:document>` / `<svelte:body>` / `<svelte:head>` —
     /// **glued to content on both sides**, and so lays out as a glued inline element rather than
     /// taking its own line.
     ///
     /// Those four are block-classified, and anywhere else a line of their own is free: the
     /// compiler hoists them out of the fragment before its whitespace rules run
-    /// ([`internal::FragmentNode::is_compiler_hoisted`]), so a break on one side merges with the
+    /// ([`ast::FragmentNode::is_compiler_hoisted`]), so a break on one side merges with the
     /// whitespace — or the fragment edge — on the other into the render that was already there.
     /// Glued on BOTH sides it is not: the two neighbours meet directly (`a<svelte:window />b`
     /// renders `ab`), and a break on either side renders a space between them — the standing
@@ -914,7 +914,7 @@ impl<'a> Printer<'a> {
         let FragmentNode::Text(text) = node else {
             return span;
         };
-        let trailing = internal::text_edge_ws(text.raw(self.source), false).len() as u32;
+        let trailing = ast::text_edge_ws(text.raw(self.source), false).len() as u32;
         Span::new(span.start, span.end - trailing)
     }
 
@@ -1022,7 +1022,7 @@ impl<'a> Printer<'a> {
     fn format_ignore_slice_carries_gap(&self, frozen: Span) -> bool {
         frozen
             .extract(self.source)
-            .starts_with(internal::is_collapsible_ws_char)
+            .starts_with(ast::is_collapsible_ws_char)
     }
 
     /// Push an already-built inline child doc with its leading-boundary treatment
@@ -1087,7 +1087,7 @@ impl<'a> Printer<'a> {
     }
 
     /// The number of **words** `node` gives a `fill` to pack — its prose. A content text counts
-    /// its collapsible-whitespace-separated words ([`internal::split_collapsible_ws`]) over its
+    /// its collapsible-whitespace-separated words ([`ast::split_collapsible_ws`]) over its
     /// SOURCE BYTES (`raw`) — the fill's own item split, so the count and the fill cannot
     /// disagree about where a seam is: an NBSP-joined pair is one word because it is one fill
     /// item, and so is an entity-encoded space (`text1&#32;text2` — the entity's bytes print
@@ -1128,7 +1128,7 @@ impl<'a> Printer<'a> {
                 if Self::text_is_separator_like(t, self.source) {
                     0
                 } else {
-                    internal::split_collapsible_ws(t.raw(self.source))
+                    ast::split_collapsible_ws(t.raw(self.source))
                         .take(Self::PROSE_WORDS_CAP)
                         .count()
                 }
@@ -1163,7 +1163,7 @@ impl<'a> Printer<'a> {
     /// here is indistinguishable from the true one, and neither counter walks a long paragraph
     /// to learn a number it would discard.
     ///
-    /// The same trade `internal::Text::newline_count` makes one crate-module over, for the same
+    /// The same trade `ast::Text::newline_count` makes one crate-module over, for the same
     /// reason: the printer only ever asks `== 0` / `>= 1` / `>= 2` of it.
     const PROSE_WORDS_CAP: usize = 2;
 
@@ -1234,7 +1234,7 @@ impl<'a> Printer<'a> {
     /// The node-unwrap alone: the blank question itself is the printer's one seam pair,
     /// [`text::has_leading_blank_line`] / [`text::has_trailing_blank_line`], asked of the whole
     /// `raw` so this caller never holds an edge slice of its own. Counting newlines inside a
-    /// slice of [`internal::text_edge_ws`] answers the same thing and is the near miss that
+    /// slice of [`ast::text_edge_ws`] answers the same thing and is the near miss that
     /// module's doc names — it is a newline TOTAL, correct only because the slice happens to be
     /// pure whitespace.
     ///
@@ -1500,7 +1500,7 @@ impl<'a> Printer<'a> {
     /// collapsible whitespace off the ends and asking about the remainder answers "not
     /// separator-like" for the node that decodes to nothing BUT collapsible whitespace —
     /// an entity-encoded space or tab (`&#9;`, `&#x20;`, `&Tab;`), whose raw bytes make it
-    /// content to [`internal::Text::is_collapsible_ws_only`] while its decoded form carries
+    /// content to [`ast::Text::is_collapsible_ws_only`] while its decoded form carries
     /// no word at all. Such a node then reported as the run's *prose*, made the content a
     /// `fill`, and collapsed an authored break its literal-space twin keeps — see
     /// [inline_separator_entity_newline](../../../../../tests/fixtures/svelte/elements/inline_separator_entity_newline/).
@@ -1516,7 +1516,7 @@ impl<'a> Printer<'a> {
     /// - *Does the fill have a word to pack here?* — **this** one, WIDE. An NBSP is not a word,
     ///   so a node made only of NBSPs is a separator and its run is not reflowable.
     /// - *Is this separator interchangeable with a plain space?* — the NARROW
-    ///   [`internal::is_collapsible_ws`] class, which every boundary and separator decision on
+    ///   [`ast::is_collapsible_ws`] class, which every boundary and separator decision on
     ///   this path asks instead. An NBSP is **not**: it renders as itself and never collapses,
     ///   so it may not be respelled and may not pick a layout.
     ///
@@ -1546,7 +1546,7 @@ impl<'a> Printer<'a> {
     /// It slices `raw` itself although both callers hold it: threading theirs in instead grew
     /// the release build's `.text` by 114 bytes net (the callers grew by more than the slice
     /// saved here).
-    pub(super) fn text_is_separator_like(text: &internal::Text, source: &str) -> bool {
+    pub(super) fn text_is_separator_like(text: &ast::Text, source: &str) -> bool {
         let raw = text.raw(source);
         match raw.chars().find(|&c| !Self::is_separator_char(c)) {
             None => !raw.is_empty(),
@@ -1910,7 +1910,7 @@ impl<'a> Printer<'a> {
     ) -> bool {
         match trimmed_nodes.get(i + 1) {
             Some(FragmentNode::Element(el)) => {
-                el.kind != internal::ElementKind::Component && !self.is_block_element(el)
+                el.kind != ast::ElementKind::Component && !self.is_block_element(el)
             }
             Some(FragmentNode::SpecialElement(_)) => {
                 !self.is_block_fragment_at(trimmed_nodes, i + 1)
@@ -1931,7 +1931,7 @@ impl<'a> Printer<'a> {
     /// own line already.
     pub(super) fn next_is_component(&self, trimmed_nodes: &[FragmentNode<'_>], i: usize) -> bool {
         matches!(trimmed_nodes.get(i + 1), Some(FragmentNode::Element(el))
-            if el.kind == internal::ElementKind::Component && !self.is_block_element(el))
+            if el.kind == ast::ElementKind::Component && !self.is_block_element(el))
     }
 
     /// Whether a node is a flowing inline element or **component** — the set that participates
@@ -2093,7 +2093,7 @@ impl<'a> Printer<'a> {
     /// emitter in this crate follows (`Printer::js_comment_text_doc` carries the full
     /// rationale; here it is only uniformity, since `<!-- -->` closes at its own delimiter
     /// and so can never swallow).
-    pub(crate) fn build_html_comment_doc(&self, comment: &internal::HtmlComment) -> DocId {
+    pub(crate) fn build_html_comment_doc(&self, comment: &ast::HtmlComment) -> DocId {
         let d = self.d();
         let doc = d.source_span(comment.span, self.source);
         // The renderer records the emit when it reaches the node — see
@@ -2112,7 +2112,7 @@ impl<'a> Printer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::internal::{Text, TextDecoding};
+    use crate::ast::{Text, TextDecoding};
     use crate::printer::Printer;
     use tsv_lang::Span;
 

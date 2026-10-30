@@ -13,7 +13,7 @@ pub(crate) mod parser;
 pub(crate) mod scan;
 pub mod strings;
 
-use crate::ast::internal::CssValue;
+use crate::ast::CssValue;
 use crate::escapes::{ends_with_live_hex_escape, trim_end_preserving_escape, trim_start_css};
 use crate::parser::value::lists::ValueSeparator;
 use bumpalo::Bump;

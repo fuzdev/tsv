@@ -1,5 +1,5 @@
 use super::{CssParser, is_boolean_operator_keyword};
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::parser::selectors::{parse_complex_selector_list, parse_forgiving_selector_list};
 use crate::whitespace::{Comments, Edge, holds_boundary_member, spell_run};

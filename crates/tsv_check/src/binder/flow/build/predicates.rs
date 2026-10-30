@@ -2,7 +2,7 @@
 //! `utilities.go` ports) — free functions with no `FlowBuilder` state, factored
 //! out of the visitor modules. Purely a locality split — no behavior change.
 
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     AssignmentOperator, BinaryExpression, BinaryOperator, Expression, ExpressionKind, LiteralValue,
     Statement, StatementKind, UnaryOperator,
 };
@@ -30,7 +30,7 @@ pub(super) fn is_potentially_executable(stmt: &Statement<'_>) -> bool {
         | S::TryStatement(_)
         | S::DebuggerStatement(_) => true,
         S::VariableDeclaration(d) => {
-            use tsv_ts::ast::internal::VariableDeclarationKind as K;
+            use tsv_ts::ast::VariableDeclarationKind as K;
             d.kind != K::Var || d.declarations.iter().any(|decl| decl.init.is_some())
         }
         S::ClassDeclaration(_) | S::TSEnumDeclaration(_) | S::TSModuleDeclaration(_) => true,

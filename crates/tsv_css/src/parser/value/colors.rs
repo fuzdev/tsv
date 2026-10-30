@@ -1,4 +1,4 @@
-use crate::ast::internal::{AngleUnit, Color, ColorChannel};
+use crate::ast::{AngleUnit, Color, ColorChannel};
 use crate::color::is_hex_color_body;
 use crate::escapes::trim_css;
 use crate::keyword_set::ascii_keyword_set;

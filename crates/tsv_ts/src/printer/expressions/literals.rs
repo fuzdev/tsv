@@ -8,7 +8,7 @@
 // - Regex literals
 // - Spread elements
 
-use crate::ast::internal::{self, LiteralValue};
+use crate::ast::{self, LiteralValue};
 use crate::printer::Printer;
 use smallvec::{SmallVec, smallvec};
 use std::borrow::Cow;
@@ -31,7 +31,7 @@ use tsv_lang::printing::{format_string_literal, is_width_relevant, optimal_strin
 /// answers — and the width one the printer needs next — come out of a single pass
 /// over the document's own words ([`optimal_string_quote_in`], whose doc carries
 /// why the width answer is free there).
-fn string_literal_prints_verbatim(literal: &internal::Literal<'_>, source: &str) -> Option<bool> {
+fn string_literal_prints_verbatim(literal: &ast::Literal<'_>, source: &str) -> Option<bool> {
     debug_assert!(
         matches!(&literal.value, LiteralValue::String(_)),
         "string_literal_prints_verbatim called on non-string literal"
@@ -50,7 +50,7 @@ fn string_literal_prints_verbatim(literal: &internal::Literal<'_>, source: &str)
 
 /// The printed text of a string literal whose quote swaps — the `None` arm of
 /// [`string_literal_prints_verbatim`], and the only path that allocates.
-fn rebuild_string_literal(literal: &internal::Literal<'_>, source: &str) -> String {
+fn rebuild_string_literal(literal: &ast::Literal<'_>, source: &str) -> String {
     let raw_literal = literal.span.extract(source);
     format_string_literal(
         &raw_literal[1..raw_literal.len() - 1],
@@ -63,7 +63,7 @@ fn rebuild_string_literal(literal: &internal::Literal<'_>, source: &str) -> Stri
 /// The `Cow` face of [`string_literal_prints_verbatim`], for the caller that wants
 /// the printed *text* (its length, in `is_short_arg`) rather than a doc node.
 pub(crate) fn format_string_literal_from_ast<'s>(
-    literal: &internal::Literal<'_>,
+    literal: &ast::Literal<'_>,
     source: &'s str,
 ) -> Cow<'s, str> {
     match string_literal_prints_verbatim(literal, source) {
@@ -289,7 +289,7 @@ pub fn sort_regex_flags(flags: &str) -> String {
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a literal
-    pub(in crate::printer) fn build_literal_doc(&self, literal: &internal::Literal<'_>) -> DocId {
+    pub(in crate::printer) fn build_literal_doc(&self, literal: &ast::Literal<'_>) -> DocId {
         let d = self.d();
         match &literal.value {
             LiteralValue::Number(_) | LiteralValue::BigInt => {
@@ -306,10 +306,7 @@ impl<'a> Printer<'a> {
     /// already canonical — any plain decimal integer, lowercase hex/radix, or
     /// canonical float) and allocating only when normalization rewrites it.
     /// Mirrors [`Self::build_string_literal_doc`].
-    pub(in crate::printer) fn build_number_literal_doc(
-        &self,
-        lit: &internal::Literal<'_>,
-    ) -> DocId {
+    pub(in crate::printer) fn build_number_literal_doc(&self, lit: &ast::Literal<'_>) -> DocId {
         let raw = lit.span.extract(self.source);
         match normalize_number_literal(raw) {
             // ⭐ A numeric literal is plain ASCII **by grammar**, so the verbatim arm
@@ -356,10 +353,7 @@ impl<'a> Printer<'a> {
     /// the formatter wouldn't change it (no quote swap) and allocating only on the
     /// quote-swap path. Shared by string literal *values* and quoted *keys* (object,
     /// import-attribute, class field).
-    pub(in crate::printer) fn build_string_literal_doc(
-        &self,
-        lit: &internal::Literal<'_>,
-    ) -> DocId {
+    pub(in crate::printer) fn build_string_literal_doc(&self, lit: &ast::Literal<'_>) -> DocId {
         match string_literal_prints_verbatim(lit, self.source) {
             Some(plain) => self.verbatim_literal_doc(lit.span, plain),
             None => self
@@ -371,7 +365,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a private identifier
     pub(super) fn build_private_identifier_doc(
         &self,
-        pid: &internal::PrivateIdentifier<'_>,
+        pid: &ast::PrivateIdentifier<'_>,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -382,7 +376,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an identifier
-    pub(in crate::printer) fn build_identifier_doc(&self, id: &internal::Identifier<'_>) -> DocId {
+    pub(in crate::printer) fn build_identifier_doc(&self, id: &ast::Identifier<'_>) -> DocId {
         self.build_identifier_doc_inner(id, false, false)
     }
 
@@ -392,7 +386,7 @@ impl<'a> Printer<'a> {
     /// break internally (e.g., `let x: Map<LongA, LongB>` breaks inside `<>`).
     pub(in crate::printer) fn build_identifier_doc_with_wrapping_type(
         &self,
-        id: &internal::Identifier<'_>,
+        id: &ast::Identifier<'_>,
     ) -> DocId {
         self.build_identifier_doc_inner(id, true, false)
     }
@@ -403,7 +397,7 @@ impl<'a> Printer<'a> {
     /// stores them on the inner identifier.
     pub(in crate::printer) fn build_identifier_doc_no_decorators(
         &self,
-        id: &internal::Identifier<'_>,
+        id: &ast::Identifier<'_>,
     ) -> DocId {
         self.build_identifier_doc_inner(id, false, true)
     }
@@ -411,7 +405,7 @@ impl<'a> Printer<'a> {
     /// Inner implementation for identifier doc building.
     fn build_identifier_doc_inner(
         &self,
-        id: &internal::Identifier<'_>,
+        id: &ast::Identifier<'_>,
         wrap_type_args: bool,
         skip_decorators: bool,
     ) -> DocId {
@@ -460,7 +454,7 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a regex literal
     /// Flags are sorted alphabetically to match prettier's output.
-    pub(super) fn build_regex_doc(&self, regex: &internal::RegexLiteral) -> DocId {
+    pub(super) fn build_regex_doc(&self, regex: &ast::RegexLiteral) -> DocId {
         let mut w = self.d().pool_writer();
         w.push('/');
         w.push_str(regex.pattern(self.source));
@@ -470,10 +464,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a spread element
-    pub(in crate::printer) fn build_spread_doc(
-        &self,
-        spread: &internal::SpreadElement<'_>,
-    ) -> DocId {
+    pub(in crate::printer) fn build_spread_doc(&self, spread: &ast::SpreadElement<'_>) -> DocId {
         let d = self.d();
         let needs_parens = self.needs_parens(spread.argument, super::ParenContext::SpreadArgument);
         // Check for comments between `...` and the argument (e.g., `.../* comment */ arr`)

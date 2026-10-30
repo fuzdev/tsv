@@ -6,7 +6,7 @@ use crate::cli::commands::profile::{percentile, resolve_profile_files};
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::Comment;
 use tsv_lang::estimated_ast_arena_capacity;
-use tsv_ts::ast::internal::{ImportSpecifier, Statement, StatementKind};
+use tsv_ts::ast::{ImportSpecifier, Statement, StatementKind};
 
 /// Histogram the print-time buffer-size distributions used to tune the TS
 /// printer's `SmallVec` inline capacities.

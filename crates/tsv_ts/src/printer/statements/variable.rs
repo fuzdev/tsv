@@ -1,7 +1,7 @@
 // Variable declaration printing for TypeScript
 
 use super::Printer;
-use crate::ast::internal::{self, Expression, ExpressionKind};
+use crate::ast::{self, Expression, ExpressionKind};
 use crate::printer::expressions::functions::HeadForcedChainLead;
 use crate::printer::statements::TerminatorGap;
 use crate::printer::{
@@ -78,7 +78,7 @@ pub(in crate::printer) struct DeclaratorEqGap {
 pub(in crate::printer) struct DeclaratorInitInputs<'e, 'a> {
     /// The declarator itself — read for its binding (the break-lhs arms rebuild the id doc
     /// with a wrapping / non-wrapping type annotation) and its definite `!`.
-    pub declarator: &'e internal::VariableDeclarator<'a>,
+    pub declarator: &'e ast::VariableDeclarator<'a>,
     /// Its initializer. Passed rather than read back off `declarator.init`, since the caller
     /// has already matched on it to get here.
     pub init: &'e Expression<'a>,
@@ -776,7 +776,7 @@ impl<'a> Printer<'a> {
     /// `=` (`const a: Foo<⏎\tB | null⏎> = () => …`).
     fn arrow_variable_type_args_start(
         &self,
-        declarator: &internal::VariableDeclarator<'_>,
+        declarator: &ast::VariableDeclarator<'_>,
     ) -> Option<u32> {
         if !matches!(
             declarator.init.map(|init| &init.kind),
@@ -788,16 +788,16 @@ impl<'a> Printer<'a> {
             return None;
         };
         let args = match self.unwrap_redundant_parens(ident.type_annotation()?.type_annotation) {
-            internal::TSType::TypeReference(reference) => reference.type_arguments.as_ref(),
-            internal::TSType::TypeQuery(query) => query.type_arguments.as_ref(),
-            internal::TSType::Import(import) => import.type_arguments.as_ref(),
+            ast::TSType::TypeReference(reference) => reference.type_arguments.as_ref(),
+            ast::TSType::TypeQuery(query) => query.type_arguments.as_ref(),
+            ast::TSType::Import(import) => import.type_arguments.as_ref(),
             _ => None,
         }?;
         let sole_object_type = matches!(
             args.params,
             [param] if matches!(
                 self.unwrap_redundant_parens(param),
-                internal::TSType::TypeLiteral(_) | internal::TSType::Mapped(_)
+                ast::TSType::TypeLiteral(_) | ast::TSType::Mapped(_)
             )
         );
         (!sole_object_type).then_some(args.span.start)
@@ -828,7 +828,7 @@ impl<'a> Printer<'a> {
     /// - `wrap_type`: use wrapping type annotation (breaks internally) vs non-wrapping (stays on one line)
     fn build_typed_identifier_doc(
         &self,
-        ident: &internal::Identifier<'_>,
+        ident: &ast::Identifier<'_>,
         definite: bool,
         wrap_type: bool,
     ) -> DocId {
@@ -881,14 +881,14 @@ impl<'a> Printer<'a> {
     /// the `;` and the gap before it, so there is no terminator here to hand a policy to.
     pub(crate) fn build_embedded_variable_declaration_doc(
         &self,
-        decl: &internal::VariableDeclaration<'_>,
+        decl: &ast::VariableDeclaration<'_>,
     ) -> DocId {
         self.build_variable_declaration_doc(decl, None)
     }
 
     pub(in crate::printer) fn build_variable_declaration_doc(
         &self,
-        decl: &internal::VariableDeclaration<'_>,
+        decl: &ast::VariableDeclaration<'_>,
         terminator: Option<TerminatorGap>,
     ) -> DocId {
         let d = self.d();

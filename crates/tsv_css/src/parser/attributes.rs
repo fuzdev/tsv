@@ -1,5 +1,5 @@
 use super::CssParser;
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::boundary_split_offset;
 use tsv_lang::{ParseError, Span};

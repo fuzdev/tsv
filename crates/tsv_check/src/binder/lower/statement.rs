@@ -3,7 +3,7 @@
 //! specifiers) descends into.
 
 use super::super::*;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     CatchClause, ClassBody, ClassDeclaration, ClassMember, Decorator, ExportDefaultValue,
     ExportSpecifier, Expression, ForInOfLeft, ForInit, FunctionDeclaration, Identifier,
     ImportAttribute, ImportAttributeKey, ImportSpecifier, ModuleExportName, Statement,

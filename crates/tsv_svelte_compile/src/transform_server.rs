@@ -51,8 +51,8 @@ use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{Comment, Span};
-use tsv_svelte::ast::internal::{Element, Root, SpecialElement};
-use tsv_ts::ast::internal::{
+use tsv_svelte::ast::{Element, Root, SpecialElement};
+use tsv_ts::ast::{
     BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionKind,
     ExpressionStatement, FunctionDeclaration, ObjectExpression, ObjectProperty, Statement,
     StatementKind, VariableDeclaration, VariableDeclarationKind,
@@ -497,7 +497,7 @@ fn analyze<'arena>(
         })
         .flat_map(|import| import.specifiers)
         .filter_map(|spec| {
-            use tsv_ts::ast::internal::ImportSpecifier;
+            use tsv_ts::ast::ImportSpecifier;
             let local = match spec {
                 ImportSpecifier::Default(s) => &s.local,
                 ImportSpecifier::Named(s) => &s.local,
@@ -1163,7 +1163,7 @@ pub(crate) fn compile_server<'arena>(
     for user_import in user_imports {
         import_body.push(user_import);
     }
-    let import_program = tsv_ts::ast::internal::Program {
+    let import_program = tsv_ts::ast::Program {
         body: import_body.into_bump_slice(),
         comments: &[],
         span: Span::new(0, env.b.buffer.len() as u32),
@@ -1178,7 +1178,7 @@ pub(crate) fn compile_server<'arena>(
         for snippet in env.hoisted_snippets.drain(..) {
             hoisted_body.push(snippet);
         }
-        tsv_ts::ast::internal::Program {
+        tsv_ts::ast::Program {
             body: hoisted_body.into_bump_slice(),
             comments: &[],
             span: Span::new(0, env.b.buffer.len() as u32),
@@ -1200,7 +1200,7 @@ pub(crate) fn compile_server<'arena>(
     let module_program = if module_body.is_empty() {
         None
     } else {
-        Some(tsv_ts::ast::internal::Program {
+        Some(tsv_ts::ast::Program {
             body: module_body,
             comments: arena.alloc_slice_copy(&module_comments),
             span: Span::new(0, env.b.buffer.len() as u32),
@@ -1210,7 +1210,7 @@ pub(crate) fn compile_server<'arena>(
 
     let mut export_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
     export_body.push(export);
-    let export_program = tsv_ts::ast::internal::Program {
+    let export_program = tsv_ts::ast::Program {
         body: export_body.into_bump_slice(),
         comments: arena.alloc_slice_copy(&script_comments),
         span: Span::new(0, env.b.buffer.len() as u32),

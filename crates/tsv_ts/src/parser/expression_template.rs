@@ -2,7 +2,7 @@
 // the single `TemplateElement` constructor every template site builds through —
 // expression AND type templates, head/middle/tail/no-substitution alike.
 
-use crate::ast::internal::{TemplateCooked, TemplateElement, TemplateLiteral};
+use crate::ast::{TemplateCooked, TemplateElement, TemplateLiteral};
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 

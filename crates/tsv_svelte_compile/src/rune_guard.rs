@@ -36,7 +36,7 @@
 
 use std::collections::HashSet;
 
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ExpressionKind,
     ForInOfLeft, ForInit, FunctionExpression, ImportSpecifier, ObjectPatternProperty,
     ObjectProperty, Statement, StatementKind,
@@ -163,17 +163,14 @@ pub(crate) fn walk_class_member_guarded(
 /// are span-identity (`escaped: None`); an interned (escaped) name is synthetic
 /// (`$$renderer`, `$$props`, …) and never refused.
 fn dollar_identifier_name<'s>(
-    id: &tsv_ts::ast::internal::Identifier<'_>,
+    id: &tsv_ts::ast::Identifier<'_>,
     source: &'s str,
 ) -> Option<&'s str> {
     let name = identifier_name(id, source)?;
     name.starts_with('$').then_some(name)
 }
 
-fn identifier_name<'s>(
-    id: &tsv_ts::ast::internal::Identifier<'_>,
-    source: &'s str,
-) -> Option<&'s str> {
+fn identifier_name<'s>(id: &tsv_ts::ast::Identifier<'_>, source: &'s str) -> Option<&'s str> {
     plain_identifier_str(id, source)
 }
 
@@ -529,7 +526,7 @@ fn collect_decoded_binding_names(
 /// (`script_bindings::refuse_runes_invalid_import`, the oracle's own import
 /// visitor's analog). A new interception point must call this too.
 pub(crate) fn refuse_dollar_binding_name(
-    id: &tsv_ts::ast::internal::Identifier<'_>,
+    id: &tsv_ts::ast::Identifier<'_>,
     source: &str,
 ) -> Result<(), CompileError> {
     // Decode via `Identifier::name` — the raw slice for a plain id, the decoded
@@ -763,7 +760,7 @@ fn walk_statement(
 }
 
 fn walk_variable_declaration(
-    decl: &tsv_ts::ast::internal::VariableDeclaration<'_>,
+    decl: &tsv_ts::ast::VariableDeclaration<'_>,
     ctx: &mut WalkCtx<'_>,
     depth: usize,
 ) -> Result<(), CompileError> {

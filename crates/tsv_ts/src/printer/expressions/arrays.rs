@@ -6,7 +6,7 @@
 // - Comment preservation
 
 use super::objects::{LiteralRole, is_compound_target_value};
-use crate::ast::internal::{self, Expression, ExpressionKind, LiteralValue};
+use crate::ast::{self, Expression, ExpressionKind, LiteralValue};
 use crate::printer::comments::{
     ShareSite, block_is_before_comma, next_real_element_start, run_defers_line,
 };
@@ -21,7 +21,7 @@ use tsv_lang::doc::arena::DocId;
 /// element slides to. The array PATTERN's twin is `array_pattern_gap_end`, whose fallback
 /// stops before a `: T` the pattern's span swallowed; each container names its own end
 /// once and the walk past the holes is shared.
-fn array_gap_end(arr: &internal::ArrayExpression<'_>, span: Span, i: usize) -> u32 {
+fn array_gap_end(arr: &ast::ArrayExpression<'_>, span: Span, i: usize) -> u32 {
     next_real_element_start(arr.elements, i).unwrap_or(span.end - 1)
 }
 
@@ -36,7 +36,7 @@ fn array_gap_end(arr: &internal::ArrayExpression<'_>, span: Span, i: usize) -> u
 /// Free and shape-only so it can be read (and tested) without a printer; the comment clause
 /// that completes the predicate needs the comment array and lives on
 /// [`Printer::is_concisely_printed_array`], the one entry every caller asks.
-fn array_elements_are_signed_numbers(arr: &internal::ArrayExpression<'_>) -> bool {
+fn array_elements_are_signed_numbers(arr: &ast::ArrayExpression<'_>) -> bool {
     !arr.elements.is_empty()
         && arr
             .elements
@@ -46,7 +46,7 @@ fn array_elements_are_signed_numbers(arr: &internal::ArrayExpression<'_>) -> boo
                 Some(ExpressionKind::UnaryExpression(unary)) => {
                     matches!(
                         unary.operator,
-                        internal::UnaryOperator::Minus | internal::UnaryOperator::Plus
+                        ast::UnaryOperator::Minus | ast::UnaryOperator::Plus
                     ) && matches!(
                         &unary.argument.kind,
                         ExpressionKind::Literal(lit) if matches!(lit.value, LiteralValue::Number(_))
@@ -65,7 +65,7 @@ impl<'a> Printer<'a> {
     /// - EACH inner array/object has more than 1 item
     ///
     /// This matches prettier's shouldBreak logic in `printArray` (`print/array.js`)
-    fn should_break_nested_array(&self, arr: &internal::ArrayExpression<'_>) -> bool {
+    fn should_break_nested_array(&self, arr: &ast::ArrayExpression<'_>) -> bool {
         if arr.elements.len() <= 1 {
             return false;
         }
@@ -144,7 +144,7 @@ impl<'a> Printer<'a> {
     /// arm entirely is what DROPPED an author blank line before an elision.
     fn has_blank_line_after_slot(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         arr_span: Span,
         i: usize,
         emitted_leading_start: Option<u32>,
@@ -230,7 +230,7 @@ impl<'a> Printer<'a> {
     /// the three sites share one walk rather than restating the search past holes.
     fn prev_real_slot<'e>(
         &self,
-        arr: &'e internal::ArrayExpression<'e>,
+        arr: &'e ast::ArrayExpression<'e>,
         i: usize,
     ) -> Option<(usize, &'e Expression<'e>)> {
         arr.elements[..i]
@@ -327,7 +327,7 @@ impl<'a> Printer<'a> {
     /// hand-written copy of this rule has at some point got that half wrong.
     fn element_gap_split(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         span: Span,
         idx: usize,
         elem_end: u32,
@@ -377,7 +377,7 @@ impl<'a> Printer<'a> {
     /// the interior, so it has no share to emit and its run is an ordinary one.
     fn slot_paren_interior(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         span: Span,
         idx: usize,
     ) -> Option<Span> {
@@ -395,7 +395,7 @@ impl<'a> Printer<'a> {
     /// emission cannot disagree about it.
     fn slot_run_is_behind_interior(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         span: Span,
         idx: usize,
     ) -> bool {
@@ -473,7 +473,7 @@ impl<'a> Printer<'a> {
     /// conformance_prettier_ts_comments.md §Comment relocation (`across an elision`).
     fn leading_comment_search_start_for(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         span: Span,
         i: usize,
         elem_start: u32,
@@ -496,7 +496,7 @@ impl<'a> Printer<'a> {
     /// trailing-hole seams — so a real element followed by holes must not claim them.
     fn add_trailing_array_comments(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         span: Span,
         elem_end: u32,
         current_index: usize,
@@ -568,7 +568,7 @@ impl<'a> Printer<'a> {
     /// `None` when the array holds no real element: there is nothing to scan past.
     fn end_scan_start(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         span: Span,
         role: LiteralRole,
     ) -> Option<u32> {
@@ -581,7 +581,7 @@ impl<'a> Printer<'a> {
     /// ([`Printer::element_claim_anchor`]).
     fn element_printed_end(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         span: Span,
         idx: usize,
         elem: &Expression<'_>,
@@ -596,7 +596,7 @@ impl<'a> Printer<'a> {
     /// the `)` is the only one to reach it. Its comments lie inside the spread's own span,
     /// out of every gap scan the other triggers make. A frozen slot has no share
     /// ([`Self::slot_paren_interior`]): its verbatim slice printed the interior.
-    fn spread_has_share(&self, arr: &internal::ArrayExpression<'_>, span: Span) -> bool {
+    fn spread_has_share(&self, arr: &ast::ArrayExpression<'_>, span: Span) -> bool {
         (0..arr.elements.len()).any(|idx| {
             !self
                 .paren_interior_own_line_comments(self.slot_paren_interior(arr, span, idx))
@@ -615,7 +615,7 @@ impl<'a> Printer<'a> {
     /// interior there (`[...(b⏎/* i */⏎), , ]`) as unprinted.
     fn grouped_end_scan_finds_comment(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         arr_span: Span,
         role: LiteralRole,
     ) -> bool {
@@ -642,7 +642,7 @@ impl<'a> Printer<'a> {
     /// emitter does.
     fn last_element_trailing_split(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         span: Span,
         role: LiteralRole,
     ) -> Option<(u32, u32)> {
@@ -662,7 +662,7 @@ impl<'a> Printer<'a> {
     /// one layout decision serves every one of them.
     pub(in crate::printer) fn build_array_doc(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         arr_span: Span,
     ) -> DocId {
         self.build_array_doc_as(arr, arr_span, LiteralRole::Expression)
@@ -674,7 +674,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::should_break_nested_array`], an `ArrayExpression` rule) does not apply.
     pub(in crate::printer) fn build_array_doc_as(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         arr_span: Span,
         role: LiteralRole,
     ) -> DocId {
@@ -748,7 +748,7 @@ impl<'a> Printer<'a> {
     /// line, one the next pass immediately collapsed (`[a⏎, /* c */⏎b]` was a 2-pass).
     fn has_own_line_block_comments_in_array(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         span: Span,
         role: LiteralRole,
     ) -> bool {
@@ -782,7 +782,7 @@ impl<'a> Printer<'a> {
     /// No array-wide zero-comment gate: the per-element ask is a signed literal's own span,
     /// which for all but a huge number is narrower than a comment can be, so
     /// `range_too_narrow_for_a_comment` answers it at the call site without a search.
-    fn is_concisely_printed_array(&self, arr: &internal::ArrayExpression<'_>) -> bool {
+    fn is_concisely_printed_array(&self, arr: &ast::ArrayExpression<'_>) -> bool {
         array_elements_are_signed_numbers(arr)
             && !arr.elements.iter().flatten().any(|elem| {
                 matches!(elem.kind, ExpressionKind::UnaryExpression(_))
@@ -819,7 +819,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_array_doc_with_expanding_comments`] before the fill is built.
     fn build_array_fill_doc(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         span: Span,
         has_comments: bool,
     ) -> DocId {
@@ -887,7 +887,7 @@ impl<'a> Printer<'a> {
     /// comment-independent and stays with the callers, outside the gate.
     fn push_array_element_with_inline_comments(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         span: Span,
         i: usize,
         has_comments: bool,
@@ -924,7 +924,7 @@ impl<'a> Printer<'a> {
     /// Note: Arrays with expanding comments use build_array_doc_with_expanding_comments instead.
     fn build_array_group_doc(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         arr_span: Span,
         has_comments: bool,
         role: LiteralRole,
@@ -1022,7 +1022,7 @@ impl<'a> Printer<'a> {
     /// block comments (hardlines must propagate). Always expands to multiline.
     fn build_array_doc_with_expanding_comments(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         span: Span,
         role: LiteralRole,
     ) -> DocId {
@@ -1335,7 +1335,7 @@ impl<'a> Printer<'a> {
         let mut prev_end = final_scan_start;
         // The comment this scan emitted last — `None` after one it skipped, which another
         // emitter put on a line of its own, so nothing here has it to glue to.
-        let mut prev_comment: Option<&internal::Comment> = None;
+        let mut prev_comment: Option<&ast::Comment> = None;
         for comment in self.comments_to_emit_between(final_scan_start, span.end - 1) {
             if self.end_scan_emits_comment(comment, final_scan_start, last_real_split) {
                 // A pair the author GLUED onto one line keeps that line
@@ -1374,7 +1374,7 @@ impl<'a> Printer<'a> {
     /// Produces: `[\n  elem,\n]` with actual hardlines.
     pub(in crate::printer) fn build_array_doc_expanded(
         &self,
-        arr: &internal::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression<'_>,
         span: Span,
     ) -> DocId {
         self.mark_relational_sibling_authored_pairs(arr.elements.iter().copied());
@@ -1424,7 +1424,7 @@ mod tests {
 
     /// Parse a bare array expression to its internal AST node (spans index into `src`),
     /// allocated in the caller-supplied `arena`.
-    fn parse_array<'a>(arena: &'a Bump, src: &str) -> &'a internal::ArrayExpression<'a> {
+    fn parse_array<'a>(arena: &'a Bump, src: &str) -> &'a ast::ArrayExpression<'a> {
         match crate::parse_expression_with_comments(src, 0, 0, arena, |_| Ok(()))
             .expect("expression should parse")
             .0

@@ -14,7 +14,7 @@
 // acorn's walk would have entered, in the order the wire emits it. See
 // `tsv_ts`'s `ast/convert/write/comments.rs`.
 
-use crate::ast::internal;
+use crate::ast;
 use crate::whitespace::{is_svelte_ws, svelte_ws_width_at};
 
 use tsv_lang::{Comment, Span, source_scan::skip_comment};
@@ -59,7 +59,7 @@ impl<'a> AttachInputs<'a> {
 /// emits.** `preserveParens` makes every pair a `ParenthesizedExpression` the walk
 /// enters, and `remove_parens` then discards it together with every comment it claimed.
 /// tsv's parse keeps a span for one kind of pair — a JSDoc cast's
-/// (`internal::CommentBoundPair`'s span covers its `(`…`)`), which the writer runs as a silent
+/// (`ast::CommentBoundPair`'s span covers its `(`…`)`), which the writer runs as a silent
 /// frame (`IslandComments::removes_parens`) — and discards the rest, so the bare pairs
 /// around the ROOT are recovered here ([`grouping_parens_around`]) and handed over as
 /// `IslandComments::root_parens`. Two things follow from the root being a pair:
@@ -240,7 +240,7 @@ fn comment_ending_at<'a>(template_comments: &[&'a Comment], end: u32) -> Option<
 /// root fallback: each parse's root is a wrapper the wire discards (the `= 1` assignment,
 /// the `_ as` expression), and a comment inside a window starts before that wrapper ends.
 pub(super) fn attach_binding_pattern<'a>(
-    pattern: &tsv_ts::ast::internal::Expression<'_>,
+    pattern: &tsv_ts::ast::Expression<'_>,
     attach: AttachInputs<'a>,
 ) -> BindingAttach<'a> {
     let island = |span: Span| {
@@ -291,7 +291,7 @@ impl BindingAttach<'_> {
 /// attach windows: a pre-check narrower than either silently DROPS a comment (the attach
 /// is never built, and nothing else emits it); a wider one only wastes a build. It is
 /// also where a `{@const}`'s init window begins ([`attach_const_tag_init`]).
-pub(super) fn pattern_comment_window(pattern: &tsv_ts::ast::internal::Expression<'_>) -> Span {
+pub(super) fn pattern_comment_window(pattern: &tsv_ts::ast::Expression<'_>) -> Span {
     Span::new(pattern.span().start, tsv_ts::pattern_binding_end(pattern))
 }
 
@@ -311,7 +311,7 @@ pub(super) fn pattern_comment_window(pattern: &tsv_ts::ast::internal::Expression
 /// same windows the `{#each}` / `{:then}` / `{:catch}` bindings take, which is what makes
 /// the id and init windows split at the end of the BINDING rather than of its bare name.
 pub(super) fn attach_const_tag_init<'a>(
-    tag: &internal::ConstTag<'_>,
+    tag: &ast::ConstTag<'_>,
     attach: AttachInputs<'a>,
 ) -> CommentAttach<'a> {
     let binding_end = pattern_comment_window(tag.id).end;
@@ -372,9 +372,9 @@ pub(super) fn attach_expression_list<'a>(
 /// `{type: "Line", value}` shape). The `options: null` non-TS quirk is
 /// reproduced at emit time (schema-driven), so it never perturbs the walk.
 pub(super) fn attach_script<'a>(
-    script: &internal::Script<'a>,
+    script: &ast::Script<'a>,
     attach: AttachInputs<'a>,
-    html_leading_comment: Option<&internal::HtmlComment>,
+    html_leading_comment: Option<&ast::HtmlComment>,
 ) -> CommentAttach<'a> {
     CommentAttach::new(
         attach.source,

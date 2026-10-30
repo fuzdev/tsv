@@ -3,7 +3,7 @@
 // method, call/construct/index signatures. Type *expression* syntax lives in
 // `parser/types.rs`.
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 

@@ -1,4 +1,4 @@
-use crate::ast::internal::{CssValue, StringCooked};
+use crate::ast::{CssValue, StringCooked};
 use crate::escapes;
 use bumpalo::Bump;
 use std::borrow::Cow;
@@ -84,7 +84,7 @@ fn quoted_string_spans_all(bytes: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{parse_string_literal, quoted_string_spans_all};
-    use crate::ast::internal::{CssValue, StringCooked};
+    use crate::ast::{CssValue, StringCooked};
     use crate::escapes::decode_escape_sequences;
     use bumpalo::Bump;
     use std::borrow::Cow;

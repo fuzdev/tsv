@@ -7,7 +7,7 @@
 // this file sits beside `loops/` rather than in it.
 
 use super::{HeadChainGrouping, OpenParenLineBlockComment};
-use crate::ast::internal::{self, Statement, StatementKind};
+use crate::ast::{self, Statement, StatementKind};
 use crate::printer::Printer;
 use crate::printer::statements::StatementContext;
 use smallvec::smallvec;
@@ -44,7 +44,7 @@ impl<'a> Printer<'a> {
     /// when the `while (condition)` line exceeds print width.
     pub(in crate::printer::statements) fn build_while_statement_doc(
         &self,
-        stmt: &internal::WhileStatement<'_>,
+        stmt: &ast::WhileStatement<'_>,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {
@@ -72,7 +72,7 @@ impl<'a> Printer<'a> {
     ///   `print/binaryish.js`).
     pub(in crate::printer::statements) fn build_with_statement_doc(
         &self,
-        stmt: &internal::WithStatement<'_>,
+        stmt: &ast::WithStatement<'_>,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {
@@ -93,7 +93,7 @@ impl<'a> Printer<'a> {
         &self,
         kind: ParenHeadKind,
         stmt_start: u32,
-        head: &internal::Expression<'_>,
+        head: &ast::Expression<'_>,
         body: &Statement<'_>,
         ctx: StatementContext,
     ) -> DocId {
@@ -138,7 +138,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_do_while_statement_doc(
         &self,
-        stmt: &internal::DoWhileStatement<'_>,
+        stmt: &ast::DoWhileStatement<'_>,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {

@@ -113,7 +113,7 @@
 
 use std::borrow::Cow;
 
-use crate::ast::internal;
+use crate::ast;
 use crate::whitespace::is_svelte_ws;
 use tsv_css::ast::convert::{write_css_children, write_css_comments};
 use tsv_lang::{
@@ -139,7 +139,7 @@ use super::special::{bool_option, component_is_typescript, find_option_values, t
 /// it writes the span-only wire every binding ships — only `start`/`end` offsets, no
 /// `loc` and no `name_loc`; on `Wire::Loc` it adds every line/column object, the
 /// loc-bearing wire `tsv parse --locations` prints.
-pub(crate) fn write_root_bytes(root: &internal::Root<'_>, source: &str, wire: Wire) -> Vec<u8> {
+pub(crate) fn write_root_bytes(root: &ast::Root<'_>, source: &str, wire: Wire) -> Vec<u8> {
     // One set of tables for the whole document — template, every acorn island,
     // `<script>` bodies, root comments and `<style>` — in the coordinates
     // `crate::WIRE_COORDINATES` states.
@@ -179,7 +179,7 @@ struct Ctx<'a> {
     positions: WirePositions<'a>,
     /// `Root::snippet_wire_parameters`: the preserved-paren parameter lists the wire emits
     /// in place of a head's paren-free `SnippetBlock::parameters`.
-    snippet_wire_parameters: &'a [internal::SnippetWireParameters<'a>],
+    snippet_wire_parameters: &'a [ast::SnippetWireParameters<'a>],
     /// Template comments, sorted by position (empty on the common no-comment
     /// template — the whole spine then fuses).
     comments: &'a [&'a Comment],
@@ -204,7 +204,7 @@ impl<'a> Ctx<'a> {
     fn snippet_wire_parameters(
         &self,
         snippet_start: u32,
-    ) -> Option<&'a [tsv_ts::ast::internal::Expression<'a>]> {
+    ) -> Option<&'a [tsv_ts::ast::Expression<'a>]> {
         let wire = self.snippet_wire_parameters;
         wire.binary_search_by_key(&snippet_start, |entry| entry.snippet_start)
             .ok()
@@ -290,7 +290,7 @@ impl<'a> Ctx<'a> {
 /// attach uses so a sibling expression context (`{:else if}`) doesn't bleed into a
 /// block's own expression window.
 #[inline]
-fn fragment_first_start(fragment: &internal::Fragment<'_>) -> Option<u32> {
+fn fragment_first_start(fragment: &ast::Fragment<'_>) -> Option<u32> {
     fragment.nodes.first().map(|n| n.span().start)
 }
 
@@ -336,10 +336,10 @@ fn preceded_by_quote(source: &str, pos: u32) -> bool {
 /// tests/svelte_preceding_comment.rs, whose controls fail if a future rewrite reproduces the
 /// walk faithfully and reopens the duplication.
 fn preceding_comment<'a>(
-    root: &'a internal::Root<'_>,
+    root: &'a ast::Root<'_>,
     tag_start: u32,
     source: &str,
-) -> Option<&'a internal::HtmlComment> {
+) -> Option<&'a ast::HtmlComment> {
     let mut expected_end = tag_start;
     for node in root.fragment.nodes.iter().rev() {
         let span = node.span();
@@ -352,8 +352,8 @@ fn preceding_comment<'a>(
             break;
         }
         match node {
-            internal::FragmentNode::Comment(comment) => return Some(comment),
-            internal::FragmentNode::Text(text)
+            ast::FragmentNode::Comment(comment) => return Some(comment),
+            ast::FragmentNode::Text(text)
                 if text.data(source).trim_matches(is_svelte_ws).is_empty() =>
             {
                 expected_end = span.start;
@@ -366,7 +366,7 @@ fn preceding_comment<'a>(
 
 /// Emit the `Root` node. Field order:
 /// `css, js, start, end, type, fragment, options, comments, [instance], [module]`.
-fn write_root(w: &mut JsonWriter, root: &internal::Root<'_>, ctx: &Ctx<'_>) {
+fn write_root(w: &mut JsonWriter, root: &ast::Root<'_>, ctx: &Ctx<'_>) {
     let source = ctx.source;
 
     let find_preceding_comment = |tag_start: u32| preceding_comment(root, tag_start, source);
@@ -433,30 +433,30 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
 }
 
 /// Emits a `Fragment` node.
-fn write_fragment(w: &mut JsonWriter, fragment: &internal::Fragment<'_>, ctx: &Ctx<'_>) {
+fn write_fragment(w: &mut JsonWriter, fragment: &ast::Fragment<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Fragment\",\"nodes\":");
     write_array(w, fragment.nodes, |w, n| write_fragment_node(w, n, ctx));
     w.raw("}");
 }
 
 /// Emit a fragment node, dispatching on its variant.
-fn write_fragment_node(w: &mut JsonWriter, node: &internal::FragmentNode<'_>, ctx: &Ctx<'_>) {
+fn write_fragment_node(w: &mut JsonWriter, node: &ast::FragmentNode<'_>, ctx: &Ctx<'_>) {
     match node {
-        internal::FragmentNode::Element(elem) => write_element(w, elem, ctx),
-        internal::FragmentNode::SpecialElement(elem) => write_special_element(w, elem, ctx),
-        internal::FragmentNode::ExpressionTag(tag) => write_expression_tag(w, tag, ctx),
-        internal::FragmentNode::Text(text) => write_text(w, text, ctx),
-        internal::FragmentNode::Comment(comment) => write_html_comment(w, comment, ctx),
-        internal::FragmentNode::IfBlock(block) => write_if_block(w, block, ctx),
-        internal::FragmentNode::EachBlock(block) => write_each_block(w, block, ctx),
-        internal::FragmentNode::AwaitBlock(block) => write_await_block(w, block, ctx),
-        internal::FragmentNode::KeyBlock(block) => write_key_block(w, block, ctx),
-        internal::FragmentNode::SnippetBlock(block) => write_snippet_block(w, block, ctx),
-        internal::FragmentNode::HtmlTag(tag) => write_html_tag(w, tag, ctx),
-        internal::FragmentNode::ConstTag(tag) => write_const_tag(w, tag, ctx),
-        internal::FragmentNode::DeclarationTag(tag) => write_declaration_tag(w, tag, ctx),
-        internal::FragmentNode::DebugTag(tag) => write_debug_tag(w, tag, ctx),
-        internal::FragmentNode::RenderTag(tag) => write_render_tag(w, tag, ctx),
+        ast::FragmentNode::Element(elem) => write_element(w, elem, ctx),
+        ast::FragmentNode::SpecialElement(elem) => write_special_element(w, elem, ctx),
+        ast::FragmentNode::ExpressionTag(tag) => write_expression_tag(w, tag, ctx),
+        ast::FragmentNode::Text(text) => write_text(w, text, ctx),
+        ast::FragmentNode::Comment(comment) => write_html_comment(w, comment, ctx),
+        ast::FragmentNode::IfBlock(block) => write_if_block(w, block, ctx),
+        ast::FragmentNode::EachBlock(block) => write_each_block(w, block, ctx),
+        ast::FragmentNode::AwaitBlock(block) => write_await_block(w, block, ctx),
+        ast::FragmentNode::KeyBlock(block) => write_key_block(w, block, ctx),
+        ast::FragmentNode::SnippetBlock(block) => write_snippet_block(w, block, ctx),
+        ast::FragmentNode::HtmlTag(tag) => write_html_tag(w, tag, ctx),
+        ast::FragmentNode::ConstTag(tag) => write_const_tag(w, tag, ctx),
+        ast::FragmentNode::DeclarationTag(tag) => write_declaration_tag(w, tag, ctx),
+        ast::FragmentNode::DebugTag(tag) => write_debug_tag(w, tag, ctx),
+        ast::FragmentNode::RenderTag(tag) => write_render_tag(w, tag, ctx),
     }
 }
 
@@ -474,7 +474,7 @@ fn write_fragment_node(w: &mut JsonWriter, node: &internal::FragmentNode<'_>, ct
 /// node's own span and cannot be handed two offsets from different nodes.
 fn write_generic_island(
     w: &mut JsonWriter,
-    expr: &tsv_ts::ast::internal::Expression<'_>,
+    expr: &tsv_ts::ast::Expression<'_>,
     container_start: u32,
     range_end: u32,
     ctx: &Ctx<'_>,
@@ -505,7 +505,7 @@ fn write_generic_island(
 /// directly.
 fn write_braced_island(
     w: &mut JsonWriter,
-    expr: &tsv_ts::ast::internal::Expression<'_>,
+    expr: &tsv_ts::ast::Expression<'_>,
     window: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -559,11 +559,11 @@ const NAME_KEY: &[u8; 8] = b",\"name\":";
 /// `inline(never)`: one out-of-line copy of the window write, whose arms leave by tail
 /// call, so it saves no register.
 #[inline(never)]
-fn write_element_name_field(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>) {
+fn write_element_name_field(w: &mut JsonWriter, elem: &ast::Element<'_>, ctx: &Ctx<'_>) {
     let name = name_bytes(elem.name_span, ctx);
     match elem.kind {
-        internal::ElementKind::Html => w.string_escape_free_led(NAME_KEY, name),
-        internal::ElementKind::Component => write_scanned_name_field(w, name),
+        ast::ElementKind::Html => w.string_escape_free_led(NAME_KEY, name),
+        ast::ElementKind::Component => write_scanned_name_field(w, name),
     }
 }
 
@@ -595,13 +595,13 @@ fn name_bytes<'s>(span: Span, ctx: &Ctx<'s>) -> &'s [u8] {
 }
 
 /// Emits a `RegularElement` (HTML) or `Component` node.
-fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>) {
+fn write_element(w: &mut JsonWriter, elem: &ast::Element<'_>, ctx: &Ctx<'_>) {
     // Staged burst; ends before the `name` field (module doc, Staged runs). The
     // opening literal is whole per kind, so each arm's copy is one constant's width.
     let mut run = w.stage_run();
     match elem.kind {
-        internal::ElementKind::Component => run.raw("{\"type\":\"Component\",\"start\":"),
-        internal::ElementKind::Html => run.raw("{\"type\":\"RegularElement\",\"start\":"),
+        ast::ElementKind::Component => run.raw("{\"type\":\"Component\",\"start\":"),
+        ast::ElementKind::Html => run.raw("{\"type\":\"RegularElement\",\"start\":"),
     }
     run.u32(ctx.pos(elem.span.start));
     run.raw(",\"end\":");
@@ -628,7 +628,7 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
     // children: an empty one writes the same bytes under either name.
     if !nodes.is_empty() && elem.name(ctx.source) == "textarea" {
         write_items(w, nodes, |w, n| match n {
-            internal::FragmentNode::Text(text) => write_sequence_text(w, text, ctx),
+            ast::FragmentNode::Text(text) => write_sequence_text(w, text, ctx),
             _ => write_fragment_node(w, n, ctx),
         });
     } else {
@@ -655,7 +655,7 @@ fn write_items<T>(w: &mut JsonWriter, items: &[T], mut f: impl FnMut(&mut JsonWr
 
 /// Emits a special-element node (`svelte:element`, `svelte:component`, …).
 /// `tag`/`expression` are skip-if-none.
-fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>, ctx: &Ctx<'_>) {
+fn write_special_element(w: &mut JsonWriter, elem: &ast::SpecialElement<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"");
     w.raw(elem.kind.node_type());
     w.raw("\",\"start\":");
@@ -700,12 +700,12 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
 /// inside the window and attaches to it as a `leadingComments` entry the canonical parser
 /// never emits.
 ///
-/// The form is read off [`internal::SpecialThis`], never sniffed back out of the source: it
+/// The form is read off [`ast::SpecialThis`], never sniffed back out of the source: it
 /// is the parser's own answer, and a second way to ask the same question is a second way to
 /// get it wrong.
-fn write_special_tag(w: &mut JsonWriter, this: &internal::SpecialThis<'_>, ctx: &Ctx<'_>) {
+fn write_special_tag(w: &mut JsonWriter, this: &ast::SpecialThis<'_>, ctx: &Ctx<'_>) {
     match this {
-        internal::SpecialThis::Plain { content, span } => {
+        ast::SpecialThis::Plain { content, span } => {
             w.raw("{\"type\":\"Literal\",\"value\":");
             w.string(content);
             w.raw(",\"raw\":");
@@ -714,14 +714,14 @@ fn write_special_tag(w: &mut JsonWriter, this: &internal::SpecialThis<'_>, ctx: 
             w.span_start_end_field(ctx.positions, span.start, span.end);
             w.raw("}");
         }
-        internal::SpecialThis::Braced(tag) => {
+        ast::SpecialThis::Braced(tag) => {
             write_braced_island(w, tag.expression, tag.span, ctx);
         }
     }
 }
 
 /// Emits an `ExpressionTag` node (fragment `{expr}`).
-fn write_expression_tag(w: &mut JsonWriter, tag: &internal::ExpressionTag<'_>, ctx: &Ctx<'_>) {
+fn write_expression_tag(w: &mut JsonWriter, tag: &ast::ExpressionTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ExpressionTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
@@ -733,11 +733,7 @@ fn write_expression_tag(w: &mut JsonWriter, tag: &internal::ExpressionTag<'_>, c
 /// into the identifier's `loc`. The shorthand form requires `tag.span == id.span`
 /// (the identifier *is* the tag), so no comment can lie between the braces and the
 /// name — attach is always a no-op here — and the whole tag fuses.
-fn write_shorthand_expression_tag(
-    w: &mut JsonWriter,
-    tag: &internal::ExpressionTag<'_>,
-    ctx: &Ctx<'_>,
-) {
+fn write_shorthand_expression_tag(w: &mut JsonWriter, tag: &ast::ExpressionTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ExpressionTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
@@ -752,8 +748,8 @@ fn write_shorthand_expression_tag(
 /// `{start, end, type, data, raw}`. Only the fragment arm stages its header —
 /// the raw arm is one text node per nested `<script>`/`<style>`, far too rare
 /// to earn a staged run's inlined emitters (module doc, Staged runs).
-fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
-    if matches!(text.decoding, internal::TextDecoding::Raw) {
+fn write_text(w: &mut JsonWriter, text: &ast::Text, ctx: &Ctx<'_>) {
+    if matches!(text.decoding, ast::TextDecoding::Raw) {
         w.span_start_end_object(ctx.positions, text.span.start, text.span.end);
         // `data`, then `raw`: a `Raw` decoding is no decode at all, so the two
         // are always the same bytes and the pair escapes them once.
@@ -796,7 +792,7 @@ fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
 /// A flag test ahead of one of two out-of-line bodies, so neither pays for
 /// the other's registers: inlined here, either body took callee-saved registers that
 /// were saved at entry, ahead of the test, on every text.
-fn write_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
+fn write_raw_then_data(w: &mut JsonWriter, text: &ast::Text, ctx: &Ctx<'_>) {
     if text.is_collapsible_ws_only {
         write_whitespace_raw_then_data(w, text, ctx);
     } else {
@@ -807,7 +803,7 @@ fn write_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>)
 /// [`write_raw_then_data`] for a text made only of collapsible whitespace: `raw` and
 /// `data` as one [`JsonWriter::string_pair_whitespace`] window.
 #[inline(never)]
-fn write_whitespace_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
+fn write_whitespace_raw_then_data(w: &mut JsonWriter, text: &ast::Text, ctx: &Ctx<'_>) {
     // Bytes, not `raw`: a whitespace-only text is ASCII, so the `str` slice's
     // char-boundary checks buy nothing.
     w.string_pair_whitespace(&ctx.source.as_bytes()[text.raw_span.range()], b",\"data\":");
@@ -816,7 +812,7 @@ fn write_whitespace_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx
 /// [`write_raw_then_data`] for a text that holds content: `raw` escaped once and copied
 /// when `data` borrows it, two strings when `data` is decoded.
 #[inline(never)]
-fn write_content_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
+fn write_content_raw_then_data(w: &mut JsonWriter, text: &ast::Text, ctx: &Ctx<'_>) {
     let raw = text.raw(ctx.source);
     // Asked inline rather than through `data()`: this is every raw-first `Text` with
     // content the writer emits (all but a raw-content element's, which `write_text`
@@ -833,7 +829,7 @@ fn write_content_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &
 /// A `Text` as Svelte's attribute-value sequence literal, `{start, end, type, raw, data}`
 /// — an attribute value's text part, and a `<textarea>`'s content, which Svelte reads as
 /// the same sequence.
-fn write_sequence_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
+fn write_sequence_text(w: &mut JsonWriter, text: &ast::Text, ctx: &Ctx<'_>) {
     w.span_start_end_object(ctx.positions, text.span.start, text.span.end);
     w.raw(",\"type\":\"Text\",\"raw\":");
     write_raw_then_data(w, text, ctx);
@@ -841,7 +837,7 @@ fn write_sequence_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>)
 }
 
 /// Emits a `Comment` node (HTML `<!-- … -->`).
-fn write_html_comment(w: &mut JsonWriter, comment: &internal::HtmlComment, ctx: &Ctx<'_>) {
+fn write_html_comment(w: &mut JsonWriter, comment: &ast::HtmlComment, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Comment\",\"start\":");
     w.span_start_end(ctx.positions, comment.span.start, comment.span.end);
     w.raw(",\"data\":");
@@ -857,7 +853,7 @@ fn write_html_comment(w: &mut JsonWriter, comment: &internal::HtmlComment, ctx: 
 /// `{type, elseif, start, end, …}` but an `{:else if}` block as
 /// `{start, end, type, elseif, …}` — two construction sites with different
 /// literal orders, keyed exactly by `elseif`.
-fn write_if_block(w: &mut JsonWriter, block: &internal::IfBlock<'_>, ctx: &Ctx<'_>) {
+fn write_if_block(w: &mut JsonWriter, block: &ast::IfBlock<'_>, ctx: &Ctx<'_>) {
     if block.elseif {
         w.span_start_end_object(ctx.positions, block.span.start, block.span.end);
         w.raw(",\"type\":\"IfBlock\",\"elseif\":true");
@@ -878,7 +874,7 @@ fn write_if_block(w: &mut JsonWriter, block: &internal::IfBlock<'_>, ctx: &Ctx<'
 /// Emits an `EachBlock` node. `context` is a pattern island
 /// ([`write_pattern_island`] carries any binding/annotation comments);
 /// `index`/`key`/`fallback` are skip-if-none.
-fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &Ctx<'_>) {
+fn write_each_block(w: &mut JsonWriter, block: &ast::EachBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"EachBlock\",\"start\":");
     w.span_start_end(ctx.positions, block.span.start, block.span.end);
     let range_end = fragment_first_start(&block.body).unwrap_or(block.span.end);
@@ -914,7 +910,7 @@ fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &C
 
 /// Emits an `AwaitBlock` node. `value`/`error` are pattern islands; every
 /// `Option` → `null` when absent (no skip).
-fn write_await_block(w: &mut JsonWriter, block: &internal::AwaitBlock<'_>, ctx: &Ctx<'_>) {
+fn write_await_block(w: &mut JsonWriter, block: &ast::AwaitBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"AwaitBlock\",\"start\":");
     w.span_start_end(ctx.positions, block.span.start, block.span.end);
     let range_end = [
@@ -944,7 +940,7 @@ fn write_await_block(w: &mut JsonWriter, block: &internal::AwaitBlock<'_>, ctx: 
     // is `None` here yet must still emit an (empty) Fragment — hence the flag.
     match block.pending.as_ref() {
         Some(fragment) => write_fragment(w, fragment, ctx),
-        None if block.pending_block => write_fragment(w, &internal::Fragment { nodes: &[] }, ctx),
+        None if block.pending_block => write_fragment(w, &ast::Fragment { nodes: &[] }, ctx),
         None => w.raw("null"),
     }
     w.raw(",\"then\":");
@@ -955,7 +951,7 @@ fn write_await_block(w: &mut JsonWriter, block: &internal::AwaitBlock<'_>, ctx: 
 }
 
 /// Emits a `KeyBlock` node.
-fn write_key_block(w: &mut JsonWriter, block: &internal::KeyBlock<'_>, ctx: &Ctx<'_>) {
+fn write_key_block(w: &mut JsonWriter, block: &ast::KeyBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"KeyBlock\",\"start\":");
     w.span_start_end(ctx.positions, block.span.start, block.span.end);
     let range_end = fragment_first_start(&block.fragment).unwrap_or(block.span.end);
@@ -969,7 +965,7 @@ fn write_key_block(w: &mut JsonWriter, block: &internal::KeyBlock<'_>, ctx: &Ctx
 /// Emits a `SnippetBlock` node. The snippet name carries `character` (like a
 /// shorthand attribute); `typeParams` is skip-if-none, right after
 /// `expression` (Svelte assigns it before reading the parameters).
-fn write_snippet_block(w: &mut JsonWriter, block: &internal::SnippetBlock<'_>, ctx: &Ctx<'_>) {
+fn write_snippet_block(w: &mut JsonWriter, block: &ast::SnippetBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"SnippetBlock\",\"start\":");
     w.span_start_end(ctx.positions, block.span.start, block.span.end);
     let range_end = fragment_first_start(&block.body).unwrap_or(block.span.end);
@@ -999,7 +995,7 @@ fn write_snippet_block(w: &mut JsonWriter, block: &internal::SnippetBlock<'_>, c
 /// case fuses directly.
 fn write_snippet_name(
     w: &mut JsonWriter,
-    expr: &tsv_ts::ast::internal::Expression<'_>,
+    expr: &tsv_ts::ast::Expression<'_>,
     container_start: u32,
     range_end: u32,
     ctx: &Ctx<'_>,
@@ -1020,7 +1016,7 @@ fn write_snippet_name(
 /// a function context whose wrapper ends past every param.
 fn write_snippet_parameters(
     w: &mut JsonWriter,
-    parameters: &[tsv_ts::ast::internal::Expression<'_>],
+    parameters: &[tsv_ts::ast::Expression<'_>],
     container_start: u32,
     range_end: u32,
     ctx: &Ctx<'_>,
@@ -1044,7 +1040,7 @@ fn write_snippet_parameters(
 //
 
 /// Emits an `HtmlTag` node (`{@html expr}`).
-fn write_html_tag(w: &mut JsonWriter, tag: &internal::HtmlTag<'_>, ctx: &Ctx<'_>) {
+fn write_html_tag(w: &mut JsonWriter, tag: &ast::HtmlTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"HtmlTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
@@ -1053,7 +1049,7 @@ fn write_html_tag(w: &mut JsonWriter, tag: &internal::HtmlTag<'_>, ctx: &Ctx<'_>
 }
 
 /// Emits a `RenderTag` node (`{@render expr}`).
-fn write_render_tag(w: &mut JsonWriter, tag: &internal::RenderTag<'_>, ctx: &Ctx<'_>) {
+fn write_render_tag(w: &mut JsonWriter, tag: &ast::RenderTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"RenderTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
@@ -1068,7 +1064,7 @@ fn write_render_tag(w: &mut JsonWriter, tag: &internal::RenderTag<'_>, ctx: &Ctx
 /// once across the list with the wrapper-end trailing suppression, each element's own
 /// grouping pairs run as silent frames. A single identifier is itself the parse root and
 /// takes the generic-island path (root-fallback trailing).
-fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'_>) {
+fn write_debug_tag(w: &mut JsonWriter, tag: &ast::DebugTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"DebugTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"identifiers\":");
@@ -1162,7 +1158,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
 /// canonical acorn parse — `read_pattern`'s synthetic `pattern = 1` for the id (plus
 /// its `: T` annotation's own, when typed) and `read_expression`'s for the init — so a
 /// comment in one window can never reach another's tree.
-fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) {
+fn write_const_tag(w: &mut JsonWriter, tag: &ast::ConstTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ConstTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"declaration\":");
@@ -1212,7 +1208,7 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
 /// whitespace silently and recording the end of each `)` closer / comment —
 /// the last recorded end is the declarator end. Comment-aware by construction
 /// (positions come from the parsed comment list, never a substring scan).
-fn const_declarator_end(tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) -> u32 {
+fn const_declarator_end(tag: &ast::ConstTag<'_>, ctx: &Ctx<'_>) -> u32 {
     let close = (tag.span.end - 1) as usize; // the closing `}`
     let mut end = tag.init.span().end;
     let mut i = end as usize;
@@ -1254,7 +1250,7 @@ fn const_declarator_end(tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) -> u32 {
 /// the id's window reach the init's tree (see `attach_const_tag_init`).
 fn write_const_declaration(
     w: &mut JsonWriter,
-    tag: &internal::ConstTag<'_>,
+    tag: &ast::ConstTag<'_>,
     decl_end: u32,
     declarator_end: u32,
     (id_mode, id_annotation_mode): (CommentMode<'_>, CommentMode<'_>),
@@ -1283,7 +1279,7 @@ fn write_const_declaration(
 /// `VariableDeclaration` tree (every declarator and its id/init) per acorn's
 /// recursive attachment — attaching only to the first init left a comment leading
 /// a later declarator (`{let a = 1, /* c */ b}`) unattached.
-fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>, ctx: &Ctx<'_>) {
+fn write_declaration_tag(w: &mut JsonWriter, tag: &ast::DeclarationTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"DeclarationTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"declaration\":");
@@ -1309,24 +1305,24 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
 
 /// Emit an attribute node, dispatching on its variant (attribute / spread /
 /// attach / directive).
-fn write_attribute_node(w: &mut JsonWriter, node: &internal::AttributeNode<'_>, ctx: &Ctx<'_>) {
+fn write_attribute_node(w: &mut JsonWriter, node: &ast::AttributeNode<'_>, ctx: &Ctx<'_>) {
     match node {
-        internal::AttributeNode::Attribute(a) => write_attribute(w, a, ctx),
-        internal::AttributeNode::SpreadAttribute(s) => write_spread_attribute(w, s, ctx),
-        internal::AttributeNode::AttachTag(t) => write_attach_tag(w, t, ctx),
-        internal::AttributeNode::OnDirective(d) => write_on_directive(w, d, ctx),
-        internal::AttributeNode::BindDirective(d) => write_bind_directive(w, d, ctx),
-        internal::AttributeNode::ClassDirective(d) => write_class_directive(w, d, ctx),
-        internal::AttributeNode::StyleDirective(d) => write_style_directive(w, d, ctx),
-        internal::AttributeNode::UseDirective(d) => write_use_directive(w, d, ctx),
-        internal::AttributeNode::TransitionDirective(d) => write_transition_directive(w, d, ctx),
-        internal::AttributeNode::AnimateDirective(d) => write_animate_directive(w, d, ctx),
-        internal::AttributeNode::LetDirective(d) => write_let_directive(w, d, ctx),
+        ast::AttributeNode::Attribute(a) => write_attribute(w, a, ctx),
+        ast::AttributeNode::SpreadAttribute(s) => write_spread_attribute(w, s, ctx),
+        ast::AttributeNode::AttachTag(t) => write_attach_tag(w, t, ctx),
+        ast::AttributeNode::OnDirective(d) => write_on_directive(w, d, ctx),
+        ast::AttributeNode::BindDirective(d) => write_bind_directive(w, d, ctx),
+        ast::AttributeNode::ClassDirective(d) => write_class_directive(w, d, ctx),
+        ast::AttributeNode::StyleDirective(d) => write_style_directive(w, d, ctx),
+        ast::AttributeNode::UseDirective(d) => write_use_directive(w, d, ctx),
+        ast::AttributeNode::TransitionDirective(d) => write_transition_directive(w, d, ctx),
+        ast::AttributeNode::AnimateDirective(d) => write_animate_directive(w, d, ctx),
+        ast::AttributeNode::LetDirective(d) => write_let_directive(w, d, ctx),
     }
 }
 
 /// Emits an `Attribute` node.
-fn write_attribute(w: &mut JsonWriter, attr: &internal::Attribute<'_>, ctx: &Ctx<'_>) {
+fn write_attribute(w: &mut JsonWriter, attr: &ast::Attribute<'_>, ctx: &Ctx<'_>) {
     // Staged burst; ends before the `name` field (module doc, Staged runs).
     let mut run = w.stage_run();
     run.raw("{\"type\":\"Attribute\",\"start\":");
@@ -1354,14 +1350,14 @@ fn write_attribute(w: &mut JsonWriter, attr: &internal::Attribute<'_>, ctx: &Ctx
 /// text/quoted sequence (array).
 fn write_attribute_value_field(
     w: &mut JsonWriter,
-    values: &[internal::AttributeValue<'_>],
+    values: &[ast::AttributeValue<'_>],
     ctx: &Ctx<'_>,
 ) {
     let has_text = values
         .iter()
-        .any(|v| matches!(v, internal::AttributeValue::Text(_)));
+        .any(|v| matches!(v, ast::AttributeValue::Text(_)));
     let quoted = values.len() == 1
-        && matches!(&values[0], internal::AttributeValue::ExpressionTag(tag)
+        && matches!(&values[0], ast::AttributeValue::ExpressionTag(tag)
             if preceded_by_quote(ctx.source, tag.span.start));
 
     if has_text || quoted {
@@ -1370,8 +1366,8 @@ fn write_attribute_value_field(
         // Single bare expression → plain object. A shorthand `{name}` (the tag
         // and its identifier share a span) injects `character`.
         match &values[0] {
-            internal::AttributeValue::ExpressionTag(tag)
-                if matches!(&tag.expression.kind, tsv_ts::ast::internal::ExpressionKind::Identifier(id)
+            ast::AttributeValue::ExpressionTag(tag)
+                if matches!(&tag.expression.kind, tsv_ts::ast::ExpressionKind::Identifier(id)
                     if tag.span == id.span) =>
             {
                 write_shorthand_expression_tag(w, tag, ctx);
@@ -1384,19 +1380,15 @@ fn write_attribute_value_field(
 }
 
 /// One attribute-value part (array element or bare-object body).
-fn write_attribute_value(w: &mut JsonWriter, value: &internal::AttributeValue<'_>, ctx: &Ctx<'_>) {
+fn write_attribute_value(w: &mut JsonWriter, value: &ast::AttributeValue<'_>, ctx: &Ctx<'_>) {
     match value {
-        internal::AttributeValue::Text(text) => write_sequence_text(w, text, ctx),
-        internal::AttributeValue::ExpressionTag(tag) => write_expression_tag(w, tag, ctx),
+        ast::AttributeValue::Text(text) => write_sequence_text(w, text, ctx),
+        ast::AttributeValue::ExpressionTag(tag) => write_expression_tag(w, tag, ctx),
     }
 }
 
 /// Emits a `SpreadAttribute` node (`{...expr}`).
-fn write_spread_attribute(
-    w: &mut JsonWriter,
-    spread: &internal::SpreadAttribute<'_>,
-    ctx: &Ctx<'_>,
-) {
+fn write_spread_attribute(w: &mut JsonWriter, spread: &ast::SpreadAttribute<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"SpreadAttribute\",\"start\":");
     w.span_start_end(ctx.positions, spread.span.start, spread.span.end);
     w.raw(",\"expression\":");
@@ -1405,7 +1397,7 @@ fn write_spread_attribute(
 }
 
 /// Emits an `AttachTag` node (`{@attach expr}`).
-fn write_attach_tag(w: &mut JsonWriter, tag: &internal::AttachTag<'_>, ctx: &Ctx<'_>) {
+fn write_attach_tag(w: &mut JsonWriter, tag: &ast::AttachTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"AttachTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
@@ -1445,7 +1437,7 @@ fn write_modifiers(w: &mut JsonWriter, modifiers: &[&str]) {
 /// a generic island when present, else `null`.
 fn write_optional_directive_expression(
     w: &mut JsonWriter,
-    expression: Option<&tsv_ts::ast::internal::Expression<'_>>,
+    expression: Option<&tsv_ts::ast::Expression<'_>>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -1459,7 +1451,7 @@ fn write_optional_directive_expression(
 /// differing only in node type name. One body, stamped per directive.
 macro_rules! expression_directive_writer {
     ($fn_name:ident, $ty:ident) => {
-        fn $fn_name(w: &mut JsonWriter, d: &internal::$ty<'_>, ctx: &Ctx<'_>) {
+        fn $fn_name(w: &mut JsonWriter, d: &ast::$ty<'_>, ctx: &Ctx<'_>) {
             write_directive_head(w, stringify!($ty), d.span, d.name_span, d.head_span, ctx);
             w.raw(",\"expression\":");
             write_optional_directive_expression(w, d.expression, d.span, ctx);
@@ -1475,11 +1467,7 @@ expression_directive_writer!(write_use_directive, UseDirective);
 expression_directive_writer!(write_animate_directive, AnimateDirective);
 expression_directive_writer!(write_let_directive, LetDirective);
 
-fn write_transition_directive(
-    w: &mut JsonWriter,
-    d: &internal::TransitionDirective<'_>,
-    ctx: &Ctx<'_>,
-) {
+fn write_transition_directive(w: &mut JsonWriter, d: &ast::TransitionDirective<'_>, ctx: &Ctx<'_>) {
     write_directive_head(
         w,
         "TransitionDirective",
@@ -1506,7 +1494,7 @@ fn write_transition_directive(
 /// name`) that never carries a comment, emitted fused.
 fn write_directive_value_expression(
     w: &mut JsonWriter,
-    expr: &tsv_ts::ast::internal::Expression<'_>,
+    expr: &tsv_ts::ast::Expression<'_>,
     has_expression_tag: bool,
     span: Span,
     ctx: &Ctx<'_>,
@@ -1516,7 +1504,7 @@ fn write_directive_value_expression(
     } else {
         // Shorthand: the parser builds this as a synthetic `Identifier`.
         #[expect(clippy::unreachable)]
-        let tsv_ts::ast::internal::ExpressionKind::Identifier(id) = &expr.kind else {
+        let tsv_ts::ast::ExpressionKind::Identifier(id) = &expr.kind else {
             unreachable!("shorthand directive expression is always an Identifier");
         };
         w.span_start_end_object(ctx.positions, id.span.start, id.span.end);
@@ -1526,7 +1514,7 @@ fn write_directive_value_expression(
     }
 }
 
-fn write_bind_directive(w: &mut JsonWriter, d: &internal::BindDirective<'_>, ctx: &Ctx<'_>) {
+fn write_bind_directive(w: &mut JsonWriter, d: &ast::BindDirective<'_>, ctx: &Ctx<'_>) {
     write_directive_head(w, "BindDirective", d.span, d.name_span, d.head_span, ctx);
     w.raw(",\"expression\":");
     write_directive_value_expression(
@@ -1541,7 +1529,7 @@ fn write_bind_directive(w: &mut JsonWriter, d: &internal::BindDirective<'_>, ctx
     w.raw("}");
 }
 
-fn write_class_directive(w: &mut JsonWriter, d: &internal::ClassDirective<'_>, ctx: &Ctx<'_>) {
+fn write_class_directive(w: &mut JsonWriter, d: &ast::ClassDirective<'_>, ctx: &Ctx<'_>) {
     write_directive_head(w, "ClassDirective", d.span, d.name_span, d.head_span, ctx);
     w.raw(",\"expression\":");
     write_directive_value_expression(
@@ -1558,14 +1546,14 @@ fn write_class_directive(w: &mut JsonWriter, d: &internal::ClassDirective<'_>, c
 
 /// Emits a `StyleDirective` node. Field order: `start, end, type, name,
 /// name_loc, modifiers, value`.
-fn write_style_directive(w: &mut JsonWriter, d: &internal::StyleDirective<'_>, ctx: &Ctx<'_>) {
+fn write_style_directive(w: &mut JsonWriter, d: &ast::StyleDirective<'_>, ctx: &Ctx<'_>) {
     write_directive_head(w, "StyleDirective", d.span, d.name_span, d.head_span, ctx);
     w.raw(",\"modifiers\":");
     write_modifiers(w, d.modifiers);
     w.raw(",\"value\":");
     match &d.value {
-        internal::StyleDirectiveValue::True => w.raw("true"),
-        internal::StyleDirectiveValue::ExpressionTag(tag) => {
+        ast::StyleDirectiveValue::True => w.raw("true"),
+        ast::StyleDirectiveValue::ExpressionTag(tag) => {
             // Quoted (`style:x="{e}"`) → array; bare (`style:x={e}`) → plain object.
             if preceded_by_quote(ctx.source, tag.span.start) {
                 w.raw("[");
@@ -1575,7 +1563,7 @@ fn write_style_directive(w: &mut JsonWriter, d: &internal::StyleDirective<'_>, c
                 write_expression_tag(w, tag, ctx);
             }
         }
-        internal::StyleDirectiveValue::Parts(parts) => {
+        ast::StyleDirectiveValue::Parts(parts) => {
             write_array(w, *parts, |w, p| write_attribute_value(w, p, ctx));
         }
     }
@@ -1592,8 +1580,8 @@ fn write_style_directive(w: &mut JsonWriter, d: &internal::StyleDirective<'_>, c
 /// envelope is never visited by the template attach passes).
 fn write_style_sheet(
     w: &mut JsonWriter,
-    style: &internal::Style<'_>,
-    preceding_comment: Option<&internal::HtmlComment>,
+    style: &ast::Style<'_>,
+    preceding_comment: Option<&ast::HtmlComment>,
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"StyleSheet\",\"start\":");
@@ -1636,8 +1624,8 @@ fn write_style_sheet(
 /// reproduce.
 fn write_script(
     w: &mut JsonWriter,
-    script: &internal::Script<'_>,
-    html_leading_comment: Option<&internal::HtmlComment>,
+    script: &ast::Script<'_>,
+    html_leading_comment: Option<&ast::HtmlComment>,
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"Script\",\"start\":");
@@ -1671,7 +1659,7 @@ fn write_script(
 /// A `<svelte:options>`: everything fuses. Field order: `start, end,
 /// attributes` then the skip-if-none `runes, immutable, css, accessors,
 /// preserveWhitespace, namespace, customElement` (no `type`).
-fn write_svelte_options(w: &mut JsonWriter, options: &internal::SvelteOptions<'_>, ctx: &Ctx<'_>) {
+fn write_svelte_options(w: &mut JsonWriter, options: &ast::SvelteOptions<'_>, ctx: &Ctx<'_>) {
     let attrs = options.attributes;
     w.span_start_end_object(ctx.positions, options.span.start, options.span.end);
     w.raw(",\"attributes\":");
@@ -1724,10 +1712,10 @@ fn json_comma(w: &mut JsonWriter, first: &mut bool) {
 /// positions.
 fn write_custom_element_props(
     w: &mut JsonWriter,
-    props_obj: &tsv_ts::ast::internal::ObjectExpression<'_>,
+    props_obj: &tsv_ts::ast::ObjectExpression<'_>,
     ctx: &Ctx<'_>,
 ) {
-    use tsv_ts::ast::internal::{Expression, ExpressionKind, LiteralValue, ObjectProperty};
+    use tsv_ts::ast::{Expression, ExpressionKind, LiteralValue, ObjectProperty};
     w.raw("{");
     let mut first_prop = true;
     for prop in props_obj.properties {
@@ -1799,18 +1787,14 @@ fn write_custom_element_props(
 /// statically-evaluated plain object, `shadow` either the string `'open'`/`'none'` or the raw
 /// `ObjectExpression` AST, and `extend` the raw expression AST (both via the shared expression
 /// writer, so their offsets translate like any template `{expr}`).
-fn write_custom_element_field(
-    w: &mut JsonWriter,
-    attrs: &[internal::AttributeNode<'_>],
-    ctx: &Ctx<'_>,
-) {
-    use tsv_ts::ast::internal::{Expression, ExpressionKind, LiteralValue, ObjectProperty};
+fn write_custom_element_field(w: &mut JsonWriter, attrs: &[ast::AttributeNode<'_>], ctx: &Ctx<'_>) {
+    use tsv_ts::ast::{Expression, ExpressionKind, LiteralValue, ObjectProperty};
     let Some(values) = find_option_values(attrs, "customElement", ctx.source) else {
         return;
     };
     for v in values {
         // `customElement={{ tag: '…', props: {…}, shadow: …, extend: … }}`
-        if let internal::AttributeValue::ExpressionTag(expr) = v
+        if let ast::AttributeValue::ExpressionTag(expr) = v
             && let ExpressionKind::ObjectExpression(obj) = &expr.expression.kind
         {
             let mut tag: Option<&Expression<'_>> = None;
@@ -1892,8 +1876,8 @@ fn write_custom_element_field(
         }
         // Plain text or string literal: `customElement="tag-name"` → `{tag}`.
         let tag_str = match v {
-            internal::AttributeValue::Text(text) => Some(text.data(ctx.source)),
-            internal::AttributeValue::ExpressionTag(expr) => {
+            ast::AttributeValue::Text(text) => Some(text.data(ctx.source)),
+            ast::AttributeValue::ExpressionTag(expr) => {
                 if let ExpressionKind::Literal(lit) = &expr.expression.kind
                     && let LiteralValue::String(cooked) = &lit.value
                 {
@@ -1918,7 +1902,7 @@ fn write_custom_element_field(
 /// no expression-tag value can pick up a template comment.
 fn write_value_attributes(
     w: &mut JsonWriter,
-    attributes: &[internal::AttributeNode<'_>],
+    attributes: &[ast::AttributeNode<'_>],
     ctx: &Ctx<'_>,
 ) {
     let ctx = ctx.without_comments();
@@ -1938,11 +1922,7 @@ fn write_value_attributes(
 /// block's span: a comment attaching here
 /// necessarily starts inside the binding, and asking wider would only build an
 /// attach with nothing in its queue.
-fn write_pattern_island(
-    w: &mut JsonWriter,
-    expr: &tsv_ts::ast::internal::Expression<'_>,
-    ctx: &Ctx<'_>,
-) {
+fn write_pattern_island(w: &mut JsonWriter, expr: &tsv_ts::ast::Expression<'_>, ctx: &Ctx<'_>) {
     let window = pattern_comment_window(expr);
     if !ctx.any_comment_in(window.start, window.end) {
         write_pattern_embedded(
@@ -1961,7 +1941,7 @@ fn write_pattern_island(
 /// `alternate`, no skip).
 fn write_optional_fragment(
     w: &mut JsonWriter,
-    fragment: Option<&internal::Fragment<'_>>,
+    fragment: Option<&ast::Fragment<'_>>,
     ctx: &Ctx<'_>,
 ) {
     write_or_null(w, fragment, |w, f| write_fragment(w, f, ctx));
@@ -2215,14 +2195,14 @@ mod tests {
     /// `write_raw_then_data` hands [`JsonWriter::string_pair_whitespace`] every text whose
     /// `is_collapsible_ws_only` flag is set, and that window's escape table restates the
     /// flag's class, `[ \t\n\r]`, because `tsv_lang` cannot see this crate's
-    /// [`is_collapsible_ws`](crate::ast::internal::is_collapsible_ws). Graded here, where
+    /// [`is_collapsible_ws`](crate::ast::is_collapsible_ws). Graded here, where
     /// both are in reach: every byte the class admits must write byte-identical to
     /// `serde_json` — a lone byte and a run on the window's arm, a run on its long arm, each
     /// into a full buffer and one with room — so a widened class fails this test rather
     /// than writing an unescaped control byte into a release build's wire.
     #[test]
     fn whitespace_window_covers_the_collapsible_class() {
-        for byte in (0..=u8::MAX).filter(|&b| crate::ast::internal::is_collapsible_ws(b)) {
+        for byte in (0..=u8::MAX).filter(|&b| crate::ast::is_collapsible_ws(b)) {
             for len in [1, 16, 17] {
                 let text = String::from_utf8(vec![byte; len]).expect("an ASCII run");
                 let quoted = serde_json::to_string(&text).expect("serde_json serializes a str");

@@ -1,6 +1,6 @@
 // Statement parsing - main dispatcher
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::KeywordKind;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};

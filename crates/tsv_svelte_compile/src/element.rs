@@ -23,11 +23,11 @@ use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
-use tsv_svelte::ast::internal::{
+use tsv_svelte::ast::{
     Attribute, AttributeNode, ClassDirective, Element, ElementKind, FragmentNode, SpecialElement,
     SpecialThis, StyleDirective,
 };
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     Expression, ExpressionKind, ObjectExpression, ObjectProperty, SpreadElement, Statement,
 };
 

@@ -1,6 +1,6 @@
 //! Call-argument and arrow shape predicates shared by the call, new, and chain printers.
 
-use crate::ast::internal::{self, Expression, ExpressionKind, TSType};
+use crate::ast::{self, Expression, ExpressionKind, TSType};
 use crate::printer::Printer;
 use crate::printer::expressions::functions::{arrow_token_end, has_leftmost_arrow_body_parens};
 use crate::printer::needs_parens::strip_non_null_wrappers;
@@ -24,7 +24,7 @@ use tsv_lang::source_scan::has_newline_after_position;
 ///
 /// Asked through [`mark_boolean_coercion_argument`] alone, which is how the answer reaches
 /// the argument.
-fn is_boolean_type_coercion(call: &internal::CallExpression<'_>, printer: &Printer<'_>) -> bool {
+fn is_boolean_type_coercion(call: &ast::CallExpression<'_>, printer: &Printer<'_>) -> bool {
     if call.optional || call.arguments.len() != 1 {
         return false;
     }
@@ -50,7 +50,7 @@ fn is_boolean_type_coercion(call: &internal::CallExpression<'_>, printer: &Print
 /// every other call, `new Boolean(…)` included.
 pub(super) fn mark_boolean_coercion_argument(
     printer: &Printer<'_>,
-    call: &internal::CallExpression<'_>,
+    call: &ast::CallExpression<'_>,
 ) {
     if is_boolean_type_coercion(call, printer) {
         printer.mark_flat_chain(call.arguments[0]);
@@ -328,7 +328,7 @@ pub(super) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
 /// ([`arrow_body_has_leading_own_line_comment`]).
 pub(super) fn arrow_body_breaks_after_space(
     printer: &Printer<'_>,
-    arrow: &internal::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression<'_>,
     body: &Expression<'_>,
 ) -> bool {
     is_ternary_arrow_body(body)
@@ -343,7 +343,7 @@ pub(super) fn arrow_body_breaks_after_space(
 /// `=>` line by it ([`arrow_body_breaks_after_space`] and the lone ternary ladder).
 pub(super) fn arrow_body_has_leading_own_line_comment(
     printer: &Printer<'_>,
-    arrow: &internal::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression<'_>,
     body: &Expression<'_>,
 ) -> bool {
     printer
@@ -447,7 +447,7 @@ pub(super) fn is_block_function(expr: &Expression<'_>) -> bool {
     matches!(
         &expr.kind,
         ExpressionKind::ArrowFunctionExpression(arrow)
-            if matches!(arrow.body, internal::ArrowFunctionBody::BlockStatement(_))
+            if matches!(arrow.body, ast::ArrowFunctionBody::BlockStatement(_))
     ) || matches!(expr.kind, ExpressionKind::FunctionExpression(_))
 }
 
@@ -498,7 +498,7 @@ pub(super) fn is_hook_callback_with_deps(callback: &Expression<'_>, deps: &Expre
         &callback.kind,
         ExpressionKind::ArrowFunctionExpression(arrow)
             if arrow.params.is_empty()
-                && matches!(arrow.body, internal::ArrowFunctionBody::BlockStatement(_))
+                && matches!(arrow.body, ast::ArrowFunctionBody::BlockStatement(_))
     ) && matches!(deps.kind, ExpressionKind::ArrayExpression(_))
 }
 
@@ -603,7 +603,7 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
             // stays source-free.
             let has_newline = template.quasis.iter().any(|q| {
                 q.has_newline
-                    || matches!(&q.cooked, internal::TemplateCooked::Decoded(c) if c.contains('\n'))
+                    || matches!(&q.cooked, ast::TemplateCooked::Decoded(c) if c.contains('\n'))
             });
             if has_newline {
                 return false;
@@ -617,11 +617,11 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
 
         // Objects: simple if all properties are non-computed and values are simple
         ExpressionKind::ObjectExpression(obj) => obj.properties.iter().all(|prop| match prop {
-            internal::ObjectProperty::Property(p) => {
+            ast::ObjectProperty::Property(p) => {
                 !p.computed && (p.shorthand || is_simple_call_argument(p.value, depth - 1))
             }
             // Spread properties are not simple
-            internal::ObjectProperty::SpreadElement(_) => false,
+            ast::ObjectProperty::SpreadElement(_) => false,
         }),
 
         // Arrays: simple if all elements are simple (None = hole, which is simple)
@@ -636,10 +636,10 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
         ExpressionKind::UnaryExpression(unary) => {
             matches!(
                 unary.operator,
-                internal::UnaryOperator::Minus
-                    | internal::UnaryOperator::Plus
-                    | internal::UnaryOperator::Bang
-                    | internal::UnaryOperator::Tilde
+                ast::UnaryOperator::Minus
+                    | ast::UnaryOperator::Plus
+                    | ast::UnaryOperator::Bang
+                    | ast::UnaryOperator::Tilde
             ) && is_simple_call_argument(unary.argument, depth)
         }
 

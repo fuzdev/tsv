@@ -1,13 +1,13 @@
 // Element-instance classification overlay for the Svelte printer.
 //
 // The name-derived facts are computed once at parse
-// ([`TagFacts`](crate::ast::internal::TagFacts), stored on `Element::facts`); this module holds
+// ([`TagFacts`](crate::ast::TagFacts), stored on `Element::facts`); this module holds
 // the printer-specific overlay on top of them — a Component is inline, and a `<script>`/`<style>`
 // with content is block. The pure per-name classification lives in the `tsv_html` crate and can
 // be reused by other tools (linter, type-checker, language server).
 
-use crate::ast::internal;
-use crate::ast::internal::ElementKind;
+use crate::ast;
+use crate::ast::ElementKind;
 use crate::printer::Printer;
 
 impl<'a> Printer<'a> {
@@ -22,7 +22,7 @@ impl<'a> Printer<'a> {
     /// on separate lines. Empty `<script>`/`<style>` remain inline. This is the NODE-only answer:
     /// such an element renders no box, so where a break beside it would render, the positional
     /// readers lay it out as a glued inline element instead (`Printer::is_glued_raw_text_element`).
-    pub(crate) fn is_block_element(&self, element: &internal::Element<'_>) -> bool {
+    pub(crate) fn is_block_element(&self, element: &ast::Element<'_>) -> bool {
         // Components are treated as inline, not block
         if element.kind == ElementKind::Component {
             return false;
@@ -52,8 +52,8 @@ impl<'a> Printer<'a> {
 /// is the one arm that collapses) and the whitespace-sensitive head
 /// (`build_whitespace_sensitive_element_doc`, where an empty body takes the empty element's
 /// layouts). Two spellings of it would let them answer differently for the same element.
-pub(crate) fn has_raw_content(element: &internal::Element<'_>) -> bool {
-    use crate::ast::internal::FragmentNode;
+pub(crate) fn has_raw_content(element: &ast::Element<'_>) -> bool {
+    use crate::ast::FragmentNode;
     element
         .fragment
         .nodes
@@ -64,15 +64,15 @@ pub(crate) fn has_raw_content(element: &internal::Element<'_>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::internal::FragmentNode;
+    use crate::ast::FragmentNode;
     use tsv_html as html;
 
     /// Find the first child element of `parent` whose resolved tag name is `tag`.
     fn child<'p, 'arena>(
         printer: &Printer<'_>,
-        parent: &'p internal::Element<'arena>,
+        parent: &'p ast::Element<'arena>,
         tag: &str,
-    ) -> &'p internal::Element<'arena> {
+    ) -> &'p ast::Element<'arena> {
         parent
             .fragment
             .nodes

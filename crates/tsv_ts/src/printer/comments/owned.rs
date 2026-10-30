@@ -13,7 +13,7 @@
 // against — inert for an annotation the next token was carrying (`/* @__PURE__ */`).
 
 use super::paren::left_spine_has_no_shell;
-use crate::ast::internal::{self, Expression, ExpressionKind};
+use crate::ast::{self, Expression, ExpressionKind};
 use crate::printer::Printer;
 use crate::printer::expressions::assignment::is_curried_arrow_chain_owning_break;
 use tsv_lang::Span;
@@ -72,7 +72,7 @@ fn outermost_claim_child<'x>(value: &'x Expression<'x>) -> Option<&'x Expression
     }
 }
 
-/// The [`internal::CommentBoundPair`] whose comment is the FIRST thing `expr` prints — `expr`
+/// The [`ast::CommentBoundPair`] whose comment is the FIRST thing `expr` prints — `expr`
 /// itself, or the leftmost leaf reached through [`left_spine_child`].
 ///
 /// A cast is the one owned comment that has to be reached as a **node**: the cast's span
@@ -95,7 +95,7 @@ fn outermost_claim_child<'x>(value: &'x Expression<'x>) -> Option<&'x Expression
 /// short-circuit has exactly one spelling.
 fn leading_comment_bound_pair_walk<'x>(
     expr: &'x Expression<'x>,
-) -> Option<(&'x internal::CommentBoundPair<'x>, Span)> {
+) -> Option<(&'x ast::CommentBoundPair<'x>, Span)> {
     let start = expr.span().start;
     let mut node = expr;
     loop {
@@ -129,11 +129,11 @@ pub(crate) struct ValueGap {
 }
 
 impl<'a> Printer<'a> {
-    /// The [`internal::CommentBoundPair`] that leads `value`, or `None` —
+    /// The [`ast::CommentBoundPair`] that leads `value`, or `None` —
     /// [`leading_comment_bound_pair_walk`] behind this document's owned-comment presence flag.
     ///
     /// **The short-circuit belongs here, not at the call sites.** A pair's comment is always
-    /// owned (the parser sets the flag as it mints the [`internal::CommentBoundPair`]), so a
+    /// owned (the parser sets the flag as it mints the [`ast::CommentBoundPair`]), so a
     /// document carrying no owned comment carries no pair and the left-spine walk cannot find one —
     /// which is ~every document. That is a fact about the DOCUMENT, so every caller owes it,
     /// and stating it once here is what makes it unforgettable: the cannot-hang marks below
@@ -144,7 +144,7 @@ impl<'a> Printer<'a> {
     fn leading_comment_bound_pair<'x>(
         &self,
         value: &'x Expression<'x>,
-    ) -> Option<(&'x internal::CommentBoundPair<'x>, Span)> {
+    ) -> Option<(&'x ast::CommentBoundPair<'x>, Span)> {
         if !self.has_owned_comments {
             return None;
         }
@@ -152,7 +152,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether `comment` is the comment of a JSDoc cast the parser BUILT on `value`'s left
-    /// spine — a [`internal::CommentBoundPairKind::Cast`] pair that owns it — rather than
+    /// spine — a [`ast::CommentBoundPairKind::Cast`] pair that owns it — rather than
     /// cast-shaped text the parser read as an ordinary comment (`/** @type {T} */⏎(x) => y`
     /// glues to an arrow's parameter `(`, which is no cast). The question a doc-edge reader
     /// asks of the first comment it met, where the pair itself is no longer in hand.
@@ -166,8 +166,7 @@ impl<'a> Printer<'a> {
         let mut node = value;
         loop {
             if let ExpressionKind::CommentBoundPair(pair) = &node.kind {
-                if pair.kind == internal::CommentBoundPairKind::Cast && pair.comment.span == comment
-                {
+                if pair.kind == ast::CommentBoundPairKind::Cast && pair.comment.span == comment {
                     return true;
                 }
                 node = pair.inner;
@@ -871,7 +870,7 @@ impl<'a> Printer<'a> {
     /// three callers that must not print it twice each resolve the cast off the node first
     /// ([`Self::leading_comment_bound_pair`], which also walks the left spine this position
     /// cannot).
-    pub(crate) fn owned_leading_comment_at(&self, start: u32) -> Option<&'a internal::Comment> {
+    pub(crate) fn owned_leading_comment_at(&self, start: u32) -> Option<&'a ast::Comment> {
         tsv_lang::owned_leading_comment_at(self.source, self.comments, start)
     }
 
@@ -892,9 +891,9 @@ impl<'a> Printer<'a> {
     /// can be forgotten at a fourth read site is worth less than the two compares it saves.
     pub(crate) fn comment_bound_pair_comment(
         &self,
-        cast: &internal::CommentBoundPair<'_>,
+        cast: &ast::CommentBoundPair<'_>,
         span: Span,
-    ) -> internal::Comment {
+    ) -> ast::Comment {
         self.owned_leading_comment_at(span.start)
             .copied()
             .unwrap_or(cast.comment)
@@ -946,7 +945,7 @@ impl<'a> Printer<'a> {
     /// caller so the two cannot part.
     pub(crate) fn jsdoc_cast_comment_own_line(
         &self,
-        cast: &internal::CommentBoundPair<'_>,
+        cast: &ast::CommentBoundPair<'_>,
         span: Span,
     ) -> bool {
         let comment = self.comment_bound_pair_comment(cast, span);
@@ -969,7 +968,7 @@ impl<'a> Printer<'a> {
         // A glued-comment pair's block is glued to its `(` by construction, so only a cast's
         // comment can sit on a line above the pair.
         debug_assert!(
-            !own_line || cast.kind == internal::CommentBoundPairKind::Cast,
+            !own_line || cast.kind == ast::CommentBoundPairKind::Cast,
             "only a JSDoc cast's comment may sit on its own line above the pair"
         );
         own_line

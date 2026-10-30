@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::fmt::Write;
 
 use super::numbers::canonical_unit;
-use crate::ast::internal::{AngleUnit, Color, ColorChannel};
+use crate::ast::{AngleUnit, Color, ColorChannel};
 use tsv_lang::Span;
 
 /// Format a *computed* color value (`Rgb`/`Hsl`) semantically.

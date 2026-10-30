@@ -35,11 +35,11 @@
 //! `FragmentNode` variant fails compilation here instead of silently slipping
 //! past the analysis.
 
-use tsv_svelte::ast::internal::{
+use tsv_svelte::ast::{
     AttributeNode, AwaitBlock, ConstTag, EachBlock, Element, Fragment, FragmentNode, HtmlTag,
     IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement, SpecialElementKind,
 };
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ExpressionKind,
     ForInOfLeft, ForInit, FunctionExpression, ObjectPatternProperty, ObjectProperty, Statement,
     StatementKind, VariableDeclaration, VariableDeclarationKind,
@@ -314,7 +314,7 @@ fn unsupported(reason: Refusal) -> CompileError {
 
 /// The plain (non-escaped) name of an identifier, `None` for a unicode-escaped
 /// or synthetic identifier.
-fn plain_name<'s>(id: &tsv_ts::ast::internal::Identifier<'_>, source: &'s str) -> Option<&'s str> {
+fn plain_name<'s>(id: &tsv_ts::ast::Identifier<'_>, source: &'s str) -> Option<&'s str> {
     plain_identifier_str(id, source)
 }
 
@@ -324,7 +324,7 @@ fn collect_context_roots(instance_body: &[Statement<'_>], source: &str, out: &mu
     for stmt in instance_body {
         match &stmt.kind {
             StatementKind::ImportDeclaration(import) => {
-                use tsv_ts::ast::internal::ImportSpecifier;
+                use tsv_ts::ast::ImportSpecifier;
                 for spec in import.specifiers {
                     let local = match spec {
                         ImportSpecifier::Default(s) => &s.local,
@@ -439,7 +439,7 @@ pub(crate) fn collect_constant_names(
     module_body: &[Statement<'_>],
     source: &str,
 ) -> NameSet {
-    use tsv_ts::ast::internal::{ImportSpecifier, VariableDeclarationKind};
+    use tsv_ts::ast::{ImportSpecifier, VariableDeclarationKind};
 
     let mut out = NameSet::default();
     for stmt in instance_body.iter().chain(module_body.iter()) {
@@ -735,7 +735,7 @@ fn declare_js_pattern(pattern: &Expression<'_>, nc: &mut Nc<'_>, is_const: bool)
 
 /// [`declare_ident`] plus the JS-scope record. A function or class NAME is never a
 /// `const` binding.
-fn declare_js_ident(id: &tsv_ts::ast::internal::Identifier<'_>, nc: &mut Nc<'_>) {
+fn declare_js_ident(id: &tsv_ts::ast::Identifier<'_>, nc: &mut Nc<'_>) {
     declare_ident(id, nc);
     if let Some(name) = plain_name(id, nc.source) {
         let name = name.to_string();
@@ -802,7 +802,7 @@ fn declare_pattern(pattern: &Expression<'_>, nc: &mut Nc<'_>) {
 
 /// Add a single identifier's name to `shadowed` (and `fn_declared` inside a
 /// function-like subtree).
-fn declare_ident(id: &tsv_ts::ast::internal::Identifier<'_>, nc: &mut Nc<'_>) {
+fn declare_ident(id: &tsv_ts::ast::Identifier<'_>, nc: &mut Nc<'_>) {
     if let Some(name) = plain_name(id, nc.source) {
         if nc.fn_depth > 0 {
             nc.fn_declared.insert(name.to_string());

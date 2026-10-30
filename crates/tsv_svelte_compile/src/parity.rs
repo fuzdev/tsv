@@ -139,8 +139,8 @@ pub fn compare_canonical(ours: &str, oracle: &str) -> Parity {
 fn without_comment_bound_pairs<'arena>(
     arena: &'arena Bump,
     source: &str,
-    body: &'arena [tsv_ts::ast::internal::Statement<'arena>],
-) -> &'arena [tsv_ts::ast::internal::Statement<'arena>] {
+    body: &'arena [tsv_ts::ast::Statement<'arena>],
+) -> &'arena [tsv_ts::ast::Statement<'arena>] {
     crate::erase::erase_statements(arena, source, body).map_or(body, |erased| erased.body)
 }
 

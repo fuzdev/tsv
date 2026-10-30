@@ -29,7 +29,7 @@ use super::class_expr_has_decorators;
 use super::expressions::literals::format_directive;
 use super::expressions::operators::SeqLayout;
 use super::needs_parens::LeftmostText;
-use crate::ast::internal::{self, Expression, ExpressionKind, Statement, StatementKind};
+use crate::ast::{self, Expression, ExpressionKind, Statement, StatementKind};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -331,7 +331,7 @@ impl<'a> Printer<'a> {
     /// directive-prologue entry) plus the `;` and the comments bound to it.
     fn build_expression_statement_doc(
         &self,
-        stmt: &internal::ExpressionStatement<'_>,
+        stmt: &ast::ExpressionStatement<'_>,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {
@@ -454,7 +454,7 @@ impl<'a> Printer<'a> {
     /// directive is a bare string literal by grammar, so the literal's span start is the
     /// statement's first printed byte — the left-edge fact
     /// [`Printer::prepend_owned_leading_comment_at`] asks each caller for.
-    fn build_directive_doc(&self, stmt: &internal::ExpressionStatement<'_>) -> DocId {
+    fn build_directive_doc(&self, stmt: &ast::ExpressionStatement<'_>) -> DocId {
         let d = self.d();
         let span = stmt.expression.span();
         let text = d.text_pooled(&format_directive(span.extract(self.source)));
@@ -466,7 +466,7 @@ impl<'a> Printer<'a> {
     #[inline]
     fn build_expression_statement_expr_doc(
         &self,
-        stmt: &internal::ExpressionStatement<'_>,
+        stmt: &ast::ExpressionStatement<'_>,
         nested_paren: Option<Span>,
     ) -> DocId {
         self.expr_stmt_paren_target.set(nested_paren);
@@ -509,7 +509,7 @@ impl<'a> Printer<'a> {
     /// source would drop what it declined to claim, or double what it handed over.
     fn build_expression_statement_value_doc(
         &self,
-        stmt: &internal::ExpressionStatement<'_>,
+        stmt: &ast::ExpressionStatement<'_>,
         span: Span,
         in_program_or_block: bool,
     ) -> (DocId, u32) {
@@ -711,7 +711,7 @@ impl<'a> Printer<'a> {
     /// gap (threaded through the restricted production's own emitters).
     fn build_return_statement_doc(
         &self,
-        ret: &internal::ReturnStatement<'_>,
+        ret: &ast::ReturnStatement<'_>,
         span: Span,
         gap: TerminatorGap,
     ) -> DocId {

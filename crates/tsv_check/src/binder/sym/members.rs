@@ -9,7 +9,7 @@
 use super::super::symbols::{SymbolFlags, SymbolId};
 use super::{ContainerKind, DeclInput, DeclMods, Scope, SymbolBinder};
 use crate::ids::NodeId;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ClassBody, ClassMember, Expression, ExpressionKind, MethodKind, Statement, TSEnumMemberId,
     TSInterfaceBody, TSType, TSTypeAnnotation, TSTypeElement, TSTypeLiteral,
     TSTypeParameterDeclaration,
@@ -132,7 +132,7 @@ impl<'a> SymbolBinder<'a> {
                 let (inc, exc) = if p.accessor {
                     (SymbolFlags::ACCESSOR, SymbolFlags::ACCESSOR_EXCLUDES)
                 } else {
-                    let opt = if p.modifier == tsv_ts::ast::internal::PropertyModifier::Optional {
+                    let opt = if p.modifier == tsv_ts::ast::PropertyModifier::Optional {
                         SymbolFlags::OPTIONAL
                     } else {
                         SymbolFlags::NONE
@@ -386,7 +386,7 @@ impl<'a> SymbolBinder<'a> {
 
     pub(super) fn bind_enum_members(
         &mut self,
-        members: &[tsv_ts::ast::internal::TSEnumMember<'a>],
+        members: &[tsv_ts::ast::TSEnumMember<'a>],
         enum_symbol: SymbolId,
     ) {
         let saved = (self.container, self.block_scope);
@@ -467,6 +467,6 @@ fn ident_of_param<'b, 'a>(param: &'b Expression<'a>) -> &'b Expression<'a> {
 }
 
 /// A method's body statements (a `FunctionExpression`'s block body).
-fn method_body<'a>(f: &tsv_ts::ast::internal::FunctionExpression<'a>) -> &'a [Statement<'a>] {
+fn method_body<'a>(f: &tsv_ts::ast::FunctionExpression<'a>) -> &'a [Statement<'a>] {
     f.body.body
 }

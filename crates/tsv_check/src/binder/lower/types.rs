@@ -6,7 +6,7 @@
 //! type-flavored.
 
 use super::super::*;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     TSEntityName, TSImportType, TSIndexSignature, TSLiteralType, TSMappedTypeParameter,
     TSQualifiedName, TSType, TSTypeAnnotation, TSTypeElement, TSTypeParameter,
     TSTypeParameterDeclaration, TSTypeParameterInstantiation, TSTypeQueryExprName,

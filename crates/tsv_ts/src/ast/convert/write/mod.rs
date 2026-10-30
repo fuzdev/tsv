@@ -26,8 +26,8 @@
 //! assignment-pattern span override. The super-class
 //! `TSInstantiationExpression` wrap is decided before its fields are emitted.
 
-use super::super::internal;
 use super::bigint_to_decimal;
+use crate::ast;
 use tsv_lang::{Span, StageRun, Wire, WirePositions, WireTables};
 // The JSON-scalar substrate is shared across the three language writers (so the
 // Svelte writer can compose embedded TS/CSS emission into one buffer). Only the
@@ -62,11 +62,7 @@ use types::{write_type_annotation, write_type_parameter_instantiation};
 /// Byte-oriented boundaries (FFI, the CLI's stdout) take the bytes as-is; `&str`
 /// boundaries (`convert_ast_json_string` → WASM/N-API) pay the one validation at
 /// the edge.
-pub(crate) fn write_program_bytes(
-    program: &internal::Program<'_>,
-    source: &str,
-    wire: Wire,
-) -> Vec<u8> {
+pub(crate) fn write_program_bytes(program: &ast::Program<'_>, source: &str, wire: Wire) -> Vec<u8> {
     let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
     let ctx = Ctx::new(source, tables.positions(), CommentMode::Off);
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len(), wire));
@@ -87,7 +83,7 @@ pub(crate) fn write_program_bytes(
 #[inline]
 pub fn write_expression_embedded(
     w: &mut JsonWriter,
-    expr: &internal::Expression<'_>,
+    expr: &ast::Expression<'_>,
     env: EmbedWriter<'_>,
 ) {
     let ctx = Ctx::from_embed(env);
@@ -101,7 +97,7 @@ pub fn write_expression_embedded(
 #[inline]
 pub fn write_variable_declaration_embedded(
     w: &mut JsonWriter,
-    var_decl: &internal::VariableDeclaration<'_>,
+    var_decl: &ast::VariableDeclaration<'_>,
     env: EmbedWriter<'_>,
 ) {
     let ctx = Ctx::from_embed(env);
@@ -118,7 +114,7 @@ pub fn write_variable_declaration_embedded(
 #[inline]
 pub fn write_identifier_expression_with_character(
     w: &mut JsonWriter,
-    expr: &internal::Expression<'_>,
+    expr: &ast::Expression<'_>,
     env: EmbedWriter<'_>,
 ) {
     let ctx = Ctx::from_embed(env);
@@ -128,10 +124,10 @@ pub fn write_identifier_expression_with_character(
 /// The shared body of the shorthand/snippet-name identifier emission.
 fn write_identifier_expression_with_character_in(
     w: &mut JsonWriter,
-    expr: &internal::Expression<'_>,
+    expr: &ast::Expression<'_>,
     ctx: &Ctx<'_>,
 ) {
-    if let internal::ExpressionKind::Identifier(id) = &expr.kind {
+    if let ast::ExpressionKind::Identifier(id) = &expr.kind {
         write_identifier_parts_with_character(
             w,
             id.span,
@@ -162,7 +158,7 @@ fn write_identifier_expression_with_character_in(
 #[inline]
 pub fn write_pattern_embedded(
     w: &mut JsonWriter,
-    expr: &internal::Expression<'_>,
+    expr: &ast::Expression<'_>,
     env: EmbedWriter<'_>,
 ) {
     let mut ctx = Ctx::from_embed(env);
@@ -170,7 +166,7 @@ pub fn write_pattern_embedded(
         ctx.pattern_ann_span = ann.span;
     }
     match &expr.kind {
-        internal::ExpressionKind::Identifier(id) => {
+        ast::ExpressionKind::Identifier(id) => {
             // Simple identifier: inject `character` on its own `loc`.
             write_identifier_parts_with_character(
                 w,
@@ -189,7 +185,7 @@ pub fn write_pattern_embedded(
 }
 
 /// Emit the `Program` node.
-fn write_program(w: &mut JsonWriter, program: &internal::Program<'_>, ctx: &Ctx<'_>) {
+fn write_program(w: &mut JsonWriter, program: &ast::Program<'_>, ctx: &Ctx<'_>) {
     node_header(w, "Program", program.span, ctx);
     w.raw(",\"body\":");
     write_body_array(w, program.body, ctx, |w, s| write_statement(w, s, ctx));
@@ -210,7 +206,7 @@ fn write_program(w: &mut JsonWriter, program: &internal::Program<'_>, ctx: &Ctx<
 /// inert here — only a block pattern carries a second parse.
 pub fn write_program_embedded(
     w: &mut JsonWriter,
-    program: &internal::Program<'_>,
+    program: &ast::Program<'_>,
     env: EmbedWriter<'_>,
 ) {
     let ctx = Ctx::from_embed(env);
@@ -620,7 +616,7 @@ fn position_fields<const CHARACTER: bool>(run: &mut StageRun<'_>, span: Span, ct
 #[inline]
 pub(super) fn write_type_parameters_field(
     w: &mut JsonWriter,
-    type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+    type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(tp) = type_parameters {
@@ -633,7 +629,7 @@ pub(super) fn write_type_parameters_field(
 #[inline]
 pub(super) fn write_type_arguments_field(
     w: &mut JsonWriter,
-    type_arguments: Option<&internal::TSTypeParameterInstantiation<'_>>,
+    type_arguments: Option<&ast::TSTypeParameterInstantiation<'_>>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(ta) = type_arguments {
@@ -648,7 +644,7 @@ pub(super) fn write_type_arguments_field(
 #[inline]
 pub(super) fn write_type_annotation_field(
     w: &mut JsonWriter,
-    type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
+    type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(ta) = type_annotation {
@@ -661,7 +657,7 @@ pub(super) fn write_type_annotation_field(
 #[inline]
 pub(super) fn write_return_type_field(
     w: &mut JsonWriter,
-    return_type: Option<&internal::TSTypeAnnotation<'_>>,
+    return_type: Option<&ast::TSTypeAnnotation<'_>>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(rt) = return_type {
@@ -692,13 +688,13 @@ pub(super) fn write_function_flags_fields(w: &mut JsonWriter, generator: bool, r
 #[inline]
 pub(super) fn write_import_kind_field(
     w: &mut JsonWriter,
-    import_kind: internal::ImportKind,
+    import_kind: ast::ImportKind,
     ctx: &Ctx<'_>,
 ) {
     match import_kind {
-        internal::ImportKind::Type => w.raw(",\"importKind\":\"type\""),
-        internal::ImportKind::Value if ctx.vanilla_acorn => {}
-        internal::ImportKind::Value => w.raw(",\"importKind\":\"value\""),
+        ast::ImportKind::Type => w.raw(",\"importKind\":\"type\""),
+        ast::ImportKind::Value if ctx.vanilla_acorn => {}
+        ast::ImportKind::Value => w.raw(",\"importKind\":\"value\""),
     }
 }
 
@@ -707,13 +703,13 @@ pub(super) fn write_import_kind_field(
 #[inline]
 pub(super) fn write_export_kind_field(
     w: &mut JsonWriter,
-    export_kind: internal::ExportKind,
+    export_kind: ast::ExportKind,
     ctx: &Ctx<'_>,
 ) {
     match export_kind {
-        internal::ExportKind::Type => w.raw(",\"exportKind\":\"type\""),
-        internal::ExportKind::Value if ctx.vanilla_acorn => {}
-        internal::ExportKind::Value => w.raw(",\"exportKind\":\"value\""),
+        ast::ExportKind::Type => w.raw(",\"exportKind\":\"type\""),
+        ast::ExportKind::Value if ctx.vanilla_acorn => {}
+        ast::ExportKind::Value => w.raw(",\"exportKind\":\"value\""),
     }
 }
 
@@ -725,7 +721,7 @@ pub(super) fn write_export_kind_field(
 ///
 /// The span-identity arm skips the escape scan: an `IdentName` with no
 /// `escaped` form promises its source bytes hold nothing JSON escapes (see
-/// [`internal::IdentName`] — a lexed `IdentifierName` by the grammar, any other
+/// [`ast::IdentName`] — a lexed `IdentifierName` by the grammar, any other
 /// slice by its constructor's check), so the key and the quoted name are one
 /// fixed-width append. The decoded arm keeps the scan — it is rare, and it is
 /// also where a constructor parks a name it cannot vouch for.
@@ -741,7 +737,7 @@ pub(super) fn write_export_kind_field(
 #[inline(never)]
 pub(super) fn write_name_field(
     w: &mut JsonWriter,
-    name: internal::IdentName<'_>,
+    name: ast::IdentName<'_>,
     name_start: u32,
     ctx: &Ctx<'_>,
 ) {
@@ -842,7 +838,7 @@ pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
 ///
 /// The common literals take [`write_literal_fields_fused`]'s single write; any
 /// it declines takes [`write_literal_fields`].
-pub(super) fn write_literal(w: &mut JsonWriter, lit: &internal::Literal<'_>, ctx: &Ctx<'_>) {
+pub(super) fn write_literal(w: &mut JsonWriter, lit: &ast::Literal<'_>, ctx: &Ctx<'_>) {
     node_header(w, "Literal", lit.span, ctx);
     #[cfg(debug_assertions)]
     let fields_from = w.as_bytes().len();
@@ -874,57 +870,54 @@ pub(super) fn write_literal(w: &mut JsonWriter, lit: &internal::Literal<'_>, ctx
 /// decimal digits with no leading zero is the shortest form of the integer it
 /// names, so the value the parser stored prints as those same digits.
 #[inline]
-fn write_literal_fields_fused(
-    w: &mut JsonWriter,
-    lit: &internal::Literal<'_>,
-    ctx: &Ctx<'_>,
-) -> bool {
+fn write_literal_fields_fused(w: &mut JsonWriter, lit: &ast::Literal<'_>, ctx: &Ctx<'_>) -> bool {
     match lit.value {
-        internal::LiteralValue::String(internal::StringCooked::Verbatim) => {
+        ast::LiteralValue::String(ast::StringCooked::Verbatim) => {
             w.try_string_value_raw(lit.span.extract(ctx.source).as_bytes())
         }
-        internal::LiteralValue::Number(_) => {
+        ast::LiteralValue::Number(_) => {
             w.try_number_value_raw(lit.span.extract(ctx.source).as_bytes())
         }
-        internal::LiteralValue::Boolean(true) => {
+        ast::LiteralValue::Boolean(true) => {
             w.raw(",\"value\":true,\"raw\":\"true\"");
             true
         }
-        internal::LiteralValue::Boolean(false) => {
+        ast::LiteralValue::Boolean(false) => {
             w.raw(",\"value\":false,\"raw\":\"false\"");
             true
         }
-        internal::LiteralValue::Null => {
+        ast::LiteralValue::Null => {
             w.raw(",\"value\":null,\"raw\":\"null\"");
             true
         }
-        internal::LiteralValue::String(internal::StringCooked::Decoded(_))
-        | internal::LiteralValue::BigInt => false,
+        ast::LiteralValue::String(ast::StringCooked::Decoded(_)) | ast::LiteralValue::BigInt => {
+            false
+        }
     }
 }
 
 /// A `Literal`'s `value`, `raw` and (for a BigInt) `bigint` fields, field by
 /// field — every literal's general emission.
-fn write_literal_fields(w: &mut JsonWriter, lit: &internal::Literal<'_>, ctx: &Ctx<'_>) {
+fn write_literal_fields(w: &mut JsonWriter, lit: &ast::Literal<'_>, ctx: &Ctx<'_>) {
     w.raw(",\"value\":");
     // `bigint` is emitted only for BigInt literals (`skip_serializing_if` on
     // `Option`), and shares the decimal string with `value`.
     let mut bigint: Option<String> = None;
     match &lit.value {
-        internal::LiteralValue::Number(n) => write_number_value(w, *n),
-        internal::LiteralValue::String(cooked) => {
+        ast::LiteralValue::Number(n) => write_number_value(w, *n),
+        ast::LiteralValue::String(cooked) => {
             w.string(cooked.resolve(lit.span, ctx.source));
         }
-        internal::LiteralValue::BigInt => {
+        ast::LiteralValue::BigInt => {
             let decimal = bigint_to_decimal(lit.bigint_digits(ctx.source));
             w.string(&decimal);
             bigint = Some(decimal);
         }
-        internal::LiteralValue::Boolean(b) => w.bool(*b),
-        internal::LiteralValue::Null => w.null(),
+        ast::LiteralValue::Boolean(b) => w.bool(*b),
+        ast::LiteralValue::Null => w.null(),
     }
     let raw = lit.span.extract(ctx.source);
-    if let internal::LiteralValue::String(_) = lit.value {
+    if let ast::LiteralValue::String(_) = lit.value {
         w.raw(",\"raw\":");
         w.string(raw);
     } else {
@@ -945,10 +938,10 @@ fn write_literal_fields(w: &mut JsonWriter, lit: &internal::Literal<'_>, ctx: &C
 pub(super) fn write_identifier_parts(
     w: &mut JsonWriter,
     span: Span,
-    name: internal::IdentName<'_>,
+    name: ast::IdentName<'_>,
     optional: bool,
-    type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
-    decorators: Option<&[internal::Decorator<'_>]>,
+    type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
+    decorators: Option<&[ast::Decorator<'_>]>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "Identifier", span, ctx);
@@ -963,10 +956,10 @@ pub(super) fn write_identifier_parts(
 pub(super) fn write_identifier_parts_with_character(
     w: &mut JsonWriter,
     span: Span,
-    name: internal::IdentName<'_>,
+    name: ast::IdentName<'_>,
     optional: bool,
-    type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
-    decorators: Option<&[internal::Decorator<'_>]>,
+    type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
+    decorators: Option<&[ast::Decorator<'_>]>,
     ctx: &Ctx<'_>,
 ) {
     // A typed simple block binding is the bare `Identifier` the annotation hangs
@@ -994,10 +987,10 @@ pub(super) fn write_identifier_parts_with_character(
 fn write_identifier_fields(
     w: &mut JsonWriter,
     span: Span,
-    name: internal::IdentName<'_>,
+    name: ast::IdentName<'_>,
     optional: bool,
-    type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
-    decorators: Option<&[internal::Decorator<'_>]>,
+    type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
+    decorators: Option<&[ast::Decorator<'_>]>,
     ctx: &Ctx<'_>,
 ) {
     write_name_field(w, name, span.start, ctx);
@@ -1011,8 +1004,8 @@ fn write_identifier_tail(
     w: &mut JsonWriter,
     span: Span,
     optional: bool,
-    type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
-    decorators: Option<&[internal::Decorator<'_>]>,
+    type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
+    decorators: Option<&[ast::Decorator<'_>]>,
     ctx: &Ctx<'_>,
 ) {
     if optional {
@@ -1043,11 +1036,7 @@ fn write_identifier_tail(
 /// 88 to 168 bytes, a frame paid at every level of statement nesting. Kept out of
 /// line it costs ~0.03% of the parse→JSON path's instructions on TypeScript.
 #[inline(never)]
-pub(super) fn write_identifier_plain(
-    w: &mut JsonWriter,
-    id: &internal::Identifier<'_>,
-    ctx: &Ctx<'_>,
-) {
+pub(super) fn write_identifier_plain(w: &mut JsonWriter, id: &ast::Identifier<'_>, ctx: &Ctx<'_>) {
     let name = id.ident_name();
     let name_len = name.raw_len as usize;
     if name.escaped.is_some()
@@ -1085,7 +1074,7 @@ pub(super) fn write_identifier_plain(
 #[inline]
 pub(super) fn write_identifier_with_optional(
     w: &mut JsonWriter,
-    id: &internal::Identifier<'_>,
+    id: &ast::Identifier<'_>,
     ctx: &Ctx<'_>,
 ) {
     write_identifier_parts(w, id.span, id.ident_name(), id.optional, None, None, ctx);
@@ -1119,14 +1108,14 @@ mod tests {
     }
 
     /// The sole statement of `source` as the `Identifier` its expression is.
-    fn sole_identifier<'a>(program: &'a internal::Program<'a>) -> &'a internal::Identifier<'a> {
+    fn sole_identifier<'a>(program: &'a ast::Program<'a>) -> &'a ast::Identifier<'a> {
         let [statement] = program.body else {
             panic!("one statement expected");
         };
-        let internal::StatementKind::ExpressionStatement(statement) = &statement.kind else {
+        let ast::StatementKind::ExpressionStatement(statement) = &statement.kind else {
             panic!("an expression statement expected");
         };
-        let internal::ExpressionKind::Identifier(id) = &statement.expression.kind else {
+        let ast::ExpressionKind::Identifier(id) = &statement.expression.kind else {
             panic!("an identifier expected");
         };
         id
@@ -1247,7 +1236,7 @@ mod tests {
         let (expression, comments) =
             crate::parse_expression_with_comments(source, 0, 0, &arena, |_| Ok(()))
                 .expect("parses");
-        let internal::ExpressionKind::Identifier(id) = &expression.kind else {
+        let ast::ExpressionKind::Identifier(id) = &expression.kind else {
             panic!("an identifier expected");
         };
         let attach = || {

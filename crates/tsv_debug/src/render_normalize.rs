@@ -441,7 +441,7 @@ fn collapse_ws(s: &str) -> String {
 
 /// The whitespace the Svelte compiler collapses: `[ \t\n\r]`, its own
 /// `regex_not_whitespace` = `/[^ \t\r\n]/` read positively. Mirrors
-/// `tsv_svelte::ast::internal::is_collapsible_ws_char`.
+/// `tsv_svelte::ast::is_collapsible_ws_char`.
 ///
 /// ⚠️ **Narrower than the HTML tokenizer's class and than Rust's
 /// `is_ascii_whitespace`, both of which include the form feed** — and the difference is

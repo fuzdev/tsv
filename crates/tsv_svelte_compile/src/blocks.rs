@@ -10,11 +10,11 @@ use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
-use tsv_svelte::ast::internal::{
+use tsv_svelte::ast::{
     AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element, Fragment,
     FragmentNode, IfBlock, KeyBlock, SnippetBlock, SpecialElement,
 };
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     BinaryOperator, BlockStatement, Expression, ExpressionKind, ForInit, ForStatement, IfStatement,
     ObjectExpression, ObjectProperty, Statement, StatementKind, UpdateOperator,
     VariableDeclaration, VariableDeclarationKind, VariableDeclarator,

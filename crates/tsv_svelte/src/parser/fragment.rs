@@ -1,6 +1,6 @@
 // Fragment and text parsing
 
-use crate::ast::internal::*;
+use crate::ast::*;
 use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;

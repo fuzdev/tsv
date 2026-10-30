@@ -17,7 +17,7 @@
 //   `parentNeedsParentheses` (`parentheses/parent-needs-parentheses.js`)
 // - `printPathNoParens`'s caller (`print/index.js`, the application layer)
 
-use crate::ast::internal::{
+use crate::ast::{
     ArrowFunctionBody, AssignmentOperator, BinaryExpression, BinaryOperator, Expression,
     ExpressionKind, LiteralValue, UnaryOperator, UpdateOperator,
 };
@@ -789,7 +789,7 @@ fn is_unary_or_update(expr: &Expression<'_>) -> bool {
 /// ENDS on a `>`. Its DUAL, an operand that ends on the `>`'s left and whose own `<`…`>`
 /// region would re-lex as the argument list, lives in the arm of
 /// [`needs_parens_binary_operand`] keyed on
-/// `internal::BinaryExpression::relexes_as_type_arguments`. Neither half is derivable from
+/// `ast::BinaryExpression::relexes_as_type_arguments`. Neither half is derivable from
 /// the other, and a change to one is a question about the other: the two are findable from
 /// here and from there, and nowhere else.
 pub(in crate::printer) const fn joins_a_trailing_angle_bracket(op: BinaryOperator) -> bool {
@@ -1187,7 +1187,7 @@ fn export_default_leftmost<'a>(
 /// Two nodes carry a pair no position asks for, and both are tested at every step rather
 /// than at the root alone:
 ///
-/// - a [`CommentBoundPair`](crate::ast::internal::CommentBoundPair), whose parens are semantically
+/// - a [`CommentBoundPair`](crate::ast::CommentBoundPair), whose parens are semantically
 ///   required — strip them and the cast stops being one — so its own doc always prints
 ///   them. A `/** @type {T} */` the author glued to the shell of a `<` operand is the same
 ///   document as the shell without it, and the region reads alike either way: the head scan

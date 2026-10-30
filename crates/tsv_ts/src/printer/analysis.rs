@@ -4,7 +4,7 @@
 // They determine formatting decisions like whether expressions need
 // special handling, wrapping, or expansion.
 
-use crate::ast::internal;
+use crate::ast;
 use crate::printer::Printer;
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
@@ -45,9 +45,9 @@ pub(crate) fn skip_identifier_at(bytes: &[u8], pos: usize, end: usize) -> usize 
 /// are picked up separately, by scanning the full brace range rather than the
 /// statement list). Used by block-statement and namespace/module bodies to
 /// decide between the empty-body and normal rendering paths.
-pub(crate) fn is_effectively_empty_body(body: &[internal::Statement<'_>]) -> bool {
+pub(crate) fn is_effectively_empty_body(body: &[ast::Statement<'_>]) -> bool {
     body.iter()
-        .all(|s| matches!(&s.kind, internal::StatementKind::EmptyStatement(_)))
+        .all(|s| matches!(&s.kind, ast::StatementKind::EmptyStatement(_)))
 }
 
 /// The start of the next statement after `index` that will actually be printed
@@ -61,7 +61,7 @@ pub(crate) fn is_effectively_empty_body(body: &[internal::Statement<'_>]) -> boo
 /// the comment (neither the statement's trailing scan nor the dropped `;`'s
 /// leading-comment collection claims it) and silently drop it.
 pub(crate) fn next_printed_stmt_start(
-    body: &[internal::Statement<'_>],
+    body: &[ast::Statement<'_>],
     index: usize,
     body_end: u32,
 ) -> u32 {
@@ -74,12 +74,12 @@ pub(crate) fn next_printed_stmt_start(
 /// differs when nothing prints (the trailing-claim split runs only toward a printed
 /// statement — a comment hugging the body's `}` still trails).
 pub(crate) fn next_printed_stmt<'s, 'arena>(
-    body: &'s [internal::Statement<'arena>],
+    body: &'s [ast::Statement<'arena>],
     index: usize,
-) -> Option<&'s internal::Statement<'arena>> {
+) -> Option<&'s ast::Statement<'arena>> {
     body[index + 1..]
         .iter()
-        .find(|s| !matches!(&s.kind, internal::StatementKind::EmptyStatement(_)))
+        .find(|s| !matches!(&s.kind, ast::StatementKind::EmptyStatement(_)))
 }
 
 /// The slot floor for `body[index]`'s trailing gap: past the last dropped
@@ -88,10 +88,10 @@ pub(crate) fn next_printed_stmt<'s, 'arena>(
 /// content before it (`a(); /* c */ ; b();` — prettier reads it the same way), so the
 /// leads-next scan ([`Printer::trailing_claim_end`](super::Printer::trailing_claim_end))
 /// must not reach back across one.
-pub(crate) fn statement_gap_floor(body: &[internal::Statement<'_>], index: usize) -> u32 {
+pub(crate) fn statement_gap_floor(body: &[ast::Statement<'_>], index: usize) -> u32 {
     body[index + 1..]
         .iter()
-        .take_while(|s| matches!(&s.kind, internal::StatementKind::EmptyStatement(_)))
+        .take_while(|s| matches!(&s.kind, ast::StatementKind::EmptyStatement(_)))
         .last()
         .map_or_else(|| body[index].span().end, |s| s.span().end)
 }
@@ -102,16 +102,16 @@ pub(crate) fn statement_gap_floor(body: &[internal::Statement<'_>], index: usize
 /// Patterns:
 /// - `require.resolve(stringLiteral)`
 /// - `await import(stringLiteral)`
-pub(crate) fn is_module_path_fluid_call(expr: &internal::Expression<'_>, source: &str) -> bool {
+pub(crate) fn is_module_path_fluid_call(expr: &ast::Expression<'_>, source: &str) -> bool {
     // Check for `await import(string)` — single-arg only (no options)
-    if let internal::ExpressionKind::AwaitExpression(await_expr) = &expr.kind
-        && let internal::ExpressionKind::ImportExpression(import_expr) = &await_expr.argument.kind
+    if let ast::ExpressionKind::AwaitExpression(await_expr) = &expr.kind
+        && let ast::ExpressionKind::ImportExpression(import_expr) = &await_expr.argument.kind
         && import_expr.options.is_none()
     {
         return is_string_literal(import_expr.source);
     }
 
-    let internal::ExpressionKind::CallExpression(call) = &expr.kind else {
+    let ast::ExpressionKind::CallExpression(call) = &expr.kind else {
         return false;
     };
 
@@ -121,12 +121,12 @@ pub(crate) fn is_module_path_fluid_call(expr: &internal::Expression<'_>, source:
     }
 
     // Check for `require.resolve()`
-    if let internal::ExpressionKind::MemberExpression(member) = &call.callee.kind
+    if let ast::ExpressionKind::MemberExpression(member) = &call.callee.kind
         && !member.computed
         && !member.optional
-        && let internal::ExpressionKind::Identifier(resolve_id) = &member.property.kind
+        && let ast::ExpressionKind::Identifier(resolve_id) = &member.property.kind
         && resolve_id.name(source) == "resolve"
-        && let internal::ExpressionKind::Identifier(require_id) = &member.object.kind
+        && let ast::ExpressionKind::Identifier(require_id) = &member.object.kind
         && require_id.name(source) == "require"
     {
         return true;
@@ -136,10 +136,10 @@ pub(crate) fn is_module_path_fluid_call(expr: &internal::Expression<'_>, source:
 }
 
 /// Check if an expression is a string literal
-pub(crate) fn is_string_literal(expr: &internal::Expression<'_>) -> bool {
+pub(crate) fn is_string_literal(expr: &ast::Expression<'_>) -> bool {
     matches!(
         &expr.kind,
-        internal::ExpressionKind::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
+        ast::ExpressionKind::Literal(lit) if matches!(lit.value, ast::LiteralValue::String { .. })
     )
 }
 
@@ -155,13 +155,13 @@ pub(crate) fn is_string_literal(expr: &internal::Expression<'_>) -> bool {
 /// ```
 ///
 /// Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`)
-pub fn conditional_should_break_after_op(expr: &internal::Expression<'_>) -> bool {
-    if let internal::ExpressionKind::ConditionalExpression(cond) = &expr.kind {
+pub fn conditional_should_break_after_op(expr: &ast::Expression<'_>) -> bool {
+    if let ast::ExpressionKind::ConditionalExpression(cond) = &expr.kind {
         // Check if test is binaryish (BinaryExpression includes logical operators like &&, ||),
         // but exclude logical expressions with inline-able RHS (non-empty object/array).
         // Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`)
         // `isBinaryish(test) && !shouldInlineLogicalExpression(test)`
-        if let internal::ExpressionKind::BinaryExpression(binary) = &cond.test.kind {
+        if let ast::ExpressionKind::BinaryExpression(binary) = &cond.test.kind {
             !super::expressions::assignment::should_inline_logical_expression(binary)
         } else {
             false
@@ -176,9 +176,9 @@ pub fn conditional_should_break_after_op(expr: &internal::Expression<'_>) -> boo
 /// Strings with `\<newline>` need fluid layout because:
 /// 1. They span multiple lines in source
 /// 2. Prettier always wraps the declaration for these
-pub(crate) fn is_multiline_string_literal(expr: &internal::Expression<'_>, source: &str) -> bool {
-    if let internal::ExpressionKind::Literal(lit) = &expr.kind
-        && let internal::LiteralValue::String { .. } = &lit.value
+pub(crate) fn is_multiline_string_literal(expr: &ast::Expression<'_>, source: &str) -> bool {
+    if let ast::ExpressionKind::Literal(lit) = &expr.kind
+        && let ast::LiteralValue::String { .. } = &lit.value
     {
         let raw = lit.span.extract(source);
         // Check for line continuation: backslash followed by newline
@@ -225,7 +225,7 @@ pub(crate) enum PatternContext {
 /// - In function parameters: depth 3+ expands (e.g., {a: {b}} stays, {a: {b: {c}}} expands)
 /// - In standalone contexts: depth 2+ expands (e.g., {a: {b}} expands)
 pub(crate) fn object_pattern_should_expand(
-    obj: &internal::ObjectPattern<'_>,
+    obj: &ast::ObjectPattern<'_>,
     context: PatternContext,
 ) -> bool {
     let depth = pattern_nesting_depth(obj);
@@ -242,17 +242,17 @@ pub(crate) fn object_pattern_should_expand(
 /// Depth 1 = simple pattern like {a}
 /// Depth 2 = one level of nesting like {a: {b}}
 /// Depth 3 = two levels of nesting like {a: {b: {c}}}
-fn pattern_nesting_depth(obj: &internal::ObjectPattern<'_>) -> usize {
+fn pattern_nesting_depth(obj: &ast::ObjectPattern<'_>) -> usize {
     let mut max_depth = 1;
 
     for prop in obj.properties {
         match prop {
-            internal::ObjectPatternProperty::Property(p) => {
+            ast::ObjectPatternProperty::Property(p) => {
                 let nested_depth = match &p.value.kind {
-                    internal::ExpressionKind::ObjectPattern(nested_obj) => {
+                    ast::ExpressionKind::ObjectPattern(nested_obj) => {
                         1 + pattern_nesting_depth(nested_obj)
                     }
-                    internal::ExpressionKind::ArrayPattern(nested_arr) => {
+                    ast::ExpressionKind::ArrayPattern(nested_arr) => {
                         1 + array_pattern_nesting_depth(nested_arr)
                     }
                     // A property with a DEFAULT (`x: { y } = …`) does NOT count its
@@ -267,7 +267,7 @@ fn pattern_nesting_depth(obj: &internal::ObjectPattern<'_>) -> usize {
                 };
                 max_depth = max_depth.max(nested_depth);
             }
-            internal::ObjectPatternProperty::RestElement(_) => {}
+            ast::ObjectPatternProperty::RestElement(_) => {}
         }
     }
 
@@ -275,15 +275,13 @@ fn pattern_nesting_depth(obj: &internal::ObjectPattern<'_>) -> usize {
 }
 
 /// Calculate the maximum nesting depth of an array pattern
-fn array_pattern_nesting_depth(arr: &internal::ArrayPattern<'_>) -> usize {
+fn array_pattern_nesting_depth(arr: &ast::ArrayPattern<'_>) -> usize {
     let mut max_depth = 1;
 
     for elem in arr.elements.iter().flatten() {
         let nested_depth = match &elem.kind {
-            internal::ExpressionKind::ObjectPattern(nested_obj) => {
-                1 + pattern_nesting_depth(nested_obj)
-            }
-            internal::ExpressionKind::ArrayPattern(nested_arr) => {
+            ast::ExpressionKind::ObjectPattern(nested_obj) => 1 + pattern_nesting_depth(nested_obj),
+            ast::ExpressionKind::ArrayPattern(nested_arr) => {
                 1 + array_pattern_nesting_depth(nested_arr)
             }
             // A defaulted element (`[{ y } = …]`) doesn't count its nested pattern
@@ -300,7 +298,7 @@ fn array_pattern_nesting_depth(arr: &internal::ArrayPattern<'_>) -> usize {
 /// Check if a template literal contains newlines in its content
 ///
 /// Matches Prettier's `templateLiteralHasNewLines` function
-pub(crate) fn template_literal_has_newlines(template: &internal::TemplateLiteral<'_>) -> bool {
+pub(crate) fn template_literal_has_newlines(template: &ast::TemplateLiteral<'_>) -> bool {
     template.quasis.iter().any(|q| q.has_newline)
 }
 
@@ -308,12 +306,10 @@ pub(crate) fn template_literal_has_newlines(template: &internal::TemplateLiteral
 ///
 /// Combines the TemplateLiteral/TaggedTemplateExpression dispatch with the newline check.
 /// Used by call_formatting, new_expression, and arrow body formatting.
-pub(crate) fn is_multiline_template_expression(expr: &internal::Expression<'_>) -> bool {
+pub(crate) fn is_multiline_template_expression(expr: &ast::Expression<'_>) -> bool {
     match &expr.kind {
-        internal::ExpressionKind::TemplateLiteral(t) => template_literal_has_newlines(t),
-        internal::ExpressionKind::TaggedTemplateExpression(t) => {
-            template_literal_has_newlines(&t.quasi)
-        }
+        ast::ExpressionKind::TemplateLiteral(t) => template_literal_has_newlines(t),
+        ast::ExpressionKind::TaggedTemplateExpression(t) => template_literal_has_newlines(&t.quasi),
         _ => false,
     }
 }
@@ -322,18 +318,15 @@ pub(crate) fn is_multiline_template_expression(expr: &internal::Expression<'_>) 
 ///
 /// Needs the printer for the name-emission seam (span-identity source slices,
 /// arena-string escaped names).
-pub(crate) fn build_entity_name_doc(
-    printer: &Printer<'_>,
-    name: &internal::TSEntityName<'_>,
-) -> DocId {
+pub(crate) fn build_entity_name_doc(printer: &Printer<'_>, name: &ast::TSEntityName<'_>) -> DocId {
     match name {
-        internal::TSEntityName::Identifier(id) => printer.identifier_name_doc(id),
+        ast::TSEntityName::Identifier(id) => printer.identifier_name_doc(id),
         // A qualified name is a dotted pair, so both gaps around the `.` are positions an
         // author can comment in (`ns /* c */.Type`, `ns./* c */ Type`). The shared printer
         // emits them; concatenating the three pieces scans neither and drops what's there.
         // One printer serves every qualified name, so this reaches type references,
         // interface heritage, and import-equals module references alike.
-        internal::TSEntityName::QualifiedName(qn) => printer.build_dotted_pair_doc(
+        ast::TSEntityName::QualifiedName(qn) => printer.build_dotted_pair_doc(
             build_entity_name_doc(printer, &qn.left),
             printer.identifier_name_doc(&qn.right),
             qn.left.span().end,

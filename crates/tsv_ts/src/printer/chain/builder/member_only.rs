@@ -10,7 +10,7 @@ use super::super::printing::{
 use super::super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
 use crate::printer::Printer;
 
-use crate::ast::internal::{Expression, ExpressionKind};
+use crate::ast::{Expression, ExpressionKind};
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// True if a member-only chain has a line comment in any inter-member gap.

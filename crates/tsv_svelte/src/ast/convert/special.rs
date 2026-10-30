@@ -7,7 +7,7 @@
 //
 // The island comment attaches live in `comment_attachment.rs`.
 
-use crate::ast::internal;
+use crate::ast;
 use std::borrow::Cow;
 
 /// A script tag's `lang` attribute value, if it carries one (`<script lang="ts">` → `Some("ts")`,
@@ -22,19 +22,19 @@ use std::borrow::Cow;
 /// here is Svelte's own `this.ts`, which never builds an AST for the question: it runs a regex
 /// over the template text (`1-parse/index.js`, `lang=(["'])?([^"' >]+)`) and compares the
 /// captured bytes against `ts`. So `<script lang="&#116;s">` is NOT TypeScript to the wire,
-/// where the *formatting* question — `internal::lang_attribute`, the reader behind
-/// [`internal::EmbeddedLang::is_frozen`], which asks what language the body is in — decodes
+/// where the *formatting* question — `ast::lang_attribute`, the reader behind
+/// [`ast::EmbeddedLang::is_frozen`], which asks what language the body is in — decodes
 /// and calls the same spelling `ts`. Two questions, two readers, on
 /// purpose; `tests/fixtures/svelte/attributes/lang_entity` holds both answers.
-fn script_lang<'s>(script: &internal::Script<'_>, source: &'s str) -> Option<&'s str> {
+fn script_lang<'s>(script: &ast::Script<'_>, source: &'s str) -> Option<&'s str> {
     for attr_node in script.attributes {
-        let internal::AttributeNode::Attribute(attr) = attr_node else {
+        let ast::AttributeNode::Attribute(attr) = attr_node else {
             continue;
         };
         let name = attr.name(source);
         if name == "lang"
             && let Some(values) = &attr.value
-            && let Some(internal::AttributeValue::Text(text)) = values.first()
+            && let Some(ast::AttributeValue::Text(text)) = values.first()
         {
             return Some(text.raw(source));
         }
@@ -48,7 +48,7 @@ fn script_lang<'s>(script: &internal::Script<'_>, source: &'s str) -> Option<&'s
 /// (module *and* instance) emits the acorn-typescript wire shape. So a plain `<script>` alongside
 /// a `lang="ts"` sibling still emits `importKind`/`exportKind = "value"` and omits `attributes`.
 /// A `<script>` with no `lang` attribute doesn't decide; nor does `<style lang=…>`.
-pub(super) fn component_is_typescript(root: &internal::Root<'_>, source: &str) -> bool {
+pub(super) fn component_is_typescript(root: &ast::Root<'_>, source: &str) -> bool {
     // The two top-level scripts in source order — the first one carrying a `lang` decides.
     let mut scripts = [root.module, root.instance];
     scripts.sort_by_key(|s| s.map_or(u32::MAX, |script| script.span.start));
@@ -64,12 +64,12 @@ pub(super) fn component_is_typescript(root: &internal::Root<'_>, source: &str) -
 /// `pub(super)` so the wire-JSON writer reproduces `<svelte:options>` extraction
 /// (scalar props + `customElement`) without materializing a typed options struct.
 pub(super) fn find_option_values<'arena>(
-    attrs: &[internal::AttributeNode<'arena>],
+    attrs: &[ast::AttributeNode<'arena>],
     name: &str,
     source: &str,
-) -> Option<&'arena [internal::AttributeValue<'arena>]> {
+) -> Option<&'arena [ast::AttributeValue<'arena>]> {
     attrs.iter().find_map(|attr| {
-        if let internal::AttributeNode::Attribute(attr) = attr
+        if let ast::AttributeNode::Attribute(attr) = attr
             && attr.name(source) == name
         {
             attr.value
@@ -83,11 +83,11 @@ pub(super) fn find_option_values<'arena>(
 ///
 /// `pub(super)` — shared with the wire-JSON writer's fused `<svelte:options>`.
 pub(super) fn text_value<'src>(
-    values: &[internal::AttributeValue<'_>],
+    values: &[ast::AttributeValue<'_>],
     source: &'src str,
 ) -> Option<Cow<'src, str>> {
     values.iter().find_map(|v| {
-        if let internal::AttributeValue::Text(text) = v {
+        if let ast::AttributeValue::Text(text) = v {
             Some(text.data(source))
         } else {
             None
@@ -99,21 +99,20 @@ pub(super) fn text_value<'src>(
 ///
 /// `pub(super)` — shared with the wire-JSON writer's fused `<svelte:options>`.
 pub(super) fn bool_option(
-    attrs: &[internal::AttributeNode<'_>],
+    attrs: &[ast::AttributeNode<'_>],
     name: &str,
     source: &str,
 ) -> Option<bool> {
     attrs.iter().find_map(|attr| {
-        if let internal::AttributeNode::Attribute(attr) = attr
+        if let ast::AttributeNode::Attribute(attr) = attr
             && attr.name(source) == name
         {
             match &attr.value {
                 None => Some(true),
                 Some(values) => values.iter().find_map(|v| {
-                    if let internal::AttributeValue::ExpressionTag(expr) = v
-                        && let tsv_ts::ast::internal::ExpressionKind::Literal(lit) =
-                            &expr.expression.kind
-                        && let tsv_ts::ast::internal::LiteralValue::Boolean(b) = lit.value
+                    if let ast::AttributeValue::ExpressionTag(expr) = v
+                        && let tsv_ts::ast::ExpressionKind::Literal(lit) = &expr.expression.kind
+                        && let tsv_ts::ast::LiteralValue::Boolean(b) = lit.value
                     {
                         Some(b)
                     } else {

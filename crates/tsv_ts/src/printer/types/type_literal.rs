@@ -10,7 +10,7 @@ use super::super::CommentVec;
 use super::helpers::{TypeParenRule, outermost_paren, unwrap_parenthesized};
 use super::union_intersection::union_member_parens;
 use super::{Printer, StandaloneGlue};
-use crate::ast::internal::{
+use crate::ast::{
     TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
 };
 use crate::printer::{

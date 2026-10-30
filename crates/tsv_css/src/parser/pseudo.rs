@@ -3,7 +3,7 @@ use super::selectors::{
     NthTerminator, nth_arg_terminator, parse_complex_selector_list, parse_forgiving_selector_list,
     parse_relative_selector_list,
 };
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::is_boundary_whitespace;
 use tsv_lang::{ParseError, Span};

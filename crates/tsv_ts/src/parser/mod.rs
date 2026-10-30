@@ -1,7 +1,7 @@
 // TypeScript parser - main entry point and coordination
 
 use crate::Goal;
-use crate::ast::internal::*;
+use crate::ast::*;
 use crate::lexer::escapes::{LegacyEscape, find_legacy_escape};
 use crate::lexer::{KeywordKind, Lexer, LexerCheckpoint, Token, TokenKind, is_es_line_terminator};
 use crate::printer::ParenContext;

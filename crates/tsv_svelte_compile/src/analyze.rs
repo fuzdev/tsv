@@ -27,9 +27,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use tsv_ts::ast::internal::{
-    ArrowFunctionBody, BinaryOperator, Expression, ExpressionKind, UnaryOperator,
-};
+use tsv_ts::ast::{ArrowFunctionBody, BinaryOperator, Expression, ExpressionKind, UnaryOperator};
 
 use crate::{CompileError, Refusal};
 
@@ -327,7 +325,7 @@ const RUNE_KEYPATHS: &[&str] = &[
 /// matching the oracle's `get_rune` returning null for a bound root, without
 /// modeling the scope.
 pub(crate) fn rune_call_spread(
-    call: &tsv_ts::ast::internal::CallExpression<'_>,
+    call: &tsv_ts::ast::CallExpression<'_>,
     source: &str,
 ) -> Option<String> {
     let keypath = callee_keypath(call.callee, source)?;
@@ -616,11 +614,11 @@ fn all_numbers(eval: &Evaluation) -> bool {
 
 /// The cooked text of quasi `i` (decoded escapes), `None` for invalid escapes.
 fn quasi_cooked(
-    template: &tsv_ts::ast::internal::TemplateLiteral<'_>,
+    template: &tsv_ts::ast::TemplateLiteral<'_>,
     i: usize,
     source: &str,
 ) -> Option<String> {
-    use tsv_ts::ast::internal::TemplateCooked;
+    use tsv_ts::ast::TemplateCooked;
     let quasi = &template.quasis[i];
     match &quasi.cooked {
         TemplateCooked::Verbatim => Some(quasi.raw_span.extract(source).to_string()),
@@ -640,8 +638,8 @@ fn template_concat_value(value: &Value) -> Result<String, Gray> {
 }
 
 /// The literal's value in the ported domain.
-fn literal_value(lit: &tsv_ts::ast::internal::Literal<'_>, source: &str) -> EvalResult {
-    use tsv_ts::ast::internal::{LiteralValue, StringCooked};
+fn literal_value(lit: &tsv_ts::ast::Literal<'_>, source: &str) -> EvalResult {
+    use tsv_ts::ast::{LiteralValue, StringCooked};
     match &lit.value {
         LiteralValue::Number(n) => Ok(Evaluation::known(Value::Num(*n))),
         LiteralValue::Boolean(b) => Ok(Evaluation::known(Value::Bool(*b))),
@@ -828,7 +826,7 @@ pub(crate) fn pattern_binding_names(
     source: &str,
     out: &mut Vec<String>,
 ) -> Result<(), CompileError> {
-    use tsv_ts::ast::internal::{ObjectPatternProperty, ObjectProperty};
+    use tsv_ts::ast::{ObjectPatternProperty, ObjectProperty};
     match &pattern.kind {
         ExpressionKind::Identifier(id) => {
             if id.escaped_name.is_none() {
@@ -895,7 +893,7 @@ pub(crate) fn pattern_binding_names(
 /// keeps this from drifting out of step with `pattern_binding_names` — the two
 /// can only disagree in the safe direction.
 pub(crate) fn pattern_binds_unnameable_identifier(pattern: &Expression<'_>) -> bool {
-    use tsv_ts::ast::internal::{ObjectPatternProperty, ObjectProperty};
+    use tsv_ts::ast::{ObjectPatternProperty, ObjectProperty};
     match &pattern.kind {
         ExpressionKind::Identifier(id) => id.escaped_name.is_some(),
         ExpressionKind::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
@@ -1072,10 +1070,7 @@ pub(crate) fn is_inspect_call<'arena>(
 /// The plain (non-computed) identifier keypath of a callee: `$state`,
 /// `$state.raw` — one identifier or one member level.
 pub(crate) fn callee_keypath(callee: &Expression<'_>, source: &str) -> Option<String> {
-    fn plain_name<'s>(
-        id: &tsv_ts::ast::internal::Identifier<'_>,
-        source: &'s str,
-    ) -> Option<&'s str> {
+    fn plain_name<'s>(id: &tsv_ts::ast::Identifier<'_>, source: &'s str) -> Option<&'s str> {
         if id.escaped_name.is_some() {
             return None;
         }

@@ -76,9 +76,9 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
 
-use tsv_svelte::ast::internal::{Fragment, FragmentNode, Root};
-use tsv_ts::ast::internal::Statement;
-use tsv_ts::ast::internal::StatementKind;
+use tsv_svelte::ast::{Fragment, FragmentNode, Root};
+use tsv_ts::ast::Statement;
+use tsv_ts::ast::StatementKind;
 
 use crate::analyze::{Bindings, NameSet};
 use crate::attr_refs::each_child_fragment;
@@ -470,7 +470,7 @@ fn collect<'arena>(
 /// The import local names of an erased instance body — the subset of instance
 /// bindings that do not disqualify snippet hoisting. Mirrors `compile_server`.
 fn import_local_names(body: &[Statement<'_>], source: &str) -> NameSet {
-    use tsv_ts::ast::internal::ImportSpecifier;
+    use tsv_ts::ast::ImportSpecifier;
     body.iter()
         .filter_map(|stmt| match &stmt.kind {
             StatementKind::ImportDeclaration(import) => Some(import),

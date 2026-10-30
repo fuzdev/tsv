@@ -9,7 +9,7 @@ use super::super::symbols::SymbolFlags;
 use super::{ContainerKind, DeclInput, DeclMods, NodeKind, Scope, SymbolBinder};
 use crate::ids::NodeId;
 use tsv_lang::Span;
-use tsv_ts::ast::internal::{
+use tsv_ts::ast::{
     ExportDefaultValue, ExportSpecifier, Expression, ExpressionKind, ForInOfLeft, ForInit,
     Identifier, ImportSpecifier, ModuleExportName, ObjectPatternProperty, Statement, StatementKind,
     TSModuleDeclarationBody, TSModuleName,
@@ -198,7 +198,7 @@ impl<'a> SymbolBinder<'a> {
     #[inline]
     fn bind_class_statement(
         &mut self,
-        c: &tsv_ts::ast::internal::ClassDeclaration<'a>,
+        c: &tsv_ts::ast::ClassDeclaration<'a>,
         mods: DeclMods,
         skip_symbol: bool,
     ) {
@@ -216,7 +216,7 @@ impl<'a> SymbolBinder<'a> {
     #[inline]
     fn bind_enum_statement(
         &mut self,
-        e: &tsv_ts::ast::internal::TSEnumDeclaration<'a>,
+        e: &tsv_ts::ast::TSEnumDeclaration<'a>,
         span: Span,
         mods: DeclMods,
     ) {
@@ -236,7 +236,7 @@ impl<'a> SymbolBinder<'a> {
     #[inline]
     fn bind_type_alias_statement(
         &mut self,
-        t: &tsv_ts::ast::internal::TSTypeAliasDeclaration<'a>,
+        t: &tsv_ts::ast::TSTypeAliasDeclaration<'a>,
         span: Span,
         mods: DeclMods,
     ) {
@@ -256,7 +256,7 @@ impl<'a> SymbolBinder<'a> {
     #[inline]
     fn bind_import_equals_statement(
         &mut self,
-        ie: &tsv_ts::ast::internal::TSImportEqualsDeclaration<'a>,
+        ie: &tsv_ts::ast::TSImportEqualsDeclaration<'a>,
         span: Span,
     ) {
         let d = self.decl_from_ident(
@@ -276,7 +276,7 @@ impl<'a> SymbolBinder<'a> {
     #[inline]
     fn bind_export_named_statement(
         &mut self,
-        e: &tsv_ts::ast::internal::ExportNamedDeclaration<'a>,
+        e: &tsv_ts::ast::ExportNamedDeclaration<'a>,
         skip_symbol: bool,
     ) {
         if let Some(inner) = e.declaration {
@@ -296,7 +296,7 @@ impl<'a> SymbolBinder<'a> {
     }
 
     #[inline]
-    fn bind_for_statement(&mut self, s: &tsv_ts::ast::internal::ForStatement<'a>) {
+    fn bind_for_statement(&mut self, s: &tsv_ts::ast::ForStatement<'a>) {
         self.with_block_scope(|bd| {
             if let Some(init) = &s.init {
                 match init {
@@ -315,7 +315,7 @@ impl<'a> SymbolBinder<'a> {
     }
 
     #[inline]
-    fn bind_switch_statement(&mut self, s: &tsv_ts::ast::internal::SwitchStatement<'a>) {
+    fn bind_switch_statement(&mut self, s: &tsv_ts::ast::SwitchStatement<'a>) {
         self.visit_expression(s.discriminant);
         self.with_block_scope(|bd| {
             for case in s.cases {
@@ -328,7 +328,7 @@ impl<'a> SymbolBinder<'a> {
     }
 
     #[inline]
-    fn bind_try_statement(&mut self, s: &tsv_ts::ast::internal::TryStatement<'a>) {
+    fn bind_try_statement(&mut self, s: &tsv_ts::ast::TryStatement<'a>) {
         self.with_block_scope(|bd| bd.bind_statement_list(s.block.body, true));
         if let Some(h) = &s.handler {
             // The catch clause is a block scope holding the (block-scoped)
@@ -358,7 +358,7 @@ impl<'a> SymbolBinder<'a> {
     #[inline]
     fn bind_export_assignment_statement(
         &mut self,
-        ea: &tsv_ts::ast::internal::TSExportAssignment<'a>,
+        ea: &tsv_ts::ast::TSExportAssignment<'a>,
         span: Span,
     ) {
         // `export = x` — tsgo `bindExportAssignment` with `IsExportEquals`:
@@ -387,7 +387,7 @@ impl<'a> SymbolBinder<'a> {
         self.visit_expression(&ea.expression);
     }
 
-    fn bind_var_declaration(&mut self, decl: &tsv_ts::ast::internal::VariableDeclaration<'a>) {
+    fn bind_var_declaration(&mut self, decl: &tsv_ts::ast::VariableDeclaration<'a>) {
         let (includes, excludes, block_scoped) = var_flags(decl.kind);
         for d in decl.declarations {
             self.bind_binding(
@@ -415,7 +415,7 @@ impl<'a> SymbolBinder<'a> {
 
     fn bind_export_default(
         &mut self,
-        e: &tsv_ts::ast::internal::ExportDefaultDeclaration<'a>,
+        e: &tsv_ts::ast::ExportDefaultDeclaration<'a>,
         span: Span,
         skip_symbol: bool,
     ) {
@@ -670,7 +670,7 @@ impl<'a> SymbolBinder<'a> {
 
     // --- modules ---------------------------------------------------------------
 
-    fn bind_module(&mut self, m: &tsv_ts::ast::internal::TSModuleDeclaration<'a>, mods: DeclMods) {
+    fn bind_module(&mut self, m: &tsv_ts::ast::TSModuleDeclaration<'a>, mods: DeclMods) {
         // The module's own symbol (name = identifier, or `"name"` for ambient).
         let (name, display, span) = match &m.id {
             TSModuleName::Identifier(id) => {
@@ -799,10 +799,8 @@ impl<'a> SymbolBinder<'a> {
 /// A [`SymbolFlags`] triple for a variable declaration kind: `(includes,
 /// excludes, block_scoped)`. `block_scoped` selects `bindBlockScopedDeclaration`
 /// (block-scope routing) over `declareSymbolAndAddToSymbolTable` (container).
-fn var_flags(
-    kind: tsv_ts::ast::internal::VariableDeclarationKind,
-) -> (SymbolFlags, SymbolFlags, bool) {
-    use tsv_ts::ast::internal::VariableDeclarationKind as K;
+fn var_flags(kind: tsv_ts::ast::VariableDeclarationKind) -> (SymbolFlags, SymbolFlags, bool) {
+    use tsv_ts::ast::VariableDeclarationKind as K;
     match kind {
         // `var` is function-scoped (routes through the container).
         K::Var => (
@@ -842,7 +840,7 @@ fn el_span(el: &Expression<'_>) -> Span {
 /// specifier-only named exports (approximated as non-instantiated). Any value
 /// content — a var/function/class/enum, an `export =`/`export default`, an
 /// expression — makes it instantiated.
-fn module_instantiated(m: &tsv_ts::ast::internal::TSModuleDeclaration<'_>) -> bool {
+fn module_instantiated(m: &tsv_ts::ast::TSModuleDeclaration<'_>) -> bool {
     match &m.body {
         None => true,
         Some(TSModuleDeclarationBody::TSModuleDeclaration(nested)) => module_instantiated(nested),

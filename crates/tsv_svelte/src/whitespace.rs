@@ -8,7 +8,7 @@
 //! | question | class | where |
 //! | --- | --- | --- |
 //! | does this END A TOKEN / separate a keyword? (parse) | [`is_svelte_ws`] — JS `\s` | parser, lexer, and any printer read that MIRRORS one |
-//! | may a formatter add, drop or respell this without changing what RENDERS? | [`is_collapsible_ws`](crate::ast::internal::is_collapsible_ws) — `[ \t\n\r]` | printer text/fill |
+//! | may a formatter add, drop or respell this without changing what RENDERS? | [`is_collapsible_ws`](crate::ast::is_collapsible_ws) — `[ \t\n\r]` | printer text/fill |
 //!
 //! A third question is the DIFFERENCE of the two: which characters does the parse delete at the
 //! very end of the document (`template.trimEnd()`, JS `\s`) that the compiler renders
@@ -55,7 +55,7 @@
 //!   Rust's `char::is_whitespace`, and deliberately **wider** than either class above: it asks
 //!   "is this text node a separator rather than a word for the fill to pack", where an NBSP is
 //!   a separator and a `[ \t\n\r]` reading would call it prose.
-//! - `narrow_lang_value`'s trim (ast/internal.rs) is wider still — the UNION of JS `\s` and
+//! - `narrow_lang_value`'s trim (ast/mod.rs) is wider still — the UNION of JS `\s` and
 //!   Rust's `White_Space` — and mirrors no oracle at all: tsv's formattable-`lang` list is an
 //!   ALLOWLIST that the trim feeds, so widening can only route a name toward formatting, while
 //!   either class alone gives one witness away. Argued in full at that function.
@@ -81,7 +81,7 @@
 /// two ⚠️ traps (`char::is_whitespace()` differs in both directions; U+FEFF and U+0085 are
 /// the witnesses) live with the definition.
 ///
-/// ⚠️ Not [`is_collapsible_ws`](crate::ast::internal::is_collapsible_ws), the narrower render
+/// ⚠️ Not [`is_collapsible_ws`](crate::ast::is_collapsible_ws), the narrower render
 /// class (`[ \t\n\r]`). That one answers "may a formatter add, drop or respell this without
 /// changing what renders"; this one answers "does this end a token". A form feed is
 /// whitespace here and rendered content there.
@@ -197,13 +197,13 @@ pub(crate) fn brace_interior_start(source: &str, brace_pos: usize) -> usize {
 /// The parser reads `template.trimEnd()`, and JavaScript's trim class is ECMAScript `WhiteSpace`
 /// plus `LineTerminator` ([`is_svelte_ws`], JS `\s`). The compiler's own whitespace, the one
 /// that decides what renders, is only `[ \t\r\n]`
-/// ([`is_collapsible_ws_char`](crate::ast::internal::is_collapsible_ws_char)) — so the
+/// ([`is_collapsible_ws_char`](crate::ast::is_collapsible_ws_char)) — so the
 /// difference is a set of characters that render as text anywhere but at the very end of the
 /// source: `<VT>`, `<FF>`, U+00A0, U+FEFF, the other `Zs` spaces, U+2028 and U+2029. Not Rust's
 /// `char::is_whitespace`, which lacks U+FEFF and adds U+0085; and nothing in the C1 range, which
 /// Svelte's character-reference decoder remaps through windows-1252, is ever a member.
 pub(crate) fn is_end_trimmed_content(c: char) -> bool {
-    is_svelte_ws(c) && !crate::ast::internal::is_collapsible_ws_char(c)
+    is_svelte_ws(c) && !crate::ast::is_collapsible_ws_char(c)
 }
 
 #[cfg(test)]

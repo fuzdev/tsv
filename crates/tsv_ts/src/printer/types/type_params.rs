@@ -8,7 +8,7 @@ use super::helpers::{TypeParenRule, is_simple_type_arg, unwrap_parenthesized};
 use super::{
     BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, ShiftRescan, TrailingBlock,
 };
-use crate::ast::internal::{
+use crate::ast::{
     self, TSType, TSTypeParameter, TSTypeParameterDeclaration, TSTypeParameterModifier,
 };
 use crate::printer::AssumedBreak;
@@ -710,7 +710,7 @@ impl<'a> Printer<'a> {
     /// ```
     pub(in crate::printer) fn build_type_parameter_instantiation_doc(
         &self,
-        inst: &internal::TSTypeParameterInstantiation<'_>,
+        inst: &ast::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
         let d = self.d();
         if inst.params.is_empty() {
@@ -814,7 +814,7 @@ impl<'a> Printer<'a> {
     /// `has_comments` is the caller's whole-`<…>` window answer.
     pub(in crate::printer) fn sole_nullable_reference_union_routes(
         &self,
-        args: &internal::TSTypeParameterInstantiation<'_>,
+        args: &ast::TSTypeParameterInstantiation<'_>,
         has_comments: bool,
     ) -> bool {
         args.params.len() == 1
@@ -841,7 +841,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn after_operator_nullable_union_doc(
         &self,
         value_doc: DocId,
-        args: Option<&internal::TSTypeParameterInstantiation<'_>>,
+        args: Option<&ast::TSTypeParameterInstantiation<'_>>,
     ) -> Option<DocId> {
         let value_broken = self.value_with_nullable_union_broken(value_doc, args?)?;
         Some(after_operator_head_gated(self.d(), value_doc, value_broken))
@@ -858,7 +858,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn after_operator_value_nullable_union_doc(
         &self,
         value_doc: DocId,
-        value: &internal::Expression<'_>,
+        value: &ast::Expression<'_>,
     ) -> Option<DocId> {
         if self.nullable_union_type_args.borrow().is_empty() {
             return None;
@@ -877,9 +877,9 @@ impl<'a> Printer<'a> {
     /// than two calls) keeps its caller's layout
     /// ([`Self::value_with_nullable_union_broken`]).
     pub(in crate::printer) fn value_type_arguments<'v>(
-        value: &'v internal::Expression<'v>,
-    ) -> Option<&'v internal::TSTypeParameterInstantiation<'v>> {
-        use internal::ExpressionKind as Kind;
+        value: &'v ast::Expression<'v>,
+    ) -> Option<&'v ast::TSTypeParameterInstantiation<'v>> {
+        use ast::ExpressionKind as Kind;
         // A loop down the chain, not a recursion: a chain is as long as the spine limit lets
         // it be, and a frame per link is what the stack contract prices. The innermost list
         // wins — the head's own, else the innermost call's on the way down — so `found`
@@ -1153,7 +1153,7 @@ impl<'a> Printer<'a> {
     /// first.
     fn sole_type_arg_hug<'t>(
         &self,
-        inst: &internal::TSTypeParameterInstantiation<'t>,
+        inst: &ast::TSTypeParameterInstantiation<'t>,
         has_comments: bool,
     ) -> Option<SoleTypeArgHug<'t>> {
         let [ty] = inst.params else {
@@ -1193,7 +1193,7 @@ impl<'a> Printer<'a> {
     /// break.
     pub(in crate::printer) fn sole_type_arg_hug_break(
         &self,
-        inst: &internal::TSTypeParameterInstantiation<'_>,
+        inst: &ast::TSTypeParameterInstantiation<'_>,
     ) -> Option<AssumedBreak> {
         let has_comments = self.has_comments_on_page_between(inst.span.start, inst.span.end);
         if self.type_arguments_force_expansion(inst, has_comments) {
@@ -1221,9 +1221,9 @@ impl<'a> Printer<'a> {
 /// How a sole type argument hugs its `<…>` ([`Printer::sole_type_arg_hug`]).
 enum SoleTypeArgHug<'t> {
     /// An object type literal, hugging `<{` with its own width-aware group.
-    TypeLiteral(&'t internal::TSTypeLiteral<'t>),
+    TypeLiteral(&'t ast::TSTypeLiteral<'t>),
     /// A mapped type, hugging `<{` the same way.
-    Mapped(&'t internal::TSMappedType<'t>),
+    Mapped(&'t ast::TSMappedType<'t>),
     /// A hugged union (`{…} | null`), inlined atomically.
     Union(&'t TSType<'t>),
 }

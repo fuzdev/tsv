@@ -2004,7 +2004,7 @@ export interface Element {
  */
 export interface SpecialElement {
 	/**
-	 * The closed set `internal::SpecialElementKind::node_type` emits — spelled as a literal
+	 * The closed set `ast::SpecialElementKind::node_type` emits — spelled as a literal
 	 * union rather than `string` so consumers narrow on it, and so the wire-type coverage
 	 * arm of `scripts/check_ast_types.ts` can see these names declared.
 	 */
