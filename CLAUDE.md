@@ -119,7 +119,8 @@ deno task doctor         # one-pass setup check: runtimes, pins + checkout align
 deno task typecheck      # cargo check
 deno task typecheck:features # cargo check of each binding crate (tsv_wasm/tsv_ffi/tsv_napi) under each single feature,
 #                          then the three language crates without the `locations` feature tsv_cli/tsv_debug unify in —
-#                          per-package builds `cargo check --workspace` and clippy's `--all-features` both miss; in `check`
+#                          per-package builds `cargo check --workspace` and clippy's `--all-features` both miss; then
+#                          `tsv_svelte` with `smallvec/union` (a feature a consumer's graph can turn on; lib only); in `check`
 deno task typecheck:js   # deno check over the bench harness, scripts/ + the tsv_debug sidecar. NOT in `check` (node_modules)
 deno task typecheck:packages # the STAGED npm packages' .d.ts as a consumer compiles them: lean consumer modules + every
 #                          ts/js README block (checkJs) through the `exports` map (strict, nodenext + bundler; wasm
