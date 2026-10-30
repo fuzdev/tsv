@@ -313,7 +313,7 @@ macro_rules! parse_internal {
 /// [`parse_ast!`]'s **format-path** twin, over the folded document
 /// (`tsv_lang::printing::FoldedSource`): it calls the language's `parse_folded`, which maps
 /// a parse error back onto the caller's own source — and, for Svelte, refuses the one lone
-/// `<CR>` the fold cannot rewrite without changing meaning (`tsv_svelte::parse_folded`).
+/// `<CR>` the fold cannot rewrite without changing meaning (`tsv_svelte::__private::parse_folded`).
 /// The goal arrives as an `Option`, and an unset one means "no source type named" rather
 /// than `Module`.
 ///
@@ -334,13 +334,13 @@ macro_rules! parse_internal {
 #[macro_export]
 macro_rules! parse_ast_for_format {
     (goal, $lang:ident, $folded:expr, $goal:expr, $arena:expr) => {
-        $lang::parse_folded($folded, $goal, $arena)
+        $lang::__private::parse_folded($folded, $goal, $arena)
     };
     (nogoal, $lang:ident, $folded:expr, $goal:expr, $arena:expr) => {{
         // Consume the (always-unset) goal so the binding stays used in every
         // expansion.
         let _ = $goal;
-        $lang::parse_folded($folded, $arena)
+        $lang::__private::parse_folded($folded, $arena)
     }};
 }
 
@@ -371,7 +371,7 @@ macro_rules! parse_format {
             let ast = $crate::parse_ast_for_format!($goalness, $lang, &folded, $goal, arena)
                 .map_err($map_err)?;
             Ok($crate::with_doc_arena(|doc_arena| {
-                $lang::format_folded_in(&ast, &folded, doc_arena)
+                $lang::__private::format_folded_in(&ast, &folded, doc_arena)
             }))
         })
     }};
@@ -546,19 +546,23 @@ mod tests {
         pub fn parse_with_goal(source: &str, goal: &str, arena: &str) -> String {
             format!("parse_with_goal({source}, {goal}, {arena})")
         }
-        /// The goal-axis language's format-path parse (`tsv_ts::parse_folded`).
-        pub fn parse_folded(folded: &str, goal: Option<&str>, arena: &str) -> String {
-            match goal {
-                Some(goal) => format!("exact({folded}, {goal}, {arena})"),
-                None => format!("fallback({folded}, {arena})"),
+        pub mod __private {
+            /// The goal-axis language's format-path parse (`tsv_ts::__private::parse_folded`).
+            pub fn parse_folded(folded: &str, goal: Option<&str>, arena: &str) -> String {
+                match goal {
+                    Some(goal) => format!("exact({folded}, {goal}, {arena})"),
+                    None => format!("fallback({folded}, {arena})"),
+                }
             }
         }
     }
 
     /// A goalless language (Svelte, CSS): its format-path parse takes no goal at all.
     mod fake_goalless_lang {
-        pub fn parse_folded(folded: &str, arena: &str) -> String {
-            format!("parse_folded({folded}, {arena})")
+        pub mod __private {
+            pub fn parse_folded(folded: &str, arena: &str) -> String {
+                format!("parse_folded({folded}, {arena})")
+            }
         }
     }
 

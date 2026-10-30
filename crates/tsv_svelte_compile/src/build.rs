@@ -1,7 +1,7 @@
 //! Synthetic `tsv_ts` AST construction over the **hybrid appendix buffer**.
 //!
 //! The compiler generates JS by constructing `tsv_ts` internal-AST nodes and
-//! printing them through the existing printer (`tsv_ts::format_canonical`).
+//! printing them through the existing printer (`tsv_ts::__private::format_canonical`).
 //! That printer recovers most leaf text by slicing spans out of its `source`
 //! argument, so the generator maintains a *buffer* = the host `.svelte` source
 //! followed by an **appendix** of minted lexemes:

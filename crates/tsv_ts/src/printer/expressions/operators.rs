@@ -2940,7 +2940,7 @@ mod tests {
     /// Run `should_group_binary_continuation` on a parsed binary expression.
     fn group(src: &str) -> bool {
         let arena = bumpalo::Bump::new();
-        let expr = crate::parse_expression_with_comments(src, 0, 0, &arena, |_| Ok(()))
+        let expr = crate::__private::parse_expression_with_comments(src, 0, 0, &arena, |_| Ok(()))
             .expect("expression should parse")
             .0;
         match expr {

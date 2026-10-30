@@ -390,7 +390,8 @@ pub struct ClassDirective<'arena> {
 /// When shorthand (`style:color`), value is `true` (boolean).
 #[derive(Debug, Clone)]
 pub struct StyleDirective<'arena> {
-    /// Span of the CSS property name only (e.g. "color") — verbatim source slice (see `OnDirective`).
+    /// Span of the CSS property name only (e.g. "color") — verbatim source slice (see
+    /// `OnDirective`).
     pub name_span: Span,
     pub value: StyleDirectiveValue<'arena>, // true, ExpressionTag, or mixed text/expressions
     pub modifiers: &'arena [&'arena str],   // "important"
@@ -1531,7 +1532,8 @@ pub struct SpreadAttribute<'arena> {
 /// - `Attribute`: Standard `name="value"` or `name={expr}` attributes (including shorthand `{a}`)
 /// - `SpreadAttribute`: `{...obj}` spreads object properties as attributes
 /// - `AttachTag`: `{@attach expr}` attachments (Svelte 5.29+)
-/// - Directives: `on:`, `bind:`, `class:`, `style:`, `use:`, `transition:`, `in:`, `out:`, `animate:`, `let:`
+/// - Directives: `on:`, `bind:`, `class:`, `style:`, `use:`, `transition:`, `in:`, `out:`,
+///   `animate:`, `let:`
 #[derive(Debug, Clone)]
 pub enum AttributeNode<'arena> {
     Attribute(Attribute<'arena>),

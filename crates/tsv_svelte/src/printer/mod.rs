@@ -489,10 +489,10 @@ pub(crate) struct Printer<'a> {
     /// forget it.
     fragment_depth: Cell<usize>,
     /// The CSS printer's boundary-whitespace precondition over this whole document
-    /// (`tsv_css::HostBoundaryScan`), taken on the first `<style>` island that asks and
+    /// (`tsv_css::__private::HostBoundaryScan`), taken on the first `<style>` island that asks and
     /// shared by every other — one whole-source scan per component, however many nested
     /// `<style>` elements it holds. [`Printer::css_host_scan`] is the one reader.
-    css_host_scan_cache: Cell<Option<tsv_css::HostBoundaryScan>>,
+    css_host_scan_cache: Cell<Option<tsv_css::__private::HostBoundaryScan>>,
     /// Span starts of control-flow blocks the root fragment marked as part of a **single-line
     /// inline run** (`{x}{#if c}…{/if}` with no newline). The unified
     /// [`Printer::build_nodes_doc_multiline`] builds these in inline context (long body
@@ -644,7 +644,7 @@ impl<'a> Printer<'a> {
     ///
     /// `line_breaks` is the document's one whole-source line table: every embedded island
     /// borrows it (`build_program_doc` for `<script>`/`{expr}` TS,
-    /// `tsv_css::format_embedded_in` for `<style>` CSS) — never re-classify per island.
+    /// `tsv_css::__private::format_embedded_in` for `<style>` CSS) — never re-classify per island.
     /// Its table, if a line question ever falls back to it, fills the arena-parked scratch
     /// (one warm table across a multi-file driver's files); `into_string` parks it back.
     /// The caller takes it (`format_svelte_in` classifies the source; the folded entry
@@ -659,11 +659,11 @@ impl<'a> Printer<'a> {
     ) -> Self {
         // The two document-level presence flags come from the one scan `tsv_ts` owns
         // (`PrinterInputs::for_document`); `ts_inputs()` copies them per island.
-        let tsv_ts::PrinterInputs {
+        let tsv_ts::__private::PrinterInputs {
             has_owned_comments,
             has_format_ignore,
             ..
-        } = tsv_ts::PrinterInputs::for_document(source, comments, line_breaks.table());
+        } = tsv_ts::__private::PrinterInputs::for_document(source, comments, line_breaks.table());
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
@@ -744,13 +744,13 @@ impl<'a> Printer<'a> {
         self.indent_level + self.fragment_depth.get()
     }
 
-    /// This document's [`tsv_css::HostBoundaryScan`], scanned on first use — see
+    /// This document's `tsv_css::__private::HostBoundaryScan`, scanned on first use — see
     /// [`Printer::css_host_scan_cache`].
-    pub(crate) fn css_host_scan(&self) -> tsv_css::HostBoundaryScan {
+    pub(crate) fn css_host_scan(&self) -> tsv_css::__private::HostBoundaryScan {
         if let Some(scan) = self.css_host_scan_cache.get() {
             return scan;
         }
-        let scan = tsv_css::HostBoundaryScan::of(self.source);
+        let scan = tsv_css::__private::HostBoundaryScan::of(self.source);
         self.css_host_scan_cache.set(Some(scan));
         scan
     }
@@ -852,7 +852,7 @@ impl<'a> Printer<'a> {
             return doc;
         };
         let d = self.d();
-        let comment_doc = tsv_ts::build_comment_doc(d, comment, &self.ts_inputs());
+        let comment_doc = tsv_ts::__private::build_comment_doc(d, comment, &self.ts_inputs());
         let separator = if tsv_lang::printing::has_newline_between_scan(
             self.source.as_bytes(),
             self.line_table(),
@@ -926,7 +926,7 @@ impl<'a> Printer<'a> {
             // keys included ([`Self::build_ts_expression_doc`]).
             self.plain_source_span_doc(path)
         } else {
-            tsv_ts::build_expression_doc(self.d(), expr, &self.ts_inputs(), *embed)
+            tsv_ts::__private::build_expression_doc(self.d(), expr, &self.ts_inputs(), *embed)
         }
     }
 
@@ -968,9 +968,10 @@ impl<'a> Printer<'a> {
     /// The tag's own layout (`build_assignment_tag_doc`) is prettier's assignment layout, so
     /// the value owes the position-keyed rules an assignment value owes: an inlining logical
     /// chain with earlier operators indents them rather than sitting flat at the tag's column
-    /// (`tsv_ts::build_assignment_value_expression_doc`, whose doc states the contract).
-    /// `{const}`/`{let}` reach the same rules through `tsv_ts::build_variable_declaration_doc`,
-    /// which marks the position itself — the two tags print one shape and must agree on it.
+    /// (`tsv_ts::__private::build_assignment_value_expression_doc`, whose doc states the contract).
+    /// `{const}`/`{let}` reach the same rules through
+    /// `tsv_ts::__private::build_variable_declaration_doc`, which marks the position itself — the
+    /// two tags print one shape and must agree on it.
     ///
     /// The frozen arm is deliberately shared with the plain head: an honored directive emits
     /// the author's bytes, where no layout rule applies.
@@ -984,7 +985,7 @@ impl<'a> Printer<'a> {
         if frozen {
             self.build_frozen_node_doc(expr.span())
         } else {
-            tsv_ts::build_assignment_value_expression_doc(
+            tsv_ts::__private::build_assignment_value_expression_doc(
                 self.d(),
                 expr,
                 &self.ts_inputs(),
@@ -1045,7 +1046,7 @@ impl<'a> Printer<'a> {
     /// comment's own line and there is nothing to indent. A gap holding only blocks is
     /// `Inline`.
     /// The far end of a braced head's leading-comment gap: the value's **printed** start
-    /// ([`tsv_ts::expression_printed_start`]), which is its span start advanced past every
+    /// (`tsv_ts::__private::expression_printed_start`), which is its span start advanced past every
     /// grouping paren the TS printer strips off its left spine.
     ///
     /// The one spelling of that end, because three seams read this gap and a shell run reaches
@@ -1062,7 +1063,7 @@ impl<'a> Printer<'a> {
     /// comment a second time. The two axes are the point: this asks what occupies the page,
     /// the emitter asks what it must print.
     pub(in crate::printer) fn head_gap_end(&self, value: &Expression<'_>) -> u32 {
-        tsv_ts::expression_printed_start(self.d(), value, &self.ts_inputs())
+        tsv_ts::__private::expression_printed_start(self.d(), value, &self.ts_inputs())
     }
 
     pub(in crate::printer) fn head_layout(
@@ -1365,14 +1366,14 @@ impl<'a> Printer<'a> {
         self.line_breaks.table()
     }
 
-    /// Standard [`tsv_ts::PrinterInputs`] for embedding TypeScript: this
+    /// Standard `tsv_ts::__private::PrinterInputs` for embedding TypeScript: this
     /// document's source, comments, and line breaks — and this printer's comment-free
     /// window, which the island takes at construction and hands back when it finishes.
     /// A call site that overrides `comments` (`PrinterInputs { comments: &[], .. }`) is
     /// handing the island a different array and must clear `comment_free_window` too: a
     /// window is a fact about one array, and `take_from` asserts as much in a debug build.
-    pub(crate) fn ts_inputs(&self) -> tsv_ts::PrinterInputs<'_> {
-        tsv_ts::PrinterInputs {
+    pub(crate) fn ts_inputs(&self) -> tsv_ts::__private::PrinterInputs<'_> {
+        tsv_ts::__private::PrinterInputs {
             source: self.source,
             comments: self.comments,
             line_table: self.line_table(),

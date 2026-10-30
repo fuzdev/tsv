@@ -18,7 +18,7 @@
 //! annotation's span. This is a **Svelte-only** convention: acorn-typescript anchors its own
 //! `TSTypeAnnotation` at the colon (`function f(a : number)` starts the node at the `:`), and
 //! tsv matches it there — which is why the re-anchor lives at
-//! `tsv_ts::attach_pattern_type_annotation`, the attach point only the two Svelte block
+//! `tsv_ts::__private::attach_pattern_type_annotation`, the attach point only the two Svelte block
 //! readers call, rather than in the shared type parser.
 //!
 //! **Why a test rather than a fixture.** Both formatters collapse `e : T` to `e: T`, so a

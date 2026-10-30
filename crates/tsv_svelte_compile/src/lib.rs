@@ -9,7 +9,7 @@
 //!
 //! [`compile`] generates server (SSR) output by constructing a synthetic
 //! `tsv_ts` AST over the hybrid appendix buffer (`build`) and printing it
-//! through `tsv_ts::format_canonical` — generated JS is canonical-form by
+//! through `tsv_ts::__private::format_canonical` — generated JS is canonical-form by
 //! construction, so the parity comparison verifies rather than transforms it.
 //! The server transform (`transform_server`) covers a deliberately small
 //! language subset today; unhandled shapes surface as
@@ -206,7 +206,7 @@ pub enum CanonicalizeError {
 ///
 /// Parses `source` (surfacing any real parse error as [`CompileError::Parse`])
 /// and runs the server transform. The generated JS is already in canonical form
-/// (it prints through `tsv_ts::format_canonical`), so
+/// (it prints through `tsv_ts::__private::format_canonical`), so
 /// `canonicalize_js(output.js)` is a fixed point. Client generation and dev
 /// mode are not implemented yet ([`CompileError::Unsupported`]).
 ///
@@ -278,8 +278,8 @@ pub fn canonicalize_js(source: &str) -> Result<String, CanonicalizeError> {
     // folded text, so it is mapped back onto the caller's source before it leaves.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse_folded(&folded, Some(Goal::Module), &arena)?;
-    let output = tsv_ts::format_canonical(&program, folded.text());
+    let program = tsv_ts::__private::parse_folded(&folded, Some(Goal::Module), &arena)?;
+    let output = tsv_ts::__private::format_canonical(&program, folded.text());
     let check_arena = bumpalo::Bump::new();
     if let Err(err) = tsv_ts::parse_with_goal(&output, Goal::Module, &check_arena) {
         return Err(CanonicalizeError::CorruptOutput(err));

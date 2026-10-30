@@ -180,7 +180,7 @@ impl<'a> Printer<'a> {
     /// match, "preserved verbatim, not dedented"). The leading and trailing builders'
     /// comments are JS-*expression* comments instead, which prettier either reindents
     /// (leading) or drops outright (trailing — no oracle, so tsv answers with the
-    /// `<script>` twin's form): those route through `tsv_ts::build_comment_doc` and
+    /// `<script>` twin's form): those route through `tsv_ts::__private::build_comment_doc` and
     /// never reach this.
     ///
     /// ⚠️ **A line comment must reach the doc as ONE node**, which is why this returns a
@@ -190,7 +190,7 @@ impl<'a> Printer<'a> {
     /// `text("//") + content` — presents nothing for it to tag, and every `//`
     /// this crate prints goes unguarded. Spelling, not intent, decides whether an emitter
     /// is instrumented; keep new emitters on this function or on
-    /// `tsv_ts::build_comment_doc`, whose line arm is the same instrumented node.
+    /// `tsv_ts::__private::build_comment_doc`, whose line arm is the same instrumented node.
     ///
     /// A block comment's whole span is verbatim `/*…*/` for the same reason the content
     /// slice was: the delimiters are source bytes, not synthesized.
@@ -206,7 +206,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a leading JS comment (before content), with what follows the comment
     /// in hand — `next_start`, the next comment of the run or the value.
     ///
-    /// The comment's own text comes from `tsv_ts::build_comment_doc` — the *same*
+    /// The comment's own text comes from `tsv_ts::__private::build_comment_doc` — the *same*
     /// rendering the owned path uses (`prepend_owned_leading_comment`) — so a JS comment
     /// in an expression value formats exactly as it would in a `<script>` block. For a
     /// single-line block or a `//` that is the identical verbatim node this builder used
@@ -240,7 +240,7 @@ impl<'a> Printer<'a> {
         next_start: u32,
     ) -> DocId {
         let d = self.d();
-        let doc = tsv_ts::build_comment_doc(d, comment, &self.ts_inputs());
+        let doc = tsv_ts::__private::build_comment_doc(d, comment, &self.ts_inputs());
         if comment.is_block && self.leading_js_comment_glued(comment) {
             return d.concat(&[doc, d.text(" ")]);
         }
@@ -312,7 +312,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a trailing JS comment (after content), before a closing
     /// `}` / `)` / ` as ` token emitted by the caller.
     ///
-    /// The comment's own text comes from `tsv_ts::build_comment_doc`, exactly as in
+    /// The comment's own text comes from `tsv_ts::__private::build_comment_doc`, exactly as in
     /// [`Self::build_leading_js_comment_doc_before`] — for single-line payloads the identical
     /// verbatim node, and for the **multi-line block** the `<script>` twin's form:
     /// TypeScript formatting is context-free, so a `*`-aligned interior reindents to
@@ -379,7 +379,11 @@ impl<'a> Printer<'a> {
         if !starts_line {
             parts.push(d.text(" "));
         }
-        parts.push(tsv_ts::build_comment_doc(d, comment, &self.ts_inputs()));
+        parts.push(tsv_ts::__private::build_comment_doc(
+            d,
+            comment,
+            &self.ts_inputs(),
+        ));
         if !comment.is_block {
             parts.push(if dedent_break {
                 d.dedent(d.hardline())
@@ -1582,15 +1586,15 @@ impl<'a> Printer<'a> {
     /// The docs of a function binding's operands, each the ordinary value stage under the
     /// host's embed ([`Self::build_head_value_doc`]) — the operand is measured where it
     /// sits — except that every operand `tsv_ts` builds is built by one printer
-    /// ([`tsv_ts::build_bare_sequence_operand_docs`]), so the comma-list region rules reach
-    /// across the operands as they reach a sequence's. An operand `frozen_at` names prints
-    /// as its frozen slice, and a plain path as its own bytes.
+    /// (`tsv_ts::__private::build_bare_sequence_operand_docs`), so the comma-list region rules
+    /// reach across the operands as they reach a sequence's. An operand `frozen_at` names prints as
+    /// its frozen slice, and a plain path as its own bytes.
     fn build_bind_operand_docs(
         &self,
         seq: &tsv_ts::ast::SequenceExpression<'_>,
         frozen_at: impl Fn(usize) -> bool,
     ) -> Vec<DocId> {
-        let built = tsv_ts::build_bare_sequence_operand_docs(
+        let built = tsv_ts::__private::build_bare_sequence_operand_docs(
             self.d(),
             seq,
             &self.ts_inputs(),
@@ -1696,7 +1700,7 @@ impl<'a> Printer<'a> {
         // A value that takes the host's clarity pair already opens on its `(`.
         if site == TagSite::Text
             && !Self::value_takes_clarity_parens(tag.expression)
-            && tsv_ts::leading_regex_start(tag.expression)
+            && tsv_ts::__private::leading_regex_start(tag.expression)
                 .is_some_and(|start| !self.has_comments_on_page_between(tag.span.start + 1, start))
         {
             head.doc = d.concat(&[d.text("("), head.doc, d.text(")")]);

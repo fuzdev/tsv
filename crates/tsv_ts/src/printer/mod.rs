@@ -84,7 +84,7 @@ use needs_parens::{
 };
 use types::unwrap_parenthesized;
 
-use crate::PrinterInputs;
+use crate::__private::PrinterInputs;
 use crate::ast;
 use std::cell::{Cell, RefCell};
 use tsv_lang::{
@@ -332,7 +332,7 @@ pub struct Printer<'a> {
     /// Backs every newline-derived **layout** read: blank-line preservation
     /// (`has_blank_line_between`) and expansion intent (`has_newline_between`); every
     /// such read goes through those two wrappers, nothing reads the table directly.
-    /// The canonical reprint path ([`crate::format_canonical`]) erases this table via
+    /// The canonical reprint path (`crate::__private::format_canonical`) erases this table via
     /// [`Self::set_canonical`] so those reads collapse (nothing is "on a new line", no
     /// blank lines), erasing authoring intent.
     ///
@@ -351,7 +351,7 @@ pub struct Printer<'a> {
     /// `layout_line_breaks`; they diverge only under [`Self::set_canonical`].
     pub(crate) comment_line_breaks: LineTable<'a>,
     /// Whether this printer is producing the intent-erased *canonical* reprint
-    /// (see [`crate::format_canonical`]).
+    /// (see `crate::__private::format_canonical`).
     ///
     /// Gates the direct source-newline scans — the ones that read `self.source`
     /// instead of a line-break table (type-literal brace + first member, own-line
@@ -557,7 +557,7 @@ pub struct Printer<'a> {
     /// included, because the host has no operator line to end and the hardline would
     /// strand the `(` at the head's own column ([`Printer::build_comment_bound_pair_lead_doc`]).
     ///
-    /// Set once per expression entry (`tsv_ts::build_expression_doc` →
+    /// Set once per expression entry (`tsv_ts::__private::build_expression_doc` →
     /// [`Printer::mark_jsdoc_cast_cannot_hang_gap`]) on the value's **left-spine** cast —
     /// the one whose comment leads the value, the same `leading_comment_bound_pair` walk the TS
     /// hang predicates use — and never touched during the walk, unlike
@@ -929,7 +929,7 @@ pub struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer borrowing the given arena, [`PrinterInputs`], and
+    /// Create a new printer borrowing the given arena, `PrinterInputs`, and
     /// embedding context.
     ///
     /// `buffer_capacity` pre-sizes the output buffer: the source length for the
@@ -1758,7 +1758,7 @@ impl<'a> Printer<'a> {
     ///
     /// Example: `Map<string, Array<number>>` - Map has 2 params, second has nested generic
     pub(crate) fn id_has_complex_type_annotation(&self, expr: &ast::Expression<'_>) -> bool {
-        crate::pattern_type_annotation(expr)
+        crate::__private::pattern_type_annotation(expr)
             .is_some_and(|ann| self.type_has_complex_annotation(ann.type_annotation))
     }
 
@@ -3051,7 +3051,13 @@ impl<'a> Printer<'a> {
                 }
             }
             if let Some(past) = skip_trivia(source, i, end, TriviaProfile::JS) {
-                anchor.skipped_trivia(source, i, past, start as usize, crate::OPERAND_GRAMMAR);
+                anchor.skipped_trivia(
+                    source,
+                    i,
+                    past,
+                    start as usize,
+                    crate::__private::OPERAND_GRAMMAR,
+                );
                 i = past;
                 continue;
             }
@@ -3072,8 +3078,12 @@ impl<'a> Printer<'a> {
                 // paren. The scan reaches the literal's OPENING `/` first, whose
                 // next byte is never `/` or `*`, so `skip_trivia` can't claim it.
                 b'/' => {
-                    if anchor.starts_regex(source, i, start as usize, crate::OPERAND_GRAMMAR)
-                        && let Some(past) = skip_regex_literal(source, i, end)
+                    if anchor.starts_regex(
+                        source,
+                        i,
+                        start as usize,
+                        crate::__private::OPERAND_GRAMMAR,
+                    ) && let Some(past) = skip_regex_literal(source, i, end)
                     {
                         i = past;
                         anchor.skipped_operand(i);

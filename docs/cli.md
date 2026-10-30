@@ -232,7 +232,7 @@ the rest of its line as markup. (A CR with only whitespace after it, as in a dou
 `CR CR LF` ending, ends the comment where the fold does, and formats.) The message names the
 CR's `line:col`; `parse` accepts the same bytes. It is a per-file error (exit 2) like any
 other, and in the packages a returned `{kind: 'refused', message, frame, start, end, loc}`
-error spanning the CR rather than a `kind: 'parse'` one (`tsv_svelte::parse_folded`). A
+error spanning the CR rather than a `kind: 'parse'` one (`tsv_svelte::__private::parse_folded`). A
 document whose own bytes do not parse reports that parse error first, exactly as `parse` does.
 
 ## Stripping types (`tsv strip`)

@@ -556,10 +556,10 @@ impl Printer<'_> {
 
     /// `doc` inside the pair a comma-list region keeps around a **bare** list's operand
     /// `expr` — an operand its host prints without a sequence's pair, through
-    /// [`crate::build_bare_sequence_operand_docs`]: the authored pair around a node holding
-    /// a comparison ([`Self::wrap_relational_sibling_pair`]), and the authored pair around
-    /// an assignment operand inside the region, which a sequence prints as the pair of its
-    /// own style and the region rules leave to the source (`(x = a < b), c > (d, e)`;
+    /// `crate::__private::build_bare_sequence_operand_docs`: the authored pair around a node
+    /// holding a comparison ([`Self::wrap_relational_sibling_pair`]), and the authored pair around
+    /// an assignment operand inside the region, which a sequence prints as the pair of its own
+    /// style and the region rules leave to the source (`(x = a < b), c > (d, e)`;
     /// [`Self::mark_region_source_pairs`]).
     pub(crate) fn wrap_bare_list_operand(&self, expr: &Expression<'_>, doc: DocId) -> DocId {
         if matches!(expr.kind, ExpressionKind::AssignmentExpression(_))

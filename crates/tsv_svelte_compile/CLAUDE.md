@@ -1435,7 +1435,7 @@ non-dev), `CompileOutput { js, css, warnings }`, `CompileWarning { code, message
 ## The Canonicalizer Contract
 
 `canonicalize_js` parses JS as a strict module (`tsv_ts::Goal::Module`)
-and reprints it through `tsv_ts::format_canonical`, which erases newline-derived
+and reprints it through `tsv_ts::__private::format_canonical`, which erases newline-derived
 *authoring intent*:
 
 - **blank lines are dropped** between statements;

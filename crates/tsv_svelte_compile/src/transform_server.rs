@@ -1244,22 +1244,22 @@ pub(crate) fn compile_server<'arena>(
     // three fresh-arena `format_canonical` calls. `env.b.buffer` is not mutated
     // between the calls, so one immutable borrow spans all three.
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(&env.b.buffer);
-    let mut js = tsv_ts::format_canonical_in(&import_program, &env.b.buffer, &doc_arena);
+    let mut js = tsv_ts::__private::format_canonical_in(&import_program, &env.b.buffer, &doc_arena);
     if let Some(hoisted_program) = &hoisted_program {
-        js.push_str(&tsv_ts::format_canonical_in(
+        js.push_str(&tsv_ts::__private::format_canonical_in(
             hoisted_program,
             &env.b.buffer,
             &doc_arena,
         ));
     }
     if let Some(module_program) = &module_program {
-        js.push_str(&tsv_ts::format_canonical_in(
+        js.push_str(&tsv_ts::__private::format_canonical_in(
             module_program,
             &env.b.buffer,
             &doc_arena,
         ));
     }
-    js.push_str(&tsv_ts::format_canonical_in(
+    js.push_str(&tsv_ts::__private::format_canonical_in(
         &export_program,
         &env.b.buffer,
         &doc_arena,

@@ -162,7 +162,7 @@ pub fn write_pattern_embedded(
     env: EmbedWriter<'_>,
 ) {
     let mut ctx = Ctx::from_embed(env);
-    if let Some(ann) = crate::pattern_type_annotation(expr) {
+    if let Some(ann) = crate::__private::pattern_type_annotation(expr) {
         ctx.pattern_ann_span = ann.span;
     }
     match &expr.kind {
@@ -1234,7 +1234,7 @@ mod tests {
         let source = "/* c */ name";
         let arena = bumpalo::Bump::new();
         let (expression, comments) =
-            crate::parse_expression_with_comments(source, 0, 0, &arena, |_| Ok(()))
+            crate::__private::parse_expression_with_comments(source, 0, 0, &arena, |_| Ok(()))
                 .expect("parses");
         let ast::ExpressionKind::Identifier(id) = &expression.kind else {
             panic!("an identifier expected");

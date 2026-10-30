@@ -17,7 +17,7 @@
 //! interner lifetime.
 
 #[cfg(feature = "convert")]
-pub mod convert;
+pub(crate) mod convert;
 pub mod precedence;
 
 mod classes;

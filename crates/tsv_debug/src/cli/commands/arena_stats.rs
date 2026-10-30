@@ -226,14 +226,16 @@ fn run_reuse(files: &[std::path::PathBuf], list_errors: bool) -> Result<(), CliE
         // the shipped format path: fold, parse the folded text, format it
         let folded = tsv_lang::printing::normalize_carriage_returns(&source);
         let formatted = match parser {
-            ParserType::TypeScript => tsv_ts::parse_folded(&folded, None, &bump).map(|ast| {
-                let _ = tsv_ts::format_folded_in(&ast, &folded, a);
+            ParserType::TypeScript => {
+                tsv_ts::__private::parse_folded(&folded, None, &bump).map(|ast| {
+                    let _ = tsv_ts::__private::format_folded_in(&ast, &folded, a);
+                })
+            }
+            ParserType::Svelte => tsv_svelte::__private::parse_folded(&folded, &bump).map(|ast| {
+                let _ = tsv_svelte::__private::format_folded_in(&ast, &folded, a);
             }),
-            ParserType::Svelte => tsv_svelte::parse_folded(&folded, &bump).map(|ast| {
-                let _ = tsv_svelte::format_folded_in(&ast, &folded, a);
-            }),
-            ParserType::Css => tsv_css::parse_folded(&folded, &bump).map(|ast| {
-                let _ = tsv_css::format_folded_in(&ast, &folded, a);
+            ParserType::Css => tsv_css::__private::parse_folded(&folded, &bump).map(|ast| {
+                let _ = tsv_css::__private::format_folded_in(&ast, &folded, a);
             }),
         }
         .map_err(|e| format!("{e}"));
@@ -308,16 +310,16 @@ fn collect_file(source: &str, parser: ParserType, stats: &mut Stats) -> Result<(
     let parse_error = |e: tsv_lang::ParseError| format!("{e}");
     let output = match parser {
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse_folded(&folded, None, &bump).map_err(parse_error)?;
-            tsv_ts::format_folded_in(&ast, &folded, &arena)
+            let ast = tsv_ts::__private::parse_folded(&folded, None, &bump).map_err(parse_error)?;
+            tsv_ts::__private::format_folded_in(&ast, &folded, &arena)
         }
         ParserType::Svelte => {
-            let ast = tsv_svelte::parse_folded(&folded, &bump).map_err(parse_error)?;
-            tsv_svelte::format_folded_in(&ast, &folded, &arena)
+            let ast = tsv_svelte::__private::parse_folded(&folded, &bump).map_err(parse_error)?;
+            tsv_svelte::__private::format_folded_in(&ast, &folded, &arena)
         }
         ParserType::Css => {
-            let ast = tsv_css::parse_folded(&folded, &bump).map_err(parse_error)?;
-            tsv_css::format_folded_in(&ast, &folded, &arena)
+            let ast = tsv_css::__private::parse_folded(&folded, &bump).map_err(parse_error)?;
+            tsv_css::__private::format_folded_in(&ast, &folded, &arena)
         }
     };
     stats.output_bytes += output.len() as u64;

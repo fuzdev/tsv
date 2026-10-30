@@ -558,8 +558,9 @@ fn an_embedded_parse_reports_the_further_error_too() {
     // An expression island's parser is built by another constructor than a document's.
     let arena = bumpalo::Bump::new();
     let source = "fn(a < b, c + d > (e)";
-    let error = tsv_ts::parse_expression_with_comments(source, 100, 0, &arena, |_| Ok(()))
-        .expect_err("the island must not parse");
+    let error =
+        tsv_ts::__private::parse_expression_with_comments(source, 100, 0, &arena, |_| Ok(()))
+            .expect_err("the island must not parse");
     // past the `)`, in the host's coordinates — not at the `+` the list stopped on
     assert_eq!(error.position(), Some(100 + source.len()));
 }

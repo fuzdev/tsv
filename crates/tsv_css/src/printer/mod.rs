@@ -116,7 +116,7 @@ impl<'a> Printer<'a> {
     /// level or nested in markup) is spanned against — so a U+FEFF at its offset 0 is a
     /// byte-order mark, and an island's content never sits there. `holds_boundary_ws` is
     /// [`source_holds_boundary_ws`] over that whole `source` — taken by the caller so a host
-    /// with several islands scans once (`crate::HostBoundaryScan`).
+    /// with several islands scans once (`crate::__private::HostBoundaryScan`).
     pub(crate) fn with_embed(
         arena: &'a DocArena,
         source: &'a str,
@@ -1332,7 +1332,7 @@ pub(crate) fn format_css_embedded_in(
     source: &str,
     line_table: LineTable<'_>,
     embed: EmbedContext,
-    host_scan: crate::HostBoundaryScan,
+    host_scan: crate::__private::HostBoundaryScan,
     arena: &DocArena,
 ) -> String {
     // Render at the host's final indentation directly (fold `base_indent_offset`

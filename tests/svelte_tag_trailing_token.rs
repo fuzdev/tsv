@@ -9,7 +9,7 @@
 //! a pattern. Svelte enforces this with `eat('}', true)`; a token left over after the
 //! expression/pattern is a hard error ("Expected token }").
 //!
-//! tsv routes the expression callers through `tsv_ts::parse_expression_with_comments`,
+//! tsv routes the expression callers through `tsv_ts::__private::parse_expression_with_comments`,
 //! which once returned without checking it had reached the end of its slice — so a
 //! trailing token was silently DROPPED (`{@html a b}` → `{@html a}`, `<p>{a b}</p>` →
 //! `<p>{a}</p>`). That is content loss, not a divergence, and it is fuzzer-invisible: the

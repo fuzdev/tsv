@@ -14,7 +14,7 @@ acorn-typescript reads the head past its separator — `(b as A) as item` is one
 `b as A` ends before its `)`, and the head expression — a `LogicalExpression`, then a
 `ConditionalExpression` — gets an `end` inside its own source. Its `loc.end` is not touched
 at all and stays past the binding, the separate each-`as` stale `loc.end` correction. tsv
-reads the separator directly (`tsv_ts::TopLevelAs`) and never unwinds, so the head ends at
+reads the separator directly (`tsv_ts::__private::TopLevelAs`) and never unwinds, so the head ends at
 its last token, the `)`. See
 [conformance_svelte.md §Svelte Template Corrections](../../../../../../docs/conformance_svelte.md#svelte-template-corrections-corpus-enforced).
 

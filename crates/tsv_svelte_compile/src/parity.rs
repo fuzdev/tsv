@@ -123,8 +123,8 @@ pub fn compare_canonical(ours: &str, oracle: &str) -> Parity {
     oracle_program.comments = &[];
     ours_program.body = without_comment_bound_pairs(&ours_arena, ours, ours_program.body);
     oracle_program.body = without_comment_bound_pairs(&oracle_arena, oracle, oracle_program.body);
-    let ours_code = tsv_ts::format_canonical(&ours_program, ours);
-    let oracle_code = tsv_ts::format_canonical(&oracle_program, oracle);
+    let ours_code = tsv_ts::__private::format_canonical(&ours_program, ours);
+    let oracle_code = tsv_ts::__private::format_canonical(&oracle_program, oracle);
     if ours_code == oracle_code {
         Parity::CommentPosition
     } else {

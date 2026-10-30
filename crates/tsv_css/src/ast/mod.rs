@@ -1,7 +1,7 @@
 // CSS AST modules
 
 #[cfg(feature = "convert")]
-pub mod convert;
+pub(crate) mod convert;
 
 // Internal AST - CSS-specific types optimized for traversal and manipulation
 //

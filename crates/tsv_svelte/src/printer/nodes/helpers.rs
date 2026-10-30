@@ -20,12 +20,12 @@ use tsv_ts::{Expression, ExpressionKind};
 ///
 /// A word that can start an expression there — the `{#each}` block's `as`, a shorthand
 /// `{#await}` block's `then` — makes a head that prints ending on an instantiation's closing
-/// `>` take a pair ([`tsv_ts::prints_ending_on_instantiation_close`]): acorn-typescript, the
-/// parser Svelte reads the head with, gives up a type argument list ahead of a same-line
-/// word that starts an expression, so a bare `{#each f<T> as item}` is the comparison
-/// `f < T > as` and does not parse. A shorthand `{#await}` block's `catch` starts none, so it
-/// joins nothing to the close (`{#await f<T> catch e}` keeps its list for every parser).
-/// The constructors are the one statement of which heads are followed by such a word.
+/// `>` take a pair (`tsv_ts::__private::prints_ending_on_instantiation_close`): acorn-typescript,
+/// the parser Svelte reads the head with, gives up a type argument list ahead of a same-line word
+/// that starts an expression, so a bare `{#each f<T> as item}` is the comparison `f < T > as` and
+/// does not parse. A shorthand `{#await}` block's `catch` starts none, so it joins nothing to the
+/// close (`{#await f<T> catch e}` keeps its list for every parser). The constructors are the one
+/// statement of which heads are followed by such a word.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum HeadTail {
     /// The head's own syntax continues with a word that can start an expression.
@@ -402,7 +402,12 @@ impl<'a> Printer<'a> {
         let inputs = self.ts_inputs();
         let docs: DocBuf = run
             .iter()
-            .flat_map(|c| [tsv_ts::build_comment_doc(d, c, &inputs), d.text(" ")])
+            .flat_map(|c| {
+                [
+                    tsv_ts::__private::build_comment_doc(d, c, &inputs),
+                    d.text(" "),
+                ]
+            })
             .collect();
         d.concat(&docs)
     }
@@ -668,7 +673,12 @@ impl<'a> Printer<'a> {
             return pattern;
         };
         let d = self.d();
-        let tail = tsv_ts::build_type_annotation_doc(d, annotation, &self.ts_inputs(), self.embed);
+        let tail = tsv_ts::__private::build_type_annotation_doc(
+            d,
+            annotation,
+            &self.ts_inputs(),
+            self.embed,
+        );
         d.concat(&[pattern, tail])
     }
 
@@ -680,7 +690,7 @@ impl<'a> Printer<'a> {
     /// `//`, a multi-line block, or a block the author put on its own line opens the twin
     /// (`const P = x`) one entry per line; the same comment opens the block pattern the same
     /// way, through the twin's own builder
-    /// ([`tsv_ts::build_block_pattern_broken_doc`]), so the delimiter-line rule, the
+    /// (`tsv_ts::__private::build_block_pattern_broken_doc`), so the delimiter-line rule, the
     /// element-comma seam, the author blanks and the `: T` tail are the twin's by
     /// construction. Every other pattern stays on one line — at any width, and whatever it
     /// nests — which is how prettier-plugin-svelte keeps these heads, and is the one twin rule
@@ -694,14 +704,15 @@ impl<'a> Printer<'a> {
         if matches!(
             expr.kind,
             ExpressionKind::ObjectPattern(_) | ExpressionKind::ArrayPattern(_)
-        ) && !self.gap_known_comment_free(expr.span.start, tsv_ts::pattern_binding_end(expr))
-            && let Some(doc) = tsv_ts::build_block_pattern_broken_doc(
-                self.d(),
-                expr,
-                &self.ts_inputs(),
-                self.embed,
-            )
-        {
+        ) && !self.gap_known_comment_free(
+            expr.span.start,
+            tsv_ts::__private::pattern_binding_end(expr),
+        ) && let Some(doc) = tsv_ts::__private::build_block_pattern_broken_doc(
+            self.d(),
+            expr,
+            &self.ts_inputs(),
+            self.embed,
+        ) {
             return doc;
         }
         self.build_pattern_doc(expr)
@@ -961,12 +972,13 @@ impl<'a> Printer<'a> {
         }
         // The instantiation pair and the assignment clarity pair are exclusive: the walk
         // never descends into an assignment, so at most one of the two wraps the head.
-        let expr_doc =
-            if tail == HeadTail::Keyword && tsv_ts::prints_ending_on_instantiation_close(expr) {
-                d.parens(inner_doc)
-            } else {
-                self.wrap_value_clarity_parens(expr, inner_doc)
-            };
+        let expr_doc = if tail == HeadTail::Keyword
+            && tsv_ts::__private::prints_ending_on_instantiation_close(expr)
+        {
+            d.parens(inner_doc)
+        } else {
+            self.wrap_value_clarity_parens(expr, inner_doc)
+        };
 
         // Apply remove_lines() only in INLINE contexts to prevent the condition
         // from being the first thing to break when there's other content on the line.

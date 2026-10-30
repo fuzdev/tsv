@@ -1721,7 +1721,7 @@ fn get_chain_base_start<'a>(mut expr: &'a Expression<'a>) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::PrinterInputs;
+    use crate::__private::PrinterInputs;
     use crate::ast::{CallExpression, Identifier, MemberExpression};
     use bumpalo::Bump;
     use tsv_lang::doc::arena::DocArena;

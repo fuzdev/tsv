@@ -1254,12 +1254,12 @@ impl<'a> Printer<'a> {
         let host_nesting = self.nested_raw_text_nesting.get();
         let body = match kind {
             RawTextKind::Script => {
-                tsv_ts::parse_embedded(&content, base_offset, host_nesting, &arena)
+                tsv_ts::__private::parse_embedded(&content, base_offset, host_nesting, &arena)
                     .ok()
                     .and_then(|program| self.build_nested_script_body_doc(&program))
             }
             RawTextKind::Style => {
-                tsv_css::parse_embedded(&content, base_offset, host_nesting, &arena)
+                tsv_css::__private::parse_embedded(&content, base_offset, host_nesting, &arena)
                     .ok()
                     .and_then(|stylesheet| self.build_nested_style_body_doc(&stylesheet))
             }
@@ -1289,7 +1289,7 @@ impl<'a> Printer<'a> {
     }
 
     /// The body doc of a `<script>` nested in markup: the program's own doc
-    /// (`tsv_ts::build_program_body_doc`), embedded in this document's doc so the host's
+    /// (`tsv_ts::__private::build_program_body_doc`), embedded in this document's doc so the host's
     /// renderer indents it — which indents only the breaks the TS printer owns, leaving the
     /// newlines inside verbatim text (a template literal's quasis, a non-indentable block
     /// comment's interior, a `prettier-ignore` slice) at the columns the author gave them,
@@ -1308,7 +1308,7 @@ impl<'a> Printer<'a> {
             self.source,
             &tsv_lang::merge_nestled_block_comments(self.source, program.comments),
         );
-        tsv_ts::build_program_body_doc(
+        tsv_ts::__private::build_program_body_doc(
             self.d(),
             program,
             self.source,
@@ -1321,11 +1321,11 @@ impl<'a> Printer<'a> {
     ///
     /// The CSS printer writes its output rather than building one doc, so the body cannot
     /// ride this document's indentation the way a nested `<script>` does. It is formatted
-    /// the way the top-level `<style>` is instead (`tsv_css::format_embedded_in`), at the
-    /// indent level it is expected to render at — [`Printer::body_indent_level`], read while
-    /// this element's parent fragment is being built — so width is measured from that column
-    /// and verbatim text (a comment's interior, an escaped-newline string, a raw at-rule
-    /// prelude) keeps its column.
+    /// the way the top-level `<style>` is instead (`tsv_css::__private::format_embedded_in`), at
+    /// the indent level it is expected to render at — [`Printer::body_indent_level`], read while
+    /// this element's parent fragment is being built — so width is measured from that column and
+    /// verbatim text (a comment's interior, an escaped-newline string, a raw at-rule prelude) keeps
+    /// its column.
     ///
     /// That level is a count of the fragments open around the element, not the column the
     /// element renders at. The two agree wherever the parent lays its content out block-style —
@@ -1352,7 +1352,7 @@ impl<'a> Printer<'a> {
                 base_indent_offset: level,
                 ..tsv_lang::EmbedContext::default()
             };
-            tsv_css::format_embedded_in(
+            tsv_css::__private::format_embedded_in(
                 stylesheet,
                 self.source,
                 self.line_table(),

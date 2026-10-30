@@ -73,11 +73,16 @@ impl<'a> Printer<'a> {
         let decl = &tag.declaration;
         // The gap is named by `tsv_ts`, not spelled here: it is the same range the statement
         // path claims, and the two claimants must agree on it exactly.
-        let gap = tsv_ts::declaration_terminator_gap(decl);
+        let gap = tsv_ts::__private::declaration_terminator_gap(decl);
         // `closer_owns_break` is false: this run is emitted at the tag's own level, outside
         // whatever `indent(…)` the declarator list built, so a `//`'s own `hardline` is
         // already the break the `;}` needs.
-        let inner = tsv_ts::build_variable_declaration_doc(d, decl, &self.ts_inputs(), self.embed);
+        let inner = tsv_ts::__private::build_variable_declaration_doc(
+            d,
+            decl,
+            &self.ts_inputs(),
+            self.embed,
+        );
         // The declaration is the island's value: a run it defers to its own end flushes
         // ahead of the gap's run, as the gap's own comment would print there.
         let trailing = self.value_trailing_docs(inner, decl.span, gap.start, gap.end, false);
@@ -116,7 +121,7 @@ impl<'a> Printer<'a> {
     /// Prettier formats these as an AssignmentExpression, using its assignment
     /// layout to decide whether to break at `=`. Layouts:
     /// - a curried chain stacked under a gap comment: `tsv_ts` builds the whole ` = …`
-    ///   side (`tsv_ts::build_stacked_curried_chain_rhs_doc`)
+    ///   side (`tsv_ts::__private::build_stacked_curried_chain_rhs_doc`)
     /// - break-after-operator: `{… id =\n\tinit}` (group with line at `=`)
     /// - a chain whose heads force the break: `{… id =\n\tinit}` (mandatory)
     /// - will_break: `{… id = init}` (init has hardlines, keep together)
@@ -136,7 +141,7 @@ impl<'a> Printer<'a> {
 
         // Both questions below scan the `=` gap forward from the binding, so they anchor past
         // its `: T` — which `id_doc` has already printed, and which the bare span excludes.
-        let binding_end = tsv_ts::pattern_binding_end(id);
+        let binding_end = tsv_ts::__private::pattern_binding_end(id);
 
         // The layout verdict is taken BEFORE the init is built, because it is also the
         // [`Printer::trailing_comment_docs`] `closer_owns_break` answer: only the
@@ -167,7 +172,7 @@ impl<'a> Printer<'a> {
         // run-final `//` breaks for the `}` at the tag's column (`closer_owns_break`).
         let operator_pos = self.assignment_operator_pos(binding_end);
         if !frozen
-            && let Some(rhs) = tsv_ts::build_stacked_curried_chain_rhs_doc(
+            && let Some(rhs) = tsv_ts::__private::build_stacked_curried_chain_rhs_doc(
                 d,
                 init,
                 &self.ts_inputs(),
@@ -195,7 +200,7 @@ impl<'a> Printer<'a> {
         // prints the run, so the value is built with none of it — only what it owns — and
         // the value sits inside the arm's indent with the `}` one level out.
         if !frozen
-            && let Some(rhs) = tsv_ts::build_broke_after_operator_rhs_doc(
+            && let Some(rhs) = tsv_ts::__private::build_broke_after_operator_rhs_doc(
                 d,
                 init,
                 &self.ts_inputs(),
@@ -211,25 +216,24 @@ impl<'a> Printer<'a> {
         }
 
         // Every other curried chain owns its break-after-`=` itself
-        // (`tsv_ts::build_assignment_value_expression_doc`), and heads that force the break
-        // take it after the `=`, mandatorily, and stack under it. The chain is handed the gap
-        // wherever the value owns that break: a comment-free gap, or a run of single-line
-        // blocks, which the chain prints behind the break, leading the first head — whether
-        // the chain owns that break or its heads force it, as in a `<script>`. The run the
-        // author gave a line of its own, and a preserved multi-line block, are placed by this
-        // tag instead (above the value, or glued ahead of it on the `=` line), and the chain
-        // stands where that placement puts it, in its default shape — prettier's form for
-        // both.
+        // (`tsv_ts::__private::build_assignment_value_expression_doc`), and heads that force the
+        // break take it after the `=`, mandatorily, and stack under it. The chain is handed the gap
+        // wherever the value owns that break: a comment-free gap, or a run of single-line blocks,
+        // which the chain prints behind the break, leading the first head — whether the chain owns
+        // that break or its heads force it, as in a `<script>`. The run the author gave a line of
+        // its own, and a preserved multi-line block, are placed by this tag instead (above the
+        // value, or glued ahead of it on the `=` line), and the chain stands where that placement
+        // puts it, in its default shape — prettier's form for both.
         let mut gap_comments = self
             .comments_on_page_between(binding_end, gap_end)
             .peekable();
         let chain_takes_gap = gap_comments.peek().is_none()
-            || tsv_ts::is_curried_arrow_chain(init)
+            || tsv_ts::__private::is_curried_arrow_chain(init)
                 && !gap_comments.any(|c| c.is_block && c.multiline);
         let value_gap_start =
             (!break_after_op && !frozen && chain_takes_gap).then_some(binding_end);
-        let chain_breaks_after_op =
-            value_gap_start.is_some() && tsv_ts::curried_chain_breaks_after_operator(init);
+        let chain_breaks_after_op = value_gap_start.is_some()
+            && tsv_ts::__private::curried_chain_breaks_after_operator(init);
 
         // Build init with LayoutMode::Standalone so a ROOT binary init is NOT forced onto
         // ContinuationIndent by the embedded-root question. The init is an assignment
@@ -341,13 +345,15 @@ impl<'a> Printer<'a> {
             // RHS handles its own expansion: `= item || { ... }` not `=\n  item || {}`
             // Prettier ref: `shouldBreakAfterOperator`'s
             // `isBinaryish && !shouldInlineLogicalExpression`
-            ExpressionKind::BinaryExpression(bin) => !tsv_ts::should_inline_logical_expression(bin),
+            ExpressionKind::BinaryExpression(bin) => {
+                !tsv_ts::__private::should_inline_logical_expression(bin)
+            }
             ExpressionKind::SequenceExpression(_) => true,
             // Conditionals break only when the test is binary (and not inline
             // logical); simple identifier tests (e.g., `cond ? a : b`) use fluid
             // layout. False for every other expression type.
             // Prettier ref: `shouldBreakAfterOperator`'s conditional arm (assignment.js)
-            _ => tsv_ts::conditional_should_break_after_op(expr),
+            _ => tsv_ts::__private::conditional_should_break_after_op(expr),
         }
     }
 
@@ -365,8 +371,8 @@ impl<'a> Printer<'a> {
     /// the window).
     ///
     /// `value_gap_start` is the caller's other layout verdict, which only a curried chain
-    /// reads (`tsv_ts::build_assignment_value_expression_doc`): `Some` hands the chain the
-    /// binding→value gap, so the gap's comments are the value's to print and this builder
+    /// reads (`tsv_ts::__private::build_assignment_value_expression_doc`): `Some` hands the chain
+    /// the binding→value gap, so the gap's comments are the value's to print and this builder
     /// prints none of them.
     ///
     /// `closer_owns_break` is the caller's layout verdict, forwarded to

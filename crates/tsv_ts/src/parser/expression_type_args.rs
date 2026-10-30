@@ -2051,7 +2051,7 @@ fn type_arg_head_grade(bytes: &[u8], pos: usize, region: Region, scan: TypeArgSc
         // quote-to-quote trivia scan would mis-pair backticks across a nested
         // `` `${`x`}` ``), then the same follow-token question.
         b'`' => HeadGrade::Operand {
-            end: skip_template_literal(bytes, pos, bytes.len(), crate::OPERAND_GRAMMAR),
+            end: skip_template_literal(bytes, pos, bytes.len(), crate::__private::OPERAND_GRAMMAR),
             kind: OperandEnd::Other,
         },
 

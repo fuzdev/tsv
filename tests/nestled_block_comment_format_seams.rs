@@ -11,8 +11,8 @@
 //! - `tsv_ts::format_document_in` — a standalone `.ts` / `.js` document;
 //! - `tsv_ts`'s `with_program_printer` — a Svelte `<script>` body, which takes the island's
 //!   own `Program.comments` rather than the host printer's array. Two entry points share
-//!   it: `tsv_ts::build_program_doc` and `tsv_ts::build_program_body_doc` (a `<script>`
-//!   nested in markup);
+//!   it: `tsv_ts::__private::build_program_doc` and `tsv_ts::__private::build_program_body_doc` (a
+//!   `<script>` nested in markup);
 //! - `tsv_svelte`'s `format_root` — the host printer and every template `{expr}` island it
 //!   constructs (`ts_inputs`), which share `Root.comments`.
 //!

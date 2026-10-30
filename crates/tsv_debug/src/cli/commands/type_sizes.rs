@@ -31,7 +31,7 @@
 //! enumerates a module's types at compile time. It is mechanical to refresh:
 //!
 //! ```sh
-//! grep -h "^pub enum \|^pub struct " crates/tsv_ts/src/ast/*.rs \
+//! grep -h "^pub enum \|^pub struct " $(ls crates/tsv_ts/src/ast/*.rs | grep -v precedence) \
 //!   | sed "s/^pub \(enum\|struct\) \([A-Za-z0-9_]*\)\(<'[a-z]*>\)\?.*/\2\3/"
 //! ```
 //!

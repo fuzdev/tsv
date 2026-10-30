@@ -26,7 +26,7 @@
  *
  * Beside the table, the one format **refusal** of a source that parses: a lone CR inside a
  * Svelte in-tag `//` comment, which the format path's CR fold would end early
- * (`tsv_svelte::parse_folded`). The source is valid Svelte, so the refusal is an error of
+ * (`tsv_svelte::__private::parse_folded`). The source is valid Svelte, so the refusal is an error of
  * its own kind, `'refused'`, spanning the CR — never the `'parse'` a parse failure is.
  */
 

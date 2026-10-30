@@ -868,13 +868,12 @@ impl<'a> Printer<'a> {
     ///
     /// `terminator` is `None` for an embedder that supplies its own — Svelte's
     /// `{const …}` / `{let …}` tags, which close with `}` and own both the `;` and the
-    /// gap before it (`tsv_ts::build_variable_declaration_doc`). It is one argument rather
-    /// than a `bool` beside a [`TerminatorGap`] because the two were never independent:
-    /// with no `;` emitted the gap has no claimant here, and pairing them let the gap's
-    /// comments be dropped outright (`{let a /* c */;}`).
-    /// [`Self::build_variable_declaration_doc`] for an EMBEDDED declaration — a Svelte
-    /// `{const …}` / `{let …}` tag, reached through `tsv_ts::build_variable_declaration_doc`
-    /// rather than from a statement list.
+    /// gap before it (`tsv_ts::__private::build_variable_declaration_doc`). It is one argument
+    /// rather than a `bool` beside a [`TerminatorGap`] because the two were never independent: with
+    /// no `;` emitted the gap has no claimant here, and pairing them let the gap's comments be
+    /// dropped outright (`{let a /* c */;}`). [`Self::build_variable_declaration_doc`] for an
+    /// EMBEDDED declaration — a Svelte `{const …}` / `{let …}` tag, reached through
+    /// `tsv_ts::__private::build_variable_declaration_doc` rather than from a statement list.
     ///
     /// It exists so the public entry names the answer instead of passing one, which also
     /// keeps [`TerminatorGap`] inside the printer: the host closes with `}` and owns both
@@ -1215,9 +1214,9 @@ impl<'a> Printer<'a> {
         //
         // `None` emits neither, for a host that closes with a delimiter of its own — the
         // three placements above all put the comment where such a host's closer cannot
-        // follow it ([`crate::build_variable_declaration_doc`]).
+        // follow it (`crate::__private::build_variable_declaration_doc`).
         if let Some(gap) = terminator {
-            let terminator_gap = crate::declaration_terminator_gap(decl);
+            let terminator_gap = crate::__private::declaration_terminator_gap(decl);
             self.push_statement_semicolon(
                 &mut parts,
                 tail_gap_start.unwrap_or(terminator_gap.start),

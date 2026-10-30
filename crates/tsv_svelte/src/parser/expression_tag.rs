@@ -177,23 +177,21 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 /// A thin wrapper over `tsv_lang::source_scan::scan_to_matching_brace` (the shared
 /// expression-context balanced-brace scanner, which the `${…}` template-interpolation
 /// skip also uses) with `end = bytes.len()` and the answers to the operand ends bytes
-/// cannot settle (`tsv_ts::ACORN_ISLAND_GRAMMAR`), so the scan does not misread a `/` and
-/// run past the island's `}`. Whether a `>` closes a type-argument list and whether a `)`
-/// closes a statement header are answered as `tsv_ts`, which parses the island, reads
-/// them (`f<T> / 2`, `if (c)!/re/`). Whether a `}` closes a braced operand (`{} / 2`) is
-/// answered as acorn's tokenizer reads it, since Svelte hands every island's expression
-/// to acorn as a parse of its own and the island ends where acorn says: a leading
-/// `function` there reads as a statement's keyword, so `{function () {} / 2}` reads the
-/// `/` as a regex.
-/// The lexer's quoted-attribute arm takes it too, so no brace scan in the crate can be
-/// handed a different rule.
+/// cannot settle (`tsv_ts::__private::ACORN_ISLAND_GRAMMAR`), so the scan does not misread a `/`
+/// and run past the island's `}`. Whether a `>` closes a type-argument list and whether a `)`
+/// closes a statement header are answered as `tsv_ts`, which parses the island, reads them
+/// (`f<T> / 2`, `if (c)!/re/`). Whether a `}` closes a braced operand (`{} / 2`) is answered as
+/// acorn's tokenizer reads it, since Svelte hands every island's expression to acorn as a parse of
+/// its own and the island ends where acorn says: a leading `function` there reads as a statement's
+/// keyword, so `{function () {} / 2}` reads the `/` as a regex. The lexer's quoted-attribute arm
+/// takes it too, so no brace scan in the crate can be handed a different rule.
 #[inline]
 pub(crate) fn scan_to_matching_brace(bytes: &[u8], scan_start: usize) -> Option<usize> {
     tsv_lang::source_scan::scan_to_matching_brace(
         bytes,
         scan_start,
         bytes.len(),
-        tsv_ts::ACORN_ISLAND_GRAMMAR,
+        tsv_ts::__private::ACORN_ISLAND_GRAMMAR,
     )
 }
 
@@ -206,7 +204,7 @@ pub(crate) fn scan_to_matching_paren(bytes: &[u8], scan_start: usize) -> Option<
         bytes,
         scan_start,
         bytes.len(),
-        tsv_ts::ACORN_ISLAND_GRAMMAR,
+        tsv_ts::__private::ACORN_ISLAND_GRAMMAR,
     )
 }
 
@@ -261,10 +259,10 @@ mod tests {
         crate::parse(source, &arena).is_ok()
     }
 
-    /// Every island scan begins as a whole expression (`tsv_ts::ACORN_ISLAND_GRAMMAR`): Svelte
-    /// hands acorn each island as a fresh parse, so a leading `function` reads as a
-    /// statement's keyword and the `/` after its body opens a regex, which here runs through
-    /// the island's `}` to the closing tag's `/`. Each verdict is Svelte's.
+    /// Every island scan begins as a whole expression (`tsv_ts::__private::ACORN_ISLAND_GRAMMAR`):
+    /// Svelte hands acorn each island as a fresh parse, so a leading `function` reads as a
+    /// statement's keyword and the `/` after its body opens a regex, which here runs through the
+    /// island's `}` to the closing tag's `/`. Each verdict is Svelte's.
     ///
     /// The positions are the scan's entry points: the plain brace scan (a text tag, an
     /// attribute or directive value, a quoted attribute's tag), the head scan past a

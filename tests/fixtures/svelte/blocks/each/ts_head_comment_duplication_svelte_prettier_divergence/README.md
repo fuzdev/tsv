@@ -26,7 +26,7 @@ The fourth case is the other null control: an `{#if}` head takes no unwind at al
 Together they isolate the discarded parse's reach as the cause rather than "a
 comment in a TS block head".
 
-tsv answers the `as` question directly (`tsv_ts::TopLevelAs`) instead of speculating,
+tsv answers the `as` question directly (`tsv_ts::__private::TopLevelAs`) instead of speculating,
 so there is no discarded parse and each comment exists once, attached once. Declining
 to reproduce it is the same stance as every other entry in
 [conformance_svelte.md §Comment Attachment Differences](../../../../../../docs/conformance_svelte.md#comment-attachment-differences)

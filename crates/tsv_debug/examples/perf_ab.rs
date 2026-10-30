@@ -209,33 +209,39 @@ fn time_once(
     let folded = normalize_carriage_returns(source);
     match parser_type {
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse_folded(&folded, None, arena).map_err(parse_error)?;
+            let ast = tsv_ts::__private::parse_folded(&folded, None, arena).map_err(parse_error)?;
             let parse = t0.elapsed();
             if parse_only {
                 return Ok((parse, Duration::ZERO, 0));
             }
             let t1 = Instant::now();
-            let len = formatted_len(tsv_ts::format_folded_in(&ast, &folded, doc_arena));
+            let len = formatted_len(tsv_ts::__private::format_folded_in(
+                &ast, &folded, doc_arena,
+            ));
             Ok((parse, t1.elapsed(), len))
         }
         ParserType::Svelte => {
-            let ast = tsv_svelte::parse_folded(&folded, arena).map_err(parse_error)?;
+            let ast = tsv_svelte::__private::parse_folded(&folded, arena).map_err(parse_error)?;
             let parse = t0.elapsed();
             if parse_only {
                 return Ok((parse, Duration::ZERO, 0));
             }
             let t1 = Instant::now();
-            let len = formatted_len(tsv_svelte::format_folded_in(&ast, &folded, doc_arena));
+            let len = formatted_len(tsv_svelte::__private::format_folded_in(
+                &ast, &folded, doc_arena,
+            ));
             Ok((parse, t1.elapsed(), len))
         }
         ParserType::Css => {
-            let ast = tsv_css::parse_folded(&folded, arena).map_err(parse_error)?;
+            let ast = tsv_css::__private::parse_folded(&folded, arena).map_err(parse_error)?;
             let parse = t0.elapsed();
             if parse_only {
                 return Ok((parse, Duration::ZERO, 0));
             }
             let t1 = Instant::now();
-            let len = formatted_len(tsv_css::format_folded_in(&ast, &folded, doc_arena));
+            let len = formatted_len(tsv_css::__private::format_folded_in(
+                &ast, &folded, doc_arena,
+            ));
             Ok((parse, t1.elapsed(), len))
         }
     }

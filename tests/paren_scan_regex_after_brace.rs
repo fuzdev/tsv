@@ -6,16 +6,16 @@
 //! Two scans in `tsv_ts` find a `)` ahead of the parse by walking bytes — the arrow-head
 //! lookahead and the printer's paren scan — and each has to read a `/` as this crate's parser
 //! will, or a regex literal holding a `)` or a `=>` ends the scan early. After a `}` they read
-//! a regex (`tsv_ts::OPERAND_GRAMMAR` leaves the `}` to the bytes), which is what a statement's
-//! `}` is followed by: a block after a statement that ended without its `;`, a declaration's
-//! body, a type literal.
+//! a regex (`tsv_ts::__private::OPERAND_GRAMMAR` leaves the `}` to the bytes), which is what a
+//! statement's `}` is followed by: a block after a statement that ended without its `;`, a
+//! declaration's body, a type literal.
 //!
 //! A tokenizer that takes one of those braces for an object literal's — acorn's does, at
 //! several of them — reads the `/` after it as a division, and a scan reading it that way
 //! stops at the `)` inside the regex: the program is rejected, or a comment moves across the
 //! `)` the scan stopped short of. acorn's reading of a `}` belongs to the scan of a region
-//! acorn parses (`tsv_ts::ACORN_ISLAND_GRAMMAR`, a Svelte island's extent) — where each of
-//! these braces, directly inside a body, answers as a block's too.
+//! acorn parses (`tsv_ts::__private::ACORN_ISLAND_GRAMMAR`, a Svelte island's extent) — where each
+//! of these braces, directly inside a body, answers as a block's too.
 
 use tsv_lang::source_scan::{BracedOperandWalk, OperandGrammar, ScanStart};
 
@@ -146,6 +146,6 @@ fn the_crates_own_scans_never_ask_what_a_brace_closed() {
             &mut BracedOperandWalk::default(),
         )
     };
-    assert!(!closes(tsv_ts::OPERAND_GRAMMAR));
-    assert!(closes(tsv_ts::ACORN_ISLAND_GRAMMAR));
+    assert!(!closes(tsv_ts::__private::OPERAND_GRAMMAR));
+    assert!(closes(tsv_ts::__private::ACORN_ISLAND_GRAMMAR));
 }

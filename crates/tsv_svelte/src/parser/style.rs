@@ -44,7 +44,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Parse CSS content (shares the document's bump arena)
         let css_content = &self.source[content_start..content_end];
-        let css_stylesheet = tsv_css::parse_embedded(
+        let css_stylesheet = tsv_css::__private::parse_embedded(
             css_content,
             content_start,
             self.island_nesting(),

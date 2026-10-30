@@ -461,8 +461,8 @@ impl<'a> FoldedSource<'a> {
     /// Whether the fold rewrote a **lone** `<CR>` — one not opening a `<CR><LF>` pair — to
     /// `<LF>`. A `<CR><LF>` is one line break under every line rule tsv reads, so folding it
     /// moves no line; a lone `<CR>` is a line break only where the rule says so, which a
-    /// Svelte document's markup does not (`tsv_svelte::parse_folded` reads this to decide
-    /// whether the author's own bytes need a parse of their own). Taken by the fold's own
+    /// Svelte document's markup does not (`tsv_svelte::__private::parse_folded` reads this to
+    /// decide whether the author's own bytes need a parse of their own). Taken by the fold's own
     /// pass, so a source with no `<CR>` answers `false` without a scan.
     pub fn folded_lone_cr(&self) -> bool {
         self.folded_lone_cr
@@ -3308,8 +3308,8 @@ mod tests {
     }
 
     /// The fold says whether it rewrote a LONE `<CR>` — one not opening a `<CR><LF>` — the
-    /// fact `tsv_svelte::parse_folded` keys its refusal check on, so a CRLF-only document
-    /// pays nothing.
+    /// fact `tsv_svelte::__private::parse_folded` keys its refusal check on, so a CRLF-only
+    /// document pays nothing.
     #[test]
     fn the_fold_says_whether_it_rewrote_a_lone_cr() {
         assert!(!normalize_carriage_returns("a\nb").folded_lone_cr());

@@ -244,7 +244,7 @@ pub(super) fn matching_paren_close(bytes: &[u8], start: usize) -> Option<usize> 
         // not a real delimiter. The shared cursor skips all three in one place
         // (including backtick templates, which this scan historically missed).
         if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
-            anchor.skipped_trivia(bytes, pos, past, start, crate::OPERAND_GRAMMAR);
+            anchor.skipped_trivia(bytes, pos, past, start, crate::__private::OPERAND_GRAMMAR);
             pos = past;
             continue;
         }
@@ -252,7 +252,7 @@ pub(super) fn matching_paren_close(bytes: &[u8], start: usize) -> Option<usize> 
         // (it needs previous-token context). Skip a real regex so a `)`/`(`
         // inside its pattern isn't counted — e.g. a param default `(a = /\)/)`.
         if bytes[pos] == b'/'
-            && anchor.starts_regex(bytes, pos, start, crate::OPERAND_GRAMMAR)
+            && anchor.starts_regex(bytes, pos, start, crate::__private::OPERAND_GRAMMAR)
             && let Some(past) = skip_regex_literal(bytes, pos, end)
         {
             pos = past;

@@ -371,7 +371,7 @@ impl<'a> Printer<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::PrinterInputs;
+    use crate::__private::PrinterInputs;
     use tsv_lang::EmbedContext;
     use tsv_lang::doc::arena::DocArena;
 

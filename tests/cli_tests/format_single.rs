@@ -585,8 +585,8 @@ fn test_format_reports_a_parse_error_in_the_files_own_coordinates() {
 /// A lone CR inside a Svelte in-tag `//` comment is refused rather than folded: Svelte ends
 /// that comment at `\n` alone, so the fold would end it early and print the rest of its line
 /// as markup — here a real `class` attribute on a `div` the author's bytes give none
-/// (`tsv_svelte::parse_folded`). The refusal is a format error on every input arm (exit 2,
-/// nothing written), while `parse` accepts the same bytes — so a single input prints it after
+/// (`tsv_svelte::__private::parse_folded`). The refusal is a format error on every input arm (exit
+/// 2, nothing written), while `parse` accepts the same bytes — so a single input prints it after
 /// `Error: `, never `Parse error: ` (`cli::out::exit_with_parse_error`).
 #[test]
 fn test_format_refuses_a_lone_cr_in_an_in_tag_line_comment() {

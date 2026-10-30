@@ -17,7 +17,7 @@ the annotation itself, so the pattern node's span stops at the bare binding;
 binding is where the two part company — its span stays on the bare name in both
 routes, so a window anchored on that span would end before the annotation and
 leave its comment attached nowhere. The window runs to the end of the binding
-(`tsv_ts::pattern_binding_end`), annotation included.
+(`tsv_ts::__private::pattern_binding_end`), annotation included.
 
 Covered: the then-shorthand with an identifier binding, a `{:then}` destructuring
 binding, and a `{:catch}` identifier binding. The wire is a **parser match** —

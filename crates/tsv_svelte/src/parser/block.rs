@@ -9,7 +9,8 @@ use crate::whitespace::is_svelte_ws;
 use bumpalo::Bump;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
 use tsv_lang::{ParseError, Span};
-use tsv_ts::{Expression, ExpressionKind, TopLevelAs};
+use tsv_ts::__private::TopLevelAs;
+use tsv_ts::{Expression, ExpressionKind};
 
 use super::expression_tag::{scan_head_to_matching_brace, scan_to_matching_paren};
 use super::parser_impl::{EmbeddedParseMark, SvelteParser};
@@ -189,7 +190,7 @@ enum EachHeadSplit {
 /// because brackets happen to nest it — the type grammar knows it outright.
 ///
 /// The probe is read-only: it collects no comments and keeps no node (see
-/// [`tsv_ts::parse_type_extent`]) — the caller re-reads both regions with the real
+/// `tsv_ts::__private::parse_type_extent`) — the caller re-reads both regions with the real
 /// iterable and binding parses, so a probe that registered anything would double it.
 /// Its type parses start at `host_nesting`, as the real ones do.
 fn each_binding_separator(
@@ -222,7 +223,8 @@ fn each_binding_separator(
         // No type here ⇒ this item is the binding, and the keyword before it is the
         // separator — the one recorded below, or the head's first `as` when none is.
         let item_at = offset_of(item);
-        let Ok(type_end) = tsv_ts::parse_type_extent(item, item_at, host_nesting, arena) else {
+        let Ok(type_end) = tsv_ts::__private::parse_type_extent(item, item_at, host_nesting, arena)
+        else {
             break;
         };
         let after_type = skip_ws_and_comments(&item[type_end - item_at..]);
@@ -752,15 +754,15 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///   consume. The annotation's end is the TS type parse's own, never a scan — a
     ///   function type's `=>` and a type argument list's `,`/`>` sit at depth 0.
     ///
-    /// The annotation attaches through `tsv_ts::attach_pattern_type_annotation`, which owns
-    /// the span convention: the span stays on the **bare** binding for every kind (only a
-    /// destructuring pattern's wire `end` widens at emit time — the one kind whose byte
-    /// range and `loc` genuinely disagree; an annotated identifier stays bare on the wire
-    /// too, per Svelte's `read_pattern`). So `pattern.span().end` is the bare end, and the
-    /// returned offset — `tsv_ts::pattern_binding_end` — the end past any annotation. A
-    /// comment in the gap on either side of the annotation is rejected by the reads that
-    /// bound it: the annotation parse starts only at a `:`, and the caller's own check of
-    /// what follows the returned offset (`, index`, `}`, `=`) finds anything else there.
+    /// The annotation attaches through `tsv_ts::__private::attach_pattern_type_annotation`, which
+    /// owns the span convention: the span stays on the **bare** binding for every kind (only a
+    /// destructuring pattern's wire `end` widens at emit time — the one kind whose byte range and
+    /// `loc` genuinely disagree; an annotated identifier stays bare on the wire too, per Svelte's
+    /// `read_pattern`). So `pattern.span().end` is the bare end, and the returned offset —
+    /// `tsv_ts::__private::pattern_binding_end` — the end past any annotation. A comment in the gap
+    /// on either side of the annotation is rejected by the reads that bound it: the annotation
+    /// parse starts only at a `:`, and the caller's own check of what follows the returned offset
+    /// (`, index`, `}`, `=`) finds anything else there.
     pub(super) fn parse_block_pattern(
         &mut self,
         input: &str,
@@ -811,7 +813,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // (`{#each xs as x: T /* c */}` → `expected_token`), and accepting it here
         // would drop the comment.
         let annotation_end = ta.span.end as usize;
-        tsv_ts::attach_pattern_type_annotation(expr, ta, self.arena)?;
+        tsv_ts::__private::attach_pattern_type_annotation(expr, ta, self.arena)?;
         Ok((expr, annotation_end))
     }
 
@@ -1539,7 +1541,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // The preserved parse is Svelte's own reader, so it alone decides acceptance.
             // It is also the only parse a head without a pair needs — the two trees are
             // then the same tree.
-            let (preserved, preserved_a_paren) = tsv_ts::parse_embedded_preserve_parens(
+            let (preserved, preserved_a_paren) = tsv_ts::__private::parse_embedded_preserve_parens(
                 &wrapper,
                 base,
                 self.island_nesting(),
@@ -1557,8 +1559,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // parser bug, and it surfaces as the paren-free parse's own error rather
                 // than as a silent fallback to the wire tree (which prints a pair's
                 // contents bare).
-                let plain =
-                    tsv_ts::parse_embedded(&wrapper, base, self.island_nesting(), self.arena)?;
+                let plain = tsv_ts::__private::parse_embedded(
+                    &wrapper,
+                    base,
+                    self.island_nesting(),
+                    self.arena,
+                )?;
                 // The same comments, though not the same claims on them: `owned_by_node`
                 // binds a glued block to the node its token begins, and a pair's `(` begins
                 // a node only in the preserved tree (`/* c */ (x + y)`). The wire reads no

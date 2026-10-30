@@ -497,9 +497,9 @@ impl ParseError {
     /// A **refusal**: `source` parses, but an operation cannot handle what it holds — a
     /// format that cannot print it without changing what it means (a Svelte in-tag `//`
     /// comment holding a lone `<CR>`, which the format path's line-terminator fold would end
-    /// early — `tsv_svelte::parse_folded`). It covers the bytes `start..end`. The type strip's
-    /// refusals take the same report shape without a `ParseError` ([`ErrorReport::refusal`], via
-    /// `tsv_ts::UnsupportedKind::report`).
+    /// early — `tsv_svelte::__private::parse_folded`). It covers the bytes `start..end`. The type
+    /// strip's refusals take the same report shape without a `ParseError`
+    /// ([`ErrorReport::refusal`], via `tsv_ts::UnsupportedKind::report`).
     ///
     /// The message is rendered here, with the `line:col` header and excerpt of `start` in
     /// `source` under `coordinates` that a located error prints, so it reads like every other
@@ -608,9 +608,9 @@ impl ParseError {
     /// prints and [`ParseError::wire_point`] reports, and the line excerpted under it. Each
     /// language crate's public parse entry points call this with that language's
     /// coordinates (`tsv_ts::WIRE_COORDINATES` and its siblings). The embedded entry points
-    /// (`tsv_ts::parse_embedded` and its siblings, `tsv_css::parse_embedded`) do not: their
-    /// source is a slice of a host document, so their errors leave context-free and the
-    /// host (`tsv_svelte::parse`) fills them over the whole document.
+    /// (`tsv_ts::__private::parse_embedded` and its siblings, `tsv_css::__private::parse_embedded`)
+    /// do not: their source is a slice of a host document, so their errors leave context-free and
+    /// the host (`tsv_svelte::parse`) fills them over the whole document.
     ///
     /// ```ignore
     /// parser::parse(source).map_err(|e| e.with_context(source, WIRE_COORDINATES))
@@ -1010,8 +1010,8 @@ mod tests {
     #[test]
     fn a_refusal_renders_its_point_but_is_no_syntax_error() {
         let source = "ab\nc\rd";
-        // The `<CR>` itself, as `tsv_svelte::parse_folded` points: the header counts `\n`
-        // lines, the excerpt stops at the `<CR>`.
+        // The `<CR>` itself, as `tsv_svelte::__private::parse_folded` points: the header counts
+        // `\n` lines, the excerpt stops at the `<CR>`.
         let refusal = ParseError::refusal("no", source, 4, 5, LF);
         assert_eq!(refusal.to_string(), "no\n2:2 c\n     ^ here");
         assert_eq!(refusal.position(), None);

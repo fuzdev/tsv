@@ -135,8 +135,8 @@ pub(crate) fn has_trailing_blank_line(raw: &str) -> bool {
 /// form feed is content, so it breaks the run — an FF between two newlines is not a blank line,
 /// matching the compiler's own class (`regex_not_whitespace` = `/[^ \t\r\n]/`).
 ///
-/// Spelled as the explicit set rather than `ast::is_collapsible_ws(b) && b != b'\n'` — the same set,
-/// in the form the scans' `match` arms want.
+/// Spelled as the explicit set rather than `ast::is_collapsible_ws(b) && b != b'\n'` — the same
+/// set, in the form the scans' `match` arms want.
 ///
 /// A second spelling of this set lives on `text_starts_with_linebreak` in `fragment_doc.rs`. It is
 /// deliberately left alone: it feeds a `str` pattern, and swapping the `[char; 3]` array for a

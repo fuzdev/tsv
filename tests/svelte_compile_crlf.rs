@@ -1,5 +1,5 @@
 //! The Svelte compiler takes a component's own line endings: its server output is
-//! reprinted through `tsv_ts::format_canonical`, which (unlike the intent-preserving
+//! reprinted through `tsv_ts::__private::format_canonical`, which (unlike the intent-preserving
 //! format entry points) does not require CR-folded text. A CRLF component must compile
 //! — or refuse — in a debug build, never trip the format path's CR-folded-text check.
 

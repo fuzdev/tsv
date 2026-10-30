@@ -6,10 +6,10 @@ use crate::parser::element::tag_name_end;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{Comment, DepthBudget, DepthLimit, ParseError, Span};
+use tsv_ts::__private::TopLevelAs;
+use tsv_ts::__private::{is_id_continue, is_id_start};
 use tsv_ts::Expression;
 use tsv_ts::TSTypeAnnotation;
-use tsv_ts::TopLevelAs;
-use tsv_ts::{is_id_continue, is_id_start};
 
 /// Build an expression `Comment` from its already-shifted `span` / `content_span`.
 /// `content` is the comment body, read only to compute the `multiline` flag (whether
@@ -579,7 +579,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// word is an error the reader itself can raise, because it is the one case where an
     /// identifier WAS read.
     ///
-    /// ⚠️ The character class is `tsv_ts`'s [`is_id_start`] / [`is_id_continue`], the
+    /// ⚠️ The character class is `tsv_ts`'s `is_id_start` / `is_id_continue`, the
     /// ECMAScript one canonical reaches through acorn (`isIdentifierStart(code, true)` /
     /// `isIdentifierChar(code, true)`), never a local approximation. Rust's
     /// `char::is_alphabetic` / `is_alphanumeric` is NOT this class and misses in **both**
@@ -662,7 +662,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         host_check: impl Fn(&Self, &'arena Expression<'arena>) -> Result<(), ParseError>,
     ) -> Result<&'arena Expression<'arena>, ParseError> {
         let this = &*self;
-        let (expr, comments) = tsv_ts::parse_expression_with_comments(
+        let (expr, comments) = tsv_ts::__private::parse_expression_with_comments(
             source,
             base_offset,
             self.island_nesting(),
@@ -677,7 +677,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// first top-level comma.
     ///
     /// `top_level_as` is the block head's answer to "is a top-level `as` mine or
-    /// TypeScript's" ([`tsv_ts::TopLevelAs`]). There is no default to fall back on —
+    /// TypeScript's" (`tsv_ts::__private::TopLevelAs`). There is no default to fall back on —
     /// `{#each}` and `{#await}` answer it oppositely, and each answer carries an
     /// obligation the other does not. Neither head is ever asked about `satisfies`: no
     /// Svelte separator is spelled that way, so it stays TypeScript's in both.
@@ -698,7 +698,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         host_check: impl Fn(&Self, &'arena Expression<'arena>, usize) -> Result<(), ParseError>,
     ) -> Result<(&'arena Expression<'arena>, usize), ParseError> {
         let this = &*self;
-        let (expr, end_pos, comments) = tsv_ts::parse_expression_partial_with_comments(
+        let (expr, end_pos, comments) = tsv_ts::__private::parse_expression_partial_with_comments(
             source,
             base_offset,
             self.island_nesting(),
@@ -720,13 +720,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Returns only the annotation: its `span.end` is the consumed extent, and
     /// the sub-parser's own stop position is not offered because the lexer's
     /// lookahead has already swallowed the trailing trivia by then (see
-    /// `tsv_ts::parse_type_annotation_partial`).
+    /// `tsv_ts::__private::parse_type_annotation_partial`).
     pub(crate) fn parse_ts_type_annotation(
         &mut self,
         source: &str,
         base_offset: usize,
     ) -> Result<TSTypeAnnotation<'arena>, ParseError> {
-        let (ta, comments) = tsv_ts::parse_type_annotation_partial(
+        let (ta, comments) = tsv_ts::__private::parse_type_annotation_partial(
             source,
             base_offset,
             self.island_nesting(),
@@ -750,14 +750,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<&'arena mut Expression<'arena>, ParseError> {
-        let (pattern, comments) = tsv_ts::parse_pattern_with_comments(
+        let (pattern, comments) = tsv_ts::__private::parse_pattern_with_comments(
             source,
             base_offset,
             self.island_nesting(),
             self.arena,
         )?;
         debug_assert!(
-            tsv_ts::pattern_type_annotation(&pattern).is_none(),
+            tsv_ts::__private::pattern_type_annotation(&pattern).is_none(),
             "a block pattern's `: T` is its own sub-parse (`parse_block_pattern`)"
         );
         self.expression_comments.extend_from_slice(comments);
@@ -799,7 +799,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         host_check: impl Fn(&Self, &tsv_ts::Statement<'arena>) -> Result<(), ParseError>,
     ) -> Result<tsv_ts::Statement<'arena>, ParseError> {
         let this = &*self;
-        let (stmt, comments) = tsv_ts::parse_statement_with_comments(
+        let (stmt, comments) = tsv_ts::__private::parse_statement_with_comments(
             source,
             base_offset,
             self.island_nesting(),

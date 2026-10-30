@@ -18,7 +18,7 @@ use crate::ast;
 use crate::whitespace::{is_svelte_ws, svelte_ws_width_at};
 
 use tsv_lang::{Comment, Span, source_scan::skip_comment};
-use tsv_ts::ast::convert::{CommentAttach, CommentMode, IslandComments};
+use tsv_ts::__private::{CommentAttach, CommentMode, IslandComments};
 
 /// The inputs every island's comment-attach builder (the `attach_*` fns below)
 /// shares: the document's template comments and its source.
@@ -260,7 +260,7 @@ pub(super) fn attach_binding_pattern<'a>(
     };
     BindingAttach {
         pattern: island(pattern.span()),
-        annotation: tsv_ts::pattern_type_annotation(pattern).map(|ann| island(ann.span)),
+        annotation: tsv_ts::__private::pattern_type_annotation(pattern).map(|ann| island(ann.span)),
     }
 }
 
@@ -292,7 +292,10 @@ impl BindingAttach<'_> {
 /// is never built, and nothing else emits it); a wider one only wastes a build. It is
 /// also where a `{@const}`'s init window begins ([`attach_const_tag_init`]).
 pub(super) fn pattern_comment_window(pattern: &tsv_ts::ast::Expression<'_>) -> Span {
-    Span::new(pattern.span().start, tsv_ts::pattern_binding_end(pattern))
+    Span::new(
+        pattern.span().start,
+        tsv_ts::__private::pattern_binding_end(pattern),
+    )
 }
 
 /// The `{@const id = init}` INIT attach — the tag's last window.

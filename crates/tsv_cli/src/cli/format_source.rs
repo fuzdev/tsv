@@ -97,14 +97,14 @@ pub(crate) fn format_source_in(
     // `source` before it renders (`FoldedSource::parse_with`): its `line:col` and excerpt
     // are the caller's own file's, the ones `tsv parse` reports for the same file. The
     // Svelte one also refuses the one lone `<CR>` the fold cannot rewrite without changing
-    // meaning (`tsv_svelte::parse_folded`).
+    // meaning (`tsv_svelte::__private::parse_folded`).
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     match parser_type {
-        ParserType::Svelte => tsv_svelte::parse_folded(&folded, arena)
-            .map(|ast| tsv_svelte::format_folded_in(&ast, &folded, doc_arena)),
-        ParserType::Css => tsv_css::parse_folded(&folded, arena)
-            .map(|ast| tsv_css::format_folded_in(&ast, &folded, doc_arena)),
-        ParserType::TypeScript => tsv_ts::parse_folded(&folded, goal, arena)
-            .map(|ast| tsv_ts::format_folded_in(&ast, &folded, doc_arena)),
+        ParserType::Svelte => tsv_svelte::__private::parse_folded(&folded, arena)
+            .map(|ast| tsv_svelte::__private::format_folded_in(&ast, &folded, doc_arena)),
+        ParserType::Css => tsv_css::__private::parse_folded(&folded, arena)
+            .map(|ast| tsv_css::__private::format_folded_in(&ast, &folded, doc_arena)),
+        ParserType::TypeScript => tsv_ts::__private::parse_folded(&folded, goal, arena)
+            .map(|ast| tsv_ts::__private::format_folded_in(&ast, &folded, doc_arena)),
     }
 }

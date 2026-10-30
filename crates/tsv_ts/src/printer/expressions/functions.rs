@@ -1325,7 +1325,7 @@ impl<'a> Printer<'a> {
     }
 
     /// The root doc of an EMBEDDER's assignment value
-    /// ([`crate::build_assignment_value_expression_doc`], which states the contract): the
+    /// (`crate::__private::build_assignment_value_expression_doc`, which states the contract): the
     /// assignment-value mark, then — where the host leaves the break after its operator to
     /// the value, handing it the operator→value gap that opens at `value_gap_start` — a
     /// curried chain's assignment-RHS shape, printing the gap's run itself.
@@ -1382,7 +1382,7 @@ impl<'a> Printer<'a> {
     /// operator→value gap stacks a curried chain under the break it forces
     /// ([`Self::seam_break_stacks_curried_chain`]: a `//` on the operator's line, an
     /// indentable block leading the value), or `None` where it does not — the host then
-    /// keeps its own layout. [`crate::build_stacked_curried_chain_rhs_doc`] states the
+    /// keeps its own layout. `crate::__private::build_stacked_curried_chain_rhs_doc` states the
     /// contract.
     ///
     /// The declarator's own arms, in the declarator's order

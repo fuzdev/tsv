@@ -67,19 +67,19 @@ pub enum LayoutMode {
 #[expect(clippy::struct_excessive_bools)] // independent build-time axes, each read at its own seam
 pub struct EmbedContext {
     /// The host's indent level, as an INPUT to an embedded stylesheet's format: the level
-    /// `tsv_css::format_embedded_in` starts its printer at, so every line the CSS printer
-    /// breaks and indents itself lands at the host's indentation. That entry moves it into
-    /// the printer's own indent and zeroes it here before anything renders, so no renderer
-    /// reads it — a render always measures from the column it is handed.
+    /// `tsv_css::__private::format_embedded_in` starts its printer at, so every line the CSS
+    /// printer breaks and indents itself lands at the host's indentation. That entry moves it into
+    /// the printer's own indent and zeroes it here before anything renders, so no renderer reads it
+    /// — a render always measures from the column it is handed.
     // TODO: an argument of one entry, not render state — move it onto
-    // `tsv_css::format_embedded_in`'s own signature and delete the field.
+    // `tsv_css::__private::format_embedded_in`'s own signature and delete the field.
     pub base_indent_offset: usize,
     /// How the renderer should treat the outer doc — see [`LayoutMode`].
     pub mode: LayoutMode,
     /// Whether a JSDoc cast **leading** this expression must REFLOW its comment→`(` break —
     /// the value-gap category "answers the break by rule and CANNOT hang". The second
     /// build-time field (with `mode`), read once at the TS expression entry
-    /// (`tsv_ts::build_expression_doc`), which resolves the expression's left-spine
+    /// (`tsv_ts::__private::build_expression_doc`), which resolves the expression's left-spine
     /// cast and marks it; casts nested deeper keep their width-decided layout.
     ///
     /// Set by `tsv_svelte` for every braced head whose value **hugs** its delimiters (a

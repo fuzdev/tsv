@@ -53,7 +53,7 @@ impl<'a> Printer<'a> {
         // takes the safe default instead — past a `{…}` the rest of the line is markup, and
         // a deferred comment would come out as page text.
         let embed = tsv_lang::EmbedContext::line_owning();
-        let script_doc_id = tsv_ts::build_program_doc(
+        let script_doc_id = tsv_ts::__private::build_program_doc(
             self.d(),
             &script.content,
             self.source(),
@@ -136,7 +136,7 @@ impl<'a> Printer<'a> {
             // whole-host-sized one per `<style>` block. The embedded CSS renders
             // to its own string; only doc-node storage is shared, and the arena is
             // not reset, so the host's in-flight nodes stay valid.
-            let formatted_css = tsv_css::format_embedded_in(
+            let formatted_css = tsv_css::__private::format_embedded_in(
                 &style.css_stylesheet,
                 self.source(),
                 self.line_table(),

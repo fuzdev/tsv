@@ -428,27 +428,27 @@ fn profile_once(
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     match parser_type {
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse_folded(&folded, None, arena).map_err(parse_error)?;
+            let ast = tsv_ts::__private::parse_folded(&folded, None, arena).map_err(parse_error)?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();
-            let _ = tsv_ts::format_folded_in(&ast, &folded, doc_arena);
+            let _ = tsv_ts::__private::format_folded_in(&ast, &folded, doc_arena);
             Ok((parse_dur, t1.elapsed()))
         }
         ParserType::Svelte => {
-            let ast = tsv_svelte::parse_folded(&folded, arena).map_err(parse_error)?;
+            let ast = tsv_svelte::__private::parse_folded(&folded, arena).map_err(parse_error)?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();
-            let _ = tsv_svelte::format_folded_in(&ast, &folded, doc_arena);
+            let _ = tsv_svelte::__private::format_folded_in(&ast, &folded, doc_arena);
             Ok((parse_dur, t1.elapsed()))
         }
         ParserType::Css => {
-            let ast = tsv_css::parse_folded(&folded, arena).map_err(parse_error)?;
+            let ast = tsv_css::__private::parse_folded(&folded, arena).map_err(parse_error)?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();
-            let _ = tsv_css::format_folded_in(&ast, &folded, doc_arena);
+            let _ = tsv_css::__private::format_folded_in(&ast, &folded, doc_arena);
             Ok((parse_dur, t1.elapsed()))
         }
     }

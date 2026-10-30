@@ -1,6 +1,6 @@
 //! The braced-operand resolver: whether a `}` ends an operand, read as acorn reads it —
 //! `tsv_lang`'s `ClosesBracedOperand` for a Svelte island's extent
-//! (`crate::ACORN_ISLAND_GRAMMAR`).
+//! (`crate::__private::ACORN_ISLAND_GRAMMAR`).
 
 use super::scan::{identifier_starts_at, skip_identifier, skip_numeric_literal, skip_whitespace};
 use tsv_lang::source_scan::{
@@ -121,7 +121,7 @@ pub(crate) fn closes_braced_operand(
 /// The walk's reading of every `/` that no `}` settles: this crate's answers for a `>` and
 /// a `)`, and the bytes' for a `}` — which the walk never asks, a `/` after a `}` being its
 /// own to answer ([`Region::divides_after_brace`]).
-const WALK_GRAMMAR: OperandGrammar = crate::OPERAND_GRAMMAR;
+const WALK_GRAMMAR: OperandGrammar = crate::__private::OPERAND_GRAMMAR;
 
 /// [`WALK_GRAMMAR`] with every `}` ending an operand: the probe that tells whether the
 /// operand before a `/` ends on a `}` ([`Region::divides_after_brace`]).

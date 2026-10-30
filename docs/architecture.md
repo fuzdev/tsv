@@ -480,9 +480,9 @@ element.rs         — Element parsing
 attribute.rs       — Attribute and directive parsing
 block.rs           — Control flow blocks ({#if}, {#each}, {#await}, {#key})
 tag.rs             — Template tags ({@html}, {@const}, {@debug}, {@render}, {const}/{let})
-expression_tag.rs  — {expr} → tsv_ts::parse_expression_with_comments()
-script.rs          — <script> → tsv_ts::parse_embedded()
-style.rs           — <style> → tsv_css::parse_embedded()
+expression_tag.rs  — {expr} → tsv_ts::__private::parse_expression_with_comments()
+script.rs          — <script> → tsv_ts::__private::parse_embedded()
+style.rs           — <style> → tsv_css::__private::parse_embedded()
 ```
 
 Script/style tag content is extracted by **raw byte scanning** for closing delimiters (`</script>`, `</style>`) — no tokenization inside tags.
@@ -631,7 +631,7 @@ the preprocessing above reaches inside a tag's comment — so a lone `<CR>` ther
 text, and folding it would end the comment early and print the rest of its line as markup
 (a real attribute, or a document whose own bytes do not parse). So when the fold rewrote a
 lone `<CR>` in a Svelte document, the format parses the author's bytes first
-(`tsv_svelte::parse_folded`, the parse every Svelte format entry point runs): their parse
+(`tsv_svelte::__private::parse_folded`, the parse every Svelte format entry point runs): their parse
 error is the format's error, and an in-tag `//` comment holding a lone `<CR>` with comment
 text after it is refused with a `ParseError::refusal` whose message names the `<CR>` and
 whose span (`ParseError::report`) is the `<CR>` — no syntax error, since the source is valid

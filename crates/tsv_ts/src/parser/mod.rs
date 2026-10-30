@@ -527,13 +527,13 @@ pub struct Parser<'a, 'arena> {
     /// (matching acorn/Svelte, whose public AST is paren-free); enabled only for
     /// the `{#snippet}`-parameter sub-parse, where Svelte parses with acorn's
     /// `preserveParens: true` and skips `remove_parens`. Set via
-    /// [`crate::parse_embedded_preserve_parens`].
+    /// `crate::__private::parse_embedded_preserve_parens`.
     pub(crate) preserve_parens: bool,
     /// Set when [`Parser::preserve_parens`] wrapped at least one grouping pair in a
-    /// `ParenthesizedExpression` — read by [`crate::parse_embedded_preserve_parens`], whose
-    /// caller then owes the paren-free tree a parse of its own. Never cleared, so a pair a
-    /// speculative parse built and a rewind abandoned leaves it set: an over-report costs
-    /// that caller one redundant parse and is never a wrong answer.
+    /// `ParenthesizedExpression` — read by `crate::__private::parse_embedded_preserve_parens`,
+    /// whose caller then owes the paren-free tree a parse of its own. Never cleared, so a pair a
+    /// speculative parse built and a rewind abandoned leaves it set: an over-report costs that
+    /// caller one redundant parse and is never a wrong answer.
     pub(crate) preserved_a_paren: bool,
     /// When `true`, every discarded grouping paren is recorded in
     /// [`Parser::grouping_parens`]. Set only while [`Parser::parse_binding_pattern`] reads
@@ -3850,7 +3850,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Convert an expression to a Svelte block or tag pattern — an `{#each}` context, a
-    /// `{:then}` / `{:catch}` value, a `{@const}` id ([`crate::parse_pattern_with_comments`]).
+    /// `{:then}` / `{:catch}` value, a `{@const}` id
+    /// (`crate::__private::parse_pattern_with_comments`).
     ///
     /// This converts ObjectExpression to ObjectPattern, ArrayExpression to ArrayPattern,
     /// etc., under Svelte's reading of the pattern as an assignment target. A
@@ -4032,7 +4033,7 @@ pub fn parse_typescript_with_goal<'arena>(
 
 /// [`parse_typescript`] with grouping parens preserved as `ParenthesizedExpression`
 /// nodes (acorn's `preserveParens: true`). Standalone analog of
-/// [`crate::parse_embedded_preserve_parens`] — the binding audit
+/// `crate::__private::parse_embedded_preserve_parens` — the binding audit
 /// (`tsv_debug binding_audit`) reparses formatted output this way so the paren
 /// structure a glued comment binds to is visible in the wire JSON.
 pub fn parse_typescript_preserve_parens<'arena>(

@@ -510,10 +510,12 @@ fn escape_errors_point_at_their_backslash() {
 #[test]
 fn an_embedded_parse_error_has_no_point_until_its_host_fills_it() {
     let arena = Bump::new();
-    let error = tsv_ts::parse_embedded("let = ;", 5, 0, &arena).expect_err("a syntax error");
+    let error =
+        tsv_ts::__private::parse_embedded("let = ;", 5, 0, &arena).expect_err("a syntax error");
     assert!(error.position().is_some());
     assert!(error.wire_point().is_none());
-    let error = tsv_css::parse_embedded("a {", 5, 0, &arena).expect_err("a syntax error");
+    let error =
+        tsv_css::__private::parse_embedded("a {", 5, 0, &arena).expect_err("a syntax error");
     assert!(error.position().is_some());
     assert!(error.wire_point().is_none());
 }

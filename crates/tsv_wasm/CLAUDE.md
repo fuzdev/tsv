@@ -82,7 +82,7 @@ error knows a point, not a span, so `end === start`), and `loc` their
 `create_locator(source, {language}).loc_of(error)`. A format's refusal of a source that parses
 is `{kind: 'refused', message, frame, start, end, loc}`, the same shape over the refused
 character: `format_svelte` refuses a lone CR inside an in-tag `//` comment, which the format's
-CR fold would end early (`tsv_svelte::parse_folded`, a `ParseError::refusal` — no syntax error,
+CR fold would end early (`tsv_svelte::__private::parse_folded`, a `ParseError::refusal` — no syntax error,
 its span the CR). The strip adds its own `'unsupported'` (below).
 
 **The engines build it and RETURN it.** A failure the source causes is no exception: each
@@ -279,7 +279,7 @@ because formatting itself is non-configurable. Everything else is the parse sema
 
 **An unset `sourceType` is the one key whose default differs between the two
 families.** The facade forwards it unset, and the raw format exports hand that to
-`parse_format!` → `parse_ast_for_format!` → `tsv_ts::parse_folded` →
+`parse_format!` → `parse_ast_for_format!` → `tsv_ts::__private::parse_folded` →
 `tsv_ts::parse_with_goal_or_fallback`:
 the module grammar, retried as a script only if that parse *fails* (which error is reported
 when both fail: [../../CLAUDE.md §Strictness](../../CLAUDE.md#strictness-module-strict-script-by-directive)).

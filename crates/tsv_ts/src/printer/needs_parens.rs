@@ -823,7 +823,7 @@ pub(in crate::printer) const fn joins_a_trailing_angle_bracket(op: BinaryOperato
 ///
 /// The conditional, arrow, `await` and `yield` descents are live only at a position
 /// that pairs none of those kinds — a Svelte block head, asked through
-/// [`crate::prints_ending_on_instantiation_close`]. Every `ParenContext` arm that reads
+/// `crate::__private::prints_ending_on_instantiation_close`. Every `ParenContext` arm that reads
 /// this walk (a joining binary left, a `>`-led or `/=` assignment target, the left of
 /// `as` / `satisfies`) already pairs all four by kind, so there the walk only agrees
 /// with a pair the arm takes anyway: one pair, never two. An arrow's CONDITIONAL body is

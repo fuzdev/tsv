@@ -115,12 +115,12 @@ use std::borrow::Cow;
 
 use crate::ast;
 use crate::whitespace::is_svelte_ws;
-use tsv_css::ast::convert::{write_css_children, write_css_comments};
+use tsv_css::__private::{write_css_children, write_css_comments};
 use tsv_lang::{
     Comment, JsonWriter, LocationMapper, Span, Wire, WirePositions, WireTables,
     estimated_json_capacity, write_array, write_or_null,
 };
-use tsv_ts::ast::convert::{
+use tsv_ts::__private::{
     CommentAttach, CommentMode, EmbedWriter, write_expression_embedded,
     write_identifier_expression_with_character, write_pattern_embedded, write_program_embedded,
     write_variable_declaration_embedded,

@@ -10,7 +10,7 @@ Covered positions: an identifier binding's annotation, a destructuring binding's
 annotation, and an indexed each (`as b: /* c */ C, i`), where the annotation is
 followed by the `, index` tail.
 
-The annotation region is parsed on its own (`tsv_ts::parse_type_annotation_partial`)
+The annotation region is parsed on its own (`tsv_ts::__private::parse_type_annotation_partial`)
 rather than inside the pattern parse — it has to be, because the pattern's extent is
 bounded before the annotation so `{#each xs as { a } (a.id)}` cannot read
 `{ a } (a.id)` as a call. `{:then}` / `{:catch}` and `{@const}` share that reader.
