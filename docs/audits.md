@@ -33,6 +33,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting — or type-stripping — the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; neither `deno task check` nor the publish path compares engines) |
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
 | [docs.rs build](#docsrs-build-audit-docsauditdocsrs) | `docs:audit:docsrs` | a crate meant for docs.rs whose own doc build fails at its docs.rs feature set — a link to an item behind a feature docs.rs leaves off, which the all-features workspace build resolves | `deno task check` |
+| [Published deps](#published-graph-dependency-audit-depsaudit) | `deps:audit` | a crate meant for publishing reaching `serde_json` through a normal or build dependency, at any feature set or target — the workspace entry's features would unify into a consumer's own `serde_json` and change how it deserializes | `deno task check` |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
 | [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `deno task bench:install`, so NOT in `deno task check`) |
 | [Loc cross-grade](#loc-cross-grade-checkloc) | `check:loc` | tsv's loc wire and the shipped `locations.js` reconstruction of its span-only wire disagreeing on any fixture input — the two implementations of the one `loc` definition drifting apart | `deno task check` |
@@ -1100,7 +1101,8 @@ is built on its own.
 **Which crates, at which features.** A crate is graded when its `Cargo.toml` carries a
 `[package.metadata.docs.rs]` table, which marks it as meant for docs.rs and is the one
 place its docs.rs feature set is written; the script reads `features`, `all-features` and
-`no-default-features` from it rather than restating them. No table anywhere is a failure,
+`no-default-features` from it rather than restating them (`scripts/docsrs_crates.ts`, the
+reader `deps:audit` shares). No table anywhere is a failure,
 not a pass.
 
 **Lints.** The `docs:audit` set, plus `--cfg docsrs` as docs.rs passes it, with one level
@@ -1124,6 +1126,40 @@ resolves, never that the prose is true.
 **Build world.** Its own target directory, `target/docsrs`, since its lint flags differ
 from `docs:audit`'s and a shared `target/doc` would make the two rebuild each other's
 output on every run.
+
+## Published-Graph Dependency Audit (`deps:audit`)
+
+```bash
+# one `cargo tree -p <crate> -e normal,build --all-features --target all` per crate with a
+# [package.metadata.docs.rs] table; fails on a denied package (scripts/deps_audit.ts)
+deno task deps:audit
+```
+
+**What it proves.** That no crate meant for publishing reaches a denied package through a
+normal or build dependency, so a consumer of a published tsv crate never builds one because
+of tsv. The denied list is the workspace dependencies whose entry carries features that
+would unify into a consumer's own copy and change its behavior — today `serde_json`, whose
+`preserve_order` + `float_roundtrip` + `arbitrary_precision` change how a consumer's
+`serde_json` deserializes (an internally tagged enum holding an `f64` stops deserializing,
+`1.0` and `1.00` compare unequal, key order changes). The fixture gate needs those features
+(`tsv_debug`), so the entry keeps them, and this audit keeps `serde_json` to
+dev-dependencies (`tsv_lang`'s writer oracle, `tsv_html`'s entity-table generator, the
+`tsv_svelte` / `tsv_napi` tests) and to crates nothing publishes (`tsv_ffi`, `tsv_debug`,
+the root test package). The wire writer formats its `f64` with `zmij`, the formatter
+`serde_json` calls, graded byte-for-byte against `serde_json` by `f64_matches_serde_json`.
+
+**Which crates, how.** The crates with a `[package.metadata.docs.rs]` table — the one
+definition `docs:audit:docsrs` shares (`scripts/docsrs_crates.ts`). Features are additive,
+so `--all-features` reaches every package any feature subset can, and `--target all` keeps
+target-specific dependencies in. A denied package fails the crate, and the inverted tree
+(`-i`) prints the path to it. A crate whose listing does not name the crate itself fails
+too, so an empty listing never reads as a pass.
+
+**Blind spots.** Only the listed packages are denied: a new workspace dependency with
+consumer-visible features is not graded until it joins the list. A crate meant for
+publishing without the docs.rs table is not graded at all (the `docs:audit:docsrs` blind
+spot). It grades the graph `Cargo.lock` resolves; a denied package is reached by an edge
+tsv declares, which no consumer's resolution removes, so the lockfile cannot hide one.
 
 ## Wire-Type Drift Check (`check:ast-types`)
 

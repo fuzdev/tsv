@@ -11,16 +11,18 @@
 //!
 //! Behind the `json` feature (enabled transitively by each language crate's
 //! `convert` feature) so the format-only `@fuzdev/tsv-format-wasm` build — which
-//! turns `convert` off — never links `serde_json`.
+//! turns `convert` off — never links it or `zmij`.
 //!
 //! **Escape / format parity contract**: static structure and tokens are written
 //! verbatim (debug-asserted escape-free); dynamic strings are escaped by hand,
 //! **byte-identical** to `serde_json`'s string serialization (graded against
-//! `serde_json` itself by `string_matches_serde_json`); non-integral `f64`
-//! delegates to `serde_json::to_writer`, so ryu formatting is exactly its — the
+//! `serde_json` itself by `string_matches_serde_json`); non-integral `f64` is
+//! formatted by `zmij`, the shortest round-trip formatter `serde_json` calls, so
+//! the bytes are exactly `serde_json`'s (graded by `f64_matches_serde_json`) — the
 //! canonical parsers' `JSON.stringify` parity the fixtures pin; integers have a
 //! unique decimal form and are hand-formatted (two-digit-pair, the hot path
-//! emitting several ints per node).
+//! emitting several ints per node). `serde_json` is the tests' oracle only, never
+//! a dependency of the shipped crate.
 
 use crate::location::{Position, WirePositions};
 use crate::swar::{lanes_less_than, splat, zero_lanes};
@@ -1860,12 +1862,18 @@ impl JsonWriter {
         self.repeat_value_from(start, between);
     }
 
-    /// A non-integral `f64` (the rare literal tail) — `serde_json`'s ryu
-    /// formatting, matching `serde_json::Number` serialization.
+    /// A non-integral `f64` (the rare literal tail): its shortest round-trip digits from
+    /// `zmij`, the formatter `serde_json` itself calls, and `null` for a non-finite value —
+    /// byte-identical to `serde_json`'s serialization of the same `f64`, graded by
+    /// `f64_matches_serde_json`.
     #[inline]
-    #[expect(clippy::expect_used)]
     pub fn f64(&mut self, n: f64) {
-        serde_json::to_writer(&mut self.buf, &n).expect("Vec<u8> write is infallible");
+        if n.is_finite() {
+            self.buf
+                .extend_from_slice(zmij::Buffer::new().format_finite(n).as_bytes());
+        } else {
+            self.null();
+        }
     }
 
     // ⚠️ `inline(never)`, and that is a **size** constraint. The body below is
@@ -2319,6 +2327,153 @@ mod tests {
         let mut w = JsonWriter::with_capacity(0);
         w.string(s);
         w.into_bytes()
+    }
+
+    fn emit_f64(n: f64) -> Vec<u8> {
+        let mut w = JsonWriter::with_capacity(0);
+        w.f64(n);
+        w.into_bytes()
+    }
+
+    /// [`JsonWriter::f64`] must write exactly what `serde_json` writes for the same `f64` —
+    /// shortest round-trip digits in `serde_json`'s spelling (`1e21`, `1.5e-7`, `-0.0`), and
+    /// `null` for a non-finite value — over [`f64_parity_cases`]: the boundaries where a
+    /// shortest-digits formatter switches notation or loses its fast path, every binary
+    /// exponent, the subnormals, and seeded random bit patterns (`TSV_F64_PARITY_RANDOM`
+    /// raises their count from the default). A corpus cannot grade this: a non-integral
+    /// literal reaches the formatter on a small share of files, and most of these values on
+    /// none.
+    #[test]
+    fn f64_matches_serde_json() {
+        let random = std::env::var("TSV_F64_PARITY_RANDOM")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(100_000);
+        let cases = f64_parity_cases(random);
+        for &n in &cases {
+            let theirs = serde_json::to_vec(&n).expect("serde_json serializes an f64");
+            assert_eq!(
+                emit_f64(n),
+                theirs,
+                "f64 parity broke on {n:e} ({:#018x})",
+                n.to_bits()
+            );
+        }
+        eprintln!("f64_matches_serde_json: {} cases", cases.len());
+    }
+
+    /// The `f64` values [`f64_matches_serde_json`] grades, both signs of each: the specials;
+    /// every power of ten a double can approach and its nearest few neighbours by bit pattern
+    /// (the notation switches at `1e-7` / `1e-6` / `1e15`-`1e21`, and the decimal-exponent
+    /// boundaries a shortest-digits search tests against); every power of two and its
+    /// neighbours; each binary exponent with its smallest, largest and a few middle
+    /// mantissas; the subnormals' extremes and every one-bit subnormal; the values the TS
+    /// lexer's numeric-literal forms produce (decimal, exponent, hex, octal, binary,
+    /// separators, the overflow and underflow spellings); then `random` seeded bit patterns.
+    fn f64_parity_cases(random: usize) -> Vec<f64> {
+        fn neighbours(out: &mut Vec<f64>, x: f64, reach: i64) {
+            let bits = x.to_bits();
+            for k in -reach..=reach {
+                if let Some(b) = bits.checked_add_signed(k) {
+                    out.push(f64::from_bits(b));
+                }
+            }
+        }
+        let mut out = vec![
+            0.0,
+            f64::MIN_POSITIVE,
+            f64::MAX,
+            f64::EPSILON,
+            f64::NAN,
+            f64::INFINITY,
+            f64::from_bits(1),
+            f64::from_bits(0x000F_FFFF_FFFF_FFFF),
+            0.1,
+            0.2,
+            0.3,
+            1.0 / 3.0,
+            2.0 / 3.0,
+            std::f64::consts::PI,
+            std::f64::consts::E,
+            9_007_199_254_740_993.0,
+            18_446_744_073_709_551_616.0,
+            123_456_789_012_345_680_000.0,
+        ];
+        for e in -325..=309 {
+            let p: f64 = format!("1e{e}").parse().expect("a decimal literal parses");
+            neighbours(&mut out, p, 3);
+            for m in [
+                "2",
+                "5",
+                "9",
+                "1.5",
+                "9.999999999999999",
+                "1.0000000000000002",
+                "4.9",
+            ] {
+                out.push(
+                    format!("{m}e{e}")
+                        .parse()
+                        .expect("a decimal literal parses"),
+                );
+            }
+        }
+        for e in -1074..=1023 {
+            neighbours(&mut out, 2f64.powi(e), 2);
+        }
+        for exponent in 0..2047u64 {
+            for mantissa in [
+                0,
+                1,
+                2,
+                0x8_0000_0000_0000,
+                0xF_FFFF_FFFF_FFFE,
+                0xF_FFFF_FFFF_FFFF,
+            ] {
+                out.push(f64::from_bits((exponent << 52) | mantissa));
+            }
+        }
+        for bit in 0..52 {
+            out.push(f64::from_bits(1 << bit));
+            out.push(f64::from_bits((1 << bit) - 1));
+        }
+        for literal in [
+            "0.5",
+            "5.0",
+            "0.000001",
+            "0.0000001",
+            "1e-7",
+            "1.5e-6",
+            "9.99999e-6",
+            "1e21",
+            "1e20",
+            "999999999999999999999",
+            "1e999",
+            "1e-999",
+            "2e-324",
+            "2.4703282292062328e-324",
+            "1.7976931348623159e308",
+            "4.9e-324",
+            "123.456",
+            "1.000000000000000111",
+        ] {
+            out.push(literal.parse().expect("a decimal literal parses"));
+        }
+        // `0x1F`, `0o17`, `0b1011`, and a hex literal past 2^64 (`0xFFFFFFFFFFFFFFFFFFFFFF`,
+        // which rounds to 2^88).
+        out.extend([31.0, 15.0, 11.0, 2f64.powi(88)]);
+        // splitmix64, seeded: the same patterns on every run.
+        let mut state: u64 = 0x5EED_F64F_0000_0001;
+        for _ in 0..random {
+            state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+            let mut z = state;
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+            out.push(f64::from_bits(z ^ (z >> 31)));
+        }
+        let negated: Vec<f64> = out.iter().map(|&x| -x).collect();
+        out.extend(negated);
+        out
     }
 
     /// [`JsonWriter::string`], and [`JsonWriter::string_led`] and

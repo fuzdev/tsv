@@ -14,10 +14,10 @@
 //! JSON exactly (the shape each fixture's `expected.json` records).
 //!
 //! Dynamic strings are escaped by `JsonWriter::string`, byte-identical to
-//! `serde_json`'s string serialization; only non-integral `f64` delegates to
-//! `serde_json` (ryu). Static tokens (node types, operators, kinds) are known
-//! escape-free and written verbatim; integers have a unique decimal form and
-//! are hand-formatted.
+//! `serde_json`'s string serialization; only non-integral `f64` goes to
+//! `JsonWriter::f64` (`zmij`, the formatter `serde_json` calls). Static tokens
+//! (node types, operators, kinds) are known escape-free and written verbatim;
+//! integers have a unique decimal form and are hand-formatted.
 //!
 //! Three conversion-time mutations of already-converted children become
 //! pre-computed decisions threaded down as flags (see `ExprFlags` in
@@ -775,8 +775,9 @@ fn write_escaped_name_field(w: &mut JsonWriter, name: &str) {
 /// `null` (JSON has no Infinity/NaN — an overflow literal like `1e999`),
 /// integral doubles below `1e21` as their expanded shortest-round-trip integer
 /// digits and integral doubles at/above `1e21` in exponential form (JS
-/// `Number::toString` / `JSON.stringify` semantics), everything else as ryu —
-/// which matches JS except the one non-integral decade handled below.
+/// `Number::toString` / `JSON.stringify` semantics), everything else as
+/// `JsonWriter::f64` writes it (`zmij`'s shortest round-trip digits, `serde_json`'s
+/// spelling) — which matches JS except the one non-integral decade handled below.
 pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
     if !n.is_finite() {
         // ±Inf → null, matching JSON.stringify (a parsed literal is never NaN).
@@ -807,14 +808,14 @@ pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
         // expanded integer (the spec's `k <= n <= 21` case); `shortest` —
         // Rust's shortest-round-trip Display — already holds those exact digits.
         // At/above 1e21 JS switches to exponential, where Rust's Display would
-        // wrongly keep expanding, so that range falls through to ryu (`w.f64`).
+        // wrongly keep expanding, so that range falls through to `w.f64`.
         if n.abs() < 1e21 {
             w.raw(&shortest);
             return;
         }
     } else {
         // Non-integral. JS `Number::toString` uses fixed notation down to the
-        // spec's `n = -5` (|x| in [1e-6, 1e-5)), whereas ryu switches to
+        // spec's `n = -5` (|x| in [1e-6, 1e-5)), whereas `zmij` switches to
         // scientific one decade earlier — the sole non-integral divergence.
         // In that single decade the point sits at position -5, so the fixed
         // form is `0.` + five zeros + the shortest significant digits.

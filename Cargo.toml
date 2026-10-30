@@ -79,15 +79,22 @@ serde = { version = "1", features = ["derive"] }
 # instead of collapsing them to f64, so the fixture pipeline (expected.json
 # generation + validation, both of which round-trip through `Value` via
 # `to_json_with_tabs`) compares the writer's exact number bytes against acorn's
-# — a literal like `1e20`/`0.000001` no longer gets reformatted through ryu on
-# both sides, which had masked `Number::toString` divergences. The production
-# wire writer (`JsonWriter`) never touches `Value`, so its output is unchanged.
+# — a literal like `1e20`/`0.000001` no longer gets reformatted through a float
+# formatter on both sides, which had masked `Number::toString` divergences. The
+# production wire writer (`JsonWriter`) never touches `Value`, and no crate meant
+# for publishing has a normal or build `serde_json` dependency (`deno task
+# deps:audit`), so these features unify only into dev and tooling builds — never
+# into a consumer's `serde_json`, whose deserialization they would change.
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip", "arbitrary_precision"] }
 smallvec = "1.15.2"
 thiserror = "2"
 unicode-ident = "1.0"
 unicode-segmentation = "1.13.3"
 unicode-width = "0.2.2"
+# Shortest round-trip `f64` formatting for the wire writer's non-integral numbers
+# (`tsv_lang`'s `JsonWriter::f64`): the formatter `serde_json` itself calls, called
+# directly so no shipped crate depends on `serde_json`. Featureless and dependency-free.
+zmij = "1.0.21"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

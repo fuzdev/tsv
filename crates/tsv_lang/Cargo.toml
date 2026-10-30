@@ -41,8 +41,8 @@ fanout_check = []
 audits = ["swallow_check", "comment_check", "fanout_check"]
 # Shared wire-JSON writer substrate (`json_writer`), pulled in transitively by
 # each language crate's `convert` feature. Off in the format-only
-# @fuzdev/tsv-format-wasm build, so `serde_json` never enters that graph.
-json = ["dep:serde_json"]
+# @fuzdev/tsv-format-wasm build, so `zmij` never enters that graph.
+json = ["dep:zmij"]
 # The loc-bearing wire: the line table `WireTables` builds beside its map, which is the
 # only thing that makes `WirePositions::lines` non-`None`. Off in every binding (they
 # ship the span-only wire alone), so the writers' `loc` emitters compile to dead code
@@ -56,10 +56,17 @@ smallvec.workspace = true
 unicode-ident.workspace = true
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
-# Only for the `json` feature's wire-JSON writer, whose `f64` emitter delegates
-# to `serde_json::to_writer` for exact ryu parity (and whose hand string escaper
-# is graded against it in tests). Optional so format-only builds stay serde-free.
-serde_json = { workspace = true, optional = true }
+# Only for the `json` feature's wire-JSON writer, whose `f64` emitter formats a
+# non-integral number with it, as `serde_json` does. Optional so format-only builds
+# leave it out.
+zmij = { workspace = true, optional = true }
+
+[dev-dependencies]
+# The oracle the wire writer is graded against: its hand string escaper
+# (`string_matches_serde_json`) and its `f64` emitter (`f64_matches_serde_json`)
+# must write exactly what `serde_json` writes. Test-only: the shipped crate has no
+# `serde_json` dependency, so the workspace entry's features never reach a consumer.
+serde_json.workspace = true
 
 [lints]
 workspace = true

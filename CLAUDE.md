@@ -222,6 +222,9 @@ deno task pins:audit:checkouts       # checkout ALIGNMENT (an environment fact):
 #                                      conformance`, reported by doctor — NOT in check (nothing there reads the checkouts)
 deno task format:audit               # `tsv format --check .`; fails on a would-change file (exit 1) OR a parse error (exit 2)
 deno task docs:audit                 # rustdoc `[link]`s resolve (doc lints DENIED, private items, `--all-features`); a dead link is a STALE DOC
+deno task deps:audit                 # no crate meant for publishing (a `[package.metadata.docs.rs]` table) reaches `serde_json`
+#                                      through a normal or build edge, at any feature set or target — its workspace features
+#                                      would unify into a consumer's own `serde_json` (cargo tree, no build)
 deno task docs:audit:docsrs          # each crate with a `[package.metadata.docs.rs]` table documented ALONE at that table's
 #                                      features (`cargo doc -p X --no-deps`, broken links DENIED, public→private links warned
 #                                      + counted) — the feature-gated link the all-features workspace build resolves
@@ -848,7 +851,7 @@ Worked example + full design: ./docs/architecture.md §Two-AST Design.
 **Key Rules**:
 
 - Raw strings NEVER duplicated in the internal AST (extract via `source[span.range()]`)
-- The internal AST is NEVER the wire output — the writer hand-emits the wire JSON; `serde_json` is used only for exact `f64` parity (the writer substrate in `tsv_lang`, whose hand string escaper is graded byte-for-byte against it) and, in `tsv_debug` alone, to read bytes back into a `Value` (fixture gate, audits, tests)
+- The internal AST is NEVER the wire output — the writer hand-emits the wire JSON; `serde_json` is the writer substrate's test oracle (`tsv_lang`'s hand string escaper and its `zmij`-backed `f64` emitter are graded byte-for-byte against it) and, in `tsv_debug` alone, reads bytes back into a `Value` (fixture gate, audits, tests); no crate meant for publishing depends on it
 
 ### Position Types: u32 vs usize
 
@@ -879,7 +882,8 @@ Comments live **separately from AST nodes**, in a flat `Comment` array at the ro
 
 The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh`; dev tooling adds `tokio`, `futures-util`, `serde` with `derive`, `similar`, `tempfile` and `thiserror`; `tsv_wasm` adds `wasm-bindgen`/`js-sys`):
 
-- `serde_json` — wire-JSON emission (exact `f64` formatting; the oracle the hand string escaper is tested against), reached through `tsv_lang`'s `json` feature (and directly by `tsv_ffi`, which serializes its `{"error": …}` payload with it); no shipped crate deserializes. The one reader, `tsv_debug::json` (fixture gate, audits, tests), enables `unbounded_depth` — the default 128-level recursion limit refused wires the parser emits fine. `serde` itself is a dev-tooling dep (`tsv_debug`'s `derive`); the language crates see it only transitively
+- `zmij` — the wire writer's non-integral `f64` digits (`tsv_lang`'s `json` feature): the shortest round-trip formatter `serde_json` itself calls, called directly so the bytes stay `serde_json`'s (graded by `f64_matches_serde_json`) with no `serde_json` in the published graph
+- `serde_json` — **never a normal or build dependency of a crate meant for publishing** (every crate with a `[package.metadata.docs.rs]` table; `deno task deps:audit` gates it), because the workspace entry's `preserve_order` / `float_roundtrip` / `arbitrary_precision` features would unify into a consumer's own `serde_json` and change its deserialization. It is the dev-dependency oracle of `tsv_lang`'s writer (escaper + `f64`) and `tsv_html`'s entity-table generator, a normal dependency of the unpublished `tsv_ffi` (its `{"error": …}` payload), `tsv_debug` and the root test package. The one reader, `tsv_debug::json` (fixture gate, audits, tests), enables `unbounded_depth` — the default 128-level recursion limit refused wires the parser emits fine. `serde` itself is a dev-tooling dep (`tsv_debug`'s `derive`), out of every published crate's normal graph with `serde_json`
 - `smallvec` — stack-allocated vectors (printers + `tsv_check`)
 - `unicode-ident` / `unicode-segmentation` / `unicode-width` — XID identifiers, grapheme clustering, display width (CJK, zero-width)
 - `bumpalo` — bump arena for the internal AST (and, via `tsv_arena`, the bindings' per-thread `reset()` reuse; `tsv_check`'s caller-owned arenas follow the same contract)
