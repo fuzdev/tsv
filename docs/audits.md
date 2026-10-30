@@ -34,6 +34,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
 | [docs.rs build](#docsrs-build-audit-docsauditdocsrs) | `docs:audit:docsrs` | a crate meant for docs.rs whose own doc build fails at its docs.rs feature set or at its defaults — a link to an item behind a feature that build leaves off, which the all-features workspace build resolves | `deno task check` |
 | [Published deps](#published-graph-dependency-audit-depsaudit) | `deps:audit` | a crate meant for publishing reaching `serde_json` through a normal or build dependency, at any feature set or target — the workspace entry's features would unify into a consumer's own `serde_json` and change how it deserializes | `deno task check` |
+| [Package contents](#package-contents-audit-packageaudit) | `package:audit` | a crate meant for publishing whose crates.io tarball lacks its `README.md`, `LICENSE` (the root's bytes) or a required `NOTICE`, ships any other Markdown (`CLAUDE.md`), links relatively from its README, or states a `rust-version` other than the pinned toolchain's major.minor — plus cargo's publishable set drifting from the shared reader's | `deno task check` |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
 | [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `deno task bench:install`, so NOT in `deno task check`) |
 | [Loc cross-grade](#loc-cross-grade-checkloc) | `check:loc` | tsv's loc wire and the shipped `locations.js` reconstruction of its span-only wire disagreeing on any fixture input — the two implementations of the one `loc` definition drifting apart | `deno task check` |
@@ -1173,6 +1174,40 @@ consumer-visible features is not graded until it joins the list. A publishable c
 without the docs.rs table fails the shared classification (`docs:audit:docsrs`) rather than
 going ungraded. It grades the graph `Cargo.lock` resolves; a denied package is reached by an edge
 tsv declares, which no consumer's resolution removes, so the lockfile cannot hide one.
+
+## Package Contents Audit (`package:audit`)
+
+```bash
+# one `cargo package --list -p <crate> --allow-dirty` per crate with a
+# [package.metadata.docs.rs] table, plus one `cargo metadata --no-deps`; no build
+# (scripts/package_audit.ts)
+deno task package:audit
+```
+
+**What it proves.** That each crate meant for publishing uploads what a crates.io consumer
+should get, and states what it should. From the file list `cargo publish` would upload: a
+`README.md` and a `LICENSE` ship, the `LICENSE` holds the root `LICENSE`'s bytes (each crate
+commits a symlink to it, which cargo packages as a regular file), every `NOTICE` in the crate
+directory ships and `tsv_html` must hold one (the WHATWG entity list it carries is attributed
+there), no other Markdown ships (`CLAUDE.md` is excluded per crate; a stray doc fails), and the
+listing names `src/lib.rs`, so an empty listing never reads as a pass. Every link in the
+README is absolute, since crates.io renders it away from the repository. From the resolved
+manifests: each crate's `rust-version` is the major.minor of the channel `rust-toolchain.toml`
+pins (the MSRV a consumer reads is the toolchain CI tests), its license is `0BSD`, and the
+readme cargo resolved is `README.md`.
+
+**Which crates.** The members with a `[package.metadata.docs.rs]` table
+(`scripts/docsrs_crates.ts`, the reader `deps:audit` and `docs:audit:docsrs` share). The same
+`cargo metadata` read cross-checks that reader: the members cargo would publish (`publish`
+unset) must be exactly the crates it lists, so a `publish = false` its regex cannot see fails
+here instead of grading a crate nothing publishes.
+
+**Blind spots.** It reads the listing, not a built `.crate`, and never compiles the packaged
+sources — `cargo publish --workspace --dry-run --locked` does both, and no task or CI job runs
+it. A symlinked `LICENSE` that a checkout without symlink support turns into a text file fails
+the content compare on that machine only. It grades that a README exists and links absolutely,
+never what it says. `--allow-dirty` lists the working tree as it stands, untracked files
+included, so a run on a dirty tree grades what a publish from that tree would upload.
 
 ## Wire-Type Drift Check (`check:ast-types`)
 

@@ -2,9 +2,12 @@
 name = "tsv_svelte"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 description = "Svelte parsing and formatting library"
 license.workspace = true
 repository.workspace = true
+# This crate's agent notes stay in the repository; `deno task package:audit` grades the tarball.
+exclude = ["CLAUDE.md"]
 
 [package.metadata.docs.rs]
 # docs.rs builds this crate alone, at these features: the wire writers with `loc`, so the

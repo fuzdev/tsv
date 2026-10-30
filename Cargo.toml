@@ -21,6 +21,9 @@ members = [
 [workspace.package]
 version = "0.7.1"
 edition = "2024"
+# The toolchain CI tests (rust-toolchain.toml), stated for consumers as major.minor; it moves
+# with that pin, never apart (`deno task package:audit` grades that the two agree).
+rust-version = "1.94"
 authors = ["fuz.dev"]
 license = "0BSD"
 repository = "https://github.com/fuzdev/tsv"
@@ -195,7 +198,7 @@ useless_let_if_seq = "allow"
 elidable_lifetime_names = "allow"
 
 # Cargo overrides
-cargo_common_metadata = "allow"      # internal crates, not published to crates.io
+cargo_common_metadata = "allow"      # keywords/categories not curated yet; README + LICENSE gated by `package:audit`
 
 # Restriction lints (panic points need explicit #[allow] with justification)
 clone_on_ref_ptr = "warn"

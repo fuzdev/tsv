@@ -3,7 +3,8 @@
  * `Cargo.toml` carries a `[package.metadata.docs.rs]` table, with the feature set that
  * table names. The one definition of "a crate meant for publishing" the gates share
  * (`docs:audit:docsrs` builds each one's docs, `deps:audit` grades each one's
- * dependency graph).
+ * dependency graph, `package:audit` grades each one's tarball and cross-checks this list
+ * against cargo's own reading of `publish`).
  *
  * The definition is closed: every member, the root package included, either carries the
  * table or says `publish = false` in its `[package]` table, never both and never neither, and

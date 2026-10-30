@@ -225,6 +225,10 @@ deno task docs:audit                 # rustdoc `[link]`s resolve (doc lints DENI
 deno task deps:audit                 # no crate meant for publishing (a `[package.metadata.docs.rs]` table) reaches `serde_json`
 #                                      through a normal or build edge, at any feature set or target — its workspace features
 #                                      would unify into a consumer's own `serde_json` (cargo tree, no build)
+deno task package:audit              # each publishable crate's tarball (`cargo package --list`, no build): README.md + LICENSE
+#                                      (the root's bytes) + tsv_html's NOTICE ship, no other Markdown (CLAUDE.md) does, README
+#                                      links absolute, `rust-version` = rust-toolchain.toml's major.minor; cargo's publishable set
+#                                      = the docs.rs-table reader's
 deno task docs:audit:docsrs          # each crate with a `[package.metadata.docs.rs]` table documented ALONE at that table's
 #                                      features (`cargo doc -p X --no-deps`, broken links DENIED, public→private links warned
 #                                      + counted) — the feature-gated link the all-features workspace build resolves
