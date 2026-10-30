@@ -77,7 +77,7 @@ impl Drop for ArmedRun {
 /// `jobs_hint` is the `--jobs N` flag (`None` / `Some(0)` → `available_parallelism`, held to
 /// `tsv_cli::cli::stack::clamp_worker_count` — the same ceiling `tsv format --jobs` takes, shared
 /// so the two flags cannot drift — and capped at the file count). Every worker runs on the stated
-/// [`tsv_cli::cli::stack::STACK_SIZE`] reservation rather than Rust's 2 MiB default: these sweeps
+/// [`tsv_lang::STACK_SIZE`] reservation rather than Rust's 2 MiB default: these sweeps
 /// drive the same recursive descent the CLI does, and a stack overflow is uncatchable, so a
 /// narrower pool thread would abort the whole audit on input `tsv format` handles. Chunking is by
 /// **stride**, not contiguous block: fixture sizes cluster by

@@ -16,7 +16,8 @@ mod whitespace;
 use __private::{format_folded_in, parse_folded};
 use ast::Root;
 pub use tsv_lang::{
-    Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, WireCoordinates, WirePoint,
+    Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, STACK_SIZE, WireCoordinates,
+    WirePoint, run_with_stack,
 };
 
 /// The coordinates a Svelte document's positions are reported in — Svelte's: a leading

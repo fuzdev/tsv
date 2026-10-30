@@ -20,7 +20,8 @@ mod whitespace;
 
 use __private::{format_folded_in, parse_folded};
 pub use tsv_lang::{
-    Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, WireCoordinates, WirePoint,
+    Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, STACK_SIZE, WireCoordinates,
+    WirePoint, run_with_stack,
 };
 
 /// The coordinates a CSS document's positions are reported in — `parseCss`'s: a leading

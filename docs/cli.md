@@ -17,7 +17,7 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 - Input handling (file, `--content`, `--stdin`) — `cli/input.rs`
 - File/directory discovery with extension filter, gitignore-aware ignore evaluation (hierarchical `.gitignore`/`.formatignore`/`.prettierignore`), and the build-output heuristic fallback where no `.gitignore` is in scope (the per-entry verdicts from `tsv_discover`) — `cli/discover.rs`
 - The in-process parse+format entry point (`format_source`) — `cli/format_source.rs`
-- The thread stack reservation and the `--jobs` ceiling (`STACK_SIZE`, `sized_thread`, `clamp_worker_count`) — `cli/stack.rs`
+- The thread stack reservation on every route and the `--jobs` ceiling (`sized_thread`, `run_on_sized_stack`, `clamp_worker_count`, over the library's `tsv_lang::STACK_SIZE` / `run_with_stack`) — `cli/stack.rs`
 - The `--pretty` re-indenter (tab-indented form of the compact wire, no deserializer) — `json_utils.rs`
 
 ## Binary Structure
@@ -513,24 +513,34 @@ whole sweep's shapes at the same depths through the WASM package on a Node main 
 
 **A consumer's debug tests sit below the debug contract.** Rust's test harness runs each
 test on a 2 MiB thread, so `cargo test` over code that hands tsv its deepest accepted
-input can overflow in a debug build. Raise the test threads' stack to the debug contract
-with `RUST_MIN_STACK=16777216`, or build tsv optimized in the dev profile
-(`[profile.dev.package.tsv_ts] opt-level = 2`, and the same for `tsv_lang`, `tsv_css`
-and `tsv_svelte`), which keeps a dev build's checks and brings its frames within the
-optimized contract's 2 MiB — the harness's own default.
+input can overflow in a debug build. Each language crate re-exports a helper for exactly
+this: `run_with_stack(f)` (`tsv_ts::run_with_stack`, and the same item from `tsv_css` and
+`tsv_svelte`) runs `f` on a scoped thread reserving `STACK_SIZE` (32 MiB, twice the debug
+contract), so `f` may borrow, and returns its value; it fails only when the OS refuses the
+thread, and a panic in `f` resumes on the caller, so a test's assertion fails as it would
+inline. Any thread of your own that runs tsv on input it does not control can take it the
+same way, or reserve `STACK_SIZE` itself. Two alternatives need no code: raise the test
+threads' stack to the debug contract with `RUST_MIN_STACK=16777216`, or build tsv optimized
+in the dev profile (`[profile.dev.package.tsv_ts] opt-level = 2`, and the same for
+`tsv_lang`, `tsv_css` and `tsv_svelte`), which keeps a dev build's checks and brings its
+frames within the optimized contract's 2 MiB — the harness's own default.
 
 ### The CLI's stack reservation
 
-`main` runs the whole subcommand on a thread with `STACK_SIZE` reserved (32 MiB,
-`cli/stack.rs`), and the format workers reserve the same, so the stack is a property of
-tsv rather than of the route, the host and the platform: inherited, the main thread's
-stack is the process `RLIMIT_STACK` on Unix — commonly 8 MiB, but whatever the machine
-says — and **1 MiB on Windows**, where the linker writes it into the executable header,
+`main` runs the whole subcommand on a thread with `STACK_SIZE` reserved (32 MiB — the
+constant lives in `tsv_lang`, re-exported by each language crate beside `run_with_stack`,
+which the CLI's `cli/stack.rs` builds on), and the format workers reserve the same, so the
+stack is a property of tsv rather than of the route, the host and the platform: inherited,
+the main thread's stack is the process `RLIMIT_STACK` on Unix — commonly 8 MiB, but
+whatever the machine says — and **1 MiB on Windows**, where the linker writes it into the
+executable header,
 below the contract; a spawned thread takes Rust's 2 MiB. The reservation also keeps a
 debug build of the CLI above its contract, and it names the threads (`tsv`,
 `tsv-format`), because the runtime's `thread '<name>' has overflowed its stack` line is
 the one diagnostic an overflow leaves. A reservation is address space, not memory: pages
-commit lazily.
+commit lazily. Where the library's helper reports a refused spawn as an error, the CLI
+warns and runs the subcommand on the inherited stack rather than failing the run, and it
+answers a panic that reaches the top with exit 101.
 
 **The wire has no reader ceiling of its own.** `tsv parse --pretty` re-indents the compact
 wire bytes in one linear pass (`json_utils::indent_json_with_tabs`) rather than reading

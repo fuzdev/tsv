@@ -71,7 +71,8 @@ use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
 use tsv_lang::{CommentFreeWindow, EmbedContext};
 pub use tsv_lang::{
-    Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, Span, WireCoordinates, WirePoint,
+    Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, STACK_SIZE, Span, WireCoordinates,
+    WirePoint, run_with_stack,
 };
 
 pub use goal::Goal;

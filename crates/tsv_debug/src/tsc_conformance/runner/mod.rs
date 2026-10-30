@@ -157,7 +157,7 @@ pub enum MissingCause {
     Other,
 }
 
-/// Worker-thread stack for the sweep, far above the `tsv_cli::cli::stack::STACK_SIZE`
+/// Worker-thread stack for the sweep, far above the `tsv_lang::STACK_SIZE`
 /// reservation the rest of this binary already runs on.
 ///
 /// This corpus is adversarially deep by construction — pathological-nesting tests, and

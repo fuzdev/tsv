@@ -1,64 +1,43 @@
-//! The one stack reservation every tsv thread runs on.
+//! The one stack reservation every tsv thread runs on, and how many such threads tsv asks for.
 //!
-//! The parser and the printer are recursive descents, so nesting depth costs stack,
-//! and a stack overflow is **not** a catchable panic — no `catch_unwind` and no panic
-//! contract can turn it into a per-file error the way they do every other failure. It
-//! aborts the process, which for a directory format means dying partway through with
-//! some files already rewritten. The parsers' depth limits (`tsv_lang::NESTING_LIMIT`,
-//! `tsv_lang::SPINE_LIMIT`) bound how deep an accepted tree goes, sized so its walks fit
-//! a 2 MiB thread in an optimized build and a 16 MiB one in a debug build; what this
-//! module decides is that every tsv thread has at least that.
+//! The size, why a reservation is needed at all, and what it costs are the library's to
+//! state: [`tsv_lang::STACK_SIZE`] and [`tsv_lang::run_with_stack`] (a stack overflow is not
+//! a catchable panic, so for a directory format it means dying partway through with some
+//! files already rewritten; the parsers' depth limits are sized for a 2 MiB thread
+//! optimized and a 16 MiB one in debug, which an inherited stack does not promise). What
+//! this module adds is the CLI's layer over them.
 //!
-//! So the stack has to be a decision rather than an inheritance. Left alone, every
-//! route picks up a different one from its host: the main thread takes the platform
-//! default (the process `RLIMIT_STACK` on Unix — commonly 8 MiB, but larger or smaller
-//! on any given machine — and 1 MiB on Windows, where the linker writes it into the
-//! executable header and nothing at run time can raise it), a spawned thread takes
-//! Rust's 2 MiB, and `RUST_MIN_STACK` moves the second but not the first. The Windows
-//! main thread sits below the limits' contract, and a debug build's every inherited
-//! stack does.
-//!
-//! Stating it once and applying it to **every** thread tsv dispatches language work on —
-//! the wrapper [`run_on_sized_stack`] puts around the whole subcommand, each format
+//! **Every route.** Applying the reservation to *every* thread tsv dispatches language work
+//! on — the wrapper [`run_on_sized_stack`] puts around the whole subcommand, each format
 //! worker, and, in `tsv_debug`, each injection-audit worker and each thread of the tokio
-//! runtime its async commands format on — is what makes the stack a property of tsv
-//! rather than of the route, the host and the platform. [`sized_thread`] is the single
-//! constructor every `thread::Builder` spawn goes through, so one cannot quietly miss the
-//! reservation by building its own; the runtime, which builds its own threads by
-//! construction, takes [`STACK_SIZE`] directly.
+//! runtime its async commands format on — is what makes the stack a property of tsv rather
+//! than of the route, the host and the platform. [`sized_thread`] is the single constructor
+//! every `thread::Builder` spawn goes through, so one cannot quietly miss the reservation by
+//! building its own; the runtime, which builds its own threads by construction, takes
+//! [`tsv_lang::STACK_SIZE`] directly. A debug CLI and every audit `tsv_debug` runs over
+//! whole corpora (which also read the canonical parsers' trees, bounded by no tsv limit)
+//! stay on the safe side of any accepted input. `docs/cli.md` §Recursion Depth states the
+//! contract and the margins `tests/depth_limit.rs` holds.
 //!
-//! The value clears both contracts with room: 32 MiB is twice the debug build's, so a
-//! debug CLI and every audit `tsv_debug` runs over whole corpora (which also read the
-//! canonical parsers' trees, bounded by no tsv limit) stay on the safe side of any
-//! accepted input. `docs/cli.md` §Recursion Depth states the contract and the margins
-//! `tests/depth_limit.rs` holds.
+//! **Names, the fallback and the exit code.** Each thread is named (`tsv`, `tsv-format`),
+//! since an overflow's one diagnostic is the runtime's line naming the thread. A spawn the
+//! OS refuses is warned about and the work runs on the inherited stack rather than failing
+//! the run, and a panic that reaches the top exits 101, as an unhandled one would.
 //!
-//! The size is a *reservation*, not a commitment: pages are committed lazily on first
-//! touch, so it costs address space and ~0 RSS, and nothing the benchmarks measure
-//! moves. On a 64-bit target that stays free multiplied by the worker count, and every
-//! shipped target is 64-bit. The one limit it is *not* free against is a hard
-//! `RLIMIT_AS` (`ulimit -v`), which counts reservations rather than resident pages —
-//! container memory limits do not work that way, so this is a nearly-unused knob, but
-//! it is the setting under which a wide pool would fail to spawn.
-//!
-//! One question over: how *many* such threads tsv will ask the OS for. Both `--jobs`
-//! flags (the format pool's and the injection audits') are held to
-//! [`clamp_worker_count`], stated here for the same reason the size is — a rule with two
-//! spellings drifts, and this is the module both pools already go through to build a
-//! thread.
+//! **How many.** Both `--jobs` flags (the format pool's and the injection audits') are held
+//! to [`clamp_worker_count`], stated here for the same reason the size is stated once — a
+//! rule with two spellings drifts, and this is the module both pools already go through to
+//! build a thread. The reservation is free on a 64-bit target multiplied by any sane
+//! count; the ceiling exists for the blast radius (below).
 
 use crate::err_line;
+use std::panic::{self, AssertUnwindSafe};
 use std::sync::{Mutex, PoisonError};
 use std::thread;
-
-/// Stack reserved for every thread tsv runs language work on.
-///
-/// See the module docs for why this is stated rather than inherited, and where the
-/// number comes from.
-pub const STACK_SIZE: usize = 32 * 1024 * 1024;
+use tsv_lang::STACK_SIZE;
 
 /// The exit code Rust's runtime uses for an unhandled panic, reproduced here because
-/// [`run_on_sized_stack`] *joins* the panic rather than letting it unwind out of
+/// [`run_on_sized_stack`] *catches* the panic rather than letting it unwind out of
 /// `main`.
 const PANIC_EXIT_CODE: i32 = 101;
 
@@ -73,7 +52,7 @@ const PANIC_EXIT_CODE: i32 = 101;
 /// OS for every task slot it will give.
 ///
 /// The honest reason for a ceiling at all is **blast radius**, not throughput: each
-/// worker reserves [`STACK_SIZE`] of address space, and an unbounded `--jobs` takes task
+/// worker reserves [`tsv_lang::STACK_SIZE`] of address space, and an unbounded `--jobs` takes task
 /// slots until the OS starts refusing — which on a systemd machine means the login
 /// session's whole `TasksMax`, wedging every *other* process on it. A formatter should
 /// not be able to do that to a user who mistyped a number.
@@ -102,7 +81,7 @@ pub fn clamp_worker_count(requested: usize) -> usize {
     requested
 }
 
-/// A [`thread::Builder`] with [`STACK_SIZE`] reserved and `name` set.
+/// A [`thread::Builder`] with [`tsv_lang::STACK_SIZE`] reserved and `name` set.
 ///
 /// The name is not decoration: an overflow is uncatchable, so the runtime's
 /// `thread '<name>' has overflowed its stack` line is the *only* diagnostic the
@@ -120,46 +99,44 @@ pub fn sized_thread(name: &str) -> thread::Builder {
         .name(name.to_owned())
 }
 
-/// Run `f` on a thread with [`STACK_SIZE`] reserved, returning its value and
+/// Run `f` on a thread with [`tsv_lang::STACK_SIZE`] reserved, returning its value and
 /// reproducing its exit contract.
 ///
 /// The whole subcommand goes through here, not only the parts known to recurse: a
 /// route that stays on the main thread is a route with a different ceiling, and the
-/// point of the reservation is that there is exactly one. `f`'s own `process::exit`
-/// calls still exit the process from this thread, so nothing about the exit codes
-/// changes; the one path that needs restating is a panic, which arrives as a join
-/// error after the default hook has already printed it — and only under a `panic =
-/// "unwind"` profile, since `abort` kills the process before the join.
+/// point of the reservation is that there is exactly one. The thread is
+/// [`tsv_lang::run_with_stack`]'s (named `tsv`). `f`'s own `process::exit` calls still
+/// exit the process from that thread, so nothing about the exit codes changes; the one
+/// path that needs restating is a panic, which the library resumes here after the
+/// default hook has already printed it — and only under a `panic = "unwind"` profile,
+/// since `abort` kills the process first — and which exits 101 as an unhandled one would.
 ///
 /// A refused spawn runs `f` on this thread instead, and says so: that gives up the
-/// reservation (on Windows, for the 1 MiB main-thread stack the module doc exists to
+/// reservation (on Windows, for the 1 MiB main-thread stack the reservation exists to
 /// escape), and an overflow that follows would otherwise read as
 /// `thread 'main' has overflowed its stack` with nothing explaining why the ceiling
 /// was the inherited one. A machine that cannot spawn a thread is still not one where
 /// refusing to work is the better answer — the format pool answers the same refusal
 /// the same way (narrow to however many threads the OS gave, and format on the
 /// calling thread if that was none, warning each time), so no route turns a busy
-/// machine into a failed run. The closure is consumed by the failed attempt, so it is
-/// handed over in a cell the fallback can take it back out of.
+/// machine into a failed run. A refused spawn drops the closure it was handed, so `f`
+/// is handed over in a cell the fallback can take it back out of.
 pub fn run_on_sized_stack<F, T>(f: F) -> T
 where
     F: FnOnce() -> T + Send,
     T: Send,
 {
     let held = Mutex::new(Some(f));
-    thread::scope(
-        |scope| match sized_thread("tsv").spawn_scoped(scope, || take_and_run(&held)) {
-            Ok(handle) => handle
-                .join()
-                .unwrap_or_else(|_| std::process::exit(PANIC_EXIT_CODE)),
-            Err(e) => {
-                err_line!(
-                    "warning: could not start the sized thread ({e}); running on the inherited stack"
-                );
-                take_and_run(&held)
-            }
-        },
-    )
+    let outcome = panic::catch_unwind(AssertUnwindSafe(|| {
+        tsv_lang::run_with_stack(|| take_and_run(&held))
+    }))
+    .unwrap_or_else(|_| std::process::exit(PANIC_EXIT_CODE));
+    outcome.unwrap_or_else(|e| {
+        err_line!(
+            "warning: could not start the sized thread ({e}); running on the inherited stack"
+        );
+        take_and_run(&held)
+    })
 }
 
 /// Take the closure out of the cell and run it.

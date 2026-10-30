@@ -87,12 +87,12 @@ use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 /// tsv dispatches language work on, and a stack overflow is catchable under no profile:
 /// one pathological file in an arbitrary corpus aborts the sweep instead of reporting
 /// itself. The size is a reservation (lazy commit, ~0 RSS) and spawn cost is flat from
-/// 2 MiB to 32 MiB — measured, see `tsv_cli::cli::stack`, whose constant this is.
+/// 2 MiB to 32 MiB — see `tsv_lang::STACK_SIZE`, whose constant this is.
 #[expect(clippy::expect_used)]
 pub fn create_runtime() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .thread_stack_size(tsv_cli::cli::stack::STACK_SIZE)
+        .thread_stack_size(tsv_lang::STACK_SIZE)
         .build()
         .expect("Failed to create tokio runtime")
 }

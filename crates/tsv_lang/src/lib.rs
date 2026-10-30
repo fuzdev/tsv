@@ -2,7 +2,8 @@
 //!
 //! **No stability promise outside the items they re-export:** [`Span`], [`Error`],
 //! [`ErrorKind`], [`ErrorReport`], [`Result`], [`WirePoint`], [`WireCoordinates`],
-//! [`LineRule`] and [`LeadingBom`]. Everything else here is the plumbing the three share —
+//! [`LineRule`], [`LeadingBom`], and the sized-stack pair [`STACK_SIZE`] and
+//! [`run_with_stack`]. Everything else here is the plumbing the three share —
 //! the doc IR, the printing helpers, the wire-JSON writer, the comment scans, the depth
 //! limits — hidden from these docs and free to change in any release. Depend on a language
 //! crate, not on this one.
@@ -15,6 +16,8 @@
 //!   byte→UTF-16 map, and the line table under the `locations` feature);
 //!   `LocationMapper` - the line/column view a `loc` emitter reads from them
 //! - `Error` - error types and result aliases
+//! - `STACK_SIZE` / `run_with_stack` - the stack the parsers and printers are sized for,
+//!   and a way to run on one
 //! - `DepthBudget` / `NESTING_LIMIT` / `SPINE_LIMIT` - the parsers' depth limits
 //! - `OutputBuffer` - shared printer output utilities
 //! - `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` - hardcoded formatter settings, and
@@ -59,6 +62,7 @@ mod sizing;
 #[doc(hidden)]
 pub mod source_scan;
 mod span;
+mod stack;
 #[doc(hidden)]
 pub mod swar;
 mod whitespace;
@@ -103,6 +107,7 @@ pub use output::{OutputBuffer, write_indent};
 #[doc(hidden)]
 pub use sizing::{estimated_ast_arena_capacity, estimated_json_capacity};
 pub use span::Span;
+pub use stack::{STACK_SIZE, run_with_stack};
 #[doc(hidden)]
 pub use whitespace::{
     is_js_whitespace, trim_end_js_whitespace, trim_js_whitespace, trim_start_js_whitespace,
