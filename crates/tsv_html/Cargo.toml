@@ -6,6 +6,11 @@ description = "HTML-specific classification and whitespace rules for tsv"
 license.workspace = true
 repository.workspace = true
 
+[package.metadata.docs.rs]
+# docs.rs builds this crate alone, at its default features; `deno task docs:audit:docsrs`
+# builds the same shape. One target: nothing here differs by platform.
+targets = ["x86_64-unknown-linux-gnu"]
+
 [dependencies]
 phf.workspace = true
 # May add tsv_lang later if needed

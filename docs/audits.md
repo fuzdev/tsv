@@ -32,6 +32,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Discovery parity](#corpus-discovery-parity-audit-discoveryaudit) | `discovery:audit` | `tsv format --list` over the `../corpora` snapshot naming a different file set than the snapshot's committed tree holds in tsv's extensions — a discovery prune firing on real code, or an extension drift | `deno task check` (when `../corpora` is present) |
 | [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting — or type-stripping — the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; neither `deno task check` nor the publish path compares engines) |
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
+| [docs.rs build](#docsrs-build-audit-docsauditdocsrs) | `docs:audit:docsrs` | a crate meant for docs.rs whose own doc build fails at its docs.rs feature set — a link to an item behind a feature docs.rs leaves off, which the all-features workspace build resolves | `deno task check` |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
 | [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `deno task bench:install`, so NOT in `deno task check`) |
 | [Loc cross-grade](#loc-cross-grade-checkloc) | `check:loc` | tsv's loc wire and the shipped `locations.js` reconstruction of its span-only wire disagreeing on any fixture input — the two implementations of the one `loc` definition drifting apart | `deno task check` |
@@ -1041,7 +1042,9 @@ clean code**, so its coverage is a claim about what got compiled, not about what
   under two roots.
 - **`#[cfg(feature)]`** — several `audit` submodules sit behind `comment_check`, so a
   default-feature build cannot resolve a link that names them; hence `--all-features`, which
-  reaches gated code in every crate, not only this one.
+  reaches gated code in every crate, not only this one. The converse — a link that resolves
+  only with a feature on, in a crate docs.rs builds with it off — is
+  [`docs:audit:docsrs`](#docsrs-build-audit-docsauditdocsrs)'s.
 - **`#[cfg(test)]`** — rustdoc does not document test items under any feature set, so **every
   doc link inside a `#[cfg(test)] mod tests` is ungated** — including the ones on test-only
   `static`s and helpers, which is where a codebase like this one parks its oracles. A rename
@@ -1076,6 +1079,51 @@ errors *beside* the dead link, and those needed reading, not the gate.
 
 **Build world.** `cargo doc` builds its own rmeta; it does not share the `--profile corpus`
 world the other `check` audits use, so it adds a short compile of its own.
+
+## docs.rs Build Audit (`docs:audit:docsrs`)
+
+```bash
+# one `cargo doc -p <crate> --no-deps` per crate with a [package.metadata.docs.rs] table,
+# at that table's features (scripts/docsrs_audit.ts)
+deno task docs:audit:docsrs
+```
+
+**What it proves.** That every crate meant for docs.rs builds its docs the way docs.rs
+will: alone, at its own feature set, with `[workspace.lints.rustdoc]` copied into the
+package (so `broken_intra_doc_links` is denied there too). A link to an item behind a
+feature that set leaves off — a link to `Wire::Loc` under `locations`, or to a module under
+`json` — fails the crate's whole docs.rs page, and `docs:audit` cannot see it: its
+`--all-features` build turns every gate on, and a `--workspace` build unifies features
+across crates, so the link resolves through some other crate's features. Here each crate
+is built on its own.
+
+**Which crates, at which features.** A crate is graded when its `Cargo.toml` carries a
+`[package.metadata.docs.rs]` table, which marks it as meant for docs.rs and is the one
+place its docs.rs feature set is written; the script reads `features`, `all-features` and
+`no-default-features` from it rather than restating them. No table anywhere is a failure,
+not a pass.
+
+**Lints.** The `docs:audit` set, plus `--cfg docsrs` as docs.rs passes it, with one level
+changed: `private_intra_doc_links` is **warned and counted per crate**, not allowed.
+docs.rs documents public items only, so each such link is inert on the published page;
+it is not denied because the codebase links private items on purpose (`docs:audit`
+navigates them under `--document-private-items`), and many of them leave the public
+surface as it narrows.
+
+**Blind spots.** It builds the host target only, whatever the table's `targets` say, and
+with the pinned stable rustdoc, where docs.rs runs a nightly one, so a lint only nightly
+fires (or a level nightly changed) goes unseen. `cargo doc -p tsv_cli` also documents the
+`tsv` binary, which docs.rs does not, so for that crate the leg is slightly stricter than
+docs.rs. A published crate whose manifest lacks the `[package.metadata.docs.rs]` table (or
+spells it inline, which the script's reader does not parse) is not graded at all, so
+dropping the table drops the crate silently. It grades a crate's docs.rs feature set, not
+every feature combination a consumer might pick (`docs:audit`'s `--all-features` covers the
+union, nothing covers the subsets between). Like `docs:audit`, it checks that a link
+resolves, never that the prose is true.
+
+**Build world.** Its own target directory, `target/docsrs`, since its lint flags differ
+from `docs:audit`'s and a shared `target/doc` would make the two rebuild each other's
+output on every run.
 
 ## Wire-Type Drift Check (`check:ast-types`)
 

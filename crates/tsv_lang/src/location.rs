@@ -775,7 +775,8 @@ pub struct WireTables {
 
 impl WireTables {
     /// A document's tables for `wire` in its language's coordinates: the map alone for
-    /// [`Wire::Span`]; for [`Wire::Loc`] the line table under `coordinates.lines` too —
+    /// [`Wire::Span`]; for `Wire::Loc` (the `locations` feature) the line table under
+    /// `coordinates.lines` too —
     /// ECMAScript's terminators for a TypeScript document
     /// ([`LocationTracker::new_ecmascript_with_map`]), `\n` alone for a Svelte or CSS one
     /// ([`LocationTracker::new_with_map`]) — built in the same source scan. The map counts

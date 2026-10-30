@@ -6,6 +6,11 @@ description = "tsv file-discovery policy: build-output heuristic + safety-net pr
 license.workspace = true
 repository.workspace = true
 
+[package.metadata.docs.rs]
+# docs.rs builds this crate alone, at its default features; `deno task docs:audit:docsrs`
+# builds the same shape. One target: nothing here differs by platform.
+targets = ["x86_64-unknown-linux-gnu"]
+
 [dependencies]
 # Only the matcher. Zero external dependencies by design (like tsv_ignore),
 # keeping the format-only WASM artifact tiny and sidestepping the

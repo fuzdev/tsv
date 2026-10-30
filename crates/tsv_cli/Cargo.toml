@@ -6,6 +6,12 @@ description = "Command-line interface for tsv tools"
 license.workspace = true
 repository.workspace = true
 
+[package.metadata.docs.rs]
+# docs.rs builds this crate alone, at its default features; `deno task docs:audit:docsrs`
+# builds the same shape. One target: the lib is the CLI's internals, whose few
+# platform-gated lines need no page of their own.
+targets = ["x86_64-unknown-linux-gnu"]
+
 [[bin]]
 name = "tsv"
 path = "src/main.rs"

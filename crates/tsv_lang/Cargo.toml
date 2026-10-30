@@ -6,6 +6,11 @@ description = "Language-agnostic foundation primitives for tsv"
 license.workspace = true
 repository.workspace = true
 
+[package.metadata.docs.rs]
+# docs.rs builds this crate alone, at its default features; `deno task docs:audit:docsrs`
+# builds the same shape. One target: nothing here differs by platform.
+targets = ["x86_64-unknown-linux-gnu"]
+
 [features]
 # Opt-in render-time line-comment swallow check (diagnostic). Off by default so
 # production artifacts (wasm/cli/ffi) — and default `tsv_debug` builds, whose

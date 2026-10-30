@@ -34,11 +34,11 @@
 //! `cargo run --release --features census -p tsv_debug -- profile <corpus>`.
 //! Unlabelled non-zero counters still report, as `c<index>`.
 //!
-//! One site-keyed hook is durable beside the counters: [`site`] records a caller
-//! location with a small count, and `DocArena::concat` / `fill` carry a
-//! `#[cfg_attr(feature = "census", track_caller)]` that feeds it their part count — so
-//! "which sites assemble how many parts" is one feature flag away, the population a
-//! board cannot show (a `concat` inlined at hundreds of sites owns no symbol). The report
+//! One site-keyed hook is durable beside the counters: `site` (which exists only with the
+//! `census` feature) records a caller location with a small count, and `DocArena::concat` /
+//! `fill` carry a `#[cfg_attr(feature = "census", track_caller)]` that feeds it their part
+//! count — so "which sites assemble how many parts" is one feature flag away, the population
+//! a board cannot show (a `concat` inlined at hundreds of sites owns no symbol). The report
 //! prints `site,<file>:<line>,<len 0>,<1>,<2>,<3>,<4–8>,<>8>` rows, largest first.
 
 /// Number of counters. Raise it if a session needs more; the array is static and

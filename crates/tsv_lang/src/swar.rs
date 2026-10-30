@@ -1,7 +1,7 @@
 //! SWAR byte-search kernels — the word-at-a-time primitives the line scans
 //! ([`crate::location`]), the width and quote scans ([`crate::printing`]), the
-//! wire-JSON escape prescan and escaper ([`crate::json_writer`]) and the language lexers'
-//! token-body scans share.
+//! wire-JSON escape prescan and escaper (`json_writer`, behind the `json` feature) and the
+//! language lexers' token-body scans share.
 //!
 //! Every kernel here answers a question about the eight bytes packed in one
 //! `u64`. They exist as one module rather than one copy per caller because

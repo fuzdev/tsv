@@ -6,6 +6,11 @@ description = "gitignore-style path matching for tsv's file discovery (.prettier
 license.workspace = true
 repository.workspace = true
 
+[package.metadata.docs.rs]
+# docs.rs builds this crate alone, at its default features; `deno task docs:audit:docsrs`
+# builds the same shape. One target: nothing here differs by platform.
+targets = ["x86_64-unknown-linux-gnu"]
+
 [dependencies]
 # zero dependencies by design — a pure, hand-rolled gitignore(5) matcher keeps
 # the format-only WASM artifact tiny (no regex/globset) and sidesteps the
