@@ -7,7 +7,7 @@
 // ## Architecture
 //
 // Doc-first (like `selectors.rs`/`values.rs`): each prelude is built as one doc tree
-// and rendered through the renderer via the shared `write_arena_doc_with_suffix` (the
+// and rendered through the renderer via the shared `write_arena_doc_reserving` (the
 // writer the `@scope` clause's selector list uses too), so the wrap decision and emission
 // share a single representation — no measurement pass to drift from emission. `@supports`/`@container`
 // conditions and the `@media`/`@import` single-query `and`/`or` wrap are `fill`s; the
@@ -167,8 +167,8 @@ impl<'a> ConditionKind<'a> {
 /// first line overruns) dropped to its own line and left the name's space stranded as
 /// trailing whitespace (`@media ⏎\t\t(min-width: …`). The head renders in place and the
 /// wrap lands at the `and` after it (`prelude_first_segment_long_prettier_divergence`).
-fn prelude_fill_context(suffix_width: usize) -> DocContext {
-    DocContext::reserving(suffix_width).with_glued_lead(true)
+fn prelude_fill_context(reserve: usize) -> DocContext {
+    DocContext::reserving(reserve).with_glued_lead(true)
 }
 
 impl<'a> Printer<'a> {
@@ -246,9 +246,9 @@ impl<'a> Printer<'a> {
                     // column sooner, the same boundary the media-query fill above
                     // already measures for itself. Without it a 101-char
                     // `@import … supports(…);` sat one char over print width.
-                    let suffix_width = usize::from(i == values.len() - 1 && atrule.block.is_none());
+                    let reserve = usize::from(i == values.len() - 1 && atrule.block.is_none());
                     let doc = self.build_css_value_doc(value);
-                    self.write_arena_doc_with_suffix(doc, suffix_width);
+                    self.write_arena_doc_reserving(doc, reserve);
                     prev_end = value.span().end;
                 }
                 // Trailing comments between the last value and the `;` (e.g.
@@ -358,14 +358,14 @@ impl<'a> Printer<'a> {
     ///     (orientation: landscape) {
     /// ```
     fn print_media_prelude(&mut self, content: &str, has_block: bool) {
-        let suffix_width = if has_block { " {".len() } else { 0 };
-        let doc = self.build_media_prelude_doc(content, suffix_width);
-        self.write_arena_doc_with_suffix(doc, suffix_width);
+        let reserve = if has_block { " {".len() } else { 0 };
+        let doc = self.build_media_prelude_doc(content, reserve);
+        self.write_arena_doc_reserving(doc, reserve);
     }
 
     /// Build the doc tree for a media-reader prelude — `@media` or `@custom-media` (see
     /// `print_media_prelude`).
-    fn build_media_prelude_doc(&self, content: &str, suffix_width: usize) -> DocId {
+    fn build_media_prelude_doc(&self, content: &str, reserve: usize) -> DocId {
         let d = self.d();
         // Normalize numbers + string quotes in the raw prelude (`.5px` → `0.5px`,
         // `"x"` → `'x'`). Comments preserved. `@media` and `@custom-media` are the two
@@ -412,7 +412,7 @@ impl<'a> Printer<'a> {
 
         // Single query: wrap greedily at its `and`/`or` boundaries. `text` already has a
         // deletable closing comma removed, and keeps one the entries need (`@media ,`).
-        self.build_and_or_wrap_doc(text, suffix_width)
+        self.build_and_or_wrap_doc(text, reserve)
     }
 
     /// Build an `and`/`or`-wrapping fill for a single media query (raw string).
@@ -441,7 +441,7 @@ impl<'a> Printer<'a> {
     /// [`Self::write_condition_prelude`]), so the guard belongs here at the source rather
     /// than at either tail. The leading end is the same question read from the other side,
     /// and `!segment.is_empty()` already answers it.
-    fn build_and_or_wrap_doc(&self, query: &str, suffix_width: usize) -> DocId {
+    fn build_and_or_wrap_doc(&self, query: &str, reserve: usize) -> DocId {
         let d = self.d();
         let atoms = value_normalization::split_by_space_preserving_parens(query);
 
@@ -475,7 +475,7 @@ impl<'a> Printer<'a> {
         }
 
         let fill = d.fill(&fill_parts);
-        let fill = d.with_context(fill, prelude_fill_context(suffix_width));
+        let fill = d.with_context(fill, prelude_fill_context(reserve));
         d.indent(fill)
     }
 
@@ -585,7 +585,7 @@ impl<'a> Printer<'a> {
         // The tail gap's far end: the block's `{`, or the statement's `;`.
         let region_end = prelude_region_end(atrule);
 
-        let suffix_width = if atrule.block.is_some() {
+        let reserve = if atrule.block.is_some() {
             " {".len()
         } else {
             0
@@ -595,9 +595,9 @@ impl<'a> Printer<'a> {
             condition,
             name_end_pos,
             (prelude_span, region_end),
-            suffix_width,
+            reserve,
         );
-        self.write_arena_doc_with_suffix(doc, suffix_width);
+        self.write_arena_doc_reserving(doc, reserve);
     }
 
     /// Build the doc for an `@import` prelude's `supports()` call.
@@ -718,7 +718,7 @@ impl<'a> Printer<'a> {
         condition: &internal::ConditionQuery<'_>,
         name_end_pos: u32,
         (prelude_span, region_end): (Span, u32),
-        suffix_width: usize,
+        reserve: usize,
     ) -> DocId {
         let d = self.d();
         let parts = condition.parts;
@@ -871,7 +871,7 @@ impl<'a> Printer<'a> {
         }
 
         let fill = d.fill(&fill_parts);
-        let fill = d.with_context(fill, prelude_fill_context(suffix_width));
+        let fill = d.with_context(fill, prelude_fill_context(reserve));
         d.indent(fill)
     }
 
@@ -1225,11 +1225,11 @@ impl<'a> Printer<'a> {
 
         // The terminator follows the group on its last line: `;` for the statement form,
         // ` {` for a block (not `@custom-selector` grammar, but accepted like any prelude).
-        let suffix_width = if atrule.block.is_some() { 2 } else { 1 };
+        let reserve = if atrule.block.is_some() { 2 } else { 1 };
         if !claimed {
             self.write(" ");
         }
-        self.write_arena_doc_with_suffix(doc, suffix_width);
+        self.write_arena_doc_reserving(doc, reserve);
 
         // Trailing gap: after the list, before the `;` / `{` (the prelude span's end).
         self.write_prelude_gap(list.span.end, span.end, Edge::Flush);
@@ -1306,7 +1306,7 @@ impl<'a> Printer<'a> {
             // `text` already has a deletable closing comma removed, and keeps one the
             // entries need (`@import url('a.css'),;`).
             let doc = self.build_and_or_wrap_doc(text, 1);
-            self.write_arena_doc_with_suffix(doc, 1);
+            self.write_arena_doc_reserving(doc, 1);
         } else {
             self.print_import_media_query_fill(&queries, closing_comma);
         }
@@ -1329,7 +1329,7 @@ impl<'a> Printer<'a> {
     /// internal break — so naive greedy line-packing is equivalent to prettier's
     /// pairwise `fill`.) The trailing `;`/`,` (1 wide) rides each query's last line.
     fn print_import_media_query_fill(&mut self, queries: &[&str], closing_comma: bool) {
-        let base = self.effective_indent();
+        let base = self.indent_level;
         let indent1 = (base + 1) * TAB_WIDTH; // comma-break column
         let indent2 = (base + 2) * TAB_WIDTH; // within-query break column
 

@@ -996,21 +996,12 @@ impl<'a> Printer<'a> {
 
     /// The [`EmbedContext`] every **braced head** builds its value under — a block head
     /// (`{#if …}`, `{#each …}`, an `{#each}` key) and a prefixed tag (`{@html …}`,
-    /// `{@render …}`) alike. `opening_offset` is the width of the text before the
-    /// expression, derived from the emitted opening literal so the estimate and the text
-    /// cannot drift.
+    /// `{@render …}`) alike. One recipe rather than a copy each, so the two hosts cannot
+    /// read as deliberately different.
     ///
     /// `mode` is the load-bearing field: the expression-ROOT entry
     /// (`build_root_expression_doc`) reads `is_embedded()` to force ContinuationIndent on a
     /// root binary, overriding whatever its own position would otherwise answer.
-    ///
-    /// `first_line_offset` is a width estimate that reaches **nothing** on this path — it is
-    /// read only by `tsv_ts`'s own render entry (`write_arena_doc`, which a Svelte-embedded
-    /// expression never takes: this printer builds the doc and renders it with its OWN embed)
-    /// and by the renderer's `effective_suffix_width`, gated on a `suffix_width` that is 0
-    /// here. Perturbing it changes no byte of any fixture or of a 9k-file real corpus. It is
-    /// computed anyway so the two hosts cannot read as deliberately different — which is the
-    /// whole reason this recipe is one function rather than a copy each.
     ///
     /// `jsdoc_cast_cannot_hang` is the recipe's second load-bearing field: a braced head's
     /// value hugs its prefix, so a leading cast's own-line hardline has no matching hang and
@@ -1022,9 +1013,8 @@ impl<'a> Printer<'a> {
     /// width-wraps a block head at all, so the block head owns its geometry and sets the
     /// field itself ([`Self::build_expression_doc_for_block`]). Everything the two heads do
     /// share stays here.
-    pub(in crate::printer) fn head_embed(&self, opening_offset: usize) -> EmbedContext {
+    pub(in crate::printer) fn head_embed(&self) -> EmbedContext {
         EmbedContext {
-            first_line_offset: TAB_WIDTH + opening_offset,
             mode: LayoutMode::Embedded,
             jsdoc_cast_cannot_hang: true,
             ..self.embed

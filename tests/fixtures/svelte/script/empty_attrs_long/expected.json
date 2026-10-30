@@ -1,0 +1,195 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 376,
+		"end": 479,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 384,
+				"end": 469,
+				"name": "data-x",
+				"value": [
+					{
+						"start": 392,
+						"end": 468,
+						"type": "Text",
+						"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+					}
+				]
+			}
+		],
+		"children": [],
+		"comments": [],
+		"content": {
+			"start": 471,
+			"end": 471,
+			"styles": "",
+			"comment": {
+				"type": "Comment",
+				"start": 335,
+				"end": 375,
+				"data": " 101 chars: the attributes break "
+			}
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 480,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 85,
+				"data": " an empty section is measured through its closing tag: 100 chars stays inline "
+			},
+			{
+				"type": "Text",
+				"start": 85,
+				"end": 86,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 186,
+				"end": 188,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 188,
+				"end": 228,
+				"data": " 101 chars: the attributes break "
+			},
+			{
+				"type": "Text",
+				"start": 228,
+				"end": 229,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 333,
+				"end": 335,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 335,
+				"end": 375,
+				"data": " 101 chars: the attributes break "
+			},
+			{
+				"type": "Text",
+				"start": 375,
+				"end": 376,
+				"raw": "\n",
+				"data": "\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"module": {
+		"type": "Script",
+		"start": 86,
+		"end": 186,
+		"context": "module",
+		"content": {
+			"type": "Program",
+			"start": 177,
+			"end": 177,
+			"body": [],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": " an empty section is measured through its closing tag: 100 chars stays inline "
+				}
+			]
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 94,
+				"end": 100,
+				"name": "module",
+				"value": true
+			},
+			{
+				"type": "Attribute",
+				"start": 101,
+				"end": 176,
+				"name": "data-x",
+				"value": [
+					{
+						"start": 109,
+						"end": 175,
+						"type": "Text",
+						"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+					}
+				]
+			}
+		]
+	},
+	"instance": {
+		"type": "Script",
+		"start": 229,
+		"end": 333,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 324,
+			"end": 324,
+			"body": [],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": " 101 chars: the attributes break "
+				}
+			]
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 238,
+				"end": 247,
+				"name": "lang",
+				"value": [
+					{
+						"start": 244,
+						"end": 246,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			},
+			{
+				"type": "Attribute",
+				"start": 249,
+				"end": 322,
+				"name": "data-x",
+				"value": [
+					{
+						"start": 257,
+						"end": 321,
+						"type": "Text",
+						"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+					}
+				]
+			}
+		]
+	}
+}

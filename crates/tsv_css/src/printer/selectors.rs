@@ -113,12 +113,15 @@ impl<'a> Printer<'a> {
     /// Format a selector list in a nested context that wraps inside its own
     /// parentheses — `@scope (root) to (limit)`. The caller writes the `(`/`)`; this
     /// renders the inner list, breaking each selector onto its own indented line
-    /// when the line, with `suffix_width` behind it, does not fit (never the always-break
+    /// when the line, with `reserve` behind it, does not fit (never the always-break
     /// top-level rule).
     ///
-    /// `suffix_width` is the width of what the caller writes after the list on its line —
-    /// the `)` and everything behind it up to the next place a break can land — which the
-    /// fit reserves, so the list opens rather than leave that line over the print width.
+    /// `reserve` is the width of what the caller writes after the list on its line — the
+    /// `)` and everything behind it up to the next place a break can land — which the fit
+    /// reserves on the list's last line, so the list opens rather than leave that line over
+    /// the print width; a selector the open list puts on a line of its own is measured
+    /// through what follows it there — its `,`, or nothing for the last, whose `)` lands on
+    /// the next line.
     ///
     /// `paren` is the clause's full `(…)` span (end one past `)`, the pseudo-arg
     /// convention). Comments leading or trailing the selector list but inside the parens
@@ -129,7 +132,7 @@ impl<'a> Printer<'a> {
         &mut self,
         list: &internal::SelectorList<'_>,
         paren: Span,
-        suffix_width: usize,
+        reserve: usize,
     ) {
         if list.selectors.is_empty() {
             return;
@@ -140,7 +143,7 @@ impl<'a> Printer<'a> {
         // trailing softline so the closing `)` (written by the caller) lands at the
         // base level when broken.
         let doc = d.group(d.concat(&[d.indent(d.concat(&[d.softline(), inner])), d.softline()]));
-        self.write_arena_doc_with_suffix(doc, suffix_width);
+        self.write_arena_doc_reserving(doc, reserve);
     }
 
     /// The contents of a selector list in PARENS — a pseudo-class's argument list (`:is()`,

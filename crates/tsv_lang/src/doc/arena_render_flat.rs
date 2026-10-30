@@ -7,26 +7,26 @@
 //!
 //! # The claim
 //!
-//! *If the walk accepts a doc, the renderer — given the same doc, column, embed
-//! context and source — writes exactly the bytes the walk wrote, and leaves no other
-//! trace.* One direction only: a doc the renderer would print flat may still be
-//! refused (a line suffix that flushes on the same line, an `if_break` whose flat arm
-//! renders), and a refusal costs nothing but the fallback.
+//! *If the walk accepts a doc, the renderer — given the same doc, column and source —
+//! writes exactly the bytes the walk wrote, and leaves no other trace.* One direction
+//! only: a doc the renderer would print flat may still be refused (a line suffix that
+//! flushes on the same line, an `if_break` whose flat arm renders), and a refusal costs
+//! nothing but the fallback.
 //!
 //! The walk carries `left`, the columns still free: it starts at
-//! `print_width − embed.suffix_width − start_column` (saturating) and gives up a text's
-//! cached width, one column per flat `line`, and each [`DocContext::trailing_reserve`]
-//! it passes. Call what it gives up from some point on the walk's *future charge*. The
-//! walk accepts only if `left` never goes negative, so at every point the future charge
-//! is at most `left`.
+//! `print_width − reserve − start_column` (saturating) — `reserve` being what the caller
+//! writes after the doc on its line, which its fallback render charges as a trailing
+//! reserve node — and gives up a text's cached width, one column per flat `line`, and
+//! each [`DocContext::trailing_reserve`] it passes. Call what it gives up from some point
+//! on the walk's *future charge*. The walk accepts only if `left` never goes negative, so
+//! at every point the future charge is at most `left`.
 //!
 //! The renderer's `pos` at the same point is `start_column` plus the text and line
 //! columns alone (a reserve moves no column), and the width its group checks measure
-//! against is `print_width − effective_suffix_width(pos) − pos`, where the effective
-//! suffix is `embed.suffix_width` or zero. A fill measures against `print_width − pos`,
-//! less its own context's reserve on its final segment — a reserve the walk gave up
-//! when it entered that context. Either way **the renderer's budget at a point is at
-//! least the walk's `left` there.**
+//! against is `print_width − pos`. A fill measures against `print_width − pos`, less its
+//! own context's reserve on its final segment — a reserve the walk gave up when it
+//! entered that context. Either way **the renderer's budget at a point is at least the
+//! walk's `left` there.**
 //!
 //! Every layout decision the renderer takes on an accepted doc is an
 //! `arena_fits_with_lookahead` call (or `arena_fits_multi`, a wrapper over it) with no
@@ -130,6 +130,7 @@ use super::swallow::SwallowTracker;
 #[cfg(doc)]
 use super::types::DocContext;
 use super::types::{CachedWidth, DocText, LineKind, resolve_text};
+#[cfg(any(debug_assertions, feature = "swallow_check", feature = "comment_check"))]
 use crate::EmbedContext;
 #[cfg(feature = "comment_check")]
 use crate::comment_ledger;
@@ -143,7 +144,11 @@ const MAX_DEPTH: u32 = 48;
 /// renders the doc through
 /// [`arena_print_doc_with_indent_resolved_preserve_whitespace_into`](super::arena_print_doc_with_indent_resolved_preserve_whitespace_into)
 /// with the same arguments; on `true` the buffer holds what that render would have
-/// produced, appended. The arguments are that entry's, and `output` need not be empty.
+/// produced, appended. The arguments are that entry's less its `embed`, which the renderer
+/// does not read, plus `reserve`: the columns the caller writes after the doc on the same
+/// line, charged against the budget here as the caller's fallback render charges them
+/// through a trailing reserve node (a flat write is one line, its last). `output` need
+/// not be empty.
 ///
 /// It replaces that entry only — a trimming entry strips a trailing space this keeps.
 /// The module doc carries the argument, node kind by node kind.
@@ -151,7 +156,7 @@ const MAX_DEPTH: u32 = 48;
 pub fn arena_try_print_flat_into(
     arena: &DocArena,
     doc: DocId,
-    embed: &EmbedContext,
+    reserve: usize,
     start_column: usize,
     start_indent_level: usize,
     source: &str,
@@ -161,7 +166,7 @@ pub fn arena_try_print_flat_into(
         arena,
         doc,
         &RenderConfig::default(),
-        embed,
+        reserve,
         start_column,
         start_indent_level,
         source,
@@ -177,7 +182,7 @@ pub(super) fn try_print_flat(
     arena: &DocArena,
     doc: DocId,
     render: &RenderConfig,
-    embed: &EmbedContext,
+    reserve: usize,
     start_column: usize,
     start_indent_level: usize,
     source: &str,
@@ -187,7 +192,7 @@ pub(super) fn try_print_flat(
     let _ = start_indent_level;
     let budget = render
         .print_width
-        .saturating_sub(embed.suffix_width)
+        .saturating_sub(reserve)
         .saturating_sub(start_column);
     let mark = output.len();
     let mut left = budget as isize;
@@ -234,7 +239,7 @@ pub(super) fn try_print_flat(
             &RenderCtx {
                 arena,
                 render,
-                embed,
+                embed: &EmbedContext::default(),
                 source: Some(source),
             },
             doc,
@@ -467,13 +472,6 @@ mod tests {
         }
     }
 
-    fn suffix(suffix_width: usize) -> EmbedContext {
-        EmbedContext {
-            suffix_width,
-            ..EmbedContext::default()
-        }
-    }
-
     /// The flat walk's output, or `None` on a refusal — asserting either way that the
     /// text ahead of the doc is untouched, and on a refusal that nothing was left
     /// behind it.
@@ -481,12 +479,12 @@ mod tests {
         a: &DocArena,
         doc: DocId,
         render: &RenderConfig,
-        embed: &EmbedContext,
+        reserve: usize,
         column: usize,
         source: &str,
     ) -> Option<String> {
         let mut out = String::from(BASE);
-        if try_print_flat(a, doc, render, embed, column, 1, source, &mut out) {
+        if try_print_flat(a, doc, render, reserve, column, 1, source, &mut out) {
             let written = out
                 .strip_prefix(BASE)
                 .expect("an accepted doc changed the text ahead of it");
@@ -502,7 +500,6 @@ mod tests {
         a: &DocArena,
         doc: DocId,
         render: &RenderConfig,
-        embed: &EmbedContext,
         column: usize,
         source: &str,
     ) -> String {
@@ -512,7 +509,7 @@ mod tests {
             &RenderCtx {
                 arena: a,
                 render,
-                embed,
+                embed: &EmbedContext::default(),
                 source: Some(source),
             },
             doc,
@@ -523,28 +520,27 @@ mod tests {
         out
     }
 
-    /// `doc` charges exactly `cost` columns: at every start column and suffix width it
-    /// is accepted when `column + cost + suffix` reaches the print width and refused
+    /// `doc` charges exactly `cost` columns: at every start column and caller reserve it
+    /// is accepted when `column + cost + reserve` reaches the print width and refused
     /// one column short of that.
     fn assert_charges(a: &DocArena, doc: DocId, cost: usize, expect: &str) {
         for column in [0usize, 1, 7] {
-            for suffix_width in [0usize, 1, 3] {
-                let need = column + cost + suffix_width;
-                let embed = suffix(suffix_width);
+            for reserve in [0usize, 1, 3] {
+                let need = column + cost + reserve;
                 assert_eq!(
-                    flat(a, doc, &width(need), &embed, column, "").as_deref(),
+                    flat(a, doc, &width(need), reserve, column, "").as_deref(),
                     Some(expect),
-                    "refused at the exact width (column {column}, suffix {suffix_width})"
+                    "refused at the exact width (column {column}, reserve {reserve})"
                 );
                 assert_eq!(
-                    flat(a, doc, &width(need + 5), &embed, column, "").as_deref(),
+                    flat(a, doc, &width(need + 5), reserve, column, "").as_deref(),
                     Some(expect),
                 );
                 if cost > 0 {
                     assert_eq!(
-                        flat(a, doc, &width(need - 1), &embed, column, ""),
+                        flat(a, doc, &width(need - 1), reserve, column, ""),
                         None,
-                        "accepted one column over (column {column}, suffix {suffix_width})"
+                        "accepted one column over (column {column}, reserve {reserve})"
                     );
                 }
             }
@@ -563,10 +559,10 @@ mod tests {
         let source = "xx héllo yy";
         let span = a.source_span(Span::new(3, 9), source);
         assert_eq!(
-            flat(&a, span, &width(5), &suffix(0), 0, source).as_deref(),
+            flat(&a, span, &width(5), 0, 0, source).as_deref(),
             Some("héllo")
         );
-        assert_eq!(flat(&a, span, &width(4), &suffix(0), 0, source), None);
+        assert_eq!(flat(&a, span, &width(4), 0, 0, source), None);
     }
 
     #[test]
@@ -627,17 +623,16 @@ mod tests {
     #[test]
     fn a_start_column_past_the_width_leaves_room_for_nothing() {
         let a = DocArena::new();
-        let embed = suffix(2);
         assert_eq!(
-            flat(&a, a.text(""), &width(10), &embed, 30, "").as_deref(),
+            flat(&a, a.text(""), &width(10), 2, 30, "").as_deref(),
             Some("")
         );
         assert_eq!(
-            flat(&a, a.group(a.softline()), &width(10), &embed, 30, "").as_deref(),
+            flat(&a, a.group(a.softline()), &width(10), 2, 30, "").as_deref(),
             Some("")
         );
-        assert_eq!(flat(&a, a.text("a"), &width(10), &embed, 30, ""), None);
-        assert_eq!(flat(&a, a.group(a.line()), &width(10), &embed, 9, ""), None);
+        assert_eq!(flat(&a, a.text("a"), &width(10), 2, 30, ""), None);
+        assert_eq!(flat(&a, a.group(a.line()), &width(10), 2, 9, ""), None);
     }
 
     /// Every refused shape at the front, in the middle and at the end of a group that
@@ -695,7 +690,6 @@ mod tests {
             ));
         }
         let render = width(1000);
-        let embed = suffix(0);
         for (name, node) in refused {
             let x = a.text("xx");
             let y = a.text("yy");
@@ -713,7 +707,7 @@ mod tests {
                     a.fill(&[x, a.line(), a.group(a.concat(&parts))]),
                 ];
                 for doc in shapes {
-                    assert_eq!(flat(&a, doc, &render, &embed, 0, source), None, "{name}");
+                    assert_eq!(flat(&a, doc, &render, 0, 0, source), None, "{name}");
                 }
             }
         }
@@ -723,7 +717,6 @@ mod tests {
     fn a_line_outside_a_group_or_fill_is_refused() {
         let a = DocArena::new();
         let render = width(1000);
-        let embed = suffix(0);
         for line in [a.line(), a.softline()] {
             for doc in [
                 line,
@@ -734,8 +727,8 @@ mod tests {
                 a.concat(&[a.group(a.text("a")), line]),
                 a.concat(&[a.fill(&[a.text("a"), a.line(), a.text("b")]), line]),
             ] {
-                assert_eq!(flat(&a, doc, &render, &embed, 0, ""), None);
-                assert!(rendered(&a, doc, &render, &embed, 0, "").contains('\n'));
+                assert_eq!(flat(&a, doc, &render, 0, 0, ""), None);
+                assert!(rendered(&a, doc, &render, 0, "").contains('\n'));
             }
         }
     }
@@ -753,22 +746,18 @@ mod tests {
             doc
         };
         let render = width(1000);
-        let embed = suffix(0);
         let deepest = nest(MAX_DEPTH + 1);
         assert_eq!(
-            flat(&a, deepest, &render, &embed, 0, ""),
+            flat(&a, deepest, &render, 0, 0, ""),
             Some(format!("x{}", "y".repeat(MAX_DEPTH as usize + 1)))
         );
-        assert_eq!(flat(&a, nest(MAX_DEPTH + 2), &render, &embed, 0, ""), None);
+        assert_eq!(flat(&a, nest(MAX_DEPTH + 2), &render, 0, 0, ""), None);
         // Single-child forwards do not count: they continue in place.
         let mut forwards = a.text("x");
         for _ in 0..4 * MAX_DEPTH {
             forwards = a.group(a.indent(forwards));
         }
-        assert_eq!(
-            flat(&a, forwards, &render, &embed, 0, "").as_deref(),
-            Some("x")
-        );
+        assert_eq!(flat(&a, forwards, &render, 0, 0, "").as_deref(), Some("x"));
     }
 
     /// A small deterministic generator — xorshift64*, seeded per test.
@@ -941,14 +930,10 @@ mod tests {
             let depth = 1 + rng.below(5) as u32;
             let generated = generate(&a, &mut rng, depth, false, false);
             let column = rng.below(12);
-            let embed = EmbedContext {
-                suffix_width: rng.below(4),
-                // Past the column, the renderer reserves no suffix; the walk always does.
-                first_line_offset: [0, 0, 40][rng.below(3)],
-                base_indent_offset: rng.below(2),
-                ..EmbedContext::default()
-            };
-            let need = column + generated.cost + embed.suffix_width;
+            // What the caller writes after the doc: the walk charges it, the renderer of
+            // the doc alone does not.
+            let reserve = rng.below(4);
+            let need = column + generated.cost + reserve;
             for print_width in [
                 need.saturating_sub(2),
                 need.saturating_sub(1),
@@ -959,11 +944,9 @@ mod tests {
                 let render = width(print_width);
                 // Saturating, as the renderer's own budget is: a doc that charges
                 // nothing is accepted however far past the width it starts.
-                let budget = print_width
-                    .saturating_sub(embed.suffix_width)
-                    .saturating_sub(column);
+                let budget = print_width.saturating_sub(reserve).saturating_sub(column);
                 let expect_accept = generated.accepted && generated.cost <= budget;
-                let wrote = flat(&a, generated.doc, &render, &embed, column, SOURCE);
+                let wrote = flat(&a, generated.doc, &render, reserve, column, SOURCE);
                 assert_eq!(
                     wrote.is_some(),
                     expect_accept,
@@ -972,7 +955,7 @@ mod tests {
                     generated.cost,
                     generated.accepted
                 );
-                let reference = rendered(&a, generated.doc, &render, &embed, column, SOURCE);
+                let reference = rendered(&a, generated.doc, &render, column, SOURCE);
                 match wrote {
                     Some(wrote) => {
                         assert_eq!(

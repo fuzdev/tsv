@@ -171,7 +171,7 @@ impl<'a> Printer<'a> {
                 d,
                 init,
                 &self.ts_inputs(),
-                self.const_init_embed(),
+                self.embed,
                 operator_pos,
                 |value| {
                     let trailing = self.value_trailing_docs(
@@ -199,7 +199,7 @@ impl<'a> Printer<'a> {
                 d,
                 init,
                 &self.ts_inputs(),
-                self.const_init_embed(),
+                self.embed,
                 operator_pos,
                 || {
                     let init_start = init.span().start;
@@ -395,12 +395,10 @@ impl<'a> Printer<'a> {
         // not call): here the paren is fully redundant and prettier drops it (`{@const a = (b = c)}` →
         // `{@const a = b = c}`), so the frozen arm drops it too — consistent with this
         // site's own unfrozen normalization, which is what the freeze must not contradict.
-        let expr_doc = self.build_assignment_value_doc(
-            expr,
-            frozen,
-            &self.const_init_embed(),
-            value_gap_start,
-        );
+        // Built under the host's own embed: its `mode` stays Standalone, so the
+        // embedded-root question does not fire and a root binary takes whatever its own
+        // position says rather than ContinuationIndent.
+        let expr_doc = self.build_assignment_value_doc(expr, frozen, &self.embed, value_gap_start);
 
         // The run's last comment supplies the break the tag's `}` reuses —
         // `build_assignment_tag_doc` places that `}` in all three of its layouts, and
@@ -409,16 +407,6 @@ impl<'a> Printer<'a> {
             self.value_trailing_docs(expr_doc, expr.span(), expr_end, span_end, closer_owns_break);
 
         self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing.docs)
-    }
-
-    /// The [`tsv_lang::EmbedContext`] a `{@const}` init is built under. `mode` stays the
-    /// host's Standalone: the embedded-root question does not fire, so a root binary takes
-    /// whatever its own position says rather than ContinuationIndent.
-    fn const_init_embed(&self) -> tsv_lang::EmbedContext {
-        tsv_lang::EmbedContext {
-            first_line_offset: 0,
-            ..self.embed
-        }
     }
 
     /// The byte offset of the `{@const}` declarator's `=`: the first byte past the binding

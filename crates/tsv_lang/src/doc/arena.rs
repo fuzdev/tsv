@@ -956,8 +956,8 @@ fn soften_forced_break(v: u32) -> u32 {
 /// Clamping is verdict-preserving: every fits comparison is against a print width
 /// orders of magnitude below the clamp, so "32,767" and the true width answer
 /// identically. The same holds for the other consumer, `render_text`'s column
-/// advance — the column only feeds threshold comparisons (print width,
-/// `first_line_offset`) far below the clamp, and resets at each newline.
+/// advance — the column only feeds threshold comparisons (the print width) far
+/// below the clamp, and resets at each newline.
 #[inline]
 const fn clamp_text_width(w: usize) -> u16 {
     if w >= TEXT_WIDTH_FIRST_LINE_MASK as usize {

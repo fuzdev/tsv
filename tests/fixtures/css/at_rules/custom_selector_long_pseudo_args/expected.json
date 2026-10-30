@@ -1,0 +1,112 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 1201,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 94,
+				"end": 220,
+				"name": "custom-selector",
+				"prelude": ":--a\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:is(.xx, .yy),\n\t\t.b",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 256,
+				"end": 393,
+				"name": "custom-selector",
+				"prelude": ":--a\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:is(\n\t\t\t.xx,\n\t\t\t.yy\n\t\t),\n\t\t.b",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 472,
+				"end": 598,
+				"name": "custom-selector",
+				"prelude": ":--a\n\t\t.b,\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:is(.xx, .yy)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 624,
+				"end": 761,
+				"name": "custom-selector",
+				"prelude": ":--a\n\t\t.b,\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:is(\n\t\t\t.xx,\n\t\t\t.yy\n\t\t)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 858,
+				"end": 1004,
+				"name": "custom-selector",
+				"prelude": ":--a\n\t\t:is(.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, .yy):not(\n\t\t\t.zz,\n\t\t\t.ww\n\t\t),\n\t\t.b",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 1045,
+				"end": 1192,
+				"name": "custom-selector",
+				"prelude": ":--a\n\t\t:is(\n\t\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n\t\t\t.yy\n\t\t):not(.zz, .ww),\n\t\t.b",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a non-last selector is measured through its `,` alone: 100 chars stays inline ",
+				"start": 9,
+				"end": 92
+			},
+			{
+				"type": "CSSComment",
+				"value": " at 101 its arguments break ",
+				"start": 222,
+				"end": 254
+			},
+			{
+				"type": "CSSComment",
+				"value": " the last selector is measured through the `;`: 100 chars stays inline ",
+				"start": 395,
+				"end": 470
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars breaks ",
+				"start": 600,
+				"end": 622
+			},
+			{
+				"type": "CSSComment",
+				"value": " a pseudo's arguments are measured through the next pseudo's `(` alone: 100 stays inline ",
+				"start": 763,
+				"end": 856
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - its arguments break ",
+				"start": 1006,
+				"end": 1043
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 1193,
+			"styles": "\n\t/* a non-last selector is measured through its `,` alone: 100 chars stays inline */\n\t@custom-selector :--a\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:is(.xx, .yy),\n\t\t.b;\n\t/* at 101 its arguments break */\n\t@custom-selector :--a\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:is(\n\t\t\t.xx,\n\t\t\t.yy\n\t\t),\n\t\t.b;\n\t/* the last selector is measured through the `;`: 100 chars stays inline */\n\t@custom-selector :--a\n\t\t.b,\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:is(.xx, .yy);\n\t/* 101 chars breaks */\n\t@custom-selector :--a\n\t\t.b,\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:is(\n\t\t\t.xx,\n\t\t\t.yy\n\t\t);\n\t/* a pseudo's arguments are measured through the next pseudo's `(` alone: 100 stays inline */\n\t@custom-selector :--a\n\t\t:is(.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, .yy):not(\n\t\t\t.zz,\n\t\t\t.ww\n\t\t),\n\t\t.b;\n\t/* 101 chars - its arguments break */\n\t@custom-selector :--a\n\t\t:is(\n\t\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n\t\t\t.yy\n\t\t):not(.zz, .ww),\n\t\t.b;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1202,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

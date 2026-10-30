@@ -37,12 +37,7 @@ pub(super) fn render_fill_iterative(
     has_line_suffix: bool,
     should_remeasure: &mut bool,
 ) {
-    let &RenderCtx {
-        arena,
-        render,
-        embed,
-        ..
-    } = ctx;
+    let &RenderCtx { arena, render, .. } = ctx;
 
     // Every fit question this loop asks is the same one — "does `doc` fit FLAT in `budget`, given
     // what follows?" — and only the doc, the look-ahead and the budget ever vary. The other three
@@ -235,13 +230,13 @@ pub(super) fn render_fill_iterative(
                 // (`</code>.w<b>…`) is exactly that fill. The run renders in place instead, paying
                 // the overflow the way an unguarded head always has.
                 if !is_glued_head(context, offset) {
-                    let line_start_pos = line_start_column(indent, render, embed);
+                    let line_start_pos = line_start_column(indent, render);
                     if *pos != line_start_pos
                         && !on_shallower_indentation(output, *pos, line_start_pos)
                     {
                         trim_trailing_whitespace(output);
                         output.push('\n');
-                        write_indentation(output, indent, render, embed);
+                        write_indentation(output, indent, render);
                         *pos = line_start_pos;
                     }
                 }
@@ -367,7 +362,7 @@ pub(super) fn render_fill_iterative(
                 should_remeasure,
             );
         } else {
-            let line_start_pos = line_start_column(indent, render, embed);
+            let line_start_pos = line_start_column(indent, render);
             let at_line_start = *pos == line_start_pos;
 
             if !at_line_start {
@@ -471,7 +466,7 @@ pub(super) fn render_fill_iterative(
                 if !on_shallower_indentation(output, *pos, line_start_pos) {
                     trim_trailing_whitespace(output);
                     output.push('\n');
-                    write_indentation(output, indent, render, embed);
+                    write_indentation(output, indent, render);
                     *pos = line_start_pos;
                 }
 

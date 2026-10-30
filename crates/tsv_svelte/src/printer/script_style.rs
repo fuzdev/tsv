@@ -7,7 +7,7 @@
 use crate::ast::internal;
 use crate::printer::Printer;
 use tsv_lang::TAB_WIDTH;
-use tsv_lang::doc::{self, DocBuf, arena::DocId};
+use tsv_lang::doc::{self, DocBuf, DocContext, arena::DocId};
 
 impl<'a> Printer<'a> {
     /// Format a Script tag
@@ -44,8 +44,7 @@ impl<'a> Printer<'a> {
         // Width calculations are handled by:
         // - start_column for the first line
         // - start_indent_level for subsequent lines after hardline
-        // Note: the embed is default-width (base_indent_offset=0) for accurate width
-        // calculations. Template indent fallback (when source has no whitespace) is handled
+        // Template indent fallback (when source has no whitespace) is handled
         // separately in the TypeScript printer with a hardcoded default of 1 for Svelte
         // context.
         // A `<script>` body is the one Svelte island whose printer owns whole LINES: its
@@ -196,7 +195,8 @@ impl<'a> Printer<'a> {
     /// or the total line width exceeds print_width.
     ///
     /// `has_content`: when false, the closing tag follows on the same line
-    /// (e.g., `<script lang="ts"></script>`), so suffix_width accounts for it.
+    /// (e.g., `<script lang="ts"></script>`), so the render reserves its width on the
+    /// tag's last line.
     ///
     /// Flat: `<tag attr1 attr2>`
     /// Break: `<tag\n\tattr1\n\tattr2\n>`
@@ -232,26 +232,25 @@ impl<'a> Printer<'a> {
             d.group(inner)
         };
 
-        // When empty (no content), the closing tag follows on the same line:
-        // `<script lang="ts"></script>`. Account for it via suffix_width so
-        // fits() breaks when the full line exceeds print_width.
-        let closing_tag_width = if !has_content {
-            // "</tag>" = 3 + tag_name.len()
-            3 + tag_name.len()
+        // When empty (no content), the closing tag follows on the same line as the tag's
+        // `>`: `<script lang="ts"></script>`. A measurement-only trailing node (it renders
+        // nothing) reserves its width, so the group breaks when that whole line exceeds
+        // print_width.
+        let doc = if has_content {
+            group
         } else {
-            0
+            // "</tag>" = 3 + tag_name.len()
+            let closing_tag_width = 3 + tag_name.len();
+            let marker = d.with_context(d.empty(), DocContext::reserving(closing_tag_width));
+            d.concat(&[group, marker])
         };
         let col = self.buffer.current_column(TAB_WIDTH);
-        let embed = tsv_lang::EmbedContext {
-            suffix_width: closing_tag_width,
-            ..self.embed
-        };
         // Render into the arena-parked scratch (one warm buffer, no per-tag alloc).
         let mut output = self.arena.take_render_scratch();
         doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
             self.arena,
-            group,
-            &embed,
+            doc,
+            &self.embed,
             col,
             self.indent_level,
             self.source(),

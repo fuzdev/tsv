@@ -40,6 +40,11 @@ use crate::comment_ledger;
 pub(super) struct RenderCtx<'a> {
     pub(super) arena: &'a DocArena,
     pub(super) render: &'a RenderConfig,
+    // TODO: the renderer reads no embedding state any more — every width it measures
+    // against is the print width from the column it is handed, and text a host writes after
+    // a doc rides a trailing reserve node. Drop this field and the `embed` parameter every
+    // render entry threads into it.
+    #[expect(dead_code)] // threaded by every render entry, read by none (TODO above)
     pub(super) embed: &'a EmbedContext,
     pub(super) source: Option<&'a str>,
 }
@@ -81,13 +86,13 @@ fn admissible_group_state(
         return Some(state);
     };
     let probe_fits = || {
-        let fresh_pos = line_start_column(indent.indented(), ctx.render, ctx.embed);
+        let fresh_pos = line_start_column(indent.indented(), ctx.render);
         arena_fits_with_lookahead(
             ctx.arena,
             *probe,
             Mode::Flat,
             rest_commands,
-            remaining_width(fresh_pos, ctx.render, ctx.embed),
+            remaining_width(fresh_pos, ctx.render),
             false,
         )
     };
@@ -224,27 +229,14 @@ fn update_pos_for_text_unicode(pos: &mut usize, s: &str) {
     }
 }
 
-/// Reserved trailing-punctuation width once the printer has crossed
-/// `first_line_offset`. Embedding contexts use this to keep the suffix
-/// (e.g., `}` after a Svelte template expression) on the same line.
-#[inline]
-fn effective_suffix_width(pos: usize, embed: &EmbedContext) -> usize {
-    if pos >= embed.first_line_offset {
-        embed.suffix_width
-    } else {
-        0
-    }
-}
-
 /// Width remaining on the current line for a group's fits check: the print
-/// width minus the reserved embedding suffix ([`effective_suffix_width`])
-/// minus the current column, saturating at zero before the `isize` cast.
+/// width minus the current column, saturating at zero before the `isize` cast.
+/// Text a host writes after the doc is not subtracted here: it rides a trailing
+/// reserve node (`DocContext::reserving`) that the fits walk charges when its
+/// lookahead reaches it flat, so it counts on the doc's last line alone.
 #[inline]
-fn remaining_width(pos: usize, render: &RenderConfig, embed: &EmbedContext) -> isize {
-    render
-        .print_width
-        .saturating_sub(effective_suffix_width(pos, embed))
-        .saturating_sub(pos) as isize
+fn remaining_width(pos: usize, render: &RenderConfig) -> isize {
+    render.print_width.saturating_sub(pos) as isize
 }
 
 /// Trim trailing whitespace (spaces and tabs) from the end of the output buffer.
@@ -296,7 +288,6 @@ pub(super) fn render_line_break(
     output: &mut String,
     pos: &mut usize,
     render: &RenderConfig,
-    embed: &EmbedContext,
 ) -> bool {
     let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
     if mode == Mode::Break || is_hard {
@@ -314,8 +305,8 @@ pub(super) fn render_line_break(
             // (matches Prettier's trim() call before non-literal newlines)
             trim_trailing_whitespace(output);
             output.push('\n');
-            write_indentation(output, indent, render, embed);
-            *pos = line_start_column(indent, render, embed);
+            write_indentation(output, indent, render);
+            *pos = line_start_column(indent, render);
         }
         true
     } else if kind == LineKind::Normal {
@@ -366,7 +357,7 @@ fn render_line_node(
     }
     // A real newline ends the comment's line → clears the pending swallow, inside
     // `render_line_break` itself.
-    render_line_break(kind, mode, indent, output, pos, ctx.render, ctx.embed);
+    render_line_break(kind, mode, indent, output, pos, ctx.render);
 }
 
 /// Render one `MultilineText` body: `[text(line0), <break>, text(line1), <break>, …]`
@@ -886,15 +877,7 @@ fn render_embed_end<P: RenderPolicy>(
     if mode == Mode::Flat {
         *should_remeasure = true;
     }
-    render_line_break(
-        LineKind::Hard,
-        mode,
-        closer,
-        output,
-        pos,
-        ctx.render,
-        ctx.embed,
-    );
+    render_line_break(LineKind::Hard, mode, closer, output, pos, ctx.render);
     shed_host_separator(
         ctx,
         nodes,
@@ -1057,8 +1040,8 @@ fn render_doc_core<P: RenderPolicy>(
     let &RenderCtx {
         arena,
         render,
-        embed,
         source,
+        ..
     } = ctx;
     // The loop's termination condition is `commands` draining back to empty,
     // so the caller-provided (pooled or local) stack must start empty.
@@ -1267,7 +1250,7 @@ fn render_doc_core<P: RenderPolicy>(
                         (Mode::Break, fallback_group_state(nodes, contents, states))
                     } else {
                         // Fits check regardless of parent mode — matches Prettier
-                        let remaining = remaining_width(*pos, render, embed);
+                        let remaining = remaining_width(*pos, render);
 
                         let contents_fit = arena_fits_with_lookahead(
                             arena,
@@ -1343,7 +1326,7 @@ fn render_doc_core<P: RenderPolicy>(
                         contents,
                         Mode::Flat,
                         commands,
-                        remaining_width(*pos, render, embed),
+                        remaining_width(*pos, render),
                         !line_suffix.is_empty(),
                     );
                     if fits {
@@ -1652,18 +1635,8 @@ pub(super) fn render_single_doc_inner(
 /// Deeper runs chunk through it rather than falling back to a per-level push.
 const INDENT_RUN: &str = "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
 
-pub(super) fn write_indentation(
-    output: &mut String,
-    indent: RenderIndent,
-    render: &RenderConfig,
-    embed: &EmbedContext,
-) {
-    let extra = if embed.first_line_offset > 0 {
-        embed.base_indent_offset
-    } else {
-        0
-    };
-    let levels = indent.tabs() + extra;
+pub(super) fn write_indentation(output: &mut String, indent: RenderIndent, render: &RenderConfig) {
+    let levels = indent.tabs();
     // One append per line, not one per level. `String::push_str` lowers a
     // runtime-length copy to an indirect `memcpy@plt`, so pushing the one-byte
     // indent once per level paid a call per byte — 246 K calls to move 246 KB
@@ -1708,14 +1681,8 @@ fn indent_width(level: usize, render: &RenderConfig) -> usize {
     level * indent_str_width(render.indent)
 }
 
-pub(super) fn line_start_column(
-    indent: RenderIndent,
-    render: &RenderConfig,
-    embed: &EmbedContext,
-) -> usize {
-    indent_width(indent.tabs(), render)
-        + indent.trailing_align_spaces()
-        + embed.base_indent_offset * TAB_WIDTH
+pub(super) fn line_start_column(indent: RenderIndent, render: &RenderConfig) -> usize {
+    indent_width(indent.tabs(), render) + indent.trailing_align_spaces()
 }
 
 fn indent_str_width(indent: &str) -> usize {
@@ -1744,10 +1711,9 @@ mod column_arithmetic_tests {
     #[cfg(feature = "comment_check")]
     use super::RenderPurpose;
     use super::{
-        INDENT_RUN, RenderIndent, effective_suffix_width, indent_str_width, indent_width,
-        line_start_column, update_pos_for_text, write_indentation,
+        INDENT_RUN, RenderIndent, indent_str_width, indent_width, line_start_column,
+        update_pos_for_text, write_indentation,
     };
-    use crate::EmbedContext;
     use crate::config::TAB_WIDTH;
     use crate::printing::visual_width;
 
@@ -1891,55 +1857,24 @@ mod column_arithmetic_tests {
     }
 
     #[test]
-    fn line_start_column_adds_indent_and_embed_offset() {
+    fn line_start_column_adds_indent_and_alignment() {
         let tab = cfg("\t");
-        // base_indent_offset 0: purely the indent width.
-        let embed0 = EmbedContext::default();
-        assert_eq!(line_start_column(RenderIndent::level(0), &tab, &embed0), 0);
+        assert_eq!(line_start_column(RenderIndent::level(0), &tab), 0);
         assert_eq!(
-            line_start_column(RenderIndent::level(2), &tab, &embed0),
+            line_start_column(RenderIndent::level(2), &tab),
             2 * TAB_WIDTH
-        );
-        // base_indent_offset > 0 contributes base * TAB_WIDTH, ADDED (not
-        // multiplied) to the indent width. Level 0 isolates the additive term
-        // (a `+`→`*` flip reads 0 here instead of the offset); level 2 grades the
-        // sum of two non-zero terms.
-        let embed = EmbedContext {
-            base_indent_offset: 3,
-            ..EmbedContext::default()
-        };
-        assert_eq!(
-            line_start_column(RenderIndent::level(0), &tab, &embed),
-            3 * TAB_WIDTH
-        );
-        assert_eq!(
-            line_start_column(RenderIndent::level(2), &tab, &embed),
-            2 * TAB_WIDTH + 3 * TAB_WIDTH
         );
         // A sub-tab align adds literal spaces on top of the whole-tab column,
         // independent of TAB_WIDTH (the tab-width-agnostic alignment property).
+        // Level 0 isolates the additive term (a `+`→`*` flip reads 0 here).
         assert_eq!(
-            line_start_column(RenderIndent::level(2).aligned(2), &tab, &embed0),
+            line_start_column(RenderIndent::level(0).aligned(3), &tab),
+            3
+        );
+        assert_eq!(
+            line_start_column(RenderIndent::level(2).aligned(2), &tab),
             2 * TAB_WIDTH + 2
         );
-    }
-
-    // --- effective_suffix_width boundary ---
-
-    #[test]
-    fn effective_suffix_width_gates_on_first_line_offset() {
-        let embed = EmbedContext {
-            first_line_offset: 5,
-            suffix_width: 3,
-            ..EmbedContext::default()
-        };
-        // pos >= first_line_offset → the reserved suffix; the boundary is
-        // inclusive (pos == offset already reserves).
-        assert_eq!(effective_suffix_width(5, &embed), 3);
-        assert_eq!(effective_suffix_width(6, &embed), 3);
-        // pos < first_line_offset → nothing reserved yet.
-        assert_eq!(effective_suffix_width(4, &embed), 0);
-        assert_eq!(effective_suffix_width(0, &embed), 0);
     }
 
     // --- write_indentation: the emitted whitespace itself ---
@@ -1947,29 +1882,20 @@ mod column_arithmetic_tests {
     /// The indentation a line starts with, spelled out independently of
     /// [`write_indentation`]'s specialized arms: the indent string once per
     /// level, then the sub-tab alignment as literal spaces.
-    fn indent_reference(
-        indent: RenderIndent,
-        render: &RenderConfig,
-        embed: &EmbedContext,
-    ) -> String {
-        let extra = if embed.first_line_offset > 0 {
-            embed.base_indent_offset
-        } else {
-            0
-        };
-        let mut s = render.indent.repeat(indent.tabs() + extra);
+    fn indent_reference(indent: RenderIndent, render: &RenderConfig) -> String {
+        let mut s = render.indent.repeat(indent.tabs());
         for _ in 0..indent.trailing_align_spaces() {
             s.push(' ');
         }
         s
     }
 
-    fn assert_indent_agrees(indent: RenderIndent, render: &RenderConfig, embed: &EmbedContext) {
+    fn assert_indent_agrees(indent: RenderIndent, render: &RenderConfig) {
         let mut out = String::new();
-        write_indentation(&mut out, indent, render, embed);
+        write_indentation(&mut out, indent, render);
         assert_eq!(
             out,
-            indent_reference(indent, render, embed),
+            indent_reference(indent, render),
             "write_indentation disagrees with the reference at {} levels (indent {:?}, align {})",
             indent.tabs(),
             render.indent,
@@ -1988,49 +1914,21 @@ mod column_arithmetic_tests {
         // full runs is graded here, which is the only place either boundary is.
         for render in [cfg("\t"), cfg("  "), cfg("")] {
             for level in 0..=(2 * INDENT_RUN.len() + 3) {
-                assert_indent_agrees(
-                    RenderIndent::level(level),
-                    &render,
-                    &EmbedContext::default(),
-                );
+                assert_indent_agrees(RenderIndent::level(level), &render);
             }
         }
     }
 
     #[test]
-    fn write_indentation_covers_alignment_and_the_embed_offset() {
+    fn write_indentation_covers_alignment() {
         let tab = cfg("\t");
-        let embed0 = EmbedContext::default();
         // Sub-tab alignment follows the whole tabs, at every specialization arm
         // and past them.
         for level in [0usize, 1, 4, 8, 9, INDENT_RUN.len(), INDENT_RUN.len() + 1] {
             for align in [0u32, 1, 3] {
-                assert_indent_agrees(RenderIndent::level(level).aligned(align), &tab, &embed0);
+                assert_indent_agrees(RenderIndent::level(level).aligned(align), &tab);
             }
         }
-        // `base_indent_offset` adds levels, but only when `first_line_offset` is
-        // set — the gate that decides whether an embedded context indents at all.
-        let gated = EmbedContext {
-            base_indent_offset: 5,
-            first_line_offset: 0,
-            ..EmbedContext::default()
-        };
-        let live = EmbedContext {
-            base_indent_offset: 5,
-            first_line_offset: 7,
-            ..EmbedContext::default()
-        };
-        for level in [0usize, 2, 30] {
-            assert_indent_agrees(RenderIndent::level(level), &tab, &gated);
-            assert_indent_agrees(RenderIndent::level(level), &tab, &live);
-        }
-        let mut out = String::new();
-        write_indentation(&mut out, RenderIndent::level(2), &tab, &live);
-        assert_eq!(
-            out,
-            "\t".repeat(7),
-            "the embed offset must add levels, not replace them"
-        );
     }
 }
 

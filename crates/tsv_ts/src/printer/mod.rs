@@ -1477,27 +1477,14 @@ impl<'a> Printer<'a> {
     /// Write a DocId to the buffer, accounting for current column and indent level
     ///
     /// This handles the common pattern of:
-    /// 1. Calculate current column with context offset
+    /// 1. Take the current column
     /// 2. Print doc with indent-aware width calculations
     /// 3. Write the result to the buffer — in place when the buffer is empty
     ///    (`print_program`, the whole-file render), otherwise through the
     ///    arena-parked scratch, since the renderer's trims read backwards with
     ///    no floor. See the two arms below.
-    ///
-    /// For width calculations, we account for outer context in two ways:
-    /// - If `first_line_offset > 0`: expression is embedded inline (e.g., Svelte block), use it directly
-    /// - If `first_line_offset == 0`: standalone block (e.g., `<script>`), use `base_indent_offset * tab_width`
     pub(crate) fn write_arena_doc(&mut self, d: DocId) {
-        let context_offset = if self.embed.first_line_offset > 0 {
-            if self.current_column() == 0 {
-                self.embed.first_line_offset
-            } else {
-                0
-            }
-        } else {
-            self.embed.base_indent_offset * TAB_WIDTH
-        };
-        let current_col = self.current_column() + context_offset;
+        let current_col = self.current_column();
         // An empty buffer *is* the render target, and `as_empty_render_target`
         // hands it over only while it is one. The renderer's trim
         // (`trim_trailing_whitespace`, at every non-literal break and once more at

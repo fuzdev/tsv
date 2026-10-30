@@ -287,15 +287,14 @@ mod tests {
         // takes the doc and reports what the comment swallows. A doc without one is
         // written flat as usual.
         let ((refused, wrote), reports) = with_check(|d| {
-            let embed = EmbedContext::default();
             let mut out = String::from("x");
             let commented =
                 d.group(d.concat(&[d.text("["), d.line_comment_text_pooled("// c"), d.text("]")]));
             let refused =
-                !arena_try_print_flat_into(d, commented, &embed, 1, 0, "", &mut out) && out == "x";
+                !arena_try_print_flat_into(d, commented, 0, 1, 0, "", &mut out) && out == "x";
             let plain = d.group(d.concat(&[d.text("["), d.text_pooled("/* c */"), d.text("]")]));
-            let wrote = arena_try_print_flat_into(d, plain, &embed, 1, 0, "", &mut out)
-                && out == "x[/* c */]";
+            let wrote =
+                arena_try_print_flat_into(d, plain, 0, 1, 0, "", &mut out) && out == "x[/* c */]";
             (refused, wrote)
         });
         assert!(refused, "a line comment was written flat under the check");
@@ -313,7 +312,7 @@ mod tests {
             let pending = d.concat(&[d.text("x "), d.line_comment_text_pooled("// c")]);
             let _ = arena_print_doc(d, pending, &embed);
             let mut out = String::new();
-            arena_try_print_flat_into(d, d.text("y"), &embed, 0, 0, "", &mut out) && out == "y"
+            arena_try_print_flat_into(d, d.text("y"), 0, 0, 0, "", &mut out) && out == "y"
         });
         assert!(wrote);
         assert!(reports.is_empty(), "{reports:?}");
@@ -328,15 +327,7 @@ mod tests {
         let d = DocArena::new();
         let doc = d.concat(&[d.text("x "), d.line_comment_text_pooled("// c")]);
         let mut out = String::new();
-        assert!(arena_try_print_flat_into(
-            &d,
-            doc,
-            &EmbedContext::default(),
-            0,
-            0,
-            "",
-            &mut out
-        ));
+        assert!(arena_try_print_flat_into(&d, doc, 0, 0, 0, "", &mut out));
         assert_eq!(out, "x // c");
     }
 

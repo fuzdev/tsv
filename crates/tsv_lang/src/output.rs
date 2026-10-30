@@ -70,7 +70,7 @@ impl OutputBuffer {
     /// emptiness test, because such a writer cannot reach text it did not write; the
     /// doc renderer is not one (its trim walks backwards with no floor).
     /// `doc::arena_try_print_flat_into` is. Callers:
-    /// `tsv_css::printer::Printer::write_arena_doc` and its `_with_suffix` twin.
+    /// `tsv_css::printer::Printer::write_arena_doc` and its `_reserving` twin.
     #[inline]
     pub fn as_append_target(&mut self) -> &mut String {
         &mut self.buffer

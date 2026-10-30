@@ -872,13 +872,10 @@ impl<'a> Printer<'a> {
         let frozen = self.honored_directive_in_gap(span_start, expr.span().start);
 
         // The shared braced-head embed ([`Printer::head_embed`], which carries the reasoning).
-        // A rough prefix width rather than a derived one: the offset is inert on this path,
-        // and the two live prefixes disagree anyway (`{@html ` is 7, `{@render ` 9).
         //
-        // Built directly in the shared arena, and with no suffix_width — the surrounding doc
-        // tree (closing `}`, etc.) provides natural lookahead via
-        // arena_fits_with_lookahead's rest_commands.
-        let value_doc = self.build_head_value_doc(expr, frozen, &self.head_embed(5));
+        // Built directly in the shared arena — the surrounding doc tree (closing `}`, etc.)
+        // provides natural lookahead via arena_fits_with_lookahead's rest_commands.
+        let value_doc = self.build_head_value_doc(expr, frozen, &self.head_embed());
         let value_doc = self.wrap_value_clarity_parens(expr, value_doc);
 
         self.assemble_head_expr(value_doc, span_start, expr, span_end, frozen)
@@ -901,8 +898,6 @@ impl<'a> Printer<'a> {
     ///   it is inside the head prettier declines to wrap, so the same argument covers it.
     ///
     /// # Parameters
-    /// - `opening_offset` - Characters before the expression (e.g., 5 for `{#if `). Used to
-    ///   calculate `first_line_offset` for width estimation.
     /// - `in_multiline_context` - Whether the block is on its own line (multiline) or inline
     /// - `tail` - What the head's own syntax prints right after the expression ([`HeadTail`]).
     ///
@@ -918,7 +913,6 @@ impl<'a> Printer<'a> {
         expr: &Expression<'_>,
         span_start: u32,
         span_end: u32,
-        opening_offset: usize,
         in_multiline_context: bool,
         tail: HeadTail,
     ) -> HeadExpr {
@@ -938,7 +932,7 @@ impl<'a> Printer<'a> {
             // — prettier wraps `{@html (a,⏎b)}` flush and is the oracle there.
             tsv_lang::EmbedContext {
                 root_sequence_indents: true,
-                ..self.head_embed(opening_offset)
+                ..self.head_embed()
             }
         } else {
             self.cannot_hang_embed()
@@ -986,16 +980,15 @@ impl<'a> Printer<'a> {
         self.assemble_head_expr(expr_doc, span_start, expr, span_end, frozen)
     }
 
-    /// Build a block head's expression doc, deriving both the comment-scan start offset
-    /// and the width-estimation `opening_offset` from the opening literal `open` — so the
-    /// two can't drift from the emitted text (the same invariant the `*_BLOCK_OPEN` const
-    /// comment guards). `comment_end` bounds the leading/trailing-comment scan (the head
+    /// Build a block head's expression doc, deriving the comment-scan start offset from the
+    /// opening literal `open` — so it can't drift from the emitted text (the same invariant
+    /// the `*_BLOCK_OPEN` const comment guards). `comment_end` bounds the leading/trailing-comment scan (the head
     /// end for `{#if}`/`{:else if}`/`{#key}`, or the pattern-start-narrowed end for
     /// `{#each}`/`{#await}` via `each_expr_comment_end` / the await shorthand). `wrapping`
     /// is `in_multiline_context` (always false inside a whitespace-sensitive element).
     ///
     /// Wraps [`Printer::build_expression_doc_for_block`] for the standard block heads; the
-    /// parenthesized `{#each (key)}` offsets are derived from the key's own paren span, not
+    /// parenthesized `{#each (key)}` scan is derived from the key's own paren span, not
     /// `open` — [`Printer::build_each_key_expr`] is that twin.
     pub(super) fn build_block_head_expr(
         &self,
@@ -1010,24 +1003,21 @@ impl<'a> Printer<'a> {
             expr,
             opening_tag_span.start + open.len() as u32,
             comment_end,
-            open.len(),
             wrapping,
             tail,
         )
     }
 
     /// The `{#each (key)}` twin of [`Printer::build_block_head_expr`]: the key expression
-    /// sits inside parens the head assembles itself, so both offsets come from the key's
-    /// own paren span rather than an opening literal — the comment scan covers the paren
-    /// interior and the width offset is the `(` alone. One statement of that arithmetic
-    /// for the two each-key layouts (the block builder and the whitespace-sensitive
-    /// element's inline form).
+    /// sits inside parens the head assembles itself, so the comment scan comes from the
+    /// key's own paren span rather than an opening literal — it covers the paren interior.
+    /// One statement of that arithmetic for the two each-key layouts (the block builder and
+    /// the whitespace-sensitive element's inline form).
     pub(super) fn build_each_key_expr(&self, key: &EachKey<'_>, wrapping: bool) -> HeadExpr {
         self.build_expression_doc_for_block(
             key.expression,
             key.span.start + 1, // after "("
             key.span.end - 1,   // before ")"
-            1,                  // "(" = 1 char (key is inside parens)
             wrapping,
             HeadTail::Delimiter,
         )

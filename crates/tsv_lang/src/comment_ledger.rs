@@ -529,8 +529,8 @@ mod tests {
             d.tag_comment_doc(comment, comments[0].span, source);
             let doc = d.group(d.concat(&[comment, d.line(), d.text("x")]));
             let mut out = String::new();
-            let refused = !arena_try_print_flat_into(&d, doc, &embed, 0, 0, source, &mut out)
-                && out.is_empty();
+            let refused =
+                !arena_try_print_flat_into(&d, doc, 0, 0, 0, source, &mut out) && out.is_empty();
             arena_print_doc_with_indent_resolved_preserve_whitespace_into(
                 &d, doc, &embed, 0, 0, source, &mut out,
             );
@@ -539,7 +539,7 @@ mod tests {
             let untagged = arena_try_print_flat_into(
                 &d,
                 d.group(d.concat(&[d.text("y"), d.line(), d.text("z")])),
-                &embed,
+                0,
                 0,
                 0,
                 source,

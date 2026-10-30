@@ -148,15 +148,7 @@ pub(super) fn flush_line_suffix_as_host_run(
             (true, rest)
         });
         let content_start = if after_line_comment {
-            render_line_break(
-                LineKind::Hard,
-                mode,
-                indent,
-                output,
-                pos,
-                ctx.render,
-                ctx.embed,
-            );
+            render_line_break(LineKind::Hard, mode, indent, output, pos, ctx.render);
             output.len()
         } else {
             if opens {
@@ -265,7 +257,6 @@ fn push_run_separator(
         output,
         pos,
         ctx.render,
-        ctx.embed,
     )
 }
 

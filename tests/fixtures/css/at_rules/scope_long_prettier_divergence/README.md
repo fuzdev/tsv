@@ -20,6 +20,12 @@ whatever follows it up to the next place a break can land. The root is measured 
 clause with no limit, and a limit clause with no root, are measured through their `) {` — or
 through the `);` of a rule with no block.
 
+The same rule holds inside a clause that opens: each selector of the broken list is measured on its
+own line through what follows it there — its `,` when another selector comes after it — and not
+through the clause's `) to (` or `) {`, which lands on a later line. So a selector's pseudo-class
+arguments stay inline at 100 chars with the `,` and break at 101, in the root clause and the limit
+clause alike — and the last selector, whose `)` lands on the next line, through nothing at all.
+
 Prettier has several stable forms, all idempotent under Prettier: the wrapped form, the inline form
 (`prettier_variant_inline`), and the forms it gives the unspaced and the multi-spaced authorings
 (`prettier_variant_compact`, `prettier_variant_spaces` — it keeps a glued `)to(` and the runs

@@ -147,20 +147,10 @@ mod arena_tests {
     use super::*;
     use crate::EmbedContext;
 
-    /// Test helper: render with explicit width/indent overrides and
-    /// optional `base_indent_offset`. Wraps the internal
+    /// Test helper: render with explicit width/indent overrides. Wraps the internal
     /// [`arena_print_doc_with_indent_and_render`] for compactness.
-    fn render_test(
-        arena: &DocArena,
-        doc: DocId,
-        render: &RenderConfig,
-        base_indent_offset: usize,
-    ) -> String {
-        let embed = EmbedContext {
-            base_indent_offset,
-            ..EmbedContext::default()
-        };
-        arena_print_doc_with_indent_and_render(arena, doc, &embed, 0, 0, render)
+    fn render_test(arena: &DocArena, doc: DocId, render: &RenderConfig) -> String {
+        arena_print_doc_with_indent_and_render(arena, doc, &EmbedContext::default(), 0, 0, render)
     }
 
     /// Test helper: render with default widths and the default embed context.
@@ -174,7 +164,7 @@ mod arena_tests {
             print_width,
             ..RenderConfig::default()
         };
-        render_test(arena, doc, &render, 0)
+        render_test(arena, doc, &render)
     }
 
     /// Test helper: render with explicit `print_width` and 2-space indent
@@ -186,7 +176,7 @@ mod arena_tests {
             #[cfg(feature = "comment_check")]
             purpose: RenderPurpose::Output,
         };
-        render_test(arena, doc, &render, 0)
+        render_test(arena, doc, &render)
     }
 
     /// Test helper: render with explicit `print_width` and tab indent.
@@ -197,7 +187,7 @@ mod arena_tests {
             #[cfg(feature = "comment_check")]
             purpose: RenderPurpose::Output,
         };
-        render_test(arena, doc, &render, 0)
+        render_test(arena, doc, &render)
     }
 
     #[test]
@@ -769,7 +759,7 @@ mod arena_tests {
     }
 
     #[test]
-    fn test_arena_fill_with_base_indent_offset() {
+    fn test_arena_fill_indented() {
         let a = DocArena::new();
         let doc = a.indent(a.fill(&[
             a.text("1"),
@@ -795,34 +785,7 @@ mod arena_tests {
             #[cfg(feature = "comment_check")]
             purpose: RenderPurpose::Output,
         };
-        assert_eq!(
-            render_test(&a, doc, &render, 0),
-            "1, 2, 3, 4,\n\t5, 6, 7, 8"
-        );
-
-        let a2 = DocArena::new();
-        let doc2 = a2.indent(a2.fill(&[
-            a2.text("1"),
-            a2.concat(&[a2.text(","), a2.line()]),
-            a2.text("2"),
-            a2.concat(&[a2.text(","), a2.line()]),
-            a2.text("3"),
-            a2.concat(&[a2.text(","), a2.line()]),
-            a2.text("4"),
-            a2.concat(&[a2.text(","), a2.line()]),
-            a2.text("5"),
-            a2.concat(&[a2.text(","), a2.line()]),
-            a2.text("6"),
-            a2.concat(&[a2.text(","), a2.line()]),
-            a2.text("7"),
-            a2.concat(&[a2.text(","), a2.line()]),
-            a2.text("8"),
-        ]));
-
-        assert_eq!(
-            render_test(&a2, doc2, &render, 1),
-            "1, 2, 3, 4,\n\t5, 6, 7,\n\t8"
-        );
+        assert_eq!(render_test(&a, doc, &render), "1, 2, 3, 4,\n\t5, 6, 7, 8");
     }
 
     #[test]
@@ -923,10 +886,7 @@ mod arena_tests {
             #[cfg(feature = "comment_check")]
             purpose: RenderPurpose::Output,
         };
-        let embed = EmbedContext {
-            base_indent_offset: 1,
-            ..EmbedContext::default()
-        };
+        let embed = EmbedContext::default();
 
         let start_column = 6;
         let indent_level = 3;
