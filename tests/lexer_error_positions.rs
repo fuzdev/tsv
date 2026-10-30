@@ -59,19 +59,19 @@ fn location(rendered: &str) -> (usize, usize, String) {
 fn svelte_error(source: &str) -> (usize, usize, String) {
     let arena = Bump::new();
     let err = tsv_svelte::parse(source, &arena).expect_err("the input must not parse");
-    location(&err.to_string())
+    location(&format!("{err:#}"))
 }
 
 fn ts_error(source: &str) -> (usize, usize, String) {
     let arena = Bump::new();
     let err = tsv_ts::parse(source, &arena).expect_err("the input must not parse");
-    location(&err.to_string())
+    location(&format!("{err:#}"))
 }
 
 fn css_error(source: &str) -> (usize, usize, String) {
     let arena = Bump::new();
     let err = tsv_css::parse(source, &arena).expect_err("the input must not parse");
-    location(&err.to_string())
+    location(&format!("{err:#}"))
 }
 
 /// `(line, column)` of `needle`'s first byte in a Svelte or CSS document, both 1-indexed —

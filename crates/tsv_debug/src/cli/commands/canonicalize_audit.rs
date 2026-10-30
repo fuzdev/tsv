@@ -120,7 +120,7 @@ impl CanonicalizeAuditCommand {
                 Err(CanonicalizeError::CorruptOutput(e)) => {
                     report.corrupt_output.push(CorruptEntry {
                         path: display(file),
-                        error: e.to_string(),
+                        error: format!("{e:#}"),
                     });
                 }
                 Err(CanonicalizeError::Parse(_)) => report.input_rejected += 1,

@@ -91,7 +91,7 @@ fn point_violations(source: &str, language: Language, error: &Error) -> Vec<Stri
             (point.start, point.line, point.column)
         ));
     }
-    let rendered = error.to_string();
+    let rendered = format!("{error:#}");
     let located = rendered
         .lines()
         .nth(1)
@@ -159,11 +159,11 @@ fn grade(source: &str, language: Language, at: Option<At>) -> Option<Vec<String>
                     parsed.wire_point()
                 ));
             }
-            if formatted.to_string() != parsed.to_string() {
+            if format!("{formatted:#}") != format!("{parsed:#}") {
                 out.push(format!(
                     "format message {:?} != parse message {:?}",
-                    formatted.to_string(),
-                    parsed.to_string()
+                    format!("{formatted:#}"),
+                    format!("{parsed:#}")
                 ));
             }
         }
@@ -450,7 +450,7 @@ fn an_escape_after_an_optional_token_reports_the_escape() {
         let control = format!("let s = {};", &source[open..=close]);
         let message = |source: &str, language| {
             parse_error(source, language).map(|error| {
-                let rendered = error.to_string();
+                let rendered = format!("{error:#}");
                 rendered.lines().next().unwrap_or_default().to_string()
             })
         };
@@ -488,7 +488,7 @@ fn escape_errors_point_at_their_backslash() {
         let line_end = source[backslash..]
             .find('\n')
             .map_or(source.len(), |i| backslash + i);
-        let rendered = error.to_string();
+        let rendered = format!("{error:#}");
         let excerpt = rendered
             .lines()
             .nth(1)

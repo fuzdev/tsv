@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::fmt::Write as _;
+use std::ops::Range;
 
 use crate::depth::DepthLimit;
 use crate::location::{WireCoordinates, WirePoint};
@@ -158,7 +159,7 @@ enum Repr {
     },
     // Constructed only by `Error::too_deep`: a located syntax error like the four
     // above, kept apart so a caller can tell a resource limit from malformed source
-    // (`Error::is_too_deep`).
+    // (`Error::kind`).
     TooDeep {
         limit: DepthLimit,
         position: usize,
@@ -172,10 +173,13 @@ enum Repr {
         max: usize,
     },
     // Constructed only by `Error::refusal`. Not a located error, though it has a
-    // span: see that constructor.
+    // span: see that constructor. `span` is the refused bytes in the source the refusal
+    // was built over ([`Error::span`]); `start` / `end` the same two ends in its wire
+    // coordinates ([`Error::report`]).
     Refused {
         message: Box<str>,
         frame: Box<str>,
+        span: Range<usize>,
         start: WirePoint,
         end: WirePoint,
     },
@@ -220,19 +224,42 @@ impl Repr {
     }
 }
 
-/// The summary, then — for a located error with its context filled, and for a refusal — a
-/// `\n` and the frame; a located error no context has been filled for falls back to
-/// `at position N`.
+/// One line by default, the whole frame under the alternate flag (`{:#}`) — see
+/// [`Error`]'s `Display`.
 impl fmt::Display for Repr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let summary = self.summary();
-        if let Repr::Refused { frame, .. } = self {
-            return write!(f, "{summary}\n{frame}");
-        }
-        match self.located() {
-            Some((position, context)) => {
-                f.write_str(&format_error(&summary, *position, context.as_ref()))
+        if f.alternate() {
+            // The summary, then — for a located error with its context filled, and for a
+            // refusal — a `\n` and the frame; a located error no context has been filled for
+            // falls back to `at position N`.
+            if let Repr::Refused { frame, .. } = self {
+                return write!(f, "{summary}\n{frame}");
             }
+            return match self.located() {
+                Some((position, context)) => {
+                    f.write_str(&format_error(&summary, *position, context.as_ref()))
+                }
+                None => f.write_str(&summary),
+            };
+        }
+        // The point the frame's header prints, as `line:col`; a byte offset where no context
+        // has been filled; nothing for the size cap, which has no position.
+        let point = match self {
+            Repr::Refused { start, .. } => Some(*start),
+            _ => match self.located() {
+                Some((_, Some(context))) => Some(context.point),
+                Some((position, None)) => return write!(f, "{summary} (at byte {position})"),
+                None => None,
+            },
+        };
+        match point {
+            Some(point) => write!(
+                f,
+                "{summary} ({}:{})",
+                point.line,
+                u64::from(point.column) + 1
+            ),
             None => f.write_str(&summary),
         }
     }
@@ -286,8 +313,8 @@ fn escape_line_terminators(summary: String) -> String {
 }
 
 /// A pointed error as a binding reports it: the summary and the frame apart, and the span
-/// in the document's wire coordinates ([`Error::report`]). The error's own message is
-/// exactly `summary`, a `\n`, then `frame`.
+/// in the document's wire coordinates ([`Error::report`]). The error's full message (its
+/// `{:#}` form) is exactly `summary`, a `\n`, then `frame`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErrorReport {
     /// What went wrong — the message's first part.
@@ -318,8 +345,17 @@ pub struct ErrorReport {
 /// because a fat AST node (`Statement`, `Expression`) already dominated it, so the hot
 /// parse loops pack into less instruction cache.
 ///
-/// `Display` and `Debug` forward to the inner kind, so rendered messages and debug output
-/// are exactly what the enum produces.
+/// # Display
+///
+/// `{}` is **one line**: the summary, then the error's `line:col` (1-based line, 1-based
+/// UTF-16 column, the point its frame's header prints) in parentheses —
+/// `Unexpected end of file (3:7)`. A located error no context has been filled for (only
+/// an embedded entry point returns one) names its byte offset instead —
+/// `Unexpected end of file (at byte 41)` — and a source over the size cap, which has no
+/// position, is the summary alone. The alternate form `{:#}` is the whole frame: the
+/// summary, a `\n`, the `line:col` header with the excerpted line, a `\n`, and the caret
+/// line — what the `tsv` CLI prints (and `summary + "\n" + frame` of [`Error::report`]).
+/// `Debug` prints the private payload's variant.
 #[derive(Clone, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Error(Box<Payload>);
@@ -354,15 +390,36 @@ const _: () = assert!(size_of::<Repr>() == 96);
 impl fmt::Display for Error {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.kind.fmt(f)
+        fmt::Display::fmt(&self.0.kind, f)
     }
 }
 
 impl fmt::Debug for Error {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.kind.fmt(f)
+        fmt::Debug::fmt(&self.0.kind, f)
     }
+}
+
+/// What kind of failure an [`Error`] is ([`Error::kind`]).
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ErrorKind {
+    /// The source is malformed at a point: [`Error::span`] is that point, as an empty
+    /// range.
+    Syntax,
+    /// The source parses, but an operation cannot handle what it holds — a format that
+    /// cannot print it without changing what it means ([`Error::refusal`]), or — as the type
+    /// strip's `tsv_ts::StripError::kind` reports — a construct type blanking cannot erase.
+    /// [`Error::span`] is the refused bytes.
+    Refusal,
+    /// The source passed one of the parsers' depth limits — a resource bound rather than a
+    /// grammar verdict. Located like a syntax error: [`Error::span`] is the point the limit
+    /// tripped at.
+    TooDeep,
+    /// The source is longer than the `u32` offsets can index (over 4 GiB − 1 bytes). No
+    /// position: [`Error::span`] is `None`.
+    TooLarge,
 }
 
 impl std::error::Error for Error {}
@@ -462,15 +519,47 @@ impl Error {
         self.0.kind.located().map(|(position, _)| *position)
     }
 
-    /// Whether this is a **syntax error** — the source is malformed at a point — rather
-    /// than a source over the `u32` cap (positionless) or an [`Error::refusal`] of a
-    /// source that parses (pointed, but by its own span in [`Error::report`]). The one
-    /// question every surface asks before choosing its channel: the CLI's `Parse error:` prefix (a
-    /// binding reads the same split from [`ErrorReport::refused`]). A whole-document parse
-    /// entry point fills every syntax error's context, so on its errors this is exactly
-    /// `wire_point().is_some()`.
-    pub fn is_syntax_error(&self) -> bool {
-        self.0.kind.located().is_some()
+    /// What kind of failure this is: a syntax error, a refusal of a source that parses, a
+    /// depth limit, or a source over the size cap ([`ErrorKind`]).
+    ///
+    /// The surfaces split on it: the CLI prints `Parse error:` for [`ErrorKind::Syntax`]
+    /// and [`ErrorKind::TooDeep`] (both located, so both carry a frame) and `Error:` for the
+    /// rest, and a binding reads the refusal line from [`ErrorReport::refused`]. A
+    /// whole-document parse entry point fills every located error's context, so on its
+    /// errors `Syntax | TooDeep` is exactly `wire_point().is_some()`.
+    #[inline]
+    #[must_use]
+    pub fn kind(&self) -> ErrorKind {
+        match &self.0.kind {
+            Repr::UnexpectedToken { .. }
+            | Repr::UnexpectedEof { .. }
+            | Repr::InvalidSyntax { .. }
+            | Repr::InvalidExpression { .. } => ErrorKind::Syntax,
+            Repr::TooDeep { .. } => ErrorKind::TooDeep,
+            Repr::FileTooLarge { .. } => ErrorKind::TooLarge,
+            Repr::Refused { .. } => ErrorKind::Refusal,
+        }
+    }
+
+    /// The error's byte range in the source the caller handed over — UTF-8 byte offsets,
+    /// not the UTF-16 wire coordinates [`Error::report`] gives. A syntax error and a depth
+    /// limit know a point, so their range is empty (`p..p`); a refusal's is the bytes it
+    /// refuses; a source over the size cap has none (`None`).
+    ///
+    /// The offsets index the text the caller passed: a format entry point's error is
+    /// mapped back through its line-terminator fold, so it points into the unfolded bytes,
+    /// and an error inside an embedded `<script>` / `<style>` or template expression is
+    /// absolute in the host document. A leading byte-order mark is counted, whatever a
+    /// language's wire does with it — these are bytes.
+    #[must_use]
+    pub fn span(&self) -> Option<Range<usize>> {
+        if let Repr::Refused { span, .. } = &self.0.kind {
+            return Some(span.clone());
+        }
+        self.0
+            .kind
+            .located()
+            .map(|(position, _)| *position..*position)
     }
 
     /// The [`Error::too_deep`] payload, built here where the kind is visible.
@@ -480,14 +569,6 @@ impl Error {
             position,
             context: None,
         })
-    }
-
-    /// Whether this is an [`Error::too_deep`] — the source passed one of the parsers'
-    /// depth limits, a resource bound rather than a grammar verdict. A speculative parse
-    /// hands such an error back instead of rewinding to another reading, since the other
-    /// reading would be chosen for the stack's sake, not the grammar's.
-    pub fn is_too_deep(&self) -> bool {
-        matches!(self.0.kind, Repr::TooDeep { .. })
     }
 
     /// Source exceeds the 4 GiB − 1 cap the `u32` span offsets assume.
@@ -505,10 +586,13 @@ impl Error {
     /// The message is rendered here, with the `line:col` header and excerpt of `start` in
     /// `source` under `coordinates` that a located error prints, so it reads like every other
     /// error, and the span is kept ([`Error::report`]). But it is **not a syntax error** —
-    /// no [`Error::position`], no [`Error::wire_point`],
-    /// [`Error::is_syntax_error`] false: the source is not malformed (`parse` accepts it),
+    /// no [`Error::position`], no [`Error::wire_point`], [`Error::kind`]
+    /// [`ErrorKind::Refusal`]: the source is not malformed (`parse` accepts it),
     /// so every surface reports it apart from a parse failure — the CLI's `Error:` prefix, the
     /// npm facade's `kind: 'refused'`.
+    ///
+    /// `source` must be the caller's own text: neither `Error::shift_position` nor the
+    /// line-terminator fold's mapping moves a refusal.
     #[cold]
     #[inline(never)]
     pub fn refusal(
@@ -522,6 +606,8 @@ impl Error {
         Error::new(Repr::Refused {
             message: report.summary.into(),
             frame: report.frame.into(),
+            // the same ends the report's points are taken at: `end` never short of `start`
+            span: start..end.max(start),
             start: report.start,
             end: report.end,
         })
@@ -788,39 +874,38 @@ mod tests {
         assert_eq!(gated.wire_point(), plain.wire_point());
     }
 
-    /// `Display` forwards to the boxed kind, so the rendered message must be exactly
-    /// what the enum's `#[error(...)]` attributes produce — both the bare
-    /// `at position N` fallback and the caret form `with_context` fills in. The
-    /// error-message fixtures and `input_invalid_*` gate this at the product level;
-    /// this pins it beside the forwarding impl.
+    /// `{:#}` forwards to the boxed kind, so the rendered message must be exactly what the
+    /// payload's arms produce — both the bare `at position N` fallback and the caret form
+    /// `with_context` fills in. The error-message fixtures and `input_invalid_*` gate this
+    /// at the product level (the CLI prints `{:#}`); this pins it beside the forwarding impl.
     #[test]
-    fn test_display_renders_through_the_newtype() {
+    fn test_alternate_display_renders_the_frame() {
         let source = "let x =\ny";
 
         let e = Error::invalid_syntax("bad token".to_string(), 4);
-        assert_eq!(e.to_string(), "bad token at position 4");
+        assert_eq!(format!("{e:#}"), "bad token at position 4");
         assert_eq!(
-            e.with_context(source, ECMA).to_string(),
+            format!("{:#}", e.with_context(source, ECMA)),
             "bad token\n1:5 let x =\n        ^ here"
         );
 
         let e = Error::unexpected_token("';'".to_string(), "'y'".to_string(), 8);
-        assert_eq!(e.to_string(), "Expected ';', found 'y' at position 8");
+        assert_eq!(format!("{e:#}"), "Expected ';', found 'y' at position 8");
         assert_eq!(
-            e.with_context(source, ECMA).to_string(),
+            format!("{:#}", e.with_context(source, ECMA)),
             "Expected ';', found 'y'\n2:1 y\n    ^ here"
         );
 
         assert_eq!(
-            Error::unexpected_eof(9).to_string(),
+            format!("{:#}", Error::unexpected_eof(9)),
             "Unexpected end of file at position 9"
         );
         assert_eq!(
-            Error::invalid_expression("'='".to_string(), 6).to_string(),
+            format!("{:#}", Error::invalid_expression("'='".to_string(), 6)),
             "Expected expression, found '=' at position 6"
         );
         assert_eq!(
-            Error::file_too_large(5, 4).to_string(),
+            format!("{:#}", Error::file_too_large(5, 4)),
             "File too large: 5 bytes (maximum: 4 bytes / 4 GiB)"
         );
 
@@ -828,18 +913,85 @@ mod tests {
         // no point to report.
         let too_large = Error::file_too_large(5, 4).with_context(source, ECMA);
         assert_eq!(
-            too_large.to_string(),
+            format!("{too_large:#}"),
             "File too large: 5 bytes (maximum: 4 bytes / 4 GiB)"
         );
         assert_eq!(too_large.wire_point(), None);
         // Nor does a located error no context has been filled for.
         assert_eq!(Error::unexpected_eof(9).wire_point(), None);
 
-        // `Debug` forwards too, so it prints the kind — not an `Error(..)` wrapper.
+        // `Debug` prints the kind — not an `Error(..)` wrapper.
         assert!(
             format!("{:?}", Error::unexpected_eof(9)).starts_with("UnexpectedEof"),
             "Debug must forward to the kind"
         );
+    }
+
+    /// `{}` is one line: the summary and the frame header's `line:col`, a byte offset for a
+    /// located error no context has been filled for, the summary alone without a position.
+    #[test]
+    fn test_display_is_one_line() {
+        let source = "let x =\ny";
+        let e = Error::invalid_syntax("bad token".to_string(), 4);
+        assert_eq!(e.to_string(), "bad token (at byte 4)");
+        assert_eq!(e.with_context(source, ECMA).to_string(), "bad token (1:5)");
+        let e = Error::unexpected_token("';'".to_string(), "'y'".to_string(), 8)
+            .with_context(source, ECMA);
+        assert_eq!(e.to_string(), "Expected ';', found 'y' (2:1)");
+        // the header's numbers, and the summary's first line, exactly
+        let alternate = format!("{e:#}");
+        let summary = alternate.lines().next().unwrap();
+        assert_eq!(e.to_string(), format!("{summary} ({})", header(&alternate)));
+        assert_eq!(
+            Error::file_too_large(5, 4).to_string(),
+            "File too large: 5 bytes (maximum: 4 bytes / 4 GiB)"
+        );
+        let refusal = Error::refusal("no", "a\nbc", 3, 4, LF);
+        assert_eq!(refusal.to_string(), "no (2:2)");
+        // a column at the `u32` cap prints whole, as the header does
+        let at_cap = Error::new(Repr::UnexpectedEof {
+            position: 0,
+            context: Some(ErrorContext {
+                source_line: "x".into(),
+                caret_column: 1,
+                point: point(u32::MAX, 1, u32::MAX),
+                coordinates: ECMA,
+            }),
+        });
+        assert_eq!(at_cap.to_string(), "Unexpected end of file (1:4294967296)");
+    }
+
+    /// `kind()` names each payload; `span()` is the point as an empty range for a located
+    /// error, the refused bytes for a refusal, nothing for the size cap.
+    #[test]
+    fn test_kind_and_span() {
+        let syntax = Error::invalid_syntax("bad".to_string(), 4).with_context("let x =\ny", ECMA);
+        assert_eq!(syntax.kind(), ErrorKind::Syntax);
+        assert_eq!(syntax.span(), Some(4..4));
+        for e in [
+            Error::unexpected_token("a".to_string(), "b".to_string(), 2),
+            Error::unexpected_eof(2),
+            Error::invalid_expression("b".to_string(), 2),
+            Error::goal_gate("g".to_string(), 2),
+        ] {
+            assert_eq!(e.kind(), ErrorKind::Syntax, "{e:?}");
+            // unfilled, the position is already the caller's
+            assert_eq!(e.span(), Some(2..2), "{e:?}");
+        }
+        let deep = Error::depth_limit(DepthLimit::Nesting, 7);
+        assert_eq!(deep.kind(), ErrorKind::TooDeep);
+        assert_eq!(deep.span(), Some(7..7));
+        let refusal = Error::refusal("no", "ab\ncd", 3, 5, LF);
+        assert_eq!(refusal.kind(), ErrorKind::Refusal);
+        assert_eq!(refusal.span(), Some(3..5));
+        // an end short of the start is the start, as the report's points take it
+        assert_eq!(Error::refusal("no", "abcd", 3, 1, LF).span(), Some(3..3));
+        let too_large = Error::file_too_large(5, 4);
+        assert_eq!(too_large.kind(), ErrorKind::TooLarge);
+        assert_eq!(too_large.span(), None);
+        // the goal-gate mark and a shift move nothing but what they say
+        let shifted = Error::invalid_syntax("bad".to_string(), 2).shift_position(10);
+        assert_eq!(shifted.span(), Some(12..12));
     }
 
     /// The excerpt is bounded by the ECMAScript terminator class, not by `\n` alone, in
@@ -909,7 +1061,7 @@ mod tests {
                     let e = Error::invalid_syntax("bad".to_string(), position)
                         .with_context(source, coordinates);
                     let p = e.wire_point().expect("a located, filled error has a point");
-                    let rendered = e.to_string();
+                    let rendered = format!("{e:#}");
                     assert_eq!(header(&rendered), format!("{}:{}", p.line, p.column + 1));
                     let excerpt = rendered.lines().nth(1).expect("located line");
                     assert!(
@@ -1014,10 +1166,11 @@ mod tests {
         // The `<CR>` itself, as the Svelte format entry's refusal points: the header counts
         // `\n` lines, the excerpt stops at the `<CR>`.
         let refusal = Error::refusal("no", source, 4, 5, LF);
-        assert_eq!(refusal.to_string(), "no\n2:2 c\n     ^ here");
+        assert_eq!(format!("{refusal:#}"), "no\n2:2 c\n     ^ here");
         assert_eq!(refusal.position(), None);
         assert_eq!(refusal.wire_point(), None);
-        assert!(!refusal.is_syntax_error());
+        assert_eq!(refusal.kind(), ErrorKind::Refusal);
+        assert_eq!(refusal.span(), Some(4..5));
         assert_eq!(
             refusal.report(),
             Some(ErrorReport {
@@ -1029,8 +1182,8 @@ mod tests {
             })
         );
         assert_eq!(
-            refusal.clone().unfold(source).to_string(),
-            refusal.to_string()
+            format!("{:#}", refusal.clone().unfold(source)),
+            format!("{refusal:#}")
         );
     }
 
@@ -1053,7 +1206,7 @@ mod tests {
             let report = e.report().expect("a filled syntax error reports");
             assert_eq!(report.summary, format!("bad '{spelled}'"));
             assert_eq!(
-                e.to_string(),
+                format!("{e:#}"),
                 format!("{}\n{}", report.summary, report.frame)
             );
             let e = Error::unexpected_token("';'".to_string(), format!("'{raw}'"), 2)
@@ -1066,7 +1219,7 @@ mod tests {
             let report = refusal.report().expect("a refusal reports");
             assert_eq!(report.summary, spelled);
             assert_eq!(
-                refusal.to_string(),
+                format!("{refusal:#}"),
                 format!("{}\n{}", report.summary, report.frame)
             );
         }
@@ -1088,7 +1241,7 @@ mod tests {
         assert_eq!(report.end, report.start);
         assert!(!report.refused);
         assert_eq!(
-            e.to_string(),
+            format!("{e:#}"),
             format!("{}\n{}", report.summary, report.frame)
         );
         assert_eq!(Error::file_too_large(5, 4).report(), None);
@@ -1109,7 +1262,7 @@ mod tests {
             Error::invalid_syntax("bad".to_string(), at_original).with_context(original, ECMA);
         assert_eq!(unfolded.position(), Some(at_original));
         assert_eq!(unfolded.wire_point(), direct.wire_point());
-        assert_eq!(unfolded.to_string(), direct.to_string());
+        assert_eq!(format!("{unfolded:#}"), format!("{direct:#}"));
         assert_eq!(unfolded.wire_point(), Some(point(10, 3, 2)));
 
         // A text the fold left alone is handed back untouched.

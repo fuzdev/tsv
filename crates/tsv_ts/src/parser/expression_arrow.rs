@@ -124,7 +124,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Err(error) if error.is_goal_gated() => Err(error),
             // a depth limit is no verdict on the reading: the other one would be taken for
             // the stack's sake, not the grammar's
-            Err(error) if error.is_too_deep() => Err(error),
+            Err(error) if error.kind() == tsv_lang::ErrorKind::TooDeep => Err(error),
             Ok(_) | Err(_) => {
                 self.rewind(checkpoint);
                 Ok(None)

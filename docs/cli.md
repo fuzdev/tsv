@@ -212,7 +212,7 @@ U+2028 or U+2029 printed mid-line garbles the text the caret points into; it nev
 leading byte-order mark, in any language (the header alone carries the wire's reading of one).
 The caret is padded by the display width of what the excerpt prints ahead of it (a tab echoed
 as a tab), so it sits under the error's character even where the header's UTF-16 column and
-the screen column differ. The text comes from `tsv_lang`'s `Error` and is the same
+the screen column differ. The text is `tsv_lang`'s `Error` in its full (`{:#}`) form and is the same
 on both bins and in every package — where the `{kind: 'parse'}` error the facade returns
 carries it split in two, the summary as `message` and the header, excerpt and caret lines as
 `frame` (so `` `${message}\n${frame}` `` is the text), beside a `start` / `end` / `loc` span
@@ -220,9 +220,10 @@ over the same point (`crates/tsv_wasm/npm/api.js`).
 
 Two errors are not parse errors, and a single input prints them after `Error: ` rather than
 `Parse error: ` (a path-mode `format` names the file either way): a source over the 4 GiB
-size cap the parsers' `u32` offsets index, and a `format` refusal. Neither is a syntax error
-(`Error::is_syntax_error`), which is how the native bin tells them from a parse error
-(`cli::out::exit_with_parse_error`); `cli.js` tells them by the facade: the size cap throws,
+size cap the parsers' `u32` offsets index, and a `format` refusal. Neither is a located
+error (`Error::kind` is `TooLarge` / `Refusal`, not `Syntax` / `TooDeep`), which is how the
+native bin tells them from a parse error (`cli::out::exit_with_parse_error`, which prints
+the error's full `{:#}` form); `cli.js` tells them by the facade: the size cap throws,
 and the refusal is a returned error of `kind` `'refused'` where a parse failure's is `'parse'`.
 
 The refusal: a Svelte document holding a lone CR (not part of a CRLF) with comment text after
@@ -463,7 +464,7 @@ exceeds tsv's depth limit of 256 levels`, `Chain of operators, member accesses, 
 assertions or type suffixes exceeds tsv's length limit` — no number, since the spine limit
 counts weighted units with the nesting charged on top, which no count of links names; a
 CSS value's at the `(` that passes the limit): `parse` and `format` report it like any other,
-and `Error::is_too_deep` tells it apart. A speculative parse that meets it hands it
+and its `Error::kind` (`ErrorKind::TooDeep`) tells it apart. A speculative parse that meets it hands it
 back rather than trying the other reading, since that reading would be chosen for the
 stack's sake, not the grammar's — and for the same reason a format's module goal refused by
 it is not retried as a script, which could only succeed by reading `await` as a name. It is a deliberate over-rejection — every canonical

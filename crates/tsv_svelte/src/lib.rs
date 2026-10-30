@@ -14,7 +14,7 @@ mod whitespace;
 
 use __private::{format_folded_in, parse_folded};
 pub use ast::Root;
-pub use tsv_lang::{Error, ErrorReport, Result, WirePoint};
+pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, WirePoint};
 
 /// The coordinates a Svelte document's positions are reported in — Svelte's: a leading
 /// BOM **elided** (Svelte's `parse` strips it before parsing, so every offset indexes the

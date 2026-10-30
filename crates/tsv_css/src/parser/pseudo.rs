@@ -476,7 +476,7 @@ fn parse_unknown_args<'arena>(
     match parse_complex_selector_list(parser) {
         Ok(selector_list) => finish_selector_list_args(parser, args_start, selector_list),
         // a depth limit is no verdict on the arguments (see `parse_forgiving_selector_list`)
-        Err(error) if error.is_too_deep() => Err(error),
+        Err(error) if error.kind() == tsv_lang::ErrorKind::TooDeep => Err(error),
         Err(_) => {
             // Parsing as selector list failed - skip arguments
             // This handles pseudo-classes with non-selector arguments

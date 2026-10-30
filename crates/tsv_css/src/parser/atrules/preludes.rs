@@ -56,7 +56,7 @@ fn parse_selector_argument<'arena>(
     match parse_complex_selector_list(parser) {
         Ok(list) if parser.check(TokenKind::RightParen) => return Ok(Some(list)),
         // a depth limit is no verdict on the argument (see `parse_forgiving_selector_list`)
-        Err(error) if error.is_too_deep() => return Err(error),
+        Err(error) if error.kind() == tsv_lang::ErrorKind::TooDeep => return Err(error),
         Ok(_) | Err(_) => {}
     }
     parser.rewind_to(arg_start, comments_len)?;
@@ -1265,7 +1265,7 @@ fn parse_custom_selector_head_and_list<'arena>(
     match parse_complex_selector_list(parser) {
         Ok(list) => Ok(Some((name, list))),
         // a depth limit is no verdict on the list (see `parse_forgiving_selector_list`)
-        Err(error) if error.is_too_deep() => Err(error),
+        Err(error) if error.kind() == tsv_lang::ErrorKind::TooDeep => Err(error),
         Err(_) => Ok(None),
     }
 }

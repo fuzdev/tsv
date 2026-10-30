@@ -20,7 +20,7 @@ mod whitespace;
 // Re-export commonly used types
 use __private::{format_folded_in, parse_folded};
 pub use ast::{CssDeclaration, CssNode, CssRule, CssStyleSheet};
-pub use tsv_lang::{Error, ErrorReport, Result, WirePoint};
+pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, WirePoint};
 
 /// The coordinates a CSS document's positions are reported in — `parseCss`'s: a leading
 /// BOM **elided** (`parseCss` strips it before parsing, so every offset indexes the

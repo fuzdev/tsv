@@ -125,19 +125,19 @@ pub fn exit_with_error(code: i32, message: impl std::fmt::Display) -> ! {
 }
 
 /// [`exit_with_error`] for a single input the engine rejected (`parse`, and `format
-/// --content`/`--stdin`), prefixed by what the error is: `Parse error:` for a syntax
-/// error ([`tsv_lang::Error::is_syntax_error`]), and `Error:` for the kinds that are
-/// not one — the size cap and a format's refusal of a source that parses
-/// ([`tsv_lang::Error::refusal`]). The JS mirror makes the same split on the facade
-/// result's `error.kind` (`cli.js`'s `result_failure`). A path-mode `format` names the file
-/// instead, with no prefix (`error: <path>: …`).
+/// --content`/`--stdin`), prefixed by what the error is: `Parse error:` for a located
+/// error — a syntax error or a depth limit ([`tsv_lang::Error::kind`]) — and `Error:` for
+/// the kinds that are not one — the size cap and a format's refusal of a source that parses
+/// ([`tsv_lang::Error::refusal`]). The error prints in its full form (`{:#}`: the summary,
+/// then the `line:col` header, excerpt and caret). The JS mirror makes the same split on
+/// the facade result's `error.kind` (`cli.js`'s `result_failure`). A path-mode `format`
+/// names the file instead, with no prefix (`error: <path>: …`).
 pub fn exit_with_parse_error(code: i32, error: &tsv_lang::Error) -> ! {
-    let prefix = if error.is_syntax_error() {
-        "Parse error"
-    } else {
-        "Error"
+    let prefix = match error.kind() {
+        tsv_lang::ErrorKind::Syntax | tsv_lang::ErrorKind::TooDeep => "Parse error",
+        _ => "Error",
     };
-    exit_with_error(code, format_args!("{prefix}: {error}"))
+    exit_with_error(code, format_args!("{prefix}: {error:#}"))
 }
 
 /// `println!` over [`write_stdout`] — the only stdout line-writer in the CLI.

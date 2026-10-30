@@ -33,7 +33,7 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
 use tsv_lang::{CommentFreeWindow, EmbedContext, Span};
-pub use tsv_lang::{Error, ErrorReport, Result, WirePoint};
+pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, WirePoint};
 
 pub use goal::Goal;
 pub use strip::{StripError, Stripped, UnsupportedKind, strip, strip_with_goal};
@@ -163,7 +163,7 @@ pub fn parse_with_goal<'arena>(
 /// error it shows on such a file is the typo. Pinned by
 /// `tests/format_fallback_error_attribution.rs`.
 ///
-/// **A module attempt the depth limit refused takes no retry** ([`Error::is_too_deep`]):
+/// **A module attempt the depth limit refused takes no retry** ([`ErrorKind::TooDeep`]):
 /// the limit is no verdict on the grammar, and the script grammar reads every construct the
 /// module one accepts as the same tree but `await`, which it reads as a name — so a script
 /// attempt could only succeed by reading the source differently
@@ -187,7 +187,7 @@ pub fn parse_with_goal_or_fallback<'arena>(
         return parse_with_goal(source, goal, arena);
     }
     parse_with_goal(source, Goal::Module, arena).or_else(|module_error| {
-        if module_error.is_too_deep() {
+        if module_error.kind() == ErrorKind::TooDeep {
             return Err(module_error);
         }
         parse_with_goal(source, Goal::Script, arena).map_err(|script_error| {

@@ -52,7 +52,7 @@ fn fallback_error_at(source: &str) -> (usize, usize, String) {
     let arena = Bump::new();
     let err = tsv_ts::parse_with_goal_or_fallback(source, None, &arena)
         .expect_err("the input must parse under neither goal");
-    let rendered = err.to_string();
+    let rendered = format!("{err:#}");
     let mut lines = rendered.lines();
     let message = lines
         .next()
@@ -267,16 +267,20 @@ fn a_mixed_file_reports_the_module_error_whatever_the_order() {
 fn a_named_goal_reports_its_own_error() {
     let source = "with (o) {\n\ta.b = 1;\n}\nfunction f( {\n";
     let arena = Bump::new();
-    let module = tsv_ts::parse_with_goal_or_fallback(source, Some(tsv_ts::Goal::Module), &arena)
-        .expect_err("with rejects at Module")
-        .to_string();
+    let module = format!(
+        "{:#}",
+        tsv_ts::parse_with_goal_or_fallback(source, Some(tsv_ts::Goal::Module), &arena)
+            .expect_err("with rejects at Module")
+    );
     assert!(
         module.starts_with("The 'with' statement is not allowed in strict mode"),
         "{module}"
     );
-    let script = tsv_ts::parse_with_goal_or_fallback(source, Some(tsv_ts::Goal::Script), &arena)
-        .expect_err("the typo rejects at Script")
-        .to_string();
+    let script = format!(
+        "{:#}",
+        tsv_ts::parse_with_goal_or_fallback(source, Some(tsv_ts::Goal::Script), &arena)
+            .expect_err("the typo rejects at Script")
+    );
     assert!(script.starts_with(TYPO_MESSAGE), "{script}");
 }
 

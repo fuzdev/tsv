@@ -379,15 +379,15 @@ pub(in crate::fixtures::validation) fn validate_tsv_rejects(
     let parse_result: Result<(), String> = match input_type {
         InputType::Svelte => tsv_svelte::parse(input, &arena)
             .map(|_| ())
-            .map_err(|e| e.to_string()),
+            .map_err(|e| format!("{e:#}")),
         InputType::SvelteTs | InputType::TypeScript => {
             tsv_ts::parse_with_goal(input, fixture.goal(), &arena)
                 .map(|_| ())
-                .map_err(|e| e.to_string())
+                .map_err(|e| format!("{e:#}"))
         }
         InputType::Css => tsv_css::parse(input, &arena)
             .map(|_| ())
-            .map_err(|e| e.to_string()),
+            .map_err(|e| format!("{e:#}")),
     };
 
     match parse_result {

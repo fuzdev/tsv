@@ -368,7 +368,7 @@ pub fn bind_lib(name: &str, source: &str) -> Result<LibFile, String> {
 /// failure reports is stated once, there. The program records the goal it parsed
 /// under (`Program::goal`), which is also how a caller learns the `Script` retry won.
 fn parse_unit<'a>(source: &'a str, arena: &'a Bump) -> Result<Program<'a>, String> {
-    parse_with_goal_or_fallback(source, None, arena).map_err(|e| e.to_string())
+    parse_with_goal_or_fallback(source, None, arena).map_err(|e| format!("{e:#}"))
 }
 
 #[cfg(test)]

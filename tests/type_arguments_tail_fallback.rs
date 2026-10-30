@@ -100,9 +100,10 @@ fn rejects(source: &str) -> bool {
 /// The rendered error for `source`: its message line and its `line:col` header.
 fn error(source: &str) -> (String, String) {
     let arena = bumpalo::Bump::new();
-    let rendered = tsv_ts::parse(source, &arena)
-        .expect_err("the case must not parse")
-        .to_string();
+    let rendered = format!(
+        "{:#}",
+        tsv_ts::parse(source, &arena).expect_err("the case must not parse")
+    );
     let mut lines = rendered.lines();
     let message = lines.next().expect("a message line").to_owned();
     let header = lines

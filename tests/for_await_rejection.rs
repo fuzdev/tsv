@@ -28,7 +28,7 @@ use bumpalo::Bump;
 fn error_at(source: &str) -> (usize, usize, String) {
     let arena = Bump::new();
     let err = tsv_ts::parse(source, &arena).expect_err("the input must not parse");
-    let rendered = err.to_string();
+    let rendered = format!("{err:#}");
     let mut lines = rendered.lines();
     let message = lines
         .next()

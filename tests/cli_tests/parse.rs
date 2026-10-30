@@ -451,3 +451,19 @@ fn test_parser_ts_alias() {
         "`--parser ts` should parse as TypeScript"
     );
 }
+
+/// A depth refusal is located like a syntax error, so a single input prints it after
+/// `Parse error: ` with its whole frame (`ErrorKind::TooDeep`, read by
+/// `cli::out::exit_with_parse_error`), never after the `Error: ` of a refusal.
+#[test]
+fn test_parse_depth_refusal_prints_as_a_parse_error() {
+    let source = format!("x = {}a{};", "(".repeat(400), ")".repeat(400));
+    let output = tsv(&["parse", "--content", &source, "--parser", "typescript"]);
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.starts_with("Parse error: Nesting exceeds tsv's depth limit of 256 levels\n1:"),
+        "{stderr}"
+    );
+    assert!(stderr.trim_end().ends_with("^ here"), "{stderr}");
+}

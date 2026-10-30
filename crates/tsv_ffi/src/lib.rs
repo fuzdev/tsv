@@ -327,7 +327,7 @@ macro_rules! lang_bindings {
                         convert_ast_json_bytes,
                         source,
                         goal,
-                        |e| e.to_string()
+                        |e| format!("{e:#}")
                     )
                 })
             }
@@ -353,7 +353,7 @@ macro_rules! lang_bindings {
                     let goal =
                         ffi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
                     // success renders as an empty payload
-                    parse_internal!($goalness, $lang, source, goal, |e| e.to_string())
+                    parse_internal!($goalness, $lang, source, goal, |e| format!("{e:#}"))
                         .map(|()| Vec::<u8>::new())
                 })
             }
@@ -379,7 +379,7 @@ macro_rules! lang_bindings {
                     // grammar retried as a script
                     let goal =
                         ffi_source_type(source_type, goal_allowed!($goalness), Family::Format)?;
-                    parse_format!($goalness, $lang, source, goal, |e| e.to_string())
+                    parse_format!($goalness, $lang, source, goal, |e| format!("{e:#}"))
                 })
             }
         }

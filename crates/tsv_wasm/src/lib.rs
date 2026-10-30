@@ -201,7 +201,7 @@ fn parse_failure(e: &Error) -> Failure {
             None,
             &report,
         )),
-        None => Failure::Thrown(err(e)),
+        None => Failure::Thrown(err(format!("{e:#}"))),
     }
 }
 

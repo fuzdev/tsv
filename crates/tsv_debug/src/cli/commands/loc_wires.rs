@@ -327,16 +327,16 @@ fn answer(request: &WireRequest, arena: &mut bumpalo::Bump) -> Result<Vec<u8>, S
             || -> Result<Vec<u8>, String> {
                 Ok(match language {
                     WireLanguage::Svelte => {
-                        let ast = tsv_svelte::parse(source, arena).map_err(|e| e.to_string())?;
+                        let ast = tsv_svelte::parse(source, arena).map_err(|e| format!("{e:#}"))?;
                         tsv_svelte::convert_ast_json_bytes_with_locations(&ast, source)
                     }
                     WireLanguage::Typescript => {
                         let ast = tsv_ts::parse_with_goal(source, goal, arena)
-                            .map_err(|e| e.to_string())?;
+                            .map_err(|e| format!("{e:#}"))?;
                         tsv_ts::convert_ast_json_bytes_with_locations(&ast, source)
                     }
                     WireLanguage::Css => {
-                        let ast = tsv_css::parse(source, arena).map_err(|e| e.to_string())?;
+                        let ast = tsv_css::parse(source, arena).map_err(|e| format!("{e:#}"))?;
                         tsv_css::convert_ast_json_bytes_with_locations(&ast, source)
                     }
                 })

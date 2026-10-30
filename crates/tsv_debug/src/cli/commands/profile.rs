@@ -351,7 +351,7 @@ fn profile_bind_once(
     arena: &bumpalo::Bump,
 ) -> Result<(Duration, Duration, BindStats), String> {
     let t0 = Instant::now();
-    let ast = tsv_ts::parse(source, arena).map_err(|e| format!("parse error: {e}"))?;
+    let ast = tsv_ts::parse(source, arena).map_err(|e| format!("parse error: {e:#}"))?;
     let parse_dur = t0.elapsed();
 
     let t1 = Instant::now();
@@ -389,7 +389,7 @@ fn profile_strip_once(
     arena: &mut bumpalo::Bump,
 ) -> Result<(Duration, Duration), String> {
     let t0 = Instant::now();
-    tsv_ts::parse(source, arena).map_err(|e| format!("parse error: {e}"))?;
+    tsv_ts::parse(source, arena).map_err(|e| format!("parse error: {e:#}"))?;
     let parse_dur = t0.elapsed();
     arena.reset();
 
@@ -397,7 +397,7 @@ fn profile_strip_once(
     let result = tsv_ts::strip(source, arena);
     let strip_dur = t1.elapsed();
     if let Err(tsv_ts::StripError::Parse(e)) = result {
-        return Err(format!("parse error: {e}"));
+        return Err(format!("parse error: {e:#}"));
     }
     Ok((parse_dur, strip_dur.saturating_sub(parse_dur)))
 }
@@ -423,7 +423,7 @@ fn profile_once(
     arena: &bumpalo::Bump,
     doc_arena: &tsv_lang::doc::arena::DocArena,
 ) -> Result<(Duration, Duration), String> {
-    let parse_error = |e: tsv_lang::Error| format!("parse error: {e}");
+    let parse_error = |e: tsv_lang::Error| format!("parse error: {e:#}");
     let t0 = Instant::now();
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     match parser_type {

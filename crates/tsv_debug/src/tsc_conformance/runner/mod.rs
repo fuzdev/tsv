@@ -407,7 +407,7 @@ pub fn dump_flow_dot(checkout: &Path, name: &str) -> Result<String, String> {
     let program = match tsv_ts::parse_with_goal(&unit.content, tsv_ts::Goal::Module, &arena) {
         Ok(p) => p,
         Err(module_err) => tsv_ts::parse_with_goal(&unit.content, tsv_ts::Goal::Script, &arena)
-            .map_err(|_| format!("parse error: {module_err}"))?,
+            .map_err(|_| format!("parse error: {module_err:#}"))?,
     };
     let bound = bind_file(&program, &unit.content, FileId::ROOT);
     let flow = build_flow(&program, &unit.content, &bound);

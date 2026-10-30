@@ -192,7 +192,7 @@ fn profile_compile_file(
         let t1 = Instant::now();
         let folded = tsv_lang::printing::normalize_carriage_returns(&source);
         let ast = tsv_svelte::__private::parse_folded(&folded, arena)
-            .map_err(|e| format!("parse error: {e}"))?;
+            .map_err(|e| format!("parse error: {e:#}"))?;
         parse_times.push(t1.elapsed());
 
         let t2 = Instant::now();

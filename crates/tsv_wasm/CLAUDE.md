@@ -74,7 +74,7 @@ across a worker — whose span is shaped like a wire node's. A parse failure (ev
 `{kind: 'parse', message, frame, start, end, loc}`: `message` the one-line summary (a line
 terminator it quotes from the source spelled `<U+XXXX>`), `frame` the
 `line:col` header with the excerpted line, then the caret line (`Error::report`'s
-`summary` / `frame` — the Rust `Error` text is exactly `` `${message}\n${frame}` ``, the
+`summary` / `frame` — the Rust `Error`'s full (`{:#}`) text is exactly `` `${message}\n${frame}` ``, the
 header printing `loc.start` — [docs/cli.md §Parse errors](../../docs/cli.md#parse-errors));
 `start` / `end` the UTF-16 offsets a wire node would carry (`Error::report` — a parse
 error knows a point, not a span, so `end === start`), and `loc` their

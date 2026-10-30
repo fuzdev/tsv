@@ -17,9 +17,11 @@
 /// `line:col` header.
 fn error(source: &str) -> (String, String) {
     let arena = bumpalo::Bump::new();
-    let rendered = tsv_ts::parse_with_goal(source, tsv_ts::Goal::Module, &arena)
-        .expect_err("the export must not parse")
-        .to_string();
+    let rendered = format!(
+        "{:#}",
+        tsv_ts::parse_with_goal(source, tsv_ts::Goal::Module, &arena)
+            .expect_err("the export must not parse")
+    );
     let mut lines = rendered.lines();
     let message = lines.next().expect("a message line").to_owned();
     let header = lines

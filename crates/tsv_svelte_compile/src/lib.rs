@@ -157,7 +157,7 @@ pub struct CompileOutput {
 pub enum CompileError {
     /// The component failed to parse (a real syntax error in the `.svelte`
     /// source, its `<script>`, or its `<style>`).
-    #[error("failed to parse Svelte component: {0}")]
+    #[error("failed to parse Svelte component: {0:#}")]
     Parse(#[from] tsv_lang::Error),
     /// The component parsed, but uses a shape the compiler does not cover yet.
     /// Always a clear refusal — never guessed output. The [`Refusal`] carries
@@ -168,7 +168,7 @@ pub enum CompileError {
     /// guard and the transform emitted invalid JS. Always a compiler
     /// bug; surfaced loudly instead of returning the corrupt module (the same
     /// contract as [`CanonicalizeError::CorruptOutput`]).
-    #[error("generated JS failed to reparse (compiler bug): {0}")]
+    #[error("generated JS failed to reparse (compiler bug): {0:#}")]
     CorruptOutput(tsv_lang::Error),
     /// A TypeScript-only node survived type erasure into the emitted program —
     /// the erase pass missed a case. Always a compiler bug, and one
@@ -192,13 +192,13 @@ pub enum CompileError {
 #[derive(Debug, thiserror::Error)]
 pub enum CanonicalizeError {
     /// The input did not parse as a TypeScript/JS module.
-    #[error("failed to parse JS for canonicalization: {0}")]
+    #[error("failed to parse JS for canonicalization: {0:#}")]
     Parse(#[from] tsv_lang::Error),
     /// The canonical reprint itself failed to reparse — the canonicalizer
     /// corrupted the program (e.g. content trailed onto a `//` comment's line).
     /// Always a canonicalizer bug; surfaced loudly instead of returning the
     /// corrupt string.
-    #[error("canonical output failed to reparse (canonicalizer bug): {0}")]
+    #[error("canonical output failed to reparse (canonicalizer bug): {0:#}")]
     CorruptOutput(tsv_lang::Error),
 }
 

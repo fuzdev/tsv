@@ -438,7 +438,7 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
             push(
                 StripCheck::Fixture,
                 format!(
-                    "{} does not parse (tsv_ts::parse): {e}",
+                    "{} does not parse (tsv_ts::parse): {e:#}",
                     fixture.expected_file
                 ),
             );
@@ -457,7 +457,7 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
         (_, Err(tsv_ts::StripError::Parse(e))) => {
             push(
                 StripCheck::Parse,
-                format!("tsv's parser rejects the input: {e}"),
+                format!("tsv's parser rejects the input: {e:#}"),
             );
         }
         (Claim::Expected(_), Err(tsv_ts::StripError::Unsupported { kind, span })) => push(
@@ -668,7 +668,7 @@ pub fn idempotence_failure(input: &str, code: &str) -> Option<IdempotenceFailure
         Err(payload) => Some(IdempotenceFailure::Panicked(caught_panic_report(
             payload.as_ref(),
         ))),
-        Ok(Err(e)) => Some(IdempotenceFailure::Fails(e.to_string())),
+        Ok(Err(e)) => Some(IdempotenceFailure::Fails(format!("{e:#}"))),
         Ok(Ok(again)) => match again.code {
             Cow::Borrowed(_) => None,
             Cow::Owned(again) if again == code => Some(IdempotenceFailure::Copies),

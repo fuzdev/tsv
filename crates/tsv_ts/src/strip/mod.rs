@@ -63,7 +63,7 @@ mod walk;
 use std::borrow::Cow;
 use std::fmt;
 
-use tsv_lang::{Error, ErrorReport, Span};
+use tsv_lang::{Error, ErrorKind, ErrorReport, Span};
 
 /// Strip the types from TypeScript `source`, keeping every surviving character at its line
 /// and UTF-16 column.
@@ -196,6 +196,17 @@ impl UnsupportedKind {
 }
 
 impl StripError {
+    /// What kind of failure this is: a refusal ([`ErrorKind::Refusal`]) for
+    /// [`StripError::Unsupported`], and the parse error's own kind for
+    /// [`StripError::Parse`] — a syntax error, a depth limit or a source over the size cap.
+    #[must_use]
+    pub fn kind(&self) -> ErrorKind {
+        match self {
+            Self::Parse(error) => error.kind(),
+            Self::Unsupported { .. } => ErrorKind::Refusal,
+        }
+    }
+
     /// The error's message rendered against `source`, the text that was stripped: a parse
     /// error's own text (what goes wrong, then the `line:column` header, the line and a
     /// caret), and a refusal as `cannot strip <the construct>` over the same header,
@@ -204,7 +215,7 @@ impl StripError {
     #[must_use]
     pub fn message(&self, source: &str) -> String {
         match self {
-            Self::Parse(error) => error.to_string(),
+            Self::Parse(error) => format!("{error:#}"),
             Self::Unsupported { kind, span } => {
                 let report = kind.report(*span, source);
                 format!("{}\n{}", report.summary, report.frame)
@@ -231,12 +242,13 @@ impl UnsupportedKind {
     }
 }
 
-/// The message without its position (the position is the source's to render:
-/// [`StripError::message`]).
+/// A parse error as its [`Error`] displays — one line, the frame under `{:#}` — and a
+/// refusal's summary alone, without its position (a refusal's position is the source's to
+/// render: [`StripError::message`]).
 impl fmt::Display for StripError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Parse(error) => error.fmt(f),
+            Self::Parse(error) => fmt::Display::fmt(error, f),
             Self::Unsupported { kind, .. } => write!(f, "cannot strip {}", kind.description()),
         }
     }
@@ -290,7 +302,7 @@ mod tests {
         let StripError::Parse(parse) = &error else {
             panic!("expected a parse error: {error:?}");
         };
-        assert_eq!(error.message(source), parse.to_string());
+        assert_eq!(error.message(source), format!("{parse:#}"));
     }
 
     fn stripped(source: &str) -> String {

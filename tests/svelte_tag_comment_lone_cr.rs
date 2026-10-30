@@ -33,12 +33,14 @@ const REFUSAL: &str = "lone carriage return inside a '//' comment in a tag";
 /// The CLI's `format_source` error and the fused `tsv_svelte::format_str` error for
 /// `source` — two entry points that must agree, asserted here so each case states it once.
 fn svelte_format_error(source: &str) -> String {
-    let cli = format_source(source, ParserType::Svelte)
-        .expect_err("the format must refuse")
-        .to_string();
-    let fused = tsv_svelte::format_str(source)
-        .expect_err("the fused format must refuse")
-        .to_string();
+    let cli = format!(
+        "{:#}",
+        format_source(source, ParserType::Svelte).expect_err("the format must refuse")
+    );
+    let fused = format!(
+        "{:#}",
+        tsv_svelte::format_str(source).expect_err("the fused format must refuse")
+    );
     assert_eq!(cli, fused, "the CLI and the fused entry point disagree");
     cli
 }
@@ -59,9 +61,8 @@ fn svelte_format_ok(source: &str, label: &str) -> String {
 /// author's bytes must report, message and position alike.
 fn svelte_parse_error(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    tsv_svelte::parse(source, &arena)
-        .expect_err("the author's bytes must not parse")
-        .to_string()
+    let error = tsv_svelte::parse(source, &arena).expect_err("the author's bytes must not parse");
+    format!("{error:#}")
 }
 
 #[test]

@@ -125,7 +125,7 @@ impl Failure {
                 construct: None,
                 report,
             },
-            None => Failure::Plain(e.to_string()),
+            None => Failure::Plain(format!("{e:#}")),
         }
     }
 

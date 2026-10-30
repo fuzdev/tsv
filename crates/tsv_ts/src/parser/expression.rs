@@ -2774,7 +2774,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Ok(type_arguments) => Ok(Some(type_arguments)),
             Err(error)
                 if error.is_goal_gated()
-                    || error.is_too_deep()
+                    || error.kind() == tsv_lang::ErrorKind::TooDeep
                     || self.printed_tail_could_complete_type_arguments(lt) =>
             {
                 Err(error)

@@ -434,8 +434,8 @@ impl SpineCount {
 
 impl Error {
     /// The parse passed `limit` at byte offset `position` (the token where the count
-    /// tripped): a syntax error, positioned like every other, and told apart by
-    /// [`Error::is_too_deep`].
+    /// tripped): located like a syntax error, and told apart by its [`Error::kind`],
+    /// [`ErrorKind::TooDeep`](crate::ErrorKind::TooDeep).
     #[cold]
     #[inline(never)]
     #[must_use]
@@ -457,17 +457,24 @@ mod tests {
             bom: crate::LeadingBom::Counted,
         };
         let nesting = Error::too_deep(DepthLimit::Nesting, 2).with_context("((x", coordinates);
-        assert!(nesting.is_too_deep() && nesting.is_syntax_error());
+        assert_eq!(nesting.kind(), crate::ErrorKind::TooDeep);
+        assert!(nesting.wire_point().is_some());
         assert_eq!(nesting.position(), Some(2));
+        assert_eq!(nesting.span(), Some(2..2));
         assert!(
-            nesting
-                .to_string()
-                .starts_with("Nesting exceeds tsv's depth limit of 256 levels\n")
+            format!("{nesting:#}").starts_with("Nesting exceeds tsv's depth limit of 256 levels\n")
+        );
+        assert_eq!(
+            nesting.to_string(),
+            "Nesting exceeds tsv's depth limit of 256 levels (1:3)"
         );
         let spine = Error::too_deep(DepthLimit::Spine, 0);
-        assert!(spine.is_too_deep());
+        assert_eq!(spine.kind(), crate::ErrorKind::TooDeep);
         assert!(spine.to_string().contains("exceeds tsv's length limit"));
-        assert!(!Error::invalid_syntax("x".to_string(), 0).is_too_deep());
+        assert_eq!(
+            Error::invalid_syntax("x".to_string(), 0).kind(),
+            crate::ErrorKind::Syntax
+        );
     }
 
     #[test]

@@ -511,7 +511,7 @@ fn format_file(
     }));
     let formatted = match result {
         Ok(Ok(formatted)) => formatted,
-        Ok(Err(e)) => return FileOutcome::Error(e.to_string()),
+        Ok(Err(e)) => return FileOutcome::Error(format!("{e:#}")),
         Err(_) => return FileOutcome::Error("panic while formatting (internal bug)".to_string()),
     };
     if formatted == source {

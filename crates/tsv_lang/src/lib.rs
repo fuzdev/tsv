@@ -70,7 +70,7 @@ pub use depth::{
     DepthBudget, DepthLimit, NESTING_FLOOR, NESTING_LIMIT, NESTING_SPINE_WEIGHT, SPINE_LIMIT,
     SpineCount,
 };
-pub use error::{Error, ErrorReport, Result};
+pub use error::{Error, ErrorKind, ErrorReport, Result};
 pub use hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 #[cfg(feature = "json")]
 pub use json_writer::{JsonWriter, StageRun, StagedDigits, write_array, write_or_null};

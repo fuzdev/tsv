@@ -105,7 +105,7 @@ async fn run(
             if verbose {
                 eprintln!("=== Our Formatter ===");
             }
-            eprintln!("Error running our formatter: {err}");
+            eprintln!("Error running our formatter: {err:#}");
             if verbose {
                 println!();
             }

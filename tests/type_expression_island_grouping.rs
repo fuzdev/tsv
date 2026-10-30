@@ -48,9 +48,10 @@ fn count(source: &str, kind: &str) -> usize {
 
 fn error_message(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let rendered = tsv_ts::parse(source, &arena)
-        .expect_err("the case must not parse")
-        .to_string();
+    let rendered = format!(
+        "{:#}",
+        tsv_ts::parse(source, &arena).expect_err("the case must not parse")
+    );
     rendered.lines().next().expect("a message line").to_owned()
 }
 

@@ -333,8 +333,8 @@ fn verdict(lang: Lang, source: &str) -> Verdict {
     };
     match result {
         Ok(()) => Verdict::Accepted,
-        Err(e) if e.is_too_deep() => Verdict::TooDeep(e.to_string()),
-        Err(e) => Verdict::Invalid(e.to_string()),
+        Err(e) if e.kind() == tsv_lang::ErrorKind::TooDeep => Verdict::TooDeep(format!("{e:#}")),
+        Err(e) => Verdict::Invalid(format!("{e:#}")),
     }
 }
 
@@ -977,7 +977,7 @@ fn a_css_value_past_the_limit_is_refused_at_the_paren_that_passes_it() {
         );
         let arena = bumpalo::Bump::new();
         let error = tsv_css::parse(&source, &arena).expect_err("refused");
-        assert!(error.is_too_deep(), "{error}");
+        assert_eq!(error.kind(), tsv_lang::ErrorKind::TooDeep, "{error:#}");
         let at = error.position().expect("located");
         let value_start = source.find(": ").expect("value") + 2;
         assert_eq!(&source[at..=at], "(", "{error}");
@@ -1001,7 +1001,7 @@ fn a_module_past_the_limit_is_not_read_as_a_script() {
     let error = on_thread("fallback".to_owned(), SEARCH_STACK, move || {
         tsv_ts::format_str(&source).expect_err("refused")
     });
-    assert!(error.is_too_deep(), "{error}");
+    assert_eq!(error.kind(), tsv_lang::ErrorKind::TooDeep, "{error:#}");
 }
 
 /// A sibling statement costs an assignment after it nothing: the level an assignment finds

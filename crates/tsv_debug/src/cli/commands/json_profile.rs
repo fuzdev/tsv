@@ -164,7 +164,7 @@ fn profile_once(
     let bytes = match parser_type {
         ParserType::TypeScript => {
             let t = Instant::now();
-            let ast = tsv_ts::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_ts::parse(source, &arena).map_err(|e| format!("parse error: {e:#}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
             let bytes = match wire {
@@ -176,7 +176,8 @@ fn profile_once(
         }
         ParserType::Svelte => {
             let t = Instant::now();
-            let ast = tsv_svelte::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
+            let ast =
+                tsv_svelte::parse(source, &arena).map_err(|e| format!("parse error: {e:#}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
             let bytes = match wire {
@@ -188,7 +189,7 @@ fn profile_once(
         }
         ParserType::Css => {
             let t = Instant::now();
-            let ast = tsv_css::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_css::parse(source, &arena).map_err(|e| format!("parse error: {e:#}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
             let bytes = match wire {

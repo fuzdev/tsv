@@ -626,9 +626,9 @@ impl CompileFailure {
     pub(crate) fn of(error: CompileError) -> Self {
         match error {
             CompileError::Unsupported(reason) => Self::Refused(reason),
-            CompileError::Parse(e) => Self::Parse(e.to_string()),
+            CompileError::Parse(e) => Self::Parse(format!("{e:#}")),
             CompileError::CorruptOutput(e) => {
-                Self::SelfCheck(SelfCheck::CorruptOutput, e.to_string())
+                Self::SelfCheck(SelfCheck::CorruptOutput, format!("{e:#}"))
             }
             CompileError::TypeErasureLeak(span) => {
                 Self::SelfCheck(SelfCheck::TypeErasureLeak, format!("at {span:?}"))

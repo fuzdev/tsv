@@ -274,7 +274,7 @@ pub fn format_with_our_formatter(
         return Err(format!("Unsupported file type for formatting: {filepath}"));
     };
     format_source_with_source_type(content, input_type.parser_type(), Some(goal))
-        .map_err(|e| format!("Format error (parse): {e}"))
+        .map_err(|e| format!("Format error (parse): {e:#}"))
 }
 
 #[cfg(test)]
