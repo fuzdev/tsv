@@ -27,7 +27,7 @@ repository = "https://github.com/fuzdev/tsv"
 
 [workspace.dependencies]
 # Foundation
-tsv_lang = { path = "crates/tsv_lang" }
+tsv_lang = { path = "crates/tsv_lang", version = "=0.7.1" }
 # Per-thread reusable arenas for the bindings' hot loop (shared by tsv_ffi,
 # tsv_napi, and tsv_wasm). default-features = false here so consumers stay lean
 # by default — the AST-arena helper only; each binding re-enables `format` (the
@@ -35,17 +35,17 @@ tsv_lang = { path = "crates/tsv_lang" }
 # standalone `cargo test -p tsv_arena` still uses the crate's own `default =
 # ["format"]`, so both helpers are exercised there.
 tsv_arena = { path = "crates/tsv_arena", default-features = false }
-tsv_html = { path = "crates/tsv_html" }
-tsv_ignore = { path = "crates/tsv_ignore" }
-tsv_discover = { path = "crates/tsv_discover" }
+tsv_html = { path = "crates/tsv_html", version = "=0.7.1" }
+tsv_ignore = { path = "crates/tsv_ignore", version = "=0.7.1" }
+tsv_discover = { path = "crates/tsv_discover", version = "=0.7.1" }
 
 # Language implementations
 # Default-features off ships parse + format only; consumers opt into the
 # wire-JSON conversion layer with `features = ["convert"]`. The format-only
 # builds leave it off (@fuzdev/tsv-format-wasm, `build:ffi:format`).
-tsv_ts = { path = "crates/tsv_ts", default-features = false }
-tsv_css = { path = "crates/tsv_css", default-features = false }
-tsv_svelte = { path = "crates/tsv_svelte", default-features = false }
+tsv_ts = { path = "crates/tsv_ts", version = "=0.7.1", default-features = false }
+tsv_css = { path = "crates/tsv_css", version = "=0.7.1", default-features = false }
+tsv_svelte = { path = "crates/tsv_svelte", version = "=0.7.1", default-features = false }
 # Svelte→JS compiler + JS canonicalizer. Dev-tooling consumer only (tsv_debug);
 # no shipped artifact links it yet.
 tsv_svelte_compile = { path = "crates/tsv_svelte_compile" }
@@ -208,11 +208,12 @@ unwrap_used = "warn"
 
 # Root package for integration tests
 [package]
-name = "tsv"
+name = "tsv_tests"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+publish = false
 
 [dependencies]
 tsv_lang.workspace = true

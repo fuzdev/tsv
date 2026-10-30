@@ -23,12 +23,37 @@ const WORKSPACE_VERSION = /(\[workspace\.package\][^[]*?^version\s*=\s*)"([^"]*)
 export const cargo_workspace_version = (cargo_toml: string): string | null =>
 	WORKSPACE_VERSION.exec(cargo_toml)?.[2] ?? null;
 
-/** The `Cargo.toml` text with its `[workspace.package]` version replaced, or null when it
- * declares none. Every other byte is kept. */
-export const cargo_workspace_version_set = (cargo_toml: string, version: string): string | null =>
-	WORKSPACE_VERSION.test(cargo_toml)
-		? cargo_toml.replace(WORKSPACE_VERSION, `$1"${version}"`)
-		: null;
+/** The `[workspace.dependencies]` table's body: every line up to the next `[` heading. */
+const WORKSPACE_DEPENDENCIES = /(^\[workspace\.dependencies\]\n)((?:(?!\[).*\n?)*)/m;
+
+/** An exact `version = "=x.y.z"` requirement inside one entry's inline table. */
+const EXACT_VERSION = /(\bversion\s*=\s*")=[^"]*(")/;
+
+/** Whether a `[workspace.dependencies]` line is a workspace member's entry: an inline table
+ * naming a `path` (a registry dependency has none, so its own requirement is never touched). */
+const is_path_entry = (line: string): boolean => /^[\w-]+\s*=\s*\{[^#]*\bpath\s*=/.test(line);
+
+/** The `Cargo.toml` text with its `[workspace.package]` version replaced, along with every exact
+ * `=x.y.z` pin on a `[workspace.dependencies]` path entry, so the sibling requirements move in
+ * the same write as the version they name (cargo refuses a path dependency whose pin its own
+ * version does not meet). Null when it declares no workspace version. Every other byte is kept,
+ * and setting the version a text already holds returns it unchanged (idempotent). */
+export const cargo_workspace_version_set = (cargo_toml: string, version: string): string | null => {
+	if (!WORKSPACE_VERSION.test(cargo_toml)) return null;
+	return cargo_toml
+		.replace(WORKSPACE_VERSION, `$1"${version}"`)
+		.replace(
+			WORKSPACE_DEPENDENCIES,
+			(_, heading: string, body: string) =>
+				heading +
+				body
+					.split('\n')
+					.map((line) =>
+						is_path_entry(line) ? line.replace(EXACT_VERSION, `$1=${version}$2`) : line
+					)
+					.join('\n')
+		);
+};
 
 /** A release version: `<major>.<minor>.<patch>`, no prerelease or build suffix. */
 export interface ReleaseVersion {

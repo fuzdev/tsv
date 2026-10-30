@@ -24,8 +24,10 @@
  * A crate is graded when its `Cargo.toml` carries a `[package.metadata.docs.rs]` table —
  * the table that says the crate is meant for docs.rs, and the one place its feature set
  * is written, read here rather than restated. `features`, `all-features` and
- * `no-default-features` are honored; `targets` is not (this builds the host only). A
- * workspace with no such table grades nothing and fails.
+ * `no-default-features` are honored; `targets` is not (this builds the host only). Every
+ * member without the table must be `publish = false` (`docsrs_crates.ts` refuses one that is
+ * neither), so the graded set is every publishable member. A workspace with no such table
+ * grades nothing and fails.
  *
  * ## Build world
  *

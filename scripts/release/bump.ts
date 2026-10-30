@@ -1,6 +1,7 @@
 /**
- * Writing a bump into the checkout: the version in `Cargo.toml`, the workspace members' entries
- * in the lockfile, and the changelog's stamp. These are the only files a release commit holds.
+ * Writing a bump into the checkout: the version in `Cargo.toml` (with the `=x.y.z` pins its
+ * `[workspace.dependencies]` path entries carry), the workspace members' entries in the
+ * lockfile, and the changelog's stamp. These are the only files a release commit holds.
  * Every write after the version is idempotent, so a resumed release repeats them safely.
  *
  * @module
@@ -18,7 +19,8 @@ export const RELEASE_PATHS: ReadonlyArray<string> = [CARGO_PATH, LOCKFILE_PATH, 
 /** The release commit's message, which a resume also reads to recognize its own commit. */
 export const release_commit_message = (version: string): string => `chore: publish v${version}`;
 
-/** Write `version` into `Cargo.toml`'s `[workspace.package]` table. */
+/** Write `version` into `Cargo.toml`'s `[workspace.package]` table and every exact pin on a
+ * `[workspace.dependencies]` path entry, in one write. */
 export const bump_cargo_version = async (version: string): Promise<Result> => {
 	const next = cargo_workspace_version_set(await Deno.readTextFile(CARGO_PATH), version);
 	if (next === null) return { ok: false, error: `no [workspace.package] version in ${CARGO_PATH}` };

@@ -5,6 +5,7 @@ edition.workspace = true
 description = "Development utilities for tsv (AST debugging, printer comparison)"
 license.workspace = true
 repository.workspace = true
+publish = false
 
 [[bin]]
 name = "tsv_debug"

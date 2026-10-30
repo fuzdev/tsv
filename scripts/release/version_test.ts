@@ -39,6 +39,37 @@ Deno.test('cargo_workspace_version_set rewrites that one value', () => {
 	deepStrictEqual(cargo_workspace_version_set('[package]\nversion = "0.1.0"\n', '0.2.0'), null);
 });
 
+Deno.test(
+	"cargo_workspace_version_set moves the path entries' exact pins in the same write",
+	() => {
+		const pinned = `[workspace.package]
+version = "0.7.1"
+
+[workspace.dependencies]
+# a comment naming version = "=0.7.1" is kept
+tsv_lang = { path = "crates/tsv_lang", version = "=0.7.1" }
+tsv_ts = { path = "crates/tsv_ts", version = "=0.7.1", default-features = false }
+tsv_arena = { path = "crates/tsv_arena", default-features = false }
+pinned_registry = { version = "=1.2.3" }
+serde = "1"
+
+[package]
+name = "x"
+version = "=0.7.1"
+`;
+		const next = cargo_workspace_version_set(pinned, '0.8.0');
+		deepStrictEqual(
+			next,
+			pinned
+				.replace('version = "0.7.1"', 'version = "0.8.0"')
+				.replace('tsv_lang", version = "=0.7.1"', 'tsv_lang", version = "=0.8.0"')
+				.replace('tsv_ts", version = "=0.7.1"', 'tsv_ts", version = "=0.8.0"')
+		);
+		// idempotent: a resumed release repeats the write and changes nothing
+		deepStrictEqual(cargo_workspace_version_set(next!, '0.8.0'), next);
+	}
+);
+
 Deno.test('version_parse accepts release versions only', () => {
 	deepStrictEqual(version_parse('0.1.10'), { major: 0, minor: 1, patch: 10 });
 	deepStrictEqual(version_parse('0.2.0-alpha.1'), null);
@@ -70,4 +101,13 @@ Deno.test('version_from_tag accepts v-prefixed and bare semver only', () => {
 	deepStrictEqual(version_from_tag('v0.3'), null);
 	deepStrictEqual(version_from_tag('v0.3.0-rc.1'), null);
 	deepStrictEqual(version_from_tag('main'), null);
+});
+
+Deno.test("cargo_workspace_version_set leaves the repo's Cargo.toml no old version to name", () => {
+	// a pin the setter cannot read (single-quoted, a dotted table, a caret requirement) keeps
+	// the old version, and the release's `cargo update --workspace` then fails after the bump
+	const cargo_toml = Deno.readTextFileSync('Cargo.toml');
+	const current = cargo_workspace_version(cargo_toml)!;
+	const named = new RegExp(`(?<![\\d.])${current.replaceAll('.', '\\.')}(?![\\d.])`);
+	deepStrictEqual(named.test(cargo_workspace_version_set(cargo_toml, '999.0.0')!), false);
 });

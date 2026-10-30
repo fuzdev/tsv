@@ -5,6 +5,7 @@ edition.workspace = true
 description = "Svelte-to-JS compiler (pinned to Svelte's compile() as oracle) and JS canonicalizer"
 license.workspace = true
 repository.workspace = true
+publish = false
 
 [dependencies]
 tsv_lang.workspace = true

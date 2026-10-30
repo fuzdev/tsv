@@ -5,6 +5,7 @@ edition.workspace = true
 description = "Shared substrate for tsv's bindings: per-thread reusable arenas and the goal axis"
 license.workspace = true
 repository.workspace = true
+publish = false
 
 [dependencies]
 bumpalo.workspace = true

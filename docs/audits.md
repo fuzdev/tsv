@@ -1102,7 +1102,11 @@ is built on its own.
 `[package.metadata.docs.rs]` table, which marks it as meant for docs.rs and is the one
 place its docs.rs feature set is written; the script reads `features`, `all-features` and
 `no-default-features` from it rather than restating them (`scripts/docsrs_crates.ts`, the
-reader `deps:audit` shares). No table anywhere is a failure,
+reader `deps:audit` shares). That reader is a closed classification: every workspace
+member, the root test package included, carries the table or says `publish = false`, never
+both and never neither, and the gate fails naming a member that breaks it — so the graded
+set is exactly what `cargo publish --workspace` publishes (it skips the `publish = false`
+members), and a new crate cannot reach crates.io ungraded. No table anywhere is a failure,
 not a pass.
 
 **Lints.** The `docs:audit` set, plus `--cfg docsrs` as docs.rs passes it, with one level
@@ -1116,9 +1120,10 @@ surface as it narrows.
 with the pinned stable rustdoc, where docs.rs runs a nightly one, so a lint only nightly
 fires (or a level nightly changed) goes unseen. `cargo doc -p tsv_cli` also documents the
 `tsv` binary, which docs.rs does not, so for that crate the leg is slightly stricter than
-docs.rs. A published crate whose manifest lacks the `[package.metadata.docs.rs]` table (or
-spells it inline, which the script's reader does not parse) is not graded at all, so
-dropping the table drops the crate silently. It grades a crate's docs.rs feature set, not
+docs.rs. A publishable crate whose table is spelled inline (which the script's reader does
+not parse) reads as untabled and fails the classification rather than passing ungraded, and
+a `publish = false` the reader cannot see — not a bare line of its own, or after a `[` anywhere
+in the `[package]` table (a `keywords = [...]` above it) — reads as publishable the same way. It grades a crate's docs.rs feature set, not
 every feature combination a consumer might pick (`docs:audit`'s `--all-features` covers the
 union, nothing covers the subsets between). Like `docs:audit`, it checks that a link
 resolves, never that the prose is true.
@@ -1156,9 +1161,9 @@ target-specific dependencies in. A denied package fails the crate, and the inver
 too, so an empty listing never reads as a pass.
 
 **Blind spots.** Only the listed packages are denied: a new workspace dependency with
-consumer-visible features is not graded until it joins the list. A crate meant for
-publishing without the docs.rs table is not graded at all (the `docs:audit:docsrs` blind
-spot). It grades the graph `Cargo.lock` resolves; a denied package is reached by an edge
+consumer-visible features is not graded until it joins the list. A publishable crate
+without the docs.rs table fails the shared classification (`docs:audit:docsrs`) rather than
+going ungraded. It grades the graph `Cargo.lock` resolves; a denied package is reached by an edge
 tsv declares, which no consumer's resolution removes, so the lockfile cannot hide one.
 
 ## Wire-Type Drift Check (`check:ast-types`)

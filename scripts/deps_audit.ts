@@ -12,8 +12,8 @@
  * deserializing, `1.0` and `1.00` compare unequal, key order changes). Those features
  * serve the fixture gate (`tsv_debug`), so the entry keeps them, and this audit keeps
  * `serde_json` to dev-dependencies and unpublished crates. A dev-dependency never reaches
- * a consumer; neither does an unpublished crate (`tsv_ffi`, `tsv_napi`, `tsv_wasm`,
- * `tsv_debug`, the root test package).
+ * a consumer; neither does an unpublished (`publish = false`) crate (`tsv_ffi`, `tsv_napi`,
+ * `tsv_wasm`, `tsv_debug`, the root test package `tsv_tests`).
  *
  * ## Which crates, how
  *
@@ -28,8 +28,9 @@
  * ## Blind spots
  *
  * Only the listed packages are graded: a NEW workspace dependency with consumer-visible
- * features is not denied until it is added here. A crate meant for publishing that lacks
- * the docs.rs table is not graded at all (the same blind spot as `docs:audit:docsrs`).
+ * features is not denied until it is added here. A publishable crate that lacks the docs.rs
+ * table is not skipped: the shared reader refuses a member that is neither tabled nor
+ * `publish = false`, so the run fails instead.
  * `cargo tree` resolves against `Cargo.lock`, which a consumer's resolution can differ
  * from, but a denied package is reached by a dependency edge tsv declares, which no
  * lockfile removes.

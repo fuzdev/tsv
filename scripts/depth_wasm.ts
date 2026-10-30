@@ -191,7 +191,7 @@ function write_shape_limits(path: string): void {
 			'--profile',
 			'napi',
 			'-p',
-			'tsv',
+			'tsv_tests',
 			'--test',
 			'depth_limit',
 			'--quiet',
