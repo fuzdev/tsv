@@ -41,6 +41,13 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
   attestation (`gh attestation verify <file> -R fuzdev/tsv`). The checksum file
   and the attestation are this channel's whole integrity story; it has no
   signed release log of its own.
+- **`tsv` from crates.io (`cargo install --locked tsv_cli`)**: the same source,
+  built on the installing machine. A workspace's `[profile]` tables do not travel
+  with a published crate, so this build takes cargo's default `release` profile
+  rather than the workspace's: no LTO, and `panic = "unwind"`. It runs slower than
+  the prebuilt binary, and a formatter panic in path mode is caught as that file's
+  error (exit 2) where the prebuilt binary aborts. A stack overflow aborts either
+  way ([Recursion Depth](#recursion-depth)).
 - **`tsv` npm bin, WASM (`@fuzdev/tsv-wasm`)**: `crates/tsv_wasm/npm/cli.js`
   — a hand-written Node mirror of this CLI's contract (subcommands, flags,
   exit codes, output streams, traversal rules). `--jobs` is real: path mode
@@ -766,6 +773,6 @@ margin itself is graded by `tests/depth_limit.rs`.
 
   The default is **`min(logical CPUs, ceil(1.5 × physical cores))`**, not one worker per logical CPU. This workload does not scale onto SMT siblings — the per-file work is memory-bound, and on a large tree the discovery walk is the bottleneck, so extra workers compete with it for cores. One worker per logical CPU costs up to 28% on walk-bound trees while buying nothing on flat repos. The SMT width is read once from `/sys/devices/system/cpu/cpu0/topology/thread_siblings_list`; where that is unavailable (no SMT, or a non-Linux platform) the cap is inert and the default is the logical count, so it can only ever lower the worker count.
 - **Streaming discovery**: a single directory root — the common invocation — feeds the workers *as the walk finds files*, so the directory walk runs beside the first files' parse+format rather than in front of an idle pool. It is worth having: the walk is 5–10% of the wall on an application repo, and 40–67% on a repo with a large tree, where it can outrun what the pool consumes. Other argument shapes (explicit files, multiple roots) discover the whole set first, because the canonical-path dedup above is set-wide. The set of files formatted is identical either way, as is the reporting order below — only the order work is handed out differs.
-- **Error isolation**: a per-file read/parse/write error (or panic, caught via `catch_unwind` — effective only in builds with `panic = "unwind"`; release uses `panic = "abort"`) reports to stderr and processing continues.
+- **Error isolation**: a per-file read/parse/write error (or panic, caught via `catch_unwind` — effective only in builds with `panic = "unwind"`: the prebuilt binaries use `panic = "abort"`, a `cargo install` build unwinds — [Binary Structure](#binary-structure)) reports to stderr and processing continues.
 - **Deterministic reporting**: changed paths print to stdout in sorted-path order regardless of completion order — component-wise, each component by code point, the order a path's UTF-8 bytes sort in, and the same order on both bins (`cli.js` compares code points rather than UTF-16 units, which would put an astral-plane name ahead of U+E000..U+FFFF) — each spelled by the path-quoting rule above; errors (traversal and per-file) and the summary line go to stderr.
 - **Exit codes**: 0 clean, 1 would-change (`--check` only), 2 errors.

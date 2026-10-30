@@ -139,7 +139,7 @@ closed-scope/open-convention stance below.
 
 **Compile-Time Isolation** — Cargo prevents circular dependencies. CSS changes don't trigger TypeScript recompilation.
 
-**Clean API Boundaries** — Each language exports `parse_to_json()` / `parse_to_json_with(&JsonOptions)` and `format()`, over the hidden AST-taking `__private::parse()` and `__private::convert_ast_json_bytes()` / `convert_ast_json_string()` (the span-only wire every binding ships; `convert_ast_json_bytes_with_locations` adds `loc`; no shipped crate reads the wire back — `tsv_debug::json` is the one reader). tsv_ts and tsv_css also provide embedding APIs (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
+**Clean API Boundaries** — Each language exports `parse_to_json()` / `parse_to_json_with(&JsonOptions)`, `format()` and a `Formatter` (`format()` over arenas kept warm across calls), over the hidden AST-taking `__private::parse()` and `__private::convert_ast_json_bytes()` / `convert_ast_json_string()` (the span-only wire every binding ships; `convert_ast_json_bytes_with_locations` adds `loc`; no shipped crate reads the wire back — `tsv_debug::json` is the one reader). tsv_ts and tsv_css also carry hidden embedding APIs in `__private` (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
 
 **Scalability** — New capabilities land as crate additions (`tsv_ffi`, `tsv_wasm`, `tsv_napi`, `tsv_arena`, `tsv_ignore` + `tsv_discover`, the experimental, may-never-ship `tsv_check` / `tsv_svelte_compile`; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
 
@@ -155,6 +155,11 @@ trait:
 pub fn parse_to_json(source: &str) -> Result<String, Error>;
 pub fn parse_to_json_with(source: &str, options: &JsonOptions) -> Result<String, Error>;
 pub fn format(source: &str) -> Result<String, Error>;
+pub struct Formatter; // many sources on one thread, arenas kept warm
+impl Formatter {
+    pub fn new() -> Self;
+    pub fn format(&mut self, source: &str) -> Result<String, Error>;
+}
 // `__private` (hidden; the bindings, the CLI and the dev tooling)
 pub fn parse<'a>(source: &str, arena: &'a Bump) -> Result<InternalAst<'a>, Error>;
 pub fn format_ast(ast: &InternalAst, source: &str) -> String;
@@ -225,8 +230,8 @@ This shape gives both:
 - **Convention openness (Rust source level)** — anyone can write a
   `my_org/tsv_html_parse` crate following the same shape, and any
   downstream _Rust_ consumer can `use my_org_tsv_html_parse::parse`
-  without central buy-in. The tsv crates are 0BSD-licensed and will
-  eventually publish to crates.io, where third-party `tsv_*` crates
+  without central buy-in. The tsv crates are 0BSD-licensed and
+  published to crates.io, where third-party crates of the same shape
   can sit alongside the official ones.
 
   **Caveat**: this property holds at the Rust crate level, not the
@@ -283,15 +288,10 @@ format-only and parse-only `libtsv_ffi` variants to size them
 scope-matched against `oxfmt` and `oxc-parser`. Third-party
 Rust consumers that only need parse/format can follow the same pattern:
 
-```toml
-# Minimal: parse + format only (source-level consumption — tsv is not on crates.io)
-tsv_ts = { git = "https://github.com/fuzdev/tsv", default-features = false }
-
-# Also build the span-only wire-JSON parse output (`parse_to_json*`)
-tsv_ts = { git = "https://github.com/fuzdev/tsv", features = ["json"] }
-
-# Full: plus the loc-bearing wire (`JsonOptions::locations`)
-tsv_ts = { git = "https://github.com/fuzdev/tsv", features = ["locations"] }
+```sh
+cargo add tsv_ts --no-default-features   # format + type strip, no wire-JSON parse output
+cargo add tsv_ts                          # + `parse_to_json*` (the default `json` feature)
+cargo add tsv_ts --features locations     # + the loc-bearing wire (`JsonOptions::locations`)
 ```
 
 ## Foundation Crate (tsv_lang)
@@ -876,7 +876,7 @@ Native tsv runs on the system allocator — no `#[global_allocator]`, no alterna
 
 The hottest statics (the punctuation that is three quarters of a run's `text()` calls) and the stateless singleton nodes — `empty()`, the four `Line` kinds, `LineSuffixBoundary`, `BreakParent`, `FlushBreak`, the flow-probe sentinel — form a **prelude** seeded at fixed ids ahead of every document (by the constructors and `reset()`), so a literal `text(",")` or a `line()` folds to a constant with no lookup. A delimiter or operator a builder *receives* is therefore passed as a `DocId` built at the caller: a `&'static str` parameter reaches `text()` as a runtime value and pays the prelude's switch at every call. A `Line` node carries no mode or indent (the enclosing render command supplies both per visit) — the layout analog of "statics are position-free" — so every `line()` in a document is one node. Every other static goes through the static cache, mapping a `&'static str`'s address to its precomputed visual width and the current document's node for it.
 
-The single-shot `format()` path pre-sizes one arena from source length (~2 nodes per source byte, text pool at source/8; `DocArena::with_source_size_hint`) and drops it after rendering. Multi-file drivers (the CLI dir-walk worker, the FFI/NAPI/WASM bindings) instead reuse one arena across calls via `DocArena::reset()` — the doc-IR analogue of the per-call AST `Bump::reset()` — clearing the node/child/text-pool/memo stores while retaining capacity (the static cache's width halves deliberately survive, keyed on `'static` string addresses; its interned node halves are invalidated in O(1) by the reset's generation bump). The printers borrow `&DocArena` so the caller owns the reusable one (`__private::format_ast_in` is the borrowed-arena entry point).
+The single-shot `format()` path pre-sizes one arena from source length (~2 nodes per source byte, text pool at source/8; `DocArena::with_source_size_hint`) and drops it after rendering. Multi-file drivers (each language crate's public `Formatter`, which the CLI's dir-walk workers hold, and the FFI/NAPI/WASM bindings) instead reuse one arena across calls via `DocArena::reset()` — the doc-IR analogue of the per-call AST `Bump::reset()` — clearing the node/child/text-pool/memo stores while retaining capacity (the static cache's width halves deliberately survive, keyed on `'static` string addresses; its interned node halves are invalidated in O(1) by the reset's generation bump). The printers borrow `&DocArena` so the caller owns the reusable one (`__private::format_ast_in` is the borrowed-arena entry point).
 
 The builders' transient parts-lists are pooled the same way: wide-list builders (statement / object / array / parameter / specifier lists) draw a `DocBuf` from a recursion-safe arena free-list (`pooled_docbuf()`) instead of a fresh `SmallVec` per call, collapsing a document's many list-assembly spills into a handful of long-lived reused buffers (byte-identical; allocation only). Parts produced one at a time go through `DocArena::concat_iter`, which pulls three before opening any buffer — most assemblies hold one or two parts, and a one-part concat is its part — so the common case builds no buffer (byte-identical too: parts are pulled in the order a `collect` would build them).
 

@@ -137,6 +137,13 @@ a build provenance attestation (`gh attestation verify tsv-linux-x64-gnu -R fuzd
 The checksum file and the attestation are this channel's whole integrity story;
 it has no signed release log of its own.
 
+From crates.io, `cargo install --locked tsv_cli` builds the same `tsv` binary from source
+(the crate is `tsv_cli`; the `tsv` crate on crates.io is an unrelated project).
+That build doesn't get the release profile the prebuilt binaries ship with
+(LTO and `panic = "abort"` - a workspace's profiles don't travel with a published crate):
+it runs slower, and an internal panic while formatting files is reported as that file's
+error rather than aborting the run.
+
 See the [website docs](https://tsv.fuz.dev/docs)
 and package READMEs for the full API and CLI flags:
 
@@ -144,6 +151,58 @@ and package READMEs for the full API and CLI flags:
 - [crates/tsv_wasm/README_all.md](crates/tsv_wasm/README_all.md)
 - [crates/tsv_wasm/README_format.md](crates/tsv_wasm/README_format.md)
 - [crates/tsv_wasm/README_parse.md](crates/tsv_wasm/README_parse.md)
+
+## Rust
+
+The library crates are on crates.io, one per language -
+[`tsv_ts`](https://docs.rs/tsv_ts) (TypeScript/JS), [`tsv_css`](https://docs.rs/tsv_css),
+and [`tsv_svelte`](https://docs.rs/tsv_svelte) - each self-contained, with the same functions:
+
+```rust
+// format one source; a `Formatter` formats many on one thread, keeping its arenas warm
+let code = tsv_ts::format("const x=42;")?; // "const x = 42;\n"
+let code = tsv_css::format("a{color:red}")?; // "a {\n\tcolor: red;\n}\n"
+let code = tsv_svelte::format("<p   class=\"a\">x</p>")?; // "<p class=\"a\">x</p>\n"
+let code = tsv_ts::Formatter::new().format("let y=1")?; // "let y = 1;\n"
+
+// TypeScript to JS by blanking the types, every surviving character at its line and column
+let js = tsv_ts::strip("let x: number = 1;")?.code; // "let x         = 1;"
+
+// parse to the wire JSON AST, the same JSON the npm packages return
+let json = tsv_ts::parse_to_json("const x = 1;")?;
+```
+
+Errors carry a `kind()` (`Syntax`, `Refusal`, `TooDeep`, `TooLarge`), a `span()` in the
+input's UTF-8 bytes, and the report the npm packages return (`report()`); `{}` prints one
+line and `{:#}` the CLI's frame. TypeScript takes an exact parse goal (`Goal::Script` /
+`Goal::Module`) through `format_with_goal`, `strip_with_goal` and `JsonOptions::goal`; with
+none named, format and strip try the module grammar, then the script one, and parsing reads a
+module.
+
+This release exposes no AST: parsing returns the wire JSON, whose shape the npm
+packages type in `tsv_ast.d.ts`. `parse_to_json_with(source, &JsonOptions)` adds `loc`
+(the `locations` cargo feature); the default `json` feature can be turned off for a build
+without `parse_to_json*`.
+
+| npm (`@fuzdev/tsv`, `@fuzdev/tsv-wasm`)                | Rust                                                                       |
+| ------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `format_typescript(src)`                               | `tsv_ts::format(src)`                                                      |
+| `format_typescript(src, {sourceType: 'script'})`       | `tsv_ts::format_with_goal(src, Goal::Script)`                              |
+| `format_css` / `format_svelte`                         | `tsv_css::format` / `tsv_svelte::format`                                   |
+| -                                                      | `Formatter::new()` then `.format(src)`, for many sources on one thread     |
+| `strip_typescript(src, {sourceType})`                  | `tsv_ts::strip` / `strip_with_goal`                                        |
+| `parse_typescript_json(src, {sourceType})`             | `tsv_ts::parse_to_json` / `parse_to_json_with` with `JsonOptions::goal`    |
+| `parse_typescript(src)` (an object)                    | - (`parse_to_json` and a JSON reader)                                      |
+| `parse_*(src, {locations: true})`, `reconstruct_locations` | `JsonOptions::new().locations(true)` (`locations` feature)                 |
+| `{ok: false, error}`                                   | `Err(Error)` (strip: `Err(StripError)`)                                    |
+| `error.kind` `'parse'` / `'refused'` / `'unsupported'` | `ErrorKind::Syntax` or `TooDeep` / `ErrorKind::Refusal` / `StripError::Unsupported` |
+| `error.message`, `error.frame`                         | `report()`'s `summary`, `frame` (`format!("{e:#}")` is both)               |
+| `error.start` / `end`, `error.loc`                     | `report()`'s `start` / `end` (`WirePoint`: offset, line, column)           |
+| a thrown error for a source over 4 GiB                 | `ErrorKind::TooLarge`                                                      |
+| `IgnoreStack` (discovery)                              | `tsv_ignore::IgnoreStack` + `tsv_discover`                                 |
+
+The same 1-based lines and UTF-16 offsets appear on both sides; `span()` is the Rust-only
+byte range.
 
 ## Design
 
@@ -180,8 +239,7 @@ tsv's goal is to be an optimal, focused toolchain for TypeScript/JS, CSS, and Sv
 - Rust-only
   - minimal dependencies
   - no C compiler needed to build tsv
-  - crates [will be published](https://github.com/fuzdev/tsv/issues/140)
-    to crates.io for reusability
+  - crates are published to crates.io for reusability ([Rust](#rust))
   - tsv currently has no support for JS plugins or JS/WASM runtime integration -
     JS bridging and WASM plugins will be evaluated to see if the tradeoffs work for tsv's goals,
     but the current lean is against, mainly for performance and simplicity;
@@ -268,7 +326,7 @@ Multi-crate workspace with clean separation of concerns:
 tsv/
 ├── Cargo.toml         # workspace root
 ├── crates/
-│   ├── tsv_lang/      # foundation (Span, Location, Error)
+│   ├── tsv_lang/      # shared foundation (Span, Error, the doc printer, the wire writer)
 │   ├── tsv_arena/     # shared binding substrate: per-thread reusable AST/doc arenas + the goal axis
 │   ├── tsv_html/      # HTML classification and whitespace rules
 │   ├── tsv_ignore/    # gitignore-aware discovery matcher (.gitignore/.formatignore/.prettierignore)
@@ -286,11 +344,8 @@ tsv/
 └── tests/             # workspace-level integration tests
 ```
 
-Each language crate exports a consistent API:
-
-- `parse_to_json(source) -> Result<String>` — the span-only wire JSON every binding ships, in one call (default-on `json` cargo feature; turn off for format-only builds); `parse_to_json_with(source, &JsonOptions)` takes the options — `locations(true)` adds `loc` (opt-in `locations` feature), and in `tsv_ts` `goal(Goal::Script)` names the parse goal
-- `format(source) -> Result<String>` — the parse+format one-shot (it folds line terminators ahead of the parse); `tsv_ts` adds `format_with_goal`, and the type strip `strip(source)` / `strip_with_goal(source, goal)`
-- the AST-taking primitives (`__private::parse` into a caller's `bumpalo` arena, the `__private::convert_ast_json_*` writers, `__private::format_ast*`, the bindings' warm-arena paths via `tsv_arena`) are hidden plumbing, not public API
+Each language crate exports the same functions - see [Rust](#rust); the AST-taking
+primitives the bindings and dev tools use are hidden plumbing, not public API.
 
 For more details see [CLAUDE.md](CLAUDE.md).
 

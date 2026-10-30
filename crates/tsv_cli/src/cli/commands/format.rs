@@ -495,8 +495,9 @@ impl WorkerFormatters {
         // back to — see `tsv_ts::Goal::from_extension`. Everything else stays unnamed and
         // takes the fallback, which is what reaches a legacy sloppy script.
         let goal = tsv_ts::Goal::from_extension(&name);
-        // catch_unwind isolates formatter bugs to the file; release builds use
-        // panic=abort so this only pays off in dev/corpus profiles. A formatter a panic
+        // catch_unwind isolates formatter bugs to the file; the prebuilt binaries use
+        // panic=abort, so this pays off in dev/corpus profiles and in a `cargo install`
+        // build, which takes cargo's default unwinding profile. A formatter a panic
         // left mid-document is sound to reuse: it rewinds at the start of its next call.
         let result =
             panic::catch_unwind(AssertUnwindSafe(|| self.format(&source, parser_type, goal)));
