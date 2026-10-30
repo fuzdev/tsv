@@ -28,7 +28,7 @@
 // 3. **Modularity**: Each module has single responsibility for future maintainability
 
 mod analysis;
-#[cfg(feature = "buffer_stats")]
+#[cfg(feature = "internal_buffer_stats")]
 pub mod buffer_stats;
 mod calls;
 mod chain;
@@ -3359,7 +3359,7 @@ impl<'a> Printer<'a> {
         };
         // The comments inside a format-ignored node ride out in the raw slice, never
         // reaching `build_comment_doc` — tell the ledger so they don't read as dropped.
-        #[cfg(feature = "comment_check")]
+        #[cfg(feature = "internal_comment_check")]
         tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
 
         self.d().verbatim_source_span(span, self.source)

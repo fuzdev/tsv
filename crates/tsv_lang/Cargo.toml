@@ -17,28 +17,28 @@ targets = ["x86_64-unknown-linux-gnu"]
 # profiles must measure production-shaped render code — compile it out entirely:
 # no `DocArena` side-set field, no render-loop hook. `tsv_debug` forwards this
 # feature (off by default there too) to drive `swallow_audit`. See src/doc/swallow.rs.
-swallow_check = []
+internal_swallow_check = []
 # Opt-in perf census counters (diagnostic). Off by default so every production
 # artifact and every default `tsv_debug` perf build compiles the counters — and the
 # session call sites that feed them — out entirely. `tsv_debug` forwards it. See
 # src/census.rs.
-census = []
+internal_census = []
 # Opt-in print-once comment ledger (diagnostic): every comment a document parses must
-# be emitted exactly once. Off by default, same reasoning as `swallow_check` — no
+# be emitted exactly once. Off by default, same reasoning as `internal_swallow_check` — no
 # registration in the format entry points, no record hook in the printers' comment
 # seams. `tsv_ts` / `tsv_css` / `tsv_svelte` / `tsv_debug` each forward it. See
 # src/comment_ledger.rs.
-comment_check = []
+internal_comment_check = []
 # Opt-in work counters for `tsv_debug build_fanout_audit` (diagnostic): node builds at the
 # printers' build dispatch, doc-walk visits, source-scan steps. Off by default, same reasoning
-# as `swallow_check` — every call site compiles to nothing. `tsv_debug` forwards it. See
+# as `internal_swallow_check` — every call site compiles to nothing. `tsv_debug` forwards it. See
 # src/fanout_probe.rs.
-fanout_check = []
-# Umbrella that turns on every diagnostic seam at once (`swallow_check` +
-# `comment_check` + `fanout_check`). The audit deno tasks build one binary under this feature
+internal_fanout_check = []
+# Umbrella that turns on every diagnostic seam at once (`internal_swallow_check` +
+# `internal_comment_check` + `internal_fanout_check`). The audit deno tasks build one binary under this feature
 # instead of one per seam. Off by default, same as its members — production
 # artifacts and default `tsv_debug` profile/perf builds compile all of it out.
-audits = ["swallow_check", "comment_check", "fanout_check"]
+internal_audits = ["internal_swallow_check", "internal_comment_check", "internal_fanout_check"]
 # Shared wire-JSON writer substrate (`json_writer`), pulled in transitively by
 # each language crate's `json` feature. Off in the format-only
 # @fuzdev/tsv-format-wasm build, so `zmij` never enters that graph.

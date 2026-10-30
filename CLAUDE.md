@@ -155,7 +155,7 @@ deno task test:depth:napi # the same in the SHIPPED optimization (`--profile nap
 deno task test:depth:wasm # the full sweep's shapes at the same depths through the staged `all` WASM package on a Node MAIN thread,
 #                          cold and tiered up (scripts/depth_wasm.ts); NOT in `check` — publish Step 6 and CI's `artifacts`
 #                          job (deno.json `//test:depth:wasm`)
-deno task test:audits    # cargo test -p tsv_lang --features audits — the `swallow_check` + `comment_check` seams' own tests; in `check`
+deno task test:audits    # cargo test -p tsv_lang --features internal_audits — the `internal_swallow_check` + `internal_comment_check` seams' own tests; in `check`
 deno task lint           # cargo clippy
 deno task entities:update # regenerate tsv_html's committed entity table from its entities.json (the generator is
 #                          a unit test that fails on a stale table, so `deno task test` gates it)
@@ -232,7 +232,7 @@ deno task scan:audit                 # no new raw find/rfind/match_indices subst
 deno task fanout:audit               # build-fanout RATCHET: doc-node growth over nested constructs (exponential rebuild per
 #                                      layout candidate), plus counted legs over the depth gate's full sweep, the known-bug
 #                                      shapes and flat runs — builds per AST node, doc nodes per byte, work-counter growth
-#                                      (doc walks, source scans, printer predicates); `audits` counters, no wall-clock (:update)
+#                                      (doc walks, source scans, printer predicates); `internal_fanout_check` counters, no wall-clock (:update)
 deno task roundtrip:audit            # format(tests/fixtures) must reparse with its NODE POPULATION conserved (every node by
 #                                      type, minus the shells/separators the formatter rewrites by design, plus every word of
 #                                      template text) — zero-tolerance; names a dropped element where the skeleton compare only

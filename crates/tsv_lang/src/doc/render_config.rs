@@ -28,11 +28,11 @@ use crate::{INDENT, PRINT_WIDTH};
 /// threaded to every sub-render (fill segments, the line-suffix flush), so a measurement
 /// render's nested renders inherit the purpose instead of each needing to re-derive it.
 ///
-/// `cfg`-gated on `comment_check` along with the field, so a production `RenderConfig` is
-/// byte-identical to one built before this existed: like `swallow_check`, a diagnostic
+/// `cfg`-gated on `internal_comment_check` along with the field, so a production `RenderConfig` is
+/// byte-identical to one built before this existed: like `internal_swallow_check`, a diagnostic
 /// feature compiles out *entirely* rather than leaving dead state in the type the production
 /// renderer threads.
-#[cfg(feature = "comment_check")]
+#[cfg(feature = "internal_comment_check")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RenderPurpose {
     /// The rendered text becomes part of the formatted document — reaching a comment's node
@@ -42,7 +42,7 @@ pub(crate) enum RenderPurpose {
     Measure,
 }
 
-#[cfg(feature = "comment_check")]
+#[cfg(feature = "internal_comment_check")]
 impl RenderPurpose {
     /// Whether reaching a comment's doc node under this purpose counts as an emit.
     #[inline]
@@ -55,9 +55,9 @@ impl RenderPurpose {
 pub(crate) struct RenderConfig {
     pub print_width: usize,
     pub indent: &'static str,
-    /// Read only by the `comment_check` ledger — see [`RenderPurpose`]. Absent without the
+    /// Read only by the `internal_comment_check` ledger — see [`RenderPurpose`]. Absent without the
     /// feature, so production builds carry no diagnostic state.
-    #[cfg(feature = "comment_check")]
+    #[cfg(feature = "internal_comment_check")]
     pub purpose: RenderPurpose,
 }
 
@@ -66,7 +66,7 @@ impl Default for RenderConfig {
         Self {
             print_width: PRINT_WIDTH,
             indent: INDENT,
-            #[cfg(feature = "comment_check")]
+            #[cfg(feature = "internal_comment_check")]
             purpose: RenderPurpose::Output,
         }
     }

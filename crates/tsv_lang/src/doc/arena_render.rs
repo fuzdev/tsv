@@ -14,13 +14,13 @@ use super::arena_render_suffix::{
     flush_line_suffix, flush_line_suffix_as_host_run, flush_line_suffix_tail_is_line_comment,
 };
 use super::render_config::RenderConfig;
-#[cfg(feature = "comment_check")]
+#[cfg(feature = "internal_comment_check")]
 use super::render_config::RenderPurpose;
 use super::specialize_short_len;
-#[cfg(feature = "swallow_check")]
+#[cfg(feature = "internal_swallow_check")]
 use super::swallow::{self, SwallowTracker};
 use super::types::{CachedWidth, DocContext, LineKind, Mode, resolve_text};
-#[cfg(feature = "comment_check")]
+#[cfg(feature = "internal_comment_check")]
 use crate::comment_ledger;
 
 //
@@ -294,7 +294,7 @@ pub(super) fn render_line_break(
         // The one newline seam in the renderer, so the swallow diagnostic's "the line
         // ended" signal belongs here rather than on a per-render handle — see
         // [`swallow::note_line_end`].
-        #[cfg(feature = "swallow_check")]
+        #[cfg(feature = "internal_swallow_check")]
         swallow::note_line_end();
         if kind == LineKind::Literal {
             // Literal line (template literals): preserve trailing whitespace
@@ -385,10 +385,10 @@ fn render_line_node(
 #[expect(clippy::too_many_arguments)]
 #[cold]
 #[inline(never)]
-// `policy` is written only by the `swallow_check` audit seam; without the feature the
+// `policy` is written only by the `internal_swallow_check` audit seam; without the feature the
 // `&mut` is a signature the caller's borrow already committed to, not a use.
 #[cfg_attr(
-    not(feature = "swallow_check"),
+    not(feature = "internal_swallow_check"),
     allow(clippy::needless_pass_by_ref_mut)
 )]
 fn render_multiline_text<P: RenderPolicy>(
@@ -421,7 +421,7 @@ fn render_multiline_text<P: RenderPolicy>(
     };
     let mut lines = split_lf(body);
     if let Some(first) = lines.next() {
-        #[cfg(feature = "swallow_check")]
+        #[cfg(feature = "internal_swallow_check")]
         if policy.swallow_enabled() {
             // Block-comment text is never a `//` line comment.
             policy.swallow_on_text(false, first, output);
@@ -441,7 +441,7 @@ fn render_multiline_text<P: RenderPolicy>(
             line_suffix,
             should_remeasure,
         );
-        #[cfg(feature = "swallow_check")]
+        #[cfg(feature = "internal_swallow_check")]
         if policy.swallow_enabled() {
             policy.swallow_on_text(false, line, output);
         }
@@ -530,7 +530,7 @@ pub fn arena_measure_doc_flat_resolved(
         print_width: usize::MAX / 2,
         // Measured and discarded, never written to the document — so reaching a comment's
         // node here is not that comment being emitted. See `RenderPurpose`.
-        #[cfg(feature = "comment_check")]
+        #[cfg(feature = "internal_comment_check")]
         purpose: RenderPurpose::Measure,
         ..RenderConfig::default()
     };
@@ -691,21 +691,21 @@ trait RenderPolicy {
     /// special case (the suffix was already measured where it was queued).
     fn tracking_suffix(&self) -> bool;
 
-    // Opt-in swallow diagnostic hooks (`swallow_check` feature). Both policies carry
+    // Opt-in swallow diagnostic hooks (`internal_swallow_check` feature). Both policies carry
     // them: a swallow is a property of the physical output line, and the sub-renders
     // append to the same line as the main loop, so every renderer drives the one
     // shared state machine. See `crate::doc::swallow`.
-    #[cfg(feature = "swallow_check")]
+    #[cfg(feature = "internal_swallow_check")]
     fn swallow_enabled(&self) -> bool;
-    #[cfg(feature = "swallow_check")]
+    #[cfg(feature = "internal_swallow_check")]
     fn swallow_on_text(&mut self, is_line_comment: bool, text: &str, output: &str);
 }
 
 /// Policy for [`render_doc_iterative`]: always defers line suffixes, honors
-/// conditional-group `should_break`, and (under the `swallow_check` feature) hosts
+/// conditional-group `should_break`, and (under the `internal_swallow_check` feature) hosts
 /// the line-comment swallow diagnostic.
 struct TopLevelPolicy {
-    #[cfg(feature = "swallow_check")]
+    #[cfg(feature = "internal_swallow_check")]
     swallow: SwallowTracker,
 }
 
@@ -717,13 +717,13 @@ impl RenderPolicy for TopLevelPolicy {
         true
     }
 
-    #[cfg(feature = "swallow_check")]
+    #[cfg(feature = "internal_swallow_check")]
     #[inline]
     fn swallow_enabled(&self) -> bool {
         self.swallow.enabled()
     }
 
-    #[cfg(feature = "swallow_check")]
+    #[cfg(feature = "internal_swallow_check")]
     #[inline]
     fn swallow_on_text(&mut self, is_line_comment: bool, text: &str, output: &str) {
         self.swallow.on_text(is_line_comment, text, output);
@@ -744,7 +744,7 @@ struct SingleDocPolicy {
     tracking_suffix: bool,
     /// Joins the enclosing render's swallow state machine — see
     /// [`SwallowTracker::join_render`].
-    #[cfg(feature = "swallow_check")]
+    #[cfg(feature = "internal_swallow_check")]
     swallow: SwallowTracker,
 }
 
@@ -761,13 +761,13 @@ impl RenderPolicy for SingleDocPolicy {
     // line-suffix flush was a blind spot: two trailing `//` comments flushed at one
     // line break land back-to-back (`x; // c1 // c2`) and the first swallows the
     // second.
-    #[cfg(feature = "swallow_check")]
+    #[cfg(feature = "internal_swallow_check")]
     #[inline]
     fn swallow_enabled(&self) -> bool {
         self.swallow.enabled()
     }
 
-    #[cfg(feature = "swallow_check")]
+    #[cfg(feature = "internal_swallow_check")]
     #[inline]
     fn swallow_on_text(&mut self, is_line_comment: bool, text: &str, output: &str) {
         self.swallow.on_text(is_line_comment, text, output);
@@ -777,7 +777,7 @@ impl RenderPolicy for SingleDocPolicy {
 /// Command-stack-based rendering with look-ahead — the top-level renderer
 /// behind every `arena_print_doc*` entry point. Owns the render's keyed-group map,
 /// defers `line_suffix` content (flushed at line breaks and once at the end), and
-/// (under the `swallow_check` feature) hosts the line-comment swallow
+/// (under the `internal_swallow_check` feature) hosts the line-comment swallow
 /// diagnostic. The loop itself is [`render_doc_core`].
 ///
 /// The keyed-group map (`DocArena::keyed_group_modes`) is cleared here on entry, and
@@ -800,7 +800,7 @@ pub(super) fn render_doc_iterative(
     // enabled flag once per render and is inert when disabled. Compiled out
     // entirely without the feature. See `crate::doc::swallow`.
     let mut policy = TopLevelPolicy {
-        #[cfg(feature = "swallow_check")]
+        #[cfg(feature = "internal_swallow_check")]
         swallow: SwallowTracker::begin_render(),
     };
     // Borrow the arena-parked work buffers for the duration of this top-level
@@ -849,7 +849,7 @@ fn render_embed_end<P: RenderPolicy>(
     cmd: ArenaCommand,
     dedent_closer: bool,
     policy: &mut P,
-    #[cfg(feature = "comment_check")] ledger_on: bool,
+    #[cfg(feature = "internal_comment_check")] ledger_on: bool,
 ) {
     let flushes = !line_suffix.is_empty();
     ctx.arena
@@ -887,7 +887,7 @@ fn render_embed_end<P: RenderPolicy>(
         output,
         pos,
         policy,
-        #[cfg(feature = "comment_check")]
+        #[cfg(feature = "internal_comment_check")]
         ledger_on,
     );
 }
@@ -908,10 +908,10 @@ fn render_embed_end<P: RenderPolicy>(
 #[inline(never)]
 #[expect(clippy::too_many_arguments)]
 #[cfg_attr(
-    not(feature = "swallow_check"),
+    not(feature = "internal_swallow_check"),
     expect(
         clippy::needless_pass_by_ref_mut,
-        reason = "`policy` is mutated only by the `swallow_check` audit seam; one signature \
+        reason = "`policy` is mutated only by the `internal_swallow_check` audit seam; one signature \
                   serves both builds"
     )
 )]
@@ -924,16 +924,16 @@ fn shed_host_separator<P: RenderPolicy>(
     output: &mut String,
     pos: &mut usize,
     policy: &mut P,
-    #[cfg(feature = "comment_check")] ledger_on: bool,
+    #[cfg(feature = "internal_comment_check")] ledger_on: bool,
 ) {
-    #[cfg(not(feature = "swallow_check"))]
+    #[cfg(not(feature = "internal_swallow_check"))]
     let _ = &policy;
     let arena = ctx.arena;
     let Some(mut next) = commands.pop() else {
         return;
     };
     loop {
-        #[cfg(feature = "comment_check")]
+        #[cfg(feature = "internal_comment_check")]
         let record = |id: DocId| {
             if ledger_on && let Some((span, key)) = arena.comment_doc_tag(id) {
                 comment_ledger::record_emitted_keyed(key, span);
@@ -941,7 +941,7 @@ fn shed_host_separator<P: RenderPolicy>(
         };
         match &nodes[next.doc.index()] {
             DocNode::Concat(range) => {
-                #[cfg(feature = "comment_check")]
+                #[cfg(feature = "internal_comment_check")]
                 record(next.doc);
                 let kids = range.resolve(children_vec);
                 let Some((&first, rest)) = kids.split_first() else {
@@ -987,9 +987,9 @@ fn shed_host_separator<P: RenderPolicy>(
                     commands.push(next);
                     return;
                 };
-                #[cfg(feature = "comment_check")]
+                #[cfg(feature = "internal_comment_check")]
                 record(next.doc);
-                #[cfg(feature = "swallow_check")]
+                #[cfg(feature = "internal_swallow_check")]
                 if policy.swallow_enabled() {
                     policy.swallow_on_text(arena.is_line_comment(next.doc), rest, output);
                 }
@@ -1064,18 +1064,18 @@ fn render_doc_core<P: RenderPolicy>(
     let children_vec: &[DocId] = &children_outer;
     let pool: &str = &pool_outer;
 
-    // The print-once comment ledger's render-side hook (`comment_check` feature). Every
+    // The print-once comment ledger's render-side hook (`internal_comment_check` feature). Every
     // command popped here is a node the renderer *emits* — a conditional-group candidate
     // that loses, or a `fits()` lookahead, never reaches this loop — so recording the tag
     // here is the emit itself. Gated on the arena actually carrying tags, so a
     // comment-free document pays nothing. See `crate::comment_ledger`.
-    #[cfg(feature = "comment_check")]
+    #[cfg(feature = "internal_comment_check")]
     let ledger_on = comment_ledger::comment_check_enabled()
         && arena.has_comment_docs()
         && render.purpose.records_comment_emits();
 
     loop {
-        #[cfg(feature = "comment_check")]
+        #[cfg(feature = "internal_comment_check")]
         if ledger_on && let Some((span, key)) = arena.comment_doc_tag(cmd.doc) {
             comment_ledger::record_emitted_keyed(key, span);
         }
@@ -1133,7 +1133,7 @@ fn render_doc_core<P: RenderPolicy>(
         // `Text` second, and it is the probe that removes the fold: its test is
         // exactly the `tag < 4` the switch would have had to compute.
         if let DocNode::Text(t) = node {
-            #[cfg(feature = "swallow_check")]
+            #[cfg(feature = "internal_swallow_check")]
             if policy.swallow_enabled() {
                 let s = resolve_text(t, source, pool);
                 policy.swallow_on_text(arena.is_line_comment(cmd.doc), s, output);
@@ -1507,7 +1507,7 @@ fn render_doc_core<P: RenderPolicy>(
                         cmd,
                         *dedent_closer,
                         policy,
-                        #[cfg(feature = "comment_check")]
+                        #[cfg(feature = "internal_comment_check")]
                         ledger_on,
                     );
                 }
@@ -1601,7 +1601,7 @@ pub(super) fn render_single_doc_inner(
 ) {
     let mut policy = SingleDocPolicy {
         tracking_suffix: suffix_buffer.is_some(),
-        #[cfg(feature = "swallow_check")]
+        #[cfg(feature = "internal_swallow_check")]
         swallow: SwallowTracker::join_render(),
     };
     let mut dummy_suffix: LineSuffixBuf = SmallVec::new();
@@ -1708,7 +1708,7 @@ mod column_arithmetic_tests {
     //! flagged each arm below as an unasserted survivor; corruption-verify any
     //! change here by breaking the arm and watching exactly one assertion fail.
     use super::RenderConfig;
-    #[cfg(feature = "comment_check")]
+    #[cfg(feature = "internal_comment_check")]
     use super::RenderPurpose;
     use super::{
         INDENT_RUN, RenderIndent, indent_str_width, indent_width, line_start_column,
@@ -1830,7 +1830,7 @@ mod column_arithmetic_tests {
         RenderConfig {
             print_width: 100,
             indent,
-            #[cfg(feature = "comment_check")]
+            #[cfg(feature = "internal_comment_check")]
             purpose: RenderPurpose::Output,
         }
     }

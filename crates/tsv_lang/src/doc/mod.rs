@@ -29,7 +29,7 @@ mod arena_render_flat;
 mod arena_render_suffix;
 mod chain_share;
 mod render_config;
-#[cfg(feature = "swallow_check")]
+#[cfg(feature = "internal_swallow_check")]
 pub mod swallow;
 mod types;
 
@@ -122,8 +122,8 @@ pub(crate) use specialize_short_len;
 /// directly. A `DocBuf` is for the site that genuinely accumulates.
 pub type DocBuf = smallvec::SmallVec<[arena::DocId; 8]>;
 
-// Diagnostic: line-comment swallow check (opt-in, render-time; `swallow_check` feature)
-#[cfg(feature = "swallow_check")]
+// Diagnostic: line-comment swallow check (opt-in, render-time; `internal_swallow_check` feature)
+#[cfg(feature = "internal_swallow_check")]
 pub use swallow::{SwallowReport, set_swallow_check, swallow_check_enabled, take_swallow_reports};
 
 // Arena render
@@ -142,7 +142,7 @@ mod arena_tests {
     use super::arena::{DocArena, DocId};
     use super::arena_render::arena_print_doc_with_indent_and_render;
     use super::render_config::RenderConfig;
-    #[cfg(feature = "comment_check")]
+    #[cfg(feature = "internal_comment_check")]
     use super::render_config::RenderPurpose;
     use super::*;
     use crate::EmbedContext;
@@ -173,7 +173,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width,
             indent: "  ",
-            #[cfg(feature = "comment_check")]
+            #[cfg(feature = "internal_comment_check")]
             purpose: RenderPurpose::Output,
         };
         render_test(arena, doc, &render)
@@ -184,7 +184,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width,
             indent: "\t",
-            #[cfg(feature = "comment_check")]
+            #[cfg(feature = "internal_comment_check")]
             purpose: RenderPurpose::Output,
         };
         render_test(arena, doc, &render)
@@ -782,7 +782,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width: 12,
             indent: "\t",
-            #[cfg(feature = "comment_check")]
+            #[cfg(feature = "internal_comment_check")]
             purpose: RenderPurpose::Output,
         };
         assert_eq!(render_test(&a, doc, &render), "1, 2, 3, 4,\n\t5, 6, 7, 8");
@@ -883,7 +883,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width: 100,
             indent: "\t",
-            #[cfg(feature = "comment_check")]
+            #[cfg(feature = "internal_comment_check")]
             purpose: RenderPurpose::Output,
         };
         let embed = EmbedContext::default();

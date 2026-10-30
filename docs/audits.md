@@ -2,7 +2,7 @@
 
 > The standing correctness audits over the formatter, the parsers and their wire contract, the Svelte compiler, and the canonical oracles all of them are graded against — what each proves, what it is blind to, how to run it, and where it gates. The `deno task` entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--deno-based); this doc is the full reference.
 
-Most audits are pure Rust (no Deno sidecar). Those gated in `deno task check` scan `tests/fixtures` — a curated, format-stable tree — so several are cheap tripwires there whose real yield is external corpora (`../prettier/tests/format`, the `../corpora` snapshot's collections, the `live` working trees): point them at real code after a printer change, or run `deno task audit:corpus`, the standing bundle for exactly that. Audits that need the feature-gated instrumentation (`swallow_check` / `comment_check`) build via the `audits` umbrella feature under `--profile corpus` — the single build world every `deno task check` audit shares (optimized + `panic = "unwind"`, so a formatter panic is caught and reported; plain `--release` is `panic = "abort"`, which kills the process). Every "build with `--profile corpus`" below means this.
+Most audits are pure Rust (no Deno sidecar). Those gated in `deno task check` scan `tests/fixtures` — a curated, format-stable tree — so several are cheap tripwires there whose real yield is external corpora (`../prettier/tests/format`, the `../corpora` snapshot's collections, the `live` working trees): point them at real code after a printer change, or run `deno task audit:corpus`, the standing bundle for exactly that. Audits that need the feature-gated instrumentation (`internal_swallow_check` / `internal_comment_check`) build via the `internal_audits` umbrella feature under `--profile corpus` — the single build world every `deno task check` audit shares (optimized + `panic = "unwind"`, so a formatter panic is caught and reported; plain `--release` is `panic = "abort"`, which kills the process). Every "build with `--profile corpus`" below means this.
 
 ⚠️ A **stack overflow** is the one failure this containment cannot reach — not a panic, so no `catch_unwind` sees it and the sweep dies outright rather than reporting one file. So `tsv_debug`'s dispatch runs on the `tsv` binary's stated stack reservation (`tsv_cli::cli::stack`), which puts the depth an audit survives out of reach of ordinary input and, more to the point, makes it the same on every machine; see [cli.md §Recursion Depth](./cli.md#recursion-depth).
 
@@ -103,18 +103,18 @@ its own qualified variant. After any whitespace edit across many fixtures, run a
 ## Line-Comment Swallow Audit (`swallow:audit`)
 
 ```bash
-cargo run --profile corpus -p tsv_debug --features audits swallow_audit                # audit all fixtures
-cargo run --profile corpus -p tsv_debug --features audits swallow_audit ../corpora/collections/zzz/src  # audit a real codebase
+cargo run --profile corpus -p tsv_debug --features internal_audits swallow_audit                # audit all fixtures
+cargo run --profile corpus -p tsv_debug --features internal_audits swallow_audit ../corpora/collections/zzz/src  # audit a real codebase
 # Also: --json, --jobs N
 ```
 
 Formats files with the render-time swallow check on and reports any `//` line comment followed
 by content on the same output line (silent content loss). Pure Rust, no Deno; defaults to
 `tests/fixtures`, pass dirs/files to audit real code; exits 1 on any finding. The check lives
-in `tsv_lang::doc::swallow` behind the `swallow_check` cargo feature — off by default, so it is
+in `tsv_lang::doc::swallow` behind the `internal_swallow_check` cargo feature — off by default, so it is
 compiled out of prod wasm/cli/ffi AND default `tsv_debug` builds (profile/perf sessions measure
-production-shaped render code). The `swallow:audit` task builds it via the `audits` umbrella
-feature (`swallow_check` + `comment_check`) under `--profile corpus`; `--features swallow_check`
+production-shaped render code). The `swallow:audit` task builds it via the `internal_audits` umbrella
+feature (`internal_swallow_check` + `internal_comment_check`) under `--profile corpus`; `--features internal_swallow_check`
 alone still works for a targeted run. Gated in `deno task check` over `tests/fixtures`, and as
 a leg of `deno task audit:corpus` over the real-code corpus + the prettier suites — where the
 class actually lives (the callee-position swallow sits in ONE file anywhere).
@@ -150,15 +150,15 @@ reach (its first external sweep caught a live `as const` swallow this way).
 The print-once comment ledger: every comment a document PARSES must be EMITTED exactly once. tsv's answer to prettier's `ensureAllCommentsPrinted`, and the structural guard on the [detached comment model](./comments.md): nothing else *inside the model* forces a comment that the parser produced to actually reach the output. (The [comment census](#comment-census-audit-censusaudit) forces conservation from *outside* the model — content-level, registration-independent — which is what covers the comments the parser never produced at all.)
 
 ```bash
-cargo run --profile corpus -p tsv_debug --features audits comment_audit                # audit all fixtures
-cargo run --profile corpus -p tsv_debug --features audits comment_audit ../corpora/collections/zzz/src  # audit a real codebase
+cargo run --profile corpus -p tsv_debug --features internal_audits comment_audit                # audit all fixtures
+cargo run --profile corpus -p tsv_debug --features internal_audits comment_audit ../corpora/collections/zzz/src  # audit a real codebase
 # Also: --json, --jobs N
 ```
 
 Reports every comment the format DROPPED (parsed, never emitted — silent content loss) or
 DOUBLE-PRINTED; exits 1 on any finding. The ledger lives in `tsv_lang::comment_ledger` behind
-the `comment_check` cargo feature, compiled out and built exactly as its twin
-[`swallow:audit`](#line-comment-swallow-audit-swallowaudit)'s check is (`--features comment_check`
+the `internal_comment_check` cargo feature, compiled out and built exactly as its twin
+[`swallow:audit`](#line-comment-swallow-audit-swallowaudit)'s check is (`--features internal_comment_check`
 alone works for a targeted run). Gated in `deno task check` (via `comments:audit`) over
 `tests/fixtures`. The corpus walk is the same shared pristine-format
 sweep — same skip buckets, and a formatter panic mid-walk is caught, counted, and named with
@@ -176,8 +176,8 @@ that class).
 Full reference — flags, the ratchet, reading a finding, triage + re-pin workflow, scope: **[gap_audit.md](./gap_audit.md)**. Design rationale (why byte offsets and not tokens, why the ledger is the oracle, why five payloads) lives in the `gap_audit` module docs.
 
 ```bash
-cargo run --profile corpus -p tsv_debug --features audits gap_audit   # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features audits gap_audit ../corpora/collections/zzz/src
+cargo run --profile corpus -p tsv_debug --features internal_audits gap_audit   # tests/fixtures
+cargo run --profile corpus -p tsv_debug --features internal_audits gap_audit ../corpora/collections/zzz/src
 # Also: --json, --report, --by-node, --rank, --since <json>, --top N, --jobs N, --limit N, --payload <one>, --all-bytes, --update
 ```
 
@@ -439,8 +439,8 @@ both need the canonical parser, so they are conformance-tier at best. Standing f
 Full reference — flags, the ratchet, the absorb pin, reading a finding, the six invariants, scope: **[blank_audit.md](./blank_audit.md)**. Design rationale (the fast path, why a blank is graded against the injected input not the pristine, the string-interior exclusion) lives in the `blank_audit` module docs.
 
 ```bash
-cargo run --profile corpus -p tsv_debug --features audits blank_audit   # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features audits blank_audit ../corpora/collections/zzz/src
+cargo run --profile corpus -p tsv_debug --features internal_audits blank_audit   # tests/fixtures
+cargo run --profile corpus -p tsv_debug --features internal_audits blank_audit ../corpora/collections/zzz/src
 # Also: --json, --report, --jobs N, --limit N, --update
 ```
 
@@ -488,8 +488,8 @@ Why it needs its own gate. A fabricated blank is indistinguishable from an autho
 - **Corpus format compare** — a fabrication prettier also makes is a match, not a divergence.
 
 ```bash
-cargo run --profile corpus -p tsv_debug --features audits fabrication_audit
-cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ../corpora/collections/zzz/src
+cargo run --profile corpus -p tsv_debug --features internal_audits fabrication_audit
+cargo run --profile corpus -p tsv_debug --features internal_audits fabrication_audit ../corpora/collections/zzz/src
 # Also: --json, --jobs N, --update. ~0.2 s over tests/fixtures.
 ```
 
@@ -528,8 +528,8 @@ The whole-comment conservation gate: does every comment the author wrote survive
 Why it needs its own gate: every other comment instrument reads a channel the parser controls. The print-once ledger guards what a format entry *registered*; `parse().comments` is what the parser chose to carry. A comment a parse path consumes without registering (the CSS `skip_boundary_whitespace_and_comments` class that motivated this audit) never existed as far as those instruments know — the corpus stays green **by absence**, and every corrupted output in that family was a format fixed point, so F1, roundtrip, fuzz, and the authoring audit were all structurally blind too. The census's independence from the parser's comment carrying is its entire design.
 
 ```bash
-cargo run --profile corpus -p tsv_debug --features audits census_audit                # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features audits census_audit ../corpora/collections/zzz/src  # a real codebase
+cargo run --profile corpus -p tsv_debug --features internal_audits census_audit                # tests/fixtures
+cargo run --profile corpus -p tsv_debug --features internal_audits census_audit ../corpora/collections/zzz/src  # a real codebase
 # Also: --json, --jobs N, --update. ~0.35 s over tests/fixtures.
 ```
 
@@ -588,8 +588,8 @@ Why it needs its own gate: **every other gate is blind to an over-width line, by
 Two real bugs (the mid-run comment weld and its leading twin) shipped an over-width line — one of them also non-idempotent — with `deno task check` green throughout.
 
 ```bash
-cargo run --profile corpus -p tsv_debug --features audits width_audit
-cargo run --profile corpus -p tsv_debug --features audits width_audit ../corpora/collections/zzz/src
+cargo run --profile corpus -p tsv_debug --features internal_audits width_audit
+cargo run --profile corpus -p tsv_debug --features internal_audits width_audit ../corpora/collections/zzz/src
 # Also: --json, --jobs N, --verbose (every line, not the per-shape rollup), --limit N, --update.
 ```
 
@@ -635,8 +635,8 @@ So the triage note in the snapshot header holds — a new `inner` shape is a **q
 The mechanized discovery of unhonored `// prettier-ignore` / `format-ignore` positions. Recognition is centralized (`tsv_lang::is_format_ignore_directive`), but *consumption* is a per-node opt-in the printer makes at scattered sites — any position without one silently reformats an ignored construct, which prettier-authored code does not expect. This audit turns the guess-list of suspected positions into a computed ledger, the way `comments:audit` structurally guards the per-site `owned_by_node` model rather than trusting each site by inspection. Design rationale lives in the `ignore_audit` module docs.
 
 ```bash
-cargo run --profile corpus -p tsv_debug --features audits ignore_audit   # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features audits ignore_audit ../corpora/collections/zzz/src
+cargo run --profile corpus -p tsv_debug --features internal_audits ignore_audit   # tests/fixtures
+cargo run --profile corpus -p tsv_debug --features internal_audits ignore_audit ../corpora/collections/zzz/src
 # Also: --json, --report, --jobs N, --limit N, --update
 ```
 
@@ -716,7 +716,7 @@ the anchor rule is `Printer::element_claim_anchor`.
 ## Build-Fanout Audit (`fanout:audit`)
 
 ```bash
-cargo run --profile corpus -p tsv_debug --features audits build_fanout_audit
+cargo run --profile corpus -p tsv_debug --features internal_audits build_fanout_audit
 # Also: --json, --update (re-pin; refused on a narrowed run), --filter <substr> (diagnostic:
 # only the inputs whose name contains it; the ratchet is not graded)
 ```
@@ -749,7 +749,7 @@ gate: it fails past that bound (or past the doc-node cap), and `--update` refuse
 does.
 
 **The counted legs.** The growth leg sees only what compounds in the doc-node count. The other
-legs read deterministic counters instead — `tsv_lang::fanout_probe`, compiled in by the `audits`
+legs read deterministic counters instead — `tsv_lang::fanout_probe`, compiled in by the `internal_audits`
 feature and absent from every shipped build (each call site is an empty inline function without
 it; with it, a relaxed load until this audit arms the counters). The counters are:
 
@@ -902,8 +902,8 @@ own TS never writes stays invisible here. The injection audits (`gaps:audit`,
 **Build world.** Runs the `tsv` binary of the shared `--profile corpus` world, which
 `deno task build:check` builds — `tsv_cli` and `tsv_debug` selected in ONE cargo
 invocation, so it adds no separate compile. This leg wants the `tsv` BINARY, which the
-audits' own `-p tsv_debug --features audits` selection builds only as a library; a
-`-p tsv_cli` selection of its own resolves features without `audits` and so compiles the
+audits' own `-p tsv_debug --features internal_audits` selection builds only as a library; a
+`-p tsv_cli` selection of its own resolves features without `internal_audits` and so compiles the
 whole stack a second time in the same profile (20.5 s of a 30.4 s stack rebuild, on every
 edit). Reintroducing `cargo run -p tsv_cli` here silently restores that second world — the
 claim holds only while this leg and `discovery:audit` go through `build:check`.
@@ -1041,7 +1041,7 @@ clean code**, so its coverage is a claim about what got compiled, not about what
   report green, a deliberately broken link in either passing. The crate is therefore one lib,
   with `main.rs` a shim over `cli`, which also keeps the shared modules from compiling twice
   under two roots.
-- **`#[cfg(feature)]`** — several `audit` submodules sit behind `comment_check`, so a
+- **`#[cfg(feature)]`** — several `audit` submodules sit behind `internal_comment_check`, so a
   default-feature build cannot resolve a link that names them; hence `--all-features`, which
   reaches gated code in every crate, not only this one. The converse — a link that resolves
   only with a feature on, in a crate docs.rs builds with it off — is
@@ -1682,8 +1682,8 @@ greppable and cannot silently mean the wrong thing on a subtree run, and a **nar
 under the flag fails its floor, like a ratchet's refusal of a narrowed `:update`.
 
 ```bash
-cargo run --profile corpus -p tsv_debug --features audits paren_audit
-cargo run --profile corpus -p tsv_debug --features audits paren_audit ../corpora/collections
+cargo run --profile corpus -p tsv_debug --features internal_audits paren_audit
+cargo run --profile corpus -p tsv_debug --features internal_audits paren_audit ../corpora/collections
 # Also: --json, --limit N (files), --examples N (findings shown, default 20), --dump-dir DIR
 ```
 

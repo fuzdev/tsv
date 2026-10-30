@@ -66,7 +66,7 @@ use tsv_lang::source_scan::has_newline_after_position;
 /// the common comment gaps off the heap: 0–2 comments are the bulk, and a
 /// stacked `//` block (3–8 lines, common in documented code) still fits inline;
 /// comment-dense corpora put the p99 statement-gap run at 7 (`cargo run -p
-/// tsv_debug --features buffer_stats buffer_sizes` — the histogram source for
+/// tsv_debug --features internal_buffer_stats buffer_sizes` — the histogram source for
 /// this `N`). A larger run spills to a single heap alloc — exactly what a
 /// `Vec` would do.
 pub(crate) type CommentVec<'a> = SmallVec<[&'a Comment; 8]>;
@@ -2150,7 +2150,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for inline comments with filtering
     // `track_caller` (ledger builds only): the `BlockOnly` skip annotation below records
     // the caller that held the filter licence, and this wrapper must be transparent to it.
-    #[cfg_attr(feature = "comment_check", track_caller)]
+    #[cfg_attr(feature = "internal_comment_check", track_caller)]
     pub(crate) fn build_comments_between_filtered(
         &self,
         start: u32,
@@ -2183,7 +2183,7 @@ impl<'a> Printer<'a> {
     /// The swallowed form parses and is a fixed point, so idempotency, round-trip, and the
     /// print-once ledger are all blind to it; `swallow_audit` sees only shapes some fixture
     /// already carries.
-    #[cfg_attr(feature = "comment_check", track_caller)]
+    #[cfg_attr(feature = "internal_comment_check", track_caller)]
     pub(crate) fn build_comments_between_filtered_opt(
         &self,
         start: u32,
@@ -2200,7 +2200,7 @@ impl<'a> Printer<'a> {
         // comment another emitter prints (the routed expansion path, a winning
         // `conditional_group` sibling) stays invisible. See
         // `comment_ledger::record_filtered_skip`.
-        #[cfg(feature = "comment_check")]
+        #[cfg(feature = "internal_comment_check")]
         if matches!(filter, CommentFilter::BlockOnly)
             && tsv_lang::comment_ledger::comment_check_enabled()
         {

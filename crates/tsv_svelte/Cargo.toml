@@ -26,7 +26,7 @@ locations = ["json", "tsv_lang/locations", "tsv_ts/locations", "tsv_css/location
 # format-ignore seams (raw `<script>`/`<style>`, the template node + range forms) record
 # their verbatim ranges. Forwards to tsv_ts/tsv_css, which emit the comments inside the
 # `<script>`/`{expr}`/`<style>` islands. Off in production builds.
-comment_check = ["tsv_lang/comment_check", "tsv_ts/comment_check", "tsv_css/comment_check"]
+internal_comment_check = ["tsv_lang/internal_comment_check", "tsv_ts/internal_comment_check", "tsv_css/internal_comment_check"]
 
 [dependencies]
 tsv_lang.workspace = true

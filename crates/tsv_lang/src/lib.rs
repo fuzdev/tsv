@@ -20,9 +20,9 @@
 //! - `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` - hardcoded formatter settings, and
 //!   `EmbedContext` / `LayoutMode` - the per-input embedding state
 //! - `Comment` - shared comment type
-//! - `census` - opt-in perf census counters (`census` feature)
-//! - `comment_ledger` - print-once comment ledger (`comment_check` feature)
-//! - `fanout_probe` - opt-in work counters for the fanout audit (`fanout_check` feature)
+//! - `census` - opt-in perf census counters (`internal_census` feature)
+//! - `comment_ledger` - print-once comment ledger (`internal_comment_check` feature)
+//! - `fanout_probe` - opt-in work counters for the fanout audit (`internal_fanout_check` feature)
 //! - `doc` - document builder primitives for prettier-compatible formatting
 //! - `printing` - shared printing utilities for printers
 //! - `source_scan` - trivia-aware source scanning between AST nodes
@@ -37,7 +37,7 @@
 #[doc(hidden)]
 pub mod census;
 mod comment;
-#[cfg(feature = "comment_check")]
+#[cfg(feature = "internal_comment_check")]
 #[doc(hidden)]
 pub mod comment_ledger;
 mod config;

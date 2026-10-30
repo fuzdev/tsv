@@ -189,7 +189,7 @@ fn format_document_in(
     // `tsv_lang::comment_ledger`) — the MERGED list, which is the one the printers emit. A
     // Svelte host registers its own `Root.comments`, so an embedded `<script>` never
     // reaches here.
-    #[cfg(feature = "comment_check")]
+    #[cfg(feature = "internal_comment_check")]
     tsv_lang::comment_ledger::register_parsed(source, &comments);
     format_program_in(program, source, &comments, line_breaks, arena, false)
 }
@@ -422,8 +422,8 @@ pub(crate) fn closes_statement_header(bytes: &[u8], rparen: usize, lower_bound: 
 }
 
 /// Printer buffer-population sampling for `tsv_debug buffer_sizes`. Behind the
-/// `buffer_stats` feature (off in production builds).
-#[cfg(feature = "buffer_stats")]
+/// `internal_buffer_stats` feature (off in production builds).
+#[cfg(feature = "internal_buffer_stats")]
 pub use printer::buffer_stats::{
     BufferInlineCapacities, BufferStats, inline_capacities, set_buffer_stats, take_buffer_stats,
 };
@@ -437,8 +437,8 @@ pub use printer::buffer_stats::{
 /// the parser-driven `read_regex_literal` / `continue_template_from_brace` paths
 /// aren't reached by a raw `next_token` loop (a `/` lexes as division, a `}` as a
 /// brace), so those stay gated by the AST/format byte-identity suites. Behind the
-/// `debug_lex` feature (off in production builds); used by `tsv_debug lex_diff`.
-#[cfg(feature = "debug_lex")]
+/// `internal_debug_lex` feature (off in production builds); used by `tsv_debug lex_diff`.
+#[cfg(feature = "internal_debug_lex")]
 pub fn debug_token_stream(source: &str) -> String {
     use crate::lexer::{Lexer, TokenKind};
     use std::fmt::Write as _;
@@ -468,7 +468,7 @@ pub fn debug_token_stream(source: &str) -> String {
 
 /// The **reserved** control-flow and declaration keywords the lexer recognizes —
 /// the 38 words that head a statement or declaration, as distinct from the
-/// type-name and literal keywords the lexer also lexes. Behind the `debug_lex`
+/// type-name and literal keywords the lexer also lexes. Behind the `internal_debug_lex`
 /// feature (off in production builds), like `debug_token_stream`.
 ///
 /// This is the independent oracle for `tsv_debug`'s `SHAPE_KEYWORDS` drift guard.
@@ -484,7 +484,7 @@ pub fn debug_token_stream(source: &str) -> String {
 /// (`number`/`string`/`boolean`/`any`/`never`/`unknown`/`object`/`symbol`/`bigint`),
 /// and `debugger`. `void` stays in the set — it is the `void` unary operator, not
 /// a type name.
-#[cfg(feature = "debug_lex")]
+#[cfg(feature = "internal_debug_lex")]
 pub fn reserved_words() -> &'static [&'static str] {
     &[
         "const",

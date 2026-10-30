@@ -29,7 +29,7 @@ use legs::{FanoutKey, Finding, InputResult};
 /// `borrow_nodes().len()`.
 ///
 /// The counted legs ([`legs`]) read `tsv_lang::fanout_probe`'s counters (the
-/// `audits` feature) over the depth-limit gate's catalog, the known-bug shapes and
+/// `internal_audits` feature) over the depth-limit gate's catalog, the known-bug shapes and
 /// flat runs — builds per AST node, doc nodes per byte, work-counter growth — and
 /// grade against the `fanout_audit_known.txt` ratchet. Pure Rust, no Deno.
 #[derive(FromArgs, Debug)]
@@ -1146,7 +1146,7 @@ impl BuildFanoutAuditCommand {
         if !fanout_probe::ENABLED {
             eprintln!(
                 "Error: build_fanout_audit needs the work counters: build with `--features \
-                 audits` (or `fanout_check`) — `deno task fanout:audit` does."
+                 internal_audits` (or `internal_fanout_check`) — `deno task fanout:audit` does."
             );
             return Err(CliError::Failed);
         }

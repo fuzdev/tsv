@@ -1022,7 +1022,7 @@ impl<'a> Printer<'a> {
         leads_target: Option<u32>,
     ) -> CommentVec<'_> {
         if self.gap_known_comment_free(prev_end, stmt_start) {
-            #[cfg(feature = "buffer_stats")]
+            #[cfg(feature = "internal_buffer_stats")]
             crate::printer::buffer_stats::record_leading_comments(0);
             return CommentVec::new();
         }
@@ -1051,7 +1051,7 @@ impl<'a> Printer<'a> {
                 !self.comment_already_trailed(prev_stmt_end, c, claims_trailing, leads_target)
             })
             .collect();
-        #[cfg(feature = "buffer_stats")]
+        #[cfg(feature = "internal_buffer_stats")]
         crate::printer::buffer_stats::record_leading_comments(collected.len());
         collected
     }

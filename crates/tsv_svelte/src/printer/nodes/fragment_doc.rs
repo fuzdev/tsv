@@ -2100,7 +2100,7 @@ impl<'a> Printer<'a> {
         // `tsv_lang::comment_ledger`. `<!-- -->` comments register by span in
         // `format_svelte_in`; this is the template (doc) emit path, `print_comment` the
         // hoisted-section (direct-write) one.
-        #[cfg(feature = "comment_check")]
+        #[cfg(feature = "internal_comment_check")]
         d.tag_comment_doc(doc, comment.span, self.source);
         doc
     }

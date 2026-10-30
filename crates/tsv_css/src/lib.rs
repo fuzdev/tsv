@@ -146,7 +146,7 @@ fn wire_string(bytes: Vec<u8>) -> String {
 ///
 /// The differential gate for lexer changes: two lexer implementations are
 /// token-identical iff this string matches for every corpus file. Behind the
-/// `debug_lex` feature (off in production builds); used by `tsv_debug lex_diff`.
+/// `internal_debug_lex` feature (off in production builds); used by `tsv_debug lex_diff`.
 ///
 /// For `Identifier` tokens it prints the **resolved text** — the decoded value
 /// when escapes were present, otherwise the verbatim source slice. That keeps the
@@ -154,7 +154,7 @@ fn wire_string(bytes: Vec<u8>) -> String {
 /// decoded value equals its source slice, so the stream is stable whether the
 /// lexer allocates the decode eagerly or only when an escape is seen, while a
 /// wrong escape decode still shows up as a divergent `text=`.
-#[cfg(feature = "debug_lex")]
+#[cfg(feature = "internal_debug_lex")]
 pub fn debug_token_stream(source: &str) -> String {
     use crate::lexer::{Lexer, TokenKind};
     use std::fmt::Write as _;

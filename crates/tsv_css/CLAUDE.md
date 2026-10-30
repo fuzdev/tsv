@@ -29,7 +29,7 @@ Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Proje
 - `HostBoundaryScan::of(source)` — the boundary-whitespace precondition (`printer/boundary_ws.rs` §The document precondition) over a whole host document, taken once per host and handed to every `format_embedded_in` call over it, so a component with several `<style>` islands pays one whole-source scan rather than one per island
 - `write_css_children` / `write_css_comments` — emit an embedded-`<style>` stylesheet's `children` and `comments` arrays (no `metadata`), the two adjacent keys `tsv_svelte`'s writer composes for the `<style>` element. The first returns the opaque `CssComments` run its walk gathered; the second spends it
 
-**Diagnostics**: `debug_token_stream` (behind the `debug_lex` feature, off in production) — the raw-lexer dump `tsv_debug lex_diff` diffs across lexer implementations.
+**Diagnostics**: `debug_token_stream` (behind the `internal_debug_lex` feature, off in production) — the raw-lexer dump `tsv_debug lex_diff` diffs across lexer implementations.
 
 ## Distinctives
 

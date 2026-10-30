@@ -345,7 +345,7 @@ impl<K> GateDiff<K> {
 // Consumer orchestration — the prose every ratchet-consuming audit was copying
 // into its `run()`. The ones an always-compiled consumer reaches
 // (`fabrication_audit`, `census_audit`, `width_audit`) are unconditional; the
-// rest stay behind `comment_check` with the injection audits that are their
+// rest stay behind `internal_comment_check` with the injection audits that are their
 // only callers.
 // `compile_corpus_compare --ratchet` has its own path-keyed flow with different
 // semantics and keeps its own messages.
@@ -462,7 +462,7 @@ pub(crate) fn grade_narrowed_strictly(
 /// # Errors
 ///
 /// Returns [`CliError::Failed`] (after the user-facing message) when `panics > 0`.
-#[cfg(feature = "comment_check")]
+#[cfg(feature = "internal_comment_check")]
 pub(crate) fn report_unpinned_panics(
     panics: usize,
     noun: &str,

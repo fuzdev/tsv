@@ -213,7 +213,7 @@ impl<'a> Printer<'a> {
         let doc = w.finish_text();
         // A comment emission that can't route through `build_comment_doc` (the space must
         // share the node), so it tags its own ledger node.
-        #[cfg(feature = "comment_check")]
+        #[cfg(feature = "internal_comment_check")]
         d.tag_comment_doc(doc, comment.span, self.source);
         doc
     }

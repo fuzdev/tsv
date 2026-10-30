@@ -25,7 +25,7 @@
 //!   verbatim region asks of its seed.
 //! - **base fixed point** — [`base_fixed_point`], the precondition the two mutation audits
 //!   rest on: a document with no fixed point has nothing for its authorings to converge ON.
-//! - **ledger** (behind the `comment_check` feature) — [`ledger_format`] /
+//! - **ledger** (behind the `internal_comment_check` feature) — [`ledger_format`] /
 //!   [`ledger_format_with_comments`] / [`pristine_format`] drive `format_source`
 //!   with the print-once comment ledger armed, and the [`Verdict`] /
 //!   [`VerifyOutcome`] / [`VerifySummary`] verdict types turn a ledger claim
@@ -183,9 +183,9 @@ pub(crate) fn tsv_parse_to_wire_bytes(source: &str, parser: ParserType) -> Optio
 /// run. Builds no wire: the JSON write + read is the cost that made a full [`f1_check`]
 /// per injection unaffordable for `gap_audit`, and a bare parse is ~a third of a format.
 ///
-/// Its two callers (`gap_audit`, `ignore_audit`) are `comment_check` modules, so it is
+/// Its two callers (`gap_audit`, `ignore_audit`) are `internal_comment_check` modules, so it is
 /// gated the same way — a default-feature build would otherwise warn it unused.
-#[cfg(feature = "comment_check")]
+#[cfg(feature = "internal_comment_check")]
 pub(crate) fn tsv_parses(source: &str, parser: ParserType) -> bool {
     let arena = bumpalo::Bump::new();
     match parser {
@@ -252,10 +252,10 @@ impl Utf16ToByte {
     /// malformed `end < start`, or an offset lands out of range. The wire's own positions are
     /// UTF-16, so both ends are translated through the map. The one wire-node→byte-span
     /// primitive the audit walkers share (`sites`'s region/edge collection, `node_edge`'s child
-    /// walk, `blank_audit`'s verbatim-skip walk) — all `comment_check`-gated, so the method is
+    /// walk, `blank_audit`'s verbatim-skip walk) — all `internal_comment_check`-gated, so the method is
     /// too, else it reads as dead code in a default build (`Utf16ToByte` itself stays
     /// always-compiled for `binding_audit`, which uses only `byte`).
-    #[cfg(feature = "comment_check")]
+    #[cfg(feature = "internal_comment_check")]
     pub(crate) fn node_byte_span(&self, node: &Value) -> Option<(usize, usize)> {
         let s = node.get("start")?.as_u64()? as usize;
         let e = node.get("end")?.as_u64()? as usize;
@@ -1804,14 +1804,14 @@ mod coord_tests {
     }
 }
 
-// The ledger-driven property layer is only reachable through the `comment_check`
+// The ledger-driven property layer is only reachable through the `internal_comment_check`
 // feature (it arms `tsv_lang::comment_ledger`), so production and default
 // `tsv_debug` builds compile it out entirely — the same gate the audits that
 // consume it (`comment_audit`, `gap_audit`, `blank_audit`) sit behind.
-#[cfg(feature = "comment_check")]
+#[cfg(feature = "internal_comment_check")]
 pub(crate) use ledger::*;
 
-#[cfg(feature = "comment_check")]
+#[cfg(feature = "internal_comment_check")]
 mod ledger {
     use tsv_cli::cli::format_source::format_source;
     use tsv_cli::cli::input::ParserType;

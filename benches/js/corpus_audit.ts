@@ -20,10 +20,10 @@
  * - `roundtrip_audit --gate` — output must reparse to the same document (delimiter/structure
  *   corruption the char-frequency SAFETY check is blind to). All dirs.
  * - `comment_audit` — every parsed comment emitted exactly once (dropped / double-printed). All
- *   dirs. Needs the `comment_check` feature (folded into the `audits` umbrella).
+ *   dirs. Needs the `internal_comment_check` feature (folded into the `internal_audits` umbrella).
  * - `swallow_audit` — no `//` may eat the content after it on its output line (lost CODE, and a
  *   class the print-once ledger is structurally blind to since the comment IS printed once). All
- *   dirs; needs the `swallow_check` feature (same umbrella). Real code is where this one earns
+ *   dirs; needs the `internal_swallow_check` feature (same umbrella). Real code is where this one earns
  *   its keep: the callee-position swallow (`call // c⏎()` → `call // c();`) lives in exactly one
  *   file anywhere, prettier's `js/call/no-argument/no-arguments.js`, and survived because no
  *   standing gate ran the check outside `tests/fixtures`.
@@ -112,12 +112,12 @@ if (real_seeds.length === 0) {
 
 const all_seeds = [...real_seeds, ...prettier_suites];
 
-// Build the audit binary once (`audits` umbrella = swallow_check + comment_check), then invoke it
+// Build the audit binary once (`internal_audits` umbrella = internal_swallow_check + internal_comment_check), then invoke it
 // per leg via `cargo run` (a no-op re-check once built) so only `cargo` needs `--allow-run`.
-log('building --profile corpus tsv_debug (--features audits) …');
+log('building --profile corpus tsv_debug (--features internal_audits) …');
 const build = spawnSync(
 	'cargo',
-	['build', '--profile', 'corpus', '-q', '-p', 'tsv_debug', '--features', 'audits'],
+	['build', '--profile', 'corpus', '-q', '-p', 'tsv_debug', '--features', 'internal_audits'],
 	{ stdio: 'inherit' }
 );
 if (build.status !== 0) {
@@ -132,7 +132,7 @@ const cargo_run = [
 	'-p',
 	'tsv_debug',
 	'--features',
-	'audits',
+	'internal_audits',
 	'--'
 ];
 
