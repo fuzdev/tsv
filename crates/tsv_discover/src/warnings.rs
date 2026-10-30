@@ -8,7 +8,7 @@ use crate::quote::{UNSPELLABLE_REASON, line_can_spell, quote_path, quote_path_ow
 use std::fmt::Write as _;
 use tsv_ignore::{IgnoreSource, IgnoreStack, Negation, NegationTail, PathKind};
 
-/// The stderr warning for a pruned directory that a tsv-layer `!` rule was trying to
+/// The stderr warning for a pruned directory that an override-layer `!` rule was trying to
 /// re-include *into*, or `None` when no such rule is written
 /// (`IgnoreStack::negation_under`, which is how [`classify_dir`](crate::classify_dir) reaches
 /// [`DirVerdict::PruneWithWarning`](crate::DirVerdict::PruneWithWarning)). The re-include is a silent no-op — git's
@@ -23,9 +23,9 @@ use tsv_ignore::{IgnoreSource, IgnoreStack, Negation, NegationTail, PathKind};
 /// Every line is anchored (without which a one-segment `!dist/` re-includes a `dist` at
 /// every depth) and spells its path literally ([`pattern_path`]); spelled from the format
 /// root instead, the lines would do nothing in a nested file, and outside a repo — where
-/// the format root is the filesystem root — in any file. A tsv layer is read after every
+/// the format root is the filesystem root — in any file. An override layer is read after every
 /// `.gitignore` and a later line wins within a file, so the lines override the excluding
-/// rule wherever it sits — except in a tsv file *deeper* than the re-include's, which is
+/// rule wherever it sits — except in an override file *deeper* than the re-include's, which is
 /// read after it: that rule is the one to narrow or negate, and the warning says so
 /// instead — adding the lines that pass a `.gitignore` rule standing behind it
 /// ([`IgnoreStack::gitignore_exclusion`]), which narrowing alone would leave in force.
@@ -70,7 +70,7 @@ pub fn shadow_warning(d: &str, loose_root: Option<&str>, stack: &IgnoreStack) ->
             if exclusion.source != IgnoreSource::Gitignore
                 && exclusion.anchor_depth > negation.anchor_depth
             {
-                // a tsv rule in a file deeper than the re-includes' is read after any line
+                // an override rule in a file deeper than the re-includes' is read after any line
                 // added there, so it is the user's to narrow — and where a `.gitignore`
                 // rule stands behind it, narrowing alone leaves that one in force, so the
                 // lines that pass it go beside the narrowing: one warning, not one per rerun
@@ -277,7 +277,7 @@ pub fn prettierignore_outside_repo_warning(
 
 /// The heads-up when, **inside a git repo**, a directory holds both a
 /// `.formatignore` and a `.prettierignore`: the sibling `.formatignore` shadows
-/// the `.prettierignore` (one tsv layer per directory, the native file adopted),
+/// the `.prettierignore` (one override layer per directory, the native file adopted),
 /// so the `.prettierignore`'s rules go unread in that directory — the drop-in
 /// counterpart to Prettier, which applies *both* files. The message points at
 /// merging the patterns into `.formatignore`. Returns `None` otherwise. Unlike
@@ -311,7 +311,7 @@ pub fn prettierignore_shadowed_warning(
 /// none of its rules. tsv's `.gitignore` regime is git's, so the discovery walks treat such
 /// a file exactly as they treat an unreadable one: its rules are not applied, the
 /// build-output heuristic stays on for its subtree, and this says so. `path` is the link's
-/// own path. The tsv layer (`.formatignore` / `.prettierignore`) keeps reading through
+/// own path. The override layer (`.formatignore` / `.prettierignore`) keeps reading through
 /// links, as prettier does, so only this name takes the warning. Produced **once**, here,
 /// so the native CLI and the WASM binding emit the identical text.
 #[must_use]
@@ -350,21 +350,21 @@ pub fn unresolvable_root_error(root: &str) -> String {
 /// `.gitignore` excludes it too: those files exist to say what not to format, and a
 /// pre-commit hook handing over its staged files names such a file on every commit that
 /// touches one — and it stays quiet whichever of the two rules sits shallower, since the
-/// tsv rule is the author's verdict on the file however the path is bounded. Every other
+/// override rule is the author's verdict on the file however the path is bounded. Every other
 /// exclusion warns — a `.gitignore` rule is about version control, so one excluding a named
 /// file is a surprise, and a named directory is a scope someone typed — naming the file
 /// whose rule did it and how to undo it. The rule named is the shallowest exclusion's
-/// ([`IgnoreStack::exclusion`]): a tsv rule over a `.gitignore` rule at the same prefix,
-/// the `.gitignore` rule where it excludes an ancestor above the tsv rule's. The remedy
-/// turns on what *else* excludes the path. Only tsv rules: the rule is the user's to
-/// narrow or negate. A `.gitignore` rule anywhere at or below the named one: narrowing a
-/// tsv rule would leave it standing, and git's parent-directory rule keeps every `!` under
+/// ([`IgnoreStack::exclusion`]): an override rule over a `.gitignore` rule at the same prefix,
+/// the `.gitignore` rule where it excludes an ancestor above the override rule's. The remedy
+/// turns on what *else* excludes the path. Only override rules: the rule is the user's to
+/// narrow or negate. A `.gitignore` rule anywhere at or below the named one: narrowing an
+/// override rule would leave it standing, and git's parent-directory rule keeps every `!` under
 /// an excluded directory inert, so the remedy is the lines that re-include the path level
 /// by level from the shallowest exclusion down ([`reinclude_lines`]) — for the repo root's
-/// own tsv file, read after every `.gitignore` so its `!` wins, and where a later line wins
-/// over a tsv rule in the same file (the warning says "after that rule" when the named rule
-/// is one, and "which also override" a root tsv rule below a named `.gitignore` one). A
-/// tsv rule in a *deeper* file is read after the root's lines and stays the user's to
+/// own override file, read after every `.gitignore` so its `!` wins, and where a later line wins
+/// over an override rule in the same file (the warning says "after that rule" when the named rule
+/// is one, and "which also override" a root override rule below a named `.gitignore` one). An
+/// override rule in a *deeper* file is read after the root's lines and stays the user's to
 /// narrow, so it is named as the second blocker — one warning stating both, not one per
 /// rerun — wherever that file was read: none inside a directory a rule excludes is (the
 /// walk that prunes the directory reads none), so a rule in one is named only once the
@@ -375,9 +375,9 @@ pub fn unresolvable_root_error(root: &str) -> String {
 ///
 /// `display` is the argument as given; `rel` is the path relative to the format root,
 /// `/`-separated; `kind` says which kind of argument it is — as the matcher reads it,
-/// so a symbolic link is never a [`PathKind::Directory`], whatever it points at: a directory-only rule (`foo/`)
-/// does not match a link for git, and the lines offered re-include the link itself
-/// (`!/foo`), which a `!/foo/` would not; `stack` holds the layers
+/// so a symbolic link is never a [`PathKind::Directory`], whatever it points at: a
+/// directory-only rule (`foo/`) does not match a link for git, and the lines offered
+/// re-include the link itself (`!/foo`), which a `!/foo/` would not; `stack` holds the layers
 /// from the format root down through the path's parent directory, stopping at a directory
 /// a rule excludes — the walk never reads the ignore files inside one, so a rule in one
 /// can still exclude the path once that directory is re-included. `loose_root` is the
@@ -394,32 +394,32 @@ pub fn excluded_argument_warning(
     stack: &IgnoreStack,
 ) -> Option<String> {
     let exclusion = stack.exclusion(rel, kind)?;
-    let tsv = stack.override_exclusion(rel, kind);
-    // a named file a tsv rule excludes is a deliberate opt-out, skipped quietly, whether
+    let override_rule = stack.override_exclusion(rel, kind);
+    // a named file an override rule excludes is a deliberate opt-out, skipped quietly, whether
     // or not a `.gitignore` excludes it too — and whichever of the two sits shallower.
-    // The directory arm below names both blockers where a `.gitignore` above the tsv
+    // The directory arm below names both blockers where a `.gitignore` above the override
     // rule bounds the path on its own, because its warning spells a remedy; this arm
-    // spells none, and the tsv rule is the author's verdict on the file however the path
+    // spells none, and the override rule is the author's verdict on the file however the path
     // is bounded. A pre-commit hook names such a file on every commit that stages it, so
     // a warning keyed on the `.gitignore` above it would be exactly that noise
-    if !kind.is_dir() && tsv.is_some() {
+    if !kind.is_dir() && override_rule.is_some() {
         return None;
     }
-    // The rule named is the shallowest exclusion's witness — a tsv rule over a
-    // `.gitignore` rule at the same prefix (`exclusion` reads the tsv layers last), the
-    // `.gitignore` rule where it excludes an ancestor above the tsv rule's. The remedy
-    // then depends on what ELSE excludes the path: only where nothing but tsv rules do is
-    // "narrow or negate that rule" enough, since narrowing a tsv rule leaves any
+    // The rule named is the shallowest exclusion's witness — an override rule over a
+    // `.gitignore` rule at the same prefix (`exclusion` reads the override layers last), the
+    // `.gitignore` rule where it excludes an ancestor above the override rule's. The remedy
+    // then depends on what ELSE excludes the path: only where nothing but override rules do is
+    // "narrow or negate that rule" enough, since narrowing an override rule leaves any
     // `.gitignore` rule at or below it standing, and no `!` under an excluded directory
     // can reach the path (git's parent-directory rule). Everywhere a `.gitignore` rule is
     // involved the remedy is the lines that re-include the path level by level from the
-    // shallowest exclusion down, for the repo root's own tsv file: read after every
-    // `.gitignore`, so its `!` wins there, and a later line wins over a tsv rule in the
-    // same file — a tsv rule in a DEEPER file is read after it and stays the user's to
+    // shallowest exclusion down, for the repo root's own override file: read after every
+    // `.gitignore`, so its `!` wins there, and a later line wins over an override rule in the
+    // same file — an override rule in a DEEPER file is read after it and stays the user's to
     // narrow, so it is named as the second blocker.
     let named = exclusion;
     let by_gitignore = named.source == IgnoreSource::Gitignore;
-    // a `.gitignore` rule ABOVE the named one is no blocker: some tsv `!` already
+    // a `.gitignore` rule ABOVE the named one is no blocker: some override-layer `!` already
     // re-includes what it excluded, or the shallowest exclusion would sit there (the
     // re-include idiom itself — `!/dist/`, `/dist/*` — names `dist/sub` this way)
     let gitignore = stack
@@ -443,7 +443,7 @@ pub fn excluded_argument_warning(
         .override_layer_source("")
         .unwrap_or(IgnoreSource::Formatignore)
         .file_name();
-    // what a `.gitignore` or a deeper tsv rule excludes, as a clause names it
+    // what a `.gitignore` or a deeper override rule excludes, as a clause names it
     let excluded_by = |depth: usize| {
         if depth == segments.len() {
             "it".to_string()
@@ -465,41 +465,44 @@ pub fn excluded_argument_warning(
         )
     });
     let unspellable = || format!("{UNSPELLABLE_REASON}, so narrow that rule to format it");
-    let remedy = match (by_gitignore, tsv, gitignore) {
-        // the `.gitignore` rule is the shallowest; a tsv rule may also exclude the path
+    let remedy = match (by_gitignore, override_rule, gitignore) {
+        // the `.gitignore` rule is the shallowest; an override rule may also exclude the path
         // below it, overridden by the lines in the root's file or standing in a deeper one
-        (true, tsv, _) => match adding {
+        (true, override_rule, _) => match adding {
             None => unspellable(),
             Some(adding) => {
                 let mut remedy = format!("re-include it by {adding}");
-                if let Some(tsv) = tsv {
-                    let tsv_file =
-                        ignore_file_display(&segments[..tsv.anchor_depth], tsv.source, loose_root);
-                    let excluded = excluded_by(tsv.depth);
-                    if tsv.anchor_depth == 0 {
+                if let Some(rule) = override_rule {
+                    let override_file = ignore_file_display(
+                        &segments[..rule.anchor_depth],
+                        rule.source,
+                        loose_root,
+                    );
+                    let excluded = excluded_by(rule.depth);
+                    if rule.anchor_depth == 0 {
                         let _ = write!(
                             remedy,
-                            ", which also override the rule in {tsv_file} that excludes {excluded}"
+                            ", which also override the rule in {override_file} that excludes {excluded}"
                         );
                     } else {
                         let _ = write!(
                             remedy,
-                            ", and narrow or negate the rule in {tsv_file} that excludes {excluded} too"
+                            ", and narrow or negate the rule in {override_file} that excludes {excluded} too"
                         );
                     }
                 }
                 remedy
             }
         },
-        // the tsv rule named is the shallowest and a `.gitignore` rule stands at or below
-        // it: narrowing the tsv rule alone leaves the path excluded
-        (false, Some(tsv), Some(git)) => {
+        // the override rule named is the shallowest and a `.gitignore` rule stands at or below
+        // it: narrowing the override rule alone leaves the path excluded
+        (false, Some(rule), Some(git)) => {
             let git_file =
                 ignore_file_display(&segments[..git.anchor_depth], git.source, loose_root);
             let excluded = excluded_by(git.depth);
             match adding {
                 None => unspellable(),
-                Some(adding) if tsv.anchor_depth == 0 => format!(
+                Some(adding) if rule.anchor_depth == 0 => format!(
                     "re-include it by {adding} after that rule — a rule in {git_file} excludes {excluded} too, so narrowing that rule alone does not admit it"
                 ),
                 Some(adding) => format!(
@@ -507,8 +510,8 @@ pub fn excluded_argument_warning(
                 ),
             }
         }
-        // only tsv rules exclude it: the rule named is the user's own to narrow (a tsv
-        // witness with no tsv exclusion cannot happen — the witness IS a tsv rule)
+        // only override rules exclude it: the rule named is the user's own to narrow (an override
+        // witness with no override exclusion cannot happen — the witness IS an override rule)
         (false, _, _) => "narrow or negate that rule to format it".to_string(),
     };
     let display = quote_path(display);
@@ -524,7 +527,7 @@ pub fn excluded_argument_warning(
 
 /// The ignore-file lines that put `segments` — a path whose first `depth` segments name
 /// the directory or file a `.gitignore` rule excluded — back in scope and nothing beside
-/// it, for a tsv layer at the format root. A path the rule matched itself takes one line
+/// it, for an override layer at the format root. A path the rule matched itself takes one line
 /// (`!/src/a.gen.ts`); one under an excluded directory takes that directory re-included,
 /// its contents excluded again, and so on one level at a time down to the path
 /// (`!/build/`, `/build/*`, `!/build/a.ts`), because git's parent-directory rule ignores a
@@ -634,7 +637,7 @@ fn path_display(segments: &[&str], loose_root: Option<&str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::{stack_from, tsv_stack};
+    use crate::test_support::{override_stack, stack_from};
     use crate::*;
     use tsv_ignore::{IgnoreStack, PathKind};
 
@@ -643,7 +646,7 @@ mod tests {
         // pinned verbatim — the native CLI and the WASM binding both fetch it, so both
         // surfaces emit this exact string. The lines are for the file the re-include
         // was written in, anchored and relative to its directory
-        let stack = tsv_stack("!dist/keep.ts\n");
+        let stack = override_stack("!dist/keep.ts\n");
         assert_eq!(
             shadow_warning("dist", None, &stack).unwrap(),
             "dist is skipped by tsv's build-output heuristic, so a re-include under it in the repo-root .formatignore does nothing; re-include it by adding `!/dist/`, `/dist/*` and `!/dist/keep.ts`, in that order, to the repo-root .formatignore"
@@ -939,7 +942,7 @@ mod tests {
                 "pkg/out/a.ts is inside pkg/out, which a rule in pkg/.gitignore excludes, so it is not formatted; re-include it by adding `!/pkg/out/`, `/pkg/out/*` and `!/pkg/out/a.ts`, in that order, to the repo-root .formatignore"
             )
         );
-        // a directory a tsv rule excludes names that rule's file
+        // a directory an override rule excludes names that rule's file
         assert_eq!(
             warn("vendor/lib", "vendor/lib", true).as_deref(),
             Some(
@@ -960,7 +963,7 @@ mod tests {
     }
 
     #[test]
-    fn excluded_argument_warning_keeps_a_file_a_tsv_rule_excludes_quiet() {
+    fn excluded_argument_warning_keeps_a_file_an_override_rule_excludes_quiet() {
         let mut stack = IgnoreStack::new();
         stack.push_formatignore("", "skip.ts\ngen/\n");
         stack.push_prettierignore("lib", "p.ts\n");
@@ -980,7 +983,7 @@ mod tests {
     }
 
     #[test]
-    fn excluded_argument_warning_names_the_repo_roots_own_tsv_file() {
+    fn excluded_argument_warning_names_the_repo_roots_own_override_file() {
         // a root reading `.prettierignore` is not told to create a `.formatignore` beside it,
         // which would shadow every rule in that `.prettierignore`
         let mut stack = IgnoreStack::new();
@@ -1004,7 +1007,7 @@ mod tests {
     }
 
     #[test]
-    fn excluded_argument_warning_names_a_tsv_rule_that_excludes_the_path_too() {
+    fn excluded_argument_warning_names_an_override_rule_that_excludes_the_path_too() {
         // a `.gitignore` excluding a directory above the path does not hide the user's own
         // rule on it: re-including past the `.gitignore` would leave that rule standing —
         // and, added to the same file, override it — so a file it excludes stays quiet and
@@ -1019,11 +1022,11 @@ mod tests {
         };
         assert_eq!(warn("vendor/x.ts", false), None);
         assert_eq!(warn("pkg/out/a.ts", false), None);
-        // a named file a tsv rule excludes only through an ancestor is quiet too
+        // a named file an override rule excludes only through an ancestor is quiet too
         assert_eq!(warn("vendor/lib/z.ts", false), None);
-        // the `.gitignore` excludes `vendor` ABOVE the tsv rule's `vendor/lib`: narrowing
-        // the tsv rule alone leaves `vendor` excluded and every `!` under it inert, so the
-        // warning undoes the `.gitignore` exclusion and names the tsv rule as the second
+        // the `.gitignore` excludes `vendor` ABOVE the override rule's `vendor/lib`: narrowing
+        // the override rule alone leaves `vendor` excluded and every `!` under it inert, so the
+        // warning undoes the `.gitignore` exclusion and names the override rule as the second
         // blocker — one warning, not a second one after the first remedy is followed
         assert_eq!(
             warn("vendor/lib", true).as_deref(),
@@ -1031,7 +1034,7 @@ mod tests {
                 "vendor/lib is inside vendor, which a rule in the repo-root .gitignore excludes, so nothing under it is formatted; re-include it by adding `!/vendor/`, `/vendor/*` and `!/vendor/lib/`, in that order, to the repo-root .formatignore, which also override the rule in the repo-root .formatignore that excludes it"
             )
         );
-        // a tsv rule at the `.gitignore` rule's own depth is the one named (a `!` in its
+        // an override rule at the `.gitignore` rule's own depth is the one named (a `!` in its
         // file re-includes past both), but NARROWING it alone leaves the `.gitignore`
         // rule standing, so the remedy is the lines, after that rule
         assert_eq!(
@@ -1040,12 +1043,12 @@ mod tests {
                 "same is excluded by a rule in the repo-root .formatignore, so nothing under it is formatted; re-include it by adding `!/same/` to the repo-root .formatignore after that rule — a rule in the repo-root .gitignore excludes it too, so narrowing that rule alone does not admit it"
             )
         );
-        // a tsv rule excluding a directory BETWEEN the `.gitignore`'d ancestor and the
+        // an override rule excluding a directory BETWEEN the `.gitignore`'d ancestor and the
         // path names that directory as what it excludes
         assert!(warn("vendor/lib/deep", true).is_some_and(|warning| warning.ends_with(
             "to the repo-root .formatignore, which also override the rule in the repo-root .formatignore that excludes vendor/lib"
         )));
-        // a tsv rule in a DEEPER file is not overridden by lines in the root's, so it
+        // an override rule in a DEEPER file is not overridden by lines in the root's, so it
         // stays the user's to narrow, and is named as the second blocker
         let mut deeper = IgnoreStack::new();
         deeper.push_gitignore("", "pkg/vendor/\n");
@@ -1066,7 +1069,7 @@ mod tests {
 
     #[test]
     fn excluded_argument_warning_lines_readmit_exactly_the_named_path() {
-        // appended to the repo-root tsv file, the suggested lines put the named path back in
+        // appended to the repo-root override file, the suggested lines put the named path back in
         // scope and leave everything beside it out, at every depth below the exclusion
         const GITIGNORE: &str = "build/\n*.gen.ts\n";
         let cases: &[(&str, bool, &[&str])] = &[
@@ -1229,7 +1232,7 @@ mod tests {
                 "{rel}"
             );
         }
-        // a `.gitignore`'d directory a tsv layer re-includes is in scope
+        // a `.gitignore`'d directory an override layer re-includes is in scope
         let mut stack = IgnoreStack::new();
         stack.push_gitignore("", "build/\n");
         stack.push_formatignore("", "!build/\n");
@@ -1253,7 +1256,7 @@ mod tests {
         // pinned verbatim, like the heuristic arm: a re-include written under a directory
         // a RULE excludes is exactly as inert (git's parent-directory rule), and the walk
         // says so, naming the excluding rule's file as the cause. The lines go to the
-        // re-include's own file: a tsv layer is read after every `.gitignore`, and a later
+        // re-include's own file: an override layer is read after every `.gitignore`, and a later
         // line wins in the same file
         let stack = stack_from(&[("", "dist/\n")], &[("", "!dist/keep.ts\n")]);
         assert_eq!(
@@ -1274,7 +1277,7 @@ mod tests {
             shadow_warning("dist", None, &stack).unwrap(),
             "dist is excluded by a rule in the repo-root .formatignore, so a re-include under it in the repo-root .formatignore does nothing; re-include it by adding `!/dist/`, `/dist/*` and `!/dist/keep.ts`, in that order, to the repo-root .formatignore"
         );
-        // a tsv rule in a DEEPER file than the re-include's is read after it, so no line
+        // an override rule in a DEEPER file than the re-include's is read after it, so no line
         // added there can override it: that rule is the one to narrow
         let stack = stack_from(&[], &[("", "!pkg/dist/keep.ts\n"), ("pkg", "dist/\n")]);
         assert_eq!(
@@ -1306,7 +1309,7 @@ mod tests {
         // applied where the warning says, the lines put the file back in scope under each
         // kind of excluding rule — and, where the warning says to narrow instead, dropping
         // the deeper rule is what admits it
-        for (gitignores, tsvs, dir, file) in [
+        for (gitignores, overrides, dir, file) in [
             (
                 vec![("", "dist/\n")],
                 vec![("", "!dist/keep.ts\n")],
@@ -1332,10 +1335,10 @@ mod tests {
                 "dist/keep.ts",
             ),
         ] {
-            let stack = stack_from(&gitignores, &tsvs);
+            let stack = stack_from(&gitignores, &overrides);
             let warning = shadow_warning(dir, None, &stack).unwrap();
             let lines: Vec<&str> = warning.split('`').skip(1).step_by(2).collect();
-            let (anchor, rule) = tsvs[0];
+            let (anchor, rule) = overrides[0];
             let mut fixed = IgnoreStack::new();
             for (a, content) in &gitignores {
                 fixed.push_gitignore(a, content);
@@ -1363,15 +1366,15 @@ mod tests {
     }
 
     #[test]
-    fn excluded_argument_warning_lines_readmit_past_a_gitignore_rule_behind_the_tsv_rule() {
-        // the tsv rule is the shallowest exclusion and a `.gitignore` rule stands at or
-        // below it: the lines go after the tsv rule in the root's file, and re-include
+    fn excluded_argument_warning_lines_readmit_past_a_gitignore_rule_behind_the_override_rule() {
+        // the override rule is the shallowest exclusion and a `.gitignore` rule stands at or
+        // below it: the lines go after the override rule in the root's file, and re-include
         // past both — one round, where "narrow or negate" took two
-        for (git, tsv, rel) in [
+        for (git, overrides, rel) in [
             ("same/\n", "same/\n", "same"),
             ("vendor/lib/\n", "vendor/\n", "vendor/lib"),
         ] {
-            let stack = stack_from(&[("", git)], &[("", tsv)]);
+            let stack = stack_from(&[("", git)], &[("", overrides)]);
             let warning =
                 excluded_argument_warning(rel, rel, PathKind::Directory, None, &stack).unwrap();
             assert!(warning.contains("after that rule"), "{warning}");
@@ -1382,7 +1385,7 @@ mod tests {
             let lines: Vec<&str> = warning.split('`').skip(1).step_by(2).collect();
             let mut fixed = IgnoreStack::new();
             fixed.push_gitignore("", git);
-            fixed.push_formatignore("", &format!("{tsv}{}\n", lines.join("\n")));
+            fixed.push_formatignore("", &format!("{overrides}{}\n", lines.join("\n")));
             assert!(
                 !fixed.is_ignored(rel, PathKind::Directory),
                 "{rel}: {lines:?}"
@@ -1392,7 +1395,7 @@ mod tests {
                 "{lines:?}"
             );
         }
-        // the tsv rule in a deeper file: it is narrowed, and the root's lines re-include
+        // the override rule in a deeper file: it is narrowed, and the root's lines re-include
         // past the `.gitignore`
         let stack = stack_from(
             &[("", "pkg/vendor/lib/\n")],
@@ -1416,14 +1419,14 @@ mod tests {
         fixed.push_formatignore("", &lines.join("\n"));
         fixed.push_formatignore("pkg", "");
         assert!(!fixed.is_ignored("pkg/vendor/lib", PathKind::Directory));
-        // a tsv-only exclusion keeps the short remedy
+        // an override-only exclusion keeps the short remedy
         let stack = stack_from(&[], &[("", "vendor/\n")]);
         assert!(
             excluded_argument_warning("vendor", "vendor", PathKind::Directory, None, &stack)
                 .unwrap()
                 .ends_with("narrow or negate that rule to format it")
         );
-        // and so does a `.gitignore` rule ABOVE the named tsv rule: the re-include idiom
+        // and so does a `.gitignore` rule ABOVE the named override rule: the re-include idiom
         // applied and a directory under it named — `!/dist/` already passes the
         // `.gitignore`'s `dist/`, so narrowing the `/dist/*` that excludes `dist/sub` is
         // all it takes, and the warning must not claim otherwise
@@ -1702,13 +1705,13 @@ mod tests {
         assert_eq!(combinations, 2 * (9 + 36 + 84));
         // the two shapes that broke, pinned as text: a whole directory takes no close,
         // and re-includes its files past a `/**` an every-depth sibling put above it
-        let stack = tsv_stack("!dist/sub/\n!dist/sub/keep.ts\n");
+        let stack = override_stack("!dist/sub/\n!dist/sub/keep.ts\n");
         assert!(
             shadow_warning("dist", None, &stack).unwrap().ends_with(
                 "re-include it by adding `!/dist/`, `/dist/*`, `!/dist/sub/` and `!/dist/sub/keep.ts`, in that order, to the repo-root .formatignore"
             )
         );
-        let stack = tsv_stack("!dist/sub/\n!dist/**/k2.ts\n");
+        let stack = override_stack("!dist/sub/\n!dist/**/k2.ts\n");
         assert!(
             shadow_warning("dist", None, &stack).unwrap().ends_with(
                 "re-include it by adding `!/dist/`, `/dist/**`, `!/dist/**/`, `!/dist/sub/**`, `!/dist/sub/` and `!/dist/**/k2.ts`, in that order, to the repo-root .formatignore"
@@ -1717,7 +1720,7 @@ mod tests {
         // a whole directory under a whole one, both under the every-depth `/dist/**`:
         // `deep` reads its NEAREST opened ancestor, `sub`, re-included whole already, so
         // it spells no `!/dist/sub/deep/**` of its own
-        let stack = tsv_stack("!dist/sub/\n!dist/sub/deep/\n!dist/**/k2.ts\n");
+        let stack = override_stack("!dist/sub/\n!dist/sub/deep/\n!dist/**/k2.ts\n");
         assert!(
             shadow_warning("dist", None, &stack).unwrap().ends_with(
                 "re-include it by adding `!/dist/`, `/dist/**`, `!/dist/**/`, `!/dist/sub/**`, `!/dist/sub/`, `!/dist/sub/deep/` and `!/dist/**/k2.ts`, in that order, to the repo-root .formatignore"
@@ -1726,8 +1729,8 @@ mod tests {
     }
 
     #[test]
-    fn shadow_warning_names_a_gitignore_behind_the_deeper_tsv_rule() {
-        // the excluding tsv rule sits in a file deeper than the re-include's, so it is the
+    fn shadow_warning_names_a_gitignore_behind_the_deeper_override_rule() {
+        // the excluding override rule sits in a file deeper than the re-include's, so it is the
         // user's to narrow — but a `.gitignore` rule stands behind it, which narrowing
         // alone leaves in force: the lines that pass it go beside the narrowing, one
         // warning rather than a second one on the rerun

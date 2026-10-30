@@ -322,7 +322,7 @@ for (const { label, entry, has_format, has_parse, has_strip, is_npm } of smoke_t
 			if (!ctor) return false;
 			const stack = new ctor();
 			stack.push_gitignore('', 'build/\nignored.ts\n');
-			stack.push_formatignore('', '!build/keep.ts\n'); // tsv layer can't re-include under an excluded dir
+			stack.push_formatignore('', '!build/keep.ts\n'); // override layer can't re-include under an excluded dir
 			// every `classify_dir` on THIS stack passes `heuristic_active: false`, because a
 			// `.gitignore` governs this level and `classify_dir` requires the two to agree
 			// — a pushed `.gitignore` layer with the heuristic on is a state it rejects

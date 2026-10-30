@@ -557,7 +557,7 @@ fn test_format_prettierignore_in_repo_no_warn() {
 #[test]
 fn test_format_prettierignore_shadowed_by_sibling_formatignore_warns() {
     // inside a repo, a `.formatignore` beside a `.prettierignore` shadows it (one
-    // tsv layer per directory) — the `.prettierignore`'s rules go unread there.
+    // override layer per directory) — the `.prettierignore`'s rules go unread there.
     // That's a silent surprise for a prettier migration, so tsv warns (non-fatal),
     // pointing at merging the patterns into `.formatignore`. Discovery follows the
     // `.formatignore`: `af.ts` pruned, `pf.ts` (only in the shadowed prettierignore)
@@ -806,7 +806,7 @@ fn test_format_unreadable_gitignore_warns_and_keeps_heuristic_on() {
 fn test_format_unreadable_formatignore_still_shadows_prettierignore() {
     // Decision: precedence is by PRESENCE, not readability. At the repo root a
     // present-but-unreadable `.formatignore` still shadows `.prettierignore` — tsv
-    // warns and applies *no* tsv rules, rather than silently falling back to
+    // warns and applies *no* override rules, rather than silently falling back to
     // prettier's file. So `.prettierignore`'s pattern must NOT take effect.
     let dir = git_repo("unreadable_formatignore_shadows");
     fs::write(dir.join(".formatignore"), b"\xff\xfe").unwrap(); // present, unreadable

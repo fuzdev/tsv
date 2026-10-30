@@ -178,15 +178,15 @@ crates (the open-convention stance):
   stages it.
 
   Every other exclusion warns, naming the file the rule sits in
-  (`IgnoreStack::exclusion`'s `IgnoreSource` and `anchor_depth`). A tsv rule that
+  (`IgnoreStack::exclusion`'s `IgnoreSource` and `anchor_depth`). An override rule that
   bounds the path is the one named (`IgnoreStack::override_exclusion`, preferred over the
   whole stack's witness), since re-including past a `.gitignore` would leave it standing
-  — and, added to the same file, override it; a tsv rule excluding a directory is the
+  — and, added to the same file, override it; an override rule excluding a directory is the
   user's to narrow. When a `.gitignore` excludes an ancestor *above* the directory the
-  tsv rule excludes, the tsv rule is not what bounds the path (narrowing it leaves the
+  override rule excludes, the override rule is not what bounds the path (narrowing it leaves the
   ancestor excluded, and every `!` under an excluded directory is inert), so the
-  `.gitignore` exclusion is named and undone and the tsv rule is named after it —
-  overridden by those lines when it sits in the root's own tsv file (a later line wins
+  `.gitignore` exclusion is named and undone and the override rule is named after it —
+  overridden by those lines when it sits in the root's own override file (a later line wins
   there), the second blocker to narrow when it sits in a deeper one — one warning naming
   both, never a second warning after the first remedy.
 
@@ -213,7 +213,7 @@ crates (the open-convention stance):
   `npm/cli.js` makes across the binding boundary (which can't carry a tagged-union
   payload as one primitive — see below).
 - `shadow_warning(d, loose_root, &IgnoreStack) -> Option<String>` — the
-  warning when a pruned directory has a tsv-layer `!` re-include written under it;
+  warning when a pruned directory has an override-layer `!` re-include written under it;
   `None` when none is (`IgnoreStack::negation_under`, the query behind
   `PruneWithWarning`).
 
@@ -244,9 +244,9 @@ crates (the open-convention stance):
 
   The lines are anchored and relative to the file's directory, because a root-relative line does nothing in a nested file,
   and outside a repo (format root = filesystem root) in any file, while an unanchored
-  one-segment `!dist/` re-includes a `dist` at every depth. A tsv layer is read after
+  one-segment `!dist/` re-includes a `dist` at every depth. An override layer is read after
   every `.gitignore` and a later line wins within a file, so the lines override the
-  excluding rule wherever it sits — except a tsv rule in a file deeper than the
+  excluding rule wherever it sits — except an override rule in a file deeper than the
   re-include's, which is read after it: then the text says to narrow or negate that
   rule instead, adding the lines beside it where a `.gitignore` rule stands behind it
   (`IgnoreStack::gitignore_exclusion`), which narrowing alone would leave in force.
@@ -279,7 +279,7 @@ crates (the open-convention stance):
 - `prettierignore_shadowed_warning(dir, in_repo, has_prettierignore,
   has_formatignore) -> Option<String>` — the heads-up when, **inside a git repo**,
   a directory holds both a `.formatignore` and a `.prettierignore`: the sibling
-  `.formatignore` shadows the `.prettierignore` (one tsv layer per directory), so
+  `.formatignore` shadows the `.prettierignore` (one override layer per directory), so
   its rules go unread there — the drop-in counterpart to Prettier, which applies
   *both* files. The message points at merging the patterns into `.formatignore`.
   Unlike `prettierignore_outside_repo_warning` (target-root only), this fires at

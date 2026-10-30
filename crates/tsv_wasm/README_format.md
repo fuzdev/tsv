@@ -113,7 +113,7 @@ init_sync({module: workerData.wasm_module});
 
 ### File scoping (`IgnoreStack`)
 
-For tooling that needs tsv's exact file scoping, this package also exports an `IgnoreStack` class — the same hierarchical, git-faithful matcher the `tsv` CLI uses (per-directory `.gitignore` layers plus one tsv layer per directory, fed by `.formatignore` or, failing that, `.prettierignore`) to decide which files it formats. Build it from a repo's ignore files (one layer per directory, anchored at that directory), then query per path. Walking directories is the caller's job, but the class also carries tsv's discovery policy — `classify_dir`, `should_format_file`, `is_path_pruned`, `path_shadow_warning`, `excluded_argument_warning`, `unsupported_extension_error`, `shadow_warning`, `prettierignore_outside_repo_warning`, `prettierignore_shadowed_warning`, and `gitignore_symlink_warning` — so a walker reproduces the CLI's decisions, and its warnings, exactly.
+For tooling that needs tsv's exact file scoping, this package also exports an `IgnoreStack` class — the same hierarchical, git-faithful matcher the `tsv` CLI uses (per-directory `.gitignore` layers plus one override layer per directory, fed by `.formatignore` or, failing that, `.prettierignore`) to decide which files it formats. Build it from a repo's ignore files (one layer per directory, anchored at that directory), then query per path. Walking directories is the caller's job, but the class also carries tsv's discovery policy — `classify_dir`, `should_format_file`, `is_path_pruned`, `path_shadow_warning`, `excluded_argument_warning`, `unsupported_extension_error`, `shadow_warning`, `prettierignore_outside_repo_warning`, `prettierignore_shadowed_warning`, and `gitignore_symlink_warning` — so a walker reproduces the CLI's decisions, and its warnings, exactly.
 
 ```javascript
 import {IgnoreStack} from '@fuzdev/tsv-format-wasm';
@@ -122,7 +122,7 @@ const stack = new IgnoreStack();
 stack.push_gitignore('', 'build/\n*.log\n'); // a .gitignore (anchor '' = root)
 stack.push_formatignore('', '!keep.log\n'); // a .formatignore, evaluated after the gitignores
 stack.is_ignored('build/out.js', false); // → true
-stack.is_ignored('keep.log', false); // → false (the tsv layer re-includes it)
+stack.is_ignored('keep.log', false); // → false (the override layer re-includes it)
 ```
 
 The class is the WASM binding's own, re-exported as is: unlike the format and parse functions, its arguments are checked by the binding layer rather than the shared facade, so pass the declared types — a wrong-typed argument is refused or coerced differently here than by the native [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv)'s twin.

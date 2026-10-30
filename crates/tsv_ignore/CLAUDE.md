@@ -64,14 +64,14 @@ tsv's own discovery rules, and the three surfaces share the prune *decision* thr
   root, `/`-separated; test-only, since the stack layers `last_match` itself.
 
 `IgnoreStack` — the hierarchical, git-faithful evaluator the surfaces use. It
-holds two parallel per-directory layer stacks (`.gitignore` and tsv):
+holds two parallel per-directory layer stacks (`.gitignore` and override):
 
 - `IgnoreStack::new()` — an empty stack.
 - `IgnoreStack::push_gitignore(anchor, content)` / `pop_gitignore()` — add/drop
   one directory's `.gitignore`, anchored at `anchor` (relative to the format
   root, `""` = root). Push shallow-first; pop on a DFS unwind.
 - `IgnoreStack::push_formatignore(anchor, content)` /
-  `push_prettierignore(anchor, content)` / `pop_override()` — add/drop one directory's tsv
+  `push_prettierignore(anchor, content)` / `pop_override()` — add/drop one directory's override
   layer, evaluated after every `.gitignore`. The two pushes match identically; the
   layer records which file it was read from, for a diagnostic to name.
 - `PathKind { File, Directory }` — the `kind` every path query takes (whether the path
@@ -89,7 +89,7 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   ancestor is already known not-ignored* — a sharp contract, see Known edges.
 - `IgnoreStack::is_reincluded(path, kind)` — the per-path `!`-negation polarity
   (no ancestor prune), so a caller's heuristic can defer to an explicit re-include.
-- `IgnoreStack::negation_under(prefix) -> Option<Negation>` (`#[doc(hidden)]` with `Negation` / `NegationRule` / `NegationTail` — `tsv_discover`'s shadow-warning input, no stability promise) — every **tsv-layer**
+- `IgnoreStack::negation_under(prefix) -> Option<Negation>` (`#[doc(hidden)]` with `Negation` / `NegationRule` / `NegationTail` — `tsv_discover`'s shadow-warning input, no stability promise) — every **override-layer**
   negation anchored *under* `prefix` (its layer anchor + leading literal segments has
   `prefix` as a prefix, and the rule reaches under it: a literal segment beyond, or a
   glob tail — `!dist/*.ts` is as inert under a pruned `dist` as `!dist/keep.ts`), as
@@ -127,17 +127,17 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   diagnostic query off the hot path: `tsv_discover` reads it for a path an argument
   named, to warn which directory put the path out of scope and whose rule did.
 - `IgnoreStack::override_exclusion(path, kind) -> Option<Exclusion>` — `exclusion` over the
-  tsv layers alone, every `.gitignore` layer set aside. `Some` only where `exclusion` is
-  (tsv layers are read last), and the same answer wherever `exclusion`'s witness is a tsv
+  override layers alone, every `.gitignore` layer set aside. `Some` only where `exclusion` is
+  (override layers are read last), and the same answer wherever `exclusion`'s witness is an override
   layer. `tsv_discover` reads it for a named path, beside the next query, to decide the
   remedy: a `.formatignore`/`.prettierignore` rule is the user's to narrow, and a
   named *file* one excludes is skipped quietly.
 - `IgnoreStack::gitignore_exclusion(path, kind) -> Option<Exclusion>` — `exclusion`
-  over the `.gitignore` layers alone. A tsv rule at a prefix is the witness `exclusion`
+  over the `.gitignore` layers alone. An override rule at a prefix is the witness `exclusion`
   names there, so this is how a diagnostic learns a `.gitignore` rule stands behind it,
-  at that depth or below — where narrowing the tsv rule alone would leave the path
+  at that depth or below — where narrowing the override rule alone would leave the path
   excluded, and the remedy is the re-include lines instead.
-- `IgnoreStack::override_layer_source(anchor) -> Option<IgnoreSource>` — which file the tsv
+- `IgnoreStack::override_layer_source(anchor) -> Option<IgnoreSource>` — which file the override
   layer at `anchor` was read from. `tsv_discover` asks it of the format root, so a
   remedy names the file the root reads rather than one whose creation would shadow it.
 - `split_segments(path) -> Vec<&str>` — a path's meaningful segments (empty and `.`
@@ -145,10 +145,10 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   depths count in, public so a caller slicing by those depths splits the same way.
 
 **Which** files feed the stack is the caller's choice. tsv reads `.formatignore`
-hierarchically (one tsv layer per directory) and, inside a git repo,
+hierarchically (one override layer per directory) and, inside a git repo,
 `.prettierignore` hierarchically too — each shadowed by a *sibling* `.formatignore`
 in the same directory; `.gitignore` layers are pushed only inside a git repo. The
-crate matches every tsv layer the same way, whichever file it came from; it records
+crate matches every override layer the same way, whichever file it came from; it records
 the file only so a diagnostic can name it.
 
 ## Distinctives
@@ -166,9 +166,9 @@ the file only so a diagnostic can name it.
   whose parent directory is excluded (git's rule).
 - **Hierarchical, last-match-wins across layers** — `IgnoreStack` layers
   per-directory files repo-rooted like git: at each path level it evaluates every
-  applicable `.gitignore` (shallow→deep) then every applicable tsv file
+  applicable `.gitignore` (shallow→deep) then every applicable override file
   (shallow→deep), last match winning. So a deeper file overrides a shallower one,
-  the tsv layer overrides any `.gitignore`, and the parent-prune holds across
+  the override layer overrides any `.gitignore`, and the parent-prune holds across
   files. Gitignore-only behavior is byte-for-byte `git check-ignore` (the test
   table is pinned against it), less the known edges below.
 - **Case-sensitive** — always, matching prettier's `ignore` and git on a

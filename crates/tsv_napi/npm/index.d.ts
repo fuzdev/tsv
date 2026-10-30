@@ -95,7 +95,7 @@ export class IgnoreStack {
 	push_formatignore(anchor: string, content: string): void;
 	/** Push one directory's `.prettierignore` (read where a directory has no `.formatignore`), applied after every `.gitignore`. */
 	push_prettierignore(anchor: string, content: string): void;
-	/** Pop the most recently pushed tsv layer. */
+	/** Pop the most recently pushed override layer. */
 	pop_tsv(): void;
 	/** Whether `path` is ignored; `is_dir` makes trailing-`/` patterns apply (a symbolic link is not a directory here, as for git). */
 	is_ignored(path: string, is_dir: boolean): boolean;
@@ -109,11 +109,11 @@ export class IgnoreStack {
 	should_format_file(name: string, child_rel: string): boolean;
 	/** Whether an ancestor directory of `rel` would be pruned by discovery. */
 	is_path_pruned(rel: string): boolean;
-	/** The shadow warning for the first ancestor directory of `rel` discovery prunes under a tsv-layer re-include, else `undefined`. `loose_root` is the format root outside a git repo. */
+	/** The shadow warning for the first ancestor directory of `rel` discovery prunes under an override-layer re-include, else `undefined`. `loose_root` is the format root outside a git repo. */
 	path_shadow_warning(rel: string, loose_root?: string): string | undefined;
 	/** The argument error for a named file tsv doesn't format, else `undefined`. */
 	unsupported_extension_error(path: string): string | undefined;
-	/** The warning for a directory the build-output heuristic or an ignore rule pruned under a tsv-layer re-include, else `undefined`. `loose_root` is the format root outside a git repo. */
+	/** The warning for a directory the build-output heuristic or an ignore rule pruned under an override-layer re-include, else `undefined`. `loose_root` is the format root outside a git repo. */
 	shadow_warning(dir: string, loose_root?: string): string | undefined;
 	/** The `.prettierignore`-outside-a-repo warning, else `undefined`. */
 	prettierignore_outside_repo_warning(

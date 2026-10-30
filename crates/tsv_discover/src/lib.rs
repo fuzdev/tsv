@@ -56,27 +56,30 @@ pub use warnings::{
     prettierignore_shadowed_warning, shadow_warning, unresolvable_root_error,
 };
 
-/// The stacks the modules' tests build — one tsv layer at the root, or any number of
+/// The stacks the modules' tests build — one override layer at the root, or any number of
 /// `.gitignore` and `.formatignore` layers at their anchors.
 #[cfg(test)]
 pub(crate) mod test_support {
     use tsv_ignore::IgnoreStack;
 
     /// One `.formatignore` layer at the root.
-    pub(crate) fn tsv_stack(content: &str) -> IgnoreStack {
+    pub(crate) fn override_stack(content: &str) -> IgnoreStack {
         let mut stack = IgnoreStack::new();
         stack.push_formatignore("", content);
         stack
     }
 
     /// Assemble a stack the way a per-file consumer (the VS Code extension) does:
-    /// every `.gitignore` layer shallow→deep, then every tsv layer shallow→deep.
-    pub(crate) fn stack_from(gitignores: &[(&str, &str)], tsvs: &[(&str, &str)]) -> IgnoreStack {
+    /// every `.gitignore` layer shallow→deep, then every override layer shallow→deep.
+    pub(crate) fn stack_from(
+        gitignores: &[(&str, &str)],
+        overrides: &[(&str, &str)],
+    ) -> IgnoreStack {
         let mut stack = IgnoreStack::new();
         for (anchor, content) in gitignores {
             stack.push_gitignore(anchor, content);
         }
-        for (anchor, content) in tsvs {
+        for (anchor, content) in overrides {
             stack.push_formatignore(anchor, content);
         }
         stack

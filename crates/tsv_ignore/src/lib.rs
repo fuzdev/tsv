@@ -15,11 +15,11 @@
 //!   to that file's root. The single-file primitive, crate-private: every
 //!   consumer reaches it through a stack layer.
 //! - [`IgnoreStack`] — a hierarchical, git-faithful evaluator: a stack of
-//!   per-directory `.gitignore` layers plus a parallel stack of per-directory tsv
+//!   per-directory `.gitignore` layers plus a parallel stack of per-directory override
 //!   layers (`.formatignore`), evaluated against format-root-relative paths with
 //!   git's last-match-wins + parent-directory-prune semantics (oracle:
 //!   `git check-ignore`). At each path level every `.gitignore` layer is
-//!   evaluated, then every tsv layer, so a tsv `!` can re-include a gitignore'd
+//!   evaluated, then every override layer, so an override-layer `!` can re-include a gitignore'd
 //!   path (subject to git's parent-dir rule) and a deeper layer wins over a
 //!   shallower one.
 //!
@@ -36,11 +36,11 @@
 //! let mut stack = IgnoreStack::new();
 //! stack.push_gitignore("", "build/\n*.log\n"); // root .gitignore
 //! stack.push_gitignore("a", "!*.log\n"); // a/.gitignore re-includes logs
-//! stack.push_formatignore("", "*.snap\n"); // root tsv layer, applied after the gitignores
+//! stack.push_formatignore("", "*.snap\n"); // root override layer, applied after the gitignores
 //! assert!(stack.is_ignored("build/out.js", PathKind::File));
 //! assert!(stack.is_ignored("debug.log", PathKind::File));
 //! assert!(!stack.is_ignored("a/debug.log", PathKind::File)); // a deeper `!` wins
-//! assert!(stack.is_ignored("test/x.snap", PathKind::File)); // via the tsv layer
+//! assert!(stack.is_ignored("test/x.snap", PathKind::File)); // via the override layer
 //! assert!(stack.is_ignored("build", PathKind::Directory)); // `build/` matches a directory
 //! assert!(!stack.is_ignored("build", PathKind::File)); // ...never a file of that name
 //! ```
@@ -202,14 +202,14 @@ impl IgnoreRules {
 }
 
 /// A hierarchical, git-faithful ignore evaluator: a stack of per-directory
-/// `.gitignore` layers plus a parallel stack of per-directory tsv layers — the
+/// `.gitignore` layers plus a parallel stack of per-directory override layers — the
 /// **override** layers (`.formatignore` / `.prettierignore`), read after every
 /// `.gitignore` so they win over it.
 ///
 /// [`push_gitignore`](IgnoreStack::push_gitignore) /
 /// [`push_formatignore`](IgnoreStack::push_formatignore) /
 /// [`push_prettierignore`](IgnoreStack::push_prettierignore) add one directory's
-/// `.gitignore` / tsv file, anchored at that directory
+/// `.gitignore` / override file, anchored at that directory
 /// relative to the format root (the caller's chosen scope root). Layers are
 /// pushed shallowest-first (the order a DFS descends), and the CLI
 /// [`pop_gitignore`](IgnoreStack::pop_gitignore)s / [`pop_override`](IgnoreStack::pop_override)s
@@ -218,8 +218,8 @@ impl IgnoreRules {
 ///
 /// [`is_ignored`](IgnoreStack::is_ignored) walks the path's ancestors top-down
 /// and, at each level, evaluates every applicable `.gitignore` layer
-/// (shallow→deep) then every applicable tsv layer (shallow→deep), last-match
-/// winning. So a tsv layer overrides any `.gitignore`, a deeper layer overrides
+/// (shallow→deep) then every applicable override layer (shallow→deep), last-match
+/// winning. So an override layer overrides any `.gitignore`, a deeper layer overrides
 /// a shallower one of its own kind, and a positive match at an ancestor prunes
 /// the subtree before a deeper `!` can re-include it — matching git's "cannot
 /// re-include a file whose parent directory is excluded" rule. The gitignore-only
@@ -229,14 +229,14 @@ impl IgnoreRules {
 pub struct IgnoreStack {
     /// `.gitignore` layers in shallow→deep push order.
     gitignore: Vec<Layer>,
-    /// tsv layers (`.formatignore`, plus a `.prettierignore` the caller may
+    /// override layers (`.formatignore`, plus a `.prettierignore` the caller may
     /// resolve — both hierarchical) in shallow→deep push order, evaluated after
     /// every `.gitignore`.
-    tsv: Vec<Layer>,
+    overrides: Vec<Layer>,
 }
 
-/// One directory's ignore file within an [`IgnoreStack`] — a `.gitignore` or a
-/// tsv file, anchored at the directory it was read from.
+/// One directory's ignore file within an [`IgnoreStack`] — a `.gitignore` or an
+/// override file, anchored at the directory it was read from.
 #[derive(Debug)]
 struct Layer {
     /// The directory, segments relative to the format root; empty = the root.
@@ -290,32 +290,32 @@ impl IgnoreStack {
         self.gitignore.pop();
     }
 
-    /// Push one directory's `.formatignore` as a tsv layer, applied after every
+    /// Push one directory's `.formatignore` as an override layer, applied after every
     /// `.gitignore`. `anchor` is the directory relative to the format root,
     /// `/`-separated (empty string = the root).
     pub fn push_formatignore(&mut self, anchor: &str, content: &str) {
-        self.push_tsv(anchor, content, IgnoreSource::Formatignore);
+        self.push_override(anchor, content, IgnoreSource::Formatignore);
     }
 
-    /// Push one directory's `.prettierignore` as a tsv layer — the file a caller reads in
+    /// Push one directory's `.prettierignore` as an override layer — the file a caller reads in
     /// place of a `.formatignore` the directory does not have. Matched exactly as a
     /// [`push_formatignore`](Self::push_formatignore) layer is; the two differ only in the
     /// file a diagnostic names ([`Exclusion::source`],
     /// [`override_layer_source`](Self::override_layer_source)).
     pub fn push_prettierignore(&mut self, anchor: &str, content: &str) {
-        self.push_tsv(anchor, content, IgnoreSource::Prettierignore);
+        self.push_override(anchor, content, IgnoreSource::Prettierignore);
     }
 
-    /// The one tsv-layer push behind the two public names, which differ only in the
+    /// The one override-layer push behind the two public names, which differ only in the
     /// file a diagnostic names.
-    fn push_tsv(&mut self, anchor: &str, content: &str, source: IgnoreSource) {
-        self.tsv.push(Layer::new(anchor, content, source));
+    fn push_override(&mut self, anchor: &str, content: &str, source: IgnoreSource) {
+        self.overrides.push(Layer::new(anchor, content, source));
     }
 
-    /// Pop the most recently pushed tsv (override) layer — a `.formatignore` or
+    /// Pop the most recently pushed override layer — a `.formatignore` or
     /// `.prettierignore` — as a DFS unwinds out of a directory.
     pub fn pop_override(&mut self) {
-        self.tsv.pop();
+        self.overrides.pop();
     }
 
     /// Whether any `.gitignore` layer has been pushed — true even for an
@@ -392,7 +392,7 @@ impl IgnoreStack {
         self.last_match_at(&segments, is_dir)
     }
 
-    /// Every **tsv-layer** negation (`!`) anchored *under* `prefix` (a `/`-separated
+    /// Every **override-layer** negation (`!`) anchored *under* `prefix` (a `/`-separated
     /// directory path relative to the format root), or `None` when there is none.
     /// "Anchored under" means the rule's fixed leading path — its layer's anchor plus the
     /// rule's run of literal (non-glob) segments — has `prefix` as a prefix, and the rule
@@ -402,12 +402,12 @@ impl IgnoreStack {
     /// *above* `prefix` is read: a directory's own ignore files classify only what lies
     /// inside it, and a walk that prunes `prefix` never reads them.
     ///
-    /// `.gitignore` layers are not consulted; among tsv-layer rules only anchored
+    /// `.gitignore` layers are not consulted; among override-layer rules only anchored
     /// negations count. A floating `!keep.ts` (parsed with a leading `**`) targets any
     /// depth, so it is never "under" one directory; and `!dist/` re-includes the directory
     /// itself, which is not *under* it.
     ///
-    /// tsv's discovery uses this to warn when a directory a tsv-layer `!` was trying to
+    /// tsv's discovery uses this to warn when a directory an override-layer `!` was trying to
     /// re-include *into* is pruned — by its build-output heuristic or by a rule — since
     /// that re-include is a silent no-op: git's parent-directory rule (matched in the
     /// `.gitignore` regime) blocks re-including a descendant of an excluded directory. The
@@ -423,7 +423,7 @@ impl IgnoreStack {
         // every anchored re-include reaching under the prefix, with its layer's depth and
         // file, in read order: layers shallow to deep, then file order within one
         let mut found = Vec::new();
-        for layer in &self.tsv {
+        for layer in &self.overrides {
             if layer.anchor.len() >= prefix_segs.len() {
                 continue;
             }
@@ -467,14 +467,14 @@ impl IgnoreStack {
     }
 
     /// The combined last-match polarity across every applicable layer at one
-    /// `prefix` — each `.gitignore` layer (shallow→deep) then each tsv layer
-    /// (shallow→deep), so a tsv layer wins over `.gitignore` and a deeper layer
+    /// `prefix` — each `.gitignore` layer (shallow→deep) then each override layer
+    /// (shallow→deep), so an override layer wins over `.gitignore` and a deeper layer
     /// wins over a shallower one of its kind. `None` if no layer matches. This is
     /// the per-level primitive; it does *not* apply the ancestor prune
     /// ([`is_ignored`](Self::is_ignored) iterates prefixes,
     /// [`is_reincluded`](Self::is_reincluded) queries the leaf directly).
     fn last_match_at(&self, prefix: &[PathSeg<'_>], is_dir: bool) -> Option<bool> {
-        last_match_layer(self.gitignore.iter().chain(&self.tsv), prefix, is_dir)
+        last_match_layer(self.gitignore.iter().chain(&self.overrides), prefix, is_dir)
             .map(|(ignored, _)| ignored)
     }
 
@@ -488,14 +488,14 @@ impl IgnoreStack {
     /// file's rule did.
     pub fn exclusion(&self, path: &str, kind: PathKind) -> Option<Exclusion> {
         first_exclusion(path, kind.is_dir(), |prefix, dir| {
-            last_match_layer(self.gitignore.iter().chain(&self.tsv), prefix, dir)
+            last_match_layer(self.gitignore.iter().chain(&self.overrides), prefix, dir)
         })
     }
 
     /// [`exclusion`](Self::exclusion) over the `.gitignore` layers alone — what excludes
-    /// `path` once every tsv layer is set aside. A tsv rule at a prefix is the witness
+    /// `path` once every override layer is set aside. An override rule at a prefix is the witness
     /// [`exclusion`](Self::exclusion) names there, so this is how a diagnostic learns a
-    /// `.gitignore` rule stands behind it, at that depth or below (narrowing the tsv rule
+    /// `.gitignore` rule stands behind it, at that depth or below (narrowing the override rule
     /// alone would leave the path excluded).
     pub fn gitignore_exclusion(&self, path: &str, kind: PathKind) -> Option<Exclusion> {
         first_exclusion(path, kind.is_dir(), |prefix, dir| {
@@ -503,30 +503,30 @@ impl IgnoreStack {
         })
     }
 
-    /// [`exclusion`](Self::exclusion) over the tsv layers alone: where `path` would be
+    /// [`exclusion`](Self::exclusion) over the override layers alone: where `path` would be
     /// ignored with every `.gitignore` layer set aside, and which `.formatignore` or
-    /// `.prettierignore` rule ignored it. `Some` only where `exclusion` is — a tsv layer is
-    /// read after every `.gitignore`, so a tsv rule excluding a prefix excludes it in the
-    /// whole stack too — and the same answer wherever `exclusion`'s witness is a tsv layer.
+    /// `.prettierignore` rule ignored it. `Some` only where `exclusion` is — an override layer is
+    /// read after every `.gitignore`, so an override rule excluding a prefix excludes it in the
+    /// whole stack too — and the same answer wherever `exclusion`'s witness is an override layer.
     ///
     /// A diagnostic query, off the discovery hot path: tsv's discovery asks it of a path an
-    /// argument NAMED, since a tsv rule excluding the path is the one to report even where a
+    /// argument NAMED, since an override rule excluding the path is the one to report even where a
     /// `.gitignore` excludes it first — re-including the path past the `.gitignore` would
     /// leave that rule standing.
     pub fn override_exclusion(&self, path: &str, kind: PathKind) -> Option<Exclusion> {
         first_exclusion(path, kind.is_dir(), |prefix, dir| {
-            last_match_layer(self.tsv.iter(), prefix, dir)
+            last_match_layer(self.overrides.iter(), prefix, dir)
         })
     }
 
-    /// The file the tsv layer anchored at `anchor` (`/`-separated, `""` = the format root)
-    /// was read from, or `None` when no tsv layer is pushed there. What lets a diagnostic
+    /// The file the override layer anchored at `anchor` (`/`-separated, `""` = the format root)
+    /// was read from, or `None` when no override layer is pushed there. What lets a diagnostic
     /// name the file a directory actually uses: telling someone to create a
     /// `.formatignore` beside the `.prettierignore` a directory reads would shadow every
     /// rule in it.
     pub fn override_layer_source(&self, anchor: &str) -> Option<IgnoreSource> {
         let anchor = split_segments(anchor);
-        self.tsv
+        self.overrides
             .iter()
             .rev()
             .find(|layer| {
@@ -567,9 +567,9 @@ impl PathKind {
 }
 
 /// The file a layer's rules were read from — what a diagnostic about an ignored path
-/// names, and what decides how it is undone: a `.gitignore`'d path is re-included from a
-/// tsv layer, which is read after every `.gitignore`, while a tsv layer's own rule is the
-/// user's to narrow.
+/// names, and what decides how it is undone: a `.gitignore`'d path is re-included from an
+/// override layer, which is read after every `.gitignore`, while an override layer's own
+/// rule is the user's to narrow.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IgnoreSource {
@@ -613,13 +613,13 @@ pub struct Exclusion {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Negation {
     /// How many leading segments of the queried directory name the directory holding the
-    /// file every rule here is spelled for — the deepest tsv file holding one, counted as
+    /// file every rule here is spelled for — the deepest override file holding one, counted as
     /// [`split_segments`] splits the directory, and always fewer than its own segments,
     /// since only a layer anchored above it is read.
     pub anchor_depth: usize,
     /// That file: a `.formatignore` or `.prettierignore`, never a `.gitignore`.
     pub source: IgnoreSource,
-    /// Every negation reaching under the directory, from every tsv layer above it, in
+    /// Every negation reaching under the directory, from every override layer above it, in
     /// read order (shallower files first, then file order) — each spelled relative to
     /// the file `anchor_depth` names. Never empty.
     pub rules: Vec<NegationRule>,
@@ -1160,7 +1160,7 @@ mod tests {
         // is_reincluded = "the last matching rule re-includes this exact path"
         // (per-path polarity, no ancestor prune) — distinct from `!is_ignored`:
         // a path no rule mentions is neither ignored nor re-included. This is the
-        // heuristic-override primitive (#5): a tsv `!build/` re-includes the dir.
+        // heuristic-override primitive (#5): an override-layer `!build/` re-includes the dir.
         let mut stack = IgnoreStack::new();
         stack.push_formatignore("", "*.ts\n!keep.ts\n");
         assert!(stack.is_reincluded("keep.ts", PathKind::File)); // `!keep.ts` wins
@@ -1275,7 +1275,7 @@ mod tests {
         let stack = IgnoreStack::new();
         assert_eq!(stack.negation_under("dist"), None);
 
-        // `.gitignore`-layer negations are never consulted — only tsv layers
+        // `.gitignore`-layer negations are never consulted — only override layers
         let mut stack = IgnoreStack::new();
         stack.push_gitignore("", "!dist/keep.ts\n");
         assert_eq!(stack.negation_under("dist"), None);
@@ -1283,8 +1283,8 @@ mod tests {
 
     #[test]
     fn stack_gitignore_exclusion_reads_the_gitignore_layers_alone() {
-        // the `.gitignore` half of `exclusion`: what excludes the path once every tsv layer
-        // is set aside — a tsv rule at the same prefix is the witness `exclusion` names,
+        // the `.gitignore` half of `exclusion`: what excludes the path once every override layer
+        // is set aside — an override rule at the same prefix is the witness `exclusion` names,
         // and this is how a caller learns a `.gitignore` rule stands behind it
         let mut stack = IgnoreStack::new();
         stack.push_gitignore("", "same/\nvendor/lib/\n");
@@ -1300,7 +1300,7 @@ mod tests {
             stack.exclusion("same", PathKind::Directory).unwrap().source,
             IgnoreSource::Formatignore
         );
-        // deeper than the tsv rule that excludes the path first
+        // deeper than the override rule that excludes the path first
         let lib = stack
             .gitignore_exclusion("vendor/lib", PathKind::Directory)
             .unwrap();
@@ -1312,14 +1312,14 @@ mod tests {
                 .depth,
             1
         );
-        // a path only a tsv rule excludes
+        // a path only an override rule excludes
         assert_eq!(stack.gitignore_exclusion("only.ts", PathKind::File), None);
         assert!(stack.is_ignored("only.ts", PathKind::File));
     }
 
     #[test]
     fn stack_negation_under_respects_layer_anchor() {
-        // a deeper tsv layer's negation is anchored at its own directory: a
+        // a deeper override layer's negation is anchored at its own directory: a
         // `!dist/keep.ts` in `foo/.prettierignore` is under `foo/dist`, not `dist`,
         // and the witness names that file
         let mut stack = IgnoreStack::new();
@@ -1651,21 +1651,21 @@ mod tests {
     }
 
     #[test]
-    fn stack_tsv_layer_applies_after_gitignore() {
-        // the tsv layer can re-include a gitignore'd directory wholesale…
+    fn stack_override_layer_applies_after_gitignore() {
+        // the override layer can re-include a gitignore'd directory wholesale…
         let mut stack = IgnoreStack::new();
         stack.push_gitignore("", "build/\n");
         stack.push_formatignore("", "!build/\n");
         assert!(!stack.is_ignored("build/keep.ts", PathKind::File));
 
-        // …but, like git, a tsv `!build/keep.ts` can NOT re-include a file under
+        // …but, like git, an override-layer `!build/keep.ts` can NOT re-include a file under
         // a still-excluded `build/` (only re-including the dir itself works)
         let mut stack = IgnoreStack::new();
         stack.push_gitignore("", "build/\n");
         stack.push_formatignore("", "!build/keep.ts\n");
         assert!(stack.is_ignored("build/keep.ts", PathKind::File));
 
-        // and the tsv layer can exclude something `.gitignore` allows
+        // and the override layer can exclude something `.gitignore` allows
         let mut stack = IgnoreStack::new();
         stack.push_formatignore("", "*.snap\n");
         assert!(stack.is_ignored("a/x.snap", PathKind::File));
@@ -1673,8 +1673,8 @@ mod tests {
     }
 
     #[test]
-    fn stack_tsv_layer_overrides_a_deeper_gitignore() {
-        // the tsv layer is applied after every `.gitignore`, so a repo-root tsv
+    fn stack_override_layer_overrides_a_deeper_gitignore() {
+        // the override layer is applied after every `.gitignore`, so a repo-root override
         // `!` wins even over a deeper `.gitignore` re-exclusion
         let mut stack = IgnoreStack::new();
         stack.push_gitignore("", "build/\n");
@@ -1684,17 +1684,17 @@ mod tests {
     }
 
     #[test]
-    fn stack_tsv_layers_are_hierarchical() {
-        // a deeper tsv layer overrides a shallower one (like `.gitignore`)
+    fn stack_override_layers_are_hierarchical() {
+        // a deeper override layer overrides a shallower one (like `.gitignore`)
         let mut stack = IgnoreStack::new();
-        stack.push_formatignore("", "*.snap\n"); // root tsv ignores snaps everywhere
-        stack.push_formatignore("a", "!*.snap\n"); // a/ tsv re-includes them under a/
+        stack.push_formatignore("", "*.snap\n"); // root override layer ignores snaps everywhere
+        stack.push_formatignore("a", "!*.snap\n"); // a/ override layer re-includes them under a/
         assert!(stack.is_ignored("x.snap", PathKind::File));
         assert!(stack.is_ignored("b/x.snap", PathKind::File));
-        assert!(!stack.is_ignored("a/x.snap", PathKind::File)); // deeper tsv layer wins
+        assert!(!stack.is_ignored("a/x.snap", PathKind::File)); // deeper override layer wins
         assert!(!stack.is_ignored("a/deep/x.snap", PathKind::File));
 
-        // a tsv layer's patterns are anchored at its own directory
+        // an override layer's patterns are anchored at its own directory
         let mut stack = IgnoreStack::new();
         stack.push_formatignore("pkg", "gen.ts\n"); // floating, but only within pkg/
         assert!(stack.is_ignored("pkg/gen.ts", PathKind::File));
@@ -1793,7 +1793,7 @@ mod tests {
             stack.exclusion("sub/deep/a.ts", PathKind::File),
             excluded(2, 1, IgnoreSource::Gitignore)
         );
-        // a tsv layer's rule, naming which of the two files it was read from
+        // an override layer's rule, naming which of the two files it was read from
         assert_eq!(
             stack.exclusion("gen/sub", PathKind::Directory),
             excluded(1, 0, IgnoreSource::Formatignore)
@@ -1807,12 +1807,12 @@ mod tests {
         assert!(!stack.is_ignored("src/a.ts", PathKind::File));
         assert_eq!(stack.exclusion("", PathKind::Directory), None);
 
-        // a tsv negation re-including a `.gitignore`'d directory: the last layer to speak
+        // an override negation re-including a `.gitignore`'d directory: the last layer to speak
         let mut reincluded = IgnoreStack::new();
         reincluded.push_gitignore("", "build/\n");
         reincluded.push_formatignore("", "!build/\n");
         assert_eq!(reincluded.exclusion("build/sub", PathKind::Directory), None);
-        // …and a tsv rule over a `.gitignore` negation
+        // …and an override rule over a `.gitignore` negation
         let mut overridden = IgnoreStack::new();
         overridden.push_gitignore("", "!keep.ts\n");
         overridden.push_prettierignore("", "keep.ts\n");
@@ -1833,7 +1833,7 @@ mod tests {
             stack.exclusion("vendor/x.ts", PathKind::File),
             excluded(1, 0, IgnoreSource::Gitignore)
         );
-        // …while the tsv layers alone exclude the file itself
+        // …while the override layers alone exclude the file itself
         assert_eq!(
             stack.override_exclusion("vendor/x.ts", PathKind::File),
             excluded(2, 0, IgnoreSource::Formatignore)
@@ -1843,7 +1843,7 @@ mod tests {
             stack.override_exclusion("vendor/y.ts", PathKind::File),
             None
         );
-        // wherever the whole stack's witness is a tsv layer, the answers agree
+        // wherever the whole stack's witness is an override layer, the answers agree
         assert_eq!(
             stack.override_exclusion("pkg/out/a.ts", PathKind::File),
             excluded(3, 1, IgnoreSource::Prettierignore)
@@ -1852,7 +1852,7 @@ mod tests {
             stack.override_exclusion("pkg/out/a.ts", PathKind::File),
             stack.exclusion("pkg/out/a.ts", PathKind::File)
         );
-        // a tsv negation re-including a `.gitignore`'d directory excludes nothing either way
+        // an override negation re-including a `.gitignore`'d directory excludes nothing either way
         let mut reincluded = IgnoreStack::new();
         reincluded.push_gitignore("", "build/\n");
         reincluded.push_formatignore("", "!build/\n");
@@ -1867,7 +1867,7 @@ mod tests {
     fn stack_override_layer_source_names_the_file_a_directory_reads() {
         let mut stack = IgnoreStack::new();
         assert_eq!(stack.override_layer_source(""), None);
-        // a `.gitignore` is not a tsv layer
+        // a `.gitignore` is not an override layer
         stack.push_gitignore("", "a\n");
         assert_eq!(stack.override_layer_source(""), None);
         stack.push_prettierignore("", "b\n");

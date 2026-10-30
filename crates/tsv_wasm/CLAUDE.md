@@ -551,8 +551,8 @@ matcher *and* prune decision by construction. The caller builds it up: `new Igno
 `push_gitignore(anchor, content)` per discovered `.gitignore` and
 `push_formatignore(anchor, content)` per discovered `.formatignore` and, inside a repo,
 `push_prettierignore(anchor, content)` per `.prettierignore` a directory reads in its
-place (all shallowest-first; `pop_gitignore()`/`pop_tsv()` to unwind a DFS — tsv
-layers are hierarchical, and the two tsv pushes match identically, differing only in
+place (all shallowest-first; `pop_gitignore()`/`pop_tsv()` to unwind a DFS — override
+layers are hierarchical, and the two override pushes match identically, differing only in
 the file a warning names), then queries:
 
 - `classify_dir(name, child_rel, heuristic_active) -> 'descend' | 'prune' |
@@ -573,7 +573,7 @@ the file a warning names), then queries:
 - `path_shadow_warning(rel, loose_root?) -> string | undefined` — the same
   per-file replay's warning: `shadow_warning`'s text for the first ancestor
   `is_path_pruned` stops at, when it was pruned — by the heuristic or by a rule — under
-  a tsv-layer re-include (the `'prune_warn'` a walk would have reached); `undefined`
+  an override-layer re-include (the `'prune_warn'` a walk would have reached); `undefined`
   for any other prune, or none.
 - `excluded_argument_warning(display, rel, is_dir, loose_root?) -> string | undefined` (`is_dir` as the matcher reads it — never for a symbolic link, whatever it points at, as git reads one)
   — the warning for a path an argument named (a file, or a directory root) that an

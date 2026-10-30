@@ -48,7 +48,7 @@ pub enum DirVerdict {
     Prune,
     /// Skip the directory and surface a non-fatal stderr warning: the directory is
     /// pruned — by the build-output heuristic or by an ignore rule — while an
-    /// *anchored* tsv-layer `!` was trying to re-include *into* it, a silent no-op under
+    /// *anchored* override-layer `!` was trying to re-include *into* it, a silent no-op under
     /// git's parent-directory rule. The caller fetches the message from
     /// [`shadow_warning`], which reads the cause off the stack and also takes the format
     /// root's display path outside a repo — context the per-directory verdict has no
@@ -203,7 +203,7 @@ pub fn is_safety_net(name: &str) -> bool {
 ///
 /// The order mirrors discovery: the [safety nets](SAFETY_NET_DIRS) prune
 /// unconditionally; then, only while the heuristic is active, a hidden or
-/// [build-output](HEURISTIC_DIRS) directory prunes unless an explicit tsv-layer
+/// [build-output](HEURISTIC_DIRS) directory prunes unless an explicit override-layer
 /// `!` re-includes it; finally the matcher prunes a directory a rule excludes. Under
 /// either prune, an *anchored* `!dir/<file>` trying to reach inside the directory is a
 /// no-op (git's parent-directory rule), and the verdict is then
@@ -221,7 +221,7 @@ pub fn classify_dir(
     stack: &IgnoreStack,
 ) -> DirVerdict {
     // `heuristic_active` implies no `.gitignore` layer is pushed, so the
-    // `is_reincluded` consulted below sees only the tsv layer. That implication is load-bearing (a stray `.gitignore` negation would
+    // `is_reincluded` consulted below sees only the override layer. That implication is load-bearing (a stray `.gitignore` negation would
     // otherwise leak into the heuristic override), so the CLI/JS walkers' threading
     // of `heuristic_active` is enforced here, not trusted. The per-file
     // `is_path_pruned` replay assembles the full ancestor stack up front rather
@@ -262,13 +262,13 @@ fn classify_dir_inner(
         return DirVerdict::Prune;
     }
     // the heuristic prunes hidden + build-output dirs only while no `.gitignore`
-    // governs this level — but an explicit tsv-layer `!` re-include overrides the
+    // governs this level — but an explicit override-layer `!` re-include overrides the
     // guess (an explicit directive beats it).
     if heuristic_active
         && (name.starts_with('.') || HEURISTIC_DIRS.contains(&name))
         && !stack.is_reincluded(child_rel, PathKind::Directory)
     {
-        // a tsv-layer `!child_rel/<file>` re-include is a silent no-op under this
+        // an override-layer `!child_rel/<file>` re-include is a silent no-op under this
         // prune (git's parent-dir rule); the warning points at the dir-level
         // escape that works.
         return if stack.negation_under(child_rel).is_some() {
@@ -285,7 +285,7 @@ fn classify_dir_inner(
     // re-walk that dominated discovery (~70% of `--list` on a deep tree); see
     // `IgnoreStack::is_ignored_leaf`'s contract.
     if stack.is_ignored_leaf(child_rel, PathKind::Directory) {
-        // a tsv-layer `!child_rel/<file>` is as inert under this prune as under the
+        // an override-layer `!child_rel/<file>` is as inert under this prune as under the
         // heuristic's; the warning names the rule as the cause
         return if stack.negation_under(child_rel).is_some() {
             DirVerdict::PruneWithWarning
@@ -307,7 +307,7 @@ fn classify_dir_inner(
 /// files alone ([`excluded_argument_warning`](crate::excluded_argument_warning)).
 ///
 /// `stack` is the matcher assembled from the file's full ancestor chain (every
-/// `.gitignore` / tsv layer from the root down — the same stack a file-level
+/// `.gitignore` / override layer from the root down — the same stack a file-level
 /// [`is_ignored`](tsv_ignore::IgnoreStack::is_ignored) check uses). This walks the
 /// ancestor directories shallow→deep, reconstructing each level's
 /// `heuristic_active` from the stack's own pushed `.gitignore` anchors
@@ -329,7 +329,7 @@ pub fn is_path_pruned(rel: &str, stack: &IgnoreStack) -> bool {
 /// for the first ancestor directory [`is_path_pruned`] stops at, when that directory's
 /// verdict is [`DirVerdict::PruneWithWarning`]. `None` when no ancestor prunes `rel`, and
 /// when the one that does is a plain prune — a safety net, or the heuristic or a rule
-/// with no tsv-layer re-include written under the directory. The per-file companion to
+/// with no override-layer re-include written under the directory. The per-file companion to
 /// [`classify_dir`] + [`shadow_warning`], for [`is_path_pruned`]'s consumer: a
 /// document skipped because its directory is pruned, while a re-include written to reach
 /// it does nothing, is a misconfiguration that consumer can name without a walk.
@@ -418,7 +418,7 @@ pub fn should_format_file(name: &str, child_rel: &str, stack: &IgnoreStack) -> b
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::{stack_from, tsv_stack};
+    use crate::test_support::{override_stack, stack_from};
 
     /// The tags both bindings' `classify_dir` return — `npm/cli.js` compares against these
     /// literals, so a respelling here is a break there.
@@ -597,7 +597,7 @@ mod tests {
 
     #[test]
     fn explicit_dir_reinclude_overrides_heuristic() {
-        let stack = tsv_stack("!build/\n");
+        let stack = override_stack("!build/\n");
         assert_eq!(
             classify_dir("build", "build", true, &stack),
             DirVerdict::Descend
@@ -606,7 +606,7 @@ mod tests {
 
     #[test]
     fn anchored_negation_under_pruned_dir_warns() {
-        let stack = tsv_stack("!build/keep.ts\n");
+        let stack = override_stack("!build/keep.ts\n");
         assert_eq!(
             classify_dir("build", "build", true, &stack),
             DirVerdict::PruneWithWarning,
@@ -617,7 +617,7 @@ mod tests {
     fn floating_negation_under_pruned_dir_does_not_warn() {
         // a floating `!keep.ts` (parsed with a leading `**`) targets any depth,
         // not `build/` specifically, so it is a plain prune (no warning)
-        let stack = tsv_stack("!keep.ts\n");
+        let stack = override_stack("!keep.ts\n");
         assert_eq!(
             classify_dir("build", "build", true, &stack),
             DirVerdict::Prune
@@ -628,7 +628,7 @@ mod tests {
     fn matcher_prunes_ignored_non_heuristic_dir() {
         // `vendored/` is not a heuristic dir, so with the heuristic off the matcher
         // is the only thing that can prune it
-        let stack = tsv_stack("vendored/\n");
+        let stack = override_stack("vendored/\n");
         assert_eq!(
             classify_dir("vendored", "vendored", false, &stack),
             DirVerdict::Prune
@@ -641,7 +641,7 @@ mod tests {
 
     #[test]
     fn should_format_file_checks_extension_and_ignore() {
-        let stack = tsv_stack("gen.ts\n");
+        let stack = override_stack("gen.ts\n");
         assert!(should_format_file("app.ts", "src/app.ts", &stack)); // formattable, not ignored
         assert!(!should_format_file("notes.md", "notes.md", &stack)); // wrong extension
         assert!(!should_format_file("gen.ts", "src/gen.ts", &stack)); // ignored by the matcher

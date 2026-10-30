@@ -91,7 +91,7 @@
 		},
 		{
 			"name": "formatignore_reincludes_gitignored_file",
-			"note": "the tsv layer is applied after .gitignore, so a .formatignore `!` re-includes a file-level gitignore exclusion",
+			"note": "the override layer is applied after .gitignore, so a .formatignore `!` re-includes a file-level gitignore exclusion",
 			"tree": {
 				".git/": null,
 				".gitignore": "config.ts\n",
@@ -133,7 +133,7 @@
 			]
 		},
 		{
-			"name": "explicit_dir_a_tsv_rule_excludes_names_the_rules_file",
+			"name": "explicit_dir_an_override_rule_excludes_names_the_rules_file",
 			"note": "a named DIRECTORY a .formatignore or .prettierignore rule excludes warns, naming the file the rule sits in — a nested .prettierignore by its repo-relative path — while a named FILE the same rule excludes is skipped quietly",
 			"tree": {
 				".git/": null,
@@ -168,8 +168,8 @@
 			]
 		},
 		{
-			"name": "explicit_path_a_tsv_rule_also_excludes_names_that_rule",
-			"note": "a .formatignore rule excluding a named path is reported even where a .gitignore excludes the path first — re-including past the .gitignore would leave that rule standing, and, added to the same file, override it: a file it excludes is skipped quietly, a directory names it, and a path only the .gitignore excludes still gets the lines that re-include it. Where the .gitignore excludes an ANCESTOR above the tsv rule's directory, that exclusion bounds the path on its own (every `!` under an excluded directory is inert), so the warning undoes it and names the tsv rule as the second blocker — one warning, not one per rerun",
+			"name": "explicit_path_an_override_rule_also_excludes_names_that_rule",
+			"note": "a .formatignore rule excluding a named path is reported even where a .gitignore excludes the path first — re-including past the .gitignore would leave that rule standing, and, added to the same file, override it: a file it excludes is skipped quietly, a directory names it, and a path only the .gitignore excludes still gets the lines that re-include it. Where the .gitignore excludes an ANCESTOR above the override rule's directory, that exclusion bounds the path on its own (every `!` under an excluded directory is inert), so the warning undoes it and names the override rule as the second blocker — one warning, not one per rerun",
 			"tree": {
 				".git/": null,
 				".gitignore": "vendor/\n",
@@ -305,7 +305,7 @@
 		},
 		{
 			"name": "prettierignore_is_hierarchical",
-			"note": "a nested .prettierignore governs its subtree, like .formatignore (both are hierarchical tsv layers); the repo-root one applies too, and a subdir invocation still walks up to the .git root and picks up the nested one",
+			"note": "a nested .prettierignore governs its subtree, like .formatignore (both are hierarchical override layers); the repo-root one applies too, and a subdir invocation still walks up to the .git root and picks up the nested one",
 			"tree": {
 				".git/": null,
 				".prettierignore": "rootskip.ts\n",
@@ -337,7 +337,7 @@
 		},
 		{
 			"name": "prettierignore_deeper_reincludes",
-			"note": "hierarchical .prettierignore layers are last-match-wins by depth like .formatignore: a deeper .prettierignore `!` re-includes a file a shallower tsv layer ignored",
+			"note": "hierarchical .prettierignore layers are last-match-wins by depth like .formatignore: a deeper .prettierignore `!` re-includes a file a shallower override layer ignored",
 			"tree": {
 				".git/": null,
 				".prettierignore": "*.gen.ts\n",
@@ -466,7 +466,7 @@
 		},
 		{
 			"name": "a_symlinked_gitignore_is_not_applied",
-			"note": "git does not follow a symbolic link to a .gitignore in a working tree (gitignore(5)) — it warns and applies none of the linked rules — so neither does tsv, by the same rule whether the directory is walked or only preloaded: g.ts stays in scope at both depths, and with no .gitignore applied the build-output heuristic stays on and prunes dist/, which a regular .gitignore would have turned off. The tsv layer keeps following links (the scenario above)",
+			"note": "git does not follow a symbolic link to a .gitignore in a working tree (gitignore(5)) — it warns and applies none of the linked rules — so neither does tsv, by the same rule whether the directory is walked or only preloaded: g.ts stays in scope at both depths, and with no .gitignore applied the build-output heuristic stays on and prunes dist/, which a regular .gitignore would have turned off. The override layer keeps following links (the scenario above)",
 			"tree": {
 				".git/": null,
 				"rules/git": "g.ts\n",
@@ -485,7 +485,7 @@
 		},
 		{
 			"name": "shadow_warning_names_the_rules_file",
-			"note": "the build-output heuristic prunes a dist/ that a tsv-layer `!` re-include was written under, and the warning names the file holding that rule, with the directory re-include spelled for that file — anchored and relative to its directory, since a repo-root-relative `!pkg/dist/` pasted into pkg/.formatignore is anchored to pkg and does nothing. Applied (fix/.prettierignore), the anchored lines admit fix/dist and select keep.ts in it, while fix/sub/dist — which an unanchored `!dist/` would re-include too — stays pruned, and unwarned",
+			"note": "the build-output heuristic prunes a dist/ that an override-layer `!` re-include was written under, and the warning names the file holding that rule, with the directory re-include spelled for that file — anchored and relative to its directory, since a repo-root-relative `!pkg/dist/` pasted into pkg/.formatignore is anchored to pkg and does nothing. Applied (fix/.prettierignore), the anchored lines admit fix/dist and select keep.ts in it, while fix/sub/dist — which an unanchored `!dist/` would re-include too — stays pruned, and unwarned",
 			"tree": {
 				".git/": null,
 				"pkg/.formatignore": "!dist/keep.ts\n",
@@ -589,7 +589,7 @@
 		},
 		{
 			"name": "a_git_file_marks_a_repo_root",
-			"note": "a worktree or submodule checkout holds `.git` as a FILE (`gitdir: …`), not a directory, and it marks the repo root all the same: the .gitignore is honored (gen/ pruned) and turns the heuristic off (dist/ walked), the .prettierignore is read as the repo's tsv layer rather than warned about as one outside a repo, and a subdirectory target walks up to the same root",
+			"note": "a worktree or submodule checkout holds `.git` as a FILE (`gitdir: …`), not a directory, and it marks the repo root all the same: the .gitignore is honored (gen/ pruned) and turns the heuristic off (dist/ walked), the .prettierignore is read as the repo's override layer rather than warned about as one outside a repo, and a subdirectory target walks up to the same root",
 			"tree": {
 				".git": "gitdir: /elsewhere/.git/worktrees/wt\n",
 				".gitignore": "gen/\n",

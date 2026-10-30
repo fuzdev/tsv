@@ -275,7 +275,7 @@ pub fn strip_typescript(source: &str, source_type: JsValue) -> Result<JsValue, J
 
 /// The hierarchical, git-faithful matcher for tsv's discovery ignore files, wrapping
 /// `tsv_ignore::IgnoreStack`. Built up by the caller from a repo's `.gitignore` files plus
-/// one tsv file per directory (`.formatignore`, or a `.prettierignore` where no sibling
+/// one override file per directory (`.formatignore`, or a `.prettierignore` where no sibling
 /// `.formatignore` shadows it), pushed shallowest-first, then queried per path — for the
 /// raw ignore status (`is_ignored`) and for the discovery verdicts and warning strings it
 /// delegates to `tsv_discover` (`classify_dir`, `should_format_file`, `is_path_pruned`,
@@ -317,20 +317,20 @@ impl IgnoreStack {
         self.inner.pop_gitignore();
     }
 
-    /// Push one directory's `.formatignore` as a tsv layer, applied after every
+    /// Push one directory's `.formatignore` as an override layer, applied after every
     /// `.gitignore`. `anchor` is the directory relative to the format root (`""` = root).
     pub fn push_formatignore(&mut self, anchor: &str, content: &str) {
         self.inner.push_formatignore(anchor, content);
     }
 
-    /// Push one directory's `.prettierignore` as a tsv layer — the file read, inside a
+    /// Push one directory's `.prettierignore` as an override layer — the file read, inside a
     /// repo, in a directory with no `.formatignore`. Matched exactly as a `.formatignore`
     /// layer is; what differs is the file a warning about one of its rules names.
     pub fn push_prettierignore(&mut self, anchor: &str, content: &str) {
         self.inner.push_prettierignore(anchor, content);
     }
 
-    /// Pop the most recently pushed tsv layer (a traversal unwinding out of a
+    /// Pop the most recently pushed override layer (a traversal unwinding out of a
     /// directory).
     pub fn pop_tsv(&mut self) {
         self.inner.pop_override();
@@ -386,7 +386,7 @@ impl IgnoreStack {
     /// The shadow warning a walk raises on the way down to `rel` (a format-root-relative
     /// file path), delegating to `tsv_discover::path_shadow_warning`: `shadow_warning`'s
     /// text for the first ancestor directory `is_path_pruned` stops at, when it was pruned
-    /// — by the build-output heuristic or by an ignore rule — under a tsv-layer
+    /// — by the build-output heuristic or by an ignore rule — under an override-layer
     /// re-include; `undefined` (the JS view of `None`) otherwise. The per-file companion to `classify_dir`'s `"prune_warn"` for a
     /// consumer with no top-down traversal. `loose_root` is the format root's display path
     /// outside a git repo (`undefined` inside one).
@@ -409,7 +409,7 @@ impl IgnoreStack {
     /// The shadow warning text for a pruned directory `dir` (format-root relative) — pruned
     /// by the build-output heuristic or by an ignore rule, which the text says —
     /// delegating to `tsv_discover::shadow_warning`; `undefined` (the JS view of `None`)
-    /// when no tsv-layer re-include is written under `dir`. The text names the file holding that rule, which it reads from this stack.
+    /// when no override-layer re-include is written under `dir`. The text names the file holding that rule, which it reads from this stack.
     /// `loose_root` is the format root's display path outside a git repo (`undefined`
     /// inside one). Single source of truth with the native CLI — the JS CLI never
     /// templates this string.

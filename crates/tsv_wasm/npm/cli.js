@@ -1832,8 +1832,8 @@ function decode_source(buf) {
 /** Read an ignore file: its content, or `undefined` — silently for ENOENT (missing,
  * or raced away after the listing), with a non-fatal warning for any other failure,
  * so a present-but-unreadable file is never silently dropped. Which file a
- * directory's tsv layer is read from was decided by PRESENCE before this read
- * (`tsv_layer_content`), so an unreadable `.formatignore` still shadows its sibling. **Strict UTF-8** (`decode_source`) to match
+ * directory's override layer is read from was decided by PRESENCE before this read
+ * (`override_layer_content`), so an unreadable `.formatignore` still shadows its sibling. **Strict UTF-8** (`decode_source`) to match
  * Rust's `read_to_string` — Node's `readFileSync(path, 'utf-8')` would lossily
  * replace invalid bytes, silently applying a mangled ignore file the native CLI
  * drops — and, for invalid UTF-8, the same failure text, so that warning reads
@@ -2178,7 +2178,7 @@ function quote_path(path) {
 }
 
 /**
- * The tsv layer one directory contributes, read by the precedence both walks
+ * The override layer one directory contributes, read by the precedence both walks
  * share: `.formatignore` whenever present (every level, in or out of a repo);
  * inside a repo, a `.prettierignore` is the drop-in fallback at every level
  * (hierarchical, like `.formatignore`), used solely when no *sibling*
@@ -2190,18 +2190,25 @@ function quote_path(path) {
  * Rust, single source of truth with the native CLI), at whichever directory the
  * shadow sits — the ancestor preload and the descent both reach this, so the
  * warning fires whether the shadowing directory is walked or only preloaded. One
- * statement of the ladder, mirroring the native `tsv_layer_content`; the two
+ * statement of the ladder, mirroring the native `override_layer_content`; the two
  * callers differ only in how presence was learned (a listing, or an `is_ignore_file` probe).
  *
  * `dir` is the directory's ABSOLUTE path — an ancestor as preloaded, a walked
  * directory as `collect_recursive`'s `dir_abs` — never an argument spelling: the one
  * spelling its ignore files are read by and its diagnostics name it by, whichever root
  * or spelling reached it, so overlapping roots (`tsv format . sub`, `tsv format . ./`)
- * report one warning rather than one per spelling. Mirrors the native `tsv_layer_content`.
+ * report one warning rather than one per spelling. Mirrors the native `override_layer_content`.
  * @returns {{content: string, prettierignore: boolean} | null} the layer's content and
  *   whether it was read from `.prettierignore`, or null for no layer
  */
-function tsv_layer_content(dir, has_formatignore, has_prettierignore, in_repo, stack, warnings) {
+function override_layer_content(
+	dir,
+	has_formatignore,
+	has_prettierignore,
+	in_repo,
+	stack,
+	warnings
+) {
 	const warning = stack.prettierignore_shadowed_warning(
 		dir,
 		in_repo,
@@ -2220,10 +2227,10 @@ function tsv_layer_content(dir, has_formatignore, has_prettierignore, in_repo, s
 	return content === undefined ? null : { content, prettierignore };
 }
 
-/** Push a `tsv_layer_content` layer onto `stack` at `anchor`, as the file it was read
+/** Push a `override_layer_content` layer onto `stack` at `anchor`, as the file it was read
  * from — the file a warning about one of its rules names. Mirrors the native
  * `TsvLayer::push_onto`. */
-function push_tsv_layer(stack, anchor, layer) {
+function push_override_layer(stack, anchor, layer) {
 	if (layer.prettierignore) stack.push_prettierignore(anchor, layer.content);
 	else stack.push_formatignore(anchor, layer.content);
 }
@@ -2259,7 +2266,7 @@ function preload_ancestors(stack, dirs, format_root, warnings) {
  * The gate is all this adds to `push_layers`, which the descent reaches too: the preload
  * differs from a walked directory only in PROBING for the files a listing would have
  * named (`probe_ignore_presence`).
- * @returns {{tsv: boolean, gitignore: boolean} | null}
+ * @returns {{overrides: boolean, gitignore: boolean} | null}
  */
 function push_dir_layers(stack, dir, format_root, warnings) {
 	const anchor = rel_under(format_root.path, dir) ?? '';
@@ -2292,22 +2299,22 @@ function probe_ignore_presence(dir, in_repo) {
  * — the single statement of the ladder both walks run, so a preload and a descent cannot
  * drift on it.
  *
- * The tsv layer first (tsv_layer_content, which also warns about a `.prettierignore` its
+ * The override layer first (override_layer_content, which also warns about a `.prettierignore` its
  * sibling shadows), then the `.gitignore`, which pushes only from a regular file: a
  * symlinked one git does not follow and an unreadable one has no rules to apply, so both
  * warn and push nothing — leaving the build-output heuristic on for the subtree, which
  * the warning is what makes visible. Nothing here is gated on `in_repo` beyond what
- * tsv_layer_content gates itself: outside a repo `presence.gitignore` is already
+ * override_layer_content gates itself: outside a repo `presence.gitignore` is already
  * `'absent'`, by the rule each caller read it with.
  *
  * `dir` is the directory's ABSOLUTE path — the one spelling its ignore files are read by
  * and every ignore-file diagnostic names it by, whichever root or argument spelling
- * reached it (see tsv_layer_content). Mirrors the native `push_layers`.
- * @returns {{tsv: boolean, gitignore: boolean}}
+ * reached it (see override_layer_content). Mirrors the native `push_layers`.
+ * @returns {{overrides: boolean, gitignore: boolean}}
  */
 function push_layers(stack, dir, anchor, in_repo, presence, warnings) {
-	const pushed = { tsv: false, gitignore: false };
-	const layer = tsv_layer_content(
+	const pushed = { overrides: false, gitignore: false };
+	const layer = override_layer_content(
 		dir,
 		presence.formatignore,
 		presence.prettierignore,
@@ -2316,8 +2323,8 @@ function push_layers(stack, dir, anchor, in_repo, presence, warnings) {
 		warnings
 	);
 	if (layer !== null) {
-		push_tsv_layer(stack, anchor, layer);
-		pushed.tsv = true;
+		push_override_layer(stack, anchor, layer);
+		pushed.overrides = true;
 	}
 	// the path is built only in the two arms that need it — most directories have no
 	// `.gitignore`, and outside a repo none is ever read
@@ -2338,7 +2345,7 @@ function push_layers(stack, dir, anchor, in_repo, presence, warnings) {
  * `null` `push_dir_layers` returns for a directory a rule excludes, which pushed nothing.
  * Mirrors the native `PushedLayers::pop_from`. */
 function pop_layers(stack, pushed) {
-	if (pushed?.tsv) stack.pop_tsv();
+	if (pushed?.overrides) stack.pop_tsv();
 	if (pushed?.gitignore) stack.pop_gitignore();
 }
 
@@ -2656,7 +2663,7 @@ function compare_paths(a, b) {
 function collect_recursive(
 	dir,
 	// `dir`'s absolute path — the spelling its ignore files are read by and every
-	// ignore-file diagnostic names it by (see tsv_layer_content); `dir` keeps the
+	// ignore-file diagnostic names it by (see override_layer_content); `dir` keeps the
 	// argument's spelling for the paths the walk emits
 	dir_abs,
 	dir_rel,

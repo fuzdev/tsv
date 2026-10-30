@@ -124,7 +124,7 @@ pub struct Discovered {
 ///   hierarchically and repo-rooted like git (`git check-ignore` parity on a
 ///   case-sensitive filesystem); `.formatignore` and `.prettierignore` both
 ///   hierarchically from the repo root down (each `.prettierignore` shadowed by a
-///   sibling `.formatignore`) as drop-in compat. The tsv files override
+///   sibling `.formatignore`) as drop-in compat. The override files override
 ///   `.gitignore`.
 /// - **outside a git repo**, the format root is the **filesystem root**:
 ///   `.gitignore` is not consulted at all (as git itself does), and
@@ -146,7 +146,7 @@ pub struct Discovered {
 /// declaration: an empty or comments-only `.gitignore` still turns the heuristic
 /// off (and thus formats a non-ignored `dist/`), matching git, for which an empty
 /// `.gitignore` ignores nothing. With no `.gitignore` in scope the heuristic is
-/// the fallback "not source" guess, except that an explicit tsv-layer `!`
+/// the fallback "not source" guess, except that an explicit override-layer `!`
 /// re-include overrides it. Because the format root is found by
 /// walking up, the repo-root ignore files apply even when tsv is invoked on a
 /// subdirectory, and a subdirectory named directly is bounded by the same ignore
@@ -465,7 +465,7 @@ fn push_dir_layers(
 /// directory no listing is held for, the listing itself in [`collect_recursive`]) and
 /// read the same files either way.
 ///
-/// `prettierignore` is presence, not a decision to read: `tsv_layer_content` consults it
+/// `prettierignore` is presence, not a decision to read: `override_layer_content` consults it
 /// only inside a repo, and outside one it feeds the target root's heads-up
 /// ([`prettierignore_outside_repo_warning`]) instead. It is also the one field a caller
 /// may leave `false` unasked — see [`Self::probe`].
@@ -502,18 +502,18 @@ impl IgnorePresence {
 /// pushed — the single statement of the ladder both walks run, so a preload and a
 /// descent cannot drift on it.
 ///
-/// The tsv layer first ([`tsv_layer_content`], which also warns about a
+/// The override layer first ([`override_layer_content`], which also warns about a
 /// `.prettierignore` its sibling shadows), then the `.gitignore`, which pushes only from
 /// a regular file: a symlinked one git does not follow and an unreadable one has no
 /// rules to apply, so both warn and push nothing — leaving the build-output heuristic on
 /// for the subtree, which the warning is what makes visible. Nothing here is gated on
-/// `in_repo` beyond what `tsv_layer_content` gates itself: outside a repo
+/// `in_repo` beyond what `override_layer_content` gates itself: outside a repo
 /// `presence.gitignore` is already [`GitignorePresence::Absent`], by the rule each caller
 /// read it with.
 ///
 /// `dir` is the directory's **absolute** path — the one spelling its ignore files are
 /// read by and every ignore-file diagnostic names it by, whichever root or argument
-/// spelling reached it (see [`tsv_layer_content`]).
+/// spelling reached it (see [`override_layer_content`]).
 fn push_layers(
     dir: &Path,
     anchor: &str,
@@ -523,7 +523,7 @@ fn push_layers(
     warnings: &mut Vec<String>,
 ) -> PushedLayers {
     let mut pushed = PushedLayers::default();
-    if let Some(layer) = tsv_layer_content(
+    if let Some(layer) = override_layer_content(
         dir,
         presence.formatignore,
         presence.prettierignore,
@@ -531,7 +531,7 @@ fn push_layers(
         warnings,
     ) {
         layer.push_onto(stack, anchor);
-        pushed.tsv = true;
+        pushed.overrides = true;
     }
     match presence.gitignore {
         GitignorePresence::Absent => {}
@@ -551,13 +551,13 @@ fn push_layers(
 /// Which layers one directory pushed onto a stack — what taking it back off pops.
 #[derive(Clone, Copy, Default)]
 struct PushedLayers {
-    tsv: bool,
+    overrides: bool,
     gitignore: bool,
 }
 
 impl PushedLayers {
     fn pop_from(self, stack: &mut IgnoreStack) {
-        if self.tsv {
+        if self.overrides {
             stack.pop_override();
         }
         if self.gitignore {
@@ -768,7 +768,7 @@ pub fn strip_verbatim_prefix(path: PathBuf) -> PathBuf {
     }
 }
 
-/// The tsv layer one directory contributes, read by the precedence the two walks
+/// The override layer one directory contributes, read by the precedence the two walks
 /// share: `.formatignore` whenever present (every level, in or out of a repo);
 /// inside a repo, a `.prettierignore` is the drop-in fallback at every level
 /// (hierarchical, like `.formatignore`), used solely when no *sibling*
@@ -790,7 +790,7 @@ pub fn strip_verbatim_prefix(path: PathBuf) -> PathBuf {
 /// directory named once as an argument and once as a preloaded ancestor
 /// (`tsv format . sub`), or under two argument spellings (`tsv format . ./`), would
 /// otherwise warn once per spelling.
-fn tsv_layer_content(
+fn override_layer_content(
     dir: &Path,
     has_formatignore: bool,
     has_prettierignore: bool,
@@ -819,7 +819,7 @@ fn tsv_layer_content(
     })
 }
 
-/// One directory's tsv layer: its content, and which of the two files it was read from —
+/// One directory's override layer: its content, and which of the two files it was read from —
 /// the file a warning about one of its rules names.
 struct TsvLayer {
     content: String,
@@ -845,7 +845,7 @@ struct WalkDir<'a> {
     listed: &'a Path,
     /// Its absolute path — the one spelling its ignore files are read by and every
     /// ignore-file diagnostic names it by, whichever root or argument spelling reached
-    /// it (see [`tsv_layer_content`]).
+    /// it (see [`override_layer_content`]).
     abs: &'a Path,
 }
 
@@ -1056,7 +1056,7 @@ fn is_ignore_file(path: &Path) -> bool {
 /// cannot access the file and applies none of its rules. So a link is its own answer,
 /// which the walk reports ([`tsv_discover::gitignore_symlink_warning`]) and otherwise
 /// treats as a file whose rules could not be read; anything but a regular file or a link
-/// is absent, as for the tsv layer.
+/// is absent, as for the override layer.
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 enum GitignorePresence {
     /// The default so [`IgnorePresence`] can start from one: a directory outside a repo
@@ -1231,7 +1231,7 @@ fn path_to_rel(path: &Path) -> String {
 /// (genuinely missing, or raced away after the listing — not the user's problem), with
 /// a non-fatal warning pushed to `warnings` for any other error (invalid UTF-8 —
 /// `read_to_string` is strict — permissions, …: the file is there but its rules won't
-/// apply, the exact silent footgun this surfaces). Precedence between a directory's tsv
+/// apply, the exact silent footgun this surfaces). Precedence between a directory's override
 /// files is decided by *presence* before this read, so the two `None`s need no telling
 /// apart. Mirrors the JS `read_ignore_file`.
 fn read_ignore_file(path: &Path, warnings: &mut Vec<String>) -> Option<String> {
@@ -1240,9 +1240,9 @@ fn read_ignore_file(path: &Path, warnings: &mut Vec<String>) -> Option<String> {
         // not there — nothing to apply, silently (genuinely absent, or deleted between
         // the directory listing and this read)
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-        // present but unreadable: warned, and no rules. Which file the directory's tsv
+        // present but unreadable: warned, and no rules. Which file the directory's override
         // layer is read from was decided by PRESENCE before this read
-        // (`tsv_layer_content`), so an unreadable `.formatignore` still shadows its
+        // (`override_layer_content`), so an unreadable `.formatignore` still shadows its
         // sibling `.prettierignore` rather than falling through to it
         Err(e) => {
             warnings.push(format!(

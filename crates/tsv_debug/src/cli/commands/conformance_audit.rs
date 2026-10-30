@@ -242,7 +242,7 @@ fn catalog_owners(
 ///   ignored, so none of them can fail a gate over content the repo does not have. A
 ///   local list would be a second copy of both, free to drift from either — the drift
 ///   `tsv_discover` exists to prevent. (This walk wants *scope*, not `tsv format`'s file
-///   set, so it stops short of `classify_dir`: the build-output heuristic and the tsv
+///   set, so it stops short of `classify_dir`: the build-output heuristic and the override
 ///   layer are format-file policy, and `.formatignore` prunes `tests/fixtures/` — the
 ///   fixture READMEs are exactly what it must check.)
 /// - **Symlinks**, because the target is enumerated on its own: `AGENTS.md` points at

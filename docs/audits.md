@@ -2423,7 +2423,7 @@ gated in `deno task check`. Five checks:
    tsv_ignore's IgnoreStack — so build output and the per-machine *.local.* / *.tmp conventions
    are pruned by the repo's own rules rather than a second copy of them, and a gate can't fail
    over content the repo doesn't have. It stops short of classify_dir: the build-output
-   heuristic and the tsv layer are format-file policy, and .formatignore prunes tests/fixtures/
+   heuristic and the override layer are format-file policy, and .formatignore prunes tests/fixtures/
    — the fixture READMEs are exactly what this must check. Symlinks are skipped (AGENTS.md
    points at CLAUDE.md; following both would report every finding twice). External URLs and
    targets that climb out of the repo (sibling checkouts, machine-dependent) are out of scope.
