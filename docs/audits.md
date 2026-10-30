@@ -32,7 +32,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Discovery parity](#corpus-discovery-parity-audit-discoveryaudit) | `discovery:audit` | `tsv format --list` over the `../corpora` snapshot naming a different file set than the snapshot's committed tree holds in tsv's extensions — a discovery prune firing on real code, or an extension drift | `deno task check` (when `../corpora` is present) |
 | [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting — or type-stripping — the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; neither `deno task check` nor the publish path compares engines) |
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
-| [docs.rs build](#docsrs-build-audit-docsauditdocsrs) | `docs:audit:docsrs` | a crate meant for docs.rs whose own doc build fails at its docs.rs feature set — a link to an item behind a feature docs.rs leaves off, which the all-features workspace build resolves | `deno task check` |
+| [docs.rs build](#docsrs-build-audit-docsauditdocsrs) | `docs:audit:docsrs` | a crate meant for docs.rs whose own doc build fails at its docs.rs feature set or at its defaults — a link to an item behind a feature that build leaves off, which the all-features workspace build resolves | `deno task check` |
 | [Published deps](#published-graph-dependency-audit-depsaudit) | `deps:audit` | a crate meant for publishing reaching `serde_json` through a normal or build dependency, at any feature set or target — the workspace entry's features would unify into a consumer's own `serde_json` and change how it deserializes | `deno task check` |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
 | [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `deno task bench:install`, so NOT in `deno task check`) |
@@ -1085,7 +1085,8 @@ world the other `check` audits use, so it adds a short compile of its own.
 
 ```bash
 # one `cargo doc -p <crate> --no-deps` per crate with a [package.metadata.docs.rs] table,
-# at that table's features (scripts/docsrs_audit.ts)
+# at that table's features, plus one at its defaults where the two differ
+# (scripts/docsrs_audit.ts)
 deno task docs:audit:docsrs
 ```
 
@@ -1109,6 +1110,13 @@ set is exactly what `cargo publish --workspace` publishes (it skips the `publish
 members), and a new crate cannot reach crates.io ungraded. No table anywhere is a failure,
 not a pass.
 
+**The default-features leg.** A crate whose table names a feature set other than its
+defaults (today the three language crates, documented with `locations`) is built a second
+time at its defaults — the page a consumer's own `cargo doc` renders after `cargo add`, and
+where a link written against the docs.rs features breaks: an always-on page linking an item
+behind `locations` resolves in the docs.rs build and fails this one. A crate docs.rs
+documents at its defaults is built once.
+
 **Lints.** The `docs:audit` set, plus `--cfg docsrs` as docs.rs passes it, with one level
 changed: `private_intra_doc_links` is **warned and counted per crate**, not allowed.
 docs.rs documents public items only, so each such link is inert on the published page;
@@ -1123,8 +1131,8 @@ fires (or a level nightly changed) goes unseen. `cargo doc -p tsv_cli` also docu
 docs.rs. A publishable crate whose table is spelled inline (which the script's reader does
 not parse) reads as untabled and fails the classification rather than passing ungraded, and
 a `publish = false` the reader cannot see — not a bare line of its own, or after a `[` anywhere
-in the `[package]` table (a `keywords = [...]` above it) — reads as publishable the same way. It grades a crate's docs.rs feature set, not
-every feature combination a consumer might pick (`docs:audit`'s `--all-features` covers the
+in the `[package]` table (a `keywords = [...]` above it) — reads as publishable the same way. It grades a crate's docs.rs feature set and its defaults, not
+every other feature combination a consumer might pick (`docs:audit`'s `--all-features` covers the
 union, nothing covers the subsets between). Like `docs:audit`, it checks that a link
 resolves, never that the prose is true.
 

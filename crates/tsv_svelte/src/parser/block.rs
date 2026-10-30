@@ -10,7 +10,7 @@ use bumpalo::Bump;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
 use tsv_lang::{Error, Span};
 use tsv_ts::__private::TopLevelAs;
-use tsv_ts::{Expression, ExpressionKind};
+use tsv_ts::ast::{Expression, ExpressionKind};
 
 use super::expression_tag::{scan_head_to_matching_brace, scan_to_matching_paren};
 use super::parser_impl::{EmbeddedParseMark, SvelteParser};
@@ -268,10 +268,10 @@ fn await_head_clause(after_expr: &str) -> Option<(AwaitClause, &str)> {
 /// The `function f…` declaration a `{#snippet}` head's wrapper parses to. `None` only for a
 /// wrapper that produced no such statement, which the caller reports as an error.
 fn snippet_signature<'arena>(
-    program: &tsv_ts::Program<'arena>,
+    program: &tsv_ts::ast::Program<'arena>,
 ) -> Option<&'arena tsv_ts::ast::FunctionDeclaration<'arena>> {
     match program.body.first().map(|stmt| &stmt.kind) {
-        Some(tsv_ts::StatementKind::FunctionDeclaration(func)) => Some(*func),
+        Some(tsv_ts::ast::StatementKind::FunctionDeclaration(func)) => Some(*func),
         _ => None,
     }
 }
@@ -1511,7 +1511,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // text — accepted every malformed head (`fn(a b)`, `fn(,,)`, `fn<T extends>()`) and
         // was lossy twice over: the wire emits no parameters at all, and the printer
         // reflowed the kept text.
-        let mut type_parameters: Option<tsv_ts::TSTypeParameterDeclaration<'arena>> = None;
+        let mut type_parameters: Option<tsv_ts::ast::TSTypeParameterDeclaration<'arena>> = None;
         let mut parameters: &'arena [Expression<'arena>] = &[];
         if type_params_raw.is_some() || !params_str.trim_matches(is_svelte_ws).is_empty() {
             // The head runs from where the signature begins (`<` or `(`) through the `)`.

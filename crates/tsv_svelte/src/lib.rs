@@ -4,6 +4,7 @@
 
 #[doc(hidden)]
 pub mod __private;
+#[doc(hidden)]
 pub mod ast;
 mod lexer;
 mod parser;
@@ -13,8 +14,10 @@ mod test_support;
 mod whitespace;
 
 use __private::{format_folded_in, parse_folded};
-pub use ast::Root;
-pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, WirePoint};
+use ast::Root;
+pub use tsv_lang::{
+    Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, WireCoordinates, WirePoint,
+};
 
 /// The coordinates a Svelte document's positions are reported in — Svelte's: a leading
 /// BOM **elided** (Svelte's `parse` strips it before parsing, so every offset indexes the
@@ -22,9 +25,9 @@ pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, WirePoint};
 /// markup and in every `<script>`, template expression and `<style>` alike. The wire
 /// writer's tables and every parse error's point (`Error::wire_point`, and the
 /// `line:col` its message prints) read this one statement.
-pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinates {
-    lines: tsv_lang::LineRule::Lf,
-    bom: tsv_lang::LeadingBom::Elided,
+pub const WIRE_COORDINATES: WireCoordinates = WireCoordinates {
+    lines: LineRule::Lf,
+    bom: LeadingBom::Elided,
 };
 
 /// `parse_folded`'s refusal: parse the author's own bytes, and refuse the first in-tag `//`
@@ -121,6 +124,14 @@ impl JsonOptions {
         self
     }
 }
+
+// Options are plain data a caller may build once and share across threads; pin that so a
+// field added later cannot take it away unnoticed.
+#[cfg(feature = "json")]
+const _: () = {
+    const fn assert_send_sync_static<T: Send + Sync + 'static>() {}
+    assert_send_sync_static::<JsonOptions>();
+};
 
 /// Parse `source` and return its wire JSON AST: compact JSON in Svelte's modern `parse()`
 /// shape, every node's `start` / `end` a UTF-16 offset and no `loc`.

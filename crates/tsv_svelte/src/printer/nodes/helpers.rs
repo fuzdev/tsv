@@ -13,7 +13,7 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, Span};
-use tsv_ts::{Expression, ExpressionKind};
+use tsv_ts::ast::{Expression, ExpressionKind};
 
 /// What a block head's own syntax prints right after its expression — the question the
 /// instantiation pair asks of the host ([`Printer::build_expression_doc_for_block`]).
@@ -544,16 +544,19 @@ impl<'a> Printer<'a> {
     }
 
     /// Property dispatcher for a binding `ObjectPattern`.
-    fn build_object_pattern_property_doc(&self, prop: &tsv_ts::ObjectPatternProperty<'_>) -> DocId {
+    fn build_object_pattern_property_doc(
+        &self,
+        prop: &tsv_ts::ast::ObjectPatternProperty<'_>,
+    ) -> DocId {
         match prop {
-            tsv_ts::ObjectPatternProperty::Property(p) => self.build_pattern_property_kv(
+            tsv_ts::ast::ObjectPatternProperty::Property(p) => self.build_pattern_property_kv(
                 p.shorthand,
                 p.computed,
                 p.key,
                 p.value,
                 p.span.start,
             ),
-            tsv_ts::ObjectPatternProperty::RestElement(r) => {
+            tsv_ts::ast::ObjectPatternProperty::RestElement(r) => {
                 self.build_rest_pattern_doc(r.span.start, r.argument)
             }
         }
@@ -562,16 +565,16 @@ impl<'a> Printer<'a> {
     /// Property dispatcher for an `ObjectExpression` reached as an assignment-pattern
     /// **default value** (`{ a = { b: /* c */ 1 } }`). Same shape as the binding
     /// dispatcher; only the enum (`ObjectProperty` / `SpreadElement`) differs.
-    fn build_object_expr_property_doc(&self, prop: &tsv_ts::ObjectProperty<'_>) -> DocId {
+    fn build_object_expr_property_doc(&self, prop: &tsv_ts::ast::ObjectProperty<'_>) -> DocId {
         match prop {
-            tsv_ts::ObjectProperty::Property(p) => self.build_pattern_property_kv(
+            tsv_ts::ast::ObjectProperty::Property(p) => self.build_pattern_property_kv(
                 p.shorthand,
                 p.computed,
                 p.key,
                 p.value,
                 p.span.start,
             ),
-            tsv_ts::ObjectProperty::SpreadElement(s) => {
+            tsv_ts::ast::ObjectProperty::SpreadElement(s) => {
                 self.build_rest_pattern_doc(s.span.start, s.argument)
             }
         }

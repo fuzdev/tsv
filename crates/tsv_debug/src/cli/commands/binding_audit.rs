@@ -383,7 +383,7 @@ fn audit_file(path: &Path) -> FileOutcome {
 /// `preserve_parens`), in source order. `None` if the source doesn't parse.
 fn extract_bindings(source: &str) -> Option<Vec<CommentBinding>> {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse_preserve_parens(source, &arena).ok()?;
+    let program = tsv_ts::__private::parse_preserve_parens(source, &arena).ok()?;
     let wire =
         crate::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
     let map = Utf16ToByte::new(source);
@@ -439,7 +439,7 @@ fn comment_binding(
     // parens are swallowed by whatever encloses it, so `(root).head` has a
     // `MemberExpression` starting right there. Only an arrow *begins* at its own
     // parameter `(`.
-    if tsv_ts::is_jsdoc_type_cast_comment(content)
+    if tsv_ts::__private::is_jsdoc_type_cast_comment(content)
         && bytes[anchor] == b'('
         && !node_of_type_at(wire, map, anchor, "ArrowFunctionExpression")
     {

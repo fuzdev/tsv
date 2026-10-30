@@ -1,6 +1,7 @@
 /**
  * The docs.rs-shaped doc build: every crate meant for docs.rs documented on its own, at the
- * feature set docs.rs will use, with a broken intra-doc link denied.
+ * feature set docs.rs will use (and at its defaults, where those differ), with a broken
+ * intra-doc link denied.
  *
  * ## What it proves
  *
@@ -28,6 +29,14 @@
  * member without the table must be `publish = false` (`docsrs_crates.ts` refuses one that is
  * neither), so the graded set is every publishable member. A workspace with no such table
  * grades nothing and fails.
+ *
+ * ## The default-features leg
+ *
+ * A crate whose table names a feature set other than its defaults is graded a second time
+ * at its defaults: what a consumer's own `cargo doc` builds after `cargo add`, and the set
+ * a link written against the docs.rs features is most likely to break in (a `json` item
+ * linked from an always-on page). A crate documented at its defaults on docs.rs is graded
+ * once.
  *
  * ## Build world
  *
@@ -62,32 +71,39 @@ function run(): never {
 	}
 
 	let failed = 0;
+	let builds = 0;
 	for (const c of crates) {
-		const args = ['doc', '-p', c.name, '--no-deps', '--quiet'];
-		if (c.all_features) args.push('--all-features');
-		if (c.no_default_features) args.push('--no-default-features');
-		if (c.features.length > 0) args.push('--features', c.features.join(','));
-		const result = spawnSync('cargo', args, {
-			encoding: 'utf8',
-			env: { ...process.env, RUSTDOCFLAGS, CARGO_TARGET_DIR: TARGET_DIR },
-			stdio: ['ignore', 'ignore', 'pipe']
-		});
-		const stderr = result.stderr ?? '';
-		const private_links = stderr.match(/links to private item/g)?.length ?? 0;
-		const shape = c.features.length > 0 ? ` --features ${c.features.join(',')}` : '';
-		if (result.status !== 0) {
-			failed++;
-			log(stderr.trimEnd());
-			log(`✗ ${c.name}${shape}: the docs.rs build fails`);
-		} else {
-			log(`✓ ${c.name}${shape}: ${private_links} public→private link(s) (warned)`);
+		const docs_rs_shape: Array<string> = [];
+		if (c.all_features) docs_rs_shape.push('--all-features');
+		if (c.no_default_features) docs_rs_shape.push('--no-default-features');
+		if (c.features.length > 0) docs_rs_shape.push('--features', c.features.join(','));
+		const legs: Array<[label: string, flags: Array<string>]> = [['docs.rs', docs_rs_shape]];
+		// the defaults leg (module doc §The default-features leg)
+		if (docs_rs_shape.length > 0) legs.push(['default-features', []]);
+		for (const [label, flags] of legs) {
+			builds++;
+			const result = spawnSync('cargo', ['doc', '-p', c.name, '--no-deps', '--quiet', ...flags], {
+				encoding: 'utf8',
+				env: { ...process.env, RUSTDOCFLAGS, CARGO_TARGET_DIR: TARGET_DIR },
+				stdio: ['ignore', 'ignore', 'pipe']
+			});
+			const stderr = result.stderr ?? '';
+			const private_links = stderr.match(/links to private item/g)?.length ?? 0;
+			const shape = flags.length > 0 ? ` ${flags.join(' ')}` : '';
+			if (result.status !== 0) {
+				failed++;
+				log(stderr.trimEnd());
+				log(`✗ ${c.name}${shape}: the ${label} build fails`);
+			} else {
+				log(`✓ ${c.name}${shape} (${label}): ${private_links} public→private link(s) (warned)`);
+			}
 		}
 	}
 	if (failed > 0) {
-		log(`docs:audit:docsrs FAILED — ${failed} of ${crates.length} crate(s)`);
+		log(`docs:audit:docsrs FAILED — ${failed} of ${builds} build(s)`);
 		process.exit(1);
 	}
-	log(`docs:audit:docsrs OK — ${crates.length} crate(s) build their docs.rs docs`);
+	log(`docs:audit:docsrs OK — ${crates.length} crate(s), ${builds} build(s)`);
 	process.exit(0);
 }
 

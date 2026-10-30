@@ -46,7 +46,7 @@ use tsv_lang::{
     is_region_end_marker,
 };
 use tsv_lang::{FxHashMap, FxHashSet};
-use tsv_ts::{Expression, ExpressionKind};
+use tsv_ts::ast::{Expression, ExpressionKind};
 
 /// A buffered run of comments from one gap — collected rather than iterated because the
 /// callers ask two questions of it (how does each one lay out? and how did the run end?).

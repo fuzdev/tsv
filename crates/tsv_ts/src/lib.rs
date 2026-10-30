@@ -56,6 +56,7 @@
 
 #[doc(hidden)]
 pub mod __private;
+#[doc(hidden)]
 pub mod ast;
 mod goal;
 mod lexer;
@@ -64,11 +65,14 @@ mod printer;
 mod strip;
 
 use __private::{PrinterInputs, format_folded_in, parse_folded};
+use ast::Program;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
-use tsv_lang::{CommentFreeWindow, EmbedContext, Span};
-pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, WirePoint};
+use tsv_lang::{CommentFreeWindow, EmbedContext};
+pub use tsv_lang::{
+    Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, Span, WireCoordinates, WirePoint,
+};
 
 pub use goal::Goal;
 pub use strip::{StripError, Stripped, UnsupportedKind, strip, strip_with_goal};
@@ -78,9 +82,9 @@ pub use strip::{StripError, Stripped, UnsupportedKind, strip, strip_with_goal};
 /// offset 0), and ECMAScript's line terminators (LF, CR, CRLF as one, U+2028, U+2029).
 /// The wire writer's tables and every parse error's point (`Error::wire_point`, and
 /// the `line:col` its message prints) read this one statement.
-pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinates {
-    lines: tsv_lang::LineRule::Ecmascript,
-    bom: tsv_lang::LeadingBom::Counted,
+pub const WIRE_COORDINATES: WireCoordinates = WireCoordinates {
+    lines: LineRule::Ecmascript,
+    bom: LeadingBom::Counted,
 };
 
 /// Build an *output* printer — pre-sizes the output buffer to the source
@@ -124,39 +128,6 @@ fn with_doc_printer<'a, R>(
         window.take_from(&printer.comment_free_gap);
     }
     out
-}
-
-/// Parse standalone TypeScript with grouping parens preserved.
-///
-/// Like `__private::parse` but keeps `(expr)` as a `ParenthesizedExpression` node (acorn's
-/// `preserveParens: true`), so the paren structure is
-/// present in the AST and its wire JSON. The binding audit uses this to reparse
-/// formatted output and see which parenthesized subtree a glued comment binds to
-/// — a re-binding is invisible in the paren-free public AST.
-///
-/// ⚠️ The tree is for the **wire** (`__private::convert_ast_json_*`) and for walks that read it,
-/// never for [`format()`] or any other printer entry point: a `ParenthesizedExpression`
-/// answers no paren question about its position, so the printer refuses one in a debug
-/// build and prints its contents bare in a release one — dropping every pair the
-/// position needs (`(x + y) * 2` → `x + y * 2`). Format the `__private::parse` tree instead.
-pub fn parse_preserve_parens<'arena>(
-    source: &str,
-    arena: &'arena bumpalo::Bump,
-) -> Result<Program<'arena>> {
-    Error::ensure_source_fits(source)?;
-    parser::parse_typescript_preserve_parens(source, arena)
-        .map_err(|e| e.with_context(source, WIRE_COORDINATES))
-}
-
-/// Whether a block comment's content (delimiters excluded) is a JSDoc type cast —
-/// the `/**`-form comment carrying `@type`/`@satisfies` that binds forward to the
-/// `(` it precedes (prettier's `isTypeCastComment`).
-///
-/// Exposed for the binding audit, which classifies a glued comment's anchor rule
-/// by whether it is a cast (its parens are expected — the audit looks *inside*
-/// them) or an ordinary glued/annotation comment (its next token is what it binds).
-pub fn is_jsdoc_type_cast_comment(content: &str) -> bool {
-    parser::is_jsdoc_type_cast_comment(content)
 }
 
 /// Parse and format `source` in one call, with no source type named.
@@ -319,6 +290,14 @@ impl Default for JsonOptions {
     }
 }
 
+// Options are plain data a caller may build once and share across threads; pin that so a
+// field added later cannot take it away unnoticed.
+#[cfg(feature = "json")]
+const _: () = {
+    const fn assert_send_sync_static<T: Send + Sync + 'static>() {}
+    assert_send_sync_static::<JsonOptions>();
+};
+
 /// Parse `source` as a module and return its wire JSON AST: compact JSON in the
 /// acorn-typescript shape, every node's `start` / `end` a UTF-16 offset and no `loc`.
 ///
@@ -428,7 +407,7 @@ fn with_program_printer<R>(
 /// The TypeScript grammar's `tsv_lang::source_scan::ClosesTypeArguments`
 /// (`OPERAND_GRAMMAR`). `lower_bound` is the scan's own start, which bounds the walk.
 #[must_use]
-pub fn closes_type_arguments(bytes: &[u8], gt: usize, lower_bound: usize) -> bool {
+pub(crate) fn closes_type_arguments(bytes: &[u8], gt: usize, lower_bound: usize) -> bool {
     parser::closes_type_arguments(bytes, gt, lower_bound)
 }
 
@@ -438,7 +417,7 @@ pub fn closes_type_arguments(bytes: &[u8], gt: usize, lower_bound: usize) -> boo
 /// `tsv_lang::source_scan::ClosesStatementHeader` (`OPERAND_GRAMMAR`). `lower_bound` is
 /// the scan's own start, where its forward walk begins.
 #[must_use]
-pub fn closes_statement_header(bytes: &[u8], rparen: usize, lower_bound: usize) -> bool {
+pub(crate) fn closes_statement_header(bytes: &[u8], rparen: usize, lower_bound: usize) -> bool {
     parser::closes_statement_header(bytes, rparen, lower_bound)
 }
 
@@ -447,17 +426,6 @@ pub fn closes_statement_header(bytes: &[u8], rparen: usize, lower_bound: usize) 
 #[cfg(feature = "buffer_stats")]
 pub use printer::buffer_stats::{
     BufferInlineCapacities, BufferStats, inline_capacities, set_buffer_stats, take_buffer_stats,
-};
-
-// Re-exports of types that appear in this crate's public function signatures
-// (`Program`, `Expression` and its variant half `ExpressionKind`, `TSTypeAnnotation`)
-// or are named via the short `tsv_ts::Foo` path by external consumers (`Statement` and
-// its variant half `StatementKind`, `ObjectProperty`, `ObjectPatternProperty` — currently
-// only by tsv_svelte). All other AST types remain accessible through the full
-// `tsv_ts::ast::Foo` path.
-pub use ast::{
-    Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, Program, Statement,
-    StatementKind, TSTypeAnnotation, TSTypeParameterDeclaration, VariableDeclaration,
 };
 
 /// Drive the raw lexer over `source` and return a deterministic, line-per-token

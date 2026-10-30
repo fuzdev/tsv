@@ -1080,13 +1080,13 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &ast::DebugTag<'_>, ctx: &Ctx<'_>) {
     let spliced = if tag.identifiers.iter().any(|entry| {
         matches!(
             entry.unwrap_comment_bound_pairs().kind,
-            tsv_ts::ExpressionKind::SequenceExpression(_)
+            tsv_ts::ast::ExpressionKind::SequenceExpression(_)
         )
     }) {
         let mut flat = Vec::with_capacity(tag.identifiers.len() + 1);
         for entry in tag.identifiers {
             match &entry.unwrap_comment_bound_pairs().kind {
-                tsv_ts::ExpressionKind::SequenceExpression(seq) => {
+                tsv_ts::ast::ExpressionKind::SequenceExpression(seq) => {
                     flat.extend(seq.expressions.iter().map(|e| (*e).clone()));
                 }
                 _ => flat.push(entry.clone()),

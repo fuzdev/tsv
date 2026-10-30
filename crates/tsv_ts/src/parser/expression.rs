@@ -201,7 +201,7 @@ enum SubscriptMode {
 ///
 /// Binds forward to the `(` it glues to: the comment plus those parens **are** the cast.
 ///
-/// Re-exported as [`crate::is_jsdoc_type_cast_comment`] for the binding audit.
+/// Re-exported as [`crate::__private::is_jsdoc_type_cast_comment`] for the binding audit.
 pub(crate) fn is_jsdoc_type_cast_comment(value: &str) -> bool {
     value.starts_with('*') && contains_type_or_satisfies_tag(value)
 }

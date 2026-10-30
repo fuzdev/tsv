@@ -8,8 +8,8 @@ use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{Comment, DepthBudget, DepthLimit, Error, Span};
 use tsv_ts::__private::TopLevelAs;
 use tsv_ts::__private::{is_id_continue, is_id_start};
-use tsv_ts::Expression;
-use tsv_ts::TSTypeAnnotation;
+use tsv_ts::ast::Expression;
+use tsv_ts::ast::TSTypeAnnotation;
 
 /// Build an expression `Comment` from its already-shifted `span` / `content_span`.
 /// `content` is the comment body, read only to compute the `multiline` flag (whether
@@ -796,8 +796,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-        host_check: impl Fn(&Self, &tsv_ts::Statement<'arena>) -> Result<(), Error>,
-    ) -> Result<tsv_ts::Statement<'arena>, Error> {
+        host_check: impl Fn(&Self, &tsv_ts::ast::Statement<'arena>) -> Result<(), Error>,
+    ) -> Result<tsv_ts::ast::Statement<'arena>, Error> {
         let this = &*self;
         let (stmt, comments) = tsv_ts::__private::parse_statement_with_comments(
             source,

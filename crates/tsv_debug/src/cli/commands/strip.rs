@@ -83,6 +83,10 @@ fn strip_file(path: &std::path::Path) -> Result<(), CliError> {
             eprintln!("parse error: {e:#}");
             Err(CliError::Failed)
         }
+        Err(other) => {
+            eprintln!("error: {}", other.message(&source));
+            Err(CliError::Failed)
+        }
     }
 }
 
@@ -166,6 +170,7 @@ fn answer(source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
             serde_json::json!({ "refusal": refusal_line(source, kind, span) })
         }
         Ok(Err(tsv_ts::StripError::Parse(e))) => serde_json::json!({ "error": format!("{e:#}") }),
+        Ok(Err(other)) => serde_json::json!({ "error": other.message(source) }),
         Err(payload) => {
             // a panicked strip may leave the arena mid-allocation; start the next one fresh
             *arena = bumpalo::Bump::new();

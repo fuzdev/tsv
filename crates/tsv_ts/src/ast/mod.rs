@@ -18,7 +18,7 @@
 
 #[cfg(feature = "json")]
 pub(crate) mod convert;
-pub mod precedence;
+pub(crate) mod precedence;
 
 mod classes;
 mod declarations;

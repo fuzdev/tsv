@@ -130,7 +130,7 @@ fn wire_counts(lang: Lang, source: &str) -> WireCounts {
     let arena = bumpalo::Bump::new();
     let wire = match lang {
         Lang::Ts => tsv_ts::__private::convert_ast_json_bytes(
-            &tsv_ts::parse_preserve_parens(source, &arena).expect("parses"),
+            &tsv_ts::__private::parse_preserve_parens(source, &arena).expect("parses"),
             source,
         ),
         Lang::Css => tsv_css::__private::convert_ast_json_bytes(

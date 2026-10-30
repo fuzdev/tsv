@@ -3,6 +3,7 @@
 //! nothing here is covered by semver, and any item may change or go away in any release.
 
 use super::*;
+use crate::ast::CssStyleSheet;
 
 /// [`parse`] over a document the format path folded
 /// (`tsv_lang::printing::normalize_carriage_returns`) — the parse every CSS format entry

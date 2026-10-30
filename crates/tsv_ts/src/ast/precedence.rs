@@ -11,7 +11,7 @@
 use super::BinaryOperator;
 
 /// Operator precedence level (higher = tighter binding)
-pub type PrecedenceLevel = u8;
+pub(crate) type PrecedenceLevel = u8;
 
 /// Get precedence level for an operator
 ///
@@ -28,7 +28,7 @@ pub type PrecedenceLevel = u8;
 /// 10: +, - (additive)
 /// 11: *, /, % (multiplicative)
 /// 12: ** (exponentiation) - right-associative!
-pub fn get_precedence(op: BinaryOperator) -> PrecedenceLevel {
+pub(crate) fn get_precedence(op: BinaryOperator) -> PrecedenceLevel {
     match op {
         // The relative order of the three logical operators here is NOT the
         // grouping authority. `??` and `||` are actually the same precedence
@@ -65,7 +65,9 @@ pub fn get_precedence(op: BinaryOperator) -> PrecedenceLevel {
 }
 
 /// Returns true if the operator is right-associative
-pub fn is_right_associative(op: BinaryOperator) -> bool {
+// TODO: test-only since `precedence` went `pub(crate)` — no printer path asks it.
+#[cfg(test)]
+fn is_right_associative(op: BinaryOperator) -> bool {
     matches!(op, BinaryOperator::StarStar)
 }
 
@@ -82,7 +84,7 @@ pub fn is_right_associative(op: BinaryOperator) -> bool {
 /// Returns true (can flatten, no parens) when:
 /// - Same operator at same precedence (x && y && z)
 /// - Compatible operators at same level
-pub fn should_flatten(parent_op: BinaryOperator, child_op: BinaryOperator) -> bool {
+pub(crate) fn should_flatten(parent_op: BinaryOperator, child_op: BinaryOperator) -> bool {
     let parent_prec = get_precedence(parent_op);
     let child_prec = get_precedence(child_op);
 

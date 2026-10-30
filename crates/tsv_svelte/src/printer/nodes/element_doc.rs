@@ -1299,7 +1299,7 @@ impl<'a> Printer<'a> {
     /// The embed is [`tsv_lang::EmbedContext::line_owning`], the top-level `<script>`'s: a
     /// nested body's statements end their own lines too, and its closing tag takes a fresh
     /// one, so a `//` deferred to a line end still lands in JS.
-    fn build_nested_script_body_doc(&self, program: &tsv_ts::Program<'_>) -> Option<DocId> {
+    fn build_nested_script_body_doc(&self, program: &tsv_ts::ast::Program<'_>) -> Option<DocId> {
         // The body is raw text to the canonical parser, so the host's `Root.comments` holds
         // none of its comments: they are this island's, registered here under the host
         // source they are spanned against (the MERGED view, the one the TS printer emits).
@@ -1344,7 +1344,7 @@ impl<'a> Printer<'a> {
     /// it emits verbatim (the TODO in the body) would remove it with the second format.
     fn build_nested_style_body_doc(
         &self,
-        stylesheet: &tsv_css::CssStyleSheet<'_>,
+        stylesheet: &tsv_css::ast::CssStyleSheet<'_>,
     ) -> Option<DocId> {
         let level = self.body_indent_level();
         let format_at = |level: usize| {

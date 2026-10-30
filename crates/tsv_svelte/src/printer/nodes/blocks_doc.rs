@@ -98,12 +98,12 @@ pub(super) struct AwaitPieces {
 /// False for a binary/logical chain (ends on an operand), a multi-segment member chain (a
 /// `.method(...)` segment, not a bare `)`), a sequence (its `)` is glued to the last operand
 /// one indent in, not at base), and an `as` / `satisfies` cast (ends on the type).
-fn ends_at_base_closer(expr: &tsv_ts::Expression<'_>) -> bool {
-    use tsv_ts::ExpressionKind as E;
+fn ends_at_base_closer(expr: &tsv_ts::ast::Expression<'_>) -> bool {
     use tsv_ts::ast::ArrowFunctionBody;
+    use tsv_ts::ast::ExpressionKind as E;
     // A callee with no nested call means the only `(` belongs to this call, so its
     // `)` lands at the tag base when the args wrap (vs. a chain, whose segments indent).
-    fn callee_has_no_call(mut e: &tsv_ts::Expression<'_>) -> bool {
+    fn callee_has_no_call(mut e: &tsv_ts::ast::Expression<'_>) -> bool {
         // A loop down the spine, not a recursion: a frame per link is what the stack
         // contract prices
         loop {
@@ -381,7 +381,7 @@ impl<'a> Printer<'a> {
     fn build_block_head(
         &self,
         open: &'static str,
-        expr: &tsv_ts::Expression<'_>,
+        expr: &tsv_ts::ast::Expression<'_>,
         head: HeadExpr,
         closer: HeadCloser,
         can_wrap: bool,

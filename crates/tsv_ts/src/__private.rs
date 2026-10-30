@@ -3,6 +3,10 @@
 //! nothing here is covered by semver, and any item may change or go away in any release.
 
 use super::*;
+use crate::ast::{
+    Expression, ExpressionKind, Statement, TSTypeAnnotation, TSTypeParameterDeclaration,
+    VariableDeclaration,
+};
 
 pub use crate::parser::TopLevelAs;
 pub use crate::strip::strip_in;
@@ -1303,4 +1307,37 @@ pub fn convert_ast_json_bytes_with_locations(program: &Program<'_>, source: &str
 pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes(program, source))
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
+}
+
+/// Parse standalone TypeScript with grouping parens preserved.
+///
+/// Like [`parse`] but keeps `(expr)` as a `ParenthesizedExpression` node (acorn's
+/// `preserveParens: true`), so the paren structure is
+/// present in the AST and its wire JSON. The binding audit uses this to reparse
+/// formatted output and see which parenthesized subtree a glued comment binds to
+/// — a re-binding is invisible in the paren-free public AST.
+///
+/// ⚠️ The tree is for the **wire** (`convert_ast_json_*`) and for walks that read it,
+/// never for [`crate::format()`] or any other printer entry point: a `ParenthesizedExpression`
+/// answers no paren question about its position, so the printer refuses one in a debug
+/// build and prints its contents bare in a release one — dropping every pair the
+/// position needs (`(x + y) * 2` → `x + y * 2`). Format the [`parse`] tree instead.
+pub fn parse_preserve_parens<'arena>(
+    source: &str,
+    arena: &'arena bumpalo::Bump,
+) -> Result<Program<'arena>> {
+    Error::ensure_source_fits(source)?;
+    parser::parse_typescript_preserve_parens(source, arena)
+        .map_err(|e| e.with_context(source, WIRE_COORDINATES))
+}
+
+/// Whether a block comment's content (delimiters excluded) is a JSDoc type cast —
+/// the `/**`-form comment carrying `@type`/`@satisfies` that binds forward to the
+/// `(` it precedes (prettier's `isTypeCastComment`).
+///
+/// Exposed for the binding audit, which classifies a glued comment's anchor rule
+/// by whether it is a cast (its parens are expected — the audit looks *inside*
+/// them) or an ordinary glued/annotation comment (its next token is what it binds).
+pub fn is_jsdoc_type_cast_comment(content: &str) -> bool {
+    parser::is_jsdoc_type_cast_comment(content)
 }

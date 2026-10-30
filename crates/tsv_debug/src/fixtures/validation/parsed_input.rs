@@ -11,9 +11,9 @@ use tsv_cli::json_utils::indent_json_with_tabs;
 /// serialization) all need the same AST — sharing one parse keeps
 /// `fixtures_validate` from re-parsing every fixture per phase.
 pub(crate) enum ParsedInput<'arena> {
-    Svelte(tsv_svelte::Root<'arena>),
-    Ts(tsv_ts::Program<'arena>),
-    Css(tsv_css::CssStyleSheet<'arena>),
+    Svelte(tsv_svelte::ast::Root<'arena>),
+    Ts(tsv_ts::ast::Program<'arena>),
+    Css(tsv_css::ast::CssStyleSheet<'arena>),
 }
 
 /// Parse fixture content once for the parser-side validation phases.

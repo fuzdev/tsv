@@ -62,6 +62,7 @@ mod walk;
 
 use std::borrow::Cow;
 use std::fmt;
+use std::ops::Range;
 
 use tsv_lang::{Error, ErrorKind, ErrorReport, Span};
 
@@ -130,6 +131,7 @@ pub fn strip_in<'s>(
 
 /// A successful [`strip`].
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Stripped<'s> {
     /// The JS. `Cow::Borrowed(source)` when nothing is type-only: no copy.
     pub code: Cow<'s, str>,
@@ -139,6 +141,7 @@ pub struct Stripped<'s> {
 
 /// Why [`strip`] produced no output.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum StripError {
     /// The source does not parse.
     Parse(Error),
@@ -156,6 +159,7 @@ pub enum StripError {
 /// The TypeScript [`strip`] refuses: syntax that type blanking cannot erase, because
 /// erasure would have to transform it rather than blank it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum UnsupportedKind {
     /// A non-`declare` `enum`, `const enum` included.
     Enum,
@@ -223,6 +227,19 @@ impl StripError {
         }
     }
 
+    /// The failure's byte range in the source that was stripped — UTF-8 byte offsets, not
+    /// the UTF-16 wire coordinates [`StripError::message`] and [`UnsupportedKind::report`]
+    /// render. A parse error's is [`Error::span`] (an empty `p..p` at a syntax error or a
+    /// depth limit, `None` for a source over the size cap); a refusal's is the refused
+    /// construct's bytes.
+    #[must_use]
+    pub fn span(&self) -> Option<Range<usize>> {
+        match self {
+            Self::Parse(error) => error.span(),
+            Self::Unsupported { span, .. } => Some(span.range()),
+        }
+    }
+
     /// The error's message rendered against `source`, the text that was stripped: a parse
     /// error's own text (what goes wrong, then the `line:column` header, the line and a
     /// caret), and a refusal as `cannot strip <the construct>` over the same header,
@@ -270,6 +287,15 @@ impl fmt::Display for StripError {
     }
 }
 
+// A strip's output and its failure cross threads (a loader's worker pool) and a failure
+// outlives the call (a boxed `dyn Error`); pin that so a field added later cannot take it
+// away unnoticed.
+const _: () = {
+    const fn assert_send_sync_static<T: Send + Sync + 'static>() {}
+    assert_send_sync_static::<StripError>();
+    assert_send_sync_static::<Stripped<'static>>();
+};
+
 impl std::error::Error for StripError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
@@ -308,6 +334,40 @@ mod tests {
             error.message(source),
             "cannot strip an enum\n2:1 enum E {}\n    ^ here"
         );
+    }
+
+    /// A refusal's span is the refused construct's UTF-8 bytes — counted past a
+    /// four-byte character, two UTF-16 units on the wire — and a refusal has no source.
+    #[test]
+    fn refusal_span_is_the_refused_bytes() {
+        let source = "let \u{1d49c}: T = 1;\nenum E {}\n";
+        let error = strip_error(source);
+        let enum_start = source.find("enum").expect("the source holds an enum");
+        assert_eq!(
+            error.span(),
+            Some(enum_start..enum_start + "enum E {}".len())
+        );
+        assert_eq!(
+            &source[error.span().expect("a refusal has a span")],
+            "enum E {}"
+        );
+        assert!(std::error::Error::source(&error).is_none());
+    }
+
+    /// A parse error's span and source are the inner [`Error`](tsv_lang::Error)'s own.
+    #[test]
+    fn parse_error_span_and_source_are_the_inner_errors() {
+        let source = "let \u{1d49c} = ;\n";
+        let error = strip_error(source);
+        let StripError::Parse(parse) = &error else {
+            panic!("expected a parse error: {error:?}");
+        };
+        let span = error.span().expect("a syntax error has a point");
+        assert_eq!(Some(span.clone()), parse.span());
+        assert!(span.is_empty());
+        assert_eq!(&source[span.start..], ";\n");
+        let inner = std::error::Error::source(&error).expect("a parse error has a source");
+        assert_eq!(inner.to_string(), parse.to_string());
     }
 
     #[test]

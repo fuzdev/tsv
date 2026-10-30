@@ -4,7 +4,7 @@
 //   parser output) directly from this AST via the writer
 
 #[cfg(feature = "json")]
-pub mod convert;
+pub(crate) mod convert;
 
 // Svelte internal AST types
 //
@@ -1033,7 +1033,7 @@ impl<'arena> FragmentNode<'arena> {
     /// Computed once per fragment and compared against, rather than asked per node: a
     /// `nodes[..i].all(is_hoisted)` test at each child would be O(n²) over a fragment, on a
     /// question whose answer two bounds settle.
-    pub fn content_bounds(nodes: &[FragmentNode<'_>]) -> Option<(usize, usize)> {
+    pub(crate) fn content_bounds(nodes: &[FragmentNode<'_>]) -> Option<(usize, usize)> {
         let first = nodes.iter().position(|n| !n.is_hoisted_from_fragment())?;
         let last = nodes.iter().rposition(|n| !n.is_hoisted_from_fragment())?;
         Some((first, last))
@@ -1052,14 +1052,14 @@ impl<'arena> FragmentNode<'arena> {
     /// bug class those three exist to close. `<=` rather than `==` because a HOISTED node sits
     /// at a real index below `bounds.0`, and every index it occupies answers the same.
     #[inline]
-    pub fn at_content_start(i: usize, bounds: (usize, usize)) -> bool {
+    pub(crate) fn at_content_start(i: usize, bounds: (usize, usize)) -> bool {
         i <= bounds.0
     }
 
     /// The mirror of [`FragmentNode::at_content_start`] at the **end** of the content bounds —
     /// same rule, same readers, same reason for `>=`.
     #[inline]
-    pub fn at_content_end(i: usize, bounds: (usize, usize)) -> bool {
+    pub(crate) fn at_content_end(i: usize, bounds: (usize, usize)) -> bool {
         i >= bounds.1
     }
 }
@@ -1600,7 +1600,7 @@ pub enum AttributeValue<'arena> {
 /// the token-separator question instead, and answer it with
 /// [`is_svelte_ws`](crate::whitespace::is_svelte_ws).
 #[inline]
-pub const fn is_collapsible_ws(b: u8) -> bool {
+pub(crate) const fn is_collapsible_ws(b: u8) -> bool {
     matches!(b, b' ' | b'\t' | b'\n' | b'\r')
 }
 
@@ -1619,7 +1619,7 @@ pub fn is_collapsible_ws_char(c: char) -> bool {
 /// Byte length of the [`is_collapsible_ws`] run at the head of `s` — exact, since every
 /// member is one ASCII byte, so the answer is a byte boundary and a char boundary at once.
 #[inline]
-pub fn collapsible_ws_prefix_len(s: &str) -> usize {
+pub(crate) fn collapsible_ws_prefix_len(s: &str) -> usize {
     let bytes = s.as_bytes();
     let mut i = 0;
     while i < bytes.len() && is_collapsible_ws(bytes[i]) {
@@ -1631,7 +1631,7 @@ pub fn collapsible_ws_prefix_len(s: &str) -> usize {
 /// Byte length of the [`is_collapsible_ws`] run at the tail of `s` — the mirror of
 /// [`collapsible_ws_prefix_len`].
 #[inline]
-pub fn collapsible_ws_suffix_len(s: &str) -> usize {
+pub(crate) fn collapsible_ws_suffix_len(s: &str) -> usize {
     let bytes = s.as_bytes();
     let mut i = bytes.len();
     while i > 0 && is_collapsible_ws(bytes[i - 1]) {
@@ -1642,19 +1642,19 @@ pub fn collapsible_ws_suffix_len(s: &str) -> usize {
 
 /// Whether `s` is [`is_collapsible_ws`] throughout (an empty `s` is).
 #[inline]
-pub fn is_collapsible_ws_str(s: &str) -> bool {
+pub(crate) fn is_collapsible_ws_str(s: &str) -> bool {
     collapsible_ws_prefix_len(s) == s.len()
 }
 
 /// `s.trim_start_matches(is_collapsible_ws_char)` on bytes — see [`is_collapsible_ws_char`].
 #[inline]
-pub fn trim_start_collapsible_ws(s: &str) -> &str {
+pub(crate) fn trim_start_collapsible_ws(s: &str) -> &str {
     &s[collapsible_ws_prefix_len(s)..]
 }
 
 /// `s.trim_end_matches(is_collapsible_ws_char)` on bytes — see [`is_collapsible_ws_char`].
 #[inline]
-pub fn trim_end_collapsible_ws(s: &str) -> &str {
+pub(crate) fn trim_end_collapsible_ws(s: &str) -> &str {
     &s[..s.len() - collapsible_ws_suffix_len(s)]
 }
 
@@ -1663,7 +1663,7 @@ pub fn trim_end_collapsible_ws(s: &str) -> &str {
 /// same walk as [`collapsible_word_ranges`], the fill's splitter, so a word counted here is a
 /// word packed there.
 #[inline]
-pub fn split_collapsible_ws(s: &str) -> impl Iterator<Item = &str> {
+pub(crate) fn split_collapsible_ws(s: &str) -> impl Iterator<Item = &str> {
     CollapsibleWords { s, pos: 0 }
 }
 
@@ -1683,7 +1683,7 @@ pub fn split_collapsible_ws(s: &str) -> impl Iterator<Item = &str> {
 /// byte of every text node's prose to find a class that is four ASCII bytes, and the fill asks
 /// it of every content text it packs.
 #[inline]
-pub fn collapsible_word_ranges(s: &str) -> impl Iterator<Item = CollapsibleWord> {
+pub(crate) fn collapsible_word_ranges(s: &str) -> impl Iterator<Item = CollapsibleWord> {
     CollapsibleWordRanges {
         bytes: s.as_bytes(),
         pos: 0,
@@ -1693,19 +1693,19 @@ pub fn collapsible_word_ranges(s: &str) -> impl Iterator<Item = CollapsibleWord>
 /// One word of [`collapsible_word_ranges`]: a maximal run of non-[`is_collapsible_ws`] bytes,
 /// as offsets into the string that was split.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CollapsibleWord {
-    pub start: u32,
-    pub end: u32,
+pub(crate) struct CollapsibleWord {
+    pub(crate) start: u32,
+    pub(crate) end: u32,
     /// Whether every byte of the word is ASCII, read off the walk that found its end. A
     /// word holds no `\t` and no `\n` (both end one), so an ASCII word is one column a
     /// byte: its display width is its byte length.
-    pub is_ascii: bool,
+    pub(crate) is_ascii: bool,
 }
 
 impl CollapsibleWord {
     /// The word's text, sliced from the string it was split out of.
     #[inline]
-    pub fn extract<'a>(&self, s: &'a str) -> &'a str {
+    pub(crate) fn extract<'a>(&self, s: &'a str) -> &'a str {
         &s[self.start as usize..self.end as usize]
     }
 }
@@ -1800,7 +1800,7 @@ pub fn text_edge_ws(raw: &str, leading: bool) -> &str {
 /// `matches('\n')`, whose `char` searcher is an out-of-line call per newline on a run of a
 /// few bytes.
 #[inline]
-pub fn text_edge_newlines(raw: &str, leading: bool) -> usize {
+pub(crate) fn text_edge_newlines(raw: &str, leading: bool) -> usize {
     let bytes = raw.as_bytes();
     let mut newlines = 0;
     if leading {

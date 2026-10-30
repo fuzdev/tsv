@@ -316,6 +316,7 @@ fn escape_line_terminators(summary: String) -> String {
 /// in the document's wire coordinates ([`Error::report`]). The error's full message (its
 /// `{:#}` form) is exactly `summary`, a `\n`, then `frame`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ErrorReport {
     /// What went wrong — the message's first part.
     pub summary: String,
@@ -423,6 +424,14 @@ pub enum ErrorKind {
 }
 
 impl std::error::Error for Error {}
+
+// An error crosses threads and outlives the call that made it (a worker pool's results, a
+// boxed `dyn Error`); pin that so a field added later cannot take it away unnoticed.
+const _: () = {
+    const fn assert_send_sync_static<T: Send + Sync + 'static>() {}
+    assert_send_sync_static::<Error>();
+    assert_send_sync_static::<ErrorReport>();
+};
 
 /// Result type alias for parsing operations
 pub type Result<T> = std::result::Result<T, Error>;

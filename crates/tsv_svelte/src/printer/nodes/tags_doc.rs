@@ -10,7 +10,7 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::after_operator::fluid_after_operator;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::TriviaProfile;
-use tsv_ts::{Expression, ExpressionKind};
+use tsv_ts::ast::{Expression, ExpressionKind};
 
 // Opening-tag literals whose `.len()` locates the embedded expression past the
 // tag; sharing the literal keeps the emitted text and the scan offset in sync.

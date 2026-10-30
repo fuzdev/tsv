@@ -7,7 +7,7 @@ use crate::lexer::TokenKind;
 use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::TriviaProfile;
 use tsv_lang::{Error, Span};
-use tsv_ts::{Expression, ExpressionKind};
+use tsv_ts::ast::{Expression, ExpressionKind};
 
 use super::parser_impl::SvelteParser;
 use super::subslice_offset;
@@ -144,7 +144,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let statement = self.parse_ts_statement(tag_content, tag_content_start, |this, stmt| {
             this.reject_declaration_tag_statement(stmt, tag_content_start, close_brace)
         })?;
-        let tsv_ts::StatementKind::VariableDeclaration(declaration) = statement.kind else {
+        let tsv_ts::ast::StatementKind::VariableDeclaration(declaration) = statement.kind else {
             // Refused inside the parse; this arm only names the shape.
             return Err(self.error_not_a_declaration(tag_content_start));
         };
@@ -163,11 +163,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// re-read as acorn-typescript's. `close_brace` is the tag's `}`.
     fn reject_declaration_tag_statement(
         &self,
-        statement: &tsv_ts::Statement<'arena>,
+        statement: &tsv_ts::ast::Statement<'arena>,
         tag_content_start: usize,
         close_brace: usize,
     ) -> Result<(), Error> {
-        let tsv_ts::StatementKind::VariableDeclaration(declaration) = &statement.kind else {
+        let tsv_ts::ast::StatementKind::VariableDeclaration(declaration) = &statement.kind else {
             return Err(self.error_not_a_declaration(tag_content_start));
         };
 

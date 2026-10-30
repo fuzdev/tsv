@@ -513,6 +513,13 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
                 );
             }
         }
+        (_, Err(other)) => push(
+            StripCheck::Output,
+            format!(
+                "a strip failure this grader does not know: {}",
+                other.message(&input)
+            ),
+        ),
     }
     findings
 }

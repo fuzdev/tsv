@@ -395,6 +395,9 @@ fn strip_typescript_engine(source: &str, source_type: Option<String>) -> Result<
                 construct: Some(kind.name()),
                 report: kind.report(span, source),
             }),
+            // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
+            // thrown with its message rather than given a `kind` the facade does not declare
+            Err(other) => Err(Failure::Plain(other.message(source))),
         },
     )
 }

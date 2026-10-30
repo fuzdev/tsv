@@ -8,7 +8,7 @@
 
 use tsv_lang::doc::DocContext;
 use tsv_lang::doc::arena::DocNode;
-use tsv_ts::{Expression, Statement};
+use tsv_ts::ast::{Expression, Statement};
 
 // `DocContext` rides inline in `DocNode::WithContext`; see its native pin in `tsv_lang`
 // for the budget it is held to.

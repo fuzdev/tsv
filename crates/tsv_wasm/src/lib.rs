@@ -266,6 +266,9 @@ pub fn strip_typescript(source: &str, source_type: JsValue) -> Result<JsValue, J
                 Some(kind.name()),
                 &kind.report(span, source),
             )),
+            // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
+            // thrown with its message rather than given a `kind` the facade does not declare
+            Err(other) => Err(err(other.message(source))),
         },
     )
 }

@@ -269,7 +269,10 @@ impl SimpleSelector<'_> {
 /// the printer's re-quoting all read this split rather than re-deriving it. The slice
 /// is safe: a `TokenKind::String` span always carries both delimiters (the lexer
 /// errors on an unterminated string).
-pub fn attribute_value_quote_and_text(source: &str, value_span: Span) -> (Option<char>, &str) {
+pub(crate) fn attribute_value_quote_and_text(
+    source: &str,
+    value_span: Span,
+) -> (Option<char>, &str) {
     let raw = value_span.extract(source);
     match raw.as_bytes().first() {
         Some(&q @ (b'\'' | b'"')) => (Some(q as char), &raw[1..raw.len() - 1]),
