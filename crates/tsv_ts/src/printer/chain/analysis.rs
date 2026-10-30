@@ -645,7 +645,7 @@ enum PendingLink<'a> {
     },
 }
 
-/// The links [`linearize_spine_loop`] holds: a chain's rest past [`LINK_FRAMES`] links, the
+/// The links [`linearize_spine_loop`] holds: a chain's rest past [`CHAIN_FRAMES`] links, the
 /// first eight of it without spilling to the heap.
 type PendingLinks<'a> = SmallVec<[PendingLink<'a>; 8]>;
 
@@ -653,7 +653,7 @@ type PendingLinks<'a> = SmallVec<[PendingLink<'a>; 8]>;
 /// in [`linearize_spine_loop`]: the common chain is a few links long and its recursion is
 /// the cheaper walk, while a chain past them costs the stack of this many frames whatever
 /// its length.
-const LINK_FRAMES: u32 = 16;
+const CHAIN_FRAMES: u32 = 16;
 
 /// Linearize the chain rooted at `expr` onto `nodes`, base first: a member, call or
 /// non-null link pushes its node after everything below it, so the nodes come out in
@@ -662,7 +662,7 @@ const LINK_FRAMES: u32 = 16;
 /// Each link runs in two halves: on the way down, its descent half pushes what stops the
 /// walk there (a base of its own) or hands back the operand to walk; once everything below
 /// it is linearized, its return half pushes the link's node, reading `nodes` as it then
-/// stands (the last node, the last member node). The first [`LINK_FRAMES`] links recurse;
+/// stands (the last node, the last member node). The first [`CHAIN_FRAMES`] links recurse;
 /// the rest of a longer chain is walked by [`linearize_spine_loop`], which runs the same
 /// halves in the same order without a frame per link.
 fn linearize_spine<'a>(
@@ -671,7 +671,7 @@ fn linearize_spine<'a>(
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
-    linearize_link(expr, input, nodes, paren_gaps, LINK_FRAMES);
+    linearize_link(expr, input, nodes, paren_gaps, CHAIN_FRAMES);
 }
 
 /// [`linearize_spine`]'s recursion: `expr`'s link, with `frames` link frames left before
@@ -720,7 +720,7 @@ fn linearize_link<'a>(
     }
 }
 
-/// The rest of a chain past [`LINK_FRAMES`] links, walked as a loop: it descends through the
+/// The rest of a chain past [`CHAIN_FRAMES`] links, walked as a loop: it descends through the
 /// links running each descent half and holding each return half ([`PendingLink`]) until a
 /// base ends the descent, then runs the held halves innermost first — the order
 /// [`linearize_link`]'s recursion returns in, so each half reads the `nodes` it would read
@@ -2066,7 +2066,7 @@ mod tests {
 
     /// The loop pushes the nodes and the paren gaps the recursion pushes, in the same order —
     /// the loop from the first link, the recursion all the way down, and the walk itself,
-    /// which switches from one to the other past [`LINK_FRAMES`] links — over chains that
+    /// which switches from one to the other past [`CHAIN_FRAMES`] links — over chains that
     /// reach every descent half and every return half: sealed optional chains, transparent
     /// instantiations, IIFE bases, retained `!` shells, stripped-paren gaps with comments,
     /// and the kept shells of a comma-list region (every link's span marked, every other
@@ -2105,7 +2105,7 @@ mod tests {
             "a.b`x${c.d()}`.e();",
             "x.y(() => z.w().v).u;",
         ];
-        let long_tail = ".b!/* c */.c()?.d[0]".repeat(LINK_FRAMES as usize / 2);
+        let long_tail = ".b!/* c */.c()?.d[0]".repeat(CHAIN_FRAMES as usize / 2);
         let sources: Vec<String> = short
             .iter()
             .map(|&source| source.to_owned())
@@ -2151,7 +2151,7 @@ mod tests {
                 for root in &roots {
                     let recursed = linearized(root, input, Some(u32::MAX));
                     let looped = linearized(root, input, None);
-                    let switched = linearized(root, input, Some(LINK_FRAMES));
+                    let switched = linearized(root, input, Some(CHAIN_FRAMES));
                     let at = &source[root.span.range()];
                     assert_eq!(looped, recursed, "{source:?} from {at:?}");
                     assert_eq!(switched, recursed, "{source:?} from {at:?}");
