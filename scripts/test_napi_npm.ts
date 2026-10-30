@@ -1511,11 +1511,31 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 	// exit 1 as every parse failure exits, never an uncaught stack trace. (The native bin
 	// re-indents the wire's bytes without reading them back, so it has no such ceiling —
 	// not compared here: its `--pretty` of this tree is hundreds of megabytes of indent.)
+	// The input is the deepest flat `+` chain the spine limit admits, found by bisecting on
+	// the engine itself so the test follows the limit's constants rather than restating them
+	// (`docs/cli.md` §The depth limits; `tests/depth_limit.rs` grades the limit) — a `+` chain
+	// nests to the left, one wire level per operator, so it is as deep a tree as the engine
+	// accepts. The tree outgrows Node's default stack by too thin a margin to hold on every
+	// platform's frame size, so the mirror runs on about half that stack, which the tree
+	// outgrows everywhere; the classification under test does not depend on where the stack ends.
 	it('a tree too deep to serialize in JS is its own error on the mirror', () => {
-		const deep = `x = ${Array.from({ length: 10_000 }, () => '1').join('+')};\n`;
+		const chain = (terms: number) => `x = ${Array.from({ length: terms }, () => '1').join('+')};\n`;
+		let [accepted, refused] = [2, 2 * 6_000];
+		assert.equal(api.parse_typescript_json(chain(refused)).ok, false, 'past the spine limit');
+		while (refused - accepted > 1) {
+			const mid = (accepted + refused) >> 1;
+			if (api.parse_typescript_json(chain(mid)).ok) accepted = mid;
+			else refused = mid;
+		}
+		const deep = chain(accepted);
+		const too_long = run_mirror(['parse', '--content', chain(refused), '--parser', 'typescript']);
+		assert.equal(too_long.status, 1, too_long.stderr);
+		assert.match(too_long.stderr, /^Parse error: Chain of .* exceeds tsv's length limit\n/);
 		for (const flag of ['--pretty', '--locations']) {
 			const args = ['parse', flag, '--content', deep, '--parser', 'typescript'];
-			const mirror = run_mirror(args);
+			const mirror = spawnSync(process.execPath, ['--stack-size=500', cli_path, ...args], {
+				encoding: 'utf-8'
+			});
 			assert.equal(mirror.status, 1, mirror.stderr);
 			assert.equal(mirror.stdout, '');
 			assert.match(
@@ -1525,7 +1545,7 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 			);
 		}
 		// the engine parsed it: the compact default prints the engine's wire string verbatim,
-		// with nothing to serialize (a few megabytes, past `spawnSync`'s default buffer)
+		// with nothing to serialize (its size follows the limit, so the buffer has headroom)
 		const compact = spawnSync(
 			process.execPath,
 			[cli_path, 'parse', '--content', deep, '--parser', 'typescript'],
