@@ -1838,7 +1838,7 @@ mod tests {
         ];
         for source in sources {
             let arena = bumpalo::Bump::new();
-            let root = crate::parse(source, &arena)
+            let root = crate::__private::parse(source, &arena)
                 .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
             assert!(
                 !root.comments.is_empty(),
@@ -1883,7 +1883,7 @@ mod tests {
         ];
         for source in sources {
             let arena = bumpalo::Bump::new();
-            let root = crate::parse(source, &arena)
+            let root = crate::__private::parse(source, &arena)
                 .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
             let mut seen = 0;
             let mut stack = vec![&root.fragment];

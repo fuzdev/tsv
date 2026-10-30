@@ -51,18 +51,18 @@ fn assert_name_survives(name: &str) {
         let source = template.replace("NAME", name);
 
         let arena = bumpalo::Bump::new();
-        let program = tsv_ts::parse(&source, &arena)
+        let program = tsv_ts::__private::parse(&source, &arena)
             .unwrap_or_else(|e| panic!("parse failed for a {len}-byte name in {template:?}: {e}"));
         // A name of ASCII letters or `é` is written to the wire as its own bytes.
         let field = format!("\"name\":\"{name}\"");
         for (variant, bytes) in [
             (
                 "loc",
-                tsv_ts::convert_ast_json_bytes_with_locations(&program, &source),
+                tsv_ts::__private::convert_ast_json_bytes_with_locations(&program, &source),
             ),
             (
                 "span-only",
-                tsv_ts::convert_ast_json_bytes(&program, &source),
+                tsv_ts::__private::convert_ast_json_bytes(&program, &source),
             ),
         ] {
             let wire = String::from_utf8(bytes).expect("the wire is UTF-8");

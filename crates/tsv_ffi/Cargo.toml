@@ -25,13 +25,13 @@ serde_json.workspace = true
 # Default build — both halves: the full libtsv_ffi the bench perf rows load and
 # any FFI host links against. The format-only size build uses
 # `--no-default-features --features format` (deno task build:ffi:format), the
-# native mirror of @fuzdev/tsv-format-wasm — it drops the convert/JSON layer.
+# native mirror of @fuzdev/tsv-format-wasm — it drops the wire-JSON layer.
 default = ["format", "parse"]
 # tsv_format_<lang> exports. Pulls the reusable `DocArena` (tsv_arena/format → tsv_lang).
 format = ["tsv_arena/format"]
 # tsv_parse_<lang> + tsv_parse_internal_<lang> exports plus the wire-JSON
-# convert layer they emit through.
-parse = ["tsv_ts/convert", "tsv_css/convert", "tsv_svelte/convert"]
+# layer they emit through (each language crate's `json` feature).
+parse = ["tsv_ts/json", "tsv_css/json", "tsv_svelte/json"]
 
 # FFI requires unsafe code. Cargo replaces the whole [lints] table on
 # override (no partial inherit), so the workspace lints are re-declared

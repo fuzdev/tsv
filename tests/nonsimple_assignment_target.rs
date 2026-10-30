@@ -39,19 +39,19 @@ use serde_json::Value;
 
 fn parse_json(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source))
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source))
 }
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
     tsv_ts::__private::format_ast(&program, source)
 }
 
 fn rejects(source: &str) -> bool {
     let arena = bumpalo::Bump::new();
-    tsv_ts::parse(source, &arena).is_err()
+    tsv_ts::__private::parse(source, &arena).is_err()
 }
 
 /// `foo() = bar;` parses as an `AssignmentExpression` whose left is the
@@ -326,7 +326,7 @@ fn cast_wrapping_destructure_target_parses_and_formats() {
 fn nested_parenthesized_cast_target_parses_and_formats() {
     let arena = bumpalo::Bump::new();
     assert!(
-        tsv_ts::parse("({ a: (b as T) } = obj);", &arena).is_ok(),
+        tsv_ts::__private::parse("({ a: (b as T) } = obj);", &arena).is_ok(),
         "a nested parenthesized cast in a destructuring assignment parses",
     );
     let canonical = "({ a: b as T } = obj);\n";

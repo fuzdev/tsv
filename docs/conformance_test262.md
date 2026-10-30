@@ -335,7 +335,7 @@ See `crates/tsv_debug/src/test262/frontmatter.rs`.
       - onlyStrict  → one Script parse, "use strict"; prepended
       - noStrict/raw → one sloppy Script parse of the file's own bytes
       - no mode flag → TWO Script parses, sloppy and strict
-   e. Parse with tsv_ts::parse_with_goal(), once per declared run
+   e. Parse with tsv_ts::__private::parse_with_goal(), once per declared run
    f. Compare result with expected — a two-run test must agree with it in BOTH
       runs, and a disagreement between the runs is reported as its own failure
 
@@ -484,7 +484,7 @@ grades them in the mode the test declares.
 **Strictness and the *goal* symbol are orthogonal axes** (ECMAScript §11.2.2), with one
 coupling: a parse runs against either `Goal::Module` or `Goal::Script`; Module code is
 strict by definition, while Script code carries whatever strictness its own source text
-declares. tsv exposes the goal as `tsv_ts::parse_with_goal` (and
+declares. tsv exposes the goal as `tsv_ts::JsonOptions::goal` / `format_with_goal` (and
 `tsv parse|format --source-type script|module`), defaulting to **`Module`** — correct for
 Svelte `<script>` and ~all real TS. The goal toggles only the four goal-specific
 constructs:

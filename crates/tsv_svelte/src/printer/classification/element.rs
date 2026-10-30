@@ -88,7 +88,7 @@ mod tests {
     fn block_adapter_delegates_and_treats_components_as_inline() {
         let src = "<div><span>i</span><Comp>c</Comp></div>";
         let arena = bumpalo::Bump::new();
-        let root = crate::parse(src, &arena).expect("template should parse");
+        let root = crate::__private::parse(src, &arena).expect("template should parse");
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
         let printer = Printer::new(&doc_arena, src, &[]);
         let div = match &root.fragment.nodes[0] {
@@ -113,7 +113,7 @@ mod tests {
 
         let src = "<div><script>let x = 1;</script><style>a { color: red }</style></div>";
         let arena = bumpalo::Bump::new();
-        let root = crate::parse(src, &arena).expect("template should parse");
+        let root = crate::__private::parse(src, &arena).expect("template should parse");
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
         let printer = Printer::new(&doc_arena, src, &[]);
         let div = match &root.fragment.nodes[0] {
@@ -133,7 +133,7 @@ mod tests {
         // `has_raw_content` — not node-presence — is what makes this inline.
         let src = "<div><script></script><style></style></div>";
         let arena = bumpalo::Bump::new();
-        let root = crate::parse(src, &arena).expect("template should parse");
+        let root = crate::__private::parse(src, &arena).expect("template should parse");
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
         let printer = Printer::new(&doc_arena, src, &[]);
         let div = match &root.fragment.nodes[0] {

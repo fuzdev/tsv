@@ -77,7 +77,7 @@ impl StripCommand {
         let source = input.content();
         let arena =
             bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-        match tsv_ts::strip_with_goal(source, goal, &arena) {
+        match tsv_ts::__private::strip_in(source, goal, &arena) {
             Ok(stripped) => {
                 if !self.check {
                     write_stdout(stripped.code.as_bytes());

@@ -1814,7 +1814,7 @@ fn format_respelled_tail(
     respelled.push_str(&source[at + ch.len_utf8()..]);
 
     let bump = bumpalo::Bump::new();
-    match crate::parse(&respelled, &bump) {
+    match crate::__private::parse(&respelled, &bump) {
         Ok(respelled_root) => {
             let line_breaks = LineBreaks::new(&respelled, arena.take_line_breaks_scratch());
             format_root(
@@ -1864,7 +1864,7 @@ fn format_lifted_runs(
     frozen: FrozenSections,
 ) -> String {
     let bump = bumpalo::Bump::new();
-    match crate::parse(lifted, &bump) {
+    match crate::__private::parse(lifted, &bump) {
         Ok(lifted_root) => {
             let line_breaks = LineBreaks::new(lifted, arena.take_line_breaks_scratch());
             format_root(

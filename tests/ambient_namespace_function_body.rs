@@ -30,8 +30,8 @@ use serde_json::Value;
 
 fn parse_json(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source))
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source))
 }
 
 /// The plain form's function node matches the `export function` form's (minus the

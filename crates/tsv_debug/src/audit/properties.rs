@@ -116,7 +116,7 @@ pub(crate) fn source_has_ignore_directive(source: &str) -> bool {
 ///
 /// TypeScript is read **exactly as [`format_source`] reads it** — no source type
 /// named, so the module grammar with a script retry
-/// (`tsv_ts::parse_with_goal_or_fallback`). Every caller here is an audit that
+/// (`tsv_ts::__private::parse_with_goal_or_fallback`). Every caller here is an audit that
 /// paired this with a `format_source` call, and a re-read stricter than the
 /// formatter's own would report a sloppy script's perfectly good output as
 /// unreparseable. This is the audit substrate's reader, not the `parse` command's:
@@ -160,16 +160,16 @@ pub(crate) fn tsv_parse_to_wire_bytes(source: &str, parser: ParserType) -> Optio
     let arena = bumpalo::Bump::new();
     match parser {
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse_with_goal_or_fallback(source, None, &arena).ok()?;
-            Some(tsv_ts::convert_ast_json_bytes(&ast, source))
+            let ast = tsv_ts::__private::parse_with_goal_or_fallback(source, None, &arena).ok()?;
+            Some(tsv_ts::__private::convert_ast_json_bytes(&ast, source))
         }
         ParserType::Svelte => {
-            let ast = tsv_svelte::parse(source, &arena).ok()?;
-            Some(tsv_svelte::convert_ast_json_bytes(&ast, source))
+            let ast = tsv_svelte::__private::parse(source, &arena).ok()?;
+            Some(tsv_svelte::__private::convert_ast_json_bytes(&ast, source))
         }
         ParserType::Css => {
-            let ast = tsv_css::parse(source, &arena).ok()?;
-            Some(tsv_css::convert_ast_json_bytes(&ast, source))
+            let ast = tsv_css::__private::parse(source, &arena).ok()?;
+            Some(tsv_css::__private::convert_ast_json_bytes(&ast, source))
         }
     }
 }
@@ -189,9 +189,11 @@ pub(crate) fn tsv_parse_to_wire_bytes(source: &str, parser: ParserType) -> Optio
 pub(crate) fn tsv_parses(source: &str, parser: ParserType) -> bool {
     let arena = bumpalo::Bump::new();
     match parser {
-        ParserType::TypeScript => tsv_ts::parse_with_goal_or_fallback(source, None, &arena).is_ok(),
-        ParserType::Svelte => tsv_svelte::parse(source, &arena).is_ok(),
-        ParserType::Css => tsv_css::parse(source, &arena).is_ok(),
+        ParserType::TypeScript => {
+            tsv_ts::__private::parse_with_goal_or_fallback(source, None, &arena).is_ok()
+        }
+        ParserType::Svelte => tsv_svelte::__private::parse(source, &arena).is_ok(),
+        ParserType::Css => tsv_css::__private::parse(source, &arena).is_ok(),
     }
 }
 

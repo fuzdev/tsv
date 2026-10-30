@@ -480,7 +480,7 @@ fn scan_past_trailing_comments(source: &str, start: u32, limit: u32) -> u32 {
     last_comment_end
 }
 
-#[cfg(all(test, feature = "convert"))]
+#[cfg(all(test, feature = "json"))]
 mod tests {
     use serde_json::Value;
 
@@ -490,9 +490,10 @@ mod tests {
         // Test inputs are hardcoded valid sources; a parse failure should panic
         let arena = bumpalo::Bump::new();
         #[expect(clippy::expect_used)]
-        let root = crate::parse(&source, &arena).expect("parse");
+        let root = crate::__private::parse(&source, &arena).expect("parse");
         #[expect(clippy::expect_used)]
-        serde_json::from_slice(&crate::convert_ast_json_bytes(&root, &source)).expect("wire")
+        serde_json::from_slice(&crate::__private::convert_ast_json_bytes(&root, &source))
+            .expect("wire")
     }
 
     /// The first statement's expression in the instance `<script>`.
@@ -513,9 +514,10 @@ mod tests {
     fn convert_component(source: &str) -> Value {
         let arena = bumpalo::Bump::new();
         #[expect(clippy::expect_used)]
-        let root = crate::parse(source, &arena).expect("parse");
+        let root = crate::__private::parse(source, &arena).expect("parse");
         #[expect(clippy::expect_used)]
-        serde_json::from_slice(&crate::convert_ast_json_bytes(&root, source)).expect("wire")
+        serde_json::from_slice(&crate::__private::convert_ast_json_bytes(&root, source))
+            .expect("wire")
     }
 
     /// `scan_past_trailing_comments` mimics acorn's post-expression token scan, so its
@@ -568,7 +570,7 @@ mod tests {
         let arena = bumpalo::Bump::new();
         let source = "<div>{expr\u{85}/* c */}</div>";
         assert!(
-            crate::parse(source, &arena).is_err(),
+            crate::__private::parse(source, &arena).is_err(),
             "U+0085 is not JS `\\s`, so it cannot open a gap acorn scans across"
         );
     }
@@ -708,20 +710,22 @@ mod tests {
         #[expect(clippy::expect_used)]
         fn assert_placements(source: &str, expected: &[(&str, u64, u64, &'static str, &str)]) {
             let arena = bumpalo::Bump::new();
-            let root = crate::parse(source, &arena).expect("parse");
+            let root = crate::__private::parse(source, &arena).expect("parse");
             let expected: Vec<Placement> = expected
                 .iter()
                 .map(|&(node, start, end, key, value)| {
                     (node.to_owned(), start, end, key, value.to_owned())
                 })
                 .collect();
-            let wires =
-                std::iter::once(("span-only", crate::convert_ast_json_bytes(&root, source)));
+            let wires = std::iter::once((
+                "span-only",
+                crate::__private::convert_ast_json_bytes(&root, source),
+            ));
             // the loc-bearing wire exists only under `tsv_lang`'s `locations` feature
             #[cfg(feature = "locations")]
             let wires = wires.chain(std::iter::once((
                 "loc",
-                crate::convert_ast_json_bytes_with_locations(&root, source),
+                crate::__private::convert_ast_json_bytes_with_locations(&root, source),
             )));
             for (wire_name, bytes) in wires {
                 let wire: Value = serde_json::from_slice(&bytes).expect("wire");

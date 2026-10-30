@@ -116,9 +116,9 @@ fn on_thread<T: Send + 'static>(
 fn parse(lang: Lang, source: &str) -> Result<(), String> {
     let arena = bumpalo::Bump::new();
     match lang {
-        Lang::Ts => tsv_ts::parse(source, &arena).map(drop),
-        Lang::Css => tsv_css::parse(source, &arena).map(drop),
-        Lang::Svelte => tsv_svelte::parse(source, &arena).map(drop),
+        Lang::Ts => tsv_ts::__private::parse(source, &arena).map(drop),
+        Lang::Css => tsv_css::__private::parse(source, &arena).map(drop),
+        Lang::Svelte => tsv_svelte::__private::parse(source, &arena).map(drop),
     }
     .map_err(|e| e.to_string())
 }
@@ -129,16 +129,16 @@ fn parse(lang: Lang, source: &str) -> Result<(), String> {
 fn wire_counts(lang: Lang, source: &str) -> WireCounts {
     let arena = bumpalo::Bump::new();
     let wire = match lang {
-        Lang::Ts => tsv_ts::convert_ast_json_bytes(
+        Lang::Ts => tsv_ts::__private::convert_ast_json_bytes(
             &tsv_ts::parse_preserve_parens(source, &arena).expect("parses"),
             source,
         ),
-        Lang::Css => tsv_css::convert_ast_json_bytes(
-            &tsv_css::parse(source, &arena).expect("parses"),
+        Lang::Css => tsv_css::__private::convert_ast_json_bytes(
+            &tsv_css::__private::parse(source, &arena).expect("parses"),
             source,
         ),
-        Lang::Svelte => tsv_svelte::convert_ast_json_bytes(
-            &tsv_svelte::parse(source, &arena).expect("parses"),
+        Lang::Svelte => tsv_svelte::__private::convert_ast_json_bytes(
+            &tsv_svelte::__private::parse(source, &arena).expect("parses"),
             source,
         ),
     };
@@ -327,9 +327,9 @@ enum Verdict {
 fn verdict(lang: Lang, source: &str) -> Verdict {
     let arena = bumpalo::Bump::new();
     let result = match lang {
-        Lang::Ts => tsv_ts::parse(source, &arena).map(drop),
-        Lang::Css => tsv_css::parse(source, &arena).map(drop),
-        Lang::Svelte => tsv_svelte::parse(source, &arena).map(drop),
+        Lang::Ts => tsv_ts::__private::parse(source, &arena).map(drop),
+        Lang::Css => tsv_css::__private::parse(source, &arena).map(drop),
+        Lang::Svelte => tsv_svelte::__private::parse(source, &arena).map(drop),
     };
     match result {
         Ok(()) => Verdict::Accepted,
@@ -505,17 +505,18 @@ fn run_walks(name: String, lang: Lang, source: String) {
         let arena = bumpalo::Bump::new();
         match lang {
             Lang::Ts => {
-                let program = tsv_ts::parse(&source, &arena).expect("parses");
-                assert!(!tsv_ts::convert_ast_json_bytes(&program, &source).is_empty());
+                let program = tsv_ts::__private::parse(&source, &arena).expect("parses");
+                assert!(!tsv_ts::__private::convert_ast_json_bytes(&program, &source).is_empty());
                 assert!(
-                    !tsv_ts::convert_ast_json_bytes_with_locations(&program, &source).is_empty()
+                    !tsv_ts::__private::convert_ast_json_bytes_with_locations(&program, &source)
+                        .is_empty()
                 );
                 let formatted = tsv_ts::format(&source).expect("formats");
                 assert_output_reparses(&name, Lang::Ts, &formatted);
                 let strip_arena = bumpalo::Bump::new();
                 // a refusal (a value namespace has runtime semantics) is a verdict, not a
                 // failure: the walk reached it
-                let stripped = tsv_ts::strip(&source, &strip_arena);
+                let stripped = tsv_ts::__private::strip_in(&source, None, &strip_arena);
                 assert!(
                     matches!(
                         stripped,
@@ -525,19 +526,21 @@ fn run_walks(name: String, lang: Lang, source: String) {
                 );
             }
             Lang::Css => {
-                let sheet = tsv_css::parse(&source, &arena).expect("parses");
-                assert!(!tsv_css::convert_ast_json_bytes(&sheet, &source).is_empty());
+                let sheet = tsv_css::__private::parse(&source, &arena).expect("parses");
+                assert!(!tsv_css::__private::convert_ast_json_bytes(&sheet, &source).is_empty());
                 assert!(
-                    !tsv_css::convert_ast_json_bytes_with_locations(&sheet, &source).is_empty()
+                    !tsv_css::__private::convert_ast_json_bytes_with_locations(&sheet, &source)
+                        .is_empty()
                 );
                 let formatted = tsv_css::format(&source).expect("formats");
                 assert_output_reparses(&name, Lang::Css, &formatted);
             }
             Lang::Svelte => {
-                let root = tsv_svelte::parse(&source, &arena).expect("parses");
-                assert!(!tsv_svelte::convert_ast_json_bytes(&root, &source).is_empty());
+                let root = tsv_svelte::__private::parse(&source, &arena).expect("parses");
+                assert!(!tsv_svelte::__private::convert_ast_json_bytes(&root, &source).is_empty());
                 assert!(
-                    !tsv_svelte::convert_ast_json_bytes_with_locations(&root, &source).is_empty()
+                    !tsv_svelte::__private::convert_ast_json_bytes_with_locations(&root, &source)
+                        .is_empty()
                 );
                 let formatted = tsv_svelte::format(&source).expect("formats");
                 assert_output_reparses(&name, Lang::Svelte, &formatted);
@@ -976,7 +979,7 @@ fn a_css_value_past_the_limit_is_refused_at_the_paren_that_passes_it() {
             if pre.is_empty() { "" } else { ")" }
         );
         let arena = bumpalo::Bump::new();
-        let error = tsv_css::parse(&source, &arena).expect_err("refused");
+        let error = tsv_css::__private::parse(&source, &arena).expect_err("refused");
         assert_eq!(error.kind(), tsv_lang::ErrorKind::TooDeep, "{error:#}");
         let at = error.position().expect("located");
         let value_start = source.find(": ").expect("value") + 2;

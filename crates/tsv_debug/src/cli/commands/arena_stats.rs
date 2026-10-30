@@ -290,9 +290,9 @@ fn run_reuse(files: &[std::path::PathBuf], list_errors: bool) -> Result<(), CliE
 fn measure_bump_demand(source: &str, parser: ParserType) -> u64 {
     let bump = bumpalo::Bump::new();
     let ok = match parser {
-        ParserType::TypeScript => tsv_ts::parse(source, &bump).is_ok(),
-        ParserType::Svelte => tsv_svelte::parse(source, &bump).is_ok(),
-        ParserType::Css => tsv_css::parse(source, &bump).is_ok(),
+        ParserType::TypeScript => tsv_ts::__private::parse(source, &bump).is_ok(),
+        ParserType::Svelte => tsv_svelte::__private::parse(source, &bump).is_ok(),
+        ParserType::Css => tsv_css::__private::parse(source, &bump).is_ok(),
     };
     if ok { bump.allocated_bytes() as u64 } else { 0 }
 }

@@ -160,7 +160,7 @@ Failures the strip does not yet fix are pinned in the ratchet snapshot
 `crates/tsv_debug/src/cli/commands/strip_fixtures_known.txt`: a new failure fails the gate,
 and so does a pinned one that stopped failing — re-pin with
 `deno task strip:fixtures:validate:update` once the change is deliberate. A broken fixture
-(an expected output that breaks the contract above or does not parse under `tsv_ts::parse`,
+(an expected output that breaks the contract above or does not parse under `tsv_ts::__private::parse`,
 or a malformed `divergences.txt`) and a panic are never pinned. A reviewed claim is graded
 exactly like a generated one. That parse is a TypeScript one, so it shows the expected output
 parses, not that it is JS; the oracle side's oxc JS-mode parse is the JS-validity

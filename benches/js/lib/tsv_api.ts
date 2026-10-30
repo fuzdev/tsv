@@ -238,7 +238,7 @@ export abstract class TsvBinding extends BaseImplementation {
 	/**
 	 * `format_<lang>(source)` — no source type named: the shipped default on every
 	 * surface, and the one that reaches the module-then-script fallback
-	 * (`tsv_ts::parse_with_goal_or_fallback`). Unwrapped as `parse` is.
+	 * (`tsv_ts::__private::parse_with_goal_or_fallback`). Unwrapped as `parse` is.
 	 */
 	format(source: string, language: Language): string {
 		const result = this.bound.format[language](source);

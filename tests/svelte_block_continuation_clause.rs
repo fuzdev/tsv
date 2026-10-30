@@ -27,7 +27,7 @@
 
 fn parse_error(source: &str) -> Option<String> {
     let arena = bumpalo::Bump::new();
-    tsv_svelte::parse(source, &arena)
+    tsv_svelte::__private::parse(source, &arena)
         .err()
         .map(|e| e.to_string())
 }
@@ -181,7 +181,7 @@ fn a_misplaced_continuation_names_what_the_block_takes() {
     ] {
         assert_rejected_with(source, message);
         let arena = bumpalo::Bump::new();
-        let error = tsv_svelte::parse(source, &arena).expect_err(source);
+        let error = tsv_svelte::__private::parse(source, &arena).expect_err(source);
         assert_eq!(
             error.position(),
             source.find(at),

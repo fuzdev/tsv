@@ -130,7 +130,7 @@ impl Donor {
     /// seed list uses, so a donor is always a real, parseable component.
     pub fn from_source(source: &str) -> Option<Self> {
         let arena = bumpalo::Bump::new();
-        let root = tsv_svelte::parse(source, &arena).ok()?;
+        let root = tsv_svelte::__private::parse(source, &arena).ok()?;
         // The three top-level regions to cut out of the template. `<svelte:options>`
         // stays in: it is a template-level construct and carries no bindings.
         let mut cuts: Vec<(usize, usize)> = Vec::new();

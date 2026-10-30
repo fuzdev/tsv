@@ -38,8 +38,8 @@ const RAW_CONTENT_OPENERS: &[(&str, &str, &str)] = &[
 
 fn wire(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::parse(source, &arena).expect("the document should parse");
-    tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, source))
+    let ast = tsv_svelte::__private::parse(source, &arena).expect("the document should parse");
+    tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, source))
 }
 
 /// The first element named `name` among `nodes`, depth first.
@@ -147,7 +147,7 @@ fn opener_in_template_or_top_level_content_still_rejects() {
     ] {
         let arena = bumpalo::Bump::new();
         assert!(
-            tsv_svelte::parse(source, &arena).is_err(),
+            tsv_svelte::__private::parse(source, &arena).is_err(),
             "{source:?} should be rejected"
         );
     }

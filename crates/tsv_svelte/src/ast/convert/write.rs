@@ -1959,17 +1959,20 @@ mod tests {
     fn convert_svelte(source: &str) -> Value {
         let arena = bumpalo::Bump::new();
         // Test inputs are hardcoded valid sources; a parse failure should panic
-        let root = crate::parse(source, &arena).expect("parse");
-        serde_json::from_slice(&crate::convert_ast_json_bytes(&root, source)).expect("wire")
+        let root = crate::__private::parse(source, &arena).expect("parse");
+        serde_json::from_slice(&crate::__private::convert_ast_json_bytes(&root, source))
+            .expect("wire")
     }
 
     /// Parse full Svelte source and return its loc-bearing wire.
     #[cfg(feature = "locations")]
     fn convert_svelte_with_locations(source: &str) -> Value {
         let arena = bumpalo::Bump::new();
-        let root = crate::parse(source, &arena).expect("parse");
-        serde_json::from_slice(&crate::convert_ast_json_bytes_with_locations(&root, source))
-            .expect("wire")
+        let root = crate::__private::parse(source, &arena).expect("parse");
+        serde_json::from_slice(&crate::__private::convert_ast_json_bytes_with_locations(
+            &root, source,
+        ))
+        .expect("wire")
     }
 
     // Svelte hard-codes a `{@const}` declaration's `end` to `parser.index - 1`
@@ -2074,8 +2077,8 @@ mod tests {
     #[test]
     fn element_and_attribute_shapes_write_these_bytes() {
         let arena = bumpalo::Bump::new();
-        let root = crate::parse(SHAPES, &arena).expect("parse");
-        let wire = crate::convert_ast_json_bytes(&root, SHAPES);
+        let root = crate::__private::parse(SHAPES, &arena).expect("parse");
+        let wire = crate::__private::convert_ast_json_bytes(&root, SHAPES);
         let expected = concat!(
             r#"{"css":null,"js":[],"start":0,"end":111,"type":"Root","fragment":{"type":"Fragment","#,
             r#""nodes":[{"type":"RegularElement","start":0,"end":111,"name":"div","#,
@@ -2143,11 +2146,11 @@ mod tests {
     fn positions_survive_every_digit_width() {
         let wires = |source: &str| {
             let arena = bumpalo::Bump::new();
-            let root = crate::parse(source, &arena).expect("parse");
+            let root = crate::__private::parse(source, &arena).expect("parse");
             [
                 #[cfg(feature = "locations")]
-                crate::convert_ast_json_bytes_with_locations(&root, source),
-                crate::convert_ast_json_bytes(&root, source),
+                crate::__private::convert_ast_json_bytes_with_locations(&root, source),
+                crate::__private::convert_ast_json_bytes(&root, source),
             ]
             .map(|wire| serde_json::from_slice::<Value>(&wire).expect("wire"))
         };

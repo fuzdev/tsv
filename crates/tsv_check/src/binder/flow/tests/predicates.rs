@@ -12,7 +12,7 @@ use tsv_ts::ast::{Expression, ExpressionKind, StatementKind};
 fn create_flow_condition_ports_verbatim() {
     let src = "true; false; y;";
     let arena = Bump::new();
-    let program = tsv_ts::parse(src, &arena).expect("parse");
+    let program = tsv_ts::__private::parse(src, &arena).expect("parse");
     let bound = bind_file(&program, src, FileId::ROOT);
 
     // Extract the top-level expressions + their node ids.
@@ -97,7 +97,7 @@ fn is_narrowable_reference_matches_tsgo_shape() {
     // Sanity for the live access-gate helper.
     let arena = Bump::new();
     let src = "a.b; a[0]; a?.b;";
-    let program = tsv_ts::parse(src, &arena).expect("parse");
+    let program = tsv_ts::__private::parse(src, &arena).expect("parse");
     for stmt in program.body {
         if let StatementKind::ExpressionStatement(s) = &stmt.kind {
             assert!(

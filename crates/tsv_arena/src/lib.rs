@@ -230,7 +230,7 @@ pub fn decode_source_type<G>(
 ///
 /// The `$goalness` tag is the language's goal axis, fixed at the
 /// `lang_bindings!` invocation: `goal` (TypeScript) threads the decoded goal
-/// into `parse_with_goal`; `nogoal` (Svelte, CSS) ignores it — a set goal is
+/// into `__private::parse_with_goal`; `nogoal` (Svelte, CSS) ignores it — a set goal is
 /// already rejected by the binding's own goal decoder, which reads the same tag
 /// through [`goal_allowed!`].
 ///
@@ -243,18 +243,18 @@ pub fn decode_source_type<G>(
 #[macro_export]
 macro_rules! parse_ast {
     (goal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {
-        $lang::parse_with_goal($source, $goal, $arena)
+        $lang::__private::parse_with_goal($source, $goal, $arena)
     };
     (nogoal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {{
         // Consume the (always-`Module`) goal so the binding stays used in every
         // expansion.
         let _ = $goal;
-        $lang::parse($source, $arena)
+        $lang::__private::parse($source, $arena)
     }};
 }
 
 /// A binding's whole **parse** export body: parse `$source` through [`parse_ast!`] into the
-/// per-thread AST arena and convert it with the language's `$convert` writer
+/// per-thread AST arena and convert it with the language's `__private::$convert` writer
 /// (`convert_ast_json_bytes` for the C FFI, `convert_ast_json_string` for the two JS
 /// bindings), a parse error mapped through `$map_err`, the binding's own error type.
 ///
@@ -278,7 +278,7 @@ macro_rules! parse_convert {
         $crate::with_ast_arena(|arena| {
             let ast =
                 $crate::parse_ast!($goalness, $lang, source, goal, arena).map_err($map_err)?;
-            Ok($lang::$convert(&ast, source))
+            Ok($lang::__private::$convert(&ast, source))
         })
     }};
 }
@@ -319,7 +319,7 @@ macro_rules! parse_internal {
 ///
 /// Every binding's format export reads its source type the same way — a caller
 /// that names one gets exactly that grammar, a caller that names none gets
-/// `tsv_ts::parse_with_goal_or_fallback`'s module-then-script retry, which is what
+/// `tsv_ts::__private::parse_with_goal_or_fallback`'s module-then-script retry, which is what
 /// lets `tsv format <path>` and an editor's bare `format_typescript(source)` format
 /// a legacy sloppy script. The parse exports keep [`parse_ast!`], whose goal is a
 /// settled `Goal`: their product is a wire carrying `Program.sourceType`, a claim
@@ -536,17 +536,17 @@ mod tests {
 
     // The goal axis: one `$goalness` tag driving two macros, tested here rather
     // than three times over in the bindings. A stand-in language module gives
-    // `parse_ast!` the two entry points every language crate exposes, so the
+    // `parse_ast!` the two hidden entry points every language crate exposes, so the
     // DISPATCH is pinned without this crate depending on any of them.
 
     mod fake_lang {
-        pub fn parse(source: &str, arena: &str) -> String {
-            format!("parse({source}, {arena})")
-        }
-        pub fn parse_with_goal(source: &str, goal: &str, arena: &str) -> String {
-            format!("parse_with_goal({source}, {goal}, {arena})")
-        }
         pub mod __private {
+            pub fn parse(source: &str, arena: &str) -> String {
+                format!("parse({source}, {arena})")
+            }
+            pub fn parse_with_goal(source: &str, goal: &str, arena: &str) -> String {
+                format!("parse_with_goal({source}, {goal}, {arena})")
+            }
             /// The goal-axis language's format-path parse (`tsv_ts::__private::parse_folded`).
             pub fn parse_folded(folded: &str, goal: Option<&str>, arena: &str) -> String {
                 match goal {
@@ -602,22 +602,24 @@ mod tests {
     /// A language whose parse can fail, for the export-body macros: its goal type is `&str`,
     /// whose `Default` (`""`) stands in for `Goal::Module`.
     mod fake_fallible_lang {
-        pub fn parse(source: &str, arena: &bumpalo::Bump) -> Result<String, String> {
-            parse_with_goal(source, "goalless", arena)
-        }
-        pub fn parse_with_goal(
-            source: &str,
-            goal: &str,
-            _arena: &bumpalo::Bump,
-        ) -> Result<String, String> {
-            if source == "bad" {
-                Err(format!("bad source at {goal:?}"))
-            } else {
-                Ok(format!("ast({source}, {goal:?})"))
+        pub mod __private {
+            pub fn parse(source: &str, arena: &bumpalo::Bump) -> Result<String, String> {
+                parse_with_goal(source, "goalless", arena)
             }
-        }
-        pub fn convert(ast: &String, source: &str) -> String {
-            format!("convert({ast}, {source})")
+            pub fn parse_with_goal(
+                source: &str,
+                goal: &str,
+                _arena: &bumpalo::Bump,
+            ) -> Result<String, String> {
+                if source == "bad" {
+                    Err(format!("bad source at {goal:?}"))
+                } else {
+                    Ok(format!("ast({source}, {goal:?})"))
+                }
+            }
+            pub fn convert(ast: &String, source: &str) -> String {
+                format!("convert({ast}, {source})")
+            }
         }
     }
 

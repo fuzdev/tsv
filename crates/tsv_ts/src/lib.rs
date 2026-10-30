@@ -1,24 +1,58 @@
 //! TypeScript parsing and formatting library
 //!
-//! This crate provides TypeScript AST parsing and code formatting.
+//! This crate provides TypeScript formatting, the type strip, and parsing to the wire JSON
+//! AST (acorn-typescript's shape).
 //!
 //! ## Usage
 //!
 //! ```
-//! use tsv_ts::{Goal, convert_ast_json_bytes, format, format_with_goal, parse};
+//! use tsv_ts::{Goal, format, format_with_goal, strip};
 //!
 //! // Format in one call: Module, retried as Script only if that fails
 //! assert_eq!(format("const x=42;").unwrap(), "const x = 42;\n");
 //! // ...or at exactly one goal, with no retry
 //! assert!(format_with_goal("with (a) b;", Goal::Module).is_err());
 //!
-//! // Parse (the caller owns the bump arena the AST borrows) and emit the wire JSON AST
-//! let source = "const x: number = 42;";
-//! let arena = bumpalo::Bump::new();
-//! let ast = parse(source, &arena).unwrap();
-//! let json_bytes = convert_ast_json_bytes(&ast, source);
-//! assert!(json_bytes.starts_with(b"{"));
+//! // Strip the types, keeping every surviving character at its line and column
+//! assert_eq!(strip("let x: number = 1;").unwrap().code, "let x         = 1;");
+//!
+//! // Parse to the wire JSON AST (the `json` feature, on by default)
+//! # #[cfg(feature = "json")]
+//! # {
+//! let json = tsv_ts::parse_to_json("const x: number = 42;").unwrap();
+//! assert!(json.starts_with(r#"{"type":"Program""#));
+//! # }
 //! ```
+//!
+//! ## Goals
+//!
+//! A TypeScript source parses against a [`Goal`] — ECMAScript's `Module` or `Script` grammar —
+//! and each entry point reads it in one of two tiers:
+//!
+//! - **The bare name** names no goal. [`format()`] and [`strip()`] parse at `Module` and
+//!   retry at `Script` only if that fails, so a legacy sloppy script (a `with` statement, a
+//!   leading-zero literal, `await` as a name) formats and strips while a module-valid source
+//!   is never reinterpreted — neither output depends on which grammar read it.
+//!   `parse_to_json` parses at `Module` alone, with no retry: the wire's
+//!   `Program.sourceType` is a claim about which grammar produced it, which a retry would
+//!   make depend on the input.
+//! - **A named goal** — [`format_with_goal`], [`strip_with_goal`], and
+//!   `JsonOptions::goal` for `parse_to_json_with` — parses at exactly that goal, with
+//!   no retry: a source the goal's grammar rejects is an error even when the other goal
+//!   would accept it.
+//!
+//! When both attempts of a fallback fail, the error reported is the attempt's whose grammar
+//! the file was written against, decided in two steps. **A script attempt that died on a
+//! goal gate** — a top-level `import` / `export`, an `import.meta`, a top-level `for await`,
+//! or the operand a module reads after a top-level `await`, the constructs only a module
+//! holds — has proved the file a module whatever else is in it, so the module attempt's
+//! error is the file's own, even one that sits *after* the real error (definitions first,
+//! `export` at the bottom). **Otherwise the error that reached furthest into the source**
+//! is the file's own, the module attempt's on a tie: a broken sloppy script's module attempt
+//! dies early at its first `with` / legacy literal / `await` name — the very construct the
+//! retry exists to admit — so reporting *that* would point a legacy script's author away
+//! from their typo. A module attempt the depth limit refused ([`ErrorKind::TooDeep`]) takes
+//! no retry: the limit is no verdict on the grammar.
 
 #[doc(hidden)]
 pub mod __private;
@@ -92,132 +126,19 @@ fn with_doc_printer<'a, R>(
     out
 }
 
-/// Parse TypeScript source code into an internal AST
-///
-/// # Arguments
-///
-/// * `source` - The TypeScript source code to parse
-///
-/// # Returns
-///
-/// * `Ok(Program)` - The parsed AST
-/// * `Err(Error)` - If parsing fails
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let arena = bumpalo::Bump::new();
-/// let ast = tsv_ts::parse("const x = 42;", &arena)?;
-/// ```
-pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Program<'arena>> {
-    Error::ensure_source_fits(source)?;
-    parser::parse_typescript(source, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
-}
-
-/// Parse TypeScript source against an explicit [`Goal`] (`Script` vs `Module`).
-///
-/// [`parse`] is the `Goal::Module` form (the default, correct for Svelte
-/// `<script>` and ~all real TS). Pass `Goal::Script` to parse a standalone
-/// script, where `await` is an ordinary identifier and top-level `import`/`export`
-/// declarations, `import.meta`, and top-level `await` expressions are syntax
-/// errors — a TypeScript namespace body holds `import`/`export` at either goal, since
-/// tsc decides module-ness from top-level statements alone. The goal carries no
-/// strictness of its own past `Module`: a script is
-/// sloppy unless its directive prologue holds a `"use strict"`, so the strict-mode
-/// rules the parser enforces parse only under a directive-free `Script`. Which
-/// constructs those are is enumerated once, on the flag that gates them
-/// (`Parser::strict`).
-pub fn parse_with_goal<'arena>(
-    source: &str,
-    goal: Goal,
-    arena: &'arena bumpalo::Bump,
-) -> Result<Program<'arena>> {
-    Error::ensure_source_fits(source)?;
-    parser::parse_typescript_with_goal(source, goal, arena)
-        .map_err(|e| e.with_context(source, WIRE_COORDINATES))
-}
-
-/// Parse TypeScript against `goal`, or — when the goal is unset — at `Module`
-/// with a `Script` retry.
-///
-/// The **format** path's parse, and the type strip's (`strip_with_goal`). `Some(goal)` is
-/// exact, the same parse [`parse_with_goal`] runs. `None` means the caller never named a
-/// source type (`tsv format <path>`, an editor's `format_typescript(source)`), and there the
-/// module grammar is tried first and the script grammar only if it *fails* — so a
-/// legacy sloppy script (a `with` statement, a leading-zero literal, `await` as a
-/// name) formats from a bare path while a module-valid source is never reinterpreted.
-/// When both attempts fail, the reported error is the attempt's whose grammar the file
-/// was written against, decided in two steps. **A script attempt that died on a goal
-/// gate** — a top-level `import` / `export`, an `import.meta`, a top-level `for await`, or
-/// the operand a module reads after a top-level `await` (where a Script's name reading of
-/// the word fails), the constructs only a module holds ([`Error::is_goal_gated`]) —
-/// has proved the file a module whatever else is in it, so the module attempt's error is
-/// the file's own: a
-/// broken module's script attempt dies there at its first module-only construct, even one
-/// that sits *after* the real error (definitions first, `export` at the bottom).
-/// **Otherwise the error that reached furthest into the source** is the file's own, the
-/// module attempt's on a tie: a broken sloppy script's module attempt dies early at its
-/// first `with` / legacy literal / `await` name — the very construct the retry exists to
-/// admit, so reporting *that* would point a legacy script's author away from their typo.
-/// prettier reads the same way in practice: its babel parser tolerates the
-/// strict-mode rules tsv's parser enforces at the module goal (`allowedReasonCodes`), so the
-/// error it shows on such a file is the typo. Pinned by
-/// `tests/format_fallback_error_attribution.rs`.
-///
-/// **A module attempt the depth limit refused takes no retry** ([`ErrorKind::TooDeep`]):
-/// the limit is no verdict on the grammar, and the script grammar reads every construct the
-/// module one accepts as the same tree but `await`, which it reads as a name — so a script
-/// attempt could only succeed by reading the source differently
-/// (`await <T>a` as `await < T > a`) — a reading chosen by the limit rather than by the
-/// source, which the same text one level shallower would never have been given.
-///
-/// [`parse`] and [`parse_with_goal`] have no fallback: a parse hands back an AST
-/// whose `sourceType` is a claim about which grammar produced it, and a retry would
-/// make that claim depend on the input. Formatting exposes neither the AST nor the
-/// source type, and the printer never reads the goal, so the retry changes no output
-/// for anything the module grammar already accepts — the strip's reason too: it hands
-/// back JS text, and no verdict of its walk reads the goal. The retry parses into the same
-/// arena with no reset between the two attempts, so a script's arena high-water is the
-/// failed module attempt plus the script parse — an error-path cost only.
-pub fn parse_with_goal_or_fallback<'arena>(
-    source: &str,
-    goal: Option<Goal>,
-    arena: &'arena bumpalo::Bump,
-) -> Result<Program<'arena>> {
-    if let Some(goal) = goal {
-        return parse_with_goal(source, goal, arena);
-    }
-    parse_with_goal(source, Goal::Module, arena).or_else(|module_error| {
-        if module_error.kind() == ErrorKind::TooDeep {
-            return Err(module_error);
-        }
-        parse_with_goal(source, Goal::Script, arena).map_err(|script_error| {
-            // A goal gate proves the source a module; past that, the further error is
-            // the file's own and a tie keeps the module's. The one positionless error a
-            // TypeScript parse raises (`FileTooLarge`) is raised by both attempts alike, so
-            // the comparison never sees a `None` against a `Some`.
-            if !script_error.is_goal_gated() && script_error.position() > module_error.position() {
-                script_error
-            } else {
-                module_error
-            }
-        })
-    })
-}
-
 /// Parse standalone TypeScript with grouping parens preserved.
 ///
-/// Like [`parse`] but keeps `(expr)` as a `ParenthesizedExpression` node (acorn's
+/// Like `__private::parse` but keeps `(expr)` as a `ParenthesizedExpression` node (acorn's
 /// `preserveParens: true`), so the paren structure is
 /// present in the AST and its wire JSON. The binding audit uses this to reparse
 /// formatted output and see which parenthesized subtree a glued comment binds to
 /// — a re-binding is invisible in the paren-free public AST.
 ///
-/// ⚠️ The tree is for the **wire** (`convert_ast_json_*`) and for walks that read it,
+/// ⚠️ The tree is for the **wire** (`__private::convert_ast_json_*`) and for walks that read it,
 /// never for [`format()`] or any other printer entry point: a `ParenthesizedExpression`
 /// answers no paren question about its position, so the printer refuses one in a debug
 /// build and prints its contents bare in a release one — dropping every pair the
-/// position needs (`(x + y) * 2` → `x + y * 2`). Format the [`parse`] tree instead.
+/// position needs (`(x + y) * 2` → `x + y * 2`). Format the `__private::parse` tree instead.
 pub fn parse_preserve_parens<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
@@ -243,14 +164,13 @@ pub fn is_jsdoc_type_cast_comment(content: &str) -> bool {
 /// Carriage returns (`\r\n` and a lone `\r`) are folded to `\n` ahead of the parse, so
 /// the output is LF-only.
 ///
-/// The parse is [`parse_with_goal_or_fallback`]'s unset form — `Module`, retried
-/// at `Script` only if that fails — which is what every format surface that takes
+/// No goal is named, so the parse is the bare-name tier of [Goals](crate#goals) — `Module`,
+/// retried at `Script` only if that fails — which is what every format surface that takes
 /// no source type from its caller runs. [`format_with_goal`] is the exact-goal twin.
 ///
 /// # Errors
 ///
-/// A parse error under both goals (the reported one follows
-/// [`parse_with_goal_or_fallback`]).
+/// A parse error under both goals (the one [Goals](crate#goals) picks).
 pub fn format(source: &str) -> Result<String> {
     format_with_optional_goal(source, None)
 }
@@ -337,50 +257,116 @@ fn format_program_in(
     output
 }
 
-/// Convert internal AST to compact JSON wire bytes with character-based positions
+/// How [`parse_to_json_with`] parses and what its wire carries. The default is
+/// [`parse_to_json`]'s: [`Goal::Module`], the span-only wire.
 ///
-/// The span-only wire every binding ships, and `tsv parse`'s default: each node carries
-/// `start` / `end` as UTF-16 offsets and no `loc`. Line/column is a pure function of those
-/// offsets plus the source, so a consumer holding the source loses nothing — it derives
-/// `loc` on demand (the npm packages' `{locations: true}`), and emission skips the line
-/// table entirely, mirroring acorn's own `locations: false`.
+/// ```
+/// # #[cfg(feature = "locations")]
+/// # {
+/// use tsv_ts::{Goal, JsonOptions, parse_to_json_with};
 ///
-/// The **sole emission path** for its wire: emits the wire JSON directly during a single
-/// walk of the internal AST (the writer in `ast/convert/write/`), never materializing a
-/// typed public tree or an intermediate `Value`, and fuses the byte→UTF-16 offset
-/// translation into that walk: the writer receives the byte→UTF-16 map via
-/// `WirePositions` and emits final char-space positions directly, so no post-conversion
-/// translation walk runs. For ASCII sources the map is empty and emission is byte-space
-/// passthrough. Returning bytes lets a consumer that never needs `&str` skip the
-/// O(output) UTF-8 validation `convert_ast_json_string` pays (the output is several times
-/// the source).
-#[cfg(feature = "convert")]
-pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_program_bytes(program, source, tsv_lang::Wire::Span)
+/// let options = JsonOptions::new().goal(Goal::Script).locations(true);
+/// let json = parse_to_json_with("with (a) b;", &options).unwrap();
+/// assert!(json.contains(r#""sourceType":"script""#));
+/// assert!(json.contains(r#""loc":"#));
+/// # }
+/// ```
+#[cfg(feature = "json")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct JsonOptions {
+    goal: Goal,
+    #[cfg(feature = "locations")]
+    locations: bool,
 }
 
-/// Convert internal AST to compact JSON wire bytes **with** per-node `loc`.
+#[cfg(feature = "json")]
+impl JsonOptions {
+    /// The default options: [`Goal::Module`], the span-only wire.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            goal: Goal::Module,
+            #[cfg(feature = "locations")]
+            locations: false,
+        }
+    }
+
+    /// Parse at exactly `goal`, with no retry (see [Goals](crate#goals)). Default
+    /// [`Goal::Module`].
+    #[must_use]
+    pub const fn goal(mut self, goal: Goal) -> Self {
+        self.goal = goal;
+        self
+    }
+
+    /// Add a `loc` to every node: the line (1-based) and column (0-based, UTF-16 code
+    /// units) of its own `start` / `end`, under ECMAScript's line terminators (LF, CR, CRLF,
+    /// U+2028, U+2029), which are acorn's. `tsv parse --locations` writes it. Default
+    /// `false`, the span-only wire.
+    #[cfg(feature = "locations")]
+    #[must_use]
+    pub const fn locations(mut self, locations: bool) -> Self {
+        self.locations = locations;
+        self
+    }
+}
+
+#[cfg(feature = "json")]
+impl Default for JsonOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Parse `source` as a module and return its wire JSON AST: compact JSON in the
+/// acorn-typescript shape, every node's `start` / `end` a UTF-16 offset and no `loc`.
 ///
-/// The `convert_ast_json_bytes` wire plus a `loc` on every node — the line (1-based) and
-/// column (0-based, UTF-16 code units) of its own `start` / `end` under ECMAScript's line
-/// terminators (CR, LF, CRLF, LS, PS), which is acorn's. `tsv parse --locations` writes it.
+/// The span-only wire every binding ships and `tsv parse` writes by default. Line and
+/// column are a pure function of those offsets plus the source, so a consumer holding the
+/// source loses nothing; `JsonOptions::locations` (the `locations` feature) adds them. The
+/// source is read as written — no line-terminator fold — so the offsets index the caller's
+/// own text.
+///
+/// The goal is [`Goal::Module`], with no retry (see [Goals](crate#goals));
+/// [`parse_to_json_with`] names another.
+///
+/// # Errors
+///
+/// A parse error at the module goal.
+#[cfg(feature = "json")]
+pub fn parse_to_json(source: &str) -> Result<String> {
+    parse_to_json_with(source, &JsonOptions::new())
+}
+
+/// [`parse_to_json`] under `options`: the goal it parses at (exact, no retry) and whether
+/// the wire carries `loc`.
+///
+/// Each call parses into a fresh arena sized to the source, dropped once the wire is
+/// written.
+///
+/// # Errors
+///
+/// A parse error at the options' goal.
+#[cfg(feature = "json")]
+pub fn parse_to_json_with(source: &str, options: &JsonOptions) -> Result<String> {
+    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+    let program = __private::parse_with_goal(source, options.goal, &arena)?;
+    #[cfg(feature = "locations")]
+    if options.locations {
+        return Ok(wire_string(
+            __private::convert_ast_json_bytes_with_locations(&program, source),
+        ));
+    }
+    Ok(__private::convert_ast_json_string(&program, source))
+}
+
+/// The wire's bytes as the `String` they are: the writer emits source slices and ASCII
+/// fragments alone.
 #[cfg(feature = "locations")]
-pub fn convert_ast_json_bytes_with_locations(program: &Program<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_program_bytes(program, source, tsv_lang::Wire::Loc)
-}
-
-/// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM
-/// binding's `JSON.parse`, N-API strings): same wire bytes plus one UTF-8 validation of
-/// the output. Byte-oriented consumers should prefer the bytes variant.
-///
-/// There is no `_with_locations` `String` twin: the `&str` boundaries this form serves are
-/// the bindings, which ship the span-only wire alone, and the loc-bearing wire's only
-/// callers (`tsv parse --locations`, `tsv_debug`) write bytes.
-#[cfg(feature = "convert")]
 #[expect(clippy::expect_used)]
-pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
-    String::from_utf8(convert_ast_json_bytes(program, source))
-        .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
+fn wire_string(bytes: Vec<u8>) -> String {
+    String::from_utf8(bytes).expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 
 /// Build an embedding [`parser::Parser`] at `base_offset`, run `f` over it, then the

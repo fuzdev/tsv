@@ -14,14 +14,14 @@ features = ["locations"]
 targets = ["x86_64-unknown-linux-gnu"]
 
 [features]
-default = ["convert"]
-# The wire-JSON conversion layer (`ast/convert/write.rs`). Off in the
+default = ["json"]
+# The wire-JSON layer: `parse_to_json*` and the writer behind it (`ast/convert/write.rs`). Off in the
 # @fuzdev/tsv-format-wasm build; on for every other consumer. Pulls in the
 # shared wire-JSON writer substrate (`tsv_lang/json`) the emitter builds on.
-convert = ["tsv_lang/json"]
-# The loc-bearing wire (`convert_ast_json_bytes_with_locations`) — see `tsv_lang`'s
+json = ["tsv_lang/json"]
+# The loc-bearing wire (`JsonOptions::locations`) — see `tsv_lang`'s
 # `locations` feature. Off in every binding.
-locations = ["convert", "tsv_lang/locations"]
+locations = ["json", "tsv_lang/locations"]
 # Exposes `debug_token_stream` for the differential lexer harness (`tsv_debug
 # lex_diff`). Off in production builds; enabled only by `tsv_debug`.
 debug_lex = []

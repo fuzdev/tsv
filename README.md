@@ -206,7 +206,7 @@ Intentional non-features:
   and [discussion #1](https://github.com/fuzdev/tsv/discussions/1)
 
 Each language is a self-contained Rust crate exposing the same
-`parse`/`format`/`convert_ast_json_bytes` functions over its own concrete types - no
+`parse_to_json`/`format` functions over its own concrete types - no
 central `Language` trait, registry, or dynamic dispatch ("closed scope, open convention").
 Each artifact includes only what it uses: the parse build excludes the printers,
 the format build excludes the JSON-AST conversion layer, and a future TypeScript/JS-only
@@ -288,9 +288,9 @@ tsv/
 
 Each language crate exports a consistent API:
 
-- `parse(source, arena) -> Result<AST>` — the AST allocates into the caller's `bumpalo` arena (the bindings reuse a per-thread arena across calls via `tsv_arena`)
-- `format(source) -> Result<String>` — the parse+format one-shot (it folds line terminators ahead of the parse); the AST-taking primitives (`__private::format_ast`, `format_ast_in` writing through a reusable doc arena for the bindings' hot loop, `format_folded_in` for a caller that folded the source's line terminators itself) are hidden plumbing
-- `convert_ast_json_bytes(ast, source) -> Vec<u8>` — the span-only wire JSON every binding ships, emitted directly from the internal AST, with a `convert_ast_json_string` wrapper alongside (default-on `convert` cargo feature; turn off for parse+format-only builds), and a `convert_ast_json_bytes_with_locations` variant that adds `loc` (opt-in `locations` feature)
+- `parse_to_json(source) -> Result<String>` — the span-only wire JSON every binding ships, in one call (default-on `json` cargo feature; turn off for format-only builds); `parse_to_json_with(source, &JsonOptions)` takes the options — `locations(true)` adds `loc` (opt-in `locations` feature), and in `tsv_ts` `goal(Goal::Script)` names the parse goal
+- `format(source) -> Result<String>` — the parse+format one-shot (it folds line terminators ahead of the parse); `tsv_ts` adds `format_with_goal`, and the type strip `strip(source)` / `strip_with_goal(source, goal)`
+- the AST-taking primitives (`__private::parse` into a caller's `bumpalo` arena, the `__private::convert_ast_json_*` writers, `__private::format_ast*`, the bindings' warm-arena paths via `tsv_arena`) are hidden plumbing, not public API
 
 For more details see [CLAUDE.md](CLAUDE.md).
 

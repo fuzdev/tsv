@@ -6,9 +6,9 @@
 //! attempt's when the script attempt died on a **goal gate**, else the one that reached
 //! **furthest into the source**, the module attempt's on a tie.
 //!
-//! `tsv_ts::parse_with_goal_or_fallback(source, None, …)` parses at `Module` and retries at
-//! `Script` only if that fails. A source both reject has two errors, and which one the user
-//! sees decides whether the diagnosis names the file's own mistake or the construct the
+//! `tsv_ts::__private::parse_with_goal_or_fallback(source, None, …)` parses at `Module` and
+//! retries at `Script` only if that fails. A source both reject has two errors, and which one
+//! the user sees decides whether the diagnosis names the file's own mistake or the construct the
 //! retry exists to accept: a legacy sloppy script with a typo fails the module parse on its
 //! `with` / legacy literal / `await` name — the very thing the script retry then admits —
 //! and fails the script parse on the typo. Reporting the module error there points at the
@@ -50,7 +50,7 @@ use bumpalo::Bump;
 /// reading the message line as a location.
 fn fallback_error_at(source: &str) -> (usize, usize, String) {
     let arena = Bump::new();
-    let err = tsv_ts::parse_with_goal_or_fallback(source, None, &arena)
+    let err = tsv_ts::__private::parse_with_goal_or_fallback(source, None, &arena)
         .expect_err("the input must parse under neither goal");
     let rendered = format!("{err:#}");
     let mut lines = rendered.lines();
@@ -217,9 +217,9 @@ fn a_tie_reports_the_module_error() {
         ("the await operand itself", "await 010;\n", 7, true),
     ] {
         let arena = Bump::new();
-        let module = tsv_ts::parse_with_goal(source, tsv_ts::Goal::Module, &arena)
+        let module = tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Module, &arena)
             .expect_err("the octal literal rejects at Module");
-        let script = tsv_ts::parse_with_goal(source, tsv_ts::Goal::Script, &arena)
+        let script = tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Script, &arena)
             .expect_err("the missing `;` rejects at Script");
         assert_eq!(
             module.position(),
@@ -269,7 +269,7 @@ fn a_named_goal_reports_its_own_error() {
     let arena = Bump::new();
     let module = format!(
         "{:#}",
-        tsv_ts::parse_with_goal_or_fallback(source, Some(tsv_ts::Goal::Module), &arena)
+        tsv_ts::__private::parse_with_goal_or_fallback(source, Some(tsv_ts::Goal::Module), &arena)
             .expect_err("with rejects at Module")
     );
     assert!(
@@ -278,7 +278,7 @@ fn a_named_goal_reports_its_own_error() {
     );
     let script = format!(
         "{:#}",
-        tsv_ts::parse_with_goal_or_fallback(source, Some(tsv_ts::Goal::Script), &arena)
+        tsv_ts::__private::parse_with_goal_or_fallback(source, Some(tsv_ts::Goal::Script), &arena)
             .expect_err("the typo rejects at Script")
     );
     assert!(script.starts_with(TYPO_MESSAGE), "{script}");
@@ -311,7 +311,7 @@ fn the_goal_gate_mark_is_set_by_module_only_constructs_alone() {
             "{\n\tfor await (const x of y) {}\n}\n",
         ),
     ] {
-        let error = tsv_ts::parse_with_goal(source, tsv_ts::Goal::Script, &arena)
+        let error = tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Script, &arena)
             .expect_err("a module-only construct rejects at Script");
         assert!(error.is_goal_gated(), "{label}: {error}");
     }
@@ -328,7 +328,8 @@ fn the_goal_gate_mark_is_set_by_module_only_constructs_alone() {
         ),
         ("a legacy octal", tsv_ts::Goal::Module, "var n = 010;\n"),
     ] {
-        let error = tsv_ts::parse_with_goal(source, goal, &arena).expect_err("the source rejects");
+        let error = tsv_ts::__private::parse_with_goal(source, goal, &arena)
+            .expect_err("the source rejects");
         assert!(!error.is_goal_gated(), "{label}: {error}");
     }
 }
@@ -345,7 +346,7 @@ fn a_for_await_in_a_non_async_function_parses_at_either_goal() {
         ("module", tsv_ts::Goal::Module),
         ("script", tsv_ts::Goal::Script),
     ] {
-        if let Err(error) = tsv_ts::parse_with_goal(source, goal, &arena) {
+        if let Err(error) = tsv_ts::__private::parse_with_goal(source, goal, &arena) {
             panic!("{label}: a deferred early error must still parse: {error}");
         }
     }

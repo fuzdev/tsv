@@ -37,13 +37,13 @@ format = [
     "dep:tsv_discover",
     "tsv_arena/format",
 ]
-# `parse_*` exports + convert layer (@fuzdev/tsv-parse-wasm when alone).
+# `parse_*` exports + the wire-JSON layer (@fuzdev/tsv-parse-wasm when alone).
 # The parse-only build drops the printers via link-level dead-code
 # elimination — no printer feature gates in the language crates.
 parse = [
-    "tsv_ts/convert",
-    "tsv_css/convert",
-    "tsv_svelte/convert",
+    "tsv_ts/json",
+    "tsv_css/json",
+    "tsv_svelte/json",
     "dep:js-sys",
 ]
 # The `strip_typescript` export — the type strip, `tsv_ts::strip` (@fuzdev/tsv-wasm

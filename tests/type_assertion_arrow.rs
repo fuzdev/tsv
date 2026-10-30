@@ -18,12 +18,12 @@
 /// stably (idempotent).
 fn assert_ours_stable(input: &str) {
     let arena = bumpalo::Bump::new();
-    let ast = tsv_ts::parse(input, &arena).expect("parse failed");
+    let ast = tsv_ts::__private::parse(input, &arena).expect("parse failed");
     let output = tsv_ts::__private::format_ast(&ast, input);
     assert_eq!(output, input, "printer should keep the form stable");
 
     let arena_twice = bumpalo::Bump::new();
-    let ast_twice = tsv_ts::parse(&output, &arena_twice).expect("reparse failed");
+    let ast_twice = tsv_ts::__private::parse(&output, &arena_twice).expect("reparse failed");
     let output_twice = tsv_ts::__private::format_ast(&ast_twice, &output);
     assert_eq!(output, output_twice, "printer should be idempotent");
 }

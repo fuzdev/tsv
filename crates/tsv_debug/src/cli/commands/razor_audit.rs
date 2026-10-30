@@ -510,7 +510,7 @@ fn for_each_eligible_text(source: &str, f: &mut dyn FnMut(&str, usize)) {
     }
 
     let arena = bumpalo::Bump::new();
-    let Ok(root) = tsv_svelte::parse(source, &arena) else {
+    let Ok(root) = tsv_svelte::__private::parse(source, &arena) else {
         return;
     };
     walk(&root.fragment, source, false, f);

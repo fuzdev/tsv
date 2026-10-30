@@ -67,20 +67,20 @@ use serde_json::Value;
 
 fn parse_json(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source))
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source))
 }
 
 fn accepts(source: &str) -> bool {
     let arena = bumpalo::Bump::new();
-    tsv_ts::parse(source, &arena).is_ok()
+    tsv_ts::__private::parse(source, &arena).is_ok()
 }
 
 /// `accepts` at `Goal::Script`, where `await` is not reserved by the goal bullet —
 /// the only goal at which the `[Await]` binding cases are observable at all.
 fn accepts_script(source: &str) -> bool {
     let arena = bumpalo::Bump::new();
-    tsv_ts::parse_with_goal(source, tsv_ts::Goal::Script, &arena).is_ok()
+    tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Script, &arena).is_ok()
 }
 
 /// The `type` of the node at `pointer`, for asserting a widened word reaches the
@@ -95,7 +95,7 @@ fn node_type_at(source: &str, pointer: &str) -> Option<String> {
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
     tsv_ts::__private::format_ast(&program, source)
 }
 

@@ -15,9 +15,9 @@ Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-
 Mirrors `tsv_wasm`'s split so the bench can size scope-matched native artifacts:
 
 - `format` (default) — `tsv_format_<lang>` exports
-- `parse` (default) — `tsv_parse_<lang>` + `tsv_parse_internal_<lang>` exports, and the `convert` layer on each language crate
+- `parse` (default) — `tsv_parse_<lang>` + `tsv_parse_internal_<lang>` exports, and the `json` layer on each language crate
 
-The default (both features) is the full `libtsv_ffi` the bench perf rows load and any FFI host links. The size table also reports two subset builds, each in its own target dir so they don't clobber the full lib: `--no-default-features --features format` (the native mirror of `@fuzdev/tsv-format-wasm`, no convert layer, scope-matched to oxfmt) and `--no-default-features --features parse` (the mirror of `@fuzdev/tsv-parse-wasm`, printers dropped, scope-matched to oxc-parser). See `deno task build:ffi:format` / `build:ffi:parse` — built only by `build:bench`, which the gate never runs, so `deno task typecheck:features` (in `check`) `cargo check`s each half on its own.
+The default (both features) is the full `libtsv_ffi` the bench perf rows load and any FFI host links. The size table also reports two subset builds, each in its own target dir so they don't clobber the full lib: `--no-default-features --features format` (the native mirror of `@fuzdev/tsv-format-wasm`, no wire-JSON layer, scope-matched to oxfmt) and `--no-default-features --features parse` (the mirror of `@fuzdev/tsv-parse-wasm`, printers dropped, scope-matched to oxc-parser). See `deno task build:ffi:format` / `build:ffi:parse` — built only by `build:bench`, which the gate never runs, so `deno task typecheck:features` (in `check`) `cargo check`s each half on its own.
 
 ## Public API
 
@@ -50,7 +50,7 @@ are top-level `import`/`export` declarations, `import.meta` and a top-level `for
 
 - **Code `2`** says the caller named **no** source type, and is accepted by the
   **format exports only**, on every language: a formatter answers it with the module
-  grammar retried as a script (`tsv_ts::parse_with_goal_or_fallback` — see
+  grammar retried as a script (`tsv_ts::__private::parse_with_goal_or_fallback` — see
   [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)),
   and a goalless one has nothing to answer at all, while a parse export's wire carries
   a `Program.sourceType` that one settled grammar has to produce.

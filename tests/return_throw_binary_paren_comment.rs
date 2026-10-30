@@ -18,7 +18,7 @@ fn format(source: &str) -> String {
 /// The document's comments, sorted — the multiset a format must conserve.
 fn comments(source: &str) -> Vec<String> {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
     let mut found: Vec<String> = program
         .comments
         .iter()

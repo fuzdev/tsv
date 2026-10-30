@@ -33,7 +33,7 @@ A single AST cannot optimize for both manipulation and serialization.
 ```
 Parse → Internal AST → [Format, Lint, Analyze]
                           ↓ (only when serializing)
-                       convert_ast_json_bytes() → wire JSON
+                       __private::convert_ast_json_bytes() → wire JSON (parse_to_json)
 ```
 
 Each language crate separates these cleanly:
@@ -139,7 +139,7 @@ closed-scope/open-convention stance below.
 
 **Compile-Time Isolation** — Cargo prevents circular dependencies. CSS changes don't trigger TypeScript recompilation.
 
-**Clean API Boundaries** — Each language exports `parse()`, `format()`, and `convert_ast_json_bytes()` / `convert_ast_json_string()` (the span-only wire every binding ships; `convert_ast_json_bytes_with_locations` adds `loc`; no shipped crate reads the wire back — `tsv_debug::json` is the one reader). tsv_ts and tsv_css also provide embedding APIs (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
+**Clean API Boundaries** — Each language exports `parse_to_json()` / `parse_to_json_with(&JsonOptions)` and `format()`, over the hidden AST-taking `__private::parse()` and `__private::convert_ast_json_bytes()` / `convert_ast_json_string()` (the span-only wire every binding ships; `convert_ast_json_bytes_with_locations` adds `loc`; no shipped crate reads the wire back — `tsv_debug::json` is the one reader). tsv_ts and tsv_css also provide embedding APIs (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
 
 **Scalability** — New capabilities land as crate additions (`tsv_ffi`, `tsv_wasm`, `tsv_napi`, `tsv_arena`, `tsv_ignore` + `tsv_discover`, the experimental, may-never-ship `tsv_check` / `tsv_svelte_compile`; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
 
@@ -151,8 +151,13 @@ level**. The shape of a "tsv language" is a social contract, not a Rust
 trait:
 
 ```rust
+// public
+pub fn parse_to_json(source: &str) -> Result<String, Error>;
+pub fn parse_to_json_with(source: &str, options: &JsonOptions) -> Result<String, Error>;
+pub fn format(source: &str) -> Result<String, Error>;
+// `__private` (hidden; the bindings, the CLI and the dev tooling)
 pub fn parse<'a>(source: &str, arena: &'a Bump) -> Result<InternalAst<'a>, Error>;
-pub fn format(ast: &InternalAst, source: &str) -> String;
+pub fn format_ast(ast: &InternalAst, source: &str) -> String;
 pub fn convert_ast_json_bytes(ast: &InternalAst, source: &str) -> Vec<u8>;
 pub fn convert_ast_json_string(ast: &InternalAst, source: &str) -> String;
 pub fn convert_ast_json_bytes_with_locations(ast: &InternalAst, source: &str) -> Vec<u8>;
@@ -215,7 +220,7 @@ This shape gives both:
   build (`@fuzdev/tsv-parse-wasm`) excludes printer code at the link level
   because nothing references it, and a format-only build
   (`@fuzdev/tsv-format-wasm`) compiles out the JSON-AST conversion layer via
-  the lang crates' `convert` feature — build-time selection, not runtime
+  the lang crates' `json` feature — build-time selection, not runtime
   feature flags.
 - **Convention openness (Rust source level)** — anyone can write a
   `my_org/tsv_html_parse` crate following the same shape, and any
@@ -257,17 +262,17 @@ artifacts for user ergonomics independent of the Rust workspace shape.
 
 #### Cargo feature surface
 
-`tsv_ts`, `tsv_css`, and `tsv_svelte` each expose a default-on `convert`
-feature gating `pub mod convert` (the writer) and the span-only
-`convert_ast_json_bytes` / `convert_ast_json_string` free functions, and an
-opt-in `locations` feature (implying `convert`) adding the loc-bearing
-`convert_ast_json_bytes_with_locations` — its line table exists only under
+`tsv_ts`, `tsv_css`, and `tsv_svelte` each expose a default-on `json`
+feature gating the writer (`ast::convert`), the public `parse_to_json` /
+`parse_to_json_with` and the hidden span-only `__private::convert_ast_json_bytes` /
+`convert_ast_json_string`, and an opt-in `locations` feature (implying `json`) adding
+`JsonOptions::locations` and the loc-bearing `__private::convert_ast_json_bytes_with_locations` — its line table exists only under
 `tsv_lang`'s `locations`, so a build without it carries no `loc` writer at all.
 `tsv_cli` (`tsv parse --locations`) and `tsv_debug` enable it; no binding does. The
 format-only WASM build (`@fuzdev/tsv-format-wasm`) declares its language deps
-`default-features = false`, excluding the convert layer at link time; the
+`default-features = false`, excluding the wire-JSON layer at link time; the
 parse-capable builds (`@fuzdev/tsv-parse-wasm` and the full `@fuzdev/tsv-wasm`) opt
-in via `tsv_wasm/parse`, which forwards to each language crate's `convert`.
+in via `tsv_wasm/parse`, which forwards to each language crate's `json`.
 Conversely the parse-only build omits `tsv_wasm/format`, so the `format_*` exports
 and the printers behind them drop at link time. `tsv_wasm` and `tsv_napi` add a
 default-on `strip` feature (the `strip_typescript` export over `tsv_ts::strip`), which
@@ -282,10 +287,10 @@ Rust consumers that only need parse/format can follow the same pattern:
 # Minimal: parse + format only (source-level consumption — tsv is not on crates.io)
 tsv_ts = { git = "https://github.com/fuzdev/tsv", default-features = false }
 
-# Also build the span-only wire-JSON parse output (`convert_ast_json*`)
-tsv_ts = { git = "https://github.com/fuzdev/tsv", features = ["convert"] }
+# Also build the span-only wire-JSON parse output (`parse_to_json*`)
+tsv_ts = { git = "https://github.com/fuzdev/tsv", features = ["json"] }
 
-# Full: plus the loc-bearing wire (`convert_ast_json_bytes_with_locations`)
+# Full: plus the loc-bearing wire (`JsonOptions::locations`)
 tsv_ts = { git = "https://github.com/fuzdev/tsv", features = ["locations"] }
 ```
 

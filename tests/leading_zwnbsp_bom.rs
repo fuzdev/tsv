@@ -39,7 +39,7 @@ fn format_all(source: &str, parser: ParserType, label: &str) -> String {
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(source);
     let (via_str, via_format, via_format_in) = match parser {
         ParserType::Svelte => {
-            let ast = tsv_svelte::parse(source, &arena).expect("svelte parse");
+            let ast = tsv_svelte::__private::parse(source, &arena).expect("svelte parse");
             (
                 tsv_svelte::format(source).expect("svelte format"),
                 tsv_svelte::__private::format_ast(&ast, source),
@@ -47,7 +47,7 @@ fn format_all(source: &str, parser: ParserType, label: &str) -> String {
             )
         }
         ParserType::Css => {
-            let ast = tsv_css::parse(source, &arena).expect("css parse");
+            let ast = tsv_css::__private::parse(source, &arena).expect("css parse");
             (
                 tsv_css::format(source).expect("css format"),
                 tsv_css::__private::format_ast(&ast, source),
@@ -55,7 +55,7 @@ fn format_all(source: &str, parser: ParserType, label: &str) -> String {
             )
         }
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse(source, &arena).expect("ts parse");
+            let ast = tsv_ts::__private::parse(source, &arena).expect("ts parse");
             let via_format = tsv_ts::__private::format_ast(&ast, source);
             (
                 tsv_ts::format(source).expect("ts format"),

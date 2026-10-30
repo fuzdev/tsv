@@ -2490,7 +2490,7 @@ character keeps its line and UTF-16 column; and stripping the output returns it 
 save one excused change — the re-strip blanking a type-argument list that only the output's
 TypeScript re-read holds (`f(a < b, c        > (d))` re-read as `a<b, c>(d)`;
 `strip_fixtures::idempotence_failure`, shared with `strip:corpus` and the fuzzer's strip leg).
-The expected output itself is held to the same contract and must parse under `tsv_ts::parse` at
+The expected output itself is held to the same contract and must parse under `tsv_ts::__private::parse` at
 module goal — a TypeScript parse, so it shows the output parses, not that it is JS.
 The JS-validity guard is the oracle side's: `strip:fixtures:oracle` (and `:update`) parse
 every claimed output (derived or reviewed) with oxc-parser in JS mode and fail on any error. File conventions and

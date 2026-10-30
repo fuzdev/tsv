@@ -34,8 +34,9 @@ fn tree(source: &str) -> Value {
         }
     }
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("the case parses");
-    let mut value = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
+    let program = tsv_ts::__private::parse(source, &arena).expect("the case parses");
+    let mut value =
+        tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
     strip(&mut value);
     value
 }
@@ -263,8 +264,10 @@ fn svelte_tree(source: &str) -> Value {
         }
     }
     let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::parse(source, &arena).expect("the component parses");
-    let mut value = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&root, source));
+    let root = tsv_svelte::__private::parse(source, &arena).expect("the component parses");
+    let mut value = tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(
+        &root, source,
+    ));
     strip(&mut value);
     value
 }

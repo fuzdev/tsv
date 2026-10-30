@@ -16,7 +16,7 @@
 //! read directly at every consumer — the AST holds no interner and needs no
 //! interner lifetime.
 
-#[cfg(feature = "convert")]
+#[cfg(feature = "json")]
 pub(crate) mod convert;
 pub mod precedence;
 

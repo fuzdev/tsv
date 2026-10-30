@@ -15,8 +15,11 @@
 /// The wire `name` of the stylesheet's first at-rule.
 fn atrule_name(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let stylesheet = tsv_css::parse(source, &arena).expect("parse failed");
-    let wire = tsv_debug::json::wire_value(&tsv_css::convert_ast_json_bytes(&stylesheet, source));
+    let stylesheet = tsv_css::__private::parse(source, &arena).expect("parse failed");
+    let wire = tsv_debug::json::wire_value(&tsv_css::__private::convert_ast_json_bytes(
+        &stylesheet,
+        source,
+    ));
     let node = &wire["children"][0];
     assert_eq!(node["type"], "Atrule", "expected an at-rule");
     node["name"].as_str().expect("name").to_owned()

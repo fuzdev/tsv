@@ -2113,7 +2113,7 @@ mod tests {
         for source in &sources {
             let source = source.as_str();
             let arena = Bump::new();
-            let program = crate::parse(source, &arena).expect("parses");
+            let program = crate::__private::parse(source, &arena).expect("parses");
             let mut roots = Vec::new();
             for statement in program.body {
                 if let ast::StatementKind::ExpressionStatement(statement) = &statement.kind {

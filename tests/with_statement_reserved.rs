@@ -20,12 +20,12 @@
 
 fn accepts(source: &str) -> bool {
     let arena = bumpalo::Bump::new();
-    tsv_ts::parse(source, &arena).is_ok()
+    tsv_ts::__private::parse(source, &arena).is_ok()
 }
 
 fn accepts_script(source: &str) -> bool {
     let arena = bumpalo::Bump::new();
-    tsv_ts::parse_with_goal(source, tsv_ts::Goal::Script, &arena).is_ok()
+    tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Script, &arena).is_ok()
 }
 
 fn check_with(accept: fn(&str) -> bool, cases: &[(&str, bool)]) {

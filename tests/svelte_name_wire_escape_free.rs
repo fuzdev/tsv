@@ -108,13 +108,13 @@ fn root_names<'s>(root: &Root<'_>, source: &'s str, out: &mut Vec<&'s str>) {
 #[track_caller]
 fn grade(source: &str) -> Option<Vec<String>> {
     let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::parse(source, &arena).ok()?;
+    let root = tsv_svelte::__private::parse(source, &arena).ok()?;
     let mut names = Vec::new();
     root_names(&root, source, &mut names);
     graded_names(root.fragment.nodes, source, &mut names);
     for bytes in [
-        tsv_svelte::convert_ast_json_bytes_with_locations(&root, source),
-        tsv_svelte::convert_ast_json_bytes(&root, source),
+        tsv_svelte::__private::convert_ast_json_bytes_with_locations(&root, source),
+        tsv_svelte::__private::convert_ast_json_bytes(&root, source),
     ] {
         let text = String::from_utf8(bytes)
             .unwrap_or_else(|e| panic!("wire is not UTF-8 for {source:?}: {e}"));

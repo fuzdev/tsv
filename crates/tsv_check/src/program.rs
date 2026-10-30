@@ -41,8 +41,9 @@ use crate::ids::FileId;
 use crate::merge::{FileMerge, LibBase, LibFile, merge_program};
 use crate::options::CheckOptions;
 use bumpalo::Bump;
+use tsv_ts::__private::parse_with_goal_or_fallback;
+use tsv_ts::Goal;
 use tsv_ts::ast::Program;
-use tsv_ts::{Goal, parse_with_goal_or_fallback};
 
 /// One source unit to check — a file name (its diagnostic path) and its source.
 pub struct SourceUnit<'a> {
@@ -95,7 +96,7 @@ pub enum ParseReport {
     Parsed(ParsedFacts),
     /// Both goals failed; `message` is the error the format fallback attributes.
     Rejected {
-        /// The error `tsv_ts::parse_with_goal_or_fallback` reports when both goals fail.
+        /// The error `tsv_ts::__private::parse_with_goal_or_fallback` reports when both goals fail.
         message: String,
     },
 }
@@ -363,7 +364,7 @@ pub fn bind_lib(name: &str, source: &str) -> Result<LibFile, String> {
     })
 }
 
-/// Parse a unit via the goal rule — `tsv_ts::parse_with_goal_or_fallback`, the same
+/// Parse a unit via the goal rule — `tsv_ts::__private::parse_with_goal_or_fallback`, the same
 /// module-then-script fallback every format surface runs, so which error a double
 /// failure reports is stated once, there. The program records the goal it parsed
 /// under (`Program::goal`), which is also how a caller learns the `Script` retry won.

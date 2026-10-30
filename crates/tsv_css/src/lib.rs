@@ -32,31 +32,6 @@ pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinate
     bom: tsv_lang::LeadingBom::Elided,
 };
 
-/// Parse CSS source into internal AST
-///
-/// # Arguments
-/// * `source` - CSS source code
-///
-/// # Returns
-/// * `Ok(CssStyleSheet)` - Parsed AST with nodes and value comments
-/// * `Err(Error)` - Parse error with position and context
-///
-/// # Example
-/// ```
-/// use tsv_css::parse;
-///
-/// let css = "div { color: red; }";
-/// let arena = bumpalo::Bump::new();
-/// let stylesheet = parse(css, &arena).expect("Failed to parse CSS");
-/// ```
-///
-/// `arena` owns every AST node of the returned [`CssStyleSheet`]
-/// (caller-owns-`Bump`); the stylesheet borrows from it for `'arena`.
-pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<CssStyleSheet<'arena>> {
-    Error::ensure_source_fits(source)?;
-    parser::parse_css(source, 0, 0, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
-}
-
 /// Parse and format `source` in one call.
 ///
 /// Carriage returns (`\r\n` and a lone `\r`) are folded to `\n` ahead of the parse, so
@@ -76,47 +51,85 @@ pub fn format(source: &str) -> Result<String> {
     Ok(format_folded_in(&stylesheet, &folded, &doc_arena))
 }
 
-/// Convert CSS AST to compact JSON wire bytes — the **sole emission path** for its wire
-///
-/// The span-only wire every binding ships, and `tsv parse`'s default: a standalone
-/// `StyleSheetFile` matching Svelte's `parseCss()` JSON shape exactly (no `attributes` or
-/// `content` fields, `end` set to the full source length), `start`/`end` offsets with no
-/// `loc`, and no line table built at all. The writer (`ast/convert/write.rs`) walks the
-/// internal AST once and emits the wire JSON directly, never materializing a typed public
-/// tree, fusing the byte→char offset translation into the walk (each position through a
-/// byte→UTF-16 map; identity on ASCII). The bytes are valid UTF-8 by construction (source
-/// slices + ASCII fragments), and byte-oriented consumers skip the O(output) validation a
-/// `String` requires.
-#[cfg(feature = "convert")]
-pub fn convert_ast_json_bytes(stylesheet: &CssStyleSheet<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_stylesheet_file_bytes(stylesheet, source, tsv_lang::Wire::Span)
+/// What [`parse_to_json_with`]'s wire carries. The default is [`parse_to_json`]'s: the
+/// span-only wire.
+#[cfg(feature = "json")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub struct JsonOptions {
+    #[cfg(feature = "locations")]
+    locations: bool,
 }
 
-/// Convert internal AST to compact JSON wire bytes **with** per-node `loc`.
+#[cfg(feature = "json")]
+impl JsonOptions {
+    /// The default options: the span-only wire.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            #[cfg(feature = "locations")]
+            locations: false,
+        }
+    }
+
+    /// Add a `loc` to every object carrying `start` / `end`: the line (1-based) and column
+    /// (0-based, UTF-16 code units) of those offsets, under `\n` alone. `tsv parse
+    /// --locations` writes it. Default `false`, the span-only wire.
+    #[cfg(feature = "locations")]
+    #[must_use]
+    pub const fn locations(mut self, locations: bool) -> Self {
+        self.locations = locations;
+        self
+    }
+}
+
+/// Parse `source` and return its wire JSON AST: compact JSON in Svelte's `parseCss()` shape
+/// (a standalone `StyleSheetFile`), every node's `start` / `end` a UTF-16 offset and no
+/// `loc`.
 ///
-/// The `convert_ast_json_bytes` wire plus a `loc` on every object carrying `start`/`end` —
-/// `parseCss` emits none; tsv's is the line (1-based, LF-only) and column (0-based, UTF-16
-/// code units) of those offsets. `tsv parse --locations` writes it.
+/// The span-only wire every binding ships and `tsv parse` writes by default. Line and
+/// column are a pure function of those offsets plus the source, so a consumer holding the
+/// source loses nothing; `JsonOptions::locations` (the `locations` feature) adds them. The
+/// source is read as written — no line-terminator fold — so the offsets index the caller's
+/// own text.
+///
+/// # Errors
+///
+/// A parse error.
+#[cfg(feature = "json")]
+pub fn parse_to_json(source: &str) -> Result<String> {
+    parse_to_json_with(source, &JsonOptions::new())
+}
+
+/// [`parse_to_json`] under `options`: whether the wire carries `loc`.
+///
+/// Each call parses into a fresh arena sized to the source, dropped once the wire is
+/// written.
+///
+/// # Errors
+///
+/// A parse error.
+#[cfg(feature = "json")]
+pub fn parse_to_json_with(source: &str, options: &JsonOptions) -> Result<String> {
+    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+    let ast = __private::parse(source, &arena)?;
+    #[cfg(feature = "locations")]
+    if options.locations {
+        return Ok(wire_string(
+            __private::convert_ast_json_bytes_with_locations(&ast, source),
+        ));
+    }
+    #[cfg(not(feature = "locations"))]
+    let _ = options;
+    Ok(__private::convert_ast_json_string(&ast, source))
+}
+
+/// The wire's bytes as the `String` they are: the writer emits source slices and ASCII
+/// fragments alone.
 #[cfg(feature = "locations")]
-pub fn convert_ast_json_bytes_with_locations(
-    stylesheet: &CssStyleSheet<'_>,
-    source: &str,
-) -> Vec<u8> {
-    ast::convert::write_stylesheet_file_bytes(stylesheet, source, tsv_lang::Wire::Loc)
-}
-
-/// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM
-/// binding's `JSON.parse`, N-API strings): same wire bytes plus one UTF-8 validation of
-/// the output. Byte-oriented consumers should prefer the bytes variant.
-///
-/// There is no `_with_locations` `String` twin: the `&str` boundaries this form serves are
-/// the bindings, which ship the span-only wire alone, and the loc-bearing wire's only
-/// callers (`tsv parse --locations`, `tsv_debug`) write bytes.
-#[cfg(feature = "convert")]
 #[expect(clippy::expect_used)]
-pub fn convert_ast_json_string(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
-    String::from_utf8(convert_ast_json_bytes(stylesheet, source))
-        .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
+fn wire_string(bytes: Vec<u8>) -> String {
+    String::from_utf8(bytes).expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 
 /// Drive the raw lexer over `source` and return a deterministic, line-per-token

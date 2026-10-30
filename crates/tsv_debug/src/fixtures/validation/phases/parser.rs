@@ -377,15 +377,15 @@ pub(in crate::fixtures::validation) fn validate_tsv_rejects(
 
     let arena = bumpalo::Bump::new();
     let parse_result: Result<(), String> = match input_type {
-        InputType::Svelte => tsv_svelte::parse(input, &arena)
+        InputType::Svelte => tsv_svelte::__private::parse(input, &arena)
             .map(|_| ())
             .map_err(|e| format!("{e:#}")),
         InputType::SvelteTs | InputType::TypeScript => {
-            tsv_ts::parse_with_goal(input, fixture.goal(), &arena)
+            tsv_ts::__private::parse_with_goal(input, fixture.goal(), &arena)
                 .map(|_| ())
                 .map_err(|e| format!("{e:#}"))
         }
-        InputType::Css => tsv_css::parse(input, &arena)
+        InputType::Css => tsv_css::__private::parse(input, &arena)
             .map(|_| ())
             .map_err(|e| format!("{e:#}")),
     };

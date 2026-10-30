@@ -16,8 +16,8 @@ const BOM: char = '\u{FEFF}';
 /// The wire of a whole TypeScript file.
 fn ts_wire(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("the file parses");
-    tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source))
+    let program = tsv_ts::__private::parse(source, &arena).expect("the file parses");
+    tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source))
 }
 
 #[test]
@@ -33,7 +33,7 @@ fn a_file_reads_a_hashbang_behind_its_bom() {
     assert_eq!(tsv_ts::format(&with_bom).expect("the file formats"), plain);
     // Only one BOM is an encoding mark: a second is content, and the `#!` no hashbang.
     let arena = bumpalo::Bump::new();
-    assert!(tsv_ts::parse(&format!("{BOM}{BOM}{plain}"), &arena).is_err());
+    assert!(tsv_ts::__private::parse(&format!("{BOM}{BOM}{plain}"), &arena).is_err());
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn a_script_reads_no_hashbang_behind_a_bom() {
         format!("<script lang=\"ts\">{BOM}#!/x\nlet a;</script>"),
     ] {
         assert!(
-            tsv_svelte::parse(&source, &arena).is_err(),
+            tsv_svelte::__private::parse(&source, &arena).is_err(),
             "accepted: {source:?}"
         );
     }
@@ -63,7 +63,7 @@ fn an_island_opening_on_a_hashbang_is_rejected() {
         "{@html #!x\ncontent}",
     ] {
         assert!(
-            tsv_svelte::parse(source, &arena).is_err(),
+            tsv_svelte::__private::parse(source, &arena).is_err(),
             "accepted: {source:?}"
         );
     }

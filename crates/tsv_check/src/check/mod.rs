@@ -752,7 +752,7 @@ mod tests {
     /// program-wide sort/dedup.
     fn check_codes(source: &str) -> Vec<u32> {
         let arena = Bump::new();
-        let program = tsv_ts::parse(source, &arena).expect("parse");
+        let program = tsv_ts::__private::parse(source, &arena).expect("parse");
         check_file_members(&program, source, FileId::ROOT)
             .iter()
             .map(|d| d.code)
@@ -776,7 +776,7 @@ mod tests {
         // the binder-side `diag_codes` test) later collapses the T₃ pair to one.
         let arena = Bump::new();
         let src = "function f<T, T, T>() {}";
-        let program = tsv_ts::parse(src, &arena).expect("parse");
+        let program = tsv_ts::__private::parse(src, &arena).expect("parse");
         let diags = check_file_members(&program, src, FileId::ROOT);
         assert_eq!(
             diags.iter().map(|d| d.code).collect::<Vec<_>>(),
@@ -853,7 +853,7 @@ mod tests {
         // pass, so this exercises the check-side display in isolation.
         let arena = Bump::new();
         let src = "interface I { ['a']: number; ['a']: string; }";
-        let program = tsv_ts::parse(src, &arena).expect("parse");
+        let program = tsv_ts::__private::parse(src, &arena).expect("parse");
         let diags = check_file_members(&program, src, FileId::ROOT);
         assert_eq!(diags.len(), 2);
         assert!(diags.iter().all(|d| d.code == 2300));

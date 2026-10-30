@@ -61,9 +61,11 @@ fn reference_point(source: &str, position: usize, language: Language) -> (u32, u
 fn parse_error(source: &str, language: Language) -> Option<Error> {
     let arena = Bump::new();
     match language {
-        Language::TypeScript => tsv_ts::parse_with_goal_or_fallback(source, None, &arena).err(),
-        Language::Svelte => tsv_svelte::parse(source, &arena).err(),
-        Language::Css => tsv_css::parse(source, &arena).err(),
+        Language::TypeScript => {
+            tsv_ts::__private::parse_with_goal_or_fallback(source, None, &arena).err()
+        }
+        Language::Svelte => tsv_svelte::__private::parse(source, &arena).err(),
+        Language::Css => tsv_css::__private::parse(source, &arena).err(),
     }
 }
 
@@ -505,8 +507,8 @@ fn escape_errors_point_at_their_backslash() {
 }
 
 /// An embedded entry point reports a position and no point: its source is a slice of a
-/// host document, whose coordinates only the host can state (`tsv_svelte::parse` fills the
-/// context over the whole document).
+/// host document, whose coordinates only the host can state (`tsv_svelte::__private::parse`
+/// fills the context over the whole document).
 #[test]
 fn an_embedded_parse_error_has_no_point_until_its_host_fills_it() {
     let arena = Bump::new();
@@ -579,22 +581,22 @@ fn the_point_of_every_wire_position_is_its_loc() {
         let arena = Bump::new();
         let (wire, coordinates) = match language {
             Language::TypeScript => (
-                tsv_ts::convert_ast_json_bytes_with_locations(
-                    &tsv_ts::parse(source, &arena).expect("parses"),
+                tsv_ts::__private::convert_ast_json_bytes_with_locations(
+                    &tsv_ts::__private::parse(source, &arena).expect("parses"),
                     source,
                 ),
                 tsv_ts::WIRE_COORDINATES,
             ),
             Language::Svelte => (
-                tsv_svelte::convert_ast_json_bytes_with_locations(
-                    &tsv_svelte::parse(source, &arena).expect("parses"),
+                tsv_svelte::__private::convert_ast_json_bytes_with_locations(
+                    &tsv_svelte::__private::parse(source, &arena).expect("parses"),
                     source,
                 ),
                 tsv_svelte::WIRE_COORDINATES,
             ),
             Language::Css => (
-                tsv_css::convert_ast_json_bytes_with_locations(
-                    &tsv_css::parse(source, &arena).expect("parses"),
+                tsv_css::__private::convert_ast_json_bytes_with_locations(
+                    &tsv_css::__private::parse(source, &arena).expect("parses"),
                     source,
                 ),
                 tsv_css::WIRE_COORDINATES,

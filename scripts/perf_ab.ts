@@ -143,7 +143,7 @@ function driver_of(lang: Lang): DriverKind {
 
 /** The text whose presence in a tree's `crates/tsv_ts/src` says the strip driver can build
  * against it (`strip_skip_reason`). */
-const STRIP_ENTRY_POINT = 'pub fn strip_with_goal';
+const STRIP_ENTRY_POINT = 'pub fn strip_in<';
 
 const DEFAULT_ITERATIONS = 10;
 

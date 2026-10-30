@@ -10,7 +10,7 @@
 
 fn parse_error(source: &str) -> Option<String> {
     let arena = bumpalo::Bump::new();
-    tsv_svelte::parse(source, &arena)
+    tsv_svelte::__private::parse(source, &arena)
         .err()
         .map(|e| e.to_string())
 }

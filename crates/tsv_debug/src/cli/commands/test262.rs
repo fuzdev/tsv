@@ -141,7 +141,7 @@ impl Test262Command {
 
         // Manifest mode: grade the same subset `run_test` grades, write JSON,
         // and exit — the input to the tsv-vs-oxc differential consumer. Runs
-        // `tsv_ts::parse` on every graded test, so it's about as costly as a
+        // `tsv_ts::__private::parse` on every graded test, so it's about as costly as a
         // normal run.
         if let Some(manifest_path) = self.emit_manifest.as_ref() {
             eprintln!("Grading {} tests for manifest…", filtered_tests.len());

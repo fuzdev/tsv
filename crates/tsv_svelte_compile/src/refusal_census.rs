@@ -126,7 +126,7 @@ pub fn refusal_census(
     }
 
     let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::parse(source, &arena)?;
+    let root = tsv_svelte::__private::parse(source, &arena)?;
     collect(&root, source, &arena, &mut found);
 
     Ok(dedup_by_bucket(found))

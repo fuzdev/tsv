@@ -17,9 +17,9 @@ name = "tsv"
 path = "src/main.rs"
 
 [dependencies]
-tsv_svelte = { workspace = true, features = ["convert", "locations"] }
-tsv_ts = { workspace = true, features = ["convert", "locations"] }
-tsv_css = { workspace = true, features = ["convert", "locations"] }
+tsv_svelte = { workspace = true, features = ["json", "locations"] }
+tsv_ts = { workspace = true, features = ["json", "locations"] }
+tsv_css = { workspace = true, features = ["json", "locations"] }
 tsv_lang.workspace = true
 tsv_ignore.workspace = true
 tsv_discover.workspace = true

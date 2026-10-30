@@ -217,7 +217,7 @@ fn comment_loss(input: &str, output: &str) -> Option<String> {
 /// `None` if the source doesn't parse as a strict module.
 fn comment_texts(source: &str) -> Option<Vec<String>> {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).ok()?;
+    let program = tsv_ts::__private::parse(source, &arena).ok()?;
     Some(
         program
             .comments

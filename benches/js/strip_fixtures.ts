@@ -40,7 +40,7 @@
  *   (`crates/tsv_debug/src/strip_fixtures.rs`).
  * - **JS validity.** Every claimed output must parse as a JS module under oxc-parser in JS
  *   mode (semantic errors included), or the fixture fails and nothing is written. tsv's
- *   Rust side parses the expected output with `tsv_ts::parse`, which accepts TypeScript,
+ *   Rust side parses the expected output with `tsv_ts::__private::parse`, which accepts TypeScript,
  *   so this is the check that the output is JS at all.
  *
  * One input can't be fixtured: a U+2028 or U+2029 inside a string literal. The fold to LF

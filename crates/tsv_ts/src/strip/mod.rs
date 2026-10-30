@@ -12,7 +12,7 @@
 //! `module.stripTypeScriptTypes` share. They are not the Svelte compiler's: that product
 //! erases a tree, follows Svelte's own oracle, and shares no code with this one.
 //!
-//! The parse goal is the format path's (`strip_with_goal`): a named goal is exact, and an
+//! The parse goal is the format path's (`strip_in`): a named goal is exact, and an
 //! unset one reads the source as a module, retried as a script only if that fails. No
 //! verdict below depends on the goal; a script's `with` body is one more lone statement
 //! body.
@@ -68,39 +68,55 @@ use tsv_lang::{Error, ErrorKind, ErrorReport, Span};
 /// Strip the types from TypeScript `source`, keeping every surviving character at its line
 /// and UTF-16 column.
 ///
-/// The goal is unset: [`strip_with_goal`] with `None`, which parses the source as a module
-/// and retries it as a script only if that fails, as the format path reads it.
+/// No goal is named, so the source is read as [`format()`](crate::format()) reads it: as a
+/// module, retried as a script only if that fails (see [Goals](crate#goals)). The output is
+/// JS at the goal the source was read at; nothing the walk decides depends on the goal.
+/// [`strip_with_goal`] names one exactly.
 ///
 /// # Errors
 ///
-/// As [`strip_with_goal`].
-pub fn strip<'s>(source: &'s str, arena: &bumpalo::Bump) -> Result<Stripped<'s>, StripError> {
-    strip_with_goal(source, None, arena)
+/// [`StripError::Parse`] when `source` does not parse at either goal (the error reported
+/// is the one [Goals](crate#goals) picks); [`StripError::Unsupported`] when it holds
+/// TypeScript syntax that type blanking cannot erase.
+pub fn strip(source: &str) -> Result<Stripped<'_>, StripError> {
+    strip_one_shot(source, None)
 }
 
-/// Strip the types from TypeScript `source` parsed against `goal`, keeping every surviving
-/// character at its line and UTF-16 column.
-///
-/// The parse is [`crate::parse_with_goal_or_fallback`]'s: `Some(goal)` is exact, and `None`
-/// parses at `Module`, retried at `Script` only if that fails, so a legacy sloppy script
-/// strips while a module-valid source is never reinterpreted. When both attempts fail, the
-/// error reported is the one that function picks. The output is JS at the goal the source
-/// was read at; nothing the walk decides depends on the goal.
-///
-/// The caller owns `arena`, as with [`crate::parse`]: a loader keeps one per worker and
-/// resets it between modules.
+/// [`strip`] at exactly `goal`, with no Module-to-Script fallback: a source the goal's
+/// grammar rejects is a [`StripError::Parse`] even when the other goal would accept it.
 ///
 /// # Errors
 ///
-/// [`StripError::Parse`] when `source` does not parse; [`StripError::Unsupported`] when it
-/// holds TypeScript syntax that type blanking cannot erase.
-pub fn strip_with_goal<'s>(
+/// [`StripError::Parse`] when `source` does not parse at `goal`; [`StripError::Unsupported`]
+/// as [`strip`].
+pub fn strip_with_goal(source: &str, goal: crate::Goal) -> Result<Stripped<'_>, StripError> {
+    strip_one_shot(source, Some(goal))
+}
+
+/// The one-shot strips' arena: a fresh one sized to the source, dropped on return — the
+/// [`Stripped`] output borrows only `source`.
+fn strip_one_shot(source: &str, goal: Option<crate::Goal>) -> Result<Stripped<'_>, StripError> {
+    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+    strip_in(source, goal, &arena)
+}
+
+/// The strip over a caller-owned `arena` — the hidden primitive beneath [`strip`] and
+/// [`strip_with_goal`], for a hot loop that keeps one arena warm across sources (the
+/// bindings' per-thread arena), reset by the caller between calls.
+///
+/// The parse is `__private::parse_with_goal_or_fallback`'s: `Some(goal)` is exact, and
+/// `None` parses at `Module`, retried at `Script` only if that fails.
+///
+/// # Errors
+///
+/// As [`strip`].
+pub fn strip_in<'s>(
     source: &'s str,
     goal: Option<crate::Goal>,
     arena: &bumpalo::Bump,
 ) -> Result<Stripped<'s>, StripError> {
-    let program =
-        crate::parse_with_goal_or_fallback(source, goal, arena).map_err(StripError::Parse)?;
+    let program = crate::__private::parse_with_goal_or_fallback(source, goal, arena)
+        .map_err(StripError::Parse)?;
     let mut walk = walk::Walk::new(source, arena);
     walk.program(&program);
     let mut edits = walk.finish()?;
@@ -268,8 +284,7 @@ mod tests {
     use super::{StripError, UnsupportedKind, strip};
 
     fn strip_error(source: &str) -> StripError {
-        let arena = bumpalo::Bump::new();
-        match strip(source, &arena) {
+        match strip(source) {
             Err(error) => error,
             Ok(stripped) => panic!("expected a strip error, stripped to {:?}", stripped.code),
         }
@@ -306,8 +321,7 @@ mod tests {
     }
 
     fn stripped(source: &str) -> String {
-        let arena = bumpalo::Bump::new();
-        match strip(source, &arena) {
+        match strip(source) {
             Ok(stripped) => stripped.code.into_owned(),
             Err(error) => panic!("expected {source:?} to strip: {}", error.message(source)),
         }
@@ -320,7 +334,7 @@ mod tests {
             panic!("expected a parse error for {source:?}");
         };
         let arena = bumpalo::Bump::new();
-        let Err(parsed) = crate::parse_with_goal(source, goal, &arena) else {
+        let Err(parsed) = crate::__private::parse_with_goal(source, goal, &arena) else {
             panic!("expected {source:?} to fail at {goal:?}");
         };
         (stripped.to_string(), parsed.to_string())
@@ -507,8 +521,7 @@ mod tests {
         let stripped = std::thread::Builder::new()
             .stack_size(256 << 10)
             .spawn(move || {
-                let arena = bumpalo::Bump::new();
-                strip(&source, &arena)
+                strip(&source)
                     .map(|stripped| stripped.code.into_owned())
                     .map_err(|error| error.message(&source))
             })

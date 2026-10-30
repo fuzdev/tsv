@@ -40,7 +40,7 @@ fanout_check = []
 # artifacts and default `tsv_debug` profile/perf builds compile all of it out.
 audits = ["swallow_check", "comment_check", "fanout_check"]
 # Shared wire-JSON writer substrate (`json_writer`), pulled in transitively by
-# each language crate's `convert` feature. Off in the format-only
+# each language crate's `json` feature. Off in the format-only
 # @fuzdev/tsv-format-wasm build, so `zmij` never enters that graph.
 json = ["dep:zmij"]
 # The loc-bearing wire: the line table `WireTables` builds beside its map, which is the

@@ -22,20 +22,22 @@ use serde_json::Value;
 
 fn parse_json(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source))
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source))
 }
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
     tsv_ts::__private::format_ast(&program, source)
 }
 
 fn parse_svelte_json(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::parse(source, &arena).expect("parse failed");
-    tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&root, source))
+    let root = tsv_svelte::__private::parse(source, &arena).expect("parse failed");
+    tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(
+        &root, source,
+    ))
 }
 
 fn str_at<'a>(json: &'a Value, pointer: &str) -> Option<&'a str> {
@@ -316,7 +318,7 @@ fn a_comma_list_its_context_refuses_reads_as_acorn() {
     assert_acorn_call(&json, "/fragment/nodes/0/expression/consequent", "template");
     // a text both parsers reject keeps the first parse's error
     let arena = bumpalo::Bump::new();
-    assert!(tsv_ts::parse("const a = f<T, U><V>(x) +;", &arena).is_err());
+    assert!(tsv_ts::__private::parse("const a = f<T, U><V>(x) +;", &arena).is_err());
 }
 
 #[test]
@@ -436,7 +438,7 @@ fn a_svelte_head_tsc_reads_keeps_the_comparison() {
     ] {
         let source = format!("{TS}{template}");
         let arena = bumpalo::Bump::new();
-        let error = tsv_svelte::parse(&source, &arena).expect_err(template);
+        let error = tsv_svelte::__private::parse(&source, &arena).expect_err(template);
         assert!(error.to_string().contains(message), "{template:?}: {error}");
     }
 }
@@ -472,7 +474,7 @@ fn a_svelte_head_both_readings_refuse_reports_acorns_error() {
     ] {
         let source = format!("{TS}{template}");
         let arena = bumpalo::Bump::new();
-        let error = tsv_svelte::parse(&source, &arena).expect_err(template);
+        let error = tsv_svelte::__private::parse(&source, &arena).expect_err(template);
         assert!(error.to_string().contains(message), "{template:?}: {error}");
         assert_eq!(
             error.position(),
@@ -503,7 +505,7 @@ fn a_svelte_head_both_readings_refuse_reports_acorns_error() {
         ),
     ] {
         let arena = bumpalo::Bump::new();
-        let error = tsv_svelte::parse(source, &arena).expect_err(source);
+        let error = tsv_svelte::__private::parse(source, &arena).expect_err(source);
         assert!(error.to_string().contains(message), "{source:?}: {error}");
         assert_eq!(
             error.position(),
@@ -522,7 +524,7 @@ fn a_svelte_head_both_readings_refuse_reports_acorns_error() {
         ),
     ] {
         let arena = bumpalo::Bump::new();
-        let error = tsv_ts::parse(source, &arena).expect_err(source);
+        let error = tsv_ts::__private::parse(source, &arena).expect_err(source);
         assert!(error.to_string().contains(message), "{source:?}: {error}");
         assert_eq!(
             error.position(),

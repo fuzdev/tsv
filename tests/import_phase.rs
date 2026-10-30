@@ -41,7 +41,7 @@
 /// tsv parses + formats `input` to itself, then re-formats stably (idempotent).
 fn assert_ours_stable(input: &str) {
     let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::parse(input, &arena).expect("parse failed");
+    let ast = tsv_svelte::__private::parse(input, &arena).expect("parse failed");
     let output = tsv_svelte::__private::format_ast(&ast, input);
     assert_eq!(
         output, input,
@@ -49,7 +49,7 @@ fn assert_ours_stable(input: &str) {
     );
 
     let arena_twice = bumpalo::Bump::new();
-    let ast_twice = tsv_svelte::parse(&output, &arena_twice).expect("reparse failed");
+    let ast_twice = tsv_svelte::__private::parse(&output, &arena_twice).expect("reparse failed");
     let output_twice = tsv_svelte::__private::format_ast(&ast_twice, &output);
     assert_eq!(output, output_twice, "printer should be idempotent");
 }
@@ -101,7 +101,7 @@ fn static_import_source_binding_stable() {
 fn assert_ours_rejects(input: &str) {
     let arena = bumpalo::Bump::new();
     assert!(
-        tsv_svelte::parse(input, &arena).is_err(),
+        tsv_svelte::__private::parse(input, &arena).is_err(),
         "expected parse rejection (pinned divergence)"
     );
 }

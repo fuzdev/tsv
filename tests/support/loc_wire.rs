@@ -258,31 +258,32 @@ pub fn wires_and_reference(
     let arena = bumpalo::Bump::new();
     let (loc, span, rule, elide_bom) = match input_type {
         InputType::Svelte => {
-            let ast = tsv_svelte::parse(source, &arena).expect("Svelte input parses");
+            let ast = tsv_svelte::__private::parse(source, &arena).expect("Svelte input parses");
             let (rule, elide_bom) = wire_rule(false);
             (
-                tsv_svelte::convert_ast_json_bytes_with_locations(&ast, source),
-                tsv_svelte::convert_ast_json_bytes(&ast, source),
+                tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, source),
+                tsv_svelte::__private::convert_ast_json_bytes(&ast, source),
                 rule,
                 elide_bom,
             )
         }
         InputType::TypeScript | InputType::SvelteTs => {
-            let ast = tsv_ts::parse_with_goal(source, goal, &arena).expect("TS input parses");
+            let ast =
+                tsv_ts::__private::parse_with_goal(source, goal, &arena).expect("TS input parses");
             let (rule, elide_bom) = wire_rule(true);
             (
-                tsv_ts::convert_ast_json_bytes_with_locations(&ast, source),
-                tsv_ts::convert_ast_json_bytes(&ast, source),
+                tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, source),
+                tsv_ts::__private::convert_ast_json_bytes(&ast, source),
                 rule,
                 elide_bom,
             )
         }
         InputType::Css => {
-            let ast = tsv_css::parse(source, &arena).expect("CSS input parses");
+            let ast = tsv_css::__private::parse(source, &arena).expect("CSS input parses");
             let (rule, elide_bom) = wire_rule(false);
             (
-                tsv_css::convert_ast_json_bytes_with_locations(&ast, source),
-                tsv_css::convert_ast_json_bytes(&ast, source),
+                tsv_css::__private::convert_ast_json_bytes_with_locations(&ast, source),
+                tsv_css::__private::convert_ast_json_bytes(&ast, source),
                 rule,
                 elide_bom,
             )

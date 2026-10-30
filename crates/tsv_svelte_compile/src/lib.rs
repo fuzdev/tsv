@@ -223,7 +223,7 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<CompileOutput, 
         return Err(CompileError::Unsupported(Refusal::DevMode));
     }
     let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::parse(source, &arena)?;
+    let root = tsv_svelte::__private::parse(source, &arena)?;
     let output = transform_server::compile_server(&root, source, &arena)?;
     validate_output_js(&output.js)?;
     Ok(output)
@@ -235,7 +235,7 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<CompileOutput, 
 /// weakening the public API (no test-only hooks on `compile` itself).
 fn validate_output_js(js: &str) -> Result<(), CompileError> {
     let arena = bumpalo::Bump::new();
-    match tsv_ts::parse_with_goal(js, Goal::Module, &arena) {
+    match tsv_ts::__private::parse_with_goal(js, Goal::Module, &arena) {
         Ok(_) => Ok(()),
         Err(err) => Err(CompileError::CorruptOutput(err)),
     }
@@ -281,7 +281,7 @@ pub fn canonicalize_js(source: &str) -> Result<String, CanonicalizeError> {
     let program = tsv_ts::__private::parse_folded(&folded, Some(Goal::Module), &arena)?;
     let output = tsv_ts::__private::format_canonical(&program, folded.text());
     let check_arena = bumpalo::Bump::new();
-    if let Err(err) = tsv_ts::parse_with_goal(&output, Goal::Module, &check_arena) {
+    if let Err(err) = tsv_ts::__private::parse_with_goal(&output, Goal::Module, &check_arena) {
         return Err(CanonicalizeError::CorruptOutput(err));
     }
     Ok(output)

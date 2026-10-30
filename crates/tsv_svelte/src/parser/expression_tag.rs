@@ -256,7 +256,7 @@ mod tests {
 
     fn parses(source: &str) -> bool {
         let arena = Bump::new();
-        crate::parse(source, &arena).is_ok()
+        crate::__private::parse(source, &arena).is_ok()
     }
 
     /// Every island scan begins as a whole expression (`tsv_ts::__private::ACORN_ISLAND_GRAMMAR`):

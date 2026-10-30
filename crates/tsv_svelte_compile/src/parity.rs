@@ -77,8 +77,8 @@ pub fn compare_canonical(ours: &str, oracle: &str) -> Parity {
     let ours_arena = Bump::new();
     let oracle_arena = Bump::new();
     let (Ok(mut ours_program), Ok(mut oracle_program)) = (
-        tsv_ts::parse_with_goal(ours, Goal::Module, &ours_arena),
-        tsv_ts::parse_with_goal(oracle, Goal::Module, &oracle_arena),
+        tsv_ts::__private::parse_with_goal(ours, Goal::Module, &ours_arena),
+        tsv_ts::__private::parse_with_goal(oracle, Goal::Module, &oracle_arena),
     ) else {
         return Parity::Divergent;
     };

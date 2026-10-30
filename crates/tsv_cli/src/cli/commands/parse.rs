@@ -113,27 +113,27 @@ fn parse_to_json(
     // no goal.
     let bytes = match parser_type {
         ParserType::Svelte => {
-            let ast = tsv_svelte::parse(source, &arena)?;
+            let ast = tsv_svelte::__private::parse(source, &arena)?;
             if locations {
-                tsv_svelte::convert_ast_json_bytes_with_locations(&ast, source)
+                tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, source)
             } else {
-                tsv_svelte::convert_ast_json_bytes(&ast, source)
+                tsv_svelte::__private::convert_ast_json_bytes(&ast, source)
             }
         }
         ParserType::Css => {
-            let ast = tsv_css::parse(source, &arena)?;
+            let ast = tsv_css::__private::parse(source, &arena)?;
             if locations {
-                tsv_css::convert_ast_json_bytes_with_locations(&ast, source)
+                tsv_css::__private::convert_ast_json_bytes_with_locations(&ast, source)
             } else {
-                tsv_css::convert_ast_json_bytes(&ast, source)
+                tsv_css::__private::convert_ast_json_bytes(&ast, source)
             }
         }
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse_with_goal(source, goal, &arena)?;
+            let ast = tsv_ts::__private::parse_with_goal(source, goal, &arena)?;
             if locations {
-                tsv_ts::convert_ast_json_bytes_with_locations(&ast, source)
+                tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, source)
             } else {
-                tsv_ts::convert_ast_json_bytes(&ast, source)
+                tsv_ts::__private::convert_ast_json_bytes(&ast, source)
             }
         }
     };

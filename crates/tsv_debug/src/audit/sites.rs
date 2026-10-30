@@ -276,7 +276,7 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
     // A parse failure is not this function's business to report: the caller already skipped
     // any seed file tsv rejects, and an injected source that stops parsing is a `Rejected`
     // the inject loop drops on the floor.
-    let Ok(root) = tsv_svelte::parse(source, &arena) else {
+    let Ok(root) = tsv_svelte::__private::parse(source, &arena) else {
         return InternalRegions {
             named: Vec::new(),
             frozen: Vec::new(),
@@ -809,7 +809,7 @@ mod tests {
         for &(open_tag, frozen) in FROZEN_SCRIPT_CASES {
             let src = format!("{open_tag}{UNFORMATTED_BODY}</script>\n");
             let arena = bumpalo::Bump::new();
-            let ast = tsv_svelte::parse(&src, &arena).expect("parses");
+            let ast = tsv_svelte::__private::parse(&src, &arena).expect("parses");
             let out = tsv_svelte::__private::format_ast(&ast, &src);
             assert_eq!(
                 out.contains(UNFORMATTED_BODY.trim_end()),

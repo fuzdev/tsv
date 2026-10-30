@@ -1,6 +1,6 @@
 // CSS AST modules
 
-#[cfg(feature = "convert")]
+#[cfg(feature = "json")]
 pub(crate) mod convert;
 
 // Internal AST - CSS-specific types optimized for traversal and manipulation
@@ -989,7 +989,7 @@ impl CssAtrule<'_> {
     /// wire behavior of its own.
     ///
     /// [`convert_prelude_to_string`]: crate::ast::convert::convert_prelude_to_string
-    #[cfg(feature = "convert")]
+    #[cfg(feature = "json")]
     pub fn public_prelude<'src>(&self, source: &'src str) -> std::borrow::Cow<'src, str> {
         convert::convert_prelude_to_string(&self.prelude, source)
     }

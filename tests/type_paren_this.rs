@@ -29,8 +29,9 @@ fn assert_paren_this(source: &str, pointer: &str, expected_output: &str) {
     );
 
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    let json = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let json =
+        tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
 
     let paren = json.pointer(pointer).expect("parenthesized type");
     assert_eq!(
@@ -51,7 +52,7 @@ fn assert_paren_this(source: &str, pointer: &str, expected_output: &str) {
 
     // The stripped form is tsv's fixed point.
     let arena_out = bumpalo::Bump::new();
-    let reparsed = tsv_ts::parse(&output, &arena_out).expect("reparse failed");
+    let reparsed = tsv_ts::__private::parse(&output, &arena_out).expect("reparse failed");
     assert_eq!(
         tsv_ts::__private::format_ast(&reparsed, &output),
         output,

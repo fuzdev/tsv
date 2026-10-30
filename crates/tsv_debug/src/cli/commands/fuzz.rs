@@ -222,7 +222,7 @@ impl EmbeddedSeeds {
 /// parse yields nothing (its regions are not known), as does an empty body.
 fn embedded_bodies(src: &str, lang: EmbeddedSeeds) -> Vec<(&'static str, String)> {
     let arena = bumpalo::Bump::new();
-    let Ok(root) = tsv_svelte::parse(src, &arena) else {
+    let Ok(root) = tsv_svelte::__private::parse(src, &arena) else {
         return Vec::new();
     };
     let mut bodies = Vec::new();
@@ -547,15 +547,15 @@ fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) ->
 fn locations_wire(src: &str, parser: ParserType) -> bool {
     let arena = bumpalo::Bump::new();
     let wire = match parser {
-        ParserType::TypeScript => tsv_ts::parse_with_goal_or_fallback(src, None, &arena)
+        ParserType::TypeScript => tsv_ts::__private::parse_with_goal_or_fallback(src, None, &arena)
             .ok()
-            .map(|ast| tsv_ts::convert_ast_json_bytes_with_locations(&ast, src)),
-        ParserType::Svelte => tsv_svelte::parse(src, &arena)
+            .map(|ast| tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, src)),
+        ParserType::Svelte => tsv_svelte::__private::parse(src, &arena)
             .ok()
-            .map(|ast| tsv_svelte::convert_ast_json_bytes_with_locations(&ast, src)),
-        ParserType::Css => tsv_css::parse(src, &arena)
+            .map(|ast| tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, src)),
+        ParserType::Css => tsv_css::__private::parse(src, &arena)
             .ok()
-            .map(|ast| tsv_css::convert_ast_json_bytes_with_locations(&ast, src)),
+            .map(|ast| tsv_css::__private::convert_ast_json_bytes_with_locations(&ast, src)),
     };
     wire.is_some_and(|bytes| !bytes.is_empty())
 }
@@ -569,7 +569,7 @@ fn locations_wire(src: &str, parser: ParserType) -> bool {
 /// panicked (caught there, its location recorded by the capturing hook).
 fn strip_check(src: &str) -> (bool, Option<(Outcome, String)>) {
     let arena = bumpalo::Bump::new();
-    let Ok(stripped) = tsv_ts::strip(src, &arena) else {
+    let Ok(stripped) = tsv_ts::__private::strip_in(src, None, &arena) else {
         return (false, None);
     };
     let code = stripped.code.as_ref();

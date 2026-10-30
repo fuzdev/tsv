@@ -1194,7 +1194,7 @@ mod tests {
         for (written, name) in &cases {
             let source = format!("\n  {written};\n");
             let arena = bumpalo::Bump::new();
-            let program = crate::parse(&source, &arena).expect("parses");
+            let program = crate::__private::parse(&source, &arena).expect("parses");
             let id = sole_identifier(&program);
             let end = 3 + written.encode_utf16().count();
             let column = end - 1;

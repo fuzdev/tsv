@@ -53,8 +53,9 @@ fn node_kinds(source: &str) -> Vec<String> {
         }
     }
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("the case parses");
-    let json = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
+    let program = tsv_ts::__private::parse(source, &arena).expect("the case parses");
+    let json =
+        tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
     let mut out = Vec::new();
     walk(&json, &mut out);
     out
@@ -94,7 +95,7 @@ fn assert_two_comparisons(source: &str, printed: &str) {
 
 fn rejects(source: &str) -> bool {
     let arena = bumpalo::Bump::new();
-    tsv_ts::parse(source, &arena).is_err()
+    tsv_ts::__private::parse(source, &arena).is_err()
 }
 
 /// The rendered error for `source`: its message line and its `line:col` header.
@@ -102,7 +103,7 @@ fn error(source: &str) -> (String, String) {
     let arena = bumpalo::Bump::new();
     let rendered = format!(
         "{:#}",
-        tsv_ts::parse(source, &arena).expect_err("the case must not parse")
+        tsv_ts::__private::parse(source, &arena).expect_err("the case must not parse")
     );
     let mut lines = rendered.lines();
     let message = lines.next().expect("a message line").to_owned();
@@ -578,7 +579,7 @@ fn a_goal_gate_in_the_tail_is_reported_as_it_stands() {
         "fn(a < b, { [k(f<A, { p: X; [import.meta]: 1 }>(y))]: 1 }, c + d > (e));",
     ] {
         let arena = bumpalo::Bump::new();
-        let error = tsv_ts::parse_with_goal(source, tsv_ts::Goal::Script, &arena)
+        let error = tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Script, &arena)
             .expect_err("`import.meta` is no script's");
         assert!(error.is_goal_gated(), "{source:?}: {error}");
     }
@@ -641,7 +642,7 @@ fn a_list_tried_inside_a_tried_list_is_tried_once() {
     let source = format!("fn({source});");
     let started = Instant::now();
     let arena = bumpalo::Bump::new();
-    assert!(tsv_ts::parse(&source, &arena).is_ok());
+    assert!(tsv_ts::__private::parse(&source, &arena).is_ok());
     assert!(
         started.elapsed() < Duration::from_secs(20),
         "nested tried lists took {:?}",

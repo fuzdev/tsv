@@ -438,7 +438,7 @@ fn grade_runs(content: &str, is_negative_parse: bool, runs: GradedRuns) -> TestR
 fn parse_run(source: &str, goal: tsv_ts::Goal) -> Option<String> {
     // test262 tests are pure ECMAScript, so we parse as TypeScript (a superset).
     let arena = bumpalo::Bump::new();
-    match tsv_ts::parse_with_goal(source, goal, &arena) {
+    match tsv_ts::__private::parse_with_goal(source, goal, &arena) {
         Ok(_) => None,
         Err(error) => Some(format!("{error:?}")),
     }
@@ -470,7 +470,7 @@ pub enum Verdict {
 /// One graded test's row in the differential manifest.
 ///
 /// `expected` is what test262 wants (accept for positives, reject for
-/// parse-phase negatives); `tsv` is what `tsv_ts::parse` actually did. A
+/// parse-phase negatives); `tsv` is what `tsv_ts::__private::parse` actually did. A
 /// downstream consumer (`benches/js/diagnostics/test262_compare.ts`) runs the
 /// alternative parser over the same file and joins on `relative_path`.
 ///
@@ -500,7 +500,7 @@ pub struct ManifestEntry {
     pub strict: bool,
     /// What test262 expects: `accept` for positives, `reject` for parse negatives.
     pub expected: Verdict,
-    /// What `tsv_ts::parse_with_goal` did on this row's source and goal.
+    /// What `tsv_ts::__private::parse_with_goal` did on this row's source and goal.
     pub tsv: Verdict,
 }
 

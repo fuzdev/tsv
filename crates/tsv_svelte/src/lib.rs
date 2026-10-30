@@ -27,38 +27,13 @@ pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinate
     bom: tsv_lang::LeadingBom::Elided,
 };
 
-/// Parse Svelte source code into an internal AST
-///
-/// # Arguments
-///
-/// * `source` - The Svelte component source code to parse
-/// * `arena` - The bump arena that owns the parsed graph (the template AST plus
-///   the embedded TS `<script>`/`{expr}` ASTs, which share this one `Bump`); the
-///   returned `Root<'arena>` borrows from it (caller-owns-`Bump`).
-///
-/// # Returns
-///
-/// * `Ok(Root)` - The parsed AST
-/// * `Err(Error)` - If parsing fails
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let arena = bumpalo::Bump::new();
-/// let ast = tsv_svelte::parse("<div>Hello</div>", &arena)?;
-/// ```
-pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Root<'arena>> {
-    Error::ensure_source_fits(source)?;
-    parser::parse_svelte(source, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
-}
-
 /// `parse_folded`'s refusal: parse the author's own bytes, and refuse the first in-tag `//`
 /// comment that holds a lone `<CR>`. Its parse lands in `arena` beside the folded one, which
 /// the caller resets with it — a cost only a document holding a lone `<CR>` pays.
 #[cold]
 #[inline(never)]
 fn refuse_lone_cr_in_tag_line_comment(source: &str, arena: &bumpalo::Bump) -> Result<()> {
-    let root = parse(source, arena)?;
+    let root = __private::parse(source, arena)?;
     let bytes = source.as_bytes();
     for comment in &root.comments {
         // Only the template reader's `//` runs to a `\n` alone; acorn's and the CSS
@@ -113,65 +88,86 @@ pub fn format(source: &str) -> Result<String> {
     Ok(format_folded_in(&root, &folded, &doc_arena))
 }
 
-/// Convert internal AST to compact JSON wire bytes with character-based positions
-///
-/// The span-only wire every binding ships, and `tsv parse`'s default: the Svelte parser's
-/// JSON shape with every line/column object dropped — every `loc` and the `name_loc` on
-/// elements/attributes/directives — keeping only `start`/`end` offsets. All are derivable
-/// from those offsets plus the source, so a consumer that has the source loses nothing (a
-/// name's exact span is reconstructed from its node's offsets plus the source); nothing
-/// queries the line table. Mirrors acorn's `locations: false`.
-///
-/// The **sole emission path** for its wire: emits the wire JSON directly during a
-/// single walk of the *internal* Svelte AST — no typed public tree, no intermediate
-/// `Value` for the output. A **writer-mode conversion** (`ast/convert/write.rs`) fuses
-/// byte→UTF-16 offset translation into the walk: the whole document — the
-/// Svelte spine (elements, blocks, tags, directives, attributes), embedded template
-/// expressions and `<script>` content via `tsv_ts`'s embedded writers, `<style>`
-/// children via `tsv_css`'s `write_css_children` — emits final char-space positions
-/// directly (`start`, `end`). Comment-bearing islands (template expressions
-/// with comments, comment-carrying `<script>`s) run acorn's attach **online** off this
-/// same emit's node opens and closes (`ast/convert/comment_attachment.rs` declares each
-/// island's window), so each node emits its own `leadingComments` / `trailingComments` at
-/// its close — no second pass and no per-node map. The bytes are valid UTF-8 by
-/// construction (every emitted byte is a source slice or ASCII fragment), and
-/// byte-oriented consumers skip the O(output) validation a `String` requires.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let source = "<div>Hello</div>";
-/// let arena = bumpalo::Bump::new();
-/// let ast = tsv_svelte::parse(source, &arena)?;
-/// let wire = tsv_svelte::convert_ast_json_bytes(&ast, source);
-/// ```
-#[cfg(feature = "convert")]
-pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_root_bytes(root, source, tsv_lang::Wire::Span)
+/// What [`parse_to_json_with`]'s wire carries. The default is [`parse_to_json`]'s: the
+/// span-only wire.
+#[cfg(feature = "json")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub struct JsonOptions {
+    #[cfg(feature = "locations")]
+    locations: bool,
 }
 
-/// The `convert_ast_json_bytes` wire plus a `loc` on every object carrying `start`/`end`
-/// (a superset of Svelte's, which gives `loc` to acorn-parsed nodes only) and the
-/// `name_loc` on elements/attributes/directives — line (1-based) and column (0-based,
-/// UTF-16 code units) under `\n` alone, the one line rule for a Svelte document and
-/// everything embedded in it. `tsv parse --locations` writes it.
+#[cfg(feature = "json")]
+impl JsonOptions {
+    /// The default options: the span-only wire.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            #[cfg(feature = "locations")]
+            locations: false,
+        }
+    }
+
+    /// Add a `loc` to every object carrying `start` / `end`: the line (1-based) and column
+    /// (0-based, UTF-16 code units) of those offsets, under `\n` alone — the one line rule for
+    /// a Svelte document and everything embedded in it (a superset of Svelte's `loc`, which
+    /// acorn-parsed nodes alone carry); elements, attributes and directives also gain their
+    /// `name_loc`. `tsv parse --locations` writes it. Default `false`, the span-only wire.
+    #[cfg(feature = "locations")]
+    #[must_use]
+    pub const fn locations(mut self, locations: bool) -> Self {
+        self.locations = locations;
+        self
+    }
+}
+
+/// Parse `source` and return its wire JSON AST: compact JSON in Svelte's modern `parse()`
+/// shape, every node's `start` / `end` a UTF-16 offset and no `loc`.
+///
+/// The span-only wire every binding ships and `tsv parse` writes by default. Line and
+/// column are a pure function of those offsets plus the source, so a consumer holding the
+/// source loses nothing; `JsonOptions::locations` (the `locations` feature) adds them. The
+/// source is read as written — no line-terminator fold — so the offsets index the caller's
+/// own text.
+///
+/// # Errors
+///
+/// A parse error.
+#[cfg(feature = "json")]
+pub fn parse_to_json(source: &str) -> Result<String> {
+    parse_to_json_with(source, &JsonOptions::new())
+}
+
+/// [`parse_to_json`] under `options`: whether the wire carries `loc`.
+///
+/// Each call parses into a fresh arena sized to the source, dropped once the wire is
+/// written.
+///
+/// # Errors
+///
+/// A parse error.
+#[cfg(feature = "json")]
+pub fn parse_to_json_with(source: &str, options: &JsonOptions) -> Result<String> {
+    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+    let ast = __private::parse(source, &arena)?;
+    #[cfg(feature = "locations")]
+    if options.locations {
+        return Ok(wire_string(
+            __private::convert_ast_json_bytes_with_locations(&ast, source),
+        ));
+    }
+    #[cfg(not(feature = "locations"))]
+    let _ = options;
+    Ok(__private::convert_ast_json_string(&ast, source))
+}
+
+/// The wire's bytes as the `String` they are: the writer emits source slices and ASCII
+/// fragments alone.
 #[cfg(feature = "locations")]
-pub fn convert_ast_json_bytes_with_locations(root: &Root<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_root_bytes(root, source, tsv_lang::Wire::Loc)
-}
-
-/// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM
-/// binding's `JSON.parse`, N-API strings): same wire bytes plus one UTF-8 validation of
-/// the output. Byte-oriented consumers should prefer the bytes variant.
-///
-/// There is no `_with_locations` `String` twin: the `&str` boundaries this form serves are
-/// the bindings, which ship the span-only wire alone, and the loc-bearing wire's only
-/// callers (`tsv parse --locations`, `tsv_debug`) write bytes.
-#[cfg(feature = "convert")]
 #[expect(clippy::expect_used)]
-pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
-    String::from_utf8(convert_ast_json_bytes(root, source))
-        .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
+fn wire_string(bytes: Vec<u8>) -> String {
+    String::from_utf8(bytes).expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 
 /// Byte spans of the instance/module `<script>` element contents.
@@ -179,7 +175,7 @@ pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
 /// Comments inside these spans belong to the embedded TS programs; comments
 /// outside them are template expression comments. The wire writer partitions
 /// the root comment list on it.
-#[cfg(feature = "convert")]
+#[cfg(feature = "json")]
 pub(crate) fn script_content_spans(root: &Root<'_>) -> Vec<(u32, u32)> {
     let mut script_spans: Vec<(u32, u32)> = Vec::new();
     if let Some(script) = root.instance {

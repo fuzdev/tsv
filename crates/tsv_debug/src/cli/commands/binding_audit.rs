@@ -384,7 +384,8 @@ fn audit_file(path: &Path) -> FileOutcome {
 fn extract_bindings(source: &str) -> Option<Vec<CommentBinding>> {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse_preserve_parens(source, &arena).ok()?;
-    let wire = crate::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
+    let wire =
+        crate::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
     let map = Utf16ToByte::new(source);
     let bytes = source.as_bytes();
 

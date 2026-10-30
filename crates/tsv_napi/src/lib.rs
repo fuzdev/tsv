@@ -73,7 +73,7 @@ use tsv_ts::{ErrorReport, WirePoint};
 /// What an unset one means is the caller's: the parse exports read it as `Module`
 /// (their wire's `Program.sourceType` is a claim one settled grammar has to
 /// produce), the format exports and the strip as "none named", which
-/// `tsv_ts::parse_with_goal_or_fallback` answers with the module grammar retried as
+/// `tsv_ts::__private::parse_with_goal_or_fallback` answers with the module grammar retried as
 /// a script.
 #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 fn napi_source_type(
@@ -235,7 +235,7 @@ fn plain_error(env: Env, message: &str) -> napi::Error {
 // At Script goal `await` is an ordinary identifier — so a top-level `await` with an
 // operand is a syntax error — and so are top-level `import`/`export` declarations,
 // `import.meta` and a top-level `for await`. See `tsv parse --source-type` and
-// `tsv_ts::parse_with_goal`.
+// `tsv_ts::__private::parse_with_goal`.
 //
 // `tsv_ffi` spells the same axis as a `u32` source-type code and `tsv_wasm` as the
 // same trailing optional string this addon takes; each binding's own
@@ -386,23 +386,25 @@ lang_bindings!(
 #[cfg(feature = "strip")]
 fn strip_typescript_engine(source: &str, source_type: Option<String>) -> Result<String, Failure> {
     let goal = napi_source_type(source_type, true, Family::Strip)?;
-    with_ast_arena(|arena| match tsv_ts::strip_with_goal(source, goal, arena) {
-        Ok(stripped) => Ok(stripped.code.into_owned()),
-        Err(tsv_ts::StripError::Parse(e)) => Err(Failure::parse(&e)),
-        Err(tsv_ts::StripError::Unsupported { kind, span }) => Err(Failure::Returned {
-            kind: "unsupported",
-            construct: Some(kind.name()),
-            report: kind.report(span, source),
-        }),
-    })
+    with_ast_arena(
+        |arena| match tsv_ts::__private::strip_in(source, goal, arena) {
+            Ok(stripped) => Ok(stripped.code.into_owned()),
+            Err(tsv_ts::StripError::Parse(e)) => Err(Failure::parse(&e)),
+            Err(tsv_ts::StripError::Unsupported { kind, span }) => Err(Failure::Returned {
+                kind: "unsupported",
+                construct: Some(kind.name()),
+                report: kind.report(span, source),
+            }),
+        },
+    )
 }
 
-/// Strip the types from TypeScript `source` (`tsv_ts::strip_with_goal`): the JS, every type-only
-/// range blanked to whitespace so every surviving character keeps its line and UTF-16 column. The
-/// source type is read as `format_typescript` reads it: omitted, the module grammar retried as a
-/// script; set, exact. A parse failure is returned as the parse exports return one; a refusal is
-/// returned as `{ok: false, error}` with `kind` `'unsupported'`, its `construct` and its span
-/// ([`failure_result`]).
+/// Strip the types from TypeScript `source` (`tsv_ts::__private::strip_in`): the JS, every
+/// type-only range blanked to whitespace so every surviving character keeps its line and UTF-16
+/// column. The source type is read as `format_typescript` reads it: omitted, the module grammar
+/// retried as a script; set, exact. A parse failure is returned as the parse exports return one;
+/// a refusal is returned as `{ok: false, error}` with `kind` `'unsupported'`, its `construct` and
+/// its span ([`failure_result`]).
 #[cfg(feature = "strip")]
 #[napi(js_name = "strip_typescript", catch_unwind)]
 pub fn strip_typescript(

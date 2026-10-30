@@ -41,8 +41,9 @@ fn count(source: &str, kind: &str) -> usize {
         }
     }
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("the case parses");
-    let json = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
+    let program = tsv_ts::__private::parse(source, &arena).expect("the case parses");
+    let json =
+        tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
     walk(&json, kind)
 }
 
@@ -50,7 +51,7 @@ fn error_message(source: &str) -> String {
     let arena = bumpalo::Bump::new();
     let rendered = format!(
         "{:#}",
-        tsv_ts::parse(source, &arena).expect_err("the case must not parse")
+        tsv_ts::__private::parse(source, &arena).expect_err("the case must not parse")
     );
     rendered.lines().next().expect("a message line").to_owned()
 }

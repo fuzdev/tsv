@@ -45,7 +45,7 @@ fn test_all_compile_fixtures() {
         let input = match std::fs::read_to_string(fixture.input_path()) {
             Ok(input) => {
                 let arena = bumpalo::Bump::new();
-                if let Err(e) = tsv_svelte::parse(&input, &arena) {
+                if let Err(e) = tsv_svelte::__private::parse(&input, &arena) {
                     failures.push(format!("{name}: input.svelte fails to parse: {e}"));
                 }
                 Some(input)

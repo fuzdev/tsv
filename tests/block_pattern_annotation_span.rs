@@ -32,8 +32,10 @@ use serde_json::Value;
 /// The `[start, end)` of the one `TSTypeAnnotation` in the wire.
 fn annotation_span(src: &str) -> (u64, u64) {
     let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::parse(src, &arena).expect("parser should accept the component");
-    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
+    let ast =
+        tsv_svelte::__private::parse(src, &arena).expect("parser should accept the component");
+    let json =
+        tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
     let mut found = Vec::new();
     collect(&json, &mut found);
     match found.as_slice() {
@@ -132,7 +134,7 @@ fn the_optional_marker_rewrite_also_lands_as_an_over_acceptance() {
     let accepts = |annotation: &str| {
         let src = format!("{HEAD}{{#each xs as e: {annotation}}}\n\t{{e}}\n{{/each}}\n");
         let arena = bumpalo::Bump::new();
-        tsv_svelte::parse(&src, &arena).is_ok()
+        tsv_svelte::__private::parse(&src, &arena).is_ok()
     };
     assert!(
         accepts("(a?: number) => void"),

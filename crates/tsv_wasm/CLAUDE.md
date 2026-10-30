@@ -255,7 +255,7 @@ shipped stack) and smoked per variant by `scripts/validate_artifacts.ts`.
 ## JSON-String Transport
 
 The AST crosses the JS↔WASM boundary as **one compact JSON string** — the span-only wire:
-`parse_*` builds it with the lang crate's `convert_ast_json_string` (each
+`parse_*` builds it with the lang crate's `__private::convert_ast_json_string` (each
 language's wire-JSON writer emits it directly from the internal AST — no intermediate
 `serde_json::Value` or typed public tree) and calls the engine's native `JSON.parse` from
 Rust via `js_sys::JSON::parse`, so the export returns the object (as `{ok: true, ast}`). Building
@@ -280,7 +280,7 @@ because formatting itself is non-configurable. Everything else is the parse sema
 **An unset `sourceType` is the one key whose default differs between the two
 families.** The facade forwards it unset, and the raw format exports hand that to
 `parse_format!` → `parse_ast_for_format!` → `tsv_ts::__private::parse_folded` →
-`tsv_ts::parse_with_goal_or_fallback`:
+`tsv_ts::__private::parse_with_goal_or_fallback`:
 the module grammar, retried as a script only if that parse *fails* (which error is reported
 when both fail: [../../CLAUDE.md §Strictness](../../CLAUDE.md#strictness-module-strict-script-by-directive)).
 That is what lets `format_typescript(source)` with no bag
@@ -288,7 +288,7 @@ That is what lets `format_typescript(source)` with no bag
 script (`with`, a leading-zero literal or escape, `await` as a name). A **set** value
 is exact, so `{sourceType: 'module'}` refuses one; nothing the module grammar
 accepts is ever reinterpreted, and the printer reads no goal, so no output moves. The
-strip reads an unset value the same way (`tsv_ts::strip_with_goal`, whose walk reads no goal
+strip reads an unset value the same way (`tsv_ts::__private::strip_in`, whose walk reads no goal
 either). The parse exports unwrap the same unset value to `Module` (see
 [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)).
 
@@ -365,7 +365,7 @@ the same on every binding (`tsv_napi`, `tsv_ffi`). Line/column is a pure functio
 offset plus the source, so `loc` is a **view**: `{locations: true}` on a `parse_<lang>`
 call runs the shipped reconstruction (below) over the tree it just parsed and returns
 the tree with `loc` on every node — acorn-exact for TypeScript. The `loc`-bearing JSON
-form is Rust-only (`convert_ast_json_bytes_with_locations` in each language crate, behind the
+form is Rust-only (`JsonOptions::locations` in each language crate, behind the
 opt-in `locations` cargo feature no binding enables), reached by the native CLI's `tsv parse --locations`, `tsv_debug`, and the
 corpus tools. `npm/cli.js`'s `parse --locations` is reconstruct-then-stringify, so its
 trees deep-equal the native CLI's while their key order differs (the Rust writer puts

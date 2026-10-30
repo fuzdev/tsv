@@ -27,15 +27,15 @@ pub(crate) fn parse_input<'arena>(
     arena: &'arena bumpalo::Bump,
 ) -> Result<ParsedInput<'arena>, String> {
     match input_type {
-        InputType::Svelte => tsv_svelte::parse(content, arena)
+        InputType::Svelte => tsv_svelte::__private::parse(content, arena)
             .map(ParsedInput::Svelte)
             .map_err(|e| format!("Parse error: {e:?}")),
         InputType::SvelteTs | InputType::TypeScript => {
-            tsv_ts::parse_with_goal(content, goal, arena)
+            tsv_ts::__private::parse_with_goal(content, goal, arena)
                 .map(ParsedInput::Ts)
                 .map_err(|e| format!("Parse error: {e:?}"))
         }
-        InputType::Css => tsv_css::parse(content, arena)
+        InputType::Css => tsv_css::__private::parse(content, arena)
             .map(ParsedInput::Css)
             .map_err(|e| format!("Parse error: {e:?}")),
     }
@@ -72,9 +72,9 @@ impl InputAstPaths {
 /// freshness checks — is the oracle these phases compare against.
 pub(crate) fn input_ast_paths(parsed: &ParsedInput<'_>, content: &str) -> InputAstPaths {
     let wire = match parsed {
-        ParsedInput::Svelte(ast) => tsv_svelte::convert_ast_json_bytes(ast, content),
-        ParsedInput::Ts(ast) => tsv_ts::convert_ast_json_bytes(ast, content),
-        ParsedInput::Css(ast) => tsv_css::convert_ast_json_bytes(ast, content),
+        ParsedInput::Svelte(ast) => tsv_svelte::__private::convert_ast_json_bytes(ast, content),
+        ParsedInput::Ts(ast) => tsv_ts::__private::convert_ast_json_bytes(ast, content),
+        ParsedInput::Css(ast) => tsv_css::__private::convert_ast_json_bytes(ast, content),
     };
     let mut tabs = indent_json_with_tabs(&wire);
     // Trailing newline matches the expected*.json format

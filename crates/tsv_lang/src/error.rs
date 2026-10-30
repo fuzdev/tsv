@@ -696,8 +696,8 @@ impl Error {
     /// language crate's public parse entry points call this with that language's
     /// coordinates (`tsv_ts::WIRE_COORDINATES` and its siblings). The embedded entry points
     /// `tsv_svelte` uses for `<script>` / `<style>` bodies do not: their source is a slice of
-    /// a host document, so their errors leave context-free and the host (`tsv_svelte::parse`)
-    /// fills them over the whole document.
+    /// a host document, so their errors leave context-free and the host
+    /// (`tsv_svelte::__private::parse`) fills them over the whole document.
     ///
     /// ```ignore
     /// parser::parse(source).map_err(|e| e.with_context(source, WIRE_COORDINATES))

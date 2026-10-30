@@ -404,11 +404,14 @@ pub fn dump_flow_dot(checkout: &Path, name: &str) -> Result<String, String> {
     let arena = Bump::new();
     // The goal rule (Module first, Script retry) — the same rule bind_program
     // uses, inlined here because --dump-flow keeps the BoundFile for rendering.
-    let program = match tsv_ts::parse_with_goal(&unit.content, tsv_ts::Goal::Module, &arena) {
-        Ok(p) => p,
-        Err(module_err) => tsv_ts::parse_with_goal(&unit.content, tsv_ts::Goal::Script, &arena)
-            .map_err(|_| format!("parse error: {module_err:#}"))?,
-    };
+    let program =
+        match tsv_ts::__private::parse_with_goal(&unit.content, tsv_ts::Goal::Module, &arena) {
+            Ok(p) => p,
+            Err(module_err) => {
+                tsv_ts::__private::parse_with_goal(&unit.content, tsv_ts::Goal::Script, &arena)
+                    .map_err(|_| format!("parse error: {module_err:#}"))?
+            }
+        };
     let bound = bind_file(&program, &unit.content, FileId::ROOT);
     let flow = build_flow(&program, &unit.content, &bound);
     Ok(render_flow_dot(&flow, &bound.spans, &unit.content))

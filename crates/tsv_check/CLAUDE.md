@@ -216,7 +216,7 @@ let result: CheckResult = check_program(&units, &arena, &CheckOptions::default()
 // result.parse_rejected — some unit parse-rejected (reported; suppresses nothing)
 ```
 
-The caller owns the arena (the same contract as `tsv_ts::parse`); the
+The caller owns the arena (the same contract as `tsv_ts::__private::parse`); the
 result is fully owned — nothing borrows out. For lib-aware checking:
 `bind_program` (parse+bind+flow once, variant-independent, fully owned) →
 `check_bound(&bound, Some(&lib_base), &options)`; `bind_lib` produces a cacheable

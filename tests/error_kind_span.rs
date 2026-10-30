@@ -15,17 +15,17 @@ use tsv_lang::{Error, ErrorKind};
 
 fn ts_parse_error(source: &str) -> Error {
     let arena = bumpalo::Bump::new();
-    tsv_ts::parse(source, &arena).expect_err("the source must not parse")
+    tsv_ts::__private::parse(source, &arena).expect_err("the source must not parse")
 }
 
 fn svelte_parse_error(source: &str) -> Error {
     let arena = bumpalo::Bump::new();
-    tsv_svelte::parse(source, &arena).expect_err("the source must not parse")
+    tsv_svelte::__private::parse(source, &arena).expect_err("the source must not parse")
 }
 
 fn css_parse_error(source: &str) -> Error {
     let arena = bumpalo::Bump::new();
-    tsv_css::parse(source, &arena).expect_err("the source must not parse")
+    tsv_css::__private::parse(source, &arena).expect_err("the source must not parse")
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn display_is_one_line_and_the_alternate_is_the_frame() {
     // the strip's parse error forwards both forms
     let strip = {
         let arena = bumpalo::Bump::new();
-        tsv_ts::strip(source, &arena).expect_err("the source must not strip")
+        tsv_ts::__private::strip_in(source, None, &arena).expect_err("the source must not strip")
     };
     assert_eq!(strip.kind(), ErrorKind::Syntax);
     assert_eq!(strip.to_string(), one);
@@ -170,7 +170,7 @@ fn display_is_one_line_and_the_alternate_is_the_frame() {
     let enumerated = "enum E { A }\n";
     let refusal = {
         let arena = bumpalo::Bump::new();
-        tsv_ts::strip(enumerated, &arena).expect_err("an enum is refused")
+        tsv_ts::__private::strip_in(enumerated, None, &arena).expect_err("an enum is refused")
     };
     assert_eq!(refusal.kind(), ErrorKind::Refusal);
     assert_eq!(refusal.to_string(), "cannot strip an enum");

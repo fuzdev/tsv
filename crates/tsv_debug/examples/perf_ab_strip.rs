@@ -3,19 +3,20 @@
 //! times it, printed as one JSON line.
 //!
 //! A separate example from `perf_ab.rs` (whose module doc says why the drivers are examples)
-//! because it reads an entry point the format driver does not, `tsv_ts::strip_with_goal`: an
-//! older base tree without it still builds the format driver, and the task leaves the strip row
+//! because it reads an entry point the format driver does not, `tsv_ts::__private::strip_in`:
+//! an older base tree without it still builds the format driver, and the task leaves the strip row
 //! out for such a tree, saying so, rather than losing every row to a failed build.
 //!
 //! Usage: `perf_ab_strip <corpus-dir> --iterations N [--parse-only]`.
 //!
 //! - The file set is `perf_ab.rs`'s directory walk filtered to what a module loader strips —
 //!   `.ts` / `.mts` / `.cts`, no declaration file — `profile --strip`'s set.
-//! - Each iteration parses the source (`tsv_ts::parse_with_goal_or_fallback`, the goal read from
-//!   the extension as `tsv strip` reads a path), then strips it (`tsv_ts::strip_with_goal`, which
-//!   parses again inside); the strip column is the strip's time less the parse's — its walk and
-//!   blank. Both read the author's bytes: the strip folds no carriage returns, so the TypeScript
-//!   format row's parse (fold + `parse_folded`) is not this one.
+//! - Each iteration parses the source (`tsv_ts::__private::parse_with_goal_or_fallback`, the
+//!   goal read from the extension as `tsv strip` reads a path), then strips it
+//!   (`tsv_ts::__private::strip_in`, which parses again inside, into the same warm arena);
+//!   the strip column is the strip's time less the parse's — its walk and blank. Both read
+//!   the author's bytes: the strip folds no carriage returns, so the TypeScript format row's
+//!   parse (fold + `parse_folded`) is not this one.
 //! - `--parse-only` skips the strip. Since a full run parses twice per iteration, the task reads
 //!   the strip's own `instructions:u` as full − 2 × parse-only + the zero-iteration fixed cost;
 //!   `--iterations 0` reads the files and times nothing.
@@ -119,7 +120,8 @@ fn run(args: &Args) -> ExitCode {
         let mut file_output = None;
         for iteration in 0..args.iterations {
             let t0 = Instant::now();
-            let parsed = tsv_ts::parse_with_goal_or_fallback(&source, goal, &arena).is_ok();
+            let parsed =
+                tsv_ts::__private::parse_with_goal_or_fallback(&source, goal, &arena).is_ok();
             let parse = t0.elapsed();
             arena.reset();
             if !parsed {
@@ -131,7 +133,7 @@ fn run(args: &Args) -> ExitCode {
                 continue;
             }
             let t1 = Instant::now();
-            let stripped = std::hint::black_box(tsv_ts::strip_with_goal(&source, goal, &arena));
+            let stripped = std::hint::black_box(tsv_ts::__private::strip_in(&source, goal, &arena));
             let strip = t1.elapsed();
             let output = match &stripped {
                 Ok(stripped) => Some(stripped.code.len()),

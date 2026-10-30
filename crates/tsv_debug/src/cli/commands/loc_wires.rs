@@ -198,18 +198,18 @@ fn record(path: &Path, input_type: InputType, goal: tsv_ts::Goal) -> Result<Vec<
     let (language, loc, span) = match &parsed {
         ParsedInput::Svelte(ast) => (
             "svelte",
-            tsv_svelte::convert_ast_json_bytes_with_locations(ast, &source),
-            tsv_svelte::convert_ast_json_bytes(ast, &source),
+            tsv_svelte::__private::convert_ast_json_bytes_with_locations(ast, &source),
+            tsv_svelte::__private::convert_ast_json_bytes(ast, &source),
         ),
         ParsedInput::Ts(ast) => (
             "typescript",
-            tsv_ts::convert_ast_json_bytes_with_locations(ast, &source),
-            tsv_ts::convert_ast_json_bytes(ast, &source),
+            tsv_ts::__private::convert_ast_json_bytes_with_locations(ast, &source),
+            tsv_ts::__private::convert_ast_json_bytes(ast, &source),
         ),
         ParsedInput::Css(ast) => (
             "css",
-            tsv_css::convert_ast_json_bytes_with_locations(ast, &source),
-            tsv_css::convert_ast_json_bytes(ast, &source),
+            tsv_css::__private::convert_ast_json_bytes_with_locations(ast, &source),
+            tsv_css::__private::convert_ast_json_bytes(ast, &source),
         ),
     };
     let mut line = Vec::with_capacity(loc.len() + span.len() + source.len() + 64);
@@ -327,17 +327,19 @@ fn answer(request: &WireRequest, arena: &mut bumpalo::Bump) -> Result<Vec<u8>, S
             || -> Result<Vec<u8>, String> {
                 Ok(match language {
                     WireLanguage::Svelte => {
-                        let ast = tsv_svelte::parse(source, arena).map_err(|e| format!("{e:#}"))?;
-                        tsv_svelte::convert_ast_json_bytes_with_locations(&ast, source)
+                        let ast = tsv_svelte::__private::parse(source, arena)
+                            .map_err(|e| format!("{e:#}"))?;
+                        tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, source)
                     }
                     WireLanguage::Typescript => {
-                        let ast = tsv_ts::parse_with_goal(source, goal, arena)
+                        let ast = tsv_ts::__private::parse_with_goal(source, goal, arena)
                             .map_err(|e| format!("{e:#}"))?;
-                        tsv_ts::convert_ast_json_bytes_with_locations(&ast, source)
+                        tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, source)
                     }
                     WireLanguage::Css => {
-                        let ast = tsv_css::parse(source, arena).map_err(|e| format!("{e:#}"))?;
-                        tsv_css::convert_ast_json_bytes_with_locations(&ast, source)
+                        let ast = tsv_css::__private::parse(source, arena)
+                            .map_err(|e| format!("{e:#}"))?;
+                        tsv_css::__private::convert_ast_json_bytes_with_locations(&ast, source)
                     }
                 })
             },

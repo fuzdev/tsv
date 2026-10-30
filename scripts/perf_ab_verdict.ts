@@ -369,14 +369,14 @@ export function lang_presence(base_files: number, cand_files: number): LangPrese
 }
 
 /** Why the strip rows are left out of a run, or null when both sides have the entry point the
- * strip driver compiles against (`tsv_ts::strip_with_goal`). A tree without it cannot build that
+ * strip driver compiles against (`tsv_ts::__private::strip_in`). A tree without it cannot build that
  * driver; the format rows still measure it, so the strip rows are skipped — loudly, by the caller
  * — rather than failing the run, and one side alone is no A/B. */
 export function strip_skip_reason(base_has: boolean, cand_has: boolean): string | null {
 	if (base_has && cand_has) return null;
 	const sides =
 		!base_has && !cand_has ? 'neither side has' : `the ${base_has ? 'candidate' : 'base'} lacks`;
-	return `${sides} the type strip (\`tsv_ts::strip_with_goal\`)`;
+	return `${sides} the strip driver's entry point (\`tsv_ts::__private::strip_in\`)`;
 }
 
 /** Why two runs did not measure the same file set (count, bytes, parse failures), or null when

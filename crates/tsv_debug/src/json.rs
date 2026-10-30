@@ -166,30 +166,34 @@ mod tests {
                 let arena = bumpalo::Bump::new();
                 let wires: Vec<Vec<u8>> = match parser {
                     ParserType::TypeScript => {
-                        let Ok(ast) = tsv_ts::parse(&source, &arena) else {
+                        let Ok(ast) = tsv_ts::__private::parse(&source, &arena) else {
                             continue;
                         };
                         vec![
-                            tsv_ts::convert_ast_json_bytes_with_locations(&ast, &source),
-                            tsv_ts::convert_ast_json_bytes(&ast, &source),
+                            tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, &source),
+                            tsv_ts::__private::convert_ast_json_bytes(&ast, &source),
                         ]
                     }
                     ParserType::Svelte => {
-                        let Ok(ast) = tsv_svelte::parse(&source, &arena) else {
+                        let Ok(ast) = tsv_svelte::__private::parse(&source, &arena) else {
                             continue;
                         };
                         vec![
-                            tsv_svelte::convert_ast_json_bytes_with_locations(&ast, &source),
-                            tsv_svelte::convert_ast_json_bytes(&ast, &source),
+                            tsv_svelte::__private::convert_ast_json_bytes_with_locations(
+                                &ast, &source,
+                            ),
+                            tsv_svelte::__private::convert_ast_json_bytes(&ast, &source),
                         ]
                     }
                     ParserType::Css => {
-                        let Ok(ast) = tsv_css::parse(&source, &arena) else {
+                        let Ok(ast) = tsv_css::__private::parse(&source, &arena) else {
                             continue;
                         };
                         vec![
-                            tsv_css::convert_ast_json_bytes_with_locations(&ast, &source),
-                            tsv_css::convert_ast_json_bytes(&ast, &source),
+                            tsv_css::__private::convert_ast_json_bytes_with_locations(
+                                &ast, &source,
+                            ),
+                            tsv_css::__private::convert_ast_json_bytes(&ast, &source),
                         ]
                     }
                 };

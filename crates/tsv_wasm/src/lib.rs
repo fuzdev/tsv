@@ -243,7 +243,7 @@ fn position(point: tsv_ts::WirePoint) -> PlainObject {
     position
 }
 
-/// Strip the types from TypeScript `source` (`tsv_ts::strip_with_goal`): the JS, every
+/// Strip the types from TypeScript `source` (`tsv_ts::__private::strip_in`): the JS, every
 /// type-only range blanked to whitespace so every surviving character keeps its line and
 /// UTF-16 column. The source type is read as `format_typescript` reads it: omitted, the
 /// module grammar retried as a script; set, exact.
@@ -257,15 +257,17 @@ fn position(point: tsv_ts::WirePoint) -> PlainObject {
 pub fn strip_typescript(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
     let goal =
         wasm_source_type(SourceTypeArg::read(&source_type), true, Family::Strip).map_err(err)?;
-    tsv_arena::with_ast_arena(|arena| match tsv_ts::strip_with_goal(source, goal, arena) {
-        Ok(stripped) => Ok(JsValue::from_str(&stripped.code)),
-        Err(tsv_ts::StripError::Parse(e)) => parse_failure(&e).into_return(),
-        Err(tsv_ts::StripError::Unsupported { kind, span }) => Ok(failure_result(
-            "unsupported",
-            Some(kind.name()),
-            &kind.report(span, source),
-        )),
-    })
+    tsv_arena::with_ast_arena(
+        |arena| match tsv_ts::__private::strip_in(source, goal, arena) {
+            Ok(stripped) => Ok(JsValue::from_str(&stripped.code)),
+            Err(tsv_ts::StripError::Parse(e)) => parse_failure(&e).into_return(),
+            Err(tsv_ts::StripError::Unsupported { kind, span }) => Ok(failure_result(
+                "unsupported",
+                Some(kind.name()),
+                &kind.report(span, source),
+            )),
+        },
+    )
 }
 
 /// The hierarchical, git-faithful matcher for tsv's discovery ignore files, wrapping
@@ -552,7 +554,7 @@ impl SourceTypeArg {
 /// What an unset one means is the caller's: a parse reads it as `Module` (its wire's
 /// `Program.sourceType` is a claim one settled grammar has to produce), a format or the
 /// strip as "none named" — the module grammar retried as a script
-/// (`tsv_ts::parse_with_goal_or_fallback`).
+/// (`tsv_ts::__private::parse_with_goal_or_fallback`).
 #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 fn wasm_source_type(
     source_type: SourceTypeArg,

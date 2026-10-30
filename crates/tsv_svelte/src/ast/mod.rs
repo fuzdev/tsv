@@ -3,7 +3,7 @@
 // - convert: emits the public JSON-compatible wire format (matches Svelte
 //   parser output) directly from this AST via the writer
 
-#[cfg(feature = "convert")]
+#[cfg(feature = "json")]
 pub mod convert;
 
 // Svelte internal AST types
@@ -2538,7 +2538,7 @@ mod lang_attribute_tests {
         // raw-text content is parsed by nobody, so the body need not be valid TS/CSS.
         let src = format!("<div>{open_tag}x</{tag}></div>");
         let arena = bumpalo::Bump::new();
-        let ast = crate::parse(&src, &arena).expect("parses");
+        let ast = crate::__private::parse(&src, &arena).expect("parses");
         let attrs =
             raw_text_attributes(ast.fragment.nodes, tag, &src).expect("the raw-text element");
         (

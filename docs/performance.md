@@ -13,7 +13,7 @@ source → Parse → AST → Format → formatted string
                   │        write_arena_doc() → arena_print_doc_with_indent_resolved_into()
                   │          └── arena_fits() (line-breaking decisions)
                   │
-              tsv_ts::parse()                      tsv_ts::__private::format_ast()
+              tsv_ts::__private::parse()           tsv_ts::__private::format_ast()
 ```
 
 Doc building and rendering are **interleaved** per-statement inside `format()` — each statement's Doc is built as arena-allocated `DocId` nodes and immediately rendered. This means the cleanest measurable phase split is **parse vs format**. Within format, `perf` can break down time further by function.
@@ -893,10 +893,10 @@ older tree unchanged.
 The strip driver times what `profile --strip` times, over the files a module loader strips
 (`.ts` / `.mts` / `.cts`, no declaration file — not the TypeScript row's set, which carries
 `.js` and `.d.ts`): the parse of the author's bytes (no carriage-return fold, so the TypeScript
-format row's parse column is not this one), then `tsv_ts::strip_with_goal`, the goal read from the
+format row's parse column is not this one), then `tsv_ts::__private::strip_in`, the goal read from the
 extension as `tsv strip` reads a path; the strip column is the strip's time less the parse's, its
 walk + blank, and a refusal counts as a strip. It is its own example because it calls the strip,
-which an older tree lacks: a side without `tsv_ts::strip_with_goal` builds the format driver
+which an older tree lacks: a side without `tsv_ts::__private::strip_in` builds the format driver
 alone, and the run skips the strip rows — loudly, on stderr and under the table — rather than
 failing every row. Its parse row is a null control for a change confined to the strip, which
 leaves that code identical on both sides.

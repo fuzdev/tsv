@@ -21,7 +21,7 @@ A single-platform local build (`deno task build:napi` → `cargo build -p tsv_na
 Mirrors `tsv_ffi` / `tsv_wasm`:
 
 - `format` (default) — `format_<lang>` exports
-- `parse` (default) — `parse_<lang>_json` + `parse_internal_<lang>` exports, and the `convert` layer on each language crate
+- `parse` (default) — `parse_<lang>_json` + `parse_internal_<lang>` exports, and the `json` layer on each language crate
 - `strip` (default) — the `strip_typescript` export (the type strip, `tsv_ts::strip`), as `tsv_wasm`'s `strip` feature adds it to `@fuzdev/tsv-wasm`
 - `panic_probe` (test-only, never default) — the `__panic_probe` export driving the panic-contract test; see §Marshalling & errors
 
@@ -42,7 +42,7 @@ Every one takes the parse goal as a **trailing optional argument**
 twin to pick between. Omitted or `undefined` means **none named**, which the two
 families answer differently: a parse reads it as `module` (its wire's
 `Program.sourceType` is a claim one settled grammar has to produce), a format as the
-module grammar retried as a script (`tsv_ts::parse_with_goal_or_fallback`, via
+module grammar retried as a script (`tsv_ts::__private::parse_with_goal_or_fallback`, via
 `tsv_arena`'s `parse_ast_for_format!`) — so a legacy sloppy script formats through
 `format_typescript(source)` with no argument at all, while anything the module
 grammar accepts is never reinterpreted. A set value is exact on both. See

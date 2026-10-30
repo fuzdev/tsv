@@ -221,7 +221,7 @@ struct Site {
 /// annotation (≥6 bytes), keyed by its content byte-range.
 fn glued_block_sites(source: &str) -> Vec<Site> {
     let arena = bumpalo::Bump::new();
-    let Ok(program) = tsv_ts::parse(source, &arena) else {
+    let Ok(program) = tsv_ts::__private::parse(source, &arena) else {
         return Vec::new();
     };
     let bytes = source.as_bytes();
@@ -327,7 +327,7 @@ mod tests {
             assert_eq!(a.len(), w, "width {w}");
             let src = format!("const a = /*{a}*/ x;\n");
             let arena = bumpalo::Bump::new();
-            let program = tsv_ts::parse(&src, &arena).expect("the probe source parses");
+            let program = tsv_ts::__private::parse(&src, &arena).expect("the probe source parses");
             assert_eq!(program.comments.len(), 1, "width {w}");
             assert!(
                 program.comments[0].owned_by_node,

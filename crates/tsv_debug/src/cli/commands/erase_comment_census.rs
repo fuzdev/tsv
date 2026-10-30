@@ -142,8 +142,11 @@ struct ErasedSpan {
 fn census_file(path: &Path) -> Result<Option<FileResult>, String> {
     let source = std::fs::read_to_string(path).map_err(|e| format!("read error: {e}"))?;
     let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::parse(&source, &arena).map_err(|e| format!("parse error: {e:#}"))?;
-    let wire = crate::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&root, &source));
+    let root =
+        tsv_svelte::__private::parse(&source, &arena).map_err(|e| format!("parse error: {e:#}"))?;
+    let wire = crate::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(
+        &root, &source,
+    ));
 
     if !is_ts_document(&wire) {
         return Ok(None);

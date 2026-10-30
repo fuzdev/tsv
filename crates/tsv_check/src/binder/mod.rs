@@ -707,7 +707,7 @@ mod tests {
 
     fn bind(source: &str) -> BoundFile {
         let arena = Bump::new();
-        let program = tsv_ts::parse(source, &arena).expect("parse");
+        let program = tsv_ts::__private::parse(source, &arena).expect("parse");
         bind_file(&program, source, FileId::ROOT)
     }
 
@@ -746,7 +746,7 @@ mod tests {
     #[test]
     fn address_map_resolves_a_statement() {
         let arena = Bump::new();
-        let program = tsv_ts::parse("let a = 1; let b = 2;", &arena).expect("parse");
+        let program = tsv_ts::__private::parse("let a = 1; let b = 2;", &arena).expect("parse");
         let bound = bind_file(&program, "let a = 1; let b = 2;", FileId::ROOT);
         let second = &program.body[1];
         let addr = std::ptr::from_ref(second) as usize;
@@ -785,7 +785,7 @@ mod tests {
     #[test]
     fn require_node_id_resolves_a_known_node() {
         let arena = Bump::new();
-        let program = tsv_ts::parse("let a = 1;", &arena).expect("parse");
+        let program = tsv_ts::__private::parse("let a = 1;", &arena).expect("parse");
         let bound = bind_file(&program, "let a = 1;", FileId::ROOT);
         let addr = std::ptr::from_ref(&program.body[0]) as usize;
         let id = bound.require_node_id(addr, NodeKind::VariableDeclaration);
@@ -811,7 +811,7 @@ mod tests {
         use tsv_ts::ast::ClassMember;
         let arena = Bump::new();
         let src = "class C { m() {} }";
-        let program = tsv_ts::parse(src, &arena).expect("parse");
+        let program = tsv_ts::__private::parse(src, &arena).expect("parse");
         let bound = bind_file(&program, src, FileId::ROOT);
         let StatementKind::ClassDeclaration(class) = &program.body[0].kind else {
             panic!("expected a class declaration");
@@ -840,7 +840,7 @@ mod tests {
         // TSTypeParameterDeclaration, TSTypeParameter, Identifier(T) = 6 nodes, and
         // `require_node_id` resolves the type-parameter node.
         let arena = Bump::new();
-        let program = tsv_ts::parse("class C<T> {}", &arena).expect("parse");
+        let program = tsv_ts::__private::parse("class C<T> {}", &arena).expect("parse");
         let bound = bind_file(&program, "class C<T> {}", FileId::ROOT);
         assert_eq!(bound.node_count, 6);
         let tp = bound

@@ -127,7 +127,7 @@ fn collect_file(
 
     match parser {
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse(source, &arena).map_err(|_| ())?;
+            let ast = tsv_ts::__private::parse(source, &arena).map_err(|_| ())?;
             collect_imports(ast.body, named_specs);
             collect_comments(ast.comments, source, comment_lines);
             // Run the real printer so the armed buffer_stats hooks sample the
@@ -136,7 +136,7 @@ fn collect_file(
             drop(tsv_ts::__private::format_ast(&ast, source));
         }
         ParserType::Svelte => {
-            let root = tsv_svelte::parse(source, &arena).map_err(|_| ())?;
+            let root = tsv_svelte::__private::parse(source, &arena).map_err(|_| ())?;
             // The instance/module `<script>` programs feed the same import
             // printer; `Root.comments` unifies every script + `{expr}` comment
             // (the exact population `render.rs` renders).

@@ -24,7 +24,7 @@
 //! Two classes of check, kept apart by [`StripCheck::is_pinnable`]:
 //!
 //! - **Fixture integrity** (unpinnable, always failing): the files are well-formed, and the
-//!   expected output itself keeps the contract below and parses under `tsv_ts::parse` at
+//!   expected output itself keeps the contract below and parses under `tsv_ts::__private::parse` at
 //!   module goal. These hold whatever tsv's strip does. That parse is a TypeScript one, so it
 //!   cannot prove the output is JS; the JS-validity guard is the oracle script's
 //!   oxc-parser parse in JS mode.
@@ -200,7 +200,7 @@ fn walk_recursive(
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum StripCheck {
     /// The fixture itself is broken: a file missing, unreadable or malformed, or its
-    /// expected output breaks the contract or does not parse under `tsv_ts::parse` (a
+    /// expected output breaks the contract or does not parse under `tsv_ts::__private::parse` (a
     /// TypeScript parse). Never pinned.
     Fixture,
     /// `strip` panicked. Never pinned.
@@ -434,11 +434,11 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
             );
         }
         let arena = bumpalo::Bump::new();
-        if let Err(e) = tsv_ts::parse(expected, &arena) {
+        if let Err(e) = tsv_ts::__private::parse(expected, &arena) {
             push(
                 StripCheck::Fixture,
                 format!(
-                    "{} does not parse (tsv_ts::parse): {e:#}",
+                    "{} does not parse (tsv_ts::__private::parse): {e:#}",
                     fixture.expected_file
                 ),
             );
@@ -447,7 +447,7 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
 
     let arena = bumpalo::Bump::new();
     let Ok(result) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        tsv_ts::strip(&input, &arena)
+        tsv_ts::__private::strip_in(&input, None, &arena)
     })) else {
         push(StripCheck::Panic, "strip panicked".to_string());
         return findings;
@@ -664,7 +664,9 @@ impl std::fmt::Display for IdempotenceFailure {
 /// such a list is not a failure ([`only_reread_type_arguments`]); any other change is.
 pub fn idempotence_failure(input: &str, code: &str) -> Option<IdempotenceFailure> {
     let arena = bumpalo::Bump::new();
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tsv_ts::strip(code, &arena))) {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        tsv_ts::__private::strip_in(code, None, &arena)
+    })) {
         Err(payload) => Some(IdempotenceFailure::Panicked(caught_panic_report(
             payload.as_ref(),
         ))),
@@ -900,7 +902,7 @@ mod tests {
         let input = "f(a < b, c as any > (d));\n";
         let code = "f(a < b, c        > (d));\n";
         let arena = bumpalo::Bump::new();
-        let again = tsv_ts::strip(code, &arena).expect("the output strips");
+        let again = tsv_ts::__private::strip_in(code, None, &arena).expect("the output strips");
         assert_eq!(
             again.code, "f(a                 (d));\n",
             "the re-read the excuse is for"

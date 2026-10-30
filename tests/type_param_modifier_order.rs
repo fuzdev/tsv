@@ -39,13 +39,13 @@ use serde_json::Value;
 
 fn parse_json(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source))
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source))
 }
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
     tsv_ts::__private::format_ast(&program, source)
 }
 
@@ -138,7 +138,7 @@ fn repeated_modifier_rejects() {
             "Duplicate modifier: 'const'",
         ),
     ] {
-        let err = tsv_ts::parse(source, &arena)
+        let err = tsv_ts::__private::parse(source, &arena)
             .expect_err(&format!("expected a parse error for {source:?}"));
         let message = err.to_string();
         assert!(

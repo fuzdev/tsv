@@ -283,7 +283,7 @@ fn ffi_source_type(
 // At Script goal `await` is an ordinary identifier — so a top-level `await` with an
 // operand is a syntax error — and so are top-level `import`/`export` declarations,
 // `import.meta` and a top-level `for await`. See `tsv parse --source-type` /
-// `tsv format --source-type` and `tsv_ts::parse_with_goal`.
+// `tsv format --source-type` and `tsv_ts::__private::parse_with_goal`.
 //
 // `tsv_wasm` and `tsv_napi` spell the same axis as a trailing optional string (the
 // npm facade over both turns it into a `{sourceType}` bag); each binding's own
@@ -301,7 +301,7 @@ macro_rules! lang_bindings {
     ) => {
         /// Parse source code and return the span-only JSON AST — `start`/`end` offsets,
         /// no per-node `loc` (Svelte also no `name_loc`): the language crate's
-        /// `convert_ast_json_bytes`, the one wire every binding emits.
+        /// `__private::convert_ast_json_bytes`, the one wire every binding emits.
         ///
         /// # Safety
         /// See the module-level safety contract.

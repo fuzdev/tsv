@@ -10,9 +10,11 @@ and Node's `module.stripTypeScriptTypes` share. The implementation is `tsv_ts::s
 
 ## Surfaces
 
-- **Rust**: `tsv_ts::strip(source, &arena) -> Result<Stripped, StripError>`, the unset goal,
-  and `tsv_ts::strip_with_goal(source, goal: Option<Goal>, &arena)`. `Stripped.code`
-  borrows the source when nothing is type-only. `StripError::Parse` carries the
+- **Rust**: `tsv_ts::strip(source) -> Result<Stripped, StripError>`, the unset goal, and
+  `tsv_ts::strip_with_goal(source, goal: Goal)`, exact; each parses into a fresh arena of
+  its own. (The bindings' warm per-thread arena reaches the same strip through the hidden
+  `__private::strip_in(source, Option<Goal>, &arena)`.) `Stripped.code` borrows the source
+  when nothing is type-only. `StripError::Parse` carries the
   `Error`; `StripError::Unsupported { kind, span }` the refused construct
   (`UnsupportedKind::name` is its snake_case wire name) and its byte span.
   `StripError::message(source)` renders either as the CLI prints it, and

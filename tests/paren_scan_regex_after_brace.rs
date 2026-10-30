@@ -21,7 +21,7 @@ use tsv_lang::source_scan::{BracedOperandWalk, OperandGrammar, ScanStart};
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
     tsv_ts::__private::format_ast(&program, source)
 }
 

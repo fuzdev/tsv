@@ -94,7 +94,7 @@ fn strip_at_path<'s>(
     arena: &bumpalo::Bump,
 ) -> Result<tsv_ts::Stripped<'s>, tsv_ts::StripError> {
     let goal = path.to_str().and_then(tsv_ts::Goal::from_extension);
-    tsv_ts::strip_with_goal(source, goal, arena)
+    tsv_ts::__private::strip_in(source, goal, arena)
 }
 
 /// One `--stdin` request (module doc).
@@ -146,7 +146,7 @@ fn answer(source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
     let result = {
         let arena: &bumpalo::Bump = arena;
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            tsv_ts::strip(source, arena).map(|stripped| {
+            tsv_ts::__private::strip_in(source, None, arena).map(|stripped| {
                 let code = stripped.code.as_ref();
                 let mut findings: Vec<String> = contract_violations(source, code)
                     .into_iter()

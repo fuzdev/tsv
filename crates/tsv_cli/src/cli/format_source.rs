@@ -11,10 +11,10 @@
 //! TypeScript goal is an `Option`. A named one is exact. An unnamed one — an unset
 //! `--source-type` on `--content`/`--stdin`, every `tsv_debug` audit that calls
 //! [`format_source`] — parses at `Module` and retries at `Script` only if that
-//! *fails* (`tsv_ts::parse_with_goal_or_fallback`), so a legacy sloppy script formats
+//! *fails* (`tsv_ts::__private::parse_with_goal_or_fallback`), so a legacy sloppy script formats
 //! without anyone naming a grammar, and a module-valid source is never reinterpreted.
-//! Which error a source both grammars reject reports is that function's rule, stated
-//! there.
+//! Which error a source both grammars reject reports is stated once, in `tsv_ts`'s crate
+//! docs (§Goals).
 //!
 //! `tsv format <path>` names a goal without being told one: it reads the path's
 //! extension (`tsv_ts::Goal::from_extension`), which settles the goal for `.mjs`/`.mts`

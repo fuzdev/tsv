@@ -44,8 +44,9 @@ fn assert_quasi(
     expected_cooked: Option<&str>,
 ) {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    let json = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let json =
+        tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
     let quasi = json.pointer(quasi_pointer).expect("template element");
 
     assert_eq!(
@@ -235,8 +236,9 @@ fn template_literal_type_crlf_normalizes() {
 fn every_quasi_normalizes() {
     let source = "fn`a\r\n${x}b\r\n${y}c\r\n`;\n";
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    let json = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let json =
+        tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
 
     for (i, expected) in ["a\n", "b\n", "c\n"].iter().enumerate() {
         let quasi = json

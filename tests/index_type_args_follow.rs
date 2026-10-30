@@ -15,13 +15,13 @@ use serde_json::Value;
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
     tsv_ts::__private::format_ast(&program, source)
 }
 
 fn svelte_format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::parse(source, &arena).expect("component should parse");
+    let root = tsv_svelte::__private::parse(source, &arena).expect("component should parse");
     tsv_svelte::__private::format_ast(&root, source)
 }
 
@@ -29,8 +29,9 @@ fn svelte_format(source: &str) -> String {
 /// type arguments, a `BinaryExpression` (or a conditional over one) for the comparison chain.
 fn expression_kind(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    let json = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let json =
+        tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
     json.pointer("/body/0/expression/type")
         .and_then(Value::as_str)
         .expect("an expression statement")
@@ -63,8 +64,9 @@ fn expression_kinds(source: &str) -> Vec<String> {
         }
     }
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    let json = tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source));
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let json =
+        tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
     let mut out = Vec::new();
     walk(
         json.pointer("/body/0/expression")
@@ -867,7 +869,10 @@ fn claimed_regions_stay_rejected() {
         "f<A[(a) => asserts a | B]>(x);\n",
     ] {
         let arena = bumpalo::Bump::new();
-        assert!(tsv_ts::parse(source, &arena).is_err(), "{source:?}");
+        assert!(
+            tsv_ts::__private::parse(source, &arena).is_err(),
+            "{source:?}"
+        );
     }
 }
 
@@ -996,7 +1001,10 @@ fn ungraded_index_bodies_stay_rejected() {
         "a < b[() => { return c; }] > (t, u);\n",
     ] {
         let arena = bumpalo::Bump::new();
-        assert!(tsv_ts::parse(source, &arena).is_err(), "{source:?}");
+        assert!(
+            tsv_ts::__private::parse(source, &arena).is_err(),
+            "{source:?}"
+        );
     }
 }
 

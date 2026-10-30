@@ -108,11 +108,11 @@ fn assert_wire_names(source: &str, wires: [Vec<u8>; 2], decoded: &str, hits: usi
 #[track_caller]
 fn ts_holds(source: &str, goal: tsv_ts::Goal, decoded: &str, hits: usize) {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse_with_goal(source, goal, &arena)
+    let program = tsv_ts::__private::parse_with_goal(source, goal, &arena)
         .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
     let wires = [
-        tsv_ts::convert_ast_json_bytes_with_locations(&program, source),
-        tsv_ts::convert_ast_json_bytes(&program, source),
+        tsv_ts::__private::convert_ast_json_bytes_with_locations(&program, source),
+        tsv_ts::__private::convert_ast_json_bytes(&program, source),
     ];
     assert_wire_names(source, wires, decoded, hits);
 }
@@ -121,11 +121,11 @@ fn ts_holds(source: &str, goal: tsv_ts::Goal, decoded: &str, hits: usize) {
 #[track_caller]
 fn svelte_wires(source: &str) -> [Vec<u8>; 2] {
     let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::parse(source, &arena)
+    let root = tsv_svelte::__private::parse(source, &arena)
         .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
     [
-        tsv_svelte::convert_ast_json_bytes_with_locations(&root, source),
-        tsv_svelte::convert_ast_json_bytes(&root, source),
+        tsv_svelte::__private::convert_ast_json_bytes_with_locations(&root, source),
+        tsv_svelte::__private::convert_ast_json_bytes(&root, source),
     ]
 }
 
@@ -292,7 +292,7 @@ fn a_directive_name_claims_span_identity_only_when_clean() {
         ] {
             let source = format!("<div {directive}:{name}></div>\n");
             let arena = bumpalo::Bump::new();
-            let root = tsv_svelte::parse(&source, &arena)
+            let root = tsv_svelte::__private::parse(&source, &arena)
                 .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
             let Some(FragmentNode::Element(element)) = root.fragment.nodes.first() else {
                 panic!("{source:?}: no element");
@@ -360,12 +360,12 @@ fn a_non_string_literal_raw_is_written_verbatim() {
     ] {
         let source = format!("x = {raw};\n");
         let arena = bumpalo::Bump::new();
-        let program = tsv_ts::parse(&source, &arena)
+        let program = tsv_ts::__private::parse(&source, &arena)
             .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
         let field = format!("\"raw\":\"{raw}\"");
         for bytes in [
-            tsv_ts::convert_ast_json_bytes_with_locations(&program, &source),
-            tsv_ts::convert_ast_json_bytes(&program, &source),
+            tsv_ts::__private::convert_ast_json_bytes_with_locations(&program, &source),
+            tsv_ts::__private::convert_ast_json_bytes(&program, &source),
         ] {
             let text = String::from_utf8(bytes).expect("the wire is UTF-8");
             assert!(

@@ -1378,7 +1378,7 @@ mod tests {
             arena.reset();
             // An `Err` is a rejected stylesheet, which is most of these; the parse is run
             // for the assertions inside it.
-            let _ = crate::parse(&source, &arena);
+            let _ = crate::__private::parse(&source, &arena);
         };
 
         let mut value = String::new();
@@ -1781,13 +1781,13 @@ mod tests {
             "\n\ta {\n\t\tcolor: url(x;\n\t}\n",
         ] {
             let arena = bumpalo::Bump::new();
-            let err = crate::parse(source, &arena).expect_err(source);
+            let err = crate::__private::parse(source, &arena).expect_err(source);
             assert!(
                 err.to_string().contains("Expected '}'"),
                 "{source:?}: {err}"
             );
         }
         let arena = bumpalo::Bump::new();
-        assert!(crate::parse("a{color: url(x)}", &arena).is_ok());
+        assert!(crate::__private::parse("a{color: url(x)}", &arena).is_ok());
     }
 }

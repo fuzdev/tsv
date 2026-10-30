@@ -144,7 +144,7 @@ impl Anchors {
     /// it (an unparseable seed is simply not usable as one).
     pub fn collect(source: &str) -> Option<Self> {
         let arena = bumpalo::Bump::new();
-        let root = tsv_svelte::parse(source, &arena).ok()?;
+        let root = tsv_svelte::__private::parse(source, &arena).ok()?;
         let mut anchors = Self::default();
         anchors.walk_fragment(&root.fragment, source, false);
         anchors.instance = script_slot(&root, source, ScriptContext::Default);

@@ -31,7 +31,7 @@ fn method_target_rejects_at_its_value() {
         ("let { f() {} } = x;", "() {} }"),
     ] {
         let arena = bumpalo::Bump::new();
-        let error = tsv_ts::parse(source, &arena).expect_err(source);
+        let error = tsv_ts::__private::parse(source, &arena).expect_err(source);
         let (message, position) = (error.to_string(), error.position());
         assert!(
             message.contains("Invalid assignment target"),
@@ -56,7 +56,10 @@ fn compound_operator_over_a_method_target_parses() {
         "[{ set f(v) {} }] ||= z;",
     ] {
         let arena = bumpalo::Bump::new();
-        assert!(tsv_ts::parse(source, &arena).is_ok(), "{source:?}");
+        assert!(
+            tsv_ts::__private::parse(source, &arena).is_ok(),
+            "{source:?}"
+        );
     }
 }
 

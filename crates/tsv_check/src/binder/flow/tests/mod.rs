@@ -19,14 +19,14 @@ use bumpalo::Bump;
 /// Bind + build the flow product for a snippet (a fresh arena per call).
 fn flow_of(source: &str) -> (Bump, BoundFile) {
     let arena = Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse");
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse");
     let bound = bind_file(&program, source, FileId::ROOT);
     (arena, bound)
 }
 
 fn build(source: &str) -> FlowProduct {
     let arena = Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse");
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse");
     let bound = bind_file(&program, source, FileId::ROOT);
     build_flow(&program, source, &bound)
 }
@@ -35,7 +35,7 @@ fn build(source: &str) -> FlowProduct {
 /// topology test can look up node ids by kind / text.
 fn build_with_bound(source: &str) -> (FlowProduct, BoundFile) {
     let arena = Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse");
+    let program = tsv_ts::__private::parse(source, &arena).expect("parse");
     let bound = bind_file(&program, source, FileId::ROOT);
     let product = build_flow(&program, source, &bound);
     (product, bound)
@@ -45,7 +45,7 @@ fn build_with_bound(source: &str) -> (FlowProduct, BoundFile) {
 /// goal rejects (`with`).
 fn build_with_bound_script(source: &str) -> (FlowProduct, BoundFile) {
     let arena = Bump::new();
-    let program = tsv_ts::parse_with_goal(source, tsv_ts::Goal::Script, &arena)
+    let program = tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Script, &arena)
         .expect("parse at script goal");
     let bound = bind_file(&program, source, FileId::ROOT);
     let product = build_flow(&program, source, &bound);
@@ -150,7 +150,7 @@ fn linear_two_statements_thread_one_start() {
     let (_arena, bound) = flow_of(src);
     let product = {
         let arena = Bump::new();
-        let program = tsv_ts::parse(src, &arena).expect("parse");
+        let program = tsv_ts::__private::parse(src, &arena).expect("parse");
         build_flow(&program, src, &bind_file(&program, src, FileId::ROOT))
     };
     // Both expression statements capture the same entry flow (f's Start), and
@@ -189,7 +189,7 @@ fn unreachable_after_return_propagates() {
     let (_arena, bound) = flow_of(src);
     let product = {
         let arena = Bump::new();
-        let program = tsv_ts::parse(src, &arena).expect("parse");
+        let program = tsv_ts::__private::parse(src, &arena).expect("parse");
         build_flow(&program, src, &bind_file(&program, src, FileId::ROOT))
     };
 
@@ -226,7 +226,7 @@ fn constructor_gets_a_return_flow_anchor() {
     let (_arena, bound) = flow_of(src);
     let product = {
         let arena = Bump::new();
-        let program = tsv_ts::parse(src, &arena).expect("parse");
+        let program = tsv_ts::__private::parse(src, &arena).expect("parse");
         build_flow(&program, src, &bind_file(&program, src, FileId::ROOT))
     };
     // The constructor container carries exactly one return_flow anchor (keyed
@@ -252,7 +252,7 @@ fn constructor_gets_a_return_flow_anchor() {
 fn finish_flow_label_pool_run_preserves_order_and_dedups() {
     let src = "const x = 1;";
     let arena = Bump::new();
-    let program = tsv_ts::parse(src, &arena).expect("parse");
+    let program = tsv_ts::__private::parse(src, &arena).expect("parse");
     let bound = bind_file(&program, src, FileId::ROOT);
     let mut b = FlowBuilder::new(&bound, src);
     let a1 = b.new_flow_node(FlowFlags::START);

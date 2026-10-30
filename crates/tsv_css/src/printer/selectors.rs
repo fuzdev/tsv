@@ -2259,10 +2259,10 @@ mod tests {
             "> > /* c */ .a { color: red }",
         ] {
             let arena = Bump::new();
-            let ast = crate::parse(input, &arena).expect("parses");
+            let ast = crate::__private::parse(input, &arena).expect("parses");
             let once = crate::__private::format_ast(&ast, input);
             let arena2 = Bump::new();
-            let ast2 = crate::parse(&once, &arena2).expect("reparses");
+            let ast2 = crate::__private::parse(&once, &arena2).expect("reparses");
             let twice = crate::__private::format_ast(&ast2, &once);
             assert_eq!(once, twice, "not idempotent for {input:?}");
         }

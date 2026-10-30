@@ -164,37 +164,43 @@ fn profile_once(
     let bytes = match parser_type {
         ParserType::TypeScript => {
             let t = Instant::now();
-            let ast = tsv_ts::parse(source, &arena).map_err(|e| format!("parse error: {e:#}"))?;
+            let ast = tsv_ts::__private::parse(source, &arena)
+                .map_err(|e| format!("parse error: {e:#}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
             let bytes = match wire {
-                Wire::Span => tsv_ts::convert_ast_json_bytes(&ast, source),
-                Wire::Loc => tsv_ts::convert_ast_json_bytes_with_locations(&ast, source),
+                Wire::Span => tsv_ts::__private::convert_ast_json_bytes(&ast, source),
+                Wire::Loc => tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, source),
             };
             steps.write.push(t.elapsed());
             bytes
         }
         ParserType::Svelte => {
             let t = Instant::now();
-            let ast =
-                tsv_svelte::parse(source, &arena).map_err(|e| format!("parse error: {e:#}"))?;
+            let ast = tsv_svelte::__private::parse(source, &arena)
+                .map_err(|e| format!("parse error: {e:#}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
             let bytes = match wire {
-                Wire::Span => tsv_svelte::convert_ast_json_bytes(&ast, source),
-                Wire::Loc => tsv_svelte::convert_ast_json_bytes_with_locations(&ast, source),
+                Wire::Span => tsv_svelte::__private::convert_ast_json_bytes(&ast, source),
+                Wire::Loc => {
+                    tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, source)
+                }
             };
             steps.write.push(t.elapsed());
             bytes
         }
         ParserType::Css => {
             let t = Instant::now();
-            let ast = tsv_css::parse(source, &arena).map_err(|e| format!("parse error: {e:#}"))?;
+            let ast = tsv_css::__private::parse(source, &arena)
+                .map_err(|e| format!("parse error: {e:#}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
             let bytes = match wire {
-                Wire::Span => tsv_css::convert_ast_json_bytes(&ast, source),
-                Wire::Loc => tsv_css::convert_ast_json_bytes_with_locations(&ast, source),
+                Wire::Span => tsv_css::__private::convert_ast_json_bytes(&ast, source),
+                Wire::Loc => {
+                    tsv_css::__private::convert_ast_json_bytes_with_locations(&ast, source)
+                }
             };
             steps.write.push(t.elapsed());
             bytes

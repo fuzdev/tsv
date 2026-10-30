@@ -884,7 +884,7 @@ mod tests {
     #[expect(clippy::trivially_copy_pass_by_ref)]
     fn emit_both(source: &str, opts: &CheckOptions) -> (Vec<Diagnostic>, Vec<Diagnostic>) {
         let arena = Bump::new();
-        let program = tsv_ts::parse(source, &arena).expect("parse");
+        let program = tsv_ts::__private::parse(source, &arena).expect("parse");
         let bound = bind_file(&program, source, FileId::ROOT);
         let flow = build_flow(&program, source, &bound);
         let cands = build_candidates(&program, source, &bound, &flow);
@@ -1057,7 +1057,7 @@ mod tests {
         // Interface/type only → non-instantiated; const enum only → const-enum-only;
         // a value → instantiated.
         let arena = Bump::new();
-        let parse = |s: &str| tsv_ts::parse(s, &arena).expect("parse");
+        let parse = |s: &str| tsv_ts::__private::parse(s, &arena).expect("parse");
         let state_of = |src: &str| -> ModuleInstanceState {
             let program = parse(src);
             match &program.body[0].kind {
