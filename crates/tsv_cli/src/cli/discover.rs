@@ -374,12 +374,12 @@ fn collect_root(root: &Path, symlink: bool, cwd: Option<&Path>, out: &mut Walk<'
     // `tsv format node_modules` or `dist` walks there. Below the root they classify every
     // child as usual.
     // the matcher's kind for the argument: a directory, unless it is a link to one
-    let matcher_dir = !symlink;
-    if stack.is_ignored(&base_rel, PathKind::from_is_dir(matcher_dir)) {
+    let kind = PathKind::from_is_dir(!symlink);
+    if stack.is_ignored(&base_rel, kind) {
         if let Some(warning) = tsv_discover::excluded_argument_warning(
             &root.to_string_lossy(),
             &base_rel,
-            matcher_dir,
+            kind,
             format_root.loose_root().as_deref(),
             &stack,
         ) {
@@ -650,7 +650,7 @@ fn collect_file(path: &str, cwd: Option<&Path>, scope: &mut FileScope, out: &mut
     if let Some(warning) = tsv_discover::excluded_argument_warning(
         path,
         &rel,
-        false,
+        PathKind::File,
         scope.format_root.loose_root().as_deref(),
         &scope.stack,
     ) {
@@ -1005,6 +1005,11 @@ fn collect_recursive(
                     continue;
                 }
                 DirVerdict::Descend => {}
+                // `DirVerdict` is non-exhaustive, so a variant added to it lands here with no
+                // compile error (the `=` pin on tsv_discover means only a workspace edit adds
+                // one): it prunes, as cli.js prunes every tag but `descend`, since skipping a
+                // directory never rewrites a file it should not
+                _ => continue,
             }
             // the child reads its own ignore files (and pushes/pops its own layers)
             // when we recurse into it. The paths are built only here, so a pruned dir

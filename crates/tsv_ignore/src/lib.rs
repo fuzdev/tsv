@@ -570,6 +570,7 @@ impl PathKind {
 /// names, and what decides how it is undone: a `.gitignore`'d path is re-included from a
 /// tsv layer, which is read after every `.gitignore`, while a tsv layer's own rule is the
 /// user's to narrow.
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IgnoreSource {
     /// A `.gitignore` ([`IgnoreStack::push_gitignore`]).

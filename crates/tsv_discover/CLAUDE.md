@@ -157,10 +157,10 @@ crates (the open-convention stance):
   ancestor, since the walk stops there. This is how a consumer with no walk names a
   `!dist/keep.ts` a prune makes a no-op, instead of skipping the file silently. Both
   `is_path_pruned` and this run one private replay (`first_pruned_ancestor`).
-- `excluded_argument_warning(display, rel, is_dir, loose_root, &IgnoreStack)
+- `excluded_argument_warning(display, rel, kind: PathKind, loose_root, &IgnoreStack)
   -> Option<String>` — the warning for a path an argument **named** (a file, or a
-  directory root) that an ignore file puts out of scope. `is_dir` is the kind as the
-  matcher reads it, so a symbolic link is never one whatever it points at: a
+  directory root) that an ignore file puts out of scope. `kind` is the kind as the
+  matcher reads it, so a symbolic link is never a `PathKind::Directory` whatever it points at: a
   directory-only rule does not match a link for git, and the lines offered re-include
   the link itself (`!/foo`, which a `!/foo/` would not).
 
@@ -206,7 +206,8 @@ crates (the open-convention stance):
   such a file can still exclude the path once the directory is re-included.
   `loose_root` is the format root's display path outside a repo, where paths are named
   absolutely; inside one (`None`) they read relative to the repo root.
-- `DirVerdict { Descend, Prune, PruneWithWarning }` — on `PruneWithWarning` the
+- `DirVerdict { Descend, Prune, PruneWithWarning }` (`#[non_exhaustive]`, so a
+  caller's `match` carries a wildcard arm; the CLI's prunes) — on `PruneWithWarning` the
   caller fetches the text from `shadow_warning`, which takes display context
   (`loose_root`) the per-directory verdict has no other use for — the same fetch
   `npm/cli.js` makes across the binding boundary (which can't carry a tagged-union
@@ -307,7 +308,8 @@ crates (the open-convention stance):
     (`"descend"|"prune"|"prune_warn"`)
   - `should_format_file(name, child_rel) -> bool`, `is_path_pruned(rel) -> bool`
   - returning `string | undefined`: `path_shadow_warning(rel, loose_root?)`,
-    `excluded_argument_warning(display, rel, is_dir, loose_root?)`,
+    `excluded_argument_warning(display, rel, is_dir, loose_root?)` (the wrapper converts
+    `is_dir` to the `PathKind` the Rust fn takes),
     `shadow_warning(dir, loose_root?)`, `unsupported_extension_error(path)`, and the
     sibling pair `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore, has_formatignore)`
     / `prettierignore_shadowed_warning(…)` (same arguments)

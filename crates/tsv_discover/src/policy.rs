@@ -39,6 +39,7 @@ pub const FORMATTABLE_EXTENSIONS: [&str; 8] =
 
 /// The discovery verdict for one child **directory**: descend into it, prune it
 /// (skip its whole subtree), or prune it **and** surface a diagnostic.
+#[non_exhaustive]
 #[derive(Debug, PartialEq, Eq)]
 pub enum DirVerdict {
     /// Recurse into the directory.

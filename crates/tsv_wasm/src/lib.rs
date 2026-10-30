@@ -502,7 +502,7 @@ impl IgnoreStack {
         tsv_discover::excluded_argument_warning(
             display,
             rel,
-            is_dir,
+            tsv_ignore::PathKind::from_is_dir(is_dir),
             loose_root.as_deref(),
             &self.inner,
         )

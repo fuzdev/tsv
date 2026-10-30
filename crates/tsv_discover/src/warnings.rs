@@ -374,8 +374,8 @@ pub fn unresolvable_root_error(root: &str) -> String {
 /// lines, and the warning says to narrow the rule instead.
 ///
 /// `display` is the argument as given; `rel` is the path relative to the format root,
-/// `/`-separated; `is_dir` says which kind of argument it is — as the matcher reads it,
-/// so a symbolic link is never one, whatever it points at: a directory-only rule (`foo/`)
+/// `/`-separated; `kind` says which kind of argument it is — as the matcher reads it,
+/// so a symbolic link is never a [`PathKind::Directory`], whatever it points at: a directory-only rule (`foo/`)
 /// does not match a link for git, and the lines offered re-include the link itself
 /// (`!/foo`), which a `!/foo/` would not; `stack` holds the layers
 /// from the format root down through the path's parent directory, stopping at a directory
@@ -389,12 +389,12 @@ pub fn unresolvable_root_error(root: &str) -> String {
 pub fn excluded_argument_warning(
     display: &str,
     rel: &str,
-    is_dir: bool,
+    kind: PathKind,
     loose_root: Option<&str>,
     stack: &IgnoreStack,
 ) -> Option<String> {
-    let exclusion = stack.exclusion(rel, PathKind::from_is_dir(is_dir))?;
-    let tsv = stack.override_exclusion(rel, PathKind::from_is_dir(is_dir));
+    let exclusion = stack.exclusion(rel, kind)?;
+    let tsv = stack.override_exclusion(rel, kind);
     // a named file a tsv rule excludes is a deliberate opt-out, skipped quietly, whether
     // or not a `.gitignore` excludes it too — and whichever of the two sits shallower.
     // The directory arm below names both blockers where a `.gitignore` above the tsv
@@ -402,7 +402,7 @@ pub fn excluded_argument_warning(
     // spells none, and the tsv rule is the author's verdict on the file however the path
     // is bounded. A pre-commit hook names such a file on every commit that stages it, so
     // a warning keyed on the `.gitignore` above it would be exactly that noise
-    if !is_dir && tsv.is_some() {
+    if !kind.is_dir() && tsv.is_some() {
         return None;
     }
     // The rule named is the shallowest exclusion's witness — a tsv rule over a
@@ -423,7 +423,7 @@ pub fn excluded_argument_warning(
     // re-includes what it excluded, or the shallowest exclusion would sit there (the
     // re-include idiom itself — `!/dist/`, `/dist/*` — names `dist/sub` this way)
     let gitignore = stack
-        .gitignore_exclusion(rel, PathKind::from_is_dir(is_dir))
+        .gitignore_exclusion(rel, kind)
         .filter(|git| git.depth >= named.depth);
     // a `.gitignore` is read only inside a repo, so a witness in one means the format
     // root is the repo root — what "the repo-root <file>" names, in the remedy below and
@@ -433,7 +433,7 @@ pub fn excluded_argument_warning(
         "a .gitignore rule excluded {rel} outside a repo"
     );
     let segments = tsv_ignore::split_segments(rel);
-    let consequence = if is_dir {
+    let consequence = if kind.is_dir() {
         "so nothing under it is formatted"
     } else {
         "so it is not formatted"
@@ -453,7 +453,7 @@ pub fn excluded_argument_warning(
     };
     // the re-include lines from the shallowest exclusion down, as "adding …, in that
     // order, to the repo-root <file>"; `None` where no line can spell the path
-    let adding = reinclude_lines(&segments, named.depth, is_dir).map(|lines| {
+    let adding = reinclude_lines(&segments, named.depth, kind).map(|lines| {
         let order = if lines.len() > 1 {
             ", in that order,"
         } else {
@@ -536,12 +536,12 @@ pub fn excluded_argument_warning(
 /// control character other than a tab — a line feed splits every line spelling it, a
 /// carriage return ending the file's own line is stripped with the line ending, and the
 /// rest are not offered raw.
-fn reinclude_lines(segments: &[&str], depth: usize, is_dir: bool) -> Option<Vec<String>> {
+fn reinclude_lines(segments: &[&str], depth: usize, kind: PathKind) -> Option<Vec<String>> {
     if segments.iter().any(|segment| !line_can_spell(segment)) {
         return None;
     }
     let anchored = |len: usize| {
-        let slash = if len < segments.len() || is_dir {
+        let slash = if len < segments.len() || kind.is_dir() {
             "/"
         } else {
             ""
@@ -847,14 +847,27 @@ mod tests {
         stack.push_gitignore("", "bu\tild/\n");
         stack.push_gitignore("we\"ird", "out/\n");
         assert_eq!(
-            excluded_argument_warning("./bu\tild/x.ts", "bu\tild/x.ts", false, None, &stack)
-                .as_deref(),
+            excluded_argument_warning(
+                "./bu\tild/x.ts",
+                "bu\tild/x.ts",
+                PathKind::File,
+                None,
+                &stack
+            )
+            .as_deref(),
             Some(
                 "\"./bu\\tild/x.ts\" is inside \"bu\\tild\", which a rule in the repo-root .gitignore excludes, so it is not formatted; re-include it by adding `!/bu\tild/`, `/bu\tild/*` and `!/bu\tild/x.ts`, in that order, to the repo-root .formatignore"
             )
         );
         assert_eq!(
-            excluded_argument_warning("we\"ird/out", "we\"ird/out", true, None, &stack).as_deref(),
+            excluded_argument_warning(
+                "we\"ird/out",
+                "we\"ird/out",
+                PathKind::Directory,
+                None,
+                &stack
+            )
+            .as_deref(),
             Some(
                 "\"we\\\"ird/out\" is excluded by a rule in \"we\\\"ird/.gitignore\", so nothing under it is formatted; re-include it by adding `!/we\"ird/out/` to the repo-root .formatignore"
             )
@@ -863,7 +876,14 @@ mod tests {
         let mut loose = IgnoreStack::new();
         loose.push_formatignore("home/u", "gen*/\n");
         assert_eq!(
-            excluded_argument_warning("gen\r", "home/u/gen\r", true, Some("/"), &loose).as_deref(),
+            excluded_argument_warning(
+                "gen\r",
+                "home/u/gen\r",
+                PathKind::Directory,
+                Some("/"),
+                &loose
+            )
+            .as_deref(),
             Some(
                 "\"gen\\r\" is excluded by a rule in /home/u/.formatignore, so nothing under it is formatted; narrow or negate that rule to format it"
             )
@@ -877,8 +897,9 @@ mod tests {
         stack.push_gitignore("pkg", "out/\n");
         stack.push_formatignore("", "vendor/\n");
         stack.push_prettierignore("lib", "gen/\n");
-        let warn =
-            |display, rel, is_dir| excluded_argument_warning(display, rel, is_dir, None, &stack);
+        let warn = |display, rel, is_dir| {
+            excluded_argument_warning(display, rel, PathKind::from_is_dir(is_dir), None, &stack)
+        };
         assert_eq!(
             warn("build", "build", true).as_deref(),
             Some(
@@ -947,13 +968,15 @@ mod tests {
             // still out of scope — only the warning is withheld
             assert!(stack.is_ignored(rel, PathKind::File), "{rel}");
             assert_eq!(
-                excluded_argument_warning(rel, rel, false, None, &stack),
+                excluded_argument_warning(rel, rel, PathKind::File, None, &stack),
                 None,
                 "{rel}"
             );
         }
         // a directory the same rules exclude still warns
-        assert!(excluded_argument_warning("gen", "gen", true, None, &stack).is_some());
+        assert!(
+            excluded_argument_warning("gen", "gen", PathKind::Directory, None, &stack).is_some()
+        );
     }
 
     #[test]
@@ -964,7 +987,8 @@ mod tests {
         stack.push_gitignore("", "build/\n");
         stack.push_prettierignore("", "vendor/\n");
         assert_eq!(
-            excluded_argument_warning("build", "build", true, None, &stack).as_deref(),
+            excluded_argument_warning("build", "build", PathKind::Directory, None, &stack)
+                .as_deref(),
             Some(
                 "build is excluded by a rule in the repo-root .gitignore, so nothing under it is formatted; re-include it by adding `!/build/` to the repo-root .prettierignore"
             )
@@ -974,7 +998,7 @@ mod tests {
         nested.push_gitignore("", "build/\n");
         nested.push_prettierignore("src", "x\n");
         assert!(
-            excluded_argument_warning("build", "build", true, None, &nested)
+            excluded_argument_warning("build", "build", PathKind::Directory, None, &nested)
                 .is_some_and(|warning| warning.ends_with("to the repo-root .formatignore"))
         );
     }
@@ -990,7 +1014,9 @@ mod tests {
         stack.push_gitignore("pkg", "out/\n");
         stack.push_formatignore("", "vendor/x.ts\nvendor/lib/\nsame/\n");
         stack.push_formatignore("pkg", "out/*.ts\n");
-        let warn = |rel, is_dir| excluded_argument_warning(rel, rel, is_dir, None, &stack);
+        let warn = |rel, is_dir| {
+            excluded_argument_warning(rel, rel, PathKind::from_is_dir(is_dir), None, &stack)
+        };
         assert_eq!(warn("vendor/x.ts", false), None);
         assert_eq!(warn("pkg/out/a.ts", false), None);
         // a named file a tsv rule excludes only through an ancestor is quiet too
@@ -1026,7 +1052,7 @@ mod tests {
         deeper.push_formatignore("", "");
         deeper.push_formatignore("pkg", "vendor/lib/\n");
         assert!(
-            excluded_argument_warning("pkg/vendor/lib", "pkg/vendor/lib", true, None, &deeper)
+            excluded_argument_warning("pkg/vendor/lib", "pkg/vendor/lib", PathKind::Directory, None, &deeper)
                 .is_some_and(|warning| warning.ends_with(
                     "to the repo-root .formatignore, and narrow or negate the rule in pkg/.formatignore that excludes it too"
                 ))
@@ -1086,8 +1112,9 @@ mod tests {
         for &(rel, is_dir, still_excluded) in cases {
             let mut stack = IgnoreStack::new();
             stack.push_gitignore("", GITIGNORE);
-            let warning = excluded_argument_warning(rel, rel, is_dir, None, &stack)
-                .unwrap_or_else(|| panic!("{rel}: no warning"));
+            let warning =
+                excluded_argument_warning(rel, rel, PathKind::from_is_dir(is_dir), None, &stack)
+                    .unwrap_or_else(|| panic!("{rel}: no warning"));
             // the backticked spans are the lines, in order
             let lines: Vec<&str> = warning.split('`').skip(1).step_by(2).collect();
             let mut fixed = IgnoreStack::new();
@@ -1134,8 +1161,9 @@ mod tests {
             ("build/k\u{1}l/m.ts", false),
             ("build/n\u{0}o.ts", false),
         ] {
-            let warning = excluded_argument_warning(rel, rel, is_dir, None, &stack)
-                .unwrap_or_else(|| panic!("{rel:?}: no warning"));
+            let warning =
+                excluded_argument_warning(rel, rel, PathKind::from_is_dir(is_dir), None, &stack)
+                    .unwrap_or_else(|| panic!("{rel:?}: no warning"));
             assert!(
                 warning.ends_with(
                     "; no ignore-file line can spell the control character in its path, so narrow that rule to format it"
@@ -1150,8 +1178,14 @@ mod tests {
         let mut stack = IgnoreStack::new();
         stack.push_formatignore("home/u", "gen/\n");
         assert_eq!(
-            excluded_argument_warning("gen/sub", "home/u/gen/sub", true, Some("/"), &stack)
-                .as_deref(),
+            excluded_argument_warning(
+                "gen/sub",
+                "home/u/gen/sub",
+                PathKind::Directory,
+                Some("/"),
+                &stack
+            )
+            .as_deref(),
             Some(
                 "gen/sub is inside /home/u/gen, which a rule in /home/u/.formatignore excludes, so nothing under it is formatted; narrow or negate that rule to format it"
             )
@@ -1159,8 +1193,14 @@ mod tests {
         let mut windows = IgnoreStack::new();
         windows.push_formatignore("Users/u", "gen/\n");
         assert_eq!(
-            excluded_argument_warning("gen\\sub", "Users/u/gen/sub", true, Some("C:\\"), &windows)
-                .as_deref(),
+            excluded_argument_warning(
+                "gen\\sub",
+                "Users/u/gen/sub",
+                PathKind::Directory,
+                Some("C:\\"),
+                &windows
+            )
+            .as_deref(),
             Some(
                 "gen\\sub is inside C:\\Users\\u\\gen, which a rule in C:\\Users\\u\\.formatignore excludes, so nothing under it is formatted; narrow or negate that rule to format it"
             )
@@ -1184,7 +1224,7 @@ mod tests {
                 "{rel}"
             );
             assert_eq!(
-                excluded_argument_warning(rel, rel, is_dir, None, &empty),
+                excluded_argument_warning(rel, rel, PathKind::from_is_dir(is_dir), None, &empty),
                 None,
                 "{rel}"
             );
@@ -1195,7 +1235,7 @@ mod tests {
         stack.push_formatignore("", "!build/\n");
         assert!(!stack.is_ignored("build/sub", PathKind::Directory));
         assert_eq!(
-            excluded_argument_warning("build/sub", "build/sub", true, None, &stack),
+            excluded_argument_warning("build/sub", "build/sub", PathKind::Directory, None, &stack),
             None
         );
     }
@@ -1332,7 +1372,8 @@ mod tests {
             ("vendor/lib/\n", "vendor/\n", "vendor/lib"),
         ] {
             let stack = stack_from(&[("", git)], &[("", tsv)]);
-            let warning = excluded_argument_warning(rel, rel, true, None, &stack).unwrap();
+            let warning =
+                excluded_argument_warning(rel, rel, PathKind::Directory, None, &stack).unwrap();
             assert!(warning.contains("after that rule"), "{warning}");
             assert!(
                 warning.contains("a rule in the repo-root .gitignore excludes"),
@@ -1357,9 +1398,14 @@ mod tests {
             &[("", "pkg/vendor/lib/\n")],
             &[("", ""), ("pkg", "vendor/\n")],
         );
-        let warning =
-            excluded_argument_warning("pkg/vendor/lib", "pkg/vendor/lib", true, None, &stack)
-                .unwrap();
+        let warning = excluded_argument_warning(
+            "pkg/vendor/lib",
+            "pkg/vendor/lib",
+            PathKind::Directory,
+            None,
+            &stack,
+        )
+        .unwrap();
         assert_eq!(
             warning,
             "pkg/vendor/lib is inside pkg/vendor, which a rule in pkg/.formatignore excludes, so nothing under it is formatted; narrow or negate that rule, and re-include it past the rule in the repo-root .gitignore that excludes it by adding `!/pkg/vendor/`, `/pkg/vendor/*` and `!/pkg/vendor/lib/`, in that order, to the repo-root .formatignore"
@@ -1373,7 +1419,7 @@ mod tests {
         // a tsv-only exclusion keeps the short remedy
         let stack = stack_from(&[], &[("", "vendor/\n")]);
         assert!(
-            excluded_argument_warning("vendor", "vendor", true, None, &stack)
+            excluded_argument_warning("vendor", "vendor", PathKind::Directory, None, &stack)
                 .unwrap()
                 .ends_with("narrow or negate that rule to format it")
         );
@@ -1386,7 +1432,8 @@ mod tests {
             &[("", "!/dist/\n/dist/*\n!/dist/keep.ts\n")],
         );
         assert_eq!(
-            excluded_argument_warning("dist/sub", "dist/sub", true, None, &stack).unwrap(),
+            excluded_argument_warning("dist/sub", "dist/sub", PathKind::Directory, None, &stack)
+                .unwrap(),
             "dist/sub is excluded by a rule in the repo-root .formatignore, so nothing under it is formatted; narrow or negate that rule to format it"
         );
         let narrowed = stack_from(&[("", "dist/\n")], &[("", "!/dist/\n!/dist/keep.ts\n")]);

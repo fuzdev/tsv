@@ -122,7 +122,8 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
   `is_ignored`: the shallowest excluded prefix of `path` (`Exclusion::depth`), the
   directory holding the excluding rule's file (`anchor_depth`), both counted in
   `split_segments` segments, and the file itself
-  (`IgnoreSource::{Gitignore, Formatignore, Prettierignore}`, with `file_name()`). A
+  (`IgnoreSource::{Gitignore, Formatignore, Prettierignore}`, `#[non_exhaustive]` so a
+  match outside tsv_ignore carries a wildcard arm, with `file_name()`). A
   diagnostic query off the hot path: `tsv_discover` reads it for a path an argument
   named, to warn which directory put the path out of scope and whose rule did.
 - `IgnoreStack::override_exclusion(path, kind) -> Option<Exclusion>` — `exclusion` over the

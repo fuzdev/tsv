@@ -268,7 +268,7 @@ macro_rules! parse_ast {
 /// rules apply; `$lang` resolves in the caller's scope, as in [`parse_ast!`].
 ///
 /// ```ignore
-/// parse_convert!(goal, tsv_ts, convert_ast_json_string, source, goal, |e| e.to_string())
+/// parse_convert!(goal, tsv_ts, convert_ast_json_string, source, goal, |e| format!("{e:#}"))
 /// ```
 #[macro_export]
 macro_rules! parse_convert {
@@ -294,7 +294,7 @@ macro_rules! parse_convert {
 /// got faster by measuring nothing.
 ///
 /// ```ignore
-/// parse_internal!(goal, tsv_ts, source, goal, |e| e.to_string())
+/// parse_internal!(goal, tsv_ts, source, goal, |e| format!("{e:#}"))
 /// ```
 #[macro_export]
 macro_rules! parse_internal {
@@ -360,7 +360,7 @@ macro_rules! parse_ast_for_format {
 /// a drop-in contract over the author's own bytes.
 ///
 /// ```ignore
-/// parse_format!(goal, tsv_ts, source, source_type, |e| e.to_string())
+/// parse_format!(goal, tsv_ts, source, source_type, |e| format!("{e:#}"))
 /// ```
 #[cfg(feature = "format")]
 #[macro_export]

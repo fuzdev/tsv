@@ -98,6 +98,7 @@ pub fn leading_bom_len(source: &str) -> usize {
 
 /// Which characters start a new line in a document's coordinates — the half of `loc`'s
 /// definition that differs by language ([`WireCoordinates::lines`]).
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineRule {
     /// ECMAScript's `LineTerminator`s: LF, CR, CRLF (one terminator), U+2028, U+2029 —
