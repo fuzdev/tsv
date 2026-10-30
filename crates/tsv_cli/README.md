@@ -10,7 +10,7 @@ From source: `cargo install --locked tsv_cli`. A source build does not get the r
 prebuilt binaries ship with (LTO, `panic = "abort"`): it runs slower, and an internal panic while
 formatting files is reported as that file's error instead of aborting the run.
 
-Usage: [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md). The library target is the
+Usage: `tsv --help`, and the [README](https://github.com/fuzdev/tsv#readme). The library target is the
 CLI's internals and makes no stability promise.
 
 Minimum supported Rust version: 1.94. Release notes:

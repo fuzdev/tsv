@@ -1,8 +1,25 @@
-//! HTML-specific classification and whitespace rules
+//! HTML element classification, whitespace rules and character-reference decoding — part
+//! of [tsv](https://github.com/fuzdev/tsv).
 //!
-//! This crate provides pure functions for HTML element classification
-//! and whitespace preservation rules. These language-level utilities are
-//! independent of any specific tool (printer, linter, type-checker, etc.)
+//! Pure functions over tag names and text, independent of any one tool (formatter, linter,
+//! type checker). The whitespace sets are the ones Svelte's compiler and
+//! prettier-plugin-svelte apply — [`collapses_child_whitespace`] is Svelte's exact set — so
+//! they answer for a Svelte-compatible formatter, not for every HTML tool.
+//!
+//! ```
+//! use tsv_html::{
+//!     ReferenceContext, decode_character_references, is_void_element, preserves_whitespace,
+//! };
+//!
+//! assert!(is_void_element("br"));
+//! assert!(preserves_whitespace("pre"));
+//! assert_eq!(decode_character_references("&lt;p&gt;", ReferenceContext::Text), "<p>");
+//! ```
+//!
+//! The named-reference table is generated from WHATWG's `entities.json`; the crate's
+//! `NOTICE` file carries its license.
+
+#![warn(missing_docs)]
 
 mod elements;
 mod entities;

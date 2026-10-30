@@ -3,8 +3,8 @@
 //! tsv is non-configurable for *style*, but file *scope* is the one sanctioned
 //! carve-out: gitignore-shaped files say which files `tsv format` reformats.
 //! This crate is the shared, pure-Rust matcher behind that feature — used
-//! natively by `tsv_cli` and exposed to the JS CLI and VS Code extension through
-//! `tsv_wasm`. It implements the
+//! natively by the `tsv` CLI and, through tsv's npm packages, by the JS CLI and the VS Code
+//! extension. Part of [tsv](https://github.com/fuzdev/tsv). It implements the
 //! [gitignore(5) pattern format](https://git-scm.com/docs/gitignore#_pattern_format),
 //! the same grammar prettier matches via its `ignore` dependency and git matches
 //! for `.gitignore`.
@@ -44,6 +44,25 @@
 //! assert!(stack.is_ignored("build", PathKind::Directory)); // `build/` matches a directory
 //! assert!(!stack.is_ignored("build", PathKind::File)); // ...never a file of that name
 //! ```
+//!
+//! ## Differences from git
+//!
+//! The `.gitignore` half answers as `git check-ignore` does, except:
+//!
+//! - **Always case-sensitive.** Git on macOS and Windows sets `core.ignorecase` and matches
+//!   case-insensitively there; reading machine-local git config would make the answer
+//!   differ between machines.
+//! - **Only `.gitignore` files.** `.git/info/exclude` and `core.excludesFile` are local,
+//!   uncommitted sources, not read for the same reason.
+//! - **Per code point.** `?`, `*` and `[...]` match per Unicode code point, where git
+//!   matches per byte (and prettier's `ignore` per UTF-16 unit), so the three can disagree
+//!   on a non-ASCII name.
+//! - **No POSIX bracket classes.** `[[:alpha:]]` is read as ordinary class members, as
+//!   prettier's matcher reads it.
+//! - **A `**` glued to a literal prefix** (`foo**/bar.ts`) is two stars within one segment,
+//!   as gitignore(5) says; git's matcher crosses directories there.
+
+#![warn(missing_docs)]
 
 mod glob;
 
@@ -224,7 +243,7 @@ impl IgnoreRules {
 /// the subtree before a deeper `!` can re-include it — matching git's "cannot
 /// re-include a file whose parent directory is excluded" rule. The gitignore-only
 /// behavior is byte-for-byte `git check-ignore` on case-sensitive filesystems, less
-/// the known edges the crate's `CLAUDE.md` lists.
+/// the [differences](crate#differences-from-git) the crate docs list.
 #[derive(Debug, Default)]
 pub struct IgnoreStack {
     /// `.gitignore` layers in shallow→deep push order.

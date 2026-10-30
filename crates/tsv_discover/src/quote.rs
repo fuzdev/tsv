@@ -19,8 +19,9 @@ use std::borrow::Cow;
 /// `git ls-files`: a line beginning with `"` is quoted, any other names the file exactly.
 /// The re-include *patterns* a warning offers are not paths and stay literal — they are
 /// meant to be pasted into an ignore file, which reads no escapes — so one that would hold
-/// a control character other than a tab is not offered at all ([`line_can_spell`]); the
-/// ignore-file names in prose (`the repo-root .gitignore`) hold nothing to quote.
+/// a control character other than a tab, which no ignore-file line can spell, is not
+/// offered at all; the ignore-file names in prose (`the repo-root .gitignore`) hold nothing
+/// to quote.
 #[must_use]
 pub fn quote_path(path: &str) -> Cow<'_, str> {
     match quote_path_bytes(path.as_bytes()) {

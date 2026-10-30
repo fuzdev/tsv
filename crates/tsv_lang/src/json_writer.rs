@@ -1884,6 +1884,7 @@ impl JsonWriter {
     // unaffected: it comes from removing the libc `memmove` **call** inside the
     // body, not from removing the call *to* the body, which any out-of-line
     // integer emitter pays.
+    /// Write `n` as a JSON integer.
     #[inline(never)]
     pub fn u32(&mut self, n: u32) {
         // The append is a *constant*-length copy of [`digit_word`]'s register,
@@ -2246,6 +2247,7 @@ impl JsonWriter {
         self.buf.extend_from_slice(&tmp[..digits]);
     }
 
+    /// Write `n` as a JSON integer.
     #[inline]
     pub fn i64(&mut self, n: i64) {
         if n < 0 {
@@ -2271,6 +2273,7 @@ impl JsonWriter {
         self.raw_pick(b, b"true", b"false");
     }
 
+    /// Write `null`.
     #[inline]
     pub fn null(&mut self) {
         self.raw("null");

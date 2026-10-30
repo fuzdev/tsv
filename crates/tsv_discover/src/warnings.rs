@@ -9,19 +9,20 @@ use std::fmt::Write as _;
 use tsv_ignore::{IgnoreSource, IgnoreStack, Negation, NegationTail, PathKind};
 
 /// The stderr warning for a pruned directory that an override-layer `!` rule was trying to
-/// re-include *into*, or `None` when no such rule is written
-/// (`IgnoreStack::negation_under`, which is how [`classify_dir`](crate::classify_dir) reaches
-/// [`DirVerdict::PruneWithWarning`](crate::DirVerdict::PruneWithWarning)). The re-include is a silent no-op — git's
+/// re-include *into*, or `None` when no such rule is written — the same test that makes
+/// [`classify_dir`](crate::classify_dir) return
+/// [`DirVerdict::PruneWithWarning`](crate::DirVerdict::PruneWithWarning) rather than `Prune`.
+/// The re-include is a silent no-op — git's
 /// parent-directory rule — whether the build-output heuristic pruned the directory or an
 /// ignore rule excluded it, and the text says which. The remedy is the lines that reach
 /// what the rules named, for the deepest file holding one (whose rules are read last),
-/// spelled relative to that file's directory and anchored ([`shadow_reinclude_lines`]):
+/// spelled relative to that file's directory and anchored:
 /// the pruned directory re-included, its contents excluded again, and so on one level at
 /// a time down to the deepest directory each rule's literal path names, then every such
 /// rule's own pattern with a leading `/` — `!/dist/`, `/dist/*`, `!/dist/keep.ts` for
 /// `!dist/keep.ts`, with `!/dist/sub/`, `/dist/sub/*` in between for `!dist/sub/keep.ts`.
 /// Every line is anchored (without which a one-segment `!dist/` re-includes a `dist` at
-/// every depth) and spells its path literally ([`pattern_path`]); spelled from the format
+/// every depth) and spells its path literally; spelled from the format
 /// root instead, the lines would do nothing in a nested file, and outside a repo — where
 /// the format root is the filesystem root — in any file. An override layer is read after every
 /// `.gitignore` and a later line wins within a file, so the lines override the excluding
@@ -360,7 +361,7 @@ pub fn unresolvable_root_error(root: &str) -> String {
 /// narrow or negate. A `.gitignore` rule anywhere at or below the named one: narrowing an
 /// override rule would leave it standing, and git's parent-directory rule keeps every `!` under
 /// an excluded directory inert, so the remedy is the lines that re-include the path level
-/// by level from the shallowest exclusion down ([`reinclude_lines`]) — for the repo root's
+/// by level from the shallowest exclusion down — for the repo root's
 /// own override file, read after every `.gitignore` so its `!` wins, and where a later line wins
 /// over an override rule in the same file (the warning says "after that rule" when the named rule
 /// is one, and "which also override" a root override rule below a named `.gitignore` one). An
@@ -370,7 +371,7 @@ pub fn unresolvable_root_error(root: &str) -> String {
 /// walk that prunes the directory reads none), so a rule in one is named only once the
 /// directory is re-included and the path named again. The root file named is its `.prettierignore` where that is the file the root
 /// reads, since a `.formatignore` created beside it would shadow every rule in it. A path
-/// holding a control character no ignore-file line can spell ([`line_can_spell`]) gets no
+/// holding a control character no ignore-file line can spell (any but a tab) gets no
 /// lines, and the warning says to narrow the rule instead.
 ///
 /// `display` is the argument as given; `rel` is the path relative to the format root,

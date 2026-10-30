@@ -8,7 +8,9 @@ use crate::swar::{ascii_has_byte_below, ascii_zero_lanes, high_bit_lanes, splat}
 /// `JsonWriter::loc_field`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Position {
+    /// The line, 1-based.
     pub line: usize,
+    /// The column, 0-based, in UTF-16 code units.
     pub column: usize,
 }
 
@@ -701,6 +703,9 @@ impl LocationMapper<'_> {
 /// is a constant `None`, so every `loc` emitter in the writers is dead code the
 /// optimizer removes — what keeps the bindings, which ship the span-only wire alone,
 /// from carrying the loc writer they never run.
+// Reached only through a `#[doc(hidden)]` re-export, so it renders nowhere public and its
+// links to private items are maintainer navigation (see the hidden modules in `lib.rs`).
+#[expect(rustdoc::private_intra_doc_links)]
 #[derive(Clone, Copy, Debug)]
 pub struct WirePositions<'a> {
     map: &'a ByteToCharMap,

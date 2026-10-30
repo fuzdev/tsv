@@ -351,10 +351,8 @@ pub struct ErrorReport {
 ///
 /// `{}` is **one line**: the summary, then the error's `line:col` (1-based line, 1-based
 /// UTF-16 column, the point its frame's header prints) in parentheses —
-/// `Unexpected end of file (3:7)`. A located error no context has been filled for (only
-/// an embedded entry point returns one) names its byte offset instead —
-/// `Unexpected end of file (at byte 41)` — and a source over the size cap, which has no
-/// position, is the summary alone. The alternate form `{:#}` is the whole frame: the
+/// `Unexpected end of file (3:7)`. A source over the size cap, which has no position, is
+/// the summary alone. The alternate form `{:#}` is the whole frame: the
 /// summary, a `\n`, the `line:col` header with the excerpted line, a `\n`, and the caret
 /// line — what the `tsv` CLI prints (and `summary + "\n" + frame` of [`Error::report`]).
 /// `Debug` prints the private payload's variant.
@@ -633,10 +631,9 @@ impl Error {
     }
 
     /// The error as a binding reports it — summary, frame and span — for every error with a
-    /// point: a syntax error whose context is filled (its span the point alone:
-    /// `end == start`) and a refusal (its own span, `refused` set). `None` for a source
-    /// over the size cap and for a located error no context has been filled for (only an
-    /// embedded entry point returns one).
+    /// point: a syntax error or a depth limit (its span the point alone: `end == start`)
+    /// and a refusal (its own span, `refused` set). `None` for a source
+    /// over the size cap ([`ErrorKind::TooLarge`]).
     pub fn report(&self) -> Option<ErrorReport> {
         if let Repr::Refused {
             frame, start, end, ..
@@ -746,10 +743,8 @@ impl Error {
     /// (`line` 1-based, `column` 0-based UTF-16 units) the document's line rule gives it —
     /// the numbers its message header prints, as `line:column+1`.
     ///
-    /// `None` for the kinds that are not syntax errors (a source over the `u32` cap, a
-    /// refusal — whose span is [`Error::report`]'s) and for an error no context has been
-    /// filled for — which only the embedded entry points return, ahead of their host's
-    /// fill; no whole-document parse entry point does.
+    /// `None` for a source over the `u32` cap ([`ErrorKind::TooLarge`]) and for a refusal,
+    /// whose span is [`Error::report`]'s.
     pub fn wire_point(&self) -> Option<WirePoint> {
         self.0
             .kind

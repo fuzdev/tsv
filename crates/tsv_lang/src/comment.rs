@@ -8,6 +8,8 @@ use crate::source_scan::{self, has_newline_after_position};
 use crate::whitespace::{trim_end_js_whitespace, trim_start_js_whitespace};
 use smallvec::SmallVec;
 
+/// One comment, as the parsers collect it: spans and flags, its text recovered from the
+/// source on demand.
 #[derive(Debug, Clone, Copy)]
 #[expect(clippy::struct_excessive_bools)] // independent flags + serializer hints, not a state machine
 pub struct Comment {
@@ -17,13 +19,15 @@ pub struct Comment {
     /// for JS/TS/CSS comments), so a span avoids a `String` allocation per
     /// comment in the lexer and the parser's collect-clone.
     pub content_span: Span,
-    pub is_block: bool, // true for /* */ or <!-- -->, false for //
+    /// Whether this is a block comment (`/* */` or `<!-- -->`) rather than a `//` line one.
+    pub is_block: bool,
     /// Whether the content contains a `\n` ([`Comment::content_is_multiline`], the one
     /// derivation every parser uses). Precomputed at construction so the
     /// multi-line-block-comment expansion checks (here and in the printers) stay
     /// O(1) and source-free. Line comments never contain a newline, so this is
     /// only ever `true` for block comments.
     pub multiline: bool,
+    /// Byte span of the whole comment, delimiters included, into the source.
     pub span: Span,
     /// Whether Svelte's template reader collected this comment — one written between an
     /// element's attributes (`<div /* c */ class="x">`) — rather than acorn or the CSS

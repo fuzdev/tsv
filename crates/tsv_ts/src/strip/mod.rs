@@ -74,6 +74,26 @@ use tsv_lang::{Error, ErrorKind, ErrorReport, Span};
 /// JS at the goal the source was read at; nothing the walk decides depends on the goal.
 /// [`strip_with_goal`] names one exactly.
 ///
+/// ```
+/// use tsv_ts::{StripError, UnsupportedKind, WIRE_COORDINATES, strip};
+///
+/// assert_eq!(strip("let x: number = 1;").unwrap().code, "let x         = 1;");
+///
+/// // an angle-bracket assertion cannot be blanked away: refused, with its span
+/// let source = "let x = <T>y;";
+/// let Err(StripError::Unsupported { kind, span }) = strip(source) else {
+///     panic!("expected a refusal");
+/// };
+/// assert_eq!(kind, UnsupportedKind::TypeAssertion);
+/// assert_eq!(span.range(), 8..12);
+/// let point = WIRE_COORDINATES.point(source, span.start as usize);
+/// assert_eq!((point.line, point.column), (1, 8));
+/// assert_eq!(
+///     strip(source).unwrap_err().message(source),
+///     "cannot strip an angle-bracket type assertion\n1:9 let x = <T>y;\n            ^ here"
+/// );
+/// ```
+///
 /// # Errors
 ///
 /// [`StripError::Parse`] when `source` does not parse at either goal (the error reported
@@ -85,6 +105,17 @@ pub fn strip(source: &str) -> Result<Stripped<'_>, StripError> {
 
 /// [`strip`] at exactly `goal`, with no Module-to-Script fallback: a source the goal's
 /// grammar rejects is a [`StripError::Parse`] even when the other goal would accept it.
+///
+/// ```
+/// use tsv_ts::{Goal, StripError, strip_with_goal};
+///
+/// let source = "import a from 'b'; let x: T;";
+/// assert!(matches!(strip_with_goal(source, Goal::Script), Err(StripError::Parse(_))));
+/// assert_eq!(
+///     strip_with_goal(source, Goal::Module).unwrap().code,
+///     "import a from 'b'; let x   ;"
+/// );
+/// ```
 ///
 /// # Errors
 ///

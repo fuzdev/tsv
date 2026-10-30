@@ -1,12 +1,64 @@
-//! Svelte parsing and formatting library
+//! Svelte formatting, and parsing to the wire JSON of Svelte's modern `parse()` — part of
+//! [tsv](https://github.com/fuzdev/tsv).
 //!
-//! This crate provides Svelte component parsing and code formatting: [`format()`] formats
-//! one component in one call, and a [`Formatter`] formats many on one thread, keeping its
-//! arenas warm between calls.
+//! [`format()`] formats one component in one call; a [`Formatter`] formats many on one
+//! thread, keeping its arenas warm between calls. Each `<script>`, `<style>` and template
+//! expression is formatted by [`tsv_ts`](https://docs.rs/tsv_ts) or
+//! [`tsv_css`](https://docs.rs/tsv_css) as part of one document. The formatter is
+//! non-configurable: Prettier's style with a print width of 100, tabs, single quotes and no
+//! trailing commas. Formatting output is not frozen — it changes between releases as
+//! formatting bugs are fixed.
+//!
+//! ```
+//! use tsv_svelte::{ErrorKind, format};
+//!
+//! assert_eq!(
+//!     format("<script>let x=1</script><p>{x}</p>").unwrap(),
+//!     "<script>\n\tlet x = 1;\n</script>\n\n<p>{x}</p>\n"
+//! );
+//!
+//! // a refusal: formatting folds this `\r` to `\n`, which would end the in-tag comment early
+//! let err = format("<div // a\rb\n></div>").unwrap_err();
+//! assert_eq!(err.kind(), ErrorKind::Refusal);
+//! assert_eq!(err.span(), Some(9..10));
+//!
+//! // Parse to the wire JSON AST (the `json` feature, on by default)
+//! # #[cfg(feature = "json")]
+//! # {
+//! let json = tsv_svelte::parse_to_json("<p>x</p>").unwrap();
+//! assert!(json.contains(r#""type":"Root""#));
+//! # }
+//! ```
+//!
+//! Every tsv language crate returns the same [`Error`]: its [`Error::kind`], its
+//! [`Error::span`] in the input's UTF-8 bytes, and [`Error::report`] in the wire's UTF-16
+//! offsets and lines; one line under `{}`, the `tsv` CLI's frame under `{:#}`. Deep input is
+//! refused with [`ErrorKind::TooDeep`]; a debug build handling input it does not control
+//! runs the call under [`run_with_stack`].
+//!
+//! ## Features
+//!
+//! - `json` (default) — [`parse_to_json`], [`parse_to_json_with`] and [`JsonOptions`]. Turn
+//!   default features off for a format-only build.
+//! - `locations` — `JsonOptions::locations`, adding a `loc` (line and column) to every
+//!   positioned object of the wire, and a `name_loc` to elements, attributes and directives.
+//!
+//! The `internal_*` features are tsv's own diagnostics, not for consumers.
+//!
+//! ## Stability
+//!
+//! This release exposes no AST: parsing returns the wire JSON, in Svelte's modern
+//! `parse()` shape, which `@fuzdev/tsv-parse-wasm`'s `tsv_ast.d.ts` types.
+
+#![warn(missing_docs)]
 
 #[doc(hidden)]
 pub mod __private;
 #[doc(hidden)]
+// A hidden module renders nowhere public, so its links to private items are maintainer
+// navigation (`docs:audit` documents private items); only the public-only docs.rs build
+// fires the lint, which `docs:audit:docsrs` denies everywhere else.
+#[expect(rustdoc::private_intra_doc_links)]
 pub mod ast;
 mod formatter;
 mod lexer;
@@ -113,6 +165,17 @@ pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
 
 /// What [`parse_to_json_with`]'s wire carries. The default is [`parse_to_json`]'s: the
 /// span-only wire.
+///
+/// ```
+/// # #[cfg(feature = "locations")]
+/// # {
+/// use tsv_svelte::{JsonOptions, parse_to_json_with};
+///
+/// let json = parse_to_json_with("<p>x</p>", &JsonOptions::new().locations(true)).unwrap();
+/// assert!(json.contains(r#""loc":"#));
+/// assert!(json.contains(r#""name_loc":"#));
+/// # }
+/// ```
 #[cfg(feature = "json")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[non_exhaustive]

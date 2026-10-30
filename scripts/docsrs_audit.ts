@@ -14,11 +14,13 @@
  * resolves only through another crate's features resolves there too. Each run here is
  * `cargo doc -p <crate> --no-deps` alone.
  *
- * Links from public docs to private items are WARNED and counted, not denied: docs.rs
- * documents public items only, so each is an inert link on the published page, but this
- * codebase's docs link private items on purpose (`docs:audit` grades them as navigation
- * under `--document-private-items`), and many go once the public surface narrows. The
- * per-crate count is printed so it is visible.
+ * A link from public docs to a private item is DENIED: docs.rs documents public items only,
+ * so each is an inert link on the published page. The lint cannot tell a hidden item from
+ * a rendered one, and the hidden internals link private items on purpose (`docs:audit`
+ * grades them as navigation under `--document-private-items`), so each hidden module or
+ * item whose docs do carries `#[expect(rustdoc::private_intra_doc_links)]`. The lint fires
+ * only in this public-only build, so this is also the one build that sees such an
+ * expectation go stale — `unfulfilled_lint_expectations` is denied here too.
  *
  * ## Which crates, at which features
  *
@@ -49,18 +51,26 @@
  * fragment, an `id` that page carries (raw strings — rustdoc percent-encodes ids and hrefs
  * alike), and every inert bracketed code span is counted. Each `cargo doc -p <crate>
  * --no-deps` writes only that crate's directory, and a crate's docs.rs leg runs LAST, so
- * what is on disk by then is every crate's docs.rs render, whatever order they were built
- * in, and a cross-crate href is checked against its sibling's. A crate whose render holds
+ * what is on disk by then is every crate's docs.rs render, and a cross-crate href is checked
+ * against its sibling's. The crates build in `members` order, which lists each after its
+ * dependencies — and must: rustdoc links into a dependency only when that dependency's render
+ * directory already exists, so a crate documented ahead of one it links renders the link
+ * inert, which fails the gate. A crate whose render holds
  * no `index.html` FAILS: an empty read-back would otherwise report no dead renders.
  * Links into anything else (std, external crates, source pages, rustdoc's own files) are
- * not graded. A hidden or private link written without backticks renders as plain
- * `[name]` text, which no scan can tell from prose, so it is not counted.
+ * not graded. A hidden link written without backticks renders as plain `[name]` text,
+ * which no scan can tell from prose, so it is not counted (a private one is the lint's).
  *
- * These are REPORTED, not gated: in the public-only docs.rs build a public→private link
- * renders exactly like a hidden one, so until the public→private count is zero a
- * nonzero dead-render count cannot tell a deliberate private link from a broken one.
- * The count is printed per crate and in the closing line, which says it is not gated.
- * `-v` lists every dead render; a crate with at most `LIST_LIMIT` lists them anyway.
+ * A dead render FAILS the gate. `-v` lists every one; a crate with at most `LIST_LIMIT`
+ * lists them anyway.
+ *
+ * ## Stale pages
+ *
+ * rustdoc never deletes a page it no longer writes, so a page left by an earlier run —
+ * an item since hidden, renamed or removed — would make an href into it read as alive.
+ * Each crate's render directory is therefore removed before each of its builds, and the
+ * read-back sees only what this run wrote: every graded crate is rebuilt every run, and a
+ * failed build fails the gate before the read-back.
  *
  * ## Build world
  *
@@ -70,7 +80,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
 
 import { docs_rs_crates } from './docsrs_crates.ts';
@@ -84,7 +94,8 @@ const RUSTDOCFLAGS = [
 	'-D rustdoc::invalid_html_tags',
 	'-D rustdoc::bare_urls',
 	'-D rustdoc::redundant_explicit_links',
-	'-W rustdoc::private_intra_doc_links'
+	'-D rustdoc::private_intra_doc_links',
+	'-D unfulfilled_lint_expectations'
 ].join(' ');
 
 const TARGET_DIR = 'target/docsrs';
@@ -93,6 +104,16 @@ const TARGET_DIR = 'target/docsrs';
 const LIST_LIMIT = 20;
 
 const verbose = process.argv.includes('-v') || process.argv.includes('--verbose');
+
+/** A crate's render directory, `target/docsrs/doc/<crate>`. The name is a package name read
+ * from a manifest; anything but `[A-Za-z0-9_-]` is refused rather than joined into a path
+ * the script then removes. */
+function render_dir(crate_name: string): string {
+	if (!/^[A-Za-z0-9_-]+$/.test(crate_name)) {
+		throw Error(`refusing an unexpected crate name: ${JSON.stringify(crate_name)}`);
+	}
+	return join(TARGET_DIR, 'doc', crate_name.replaceAll('-', '_'));
+}
 
 /** One rendered page's ids, read once per run. */
 const page_ids = new Map<string, Set<string> | null>();
@@ -120,7 +141,7 @@ interface DeadRenders {
  * holds no `index.html`, which leaves nothing to read back and must not read as clean. */
 function check_rendered(crate_name: string, graded: Set<string>): DeadRenders | null {
 	const doc_root = join(TARGET_DIR, 'doc');
-	const crate_dir = join(doc_root, crate_name);
+	const crate_dir = render_dir(crate_name);
 	const dead: DeadRenders = { anchors: [], pages: [], inert: [] };
 	if (!existsSync(join(crate_dir, 'index.html'))) return null;
 	const pages = (readdirSync(crate_dir, { recursive: true }) as string[])
@@ -174,20 +195,21 @@ function run(): never {
 		legs.push(['docs.rs', docs_rs_shape]);
 		for (const [label, flags] of legs) {
 			builds++;
+			// module doc §Stale pages: this leg's render is all the directory holds
+			rmSync(render_dir(c.name), { recursive: true, force: true });
 			const result = spawnSync('cargo', ['doc', '-p', c.name, '--no-deps', '--quiet', ...flags], {
 				encoding: 'utf8',
 				env: { ...process.env, RUSTDOCFLAGS, CARGO_TARGET_DIR: TARGET_DIR },
 				stdio: ['ignore', 'ignore', 'pipe']
 			});
 			const stderr = result.stderr ?? '';
-			const private_links = stderr.match(/links to private item/g)?.length ?? 0;
 			const shape = flags.length > 0 ? ` ${flags.join(' ')}` : '';
 			if (result.status !== 0) {
 				failed++;
 				log(stderr.trimEnd());
 				log(`✗ ${c.name}${shape}: the ${label} build fails`);
 			} else {
-				log(`✓ ${c.name}${shape} (${label}): ${private_links} public→private link(s) (warned)`);
+				log(`✓ ${c.name}${shape} (${label})`);
 				if (label === 'docs.rs') rendered.add(c.name);
 			}
 		}
@@ -207,8 +229,8 @@ function run(): never {
 		dead_total += count;
 		if (count > 0) {
 			log(
-				`⚠ ${name}: ${count} dead render(s) — ${dead.anchors.length} dead anchor(s), ` +
-					`${dead.pages.length} dead page(s), ${dead.inert.length} inert — REPORTED, NOT GATED`
+				`✗ ${name}: ${count} dead render(s) — ${dead.anchors.length} dead anchor(s), ` +
+					`${dead.pages.length} dead page(s), ${dead.inert.length} inert`
 			);
 			if (verbose || count <= LIST_LIMIT) {
 				for (const line of [...dead.anchors, ...dead.pages, ...dead.inert]) log(`    ${line}`);
@@ -216,21 +238,15 @@ function run(): never {
 		}
 	}
 
-	if (failed > 0 || unreadable > 0) {
+	if (failed > 0 || unreadable > 0 || dead_total > 0) {
 		log(
 			`docs:audit:docsrs FAILED — ${failed} of ${builds} build(s) failed, ${unreadable} ` +
-				'render(s) left nothing to read back'
+				`render(s) left nothing to read back, ${dead_total} dead render(s) (a hidden or ` +
+				'private link target; -v lists them)'
 		);
 		process.exit(1);
 	}
-	if (dead_total > 0) {
-		log(
-			`docs:audit:docsrs OK — ${crates.length} crate(s), ${builds} build(s) — ⚠ BUT ${dead_total} dead ` +
-				'render(s) REPORTED, NOT GATED (a hidden or private link target; -v lists them)'
-		);
-	} else {
-		log(`docs:audit:docsrs OK — ${crates.length} crate(s), ${builds} build(s), no dead renders`);
-	}
+	log(`docs:audit:docsrs OK — ${crates.length} crate(s), ${builds} build(s), no dead renders`);
 	process.exit(0);
 }
 

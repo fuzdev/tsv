@@ -1,41 +1,46 @@
-//! Support crate for tsv's language crates — `tsv_ts`, `tsv_css` and `tsv_svelte`.
+//! Support crate for tsv's language crates — [`tsv_ts`](https://docs.rs/tsv_ts),
+//! [`tsv_css`](https://docs.rs/tsv_css) and [`tsv_svelte`](https://docs.rs/tsv_svelte).
+//! Depend on one of those, not on this one.
 //!
 //! **No stability promise outside the items they re-export:** [`Span`], [`Error`],
 //! [`ErrorKind`], [`ErrorReport`], [`Result`], [`WirePoint`], [`WireCoordinates`],
 //! [`LineRule`], [`LeadingBom`], and the sized-stack pair [`STACK_SIZE`] and
 //! [`run_with_stack`]. Everything else here is the plumbing the three share —
 //! the doc IR, the printing helpers, the wire-JSON writer, the comment scans, the depth
-//! limits — hidden from these docs and free to change in any release. Depend on a language
-//! crate, not on this one.
+//! limits — hidden from these docs and free to change in any release.
 //!
-//! A map of the source, most of it hidden:
-//! - `Span` - source code location tracking
-//! - `WireCoordinates` / `WirePoint` - a language's position coordinates (its line rule
-//!   and how it counts a leading BOM), and one position in them
-//! - `WireTables` / `WirePositions` - what a wire writer emits positions from (the
-//!   byte→UTF-16 map, and the line table under the `locations` feature);
-//!   `LocationMapper` - the line/column view a `loc` emitter reads from them
-//! - `Error` - error types and result aliases
-//! - `STACK_SIZE` / `run_with_stack` - the stack the parsers and printers are sized for,
-//!   and a way to run on one
-//! - `DepthBudget` / `NESTING_LIMIT` / `SPINE_LIMIT` - the parsers' depth limits
-//! - `OutputBuffer` - shared printer output utilities
-//! - `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` - hardcoded formatter settings, and
-//!   `EmbedContext` / `LayoutMode` - the per-input embedding state
-//! - `Comment` - shared comment type
-//! - `census` - opt-in perf census counters (`internal_census` feature)
-//! - `comment_ledger` - print-once comment ledger (`internal_comment_check` feature)
-//! - `fanout_probe` - opt-in work counters for the fanout audit (`internal_fanout_check` feature)
-//! - `doc` - document builder primitives for prettier-compatible formatting
-//! - `printing` - shared printing utilities for printers
-//! - `source_scan` - trivia-aware source scanning between AST nodes
-//! - `estimated_json_capacity` / `estimated_ast_arena_capacity` - pre-size heuristics
-//!   for the wire-JSON output buffer and the parse-time bump arena
-//! - `JsonWriter` - shared wire-JSON emission substrate (`json` feature)
-//! - `FxHasher` / `FxHashMap` / `FxHashSet` - dep-free multiply-xor hasher for the
-//!   side tables
-//! - `swar` - word-at-a-time byte-search kernels shared by the line scans, the
-//!   wire-JSON escape prescan, and the lexers' token-body scans
+//! Part of [tsv](https://github.com/fuzdev/tsv).
+
+#![warn(missing_docs)]
+
+// A map of the source, most of it hidden:
+// - `Span` - source code location tracking
+// - `WireCoordinates` / `WirePoint` - a language's position coordinates (its line rule
+//   and how it counts a leading BOM), and one position in them
+// - `WireTables` / `WirePositions` - what a wire writer emits positions from (the
+//   byte→UTF-16 map, and the line table under the `locations` feature);
+//   `LocationMapper` - the line/column view a `loc` emitter reads from them
+// - `Error` - error types and result aliases
+// - `STACK_SIZE` / `run_with_stack` - the stack the parsers and printers are sized for,
+//   and a way to run on one
+// - `DepthBudget` / `NESTING_LIMIT` / `SPINE_LIMIT` - the parsers' depth limits
+// - `OutputBuffer` - shared printer output utilities
+// - `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` - hardcoded formatter settings, and
+//   `EmbedContext` / `LayoutMode` - the per-input embedding state
+// - `Comment` - shared comment type
+// - `census` - opt-in perf census counters (`internal_census` feature)
+// - `comment_ledger` - print-once comment ledger (`internal_comment_check` feature)
+// - `fanout_probe` - opt-in work counters for the fanout audit (`internal_fanout_check` feature)
+// - `doc` - document builder primitives for prettier-compatible formatting
+// - `printing` - shared printing utilities for printers
+// - `source_scan` - trivia-aware source scanning between AST nodes
+// - `estimated_json_capacity` / `estimated_ast_arena_capacity` - pre-size heuristics
+//   for the wire-JSON output buffer and the parse-time bump arena
+// - `JsonWriter` - shared wire-JSON emission substrate (`json` feature)
+// - `FxHasher` / `FxHashMap` / `FxHashSet` - dep-free multiply-xor hasher for the
+//   side tables
+// - `swar` - word-at-a-time byte-search kernels shared by the line scans, the
+//   wire-JSON escape prescan, and the lexers' token-body scans
 
 #[doc(hidden)]
 pub mod census;
@@ -46,6 +51,10 @@ pub mod comment_ledger;
 mod config;
 mod depth;
 #[doc(hidden)]
+// A hidden module renders nowhere public, so its links to private items are maintainer
+// navigation (`docs:audit` documents private items); only the public-only docs.rs build
+// fires the lint, which `docs:audit:docsrs` denies everywhere else.
+#[expect(rustdoc::private_intra_doc_links)]
 pub mod doc;
 mod error;
 mod escapes;
@@ -57,13 +66,19 @@ mod json_writer;
 mod location;
 mod output;
 #[doc(hidden)]
+// See `doc` above.
+#[expect(rustdoc::private_intra_doc_links)]
 pub mod printing;
 mod sizing;
 #[doc(hidden)]
+// See `doc` above.
+#[expect(rustdoc::private_intra_doc_links)]
 pub mod source_scan;
 mod span;
 mod stack;
 #[doc(hidden)]
+// See `doc` above.
+#[expect(rustdoc::private_intra_doc_links)]
 pub mod swar;
 mod whitespace;
 

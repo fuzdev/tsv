@@ -52,8 +52,11 @@ pub struct BufferStats {
 /// `N` is re-tuned. Fields mirror [`BufferStats`].
 #[derive(Debug, Clone, Copy)]
 pub struct BufferInlineCapacities {
+    /// `ChainNodeVec`'s inline capacity.
     pub chain_nodes: usize,
+    /// `ChainGroupVec`'s inline capacity.
     pub chain_groups: usize,
+    /// `CommentVec`'s inline capacity.
     pub leading_comments: usize,
 }
 

@@ -79,7 +79,7 @@
 		"//compile:corpus:compare": "Roots: the WHOLE ../corpora snapshot (every collection it vendors — the author's repos, the framework source, the third-party Svelte libraries — one root, so a new collection is in scope the day it lands), then Svelte's own runtime/snapshot/SSR/css suites, then any per-machine roots in the gitignored `compile_corpus_compare.roots.local` (one path per line, `#` comments; live checkouts the snapshot cannot carry). A missing roots file adds none; a missing positional root fails the run.",
 		"compile:corpus:compare": "cargo run -p tsv_debug --quiet compile_corpus_compare --roots-file compile_corpus_compare.roots.local ../corpora/collections ../svelte/packages/svelte/tests/runtime-runes ../svelte/packages/svelte/tests/snapshot ../svelte/packages/svelte/tests/server-side-rendering ../svelte/packages/svelte/tests/css",
 		"docs:audit": "RUSTDOCFLAGS='-D rustdoc::broken_intra_doc_links -D rustdoc::invalid_html_tags -D rustdoc::bare_urls -D rustdoc::redundant_explicit_links -A rustdoc::private_intra_doc_links' cargo doc --workspace --no-deps --document-private-items --all-features --quiet",
-		"docs:audit:docsrs": "deno run --allow-read --allow-env --allow-run=cargo scripts/docsrs_audit.ts",
+		"docs:audit:docsrs": "deno run --allow-read --allow-write=target/docsrs --allow-env --allow-run=cargo scripts/docsrs_audit.ts",
 		"deps:audit": "deno run --allow-read --allow-env --allow-run=cargo scripts/deps_audit.ts",
 		"package:audit": "deno run --allow-read --allow-env --allow-run=cargo scripts/package_audit.ts",
 		"pins:audit": "deno run --allow-read scripts/check_canonical_pins.ts --pins",

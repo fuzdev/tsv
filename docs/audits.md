@@ -32,7 +32,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Discovery parity](#corpus-discovery-parity-audit-discoveryaudit) | `discovery:audit` | `tsv format --list` over the `../corpora` snapshot naming a different file set than the snapshot's committed tree holds in tsv's extensions — a discovery prune firing on real code, or an extension drift | `deno task check` (when `../corpora` is present) |
 | [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting — or type-stripping — the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; neither `deno task check` nor the publish path compares engines) |
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
-| [docs.rs build](#docsrs-build-audit-docsauditdocsrs) | `docs:audit:docsrs` | a crate meant for docs.rs whose own doc build fails at its docs.rs feature set or at its defaults — a link to an item behind a feature that build leaves off, which the all-features workspace build resolves. Also REPORTS (does not gate) dead renders: a link to a hidden item, which resolves but renders a dead `#anchor` or inert bracketed code | `deno task check` (the dead-render count reported, not gated) |
+| [docs.rs build](#docsrs-build-audit-docsauditdocsrs) | `docs:audit:docsrs` | a crate meant for docs.rs whose own doc build fails at its docs.rs feature set or at its defaults — a link to an item behind a feature that build leaves off, which the all-features workspace build resolves; a public item's doc linking a private item; a dead render — a link to a hidden item, which resolves but renders a dead `#anchor` or inert bracketed code | `deno task check` |
 | [Published deps](#published-graph-dependency-audit-depsaudit) | `deps:audit` | a crate meant for publishing reaching `serde_json` through a normal or build dependency, at any feature set or target — the workspace entry's features would unify into a consumer's own `serde_json` and change how it deserializes | `deno task check` |
 | [Package contents](#package-contents-audit-packageaudit) | `package:audit` | a crate meant for publishing whose crates.io tarball lacks its `README.md`, `LICENSE` (the root's bytes) or a required `NOTICE`, ships any other Markdown (`CLAUDE.md`), links relatively from its README, or states a `rust-version` other than the pinned toolchain's major.minor — plus cargo's publishable set drifting from the shared reader's | `deno task check` |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
@@ -1118,14 +1118,16 @@ where a link written against the docs.rs features breaks: an always-on page link
 behind `locations` resolves in the docs.rs build and fails this one. A crate docs.rs
 documents at its defaults is built once.
 
-**Lints.** The `docs:audit` set, plus `--cfg docsrs` as docs.rs passes it, with one level
-changed: `private_intra_doc_links` is **warned and counted per crate**, not allowed.
-docs.rs documents public items only, so each such link is inert on the published page;
-it is not denied because the codebase links private items on purpose (`docs:audit`
-navigates them under `--document-private-items`), and many of them leave the public
-surface as it narrows.
+**Lints.** The `docs:audit` set, plus `--cfg docsrs` as docs.rs passes it, with two levels
+changed: `private_intra_doc_links` is **denied** rather than allowed — docs.rs documents
+public items only, so such a link is inert on the published page — and so is
+`unfulfilled_lint_expectations`. The lint cannot tell a hidden item from a rendered one, and
+the hidden internals link private items on purpose (`docs:audit` navigates them under
+`--document-private-items`), so each hidden module or item whose docs do carries
+`#[expect(rustdoc::private_intra_doc_links)]`. The lint fires only in this public-only build,
+so this is the one build that sees such an expectation go stale, and a stale one fails it.
 
-**Rendered links — reported, NOT gated.** A link to a `#[doc(hidden)]` item resolves, so no
+**Rendered links.** A link to a `#[doc(hidden)]` item resolves, so no
 lint fires, yet the item is not on the page: a hidden **member** (method, field, variant)
 renders an `<a>` whose `#anchor` its page lacks, and a hidden **page** item (fn, struct,
 module) renders as inert bracketed code, `[<code>name</code>]`, with no `<a>` at all. So once
@@ -1134,19 +1136,27 @@ graded crate's pages must name a page that exists and, with a fragment, an `id` 
 carries (compared raw — rustdoc percent-encodes ids and hrefs alike), and every inert
 bracketed code span is counted. Each `cargo doc -p <crate> --no-deps` writes only that crate's
 directory and a crate's docs.rs leg runs **last** (the defaults leg first), so by then every
-crate's docs.rs render is on disk, and a cross-crate href is checked against its sibling's
-whatever order the crates were built in. A render with no `index.html` **fails** the gate,
+crate's docs.rs render is on disk, and a cross-crate href is checked against its sibling's.
+The crates build in the root `Cargo.toml`'s `members` order, which lists each crate after its
+dependencies — and must: rustdoc renders a link into a dependency only when that dependency's
+render directory already exists, so a crate documented ahead of one it links would render the
+link inert and fail the gate. A render with no `index.html` **fails** the gate,
 since an empty read-back would otherwise report no dead renders. Links into std,
-external crates, source pages and rustdoc's own files are not graded. The count — dead
-anchors, dead pages, inert spans — is printed per crate, listed when small (or with `-v`),
-and named in the closing line as **not gated**: in the public-only docs.rs build a
-public→private link renders exactly like a hidden one, so until the public→private count is
-zero a dead render cannot be told apart from a deliberate private link. Both flip to denied
-together once that count reaches zero.
+external crates, source pages and rustdoc's own files are not graded. A dead render —
+dead anchor, dead page or inert span — **fails** the gate, each one listed when a crate
+has few (or with `-v`).
 
-**Blind spots.** A hidden or private link written without backticks (`[name]`) renders as
-plain bracketed text, indistinguishable from prose, so the rendered-link pass cannot count
-it; nor does any lint fire for a hidden target. It builds the host target only, whatever the table's `targets` say, and
+**Stale pages.** rustdoc never deletes a page it no longer writes, so a page an earlier run
+left — an item since hidden, renamed or removed — would make an href into it read as alive.
+The script removes each crate's render directory (`target/docsrs/doc/<crate>`) before each
+of that crate's builds, so the read-back sees only what this run wrote: every graded crate
+is rebuilt on every run, and a failed build fails the gate before the read-back.
+
+**Blind spots.** A hidden link written without backticks (`[name]`) renders as plain
+bracketed text, indistinguishable from prose, so the rendered-link pass cannot count it,
+and no lint fires for a hidden target (a private one is the lint's). A hidden module's own
+`#[expect]` covers every link in it, so a hidden module made public again keeps silencing
+its private links until the expectation is removed. It builds the host target only, whatever the table's `targets` say, and
 with the pinned stable rustdoc, where docs.rs runs a nightly one, so a lint only nightly
 fires (or a level nightly changed) goes unseen. `cargo doc -p tsv_cli` also documents the
 `tsv` binary, which docs.rs does not, so for that crate the leg is slightly stricter than

@@ -50,6 +50,9 @@ pub(crate) use expression_type_args::{closes_statement_header, closes_type_argum
 ///
 /// The policy applies only at [`Parser::grouping_depth`] `0` — inside grouping,
 /// `(x as T)` is unambiguously an assertion under both.
+// Reached only through a `#[doc(hidden)]` re-export, so it renders nowhere public and its
+// links to private items are maintainer navigation (see the hidden modules in `lib.rs`).
+#[expect(rustdoc::private_intra_doc_links)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TopLevelAs {
     /// Consume `as` wherever it is grammatical.

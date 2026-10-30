@@ -230,9 +230,9 @@ deno task package:audit              # each publishable crate's tarball (`cargo 
 #                                      links absolute, `rust-version` = rust-toolchain.toml's major.minor; cargo's publishable set
 #                                      = the docs.rs-table reader's
 deno task docs:audit:docsrs          # each crate with a `[package.metadata.docs.rs]` table documented ALONE at that table's
-#                                      features (`cargo doc -p X --no-deps`, broken links DENIED, public→private links warned
-#                                      + counted) — the feature-gated link the all-features workspace build resolves; then reads
-#                                      the render back and REPORTS (not gated) dead renders: a hidden link's dead `#anchor` or inert `[name]`
+#                                      features (`cargo doc -p X --no-deps`, broken and public→private links DENIED) — the
+#                                      feature-gated link the all-features workspace build resolves; then reads this run's render
+#                                      back and FAILS on a dead render: a hidden link's dead `#anchor` or inert `[name]`
 deno task scan:audit                 # no new raw find/rfind/match_indices substring scans over source
 deno task fanout:audit               # build-fanout RATCHET: doc-node growth over nested constructs (exponential rebuild per
 #                                      layout candidate), plus counted legs over the depth gate's full sweep, the known-bug

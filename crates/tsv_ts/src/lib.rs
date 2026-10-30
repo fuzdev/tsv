@@ -1,7 +1,9 @@
-//! TypeScript parsing and formatting library
+//! TypeScript and JavaScript formatting, type stripping, and parsing to acorn-typescript's
+//! wire JSON — part of [tsv](https://github.com/fuzdev/tsv).
 //!
-//! This crate provides TypeScript formatting, the type strip, and parsing to the wire JSON
-//! AST (acorn-typescript's shape).
+//! The formatter is non-configurable: Prettier's style with a print width of 100, tabs,
+//! single quotes and no trailing commas. Formatting output is not frozen — it changes
+//! between releases as formatting bugs are fixed.
 //!
 //! ## Usage
 //!
@@ -26,6 +28,34 @@
 //! assert!(json.starts_with(r#"{"type":"Program""#));
 //! # }
 //! ```
+//!
+//! ## Errors
+//!
+//! Formatting and parsing return an [`Error`] that says what kind of failure it is
+//! ([`Error::kind`]), where it is in the input's UTF-8 bytes ([`Error::span`]), and how a
+//! binding reports it ([`Error::report`]: the summary and the frame apart, positions in
+//! UTF-16 offsets and 1-based lines). `{}` prints one line; `{:#}` adds the frame the
+//! `tsv` CLI prints.
+//!
+//! ```
+//! use tsv_ts::{ErrorKind, format};
+//!
+//! let err = format("const x=").unwrap_err();
+//! assert_eq!(err.kind(), ErrorKind::Syntax);
+//! assert_eq!(err.span(), Some(8..8));
+//! assert_eq!(err.to_string(), "Expected expression, found end of file (1:9)");
+//! assert_eq!(
+//!     format!("{err:#}"),
+//!     "Expected expression, found end of file\n1:9 const x=\n            ^ here"
+//! );
+//! let report = err.report().unwrap();
+//! assert_eq!((report.start.start, report.start.line, report.start.column), (8, 1, 8));
+//! ```
+//!
+//! A refusal ([`ErrorKind::Refusal`]) is a source that parses but that an operation cannot
+//! handle, with a span over the refused bytes; the type strip reports its refusals as
+//! [`StripError::Unsupported`]. A source longer than 4 GiB − 1 bytes is
+//! [`ErrorKind::TooLarge`], with no span.
 //!
 //! ## Goals
 //!
@@ -56,10 +86,40 @@
 //! retry exists to admit — so reporting *that* would point a legacy script's author away
 //! from their typo. A module attempt the depth limit refused ([`ErrorKind::TooDeep`]) takes
 //! no retry: the limit is no verdict on the grammar.
+//!
+//! ## Deep input
+//!
+//! The parsers refuse a tree past their depth limits with [`ErrorKind::TooDeep`], so every
+//! walk of an accepted tree fits a 2 MiB thread in an optimized build and a 16 MiB one in a
+//! debug build. A stack overflow aborts the process rather than panicking, so a debug build
+//! handling input it does not control — `cargo test` runs each test on a 2 MiB thread — wraps
+//! the call in [`run_with_stack`], which runs it on a thread reserving [`STACK_SIZE`].
+//!
+//! ## Features
+//!
+//! - `json` (default) — [`parse_to_json`], [`parse_to_json_with`] and [`JsonOptions`]. Turn
+//!   default features off for a format-and-strip build.
+//! - `locations` — `JsonOptions::locations`, adding a `loc` (line and column) to every node
+//!   of the wire.
+//!
+//! The `internal_*` features are tsv's own diagnostics, not for consumers.
+//!
+//! ## Stability
+//!
+//! This release exposes no AST: parsing returns the wire JSON, in acorn-typescript's shape,
+//! which `@fuzdev/tsv-parse-wasm`'s `tsv_ast.d.ts` types.
+
+#![warn(missing_docs)]
 
 #[doc(hidden)]
+// See `ast` below.
+#[expect(rustdoc::private_intra_doc_links)]
 pub mod __private;
 #[doc(hidden)]
+// A hidden module renders nowhere public, so its links to private items are maintainer
+// navigation (`docs:audit` documents private items); only the public-only docs.rs build
+// fires the lint, which `docs:audit:docsrs` denies everywhere else.
+#[expect(rustdoc::private_intra_doc_links)]
 pub mod ast;
 mod formatter;
 mod goal;
@@ -159,6 +219,13 @@ pub fn format(source: &str) -> Result<String> {
 /// even when the other goal would accept it (`with (a) b;` is an error under
 /// [`Goal::Module`]; `import x from 'y';` is one under [`Goal::Script`]). Folds carriage
 /// returns ahead of the parse like [`format()`].
+///
+/// ```
+/// use tsv_ts::{Goal, format_with_goal};
+///
+/// assert_eq!(format_with_goal("with (a) b", Goal::Script).unwrap(), "with (a) b;\n");
+/// assert!(format_with_goal("with (a) b", Goal::Module).is_err());
+/// ```
 ///
 /// # Errors
 ///
@@ -442,6 +509,7 @@ pub(crate) fn closes_statement_header(bytes: &[u8], rparen: usize, lower_bound: 
 /// Printer buffer-population sampling for `tsv_debug buffer_sizes`. Behind the
 /// `internal_buffer_stats` feature (off in production builds).
 #[cfg(feature = "internal_buffer_stats")]
+#[doc(hidden)]
 pub use printer::buffer_stats::{
     BufferInlineCapacities, BufferStats, inline_capacities, set_buffer_stats, take_buffer_stats,
 };
@@ -457,6 +525,7 @@ pub use printer::buffer_stats::{
 /// brace), so those stay gated by the AST/format byte-identity suites. Behind the
 /// `internal_debug_lex` feature (off in production builds); used by `tsv_debug lex_diff`.
 #[cfg(feature = "internal_debug_lex")]
+#[doc(hidden)]
 pub fn debug_token_stream(source: &str) -> String {
     use crate::lexer::{Lexer, TokenKind};
     use std::fmt::Write as _;
@@ -503,6 +572,7 @@ pub fn debug_token_stream(source: &str) -> String {
 /// and `debugger`. `void` stays in the set — it is the `void` unary operator, not
 /// a type name.
 #[cfg(feature = "internal_debug_lex")]
+#[doc(hidden)]
 pub fn reserved_words() -> &'static [&'static str] {
     &[
         "const",

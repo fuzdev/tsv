@@ -29,7 +29,7 @@ pub const HEURISTIC_DIRS: [&str; 3] = ["dist", "build", "target"];
 /// The file extensions tsv formats — the discovery filter behind
 /// [`is_formattable`]. The whole JS/TS family (`ts`/`mts`/`cts`/`js`/`mjs`/`cjs`)
 /// parses as TypeScript, a syntactic superset of JS — the same dispatch
-/// an explicitly named file gets from `ParserType::from_extension`, so a walk and
+/// an explicitly named file gets from the `tsv` CLI, so a walk and
 /// a named path agree on every extension. JSX/TSX is out of tsv's scope, so `jsx`
 /// and `tsx` are deliberately absent; JSX inside a `.js` file is a parse error
 /// rather than a silent skip. Compound forms like `.svelte.ts` are covered by the
@@ -80,9 +80,10 @@ impl DirVerdict {
 /// The extension is read without regard to ASCII case (`A.TS`, `styles.CSS`), as
 /// prettier infers a parser from the lowercased name: a tree that passed through a
 /// case-insensitive filesystem carries such names, and each is the same kind of file.
-/// Every extension dispatch in both `tsv` bins reads the case the same way
-/// (`ParserType::from_extension`, `tsv_ts::Goal::from_extension`, `cli.js`'s twins), so a
-/// walk and a named path agree on what `A.TS` is.
+/// Every extension dispatch in both `tsv` bins reads the case the same way, so a walk and
+/// a named path agree on what `A.TS` is.
+// The dispatches: the CLI's `ParserType::from_extension`, `tsv_ts::Goal::from_extension`,
+// and `cli.js`'s twins.
 pub fn is_formattable(name: &str) -> bool {
     has_extension_in(name, &FORMATTABLE_EXTENSIONS)
 }
@@ -153,8 +154,8 @@ pub(crate) const STRIPPABLE_EXTENSIONS: [&str; 3] = ["ts", "mts", "cts"];
 /// The JavaScript extensions, which `tsv strip` refuses with a message of their own.
 const JAVASCRIPT_EXTENSIONS: [&str; 3] = ["js", "mjs", "cjs"];
 
-/// The error for a file named to `tsv strip` whose extension is not one of
-/// [`STRIPPABLE_EXTENSIONS`] (read without regard to ASCII case, as [`is_formattable`]
+/// The error for a file named to `tsv strip` whose extension is not `.ts`, `.mts` or `.cts`
+/// (read without regard to ASCII case, as [`is_formattable`]
 /// reads one), or `None` when it is. An argument error, as
 /// [`unsupported_extension_error`] is for `format`: without it a `.svelte` file would
 /// reach the TypeScript parser and fail on its markup, and a JavaScript file would be
@@ -318,9 +319,9 @@ fn classify_dir_inner(
 /// [`is_ignored(rel, PathKind::File)`](tsv_ignore::IgnoreStack::is_ignored) for the
 /// file-level match (a file no directory prunes may still be ignored by a rule).
 ///
-/// Equivalent to running [`classify_dir`] down a real single-path walk — it calls
-/// [`classify_dir_inner`] so the full-stack assembly skips the incremental-walk
-/// assert; see that fn for why the assembled stack stays faithful.
+/// Equivalent to running [`classify_dir`] down a real single-path walk.
+// It calls `classify_dir_inner` so the full-stack assembly skips the incremental-walk
+// assert; see that fn for why the assembled stack stays faithful.
 pub fn is_path_pruned(rel: &str, stack: &IgnoreStack) -> bool {
     first_pruned_ancestor(rel, stack).is_some()
 }

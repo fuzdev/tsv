@@ -1,7 +1,11 @@
 //! tsv's file-discovery **policy** — the per-directory and per-file decisions
 //! `tsv format` makes while walking a tree, as pure functions over a
 //! [`tsv_ignore::IgnoreStack`] (the matcher) plus the entry name and its
-//! format-root-relative path.
+//! format-root-relative path. Part of [tsv](https://github.com/fuzdev/tsv).
+//!
+//! **Published for tsv's own tools.** The verdicts and the warnings' wording follow
+//! `tsv format`'s behavior and change with it in any release. A tool that wants gitignore
+//! matching alone should depend on [`tsv_ignore`].
 //!
 //! This is the single home of the build-output heuristic, the always-pruned
 //! safety nets, the formattable-extension check (both as a discovery filter and
@@ -9,10 +13,9 @@
 //! heuristic-shadow warning text, the `.prettierignore`-shadowed warning, the
 //! `.prettierignore`-outside-a-repo warning, and the gate on a path an argument names
 //! (bounded by the ignore files alone, with its warning). The three discovery
-//! surfaces — the native CLI (`tsv_cli`), the
-//! WASM CLI (`tsv_wasm`'s `npm/cli.js`), and the VS Code extension — call it
-//! instead of reimplementing the decision, so they agree **by construction**
-//! rather than by hand-mirrored constants and templates.
+//! surfaces — the native CLI, the JS CLI in tsv's npm packages, and the VS Code
+//! extension — call it instead of reimplementing the decision, so they agree **by
+//! construction** rather than by hand-mirrored constants and templates.
 //!
 //! Everything here is **pure**: no filesystem access. Locating directories,
 //! reading ignore files, resolving the format root, and walking the tree stay in
@@ -40,6 +43,8 @@
 //! // a non-ignored `.ts` file → format it
 //! assert!(should_format_file("app.ts", "src/app.ts", &stack));
 //! ```
+
+#![warn(missing_docs)]
 
 mod policy;
 mod quote;

@@ -40,8 +40,8 @@ pub enum Goal {
     /// `[~Await]`); `import`/`export` declarations, `import.meta`, and top-level
     /// `await` expressions and `for await` loops are syntax errors. Script code is **sloppy** unless its
     /// directive prologue holds a `"use strict"`, so the strict-mode rules the parser
-    /// enforces parse where a module rejects them — enumerated once on the flag
-    /// that gates them (`Parser::strict`), never re-listed here. The Annex B
+    /// enforces (a `with` statement, a leading-zero numeric literal, a legacy
+    /// string escape) parse where a module rejects them. The Annex B
     /// web-compatibility grammar is out of scope at both goals.
     Script,
 }
@@ -58,10 +58,19 @@ impl Goal {
 
     /// Parse a goal from its [`source_type`](Goal::source_type) string
     /// (`"module"` / `"script"`), the inverse of `source_type`. Returns `None`
-    /// for any other string. The single source of truth for the goal vocabulary,
-    /// shared by the CLI `--source-type` flag (`tsv_cli`), the WASM bindings (`tsv_wasm`),
-    /// and the fixture goal-marker reader (`tsv_debug`); callers layer their own
-    /// default and error formatting on top.
+    /// for any other string (the match is case-sensitive). The vocabulary acorn's
+    /// `sourceType` and the `tsv` CLI's `--source-type` use.
+    ///
+    /// ```
+    /// use tsv_ts::Goal;
+    ///
+    /// assert_eq!(Goal::from_source_type("script"), Some(Goal::Script));
+    /// assert_eq!(Goal::from_source_type("Module"), None);
+    /// ```
+    // The single source of truth for the goal vocabulary, shared by the CLI
+    // `--source-type` flag (`tsv_cli`), the WASM bindings (`tsv_wasm`), and the fixture
+    // goal-marker reader (`tsv_debug`); callers layer their own default and error
+    // formatting on top.
     pub fn from_source_type(s: &str) -> Option<Goal> {
         match s {
             "module" => Some(Goal::Module),
@@ -93,6 +102,16 @@ impl Goal {
     ///
     /// The extension is `Path::extension`'s, read without regard to ASCII case
     /// (`legacy.MJS`), as every extension dispatch in the CLIs reads one.
+    ///
+    /// ```
+    /// use tsv_ts::Goal;
+    ///
+    /// assert_eq!(Goal::from_extension("src/legacy.MJS"), Some(Goal::Module));
+    /// assert_eq!(Goal::from_extension("a.mts"), Some(Goal::Module));
+    /// // `.js`, `.ts` and the CommonJS names settle nothing
+    /// assert_eq!(Goal::from_extension("a.cjs"), None);
+    /// assert_eq!(Goal::from_extension("a.ts"), None);
+    /// ```
     pub fn from_extension(path: &str) -> Option<Goal> {
         std::path::Path::new(path)
             .extension()

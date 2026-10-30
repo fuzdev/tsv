@@ -1,13 +1,59 @@
-//! CSS parsing and formatting library
+//! CSS formatting, and parsing to the wire JSON of Svelte's `parseCss` — part of
+//! [tsv](https://github.com/fuzdev/tsv).
 //!
-//! Provides CSS parsing, formatting, and AST conversion functionality: [`format()`] formats
-//! one source in one call, and a [`Formatter`] formats many on one thread, keeping its
-//! arenas warm between calls.
-//! Part of the tsv (precise language tools for TypeScript/JS, CSS, and Svelte in Rust) project.
+//! [`format()`] formats one stylesheet in one call; a [`Formatter`] formats many on one
+//! thread, keeping its arenas warm between calls. The formatter is non-configurable:
+//! Prettier's style with a print width of 100, tabs and single quotes. Formatting output
+//! is not frozen — it changes between releases as formatting bugs are fixed.
+//!
+//! ```
+//! use tsv_css::{ErrorKind, Formatter, format};
+//!
+//! assert_eq!(format("a{color:red}").unwrap(), "a {\n\tcolor: red;\n}\n");
+//! let mut formatter = Formatter::new();
+//! assert_eq!(formatter.format("b{}").unwrap(), "b {\n}\n");
+//!
+//! let err = format("a{").unwrap_err();
+//! assert_eq!(err.kind(), ErrorKind::Syntax);
+//! assert_eq!(err.span(), Some(2..2));
+//!
+//! // Parse to the wire JSON AST (the `json` feature, on by default)
+//! # #[cfg(feature = "json")]
+//! # {
+//! let json = tsv_css::parse_to_json("a{}").unwrap();
+//! assert!(json.starts_with(r#"{"type":"StyleSheetFile""#));
+//! # }
+//! ```
+//!
+//! Every tsv language crate returns the same [`Error`]: its [`Error::kind`], its
+//! [`Error::span`] in the input's UTF-8 bytes, and [`Error::report`] in the wire's UTF-16
+//! offsets and lines; one line under `{}`, the `tsv` CLI's frame under `{:#}`. Deep input is
+//! refused with [`ErrorKind::TooDeep`]; a debug build handling input it does not control
+//! runs the call under [`run_with_stack`].
+//!
+//! ## Features
+//!
+//! - `json` (default) — [`parse_to_json`], [`parse_to_json_with`] and [`JsonOptions`]. Turn
+//!   default features off for a format-only build.
+//! - `locations` — `JsonOptions::locations`, adding a `loc` (line and column) to every
+//!   positioned object of the wire.
+//!
+//! The `internal_*` features are tsv's own diagnostics, not for consumers.
+//!
+//! ## Stability
+//!
+//! This release exposes no AST: parsing returns the wire JSON, in `parseCss`'s shape, which
+//! `@fuzdev/tsv-parse-wasm`'s `tsv_ast.d.ts` types.
+
+#![warn(missing_docs)]
 
 #[doc(hidden)]
 pub mod __private;
 #[doc(hidden)]
+// A hidden module renders nowhere public, so its links to private items are maintainer
+// navigation (`docs:audit` documents private items); only the public-only docs.rs build
+// fires the lint, which `docs:audit:docsrs` denies everywhere else.
+#[expect(rustdoc::private_intra_doc_links)]
 pub mod ast;
 mod color;
 mod comments;
@@ -74,6 +120,16 @@ pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
 
 /// What [`parse_to_json_with`]'s wire carries. The default is [`parse_to_json`]'s: the
 /// span-only wire.
+///
+/// ```
+/// # #[cfg(feature = "locations")]
+/// # {
+/// use tsv_css::{JsonOptions, parse_to_json_with};
+///
+/// let json = parse_to_json_with("a{}", &JsonOptions::new().locations(true)).unwrap();
+/// assert!(json.contains(r#""loc":"#));
+/// # }
+/// ```
 #[cfg(feature = "json")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[non_exhaustive]
@@ -175,6 +231,7 @@ fn wire_string(bytes: Vec<u8>) -> String {
 /// lexer allocates the decode eagerly or only when an escape is seen, while a
 /// wrong escape decode still shows up as a divergent `text=`.
 #[cfg(feature = "internal_debug_lex")]
+#[doc(hidden)]
 pub fn debug_token_stream(source: &str) -> String {
     use crate::lexer::{Lexer, TokenKind};
     use std::fmt::Write as _;
