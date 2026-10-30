@@ -4,19 +4,20 @@
 //!
 //! ## Usage
 //!
-//! ```rust,ignore
-//! use tsv_ts::{parse, format, convert_ast_json_bytes};
+//! ```
+//! use tsv_ts::{Goal, convert_ast_json_bytes, format, format_with_goal, parse};
 //!
-//! // Parse TypeScript code (the caller owns the bump arena the AST borrows)
+//! // Format in one call: Module, retried as Script only if that fails
+//! assert_eq!(format("const x=42;").unwrap(), "const x = 42;\n");
+//! // ...or at exactly one goal, with no retry
+//! assert!(format_with_goal("with (a) b;", Goal::Module).is_err());
+//!
+//! // Parse (the caller owns the bump arena the AST borrows) and emit the wire JSON AST
 //! let source = "const x: number = 42;";
 //! let arena = bumpalo::Bump::new();
-//! let ast = parse(source, &arena)?;
-//!
-//! // Format TypeScript code
-//! let formatted = format(&ast, source);
-//!
-//! // Emit the wire JSON AST
+//! let ast = parse(source, &arena).unwrap();
 //! let json_bytes = convert_ast_json_bytes(&ast, source);
+//! assert!(json_bytes.starts_with(b"{"));
 //! ```
 
 #[doc(hidden)]
@@ -237,74 +238,51 @@ pub fn is_jsdoc_type_cast_comment(content: &str) -> bool {
     parser::is_jsdoc_type_cast_comment(content)
 }
 
-/// Format a TypeScript AST back to source code
-///
-/// `source` must hold **no carriage return**: the printers split lines on `\n` alone, so a
-/// `\r` would reach the output verbatim and the same document could format two ways on two
-/// passes. Parse a CR-folded text (`tsv_lang::printing::normalize_carriage_returns`, via
-/// `parse_folded`) and format it with `format_folded_in`, or call [`format_str`], which
-/// does both. Debug builds assert it.
-///
-/// # Arguments
-///
-/// * `program` - The TypeScript AST to format
-///
-/// # Returns
-///
-/// The formatted TypeScript source code as a String
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let source = "const x=42;";
-/// let arena = bumpalo::Bump::new();
-/// let ast = tsv_ts::parse(source, &arena)?;
-/// let formatted = tsv_ts::format(&ast, source);
-/// assert_eq!(formatted, "const x = 42;\n");
-/// ```
-pub fn format(program: &Program<'_>, source: &str) -> String {
-    let arena = DocArena::for_source(source);
-    format_in(program, source, &arena)
-}
-
 /// Parse and format `source` in one call, with no source type named.
 ///
-/// The fully-fused one-shot convenience for callers that just want the
-/// formatted string and never touch the AST (the primitive/convenience split
-/// `format`/`format_in` already applies to the `DocArena`, extended here to the
-/// parse). Batch drivers that reuse arenas across files thread the primitives
-/// ([`parse_with_goal_or_fallback`] + [`format_in`]) instead.
+/// Carriage returns (`\r\n` and a lone `\r`) are folded to `\n` ahead of the parse, so
+/// the output is LF-only.
 ///
 /// The parse is [`parse_with_goal_or_fallback`]'s unset form — `Module`, retried
 /// at `Script` only if that fails — which is what every format surface that takes
-/// no source type from its caller runs.
-pub fn format_str(source: &str) -> Result<String> {
+/// no source type from its caller runs. [`format_with_goal`] is the exact-goal twin.
+///
+/// # Errors
+///
+/// A parse error under both goals (the reported one follows
+/// [`parse_with_goal_or_fallback`]).
+pub fn format(source: &str) -> Result<String> {
+    format_with_optional_goal(source, None)
+}
+
+/// Parse and format `source` in one call at exactly `goal`, with no Module-to-Script
+/// fallback.
+///
+/// The exact-goal twin of [`format()`]: a source the goal's grammar rejects is an error
+/// even when the other goal would accept it (`with (a) b;` is an error under
+/// [`Goal::Module`]; `import x from 'y';` is one under [`Goal::Script`]). Folds carriage
+/// returns ahead of the parse like [`format()`].
+///
+/// # Errors
+///
+/// A parse error at `goal`.
+pub fn format_with_goal(source: &str, goal: Goal) -> Result<String> {
+    format_with_optional_goal(source, Some(goal))
+}
+
+fn format_with_optional_goal(source: &str, goal: Option<Goal>) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse — see
     // `tsv_lang::printing::normalize_carriage_returns` for why it belongs here and not on
     // the finished string. `parse` deliberately does NOT do this: its offsets are a
     // drop-in contract over the author's own bytes.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let program = parse_folded(&folded, None, &arena)?;
+    let program = parse_folded(&folded, goal, &arena)?;
     let doc_arena = DocArena::for_source(folded.text());
     Ok(format_folded_in(&program, &folded, &doc_arena))
 }
 
-/// Format into a caller-provided doc arena.
-///
-/// The same precondition on `source` as [`fn@format`]: no carriage return.
-///
-/// Identical output to [`fn@format`], but the doc IR is built into `arena` instead
-/// of a freshly allocated one, so a driver that formats many files can reuse one
-/// arena across them (`arena.reset()` between files retains the buffers). Nothing
-/// borrowed from `arena` escapes — the result is an owned `String` — so the
-/// caller may reset and reuse it the moment this returns.
-pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
-    let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
-    format_document_in(program, source, line_breaks, arena)
-}
-
-/// The shared body of [`format_in`] and `format_folded_in`: the one place the
+/// The shared body of `__private::format_ast_in` and `format_folded_in`: the one place the
 /// intent-preserving format merges its comments, registers them and hands the printer its
 /// table.
 fn format_document_in(

@@ -13,7 +13,7 @@ source → Parse → AST → Format → formatted string
                   │        write_arena_doc() → arena_print_doc_with_indent_resolved_into()
                   │          └── arena_fits() (line-breaking decisions)
                   │
-              tsv_ts::parse()                      tsv_ts::format()
+              tsv_ts::parse()                      tsv_ts::__private::format_ast()
 ```
 
 Doc building and rendering are **interleaved** per-statement inside `format()` — each statement's Doc is built as arena-allocated `DocId` nodes and immediately rendered. This means the cleanest measurable phase split is **parse vs format**. Within format, `perf` can break down time further by function.
@@ -3176,7 +3176,7 @@ empty table that happens to answer "no terminator anywhere".
 ### The fold's pass is the verdict pass — a document that folds is walked once
 
 On every entry point that formats a file — the CLI, the three bindings, each crate's
-`format_str` — the format path folds `<CR>` ahead of the parse (`normalize_carriage_returns`),
+`format` — the format path folds `<CR>` ahead of the parse (`normalize_carriage_returns`),
 and the printer's line table then took its verdict (`line_terminators_are_lf_only`)
 over the same bytes: two whole-source passes, the first std's `memchr` for `\r` (18
 instructions per sixteen bytes, inlined into the CLI's format function) and the second the
@@ -3185,7 +3185,7 @@ fold's own needle is inside it — so one pass states both: `classify_line_termi
 the verdict pass's loop and records, on the cold re-ask of a fired word, where the first `\r` is
 and whether a U+2028 / U+2029 is anywhere. The fold returns a `FoldedSource` — the folded
 text with the verdict over it — and each crate's `format_folded_in` builds its
-`LineBreaks::of_folded` on that instead of classifying again; `format_in` (the `profile`
+`LineBreaks::of_folded` on that instead of classifying again; `format_ast_in` (the `profile`
 path, which never folds) classifies as before. The verdict is stated over the FOLDED text,
 which is exactly "no U+2028 / U+2029 anywhere" once every `\r` is a `\n`, and the fold moves
 neither. `instructions:u` **−0.603% / −0.582% / −0.686%** on the shipped CLI (tsbig / sveltebig /

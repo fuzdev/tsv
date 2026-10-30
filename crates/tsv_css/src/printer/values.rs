@@ -1221,7 +1221,7 @@ mod tests {
                         for scope in scopes {
                             // A value the parser refuses reaches no gap; the rest are
                             // graded by the assertion inside the rule.
-                            formatted += u32::from(crate::format_str(&scope(&value)).is_ok());
+                            formatted += u32::from(crate::format(&scope(&value)).is_ok());
                         }
                     }
                 }

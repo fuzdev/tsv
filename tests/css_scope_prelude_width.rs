@@ -15,7 +15,7 @@
 //! `) {` and `) to (` boundaries: these are the same rule read through a different tail.
 
 fn format_css(source: &str) -> String {
-    tsv_css::format_str(source).expect("format failed")
+    tsv_css::format(source).expect("format failed")
 }
 
 /// The first line's width — every line here is ASCII with no tab.

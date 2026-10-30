@@ -41,7 +41,7 @@ fn accepts(src: &str) -> bool {
 fn format(src: &str) -> String {
     let arena = bumpalo::Bump::new();
     let root = tsv_svelte::parse(src, &arena).expect("src should parse");
-    tsv_svelte::format(&root, src)
+    tsv_svelte::__private::format_ast(&root, src)
 }
 
 /// Every argument is a plain identifier — accepted (matching Svelte). Includes

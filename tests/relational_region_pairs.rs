@@ -43,9 +43,9 @@ fn tree(source: &str) -> Value {
 /// `source` formatted, asserted a fixed point whose reparse is the program `source` wrote.
 #[track_caller]
 fn stable(source: &str) -> String {
-    let output = tsv_ts::format_str(source).expect("the case formats");
+    let output = tsv_ts::format(source).expect("the case formats");
     assert_eq!(
-        tsv_ts::format_str(&output).expect("the output formats"),
+        tsv_ts::format(&output).expect("the output formats"),
         output,
         "not a fixed point: {source}"
     );
@@ -353,9 +353,9 @@ fn a_function_binding_reads_its_operands_as_one_list() {
             "<input bind:value={() => a < b, (v) => (a = v)} />",
         ),
     ] {
-        let output = tsv_svelte::format_str(source).expect("the component formats");
+        let output = tsv_svelte::format(source).expect("the component formats");
         assert_eq!(
-            tsv_svelte::format_str(&output).expect("the output formats"),
+            tsv_svelte::format(&output).expect("the output formats"),
             output,
             "not a fixed point: {source}"
         );
@@ -605,7 +605,7 @@ fn a_plain_script_reads_the_same_lines() {
         "check(lo < hi, [x => x > (lo + hi) / 2]);",
     ] {
         let source = format!("<script>\n\t{line}\n</script>\n");
-        let output = tsv_svelte::format_str(&source).expect("the component formats");
+        let output = tsv_svelte::format(&source).expect("the component formats");
         assert_eq!(output, source);
     }
 }

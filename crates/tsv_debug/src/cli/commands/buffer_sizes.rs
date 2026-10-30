@@ -133,7 +133,7 @@ fn collect_file(
             // Run the real printer so the armed buffer_stats hooks sample the
             // actual chain/comment buffer populations. Output is discarded.
             #[cfg(feature = "buffer_stats")]
-            drop(tsv_ts::format(&ast, source));
+            drop(tsv_ts::__private::format_ast(&ast, source));
         }
         ParserType::Svelte => {
             let root = tsv_svelte::parse(source, &arena).map_err(|_| ())?;
@@ -148,7 +148,7 @@ fn collect_file(
             }
             collect_comments(&root.comments, source, comment_lines);
             #[cfg(feature = "buffer_stats")]
-            drop(tsv_svelte::format(&root, source));
+            drop(tsv_svelte::__private::format_ast(&root, source));
         }
         ParserType::Css => {}
     }

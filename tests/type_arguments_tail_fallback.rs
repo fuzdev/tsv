@@ -29,9 +29,9 @@ use std::time::{Duration, Instant};
 
 /// `source` formatted, asserted a fixed point.
 fn stable(source: &str) -> String {
-    let output = tsv_ts::format_str(source).expect("the case parses");
+    let output = tsv_ts::format(source).expect("the case parses");
     assert_eq!(
-        tsv_ts::format_str(&output).expect("the output reparses"),
+        tsv_ts::format(&output).expect("the output reparses"),
         output,
         "not a fixed point: {source}"
     );
@@ -463,7 +463,7 @@ fn a_pair_the_printer_adds_is_not_read_by_the_refusal() {
     //
     // A number's member access prints in a pair, which is then a shell ahead of a `.`:
     // the comparisons parse, and their output is rejected on a second pass.
-    let output = tsv_ts::format_str("fn(a < b, 5..toFixed() > (c, d));").expect("the case parses");
+    let output = tsv_ts::format("fn(a < b, 5..toFixed() > (c, d));").expect("the case parses");
     assert_eq!(output, "fn(a < b, (5).toFixed() > (c, d));\n");
     assert!(rejects(&output), "{output:?}");
     // The pairs the printer would add around an assignment or an arrow function's

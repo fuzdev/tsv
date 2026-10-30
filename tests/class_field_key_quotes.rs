@@ -18,16 +18,16 @@
 /// Format a standalone TypeScript / JavaScript source, asserting the output is a fixed
 /// point.
 fn format_ts(source: &str) -> String {
-    let once = tsv_ts::format_str(source).expect("format failed");
-    let twice = tsv_ts::format_str(&once).expect("the output failed to format");
+    let once = tsv_ts::format(source).expect("format failed");
+    let twice = tsv_ts::format(&once).expect("the output failed to format");
     assert_eq!(once, twice, "not a fixed point: {source:?}");
     once
 }
 
 /// Format a Svelte document, asserting the output is a fixed point.
 fn format_svelte(source: &str) -> String {
-    let once = tsv_svelte::format_str(source).expect("format failed");
-    let twice = tsv_svelte::format_str(&once).expect("the output failed to format");
+    let once = tsv_svelte::format(source).expect("format failed");
+    let twice = tsv_svelte::format(&once).expect("the output failed to format");
     assert_eq!(once, twice, "not a fixed point: {source:?}");
     once
 }

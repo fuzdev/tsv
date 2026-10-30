@@ -19,7 +19,7 @@
 //! the hug only where the literal prints expanded.
 
 fn format(source: &str) -> String {
-    tsv_ts::format_str(source).expect("formats")
+    tsv_ts::format(source).expect("formats")
 }
 
 /// Each pair is (authoring, the single-pass fixed point).

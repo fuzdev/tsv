@@ -6,7 +6,7 @@ use super::*;
 
 /// [`parse`] over a document the format path folded
 /// (`tsv_lang::printing::normalize_carriage_returns`) — the parse every CSS format entry
-/// point runs (the CLI, the bindings' `parse_format!`, [`format_str`]), its error reported in
+/// point runs (the CLI, the bindings' `parse_format!`, [`format()`]), its error reported in
 /// the caller's own coordinates (`FoldedSource::parse_with`). The fold keeps meaning
 /// everywhere in CSS, whose syntax normalizes a `<CR>` to `<LF>` itself (css-syntax-3
 /// §Preprocessing the input stream), so this is the folded parse alone;
@@ -51,9 +51,9 @@ pub fn parse_embedded<'arena>(
     parser::parse_css(source, base_offset, host_nesting, arena)
 }
 
-/// [`format_in`] over a document the caller folded ahead of the parse
+/// [`format_ast_in`] over a document the caller folded ahead of the parse
 /// (`tsv_lang::printing::normalize_carriage_returns`) — the format entry points that fold
-/// (the CLI, the bindings, [`format_str`]). Identical output; the document's line verdict
+/// (the CLI, the bindings, [`format()`]). Identical output; the document's line verdict
 /// comes from the fold's own pass instead of a second walk of the source.
 pub fn format_folded_in(
     stylesheet: &CssStyleSheet<'_>,
@@ -116,3 +116,49 @@ impl HostBoundaryScan {
 
 #[cfg(feature = "convert")]
 pub use crate::ast::convert::{CssComments, write_css_children, write_css_comments};
+
+/// Format a CSS stylesheet to a formatted string — the hidden, AST-taking primitive beneath
+/// [`format()`], the public one-shot (parse and format a `&str`). Unlike [`format()`] it does no fold.
+///
+/// `source` must hold **no carriage return**: the printers split lines on `\n` alone, so a
+/// `\r` would reach the output verbatim and the same document could format two ways on two
+/// passes. Parse a CR-folded text (`tsv_lang::printing::normalize_carriage_returns`, via
+/// `parse_folded`) and format it with `format_folded_in`, or call [`format()`], which
+/// does both. Debug builds assert it.
+///
+/// # Arguments
+/// * `stylesheet` - CSS stylesheet (nodes + value comments)
+/// * `source` - Original CSS source code (for blank line preservation)
+///
+/// # Returns
+/// * Formatted CSS string
+///
+/// # Example
+/// ```
+/// use tsv_css::{parse, __private::format_ast};
+///
+/// let css = "div{color:red;}";
+/// let arena = bumpalo::Bump::new();
+/// let stylesheet = parse(css, &arena).expect("Failed to parse CSS");
+/// let formatted = format_ast(&stylesheet, css);
+/// assert_eq!(formatted, "div {\n\tcolor: red;\n}\n");
+/// ```
+pub fn format_ast(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
+    printer::format_css(stylesheet, source)
+}
+
+/// Format into a caller-provided doc arena.
+///
+/// The same precondition on `source` as [`fn@format_ast`]: no carriage return.
+///
+/// Identical output to [`fn@format_ast`], but the doc IR is built into `arena` instead
+/// of a freshly allocated one, so a driver that formats many files can reuse one
+/// arena across them (`arena.reset()` between files retains the buffers). Nothing
+/// borrowed from `arena` escapes — the result is an owned `String`.
+pub fn format_ast_in(
+    stylesheet: &CssStyleSheet<'_>,
+    source: &str,
+    arena: &tsv_lang::doc::arena::DocArena,
+) -> String {
+    printer::format_css_in(stylesheet, source, arena)
+}

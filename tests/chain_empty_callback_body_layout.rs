@@ -11,7 +11,7 @@
 //! bare `;`s prints `{}` too, so it reads as empty however it is written.
 
 fn format(source: &str) -> String {
-    tsv_ts::format_str(source).expect("formats")
+    tsv_ts::format(source).expect("formats")
 }
 
 /// Each pair is (authoring, the single-pass fixed point).

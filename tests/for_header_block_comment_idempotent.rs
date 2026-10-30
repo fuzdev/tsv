@@ -19,7 +19,7 @@
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_ts::format(&program, source)
+    tsv_ts::__private::format_ast(&program, source)
 }
 
 /// The tsv-stable form: the `for` header breaks with `(` alone, then the init (and

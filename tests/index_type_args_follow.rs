@@ -16,13 +16,13 @@ use serde_json::Value;
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_ts::format(&program, source)
+    tsv_ts::__private::format_ast(&program, source)
 }
 
 fn svelte_format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
     let root = tsv_svelte::parse(source, &arena).expect("component should parse");
-    tsv_svelte::format(&root, source)
+    tsv_svelte::__private::format_ast(&root, source)
 }
 
 /// The kind of the first statement's expression: `CallExpression` for the list read as

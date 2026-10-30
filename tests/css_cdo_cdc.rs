@@ -40,7 +40,7 @@ fn child_count(src: &str) -> usize {
 fn format(src: &str) -> String {
     let arena = bumpalo::Bump::new();
     let ast = tsv_css::parse(src, &arena).expect("parser should accept the CSS");
-    tsv_css::format(&ast, src)
+    tsv_css::__private::format_ast(&ast, src)
 }
 
 /// At `read_body` boundaries — top level and inside a block — a marker is discarded

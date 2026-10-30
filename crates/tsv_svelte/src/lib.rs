@@ -93,41 +93,16 @@ fn refuse_lone_cr_in_tag_line_comment(source: &str, arena: &bumpalo::Bump) -> Re
     Ok(())
 }
 
-/// Format a Svelte AST back to source code
-///
-/// `source` must hold **no carriage return**: the printers split lines on `\n` alone, so a
-/// `\r` would reach the output verbatim and the same document could format two ways on two
-/// passes. Parse a CR-folded text (`tsv_lang::printing::normalize_carriage_returns`, via
-/// `parse_folded`) and format it with `format_folded_in`, or call [`format_str`], which
-/// does both. Debug builds assert it.
-///
-/// # Arguments
-///
-/// * `root` - The Svelte AST to format
-/// * `source` - The original source code (for blank line preservation and escape sequences)
-///
-/// # Returns
-///
-/// The formatted Svelte source code as a String
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let source = "<div>Hello</div>";
-/// let arena = bumpalo::Bump::new();
-/// let ast = tsv_svelte::parse(source, &arena)?;
-/// let formatted = tsv_svelte::format(&ast, source);
-/// ```
-pub fn format(root: &Root<'_>, source: &str) -> String {
-    printer::format_svelte(root, source)
-}
-
 /// Parse and format `source` in one call.
 ///
-/// The fully-fused one-shot convenience (the parse/format analogue of
-/// `tsv_ts::format_str`), for callers that just want the formatted string and
-/// never touch the AST. Batch drivers thread [`parse`] + [`format_in`] instead.
-pub fn format_str(source: &str) -> Result<String> {
+/// Carriage returns (`\r\n` and a lone `\r`) are folded to `\n` ahead of the parse, so
+/// the output is LF-only.
+///
+/// # Errors
+///
+/// A parse error, or a refusal of a lone `\r` inside an in-tag `//` comment, where the
+/// fold would end the comment early.
+pub fn format(source: &str) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse (see
     // `tsv_lang::printing::normalize_carriage_returns`); `parse` leaves the author's bytes
     // alone so its offsets stay a drop-in contract with Svelte's.
@@ -136,20 +111,6 @@ pub fn format_str(source: &str) -> Result<String> {
     let root = parse_folded(&folded, &arena)?;
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(folded.text());
     Ok(format_folded_in(&root, &folded, &doc_arena))
-}
-
-/// Format into a caller-provided doc arena.
-///
-/// The same precondition on `source` as [`fn@format`]: no carriage return.
-///
-/// Identical output to [`fn@format`], but the doc IR is built into `arena` instead
-/// of a freshly allocated one, so a driver that formats many files can reuse one
-/// arena across them (`arena.reset()` between files retains the buffers). Nothing
-/// borrowed from `arena` escapes — the result is an owned `String`. Embedded
-/// `<style>` blocks share this same arena (the CSS renders to its own string but
-/// builds its doc nodes into the host arena, not a second per-block one).
-pub fn format_in(root: &Root<'_>, source: &str, arena: &tsv_lang::doc::arena::DocArena) -> String {
-    printer::format_svelte_in(root, source, arena)
 }
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions

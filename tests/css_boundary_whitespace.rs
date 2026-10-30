@@ -734,13 +734,13 @@ fn a_preserved_line_terminator_fabricates_no_blank_line() {
             "<style>a { color: red; }{T}/* c */</style>",
         ] {
             let src = component(&template.replace("{T}", ch));
-            let out = tsv_svelte::format_str(&src).expect("component should format");
+            let out = tsv_svelte::format(&src).expect("component should format");
             assert_eq!(
                 out.matches(ch).count(),
                 1,
                 "{label} {template}: the terminator survives exactly once — got {out:?}"
             );
-            let again = tsv_svelte::format_str(&out).expect("output should re-format");
+            let again = tsv_svelte::format(&out).expect("output should re-format");
             assert_eq!(
                 again, out,
                 "{label} {template}: a preserved terminator must not grow a blank line"
@@ -778,7 +778,7 @@ fn the_blank_line_rule_is_prettiers_walk_not_a_terminator_count() {
         let src = component(&format!(
             "<style>a {{ color: red; }}{gap}b {{ color: red; }}</style>"
         ));
-        let out = tsv_svelte::format_str(&src).expect("component should format");
+        let out = tsv_svelte::format(&src).expect("component should format");
         assert!(
             !out.contains("}\n\n\tb"),
             "gap {gap:?}: a <FF> ends prettier's walk, so this is one line — got {out:?}"
@@ -789,7 +789,7 @@ fn the_blank_line_rule_is_prettiers_walk_not_a_terminator_count() {
         let src = component(&format!(
             "<style>a {{ color: red; }}{gap}b {{ color: red; }}</style>"
         ));
-        let out = tsv_svelte::format_str(&src).expect("component should format");
+        let out = tsv_svelte::format(&src).expect("component should format");
         assert!(
             out.contains("}\n\n\tb"),
             "gap {gap:?}: only `\" \\t\"` may sit between the two terminators, and this gap \
@@ -807,7 +807,7 @@ fn the_blank_line_rule_is_prettiers_walk_not_a_terminator_count() {
 #[test]
 fn the_stylesheets_trailing_run_is_a_tracked_drop() {
     let src = component("<style>a { color: red; }\u{a0}</style>");
-    let out = tsv_svelte::format_str(&src).expect("component should format");
+    let out = tsv_svelte::format(&src).expect("component should format");
     assert!(
         !out.contains('\u{a0}'),
         "the stylesheet's trailing run is still dropped — if that changed, re-pin this \
@@ -930,7 +930,7 @@ fn an_attribute_tail_run_ends_the_value_and_the_flag() {
                 flag.map(str::to_owned).into_iter().collect::<Vec<_>>(),
                 "{label} {case}: the flag is the token's letters"
             );
-            let out = tsv_svelte::format_str(&src).expect("component should format");
+            let out = tsv_svelte::format(&src).expect("component should format");
             let expected = formatted.replace("{T}", ch);
             assert!(
                 out.contains(&expected),
@@ -938,7 +938,7 @@ fn an_attribute_tail_run_ends_the_value_and_the_flag() {
                  {expected:?} in {out:?}"
             );
             assert_eq!(
-                tsv_svelte::format_str(&out).expect("output should format"),
+                tsv_svelte::format(&out).expect("output should format"),
                 out,
                 "{label} {case}: the output must be its own fixed point"
             );
@@ -964,7 +964,7 @@ fn an_attribute_values_wire_trim_is_the_js_class() {
                 vec!["b".to_owned()],
                 "{label} {case}: `read_attribute_value` trims its value"
             );
-            let out = tsv_svelte::format_str(&src).expect("component should format");
+            let out = tsv_svelte::format(&src).expect("component should format");
             assert!(
                 out.contains(&selector),
                 "{label} {case}: the padding is content to the printer; got {out:?}"
@@ -1093,7 +1093,7 @@ fn a_property_gap_run_is_the_gaps_at_every_spelling() {
                 vec![value.to_owned()],
                 "{label} {case}: the value is `read_value`'s"
             );
-            let out = tsv_svelte::format_str(&src).expect("component should format");
+            let out = tsv_svelte::format(&src).expect("component should format");
             let expected = formatted.replace("{T}", ch);
             assert!(
                 out.contains(&expected),
@@ -1101,7 +1101,7 @@ fn a_property_gap_run_is_the_gaps_at_every_spelling() {
                  {out:?}"
             );
             assert_eq!(
-                tsv_svelte::format_str(&out).expect("output should format"),
+                tsv_svelte::format(&out).expect("output should format"),
                 out,
                 "{label} {case}: the output must be its own fixed point"
             );
@@ -1193,13 +1193,13 @@ fn an_an_plus_b_juncture_steps_the_boundary_class() {
                 vec![value.replace("{T}", ch)],
                 "{label} {case}: the run is the juncture's, not the term's"
             );
-            let out = tsv_svelte::format_str(&src).expect("component should format");
+            let out = tsv_svelte::format(&src).expect("component should format");
             assert!(
                 out.contains(ch),
                 "{label} {case}: the character must survive the format; got {out:?}"
             );
             assert_eq!(
-                tsv_svelte::format_str(&out).expect("output should format"),
+                tsv_svelte::format(&out).expect("output should format"),
                 out,
                 "{label} {case}: the output must be its own fixed point"
             );
@@ -1495,13 +1495,13 @@ fn the_printer_keeps_every_member_of_a_mixed_run() {
             format!("{ch}\u{85}"),
         ] {
             let src = component(&format!("<style>{run}zz {{ color: red; }}</style>"));
-            let out = tsv_svelte::format_str(&src).expect("component should format");
+            let out = tsv_svelte::format(&src).expect("component should format");
             assert_eq!(
                 out.matches(ch).count(),
                 run.matches(ch).count(),
                 "{label} (run {run:?}): every member must survive formatting — got {out:?}"
             );
-            let again = tsv_svelte::format_str(&out).expect("output should re-format");
+            let again = tsv_svelte::format(&out).expect("output should re-format");
             assert_eq!(
                 again, out,
                 "{label} (run {run:?}): formatting must be a fixed point"
@@ -1552,14 +1552,14 @@ fn the_printer_keeps_the_run_at_every_juncture_exactly_once() {
                 format!("{ch}\t{ch}"),
             ] {
                 let src = component(&template.replace("{T}", &run));
-                let out = tsv_svelte::format_str(&src).expect("component should format");
+                let out = tsv_svelte::format(&src).expect("component should format");
                 assert_eq!(
                     out.matches(ch).count(),
                     run.matches(ch).count(),
                     "{label} {template} (run {run:?}): every member survives formatting, and \
                      none is emitted twice — got {out:?}"
                 );
-                let again = tsv_svelte::format_str(&out).expect("output should re-format");
+                let again = tsv_svelte::format(&out).expect("output should re-format");
                 assert_eq!(
                     again, out,
                     "{label} {template} (run {run:?}): formatting must be a fixed point"
@@ -1727,14 +1727,14 @@ fn a_preserved_run_never_moves_a_names_boundary() {
             "<style>::part(a {T}b) { color: red; }</style>",
         ] {
             let src = component(&template.replace("{T}", ch));
-            let out = tsv_svelte::format_str(&src).expect("component should format");
+            let out = tsv_svelte::format(&src).expect("component should format");
             assert_eq!(
                 named_nodes(&src),
                 named_nodes(&out),
                 "{label} {template}: the run is preserved, but the NAME it sits beside must \
                  not absorb it — got {out:?}"
             );
-            let again = tsv_svelte::format_str(&out).expect("output should re-format");
+            let again = tsv_svelte::format(&out).expect("output should re-format");
             assert_eq!(
                 again, out,
                 "{label} {template}: the separator must be a fixed point, not a column the \
@@ -1770,7 +1770,7 @@ fn a_connector_never_absorbs_the_run_behind_it() {
             "<style>@supports (a:b) and {T}(c:d) { e { color: red; } }</style>",
         ] {
             let src = component(&template.replace("{T}", ch));
-            let out = tsv_svelte::format_str(&src).expect("component should format");
+            let out = tsv_svelte::format(&src).expect("component should format");
             let run_at = out.find(ch).unwrap_or_else(|| {
                 panic!("{label} {template}: the run must survive the format — got {out:?}")
             });
@@ -1781,7 +1781,7 @@ fn a_connector_never_absorbs_the_run_behind_it() {
             );
             // The separator's whole purpose, asserted rather than assumed.
             let again =
-                tsv_svelte::format_str(&out.replace(": ", ":")).expect("output should re-format");
+                tsv_svelte::format(&out.replace(": ", ":")).expect("output should re-format");
             assert!(
                 again.contains("(a: b)") || again.contains("(c: d)"),
                 "{label} {template}: the emitted connector no longer READS as one, so the \
@@ -1937,14 +1937,14 @@ fn a_rebuilt_head_and_its_claim_never_both_keep_the_run() {
             "<style>@supports and or {T}(a: b) { c { color: red; } }</style>",
         ] {
             let src = component(&template.replace("{T}", ch));
-            let out = tsv_svelte::format_str(&src).expect("component should format");
+            let out = tsv_svelte::format(&src).expect("component should format");
             assert_eq!(
                 out.matches(ch).count(),
                 1,
                 "{label} {template}: the run belongs to the rebuilt head or to the claim \
                  beside it, never to both — got {out:?}"
             );
-            let again = tsv_svelte::format_str(&out).expect("output should re-format");
+            let again = tsv_svelte::format(&out).expect("output should re-format");
             assert_eq!(
                 again, out,
                 "{label} {template}: a doubling run is not a fixed point — got {out:?}"
@@ -2344,11 +2344,11 @@ fn format_in_every_host(style: &str) -> [(&'static str, String); 3] {
 /// of zero, a spelling that is not the run's — rather than a panic, so a sweep reports every
 /// cell it fails on instead of stopping at the first.
 fn format_svelte(src: &str) -> String {
-    tsv_svelte::format_str(src).unwrap_or_else(|error| format!("{FORMAT_ERROR}{error}>"))
+    tsv_svelte::format(src).unwrap_or_else(|error| format!("{FORMAT_ERROR}{error}>"))
 }
 
 fn format_css(src: &str) -> String {
-    tsv_css::format_str(src).unwrap_or_else(|error| format!("{FORMAT_ERROR}{error}>"))
+    tsv_css::format(src).unwrap_or_else(|error| format!("{FORMAT_ERROR}{error}>"))
 }
 
 /// The marker [`format_svelte`] / [`format_css`] return for a format that failed, as the
@@ -2825,11 +2825,11 @@ fn a_frozen_node_keeps_the_run_in_front_of_it_byte_for_byte() {
                     for (host, out) in [
                         (
                             "css",
-                            tsv_css::format_str(&css).expect("stylesheet should format"),
+                            tsv_css::format(&css).expect("stylesheet should format"),
                         ),
                         (
                             "svelte",
-                            tsv_svelte::format_str(&component(&format!("<style>\n{css}</style>")))
+                            tsv_svelte::format(&component(&format!("<style>\n{css}</style>")))
                                 .expect("component should format"),
                         ),
                     ] {
@@ -2850,8 +2850,8 @@ fn a_frozen_node_keeps_the_run_in_front_of_it_byte_for_byte() {
                             "{context}: every member survives, none is emitted twice"
                         );
                         let again = match host {
-                            "css" => tsv_css::format_str(&out),
-                            _ => tsv_svelte::format_str(&out),
+                            "css" => tsv_css::format(&out),
+                            _ => tsv_svelte::format(&out),
                         }
                         .expect("output should re-format");
                         assert_eq!(again, out, "{context}: formatting must be a fixed point");
@@ -2888,9 +2888,9 @@ fn a_frozen_stylesheet_node_keeps_its_leading_zwnbsp() {
         ),
     ] {
         let via_cli = format_source(source, ParserType::Css).expect("format_source");
-        let via_str = tsv_css::format_str(source).expect("format_str");
+        let via_str = tsv_css::format(source).expect("format");
         assert_eq!(via_cli, expected, "{label}: format_source");
-        assert_eq!(via_str, expected, "{label}: tsv_css::format_str");
+        assert_eq!(via_str, expected, "{label}: tsv_css::format");
         assert_eq!(
             format_source(&via_cli, ParserType::Css).expect("re-format"),
             via_cli,

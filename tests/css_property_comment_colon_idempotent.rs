@@ -129,7 +129,7 @@ const PRETTIER_DIVERGENCE: &[(&str, &str, &str)] = &[
 fn format_css(source: &str) -> String {
     let arena = bumpalo::Bump::new();
     let stylesheet = tsv_css::parse(source, &arena).expect("parse failed");
-    tsv_css::format(&stylesheet, source)
+    tsv_css::__private::format_ast(&stylesheet, source)
 }
 
 /// Each input formats to its expected form in one pass, and that form is a fixed

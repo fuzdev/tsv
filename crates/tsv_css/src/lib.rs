@@ -57,41 +57,15 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<CssSt
     parser::parse_css(source, 0, 0, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
-/// Format CSS stylesheet to a formatted string
-///
-/// `source` must hold **no carriage return**: the printers split lines on `\n` alone, so a
-/// `\r` would reach the output verbatim and the same document could format two ways on two
-/// passes. Parse a CR-folded text (`tsv_lang::printing::normalize_carriage_returns`, via
-/// `parse_folded`) and format it with `format_folded_in`, or call [`format_str`], which
-/// does both. Debug builds assert it.
-///
-/// # Arguments
-/// * `stylesheet` - CSS stylesheet (nodes + value comments)
-/// * `source` - Original CSS source code (for blank line preservation)
-///
-/// # Returns
-/// * Formatted CSS string
-///
-/// # Example
-/// ```
-/// use tsv_css::{parse, format};
-///
-/// let css = "div{color:red;}";
-/// let arena = bumpalo::Bump::new();
-/// let stylesheet = parse(css, &arena).expect("Failed to parse CSS");
-/// let formatted = format(&stylesheet, css);
-/// assert_eq!(formatted, "div {\n\tcolor: red;\n}\n");
-/// ```
-pub fn format(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
-    printer::format_css(stylesheet, source)
-}
-
 /// Parse and format `source` in one call.
 ///
-/// The fully-fused one-shot convenience (the CSS twin of `tsv_ts::format_str` /
-/// `tsv_svelte::format_str`), for callers that just want the formatted string and
-/// never touch the AST. Batch drivers thread [`parse`] + [`format_in`] instead.
-pub fn format_str(source: &str) -> Result<String> {
+/// Carriage returns (`\r\n` and a lone `\r`) are folded to `\n` ahead of the parse, so
+/// the output is LF-only.
+///
+/// # Errors
+///
+/// A parse error.
+pub fn format(source: &str) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse (see
     // `tsv_lang::printing::normalize_carriage_returns`); `parse` leaves the author's bytes
     // alone so its offsets stay a drop-in contract with `parseCss`'s.
@@ -100,22 +74,6 @@ pub fn format_str(source: &str) -> Result<String> {
     let stylesheet = parse_folded(&folded, &arena)?;
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(folded.text());
     Ok(format_folded_in(&stylesheet, &folded, &doc_arena))
-}
-
-/// Format into a caller-provided doc arena.
-///
-/// The same precondition on `source` as [`fn@format`]: no carriage return.
-///
-/// Identical output to [`fn@format`], but the doc IR is built into `arena` instead
-/// of a freshly allocated one, so a driver that formats many files can reuse one
-/// arena across them (`arena.reset()` between files retains the buffers). Nothing
-/// borrowed from `arena` escapes — the result is an owned `String`.
-pub fn format_in(
-    stylesheet: &CssStyleSheet<'_>,
-    source: &str,
-    arena: &tsv_lang::doc::arena::DocArena,
-) -> String {
-    printer::format_css_in(stylesheet, source, arena)
 }
 
 /// Convert CSS AST to compact JSON wire bytes — the **sole emission path** for its wire

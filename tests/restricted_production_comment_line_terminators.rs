@@ -14,7 +14,7 @@
 
 /// Format a TypeScript document.
 fn format(source: &str) -> String {
-    tsv_ts::format_str(source).expect("format failed")
+    tsv_ts::format(source).expect("format failed")
 }
 
 /// Wrap `statement` in the function its keyword needs.

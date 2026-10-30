@@ -25,7 +25,7 @@ use legs::{FanoutKey, Finding, InputResult};
 /// *re-invoking the recursive builder* on the same nodes (instead of building
 /// once and reusing the `DocId`) makes the count grow exponentially in depth;
 /// this catches that and guards against reintroduction. The doc-node count is
-/// read directly via `format_in` into a caller-owned arena +
+/// read directly via `format_ast_in` into a caller-owned arena +
 /// `borrow_nodes().len()`.
 ///
 /// The counted legs ([`legs`]) read `tsv_lang::fanout_probe`'s counters (the
@@ -637,15 +637,15 @@ fn doc_node_count(source: &str, parser: ParserType) -> Result<usize, String> {
     match parser {
         ParserType::Svelte => {
             let ast = tsv_svelte::parse(source, &bump).map_err(|e| format!("{e:#}"))?;
-            let _ = tsv_svelte::format_in(&ast, source, &doc_arena);
+            let _ = tsv_svelte::__private::format_ast_in(&ast, source, &doc_arena);
         }
         ParserType::TypeScript => {
             let ast = tsv_ts::parse(source, &bump).map_err(|e| format!("{e:#}"))?;
-            let _ = tsv_ts::format_in(&ast, source, &doc_arena);
+            let _ = tsv_ts::__private::format_ast_in(&ast, source, &doc_arena);
         }
         ParserType::Css => {
             let ast = tsv_css::parse(source, &bump).map_err(|e| format!("{e:#}"))?;
-            let _ = tsv_css::format_in(&ast, source, &doc_arena);
+            let _ = tsv_css::__private::format_ast_in(&ast, source, &doc_arena);
         }
     }
     Ok(doc_arena.borrow_nodes().len())

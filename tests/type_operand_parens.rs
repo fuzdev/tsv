@@ -59,14 +59,14 @@ fn assert_operand_paren_arrow(source: &str, expected_output: &str) {
         "the `(…)` operand is a parenthesized type, not function params: {return_type}"
     );
 
-    let output = tsv_ts::format(&program, source);
+    let output = tsv_ts::__private::format_ast(&program, source);
     assert_eq!(output, expected_output, "paren-strip output");
 
     // The stripped form is tsv's fixed point and keeps the same arrow shape.
     let arena_out = bumpalo::Bump::new();
     let reparsed = tsv_ts::parse(&output, &arena_out).expect("reparse failed");
     assert_eq!(
-        tsv_ts::format(&reparsed, &output),
+        tsv_ts::__private::format_ast(&reparsed, &output),
         output,
         "output should be stable"
     );

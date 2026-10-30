@@ -33,13 +33,13 @@
 
 /// The body as `tsv_ts` formats a standalone document.
 fn standalone(body: &str) -> String {
-    tsv_ts::format_str(body).expect("standalone TS should parse")
+    tsv_ts::format(body).expect("standalone TS should parse")
 }
 
 /// The same body as `tsv_svelte` formats it inside a `<script lang="ts">`, dedented by the
 /// one tab the wrapper adds, so it is comparable to the standalone output.
 fn embedded(body: &str) -> String {
-    let component = tsv_svelte::format_str(&format!("<script lang=\"ts\">\n{body}</script>\n"))
+    let component = tsv_svelte::format(&format!("<script lang=\"ts\">\n{body}</script>\n"))
         .expect("component should parse");
     let inner = component
         .strip_prefix("<script lang=\"ts\">\n")

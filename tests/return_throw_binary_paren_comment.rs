@@ -12,7 +12,7 @@
 
 /// Format a TypeScript document.
 fn format(source: &str) -> String {
-    tsv_ts::format_str(source).expect("format failed")
+    tsv_ts::format(source).expect("format failed")
 }
 
 /// The document's comments, sorted — the multiset a format must conserve.
@@ -334,7 +334,7 @@ fn fitting_same_line_block_converges_in_two_passes() {
 /// naming each row that does not. The fixed point holds each comment, so its text is the
 /// comment check.
 fn assert_all_svelte_one_pass(cases: &[(&str, &str)]) {
-    let svelte = |source: &str| tsv_svelte::format_str(source).expect("format failed");
+    let svelte = |source: &str| tsv_svelte::format(source).expect("format failed");
     let failures: Vec<String> = cases
         .iter()
         .filter_map(|(authored, fixed_point)| {

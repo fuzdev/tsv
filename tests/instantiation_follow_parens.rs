@@ -61,11 +61,11 @@
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_ts::format(&program, source)
+    tsv_ts::__private::format_ast(&program, source)
 }
 
 fn format_svelte(source: &str) -> String {
-    tsv_svelte::format_str(source).expect("format failed")
+    tsv_svelte::format(source).expect("format failed")
 }
 
 fn parses(source: &str) -> bool {

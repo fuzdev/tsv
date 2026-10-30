@@ -11,7 +11,7 @@
 //! the part tsv keeps on purpose. This pins tsv's form and its idempotence.
 
 fn format(source: &str) -> String {
-    tsv_svelte::format_str(source).expect("formats")
+    tsv_svelte::format(source).expect("formats")
 }
 
 const EXPECTED: &str = "<p>

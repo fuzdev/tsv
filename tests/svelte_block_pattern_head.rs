@@ -18,7 +18,7 @@
 
 /// Format `src` as a Svelte component — the path whose printer a paren-shell id would panic.
 fn format(src: &str) -> Result<String, String> {
-    tsv_svelte::format_str(src).map_err(|e| e.to_string())
+    tsv_svelte::format(src).map_err(|e| e.to_string())
 }
 
 /// The spellings that reached the printer's declarator-`=` assertion: a paren shell around the

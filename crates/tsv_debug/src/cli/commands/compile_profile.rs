@@ -18,7 +18,7 @@ use tsv_svelte_compile::{CompileError, CompileOptions, compile};
 ///   call pays its own internal arenas (AST bump, per-program `DocArena`s, the
 ///   validation-reparse bump). There is no warm entry point, so this IS the
 ///   production shape today.
-/// - **parse** / **format** — `tsv_svelte::parse` + `format_in` on the same
+/// - **parse** / **format** — `tsv_svelte::parse` + `format_ast_in` on the same
 ///   file with run-shared reset arenas, the product shape `tsv_cli format`
 ///   pays (mirroring the `profile` command).
 ///

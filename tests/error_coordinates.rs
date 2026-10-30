@@ -69,9 +69,9 @@ fn parse_error(source: &str, language: Language) -> Option<Error> {
 
 fn format_error(source: &str, language: Language) -> Option<Error> {
     match language {
-        Language::TypeScript => tsv_ts::format_str(source).err(),
-        Language::Svelte => tsv_svelte::format_str(source).err(),
-        Language::Css => tsv_css::format_str(source).err(),
+        Language::TypeScript => tsv_ts::format(source).err(),
+        Language::Svelte => tsv_svelte::format(source).err(),
+        Language::Css => tsv_css::format(source).err(),
     }
 }
 

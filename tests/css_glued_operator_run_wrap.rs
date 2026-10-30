@@ -21,7 +21,7 @@
 //! rule would introduce.
 
 fn format_css(source: &str) -> String {
-    tsv_css::format_str(source).expect("format failed")
+    tsv_css::format(source).expect("format failed")
 }
 
 /// `source` formats to `expected` in one pass, and `expected` is a fixed point.

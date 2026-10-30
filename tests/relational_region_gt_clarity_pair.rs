@@ -30,9 +30,9 @@
 
 /// `source` formatted, asserted a fixed point.
 fn stable(source: &str) -> String {
-    let output = tsv_ts::format_str(source).expect("the case parses");
+    let output = tsv_ts::format(source).expect("the case parses");
     assert_eq!(
-        tsv_ts::format_str(&output).expect("the output reparses"),
+        tsv_ts::format(&output).expect("the output reparses"),
         output,
         "not a fixed point: {source}"
     );
@@ -147,7 +147,7 @@ fn two_case_tests_with_no_statement_between_are_one_region() {
         assert_eq!(stable(source), source, "{source}");
     }
     assert!(
-        tsv_ts::format_str("switch (k) {\n\tcase a < b < c:\n\tcase d >> (e):\n}").is_err(),
+        tsv_ts::format("switch (k) {\n\tcase a < b < c:\n\tcase d >> (e):\n}").is_err(),
         "the scan stopped reading through a clause boundary: the region can end there too"
     );
 }
@@ -304,7 +304,7 @@ fn a_pair_whose_close_keeps_two_tokens_apart_is_not_withheld() {
         // bare spelling is one the number printer does not emit.
         ("fn(a < b, c > 0..e());", "c > (0).e()"),
     ] {
-        let output = tsv_ts::format_str(source).expect("the case parses");
+        let output = tsv_ts::format(source).expect("the case parses");
         assert!(output.contains(kept), "{source} printed {output}");
     }
 }

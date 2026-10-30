@@ -22,7 +22,7 @@
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_ts::format(&program, source)
+    tsv_ts::__private::format_ast(&program, source)
 }
 
 const EXPECTED: &str = "type A =\n\t| a\n\t/* c */\n\t| { x: 1 }\n\t| b;\n";

@@ -3471,7 +3471,7 @@ mod tests {
     fn a_shared_chain_base_reports_its_deferred_run_to_the_parameter_list() {
         for base in ["new a[x + (y\n/* c */\n)]()", "import(x + (y\n/* c */\n))"] {
             let source = format!("o.aaaa().bbbb(new A((p = {base}.b().c(), q) => {{ z(); }}));\n");
-            let once = crate::format_str(&source).expect("formats");
+            let once = crate::format(&source).expect("formats");
             let comment = once.find("/* c */").expect("the comment prints");
             let params_end = once.find(") => {").expect("the arrow prints");
             assert!(

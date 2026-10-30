@@ -78,7 +78,7 @@ async fn assert_prettier_idempotency_bug(
     // Verify our printer produces stable output in one pass
     let arena = bumpalo::Bump::new();
     let our_ast = tsv_svelte::parse(input, &arena).expect("parse failed");
-    let our_output = tsv_svelte::format(&our_ast, input);
+    let our_output = tsv_svelte::__private::format_ast(&our_ast, input);
 
     assert_eq!(
         our_output, stable_output,
@@ -88,7 +88,7 @@ async fn assert_prettier_idempotency_bug(
     // Verify our printer is idempotent
     let arena_twice = bumpalo::Bump::new();
     let our_ast_twice = tsv_svelte::parse(&our_output, &arena_twice).expect("parse failed");
-    let our_output_twice = tsv_svelte::format(&our_ast_twice, &our_output);
+    let our_output_twice = tsv_svelte::__private::format_ast(&our_ast_twice, &our_output);
     assert_eq!(
         our_output, our_output_twice,
         "Our printer should be idempotent"
@@ -182,7 +182,7 @@ fn comment_drop_exact_output_and_idempotent() {
     for &(label, input, expected) in COMMENT_DROP_CASES {
         let arena = bumpalo::Bump::new();
         let program = tsv_ts::parse(input, &arena).expect("parse failed");
-        let ours = tsv_ts::format(&program, input);
+        let ours = tsv_ts::__private::format_ast(&program, input);
         assert_eq!(
             ours, expected,
             "case `{label}`: output should preserve the interior comment"
@@ -190,7 +190,7 @@ fn comment_drop_exact_output_and_idempotent() {
 
         let arena_twice = bumpalo::Bump::new();
         let program_twice = tsv_ts::parse(&ours, &arena_twice).expect("reparse failed");
-        let ours_twice = tsv_ts::format(&program_twice, &ours);
+        let ours_twice = tsv_ts::__private::format_ast(&program_twice, &ours);
         assert_eq!(
             ours_twice, ours,
             "case `{label}`: output should be idempotent"
@@ -305,7 +305,7 @@ fn separator_normalized_comment_exact_output_and_idempotent() {
     for &(label, input, expected) in SEPARATOR_NORMALIZED_COMMENT_CASES {
         let arena = bumpalo::Bump::new();
         let program = tsv_ts::parse(input, &arena).expect("parse failed");
-        let ours = tsv_ts::format(&program, input);
+        let ours = tsv_ts::__private::format_ast(&program, input);
         assert_eq!(
             ours, expected,
             "case `{label}`: comment on the wrong side of `;`"
@@ -313,7 +313,7 @@ fn separator_normalized_comment_exact_output_and_idempotent() {
 
         let arena_twice = bumpalo::Bump::new();
         let program_twice = tsv_ts::parse(&ours, &arena_twice).expect("reparse failed");
-        let ours_twice = tsv_ts::format(&program_twice, &ours);
+        let ours_twice = tsv_ts::__private::format_ast(&program_twice, &ours);
         assert_eq!(
             ours_twice, ours,
             "case `{label}`: output should be idempotent"

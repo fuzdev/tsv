@@ -63,14 +63,12 @@ const NON_ASCII: &[&str] = &["é", "ϕ", "中", "𝕏"];
 /// grader — this only has to reach it, and to prove the name survived the print.
 #[track_caller]
 fn format_holds(source: &str, name: &str) {
-    let out =
-        tsv_ts::format_str(source).unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
+    let out = tsv_ts::format(source).unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
     assert!(
         out.contains(name),
         "the name {name:?} did not survive the print of {source:?}: {out:?}"
     );
-    let again =
-        tsv_ts::format_str(&out).unwrap_or_else(|e| panic!("reparse failed for {out:?}: {e}"));
+    let again = tsv_ts::format(&out).unwrap_or_else(|e| panic!("reparse failed for {out:?}: {e}"));
     assert_eq!(again, out, "not a fixed point: {source:?}");
 }
 
@@ -209,10 +207,10 @@ fn an_escaped_name_never_claims_plain_ascii() {
         "a\\u00e9b;\n",
         "\\u{1D54F};\n",
     ] {
-        let out = tsv_ts::format_str(source)
-            .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
+        let out =
+            tsv_ts::format(source).unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
         let again =
-            tsv_ts::format_str(&out).unwrap_or_else(|e| panic!("reparse failed for {out:?}: {e}"));
+            tsv_ts::format(&out).unwrap_or_else(|e| panic!("reparse failed for {out:?}: {e}"));
         assert_eq!(again, out, "not a fixed point: {source:?}");
     }
 }
@@ -234,10 +232,10 @@ fn keyword_names_and_meta_properties_hold_the_contract() {
         "type P = { [K in keyof T as `x${string}`]: 1 };\n",
         "enum E {\n\tclass = 1\n}\n",
     ] {
-        let out = tsv_ts::format_str(source)
-            .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
+        let out =
+            tsv_ts::format(source).unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
         let again =
-            tsv_ts::format_str(&out).unwrap_or_else(|e| panic!("reparse failed for {out:?}: {e}"));
+            tsv_ts::format(&out).unwrap_or_else(|e| panic!("reparse failed for {out:?}: {e}"));
         assert_eq!(again, out, "not a fixed point: {source:?}");
     }
 }
@@ -258,13 +256,13 @@ fn svelte_synthesized_shorthand_names_hold_the_contract() {
                 "<div class:NAME></div>\n",
             ] {
                 let source = template.replace("NAME", &name);
-                let out = tsv_svelte::format_str(&source)
+                let out = tsv_svelte::format(&source)
                     .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
                 assert!(
                     out.contains(&name),
                     "the name {name:?} did not survive the print of {source:?}: {out:?}"
                 );
-                let again = tsv_svelte::format_str(&out)
+                let again = tsv_svelte::format(&out)
                     .unwrap_or_else(|e| panic!("reparse failed for {out:?}: {e}"));
                 assert_eq!(again, out, "not a fixed point: {source:?}");
             }
@@ -285,9 +283,9 @@ fn svelte_islands_hold_the_contract() {
                 "<script lang=\"ts\">\n\tconst NAME = 1;\n</script>\n\n{#if NAME}\n\t<p>{NAME}</p>\n{/if}\n",
             ] {
                 let source = template.replace("NAME", &name);
-                let out = tsv_svelte::format_str(&source)
+                let out = tsv_svelte::format(&source)
                     .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
-                let again = tsv_svelte::format_str(&out)
+                let again = tsv_svelte::format(&out)
                     .unwrap_or_else(|e| panic!("reparse failed for {out:?}: {e}"));
                 assert_eq!(again, out, "not a fixed point: {source:?}");
             }

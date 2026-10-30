@@ -15,7 +15,7 @@
 //! `svelte/tags/declaration/declaration_terminator_stripped_paren_comment_prettier_divergence`.
 
 fn format(source: &str) -> String {
-    tsv_svelte::format_str(source).expect("svelte format_str")
+    tsv_svelte::format(source).expect("svelte format")
 }
 
 fn assert_formats(source: &str, expected: &str) {

@@ -30,10 +30,7 @@ fn a_file_reads_a_hashbang_behind_its_bom() {
     assert_eq!(ts_wire(&with_bom)["body"][0]["start"], 21);
     assert_eq!(ts_wire(&with_bom)["start"], 0);
     // The format side strips the BOM and keeps the hashbang.
-    assert_eq!(
-        tsv_ts::format_str(&with_bom).expect("the file formats"),
-        plain
-    );
+    assert_eq!(tsv_ts::format(&with_bom).expect("the file formats"), plain);
     // Only one BOM is an encoding mark: a second is content, and the `#!` no hashbang.
     let arena = bumpalo::Bump::new();
     assert!(tsv_ts::parse(&format!("{BOM}{BOM}{plain}"), &arena).is_err());

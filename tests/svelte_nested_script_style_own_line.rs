@@ -20,7 +20,7 @@
 //! exact output and that the output is its own fixed point.
 
 fn format(source: &str) -> String {
-    tsv_svelte::format_str(source).expect("svelte format_str")
+    tsv_svelte::format(source).expect("svelte format")
 }
 
 fn assert_formats(source: &str, expected: &str) {

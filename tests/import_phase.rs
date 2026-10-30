@@ -42,7 +42,7 @@
 fn assert_ours_stable(input: &str) {
     let arena = bumpalo::Bump::new();
     let ast = tsv_svelte::parse(input, &arena).expect("parse failed");
-    let output = tsv_svelte::format(&ast, input);
+    let output = tsv_svelte::__private::format_ast(&ast, input);
     assert_eq!(
         output, input,
         "printer should keep import-phase syntax stable"
@@ -50,7 +50,7 @@ fn assert_ours_stable(input: &str) {
 
     let arena_twice = bumpalo::Bump::new();
     let ast_twice = tsv_svelte::parse(&output, &arena_twice).expect("reparse failed");
-    let output_twice = tsv_svelte::format(&ast_twice, &output);
+    let output_twice = tsv_svelte::__private::format_ast(&ast_twice, &output);
     assert_eq!(output, output_twice, "printer should be idempotent");
 }
 

@@ -40,7 +40,7 @@ fn assert_name_decodes(
         "wire name decodes (acorn IdentifierName StringValue): {json}"
     );
 
-    let output = tsv_ts::format(&program, source);
+    let output = tsv_ts::__private::format_ast(&program, source);
     assert_eq!(
         output, expected_output,
         "formatter decodes the escaped name"
@@ -50,7 +50,7 @@ fn assert_name_decodes(
     let arena_out = bumpalo::Bump::new();
     let reparsed = tsv_ts::parse(&output, &arena_out).expect("reparse failed");
     assert_eq!(
-        tsv_ts::format(&reparsed, &output),
+        tsv_ts::__private::format_ast(&reparsed, &output),
         output,
         "output should be stable"
     );
@@ -128,7 +128,7 @@ fn escaped_constructor_is_constructor() {
         "constructor key name decodes: {member}"
     );
     assert_eq!(
-        tsv_ts::format(&program, source),
+        tsv_ts::__private::format_ast(&program, source),
         "class C {\n\tconstructor() {}\n}\n",
         "formatter decodes the escaped constructor"
     );

@@ -8,7 +8,7 @@
 //! count, which no fixture can, since a fixture input must be prettier's own form.
 
 fn format(source: &str) -> String {
-    tsv_ts::format_str(source).expect("formats")
+    tsv_ts::format(source).expect("formats")
 }
 
 /// One comment in each gap a stack of template links has: between two links, ahead of the

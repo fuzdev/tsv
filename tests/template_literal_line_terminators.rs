@@ -18,7 +18,7 @@
 //! alone (its offsets are a drop-in contract), while every parse-then-format
 //! entry point folds `<CR>` to `<LF>` first
 //! (`tsv_lang::printing::normalize_carriage_returns`). So each test asserts
-//! BOTH: the wire values off the raw source, and `format_str`'s LF output. The
+//! BOTH: the wire values off the raw source, and `format`'s LF output. The
 //! fold cannot disturb the wire values below in any case — a template's TRV/TV
 //! already folded them at parse.
 //!
@@ -34,7 +34,7 @@ use serde_json::Value;
 
 /// Parses `source`, asserts the template element at `quasi_pointer` carries
 /// `expected_raw` / `expected_cooked` (`None` = the wire's `null`), then asserts
-/// `format_str` takes `source` to its LF form — the format path's rule, restated
+/// `format` takes `source` to its LF form — the format path's rule, restated
 /// here rather than called, so these specify it instead of agreeing with its
 /// implementation.
 fn assert_quasi(
@@ -61,7 +61,7 @@ fn assert_quasi(
 
     let lf_form = source.replace("\r\n", "\n").replace('\r', "\n");
     assert_eq!(
-        tsv_ts::format_str(source).expect("format failed"),
+        tsv_ts::format(source).expect("format failed"),
         lf_form,
         "the format path folds `<CR>` before it parses, so a `<CR>` source formats to its \
          LF form rather than to itself. That fold is on the FORMAT side of the seam and \

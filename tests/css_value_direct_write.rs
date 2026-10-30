@@ -3,7 +3,7 @@
 //! whole whatever bytes it holds, so each input here is a value that takes that path while
 //! holding a byte a narrower reading of it could mishandle — a line break, a tab, a
 //! non-ASCII character, a control byte, a trailing space that is an escape's payload —
-//! and each must come back from `format_str` exactly as written.
+//! and each must come back from `format` exactly as written.
 //!
 //! The values are assembled from named characters, never spelled as escapes inside one
 //! literal, so what the formatter is handed is unambiguous in this file.
@@ -52,7 +52,7 @@ fn cases() -> Vec<(&'static str, String)> {
 fn a_verbatim_leaf_value_is_its_own_fixed_point() {
     for (label, value) in cases() {
         let source = declaration(&value);
-        let formatted = tsv_css::format_str(&source)
+        let formatted = tsv_css::format(&source)
             .unwrap_or_else(|e| panic!("{label}: {source:?} failed to parse: {e}"));
         assert_eq!(formatted, source, "{label}");
     }

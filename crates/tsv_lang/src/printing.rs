@@ -317,7 +317,7 @@ pub fn ecmascript_lines(text: &str) -> impl Iterator<Item = &str> {
 /// Call this on a source string **before parsing it to FORMAT**, and never before parsing it
 /// for the wire AST: the fold shifts byte offsets, and `parse`'s offsets are a drop-in
 /// contract with acorn / Svelte / `parseCss` over the author's own bytes. Every
-/// parse-then-format entry point does it — each language crate's `format_str`, the CLI's
+/// parse-then-format entry point does it — each language crate's `format`, the CLI's
 /// `format_source`, each binding's format export, and `canonicalize_js` — so no printer ever
 /// sees a `<CR>`.
 /// It is also where prettier answers the same question (`normalizeEndOfLine`, in
@@ -958,7 +958,7 @@ impl<'s> LineBreaks<'s> {
     /// [`Self::new`] over a folded document, taking the verdict the fold's own pass
     /// already took ([`FoldedSource::lf_only`]) instead of classifying the bytes again —
     /// the format entry points that fold ahead of the parse (the CLI, the bindings, each
-    /// crate's `format_str`) build their table this way, so the document is walked once,
+    /// crate's `format`) build their table this way, so the document is walked once,
     /// not twice.
     pub fn of_folded(folded: &'s FoldedSource<'_>, scratch: Vec<u32>) -> Self {
         let bytes = folded.text().as_bytes();
@@ -1081,7 +1081,7 @@ const _: () = {
 /// now that its table is built on demand ([`LineBreaks`]) — on the entry points that fold
 /// `<CR>` ahead of the parse, the fold's own pass takes it instead
 /// ([`classify_line_terminators`], the same loop with a different cold re-ask), so this
-/// runs only for a caller that never folds (`format_in` reached directly).
+/// runs only for a caller that never folds (`format_ast_in` reached directly).
 ///
 /// One pass with ONE loose needle: `\r` or any non-ASCII byte, three operations a word
 /// ([`crate::swar::zero_or_high_lanes`]), and nearly every word of real source fires
@@ -1626,7 +1626,7 @@ fn build_line_breaks_bytes(bytes: &[u8], breaks: &mut Vec<u32>) -> bool {
 /// The same word-at-a-time shape, and the same reason, as `location`'s line-start
 /// scans: terminators are sparse (~1 per 30–40 source bytes), so a
 /// per-byte compare spends nearly all of its work confirming misses, and this table is
-/// built once over the whole source in every `format_in`. The `0xE2` lead is what
+/// built once over the whole source in every `format_ast_in`. The `0xE2` lead is what
 /// `location`'s does not look for — that one runs inside a run already proven ASCII, where
 /// no `<LS>` / `<PS>` can occur; this one runs over the raw source, so it must not skip it.
 /// `line_terminator_len` then classifies the hit, since most `0xE2` bytes begin some other

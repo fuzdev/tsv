@@ -182,7 +182,7 @@ fn render(expected: &[Line], level: usize) -> Vec<String> {
 }
 
 fn format(source: &str, label: &str) -> String {
-    let formatted = tsv_svelte::format_str(source);
+    let formatted = tsv_svelte::format(source);
     assert!(formatted.is_ok(), "{label}: format failed: {formatted:?}");
     formatted.expect("asserted Ok above")
 }

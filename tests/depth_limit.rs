@@ -510,7 +510,7 @@ fn run_walks(name: String, lang: Lang, source: String) {
                 assert!(
                     !tsv_ts::convert_ast_json_bytes_with_locations(&program, &source).is_empty()
                 );
-                let formatted = tsv_ts::format_str(&source).expect("formats");
+                let formatted = tsv_ts::format(&source).expect("formats");
                 assert_output_reparses(&name, Lang::Ts, &formatted);
                 let strip_arena = bumpalo::Bump::new();
                 // a refusal (a value namespace has runtime semantics) is a verdict, not a
@@ -530,7 +530,7 @@ fn run_walks(name: String, lang: Lang, source: String) {
                 assert!(
                     !tsv_css::convert_ast_json_bytes_with_locations(&sheet, &source).is_empty()
                 );
-                let formatted = tsv_css::format_str(&source).expect("formats");
+                let formatted = tsv_css::format(&source).expect("formats");
                 assert_output_reparses(&name, Lang::Css, &formatted);
             }
             Lang::Svelte => {
@@ -539,7 +539,7 @@ fn run_walks(name: String, lang: Lang, source: String) {
                 assert!(
                     !tsv_svelte::convert_ast_json_bytes_with_locations(&root, &source).is_empty()
                 );
-                let formatted = tsv_svelte::format_str(&source).expect("formats");
+                let formatted = tsv_svelte::format(&source).expect("formats");
                 assert_output_reparses(&name, Lang::Svelte, &formatted);
             }
         }
@@ -555,9 +555,9 @@ fn assert_output_reparses(name: &str, lang: Lang, formatted: &str) {
         panic!("{name}: the format's output does not parse again:\n{error}");
     }
     let again = match lang {
-        Lang::Ts => tsv_ts::format_str(formatted),
-        Lang::Css => tsv_css::format_str(formatted),
-        Lang::Svelte => tsv_svelte::format_str(formatted),
+        Lang::Ts => tsv_ts::format(formatted),
+        Lang::Css => tsv_css::format(formatted),
+        Lang::Svelte => tsv_svelte::format(formatted),
     }
     .expect("the output formats");
     assert!(
@@ -743,7 +743,7 @@ fn a_nested_raw_text_body_past_the_budget_prints_verbatim_on_the_contract_stack(
                 rep("<div>", elements),
                 rep("</div>", elements)
             );
-            let formatted = tsv_svelte::format_str(&source).expect("formats");
+            let formatted = tsv_svelte::format(&source).expect("formats");
             assert!(formatted.contains(&body), "{open}: the body kept its bytes");
         }
     });
@@ -999,7 +999,7 @@ fn a_css_value_past_the_limit_is_refused_at_the_paren_that_passes_it() {
 fn a_module_past_the_limit_is_not_read_as_a_script() {
     let source = format!("x = {}a;\n", rep("await <T>", 200));
     let error = on_thread("fallback".to_owned(), SEARCH_STACK, move || {
-        tsv_ts::format_str(&source).expect_err("refused")
+        tsv_ts::format(&source).expect_err("refused")
     });
     assert_eq!(error.kind(), tsv_lang::ErrorKind::TooDeep, "{error:#}");
 }

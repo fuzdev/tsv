@@ -37,9 +37,9 @@ fn tree(source: &str) -> Value {
 /// `source` formatted, asserted a fixed point whose reparse is the program `source` wrote.
 #[track_caller]
 fn stable(source: &str) -> String {
-    let output = tsv_ts::format_str(source).expect("the case formats");
+    let output = tsv_ts::format(source).expect("the case formats");
     assert_eq!(
-        tsv_ts::format_str(&output).expect("the output formats"),
+        tsv_ts::format(&output).expect("the output formats"),
         output,
         "not a fixed point: {source}"
     );

@@ -85,7 +85,7 @@ const CASES: &[(&str, &[&str], &str)] = &[
 fn format_css(source: &str) -> String {
     let arena = bumpalo::Bump::new();
     let stylesheet = tsv_css::parse(source, &arena).expect("parse failed");
-    tsv_css::format(&stylesheet, source)
+    tsv_css::__private::format_ast(&stylesheet, source)
 }
 
 /// Each authoring formats to its case's expected form in one pass, and that form is a

@@ -36,9 +36,9 @@ enum Break {
 
 fn break_side(template: &str) -> Break {
     let source = template.replace('A', A).replace('B', B);
-    let output = tsv_ts::format_str(&source).expect("the case parses");
+    let output = tsv_ts::format(&source).expect("the case parses");
     assert_eq!(
-        tsv_ts::format_str(&output).expect("the output reparses"),
+        tsv_ts::format(&output).expect("the output reparses"),
         output,
         "not a fixed point: {template}"
     );
@@ -153,7 +153,7 @@ fn only_a_less_than_or_a_left_shift_opens_a_region() {
 fn a_less_than_in_the_greater_thans_own_left_operand_is_the_pair_rules() {
     // `(x < q) > …` is the chain `relexes_as_type_arguments` answers with a pair, which ends
     // the region on a `)`; the `>` there ends its line.
-    let output = tsv_ts::format_str(&format!("const k = ({A} < q) > {B};")).expect("parses");
+    let output = tsv_ts::format(&format!("const k = ({A} < q) > {B};")).expect("parses");
     assert!(output.contains(" >\n"), "{output}");
     // … and a `<` inside its RIGHT operand does not stand ahead of it at all.
     assert_eq!(break_side("fn(A > B, x < q);"), Break::After);
@@ -170,7 +170,7 @@ fn a_shift_closes_no_region_with_fewer_open_than_it_has_angle_brackets() {
         ("fn(x << q, {A} >>> {B});", ">>>"),
     ] {
         let source = template.replace("{A}", A).replace("{B}", B);
-        let output = tsv_ts::format_str(&source).expect("parses");
+        let output = tsv_ts::format(&source).expect("parses");
         assert!(output.contains(&format!(" {operator}\n")), "{output}");
     }
 }
@@ -191,9 +191,9 @@ fn a_shift_closes_as_many_regions_as_it_has_angle_brackets() {
         ("fn(x << q < r, {A} >>> {B});", ">>>"),
     ] {
         let source = template.replace("{A}", A).replace("{B}", B);
-        let output = tsv_ts::format_str(&source).expect("parses");
+        let output = tsv_ts::format(&source).expect("parses");
         assert_eq!(
-            tsv_ts::format_str(&output).expect("the output reparses"),
+            tsv_ts::format(&output).expect("the output reparses"),
             output,
             "not a fixed point: {template}"
         );

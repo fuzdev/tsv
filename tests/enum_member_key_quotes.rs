@@ -12,8 +12,8 @@
 
 /// Format a standalone TypeScript source, asserting the output is a fixed point.
 fn format_ts(source: &str) -> String {
-    let once = tsv_ts::format_str(source).expect("format failed");
-    let twice = tsv_ts::format_str(&once).expect("the output failed to format");
+    let once = tsv_ts::format(source).expect("format failed");
+    let twice = tsv_ts::format(&once).expect("the output failed to format");
     assert_eq!(once, twice, "not a fixed point: {source:?}");
     once
 }

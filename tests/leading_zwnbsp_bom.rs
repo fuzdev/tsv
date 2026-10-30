@@ -16,7 +16,7 @@
 //! The fixtures (`svelte/syntax/whitespace/leading_zwnbsp_prettier_divergence` and its CSS
 //! sibling) reach one entry point, the CLI's `format_source`. The rule has to hold at every
 //! one, so this asserts the same bytes from each: `format_source`, each crate's
-//! `format_str`, and the unfolded `format` / `format_in` over a caller's own parse. The
+//! `format`, and the unfolded `format_ast` / `format_ast_in` over a caller's own parse. The
 //! bindings' `parse_format!` exports reach the crates' `format_folded_in`, as
 //! `format_source` does.
 
@@ -41,24 +41,24 @@ fn format_all(source: &str, parser: ParserType, label: &str) -> String {
         ParserType::Svelte => {
             let ast = tsv_svelte::parse(source, &arena).expect("svelte parse");
             (
-                tsv_svelte::format_str(source).expect("svelte format_str"),
-                tsv_svelte::format(&ast, source),
-                tsv_svelte::format_in(&ast, source, &doc_arena),
+                tsv_svelte::format(source).expect("svelte format"),
+                tsv_svelte::__private::format_ast(&ast, source),
+                tsv_svelte::__private::format_ast_in(&ast, source, &doc_arena),
             )
         }
         ParserType::Css => {
             let ast = tsv_css::parse(source, &arena).expect("css parse");
             (
-                tsv_css::format_str(source).expect("css format_str"),
-                tsv_css::format(&ast, source),
-                tsv_css::format_in(&ast, source, &doc_arena),
+                tsv_css::format(source).expect("css format"),
+                tsv_css::__private::format_ast(&ast, source),
+                tsv_css::__private::format_ast_in(&ast, source, &doc_arena),
             )
         }
         ParserType::TypeScript => {
             let ast = tsv_ts::parse(source, &arena).expect("ts parse");
-            let via_format = tsv_ts::format(&ast, source);
+            let via_format = tsv_ts::__private::format_ast(&ast, source);
             (
-                tsv_ts::format_str(source).expect("ts format_str"),
+                tsv_ts::format(source).expect("ts format"),
                 via_format.clone(),
                 via_format,
             )
@@ -66,7 +66,7 @@ fn format_all(source: &str, parser: ParserType, label: &str) -> String {
     };
     assert_eq!(
         via_str, via_cli,
-        "{label}: format_str disagrees with format_source"
+        "{label}: format disagrees with format_source"
     );
     assert_eq!(
         via_format, via_cli,
@@ -74,7 +74,7 @@ fn format_all(source: &str, parser: ParserType, label: &str) -> String {
     );
     assert_eq!(
         via_format_in, via_cli,
-        "{label}: format_in disagrees with format_source"
+        "{label}: format_ast_in disagrees with format_source"
     );
     via_cli
 }

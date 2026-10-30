@@ -27,7 +27,7 @@ fn parse_json(source: &str) -> Result<Value, tsv_lang::Error> {
 fn format(source: &str) -> Result<String, tsv_lang::Error> {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena)?;
-    Ok(tsv_ts::format(&program, source))
+    Ok(tsv_ts::__private::format_ast(&program, source))
 }
 
 /// Assert that the node at `default` is an `AssignmentExpression` whose left is an

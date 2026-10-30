@@ -42,7 +42,7 @@ fn a_syntax_error_spans_its_point() {
 fn a_format_error_spans_the_callers_bytes_across_the_cr_fold() {
     // Each `<CR><LF>` folds to one byte ahead of the parse; the span is mapped back.
     let source = "let a = 1;\r\nlet b = 2;\r\nlet x = ;\r\n";
-    let error = tsv_ts::format_str(source).expect_err("the source must not format");
+    let error = tsv_ts::format(source).expect_err("the source must not format");
     assert_eq!(error.kind(), ErrorKind::Syntax);
     let semicolon = source.rfind(';').expect("a `;`");
     assert_eq!(error.span(), Some(semicolon..semicolon));
@@ -50,7 +50,7 @@ fn a_format_error_spans_the_callers_bytes_across_the_cr_fold() {
     assert_eq!(ts_parse_error(source).span(), error.span());
 
     let svelte = "<p>a</p>\r\n<p>b</p>\r\n{a b}\r\n";
-    let error = tsv_svelte::format_str(svelte).expect_err("the source must not format");
+    let error = tsv_svelte::format(svelte).expect_err("the source must not format");
     assert_eq!(error.kind(), ErrorKind::Syntax);
     assert_eq!(error.span(), svelte_parse_error(svelte).span());
     let b = svelte.find(" b}").expect("the `b`") + 1;
@@ -103,7 +103,7 @@ fn an_embedded_script_error_spans_host_absolute_bytes() {
 #[test]
 fn a_lone_cr_refusal_spans_the_cr() {
     let source = "<p>a</p>\r\n<div // c\rclass=\"x\"\n>hi</div>\n";
-    let error = tsv_svelte::format_str(source).expect_err("the format must refuse");
+    let error = tsv_svelte::format(source).expect_err("the format must refuse");
     assert_eq!(error.kind(), ErrorKind::Refusal);
     let cr = source
         .match_indices('\r')

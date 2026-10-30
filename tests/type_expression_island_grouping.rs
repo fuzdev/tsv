@@ -19,9 +19,9 @@ use serde_json::Value;
 
 /// `source` formatted, asserted a fixed point.
 fn stable(source: &str) -> String {
-    let output = tsv_ts::format_str(source).expect("the case parses");
+    let output = tsv_ts::format(source).expect("the case parses");
     assert_eq!(
-        tsv_ts::format_str(&output).expect("the output reparses"),
+        tsv_ts::format(&output).expect("the output reparses"),
         output,
         "not a fixed point: {source}"
     );
@@ -155,6 +155,6 @@ fn as_is_an_assertion_in_a_type_in_an_each_head() {
     // The head's own `as` is the block's separator at the head's top level, and an
     // assertion inside a computed key's brackets.
     let source = "<script lang=\"ts\">\n\tlet a;\n</script>\n\n{#each h<A, { [c as d]: 1 }>(y) as item}<p>{item}</p>{/each}\n";
-    let output = tsv_svelte::format_str(source).expect("the head parses");
+    let output = tsv_svelte::format(source).expect("the head parses");
     assert_eq!(output, source);
 }

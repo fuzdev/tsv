@@ -223,7 +223,7 @@ mod tests {
     const COMMENTS: &[&str] = &["/*c*/ ", "\n/*c*/\n", "// c\n", "/*a\nb*/ "];
 
     fn format_with_memo_after(visits: u32, source: &str) -> Option<String> {
-        test_memo_after::with(visits, || crate::format_str(source).ok())
+        test_memo_after::with(visits, || crate::format(source).ok())
     }
 
     #[test]

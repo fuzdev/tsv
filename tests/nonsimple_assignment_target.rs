@@ -46,7 +46,7 @@ fn parse_json(source: &str) -> Value {
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_ts::format(&program, source)
+    tsv_ts::__private::format_ast(&program, source)
 }
 
 fn rejects(source: &str) -> bool {
@@ -627,13 +627,13 @@ fn a_parenthesized_instantiation_keeps_its_pair_before_a_shift_assignment() {
 
     let template = "<script lang=\"ts\"></script>\n\n{((f<T>) >>= c)}\n";
     assert_eq!(
-        tsv_svelte::format_str("<script lang=\"ts\"></script>\n\n{(f<T>) >>= c}\n")
+        tsv_svelte::format("<script lang=\"ts\"></script>\n\n{(f<T>) >>= c}\n")
             .expect("a parenthesized target parses in a template"),
         template,
         "keeps the target pair inside the assignment's own"
     );
     assert_eq!(
-        tsv_svelte::format_str(template).expect("the output parses"),
+        tsv_svelte::format(template).expect("the output parses"),
         template,
         "idempotent"
     );
@@ -673,12 +673,12 @@ fn a_greater_than_led_assignment_rejects_where_acorn_skips_the_target_check() {
         assert!(rejects(source), "must reject: {source:?}");
     }
     assert!(
-        tsv_svelte::format_str("<script lang=\"ts\"></script>\n\n{g(f<T> >>= c)}\n").is_err(),
+        tsv_svelte::format("<script lang=\"ts\"></script>\n\n{g(f<T> >>= c)}\n").is_err(),
         "a template expression reads the same window"
     );
     let unclosed = "<script lang=\"ts\"></script>\n\n{g(c < d, (x >>= 1))}\n";
     assert_eq!(
-        tsv_svelte::format_str("<script lang=\"ts\"></script>\n\n{g(c < d, x >>= 1)}\n")
+        tsv_svelte::format("<script lang=\"ts\"></script>\n\n{g(c < d, x >>= 1)}\n")
             .expect("a `<` that never closes leaves an ordinary `>>=`"),
         unclosed
     );

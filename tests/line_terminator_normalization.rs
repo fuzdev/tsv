@@ -97,16 +97,16 @@ fn css_formats_the_same_however_its_lines_end() {
 #[test]
 fn the_fused_format_str_entry_points_fold_as_well() {
     assert_eq!(
-        tsv_ts::format_str(&TS.replace('\n', "\r")).expect("ts"),
-        tsv_ts::format_str(TS).expect("ts"),
+        tsv_ts::format(&TS.replace('\n', "\r")).expect("ts"),
+        tsv_ts::format(TS).expect("ts"),
     );
     assert_eq!(
-        tsv_svelte::format_str(&SVELTE.replace('\n', "\r")).expect("svelte"),
-        tsv_svelte::format_str(SVELTE).expect("svelte"),
+        tsv_svelte::format(&SVELTE.replace('\n', "\r")).expect("svelte"),
+        tsv_svelte::format(SVELTE).expect("svelte"),
     );
     assert_eq!(
-        tsv_css::format_str(&CSS.replace('\n', "\r")).expect("css"),
-        tsv_css::format_str(CSS).expect("css"),
+        tsv_css::format(&CSS.replace('\n', "\r")).expect("css"),
+        tsv_css::format(CSS).expect("css"),
     );
 }
 

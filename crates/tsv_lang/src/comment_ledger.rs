@@ -20,7 +20,7 @@
 //! ## Model
 //!
 //! - [`register_parsed`] — a **format entry point** declares the comment list it is about
-//!   to print (`tsv_ts::format_in`, `tsv_css`'s `format_css*`, `tsv_svelte`'s
+//!   to print (`tsv_ts::__private::format_ast_in`, `tsv_css`'s `format_css*`, `tsv_svelte`'s
 //!   `format_svelte*`). That list is the expectation.
 //! - [`record_emitted`] — one comment printed. The **doc-based** printers (`tsv_ts`, and
 //!   `tsv_svelte`'s four JS-comment doc builders) don't call this directly: they tag the

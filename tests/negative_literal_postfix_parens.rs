@@ -87,7 +87,7 @@ fn the_bare_array_form_parses_as_tsc_reads_it() {
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_ts::format(&program, source)
+    tsv_ts::__private::format_ast(&program, source)
 }
 
 /// `source` prints as `printed`, and `printed` is a fixed point.

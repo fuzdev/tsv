@@ -53,10 +53,8 @@ const NON_ASCII: &[&str] = &["é", "ϕ", "中", "𝕏"];
 /// prove the document still parses after the print.
 #[track_caller]
 fn format_is_fixed_point(source: &str) -> String {
-    let out =
-        tsv_ts::format_str(source).unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
-    let again =
-        tsv_ts::format_str(&out).unwrap_or_else(|e| panic!("reparse failed for {out:?}: {e}"));
+    let out = tsv_ts::format(source).unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
+    let again = tsv_ts::format(&out).unwrap_or_else(|e| panic!("reparse failed for {out:?}: {e}"));
     assert_eq!(again, out, "not a fixed point: {source:?}");
     out
 }
@@ -221,7 +219,7 @@ fn every_number_spelling_claims_plain() {
             let source = template.replace("STR", n);
             // A number is not legal as a quoted key or an import-attribute value; the
             // parse failure filters those positions out.
-            if tsv_ts::format_str(&source).is_ok() {
+            if tsv_ts::format(&source).is_ok() {
                 format_is_fixed_point(&source);
             }
         }

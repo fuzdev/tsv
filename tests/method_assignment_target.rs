@@ -71,7 +71,7 @@ fn compound_operator_over_a_commented_method_formats_as_written() {
         "f(({ async f /* c */() {} } *= y));\n",
     ] {
         assert_eq!(
-            tsv_ts::format_str(source).expect(source),
+            tsv_ts::format(source).expect(source),
             source,
             "{source:?} formats as written"
         );
@@ -85,13 +85,9 @@ fn compound_operator_over_a_commented_method_formats_as_written() {
 fn compound_target_default_value_prints_bare_past_a_key_comment() {
     let source = "({ a // c\n: b = 1 } += x);";
     let printed = "({\n\ta // c\n\t\t: b = 1\n} += x);\n";
-    let out = tsv_ts::format_str(source).expect(source);
+    let out = tsv_ts::format(source).expect(source);
     assert_eq!(out, printed, "printed from {source:?}");
-    assert_eq!(
-        tsv_ts::format_str(&out).expect(printed),
-        out,
-        "a fixed point"
-    );
+    assert_eq!(tsv_ts::format(&out).expect(printed), out, "a fixed point");
 }
 
 /// A comment in the pair the parser erased from a compound target's default VALUE prints where
@@ -115,14 +111,14 @@ fn compound_target_default_value_shell_comment_prints_as_the_pattern() {
             "[[a = (b = c // c\n)]] = x;",
         ),
     ] {
-        let out = tsv_ts::format_str(compound).expect(compound);
-        let expected = tsv_ts::format_str(pattern)
+        let out = tsv_ts::format(compound).expect(compound);
+        let expected = tsv_ts::format(pattern)
             .expect(pattern)
             .replace("] = x", "] += x")
             .replace("} = x", "} += x");
         assert_eq!(out, expected, "{compound:?} prints as {pattern:?}");
         assert_eq!(
-            tsv_ts::format_str(&out).expect(&out),
+            tsv_ts::format(&out).expect(&out),
             out,
             "{compound:?}: a fixed point"
         );
@@ -135,13 +131,9 @@ fn compound_target_default_value_shell_comment_prints_as_the_pattern() {
 fn compound_target_default_value_shell_line_comments_stay_apart() {
     let source = "[a = (b // c1\n) // c2\n] += x;";
     let printed = "[\n\ta = b // c1\n\t// c2\n] += x;\n";
-    let out = tsv_ts::format_str(source).expect(source);
+    let out = tsv_ts::format(source).expect(source);
     assert_eq!(out, printed, "printed from {source:?}");
-    assert_eq!(
-        tsv_ts::format_str(&out).expect(printed),
-        out,
-        "a fixed point"
-    );
+    assert_eq!(tsv_ts::format(&out).expect(printed), out, "a fixed point");
 }
 
 /// A value freeze the key→`:` own-line arm does not honor (it builds the value unfrozen) leaves
@@ -150,11 +142,7 @@ fn compound_target_default_value_shell_line_comments_stay_apart() {
 fn compound_target_unhonored_value_freeze_keeps_the_shell_comment() {
     let source = "({\n\tk // x\n\t:\n\t\t// prettier-ignore\n\t\ta   =   (b /* c */)\n} += x);\n";
     let printed = "({\n\tk // x\n\t\t: // prettier-ignore\n\t\ta = b /* c */\n} += x);\n";
-    let out = tsv_ts::format_str(source).expect(source);
+    let out = tsv_ts::format(source).expect(source);
     assert_eq!(out, printed, "printed from {source:?}");
-    assert_eq!(
-        tsv_ts::format_str(&out).expect(printed),
-        out,
-        "a fixed point"
-    );
+    assert_eq!(tsv_ts::format(&out).expect(printed), out, "a fixed point");
 }

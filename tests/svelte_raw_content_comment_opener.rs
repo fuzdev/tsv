@@ -109,7 +109,7 @@ fn opener_does_not_reach_a_later_comment_closer() {
 #[test]
 fn opener_documents_format_to_themselves() {
     for &(source, ..) in RAW_CONTENT_OPENERS {
-        let formatted = tsv_svelte::format_str(source)
+        let formatted = tsv_svelte::format(source)
             .unwrap_or_else(|err| panic!("{source:?} should format: {err:?}"));
         assert_eq!(formatted.trim_end(), source, "{source:?}");
     }
@@ -121,7 +121,7 @@ fn opener_documents_format_to_themselves() {
 #[test]
 fn hoisted_script_carrying_the_closer_formats_to_a_fixed_point() {
     let source = "<textarea><!-- x</textarea><script !-->let a;</script>";
-    let formatted = tsv_svelte::format_str(source).expect("the document should format");
+    let formatted = tsv_svelte::format(source).expect("the document should format");
     assert_eq!(
         formatted,
         "<script !-->\n\tlet a;\n</script>\n\n<textarea><!-- x</textarea>\n"
@@ -129,7 +129,7 @@ fn hoisted_script_carrying_the_closer_formats_to_a_fixed_point() {
 
     let reparsed = wire(&formatted);
     assert_sole_text(&reparsed, "textarea", "<!-- x", &formatted);
-    let again = tsv_svelte::format_str(&formatted).expect("the output should format");
+    let again = tsv_svelte::format(&formatted).expect("the output should format");
     assert_eq!(again, formatted);
 }
 

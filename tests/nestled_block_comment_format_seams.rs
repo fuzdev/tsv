@@ -30,7 +30,7 @@ const SPLIT: &str = "*/ /**";
 
 #[test]
 fn standalone_document_welds_a_nestled_pair() {
-    let out = tsv_ts::format_str("/** a\n *//** b\n */\nconst a = 1;\n").unwrap();
+    let out = tsv_ts::format("/** a\n *//** b\n */\nconst a = 1;\n").unwrap();
     assert_eq!(out, "/** a\n *//** b\n */\nconst a = 1;\n");
     assert!(
         !out.contains(SPLIT),
@@ -45,14 +45,14 @@ fn standalone_document_welds_a_nestled_pair() {
 /// statement.
 #[test]
 fn comment_only_document_welds_a_nestled_pair() {
-    let out = tsv_ts::format_str("/** a\n *//** b\n */\n").unwrap();
+    let out = tsv_ts::format("/** a\n *//** b\n */\n").unwrap();
     assert_eq!(out, "/** a\n *//** b\n */\n");
 }
 
 #[test]
 fn svelte_script_island_welds_a_nestled_pair() {
     let out =
-        tsv_svelte::format_str("<script>\n\t/** a\n\t *//** b\n\t */\n\tconst a = 1;\n</script>\n")
+        tsv_svelte::format("<script>\n\t/** a\n\t *//** b\n\t */\n\tconst a = 1;\n</script>\n")
             .unwrap();
     assert!(
         out.contains("/** a\n\t *//** b\n\t */"),
@@ -66,7 +66,7 @@ fn svelte_script_island_welds_a_nestled_pair() {
 
 #[test]
 fn svelte_template_island_welds_a_nestled_pair() {
-    let out = tsv_svelte::format_str("{/** a\n *//** b\n */ expr}\n").unwrap();
+    let out = tsv_svelte::format("{/** a\n *//** b\n */ expr}\n").unwrap();
     assert_eq!(out, "{/** a\n *//** b\n */ expr}\n");
     assert!(
         !out.contains(SPLIT),
@@ -79,7 +79,7 @@ fn svelte_template_island_welds_a_nestled_pair() {
 /// prettier's CSS printer has no such splice, and a corpus `compare` agrees.
 #[test]
 fn css_does_not_weld_a_nestled_pair() {
-    let out = tsv_svelte::format_str(
+    let out = tsv_svelte::format(
         "<style>\n\t/** a\n\t *//** b\n\t */\n\t.class {\n\t\tcolor: red;\n\t}\n</style>\n",
     )
     .unwrap();

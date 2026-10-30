@@ -32,8 +32,8 @@ use tsv_lang::doc::arena::DocId;
 /// before this scan runs, so a `\r` reaching its `[\t\f\r ]` is stray filler by
 /// construction and the branch that treats it so is unreachable. tsv folds the same way at
 /// the same point ([`tsv_lang::printing::normalize_carriage_returns`], ahead of the parse),
-/// so no format entry point brings one here either — but the library primitive
-/// `format(&ast, source)` takes the caller's bytes as given, and there a `\r` is
+/// so no format entry point brings one here either — but the hidden library primitive
+/// `__private::format_ast` takes the caller's bytes as given, and there a `\r` is
 /// overwhelmingly the delimiter's own line ending. So it is matched as a terminator by
 /// [`strip_one_terminator_front`] / [`strip_one_terminator_back`] rather than eaten as
 /// filler: eaten, the `\n` the scan then looked for was never there, and a CR-terminated

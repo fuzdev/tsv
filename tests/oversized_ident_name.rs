@@ -73,14 +73,14 @@ fn assert_name_survives(name: &str) {
             );
         }
 
-        let formatted = tsv_ts::format_str(&source)
+        let formatted = tsv_ts::format(&source)
             .unwrap_or_else(|e| panic!("format failed for a {len}-byte name in {template:?}: {e}"));
         assert_eq!(
             count(&formatted, name),
             1,
             "{len}-byte name in {template:?}: the formatted output keeps the name"
         );
-        let again = tsv_ts::format_str(&formatted).unwrap_or_else(|e| {
+        let again = tsv_ts::format(&formatted).unwrap_or_else(|e| {
             panic!("reformat failed for a {len}-byte name in {template:?}: {e}")
         });
         assert!(

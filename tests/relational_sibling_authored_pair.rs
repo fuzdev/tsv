@@ -41,9 +41,9 @@ fn tree(source: &str) -> Value {
 /// `source` formatted, asserted a fixed point whose reparse is the program `source` wrote.
 #[track_caller]
 fn stable(source: &str) -> String {
-    let output = tsv_ts::format_str(source).expect("the case formats");
+    let output = tsv_ts::format(source).expect("the case formats");
     assert_eq!(
-        tsv_ts::format_str(&output).expect("the output formats"),
+        tsv_ts::format(&output).expect("the output formats"),
         output,
         "not a fixed point: {source}"
     );
@@ -237,7 +237,7 @@ fn a_plain_script_reads_the_same_lines() {
     // A `<script>` with no `lang="ts"` parses with the same parser, so the bare spelling is
     // the same generic call there and the pair stays for the same reason.
     let source = "<script>\n\tfn((a < b), c > (d, e));\n</script>\n";
-    let output = tsv_svelte::format_str(source).expect("the component formats");
+    let output = tsv_svelte::format(source).expect("the component formats");
     assert_eq!(output, source);
 }
 
@@ -587,10 +587,10 @@ fn a_blank_line_inside_a_kept_pair_keeps_the_comparisons() {
             "fn((a = b), c);\n",
         ),
     ] {
-        let once = tsv_ts::format_str(source).expect("the case formats");
+        let once = tsv_ts::format(source).expect("the case formats");
         assert_eq!(once, first, "{source}");
         assert_eq!(tree(source), tree(&once), "the program changed: {source}");
-        let twice = tsv_ts::format_str(&once).expect("the output formats");
+        let twice = tsv_ts::format(&once).expect("the output formats");
         assert_eq!(twice, second, "{source}");
         assert_eq!(stable(&twice), second.trim_end());
     }

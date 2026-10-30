@@ -810,7 +810,7 @@ mod tests {
             let src = format!("{open_tag}{UNFORMATTED_BODY}</script>\n");
             let arena = bumpalo::Bump::new();
             let ast = tsv_svelte::parse(&src, &arena).expect("parses");
-            let out = tsv_svelte::format(&ast, &src);
+            let out = tsv_svelte::__private::format_ast(&ast, &src);
             assert_eq!(
                 out.contains(UNFORMATTED_BODY.trim_end()),
                 frozen,

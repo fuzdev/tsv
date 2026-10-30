@@ -8,14 +8,14 @@
 //! construct, at line widths either side of the print width.
 
 use super::without_fused_source_spans;
-use crate::format_str;
+use crate::format;
 use std::path::{Path, PathBuf};
 
 /// `source` formatted with the fused answers on and with them declined: the two must
 /// agree, on a parse error as much as on an output.
 fn assert_fused_matches_general(source: &str, what: &dyn std::fmt::Display) {
-    let fused = format_str(source).map_err(|e| e.to_string());
-    let general = without_fused_source_spans(|| format_str(source).map_err(|e| e.to_string()));
+    let fused = format(source).map_err(|e| e.to_string());
+    let general = without_fused_source_spans(|| format(source).map_err(|e| e.to_string()));
     assert_eq!(fused, general, "fused and general output differ for {what}");
 }
 

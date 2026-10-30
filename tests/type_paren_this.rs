@@ -46,14 +46,14 @@ fn assert_paren_this(source: &str, pointer: &str, expected_output: &str) {
         "inner is the this-type, not a type reference named `this`: {paren}"
     );
 
-    let output = tsv_ts::format(&program, source);
+    let output = tsv_ts::__private::format_ast(&program, source);
     assert_eq!(output, expected_output, "paren-strip output");
 
     // The stripped form is tsv's fixed point.
     let arena_out = bumpalo::Bump::new();
     let reparsed = tsv_ts::parse(&output, &arena_out).expect("reparse failed");
     assert_eq!(
-        tsv_ts::format(&reparsed, &output),
+        tsv_ts::__private::format_ast(&reparsed, &output),
         output,
         "output should be stable"
     );

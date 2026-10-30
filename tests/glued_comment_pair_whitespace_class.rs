@@ -11,7 +11,7 @@
 //! non-ASCII space the first pass rewrites.
 
 fn format(source: &str) -> String {
-    tsv_ts::format_str(source).expect("format failed")
+    tsv_ts::format(source).expect("format failed")
 }
 
 #[test]

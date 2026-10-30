@@ -2260,10 +2260,10 @@ mod tests {
         ] {
             let arena = Bump::new();
             let ast = crate::parse(input, &arena).expect("parses");
-            let once = crate::format(&ast, input);
+            let once = crate::__private::format_ast(&ast, input);
             let arena2 = Bump::new();
             let ast2 = crate::parse(&once, &arena2).expect("reparses");
-            let twice = crate::format(&ast2, &once);
+            let twice = crate::__private::format_ast(&ast2, &once);
             assert_eq!(once, twice, "not idempotent for {input:?}");
         }
     }

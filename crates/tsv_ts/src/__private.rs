@@ -89,7 +89,7 @@ impl<'a> PrinterInputs<'a> {
 
 /// [`parse_with_goal_or_fallback`] over a document the format path folded
 /// (`tsv_lang::printing::normalize_carriage_returns`) — the parse every TypeScript format
-/// entry point runs (the CLI, the bindings' `parse_format!`, [`format_str`]), its error
+/// entry point runs (the CLI, the bindings' `parse_format!`, [`format()`]), its error
 /// reported in the caller's own coordinates (`FoldedSource::parse_with`). The fold keeps
 /// meaning everywhere in TypeScript, whose line rule ends a line at a `<CR>` already, so
 /// this is the folded parse alone; `tsv_svelte::__private::parse_folded` is the sibling that is not.
@@ -101,9 +101,9 @@ pub fn parse_folded<'arena>(
     folded.parse_with(|text| parse_with_goal_or_fallback(text, goal, arena))
 }
 
-/// [`format_in`] over a document the caller folded ahead of the parse
+/// [`format_ast_in`] over a document the caller folded ahead of the parse
 /// (`tsv_lang::printing::normalize_carriage_returns`) — the format entry points that fold
-/// (the CLI, the bindings, [`format_str`]). Identical output; the document's line verdict
+/// (the CLI, the bindings, [`format()`]). Identical output; the document's line verdict
 /// comes from the fold's own pass instead of a second walk of the source.
 pub fn format_folded_in(
     program: &Program<'_>,
@@ -117,12 +117,12 @@ pub fn format_folded_in(
 /// Format a program with newline-derived authoring intent **erased** — the
 /// intent-erased *canonical* reprint.
 ///
-/// Unlike [`fn@format`], `source` is not required to be CR-free (no debug check): its one
+/// Unlike [`fn@format_ast`], `source` is not required to be CR-free (no debug check): its one
 /// consumer, the Svelte compiler's server output, formats a buffer that can carry the
 /// component's own line endings. A CR there is NOT folded — a comment or template text
 /// holding one reprints it as written.
 ///
-/// [`fn@format`] deliberately preserves authoring intent: an object literal, import
+/// [`fn@format_ast`] deliberately preserves authoring intent: an object literal, import
 /// list, or call whose source carried a newline after the opening delimiter stays
 /// expanded even when it would fit inline, and blank lines between statements are
 /// kept. `format_canonical` turns all of that off — constructs collapse when they
@@ -147,14 +147,14 @@ pub fn format_folded_in(
 /// canonicalizes hand-written TS must account for it.
 ///
 /// This is a cold path used by tooling that needs a canonical form for comparison
-/// (e.g. diffing two compilers' output); the [`fn@format`] path is untouched and
+/// (e.g. diffing two compilers' output); the [`fn@format_ast`] path is untouched and
 /// byte-identical.
 pub fn format_canonical(program: &Program<'_>, source: &str) -> String {
     let arena = DocArena::for_source(source);
     format_canonical_in(program, source, &arena)
 }
 
-/// [`format_canonical`] into a caller-provided doc arena (see [`format_in`] for
+/// [`format_canonical`] into a caller-provided doc arena (see [`format_ast_in`] for
 /// the arena-reuse contract).
 pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
     let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
@@ -1117,3 +1117,48 @@ pub use crate::ast::convert::{
     write_identifier_expression_with_character, write_pattern_embedded, write_program_embedded,
     write_variable_declaration_embedded,
 };
+
+/// Format a TypeScript AST back to source code — the hidden, AST-taking primitive beneath [`format()`], which
+/// is the public one-shot (parse and format a `&str`). Unlike [`format()`] it does no fold.
+///
+/// `source` must hold **no carriage return**: the printers split lines on `\n` alone, so a
+/// `\r` would reach the output verbatim and the same document could format two ways on two
+/// passes. Parse a CR-folded text (`tsv_lang::printing::normalize_carriage_returns`, via
+/// `parse_folded`) and format it with `format_folded_in`, or call [`format()`], which
+/// does both. Debug builds assert it.
+///
+/// # Arguments
+///
+/// * `program` - The TypeScript AST to format
+///
+/// # Returns
+///
+/// The formatted TypeScript source code as a String
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let source = "const x=42;";
+/// let arena = bumpalo::Bump::new();
+/// let ast = tsv_ts::parse(source, &arena)?;
+/// let formatted = tsv_ts::__private::format_ast(&ast, source);
+/// assert_eq!(formatted, "const x = 42;\n");
+/// ```
+pub fn format_ast(program: &Program<'_>, source: &str) -> String {
+    let arena = DocArena::for_source(source);
+    format_ast_in(program, source, &arena)
+}
+
+/// Format into a caller-provided doc arena.
+///
+/// The same precondition on `source` as [`fn@format_ast`]: no carriage return.
+///
+/// Identical output to [`fn@format_ast`], but the doc IR is built into `arena` instead
+/// of a freshly allocated one, so a driver that formats many files can reuse one
+/// arena across them (`arena.reset()` between files retains the buffers). Nothing
+/// borrowed from `arena` escapes — the result is an owned `String` — so the
+/// caller may reset and reuse it the moment this returns.
+pub fn format_ast_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
+    let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
+    format_document_in(program, source, line_breaks, arena)
+}

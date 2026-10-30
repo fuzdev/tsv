@@ -30,7 +30,7 @@ use tsv_cli::cli::input::ParserType;
 /// The words every refusal opens with.
 const REFUSAL: &str = "lone carriage return inside a '//' comment in a tag";
 
-/// The CLI's `format_source` error and the fused `tsv_svelte::format_str` error for
+/// The CLI's `format_source` error and the fused `tsv_svelte::format` error for
 /// `source` — two entry points that must agree, asserted here so each case states it once.
 fn svelte_format_error(source: &str) -> String {
     let cli = format!(
@@ -39,7 +39,7 @@ fn svelte_format_error(source: &str) -> String {
     );
     let fused = format!(
         "{:#}",
-        tsv_svelte::format_str(source).expect_err("the fused format must refuse")
+        tsv_svelte::format(source).expect_err("the fused format must refuse")
     );
     assert_eq!(cli, fused, "the CLI and the fused entry point disagree");
     cli
@@ -49,7 +49,7 @@ fn svelte_format_error(source: &str) -> String {
 fn svelte_format_ok(source: &str, label: &str) -> String {
     let cli = format_source(source, ParserType::Svelte)
         .unwrap_or_else(|e| panic!("{label} must format: {e}"));
-    let fused = tsv_svelte::format_str(source).expect("the fused format must agree");
+    let fused = tsv_svelte::format(source).expect("the fused format must agree");
     assert_eq!(
         cli, fused,
         "{label}: the CLI and the fused entry point disagree"
@@ -186,9 +186,9 @@ fn typescript_and_css_format_a_lone_cr_as_its_line_feed() {
             let cli = format_source(text, parser)
                 .unwrap_or_else(|e| panic!("{parser:?} {text:?} must format: {e}"));
             let fused = match parser {
-                ParserType::TypeScript => tsv_ts::format_str(text),
-                ParserType::Css => tsv_css::format_str(text),
-                ParserType::Svelte => tsv_svelte::format_str(text),
+                ParserType::TypeScript => tsv_ts::format(text),
+                ParserType::Css => tsv_css::format(text),
+                ParserType::Svelte => tsv_svelte::format(text),
             }
             .unwrap_or_else(|e| panic!("{parser:?} {text:?} must format (fused): {e}"));
             assert_eq!(

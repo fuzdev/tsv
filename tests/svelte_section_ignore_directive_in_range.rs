@@ -16,7 +16,7 @@
 //! prints as written, as prettier prints it.
 
 fn format(source: &str) -> String {
-    tsv_svelte::format_str(source).expect("svelte format_str")
+    tsv_svelte::format(source).expect("svelte format")
 }
 
 #[test]

@@ -43,7 +43,7 @@ fn parse_json(source: &str) -> Value {
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_ts::format(&program, source)
+    tsv_ts::__private::format_ast(&program, source)
 }
 
 fn rejects(source: &str) -> bool {
@@ -451,17 +451,17 @@ fn parenthesized_target_is_read_from_the_source() {
 #[test]
 fn svelte_template_operator_target() {
     assert!(
-        tsv_svelte::format_str("{-a = 1}").is_err(),
+        tsv_svelte::format("{-a = 1}").is_err(),
         "a bare operator target rejects in a template"
     );
     let canonical = "{((-a) = 1)}\n";
     assert_eq!(
-        tsv_svelte::format_str("{(-a) = 1}").expect("a parenthesized target parses"),
+        tsv_svelte::format("{(-a) = 1}").expect("a parenthesized target parses"),
         canonical,
         "keeps the target pair inside the assignment's own"
     );
     assert_eq!(
-        tsv_svelte::format_str(canonical).expect("the output parses"),
+        tsv_svelte::format(canonical).expect("the output parses"),
         canonical,
         "idempotent"
     );
@@ -531,12 +531,12 @@ fn script_goal_await_is_a_name() {
         "at Module no ASI splits `await⏎a`"
     );
     assert_eq!(
-        tsv_ts::format_str("await\na = 1;").expect("the fallback parses"),
+        tsv_ts::format("await\na = 1;").expect("the fallback parses"),
         "await;\na = 1;\n",
         "the fallback's Script reading"
     );
     assert_eq!(
-        tsv_ts::format_str("await (a) = 1;").expect("the fallback parses"),
+        tsv_ts::format("await (a) = 1;").expect("the fallback parses"),
         "await(a) = 1;\n",
         "the fallback's Script reading"
     );
@@ -546,7 +546,7 @@ fn script_goal_await_is_a_name() {
     let arena = bumpalo::Bump::new();
     let module_error = tsv_ts::parse_with_goal(source, tsv_ts::Goal::Module, &arena)
         .expect_err("the module attempt rejects the `await` target");
-    let fallback_error = tsv_ts::format_str(source).expect_err("the fallback rejects");
+    let fallback_error = tsv_ts::format(source).expect_err("the fallback rejects");
     assert_eq!(
         fallback_error.to_string(),
         module_error.to_string(),
