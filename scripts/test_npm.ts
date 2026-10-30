@@ -2908,16 +2908,13 @@ try {
 		const source = readFileSync(new URL(`../${pkg_dir}/cli.js`, import.meta.url), 'utf-8');
 		const js = /const WORKER_STACK_SIZE_MB = (\d+);/.exec(source);
 		assert.ok(js, 'could not read WORKER_STACK_SIZE_MB out of cli.js — did it get renamed?');
-		const rust = readFileSync(
-			new URL('../crates/tsv_cli/src/cli/stack.rs', import.meta.url),
-			'utf-8'
-		);
+		const rust = readFileSync(new URL('../crates/tsv_lang/src/stack.rs', import.meta.url), 'utf-8');
 		const native = /pub const STACK_SIZE: usize = (\d+) \* 1024 \* 1024;/.exec(rust);
-		assert.ok(native, 'could not read STACK_SIZE out of cli/stack.rs — did it get renamed?');
+		assert.ok(native, "could not read STACK_SIZE out of tsv_lang's stack.rs — did it get renamed?");
 		assert.equal(
 			Number(js[1]),
 			Number(native[1]),
-			'cli.js and cli/stack.rs must reserve the same stack'
+			"cli.js and tsv_lang's stack.rs must reserve the same stack"
 		);
 	});
 

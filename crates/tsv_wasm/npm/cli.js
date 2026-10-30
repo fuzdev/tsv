@@ -178,7 +178,7 @@ const WORKER_FILE_THRESHOLD = IS_WASM_ENGINE
 const MAX_WORKERS_PER_LOGICAL_CPU = 4;
 
 /** The stack, in MiB, every pool worker reserves — the native CLI's `STACK_SIZE`
- * (`tsv_cli`'s `cli/stack.rs`), restated by hand like the ceiling above and gated against
+ * (`tsv_lang`'s `stack.rs`), restated by hand like the ceiling above and gated against
  * it by the package test. A V8 worker takes Node's `resourceLimits.stackSizeMb` (4 MiB
  * unless set) where the main thread has ~1 MiB, so a deep file formatted on one route
  * and overflowed on the other, and which route ran depended on how many OTHER files the
