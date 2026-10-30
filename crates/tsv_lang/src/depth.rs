@@ -436,6 +436,7 @@ impl Error {
     /// The parse passed `limit` at byte offset `position` (the token where the count
     /// tripped): located like a syntax error, and told apart by its [`Error::kind`],
     /// [`ErrorKind::TooDeep`](crate::ErrorKind::TooDeep).
+    #[doc(hidden)]
     #[cold]
     #[inline(never)]
     #[must_use]

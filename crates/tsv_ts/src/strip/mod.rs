@@ -258,8 +258,8 @@ impl StripError {
 }
 
 impl UnsupportedKind {
-    /// A refusal of this construct over `span` as a binding reports it
-    /// ([`ErrorReport::refusal`]): the summary `cannot strip <the construct>`, the frame
+    /// A refusal of this construct over `span` as a binding reports it: the summary
+    /// `cannot strip <the construct>`, the frame
     /// [`StripError::message`] prints under it, and the span, in
     /// [`crate::WIRE_COORDINATES`]. Infallible, unlike a parse error's
     /// [`Error::report`]: a refusal always has its span.

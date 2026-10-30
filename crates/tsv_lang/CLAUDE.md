@@ -4,6 +4,10 @@
 
 Every language crate (tsv_ts, tsv_css, tsv_svelte) depends on it for the shared parsing, formatting, and AST primitives. External deps: `smallvec`, `unicode-ident`, `unicode-segmentation`, `unicode-width`, plus `zmij` (shortest round-trip `f64` formatting) behind the `json` feature. `serde_json` is a dev-dependency only — the oracle the wire writer is graded against — so no consumer's `serde_json` is touched by the workspace entry's features.
 
+## Public surface
+
+A support crate: the only items its rustdoc shows — and the only ones it promises — are the types the language crates re-export: `Span`, `Error` (its `kind` / `span` / `report` / `wire_point`), `ErrorKind`, `ErrorReport`, `Result`, `WirePoint`, `WireCoordinates`, `LineRule`, `LeadingBom`. Every other module and re-export (the doc IR, `printing`, `source_scan`, `swar`, the comment scans, `EmbedContext` / `LayoutMode` and the config constants, the depth limits, the JSON writer, `census` / `comment_ledger` / `fanout_probe`) and `Error`'s constructors and builders are `pub` for the sibling crates but `#[doc(hidden)]` — free to change in any release. A new item the language crates do not re-export goes in hidden too.
+
 ## Modules
 
 Visibility in parens: private modules surface through `pub use` only; `pub mod` ones are imported directly (`tsv_lang::doc::{...}` etc.).

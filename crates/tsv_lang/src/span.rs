@@ -1,18 +1,27 @@
-// Span type for tracking source positions
 // Using u32 for 50% memory savings (8 bytes vs 16 bytes on 64-bit)
 // Maximum file size: 4 GiB − 1 (u32::MAX), which is more than sufficient for source code
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A byte range in a source: `start..end`, UTF-8 byte offsets into the text that was
+/// parsed (not the UTF-16 offsets the wire JSON carries). A source is capped at 4 GiB − 1
+/// bytes, so the offsets are `u32`.
+///
+/// [`Span::range`] is the `Range<usize>` that indexes the source; [`Span::extract`] is the
+/// text itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Span {
+    /// The first byte's offset.
     pub start: u32,
+    /// The offset one past the last byte (`start` for an empty span).
     pub end: u32,
 }
 
 impl Span {
+    /// The span `start..end`.
     pub fn new(start: u32, end: u32) -> Self {
         Self { start, end }
     }
 
+    /// The span from `start`'s start to `end`'s end.
     pub fn combine(start: Span, end: Span) -> Self {
         Self {
             start: start.start,

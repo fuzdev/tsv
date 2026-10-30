@@ -271,6 +271,7 @@ impl ErrorReport {
     /// `tsv_ts::UnsupportedKind::report`): `message` as the summary (its line terminators
     /// spelled out), the frame of `start` in `source` under `coordinates`, and the span
     /// `start..end`.
+    #[doc(hidden)]
     #[must_use]
     pub fn refusal(
         message: &str,
@@ -326,9 +327,9 @@ pub struct ErrorReport {
     /// Where the error starts: the point the header prints.
     pub start: WirePoint,
     /// Where it ends — `start` itself for a syntax error, which knows a point and no span;
-    /// a refusal's own end ([`Error::refusal`]).
+    /// a refusal's own end.
     pub end: WirePoint,
-    /// An [`Error::refusal`] of a source that parses, not a syntax error.
+    /// A refusal of a source that parses ([`ErrorKind::Refusal`]), not a syntax error.
     pub refused: bool,
 }
 
@@ -410,7 +411,7 @@ pub enum ErrorKind {
     /// range.
     Syntax,
     /// The source parses, but an operation cannot handle what it holds — a format that
-    /// cannot print it without changing what it means ([`Error::refusal`]), or — as the type
+    /// cannot print it without changing what it means, or — as the type
     /// strip's `tsv_ts::StripError::kind` reports — a construct type blanking cannot erase.
     /// [`Error::span`] is the refused bytes.
     Refusal,
@@ -456,6 +457,7 @@ impl Error {
     }
 
     /// A general parse error at `position`.
+    #[doc(hidden)]
     pub fn invalid_syntax(message: String, position: usize) -> Self {
         Error::new(Repr::InvalidSyntax {
             message,
@@ -468,6 +470,7 @@ impl Error {
     /// parse goal admits and the other refuses, so the error is evidence about the
     /// source's grammar rather than about a mistake in it. See
     /// [`Error::is_goal_gated`].
+    #[doc(hidden)]
     pub fn goal_gate(message: String, position: usize) -> Self {
         Error::invalid_syntax(message, position).into_goal_gate()
     }
@@ -475,6 +478,7 @@ impl Error {
     /// This error, marked a goal gate — for a refusal no construct-specific constructor
     /// builds: whatever error a name reading of `await` hit at the operand a module would
     /// have read (`tsv_ts`'s `Parser::parse`). Message and position are untouched.
+    #[doc(hidden)]
     #[must_use]
     pub fn into_goal_gate(mut self) -> Self {
         self.0.goal_gated = true;
@@ -488,11 +492,13 @@ impl Error {
     /// it holds an `import` / `export` / `import.meta`, or a top-level `await` with an
     /// operand — whatever position either error reached, so the module attempt's error is
     /// the source's own.
+    #[doc(hidden)]
     pub fn is_goal_gated(&self) -> bool {
         self.0.goal_gated
     }
 
     /// Found `found` where `expected` was required.
+    #[doc(hidden)]
     pub fn unexpected_token(expected: String, found: String, position: usize) -> Self {
         Error::new(Repr::UnexpectedToken {
             expected,
@@ -503,6 +509,7 @@ impl Error {
     }
 
     /// Input ended while more was required.
+    #[doc(hidden)]
     pub fn unexpected_eof(position: usize) -> Self {
         Error::new(Repr::UnexpectedEof {
             position,
@@ -511,6 +518,7 @@ impl Error {
     }
 
     /// Found `found` where an expression was required.
+    #[doc(hidden)]
     pub fn invalid_expression(found: String, position: usize) -> Self {
         Error::new(Repr::InvalidExpression {
             found,
@@ -524,6 +532,7 @@ impl Error {
     /// for the lexer case). `None` for the kinds that are not syntax errors, a source over
     /// the `u32` cap and an [`Error::refusal`]. A caller holding two errors for one source
     /// reads this to say which got further — the format fallback's module-vs-script choice.
+    #[doc(hidden)]
     pub fn position(&self) -> Option<usize> {
         self.0.kind.located().map(|(position, _)| *position)
     }
@@ -602,6 +611,7 @@ impl Error {
     ///
     /// `source` must be the caller's own text: neither `Error::shift_position` nor the
     /// line-terminator fold's mapping moves a refusal.
+    #[doc(hidden)]
     #[cold]
     #[inline(never)]
     pub fn refusal(
@@ -624,9 +634,9 @@ impl Error {
 
     /// The error as a binding reports it — summary, frame and span — for every error with a
     /// point: a syntax error whose context is filled (its span the point alone:
-    /// `end == start`) and an [`Error::refusal`] (its own span, `refused` set). `None`
-    /// for a source over the size cap and for a located error no
-    /// [`Error::with_context`] has filled.
+    /// `end == start`) and a refusal (its own span, `refused` set). `None` for a source
+    /// over the size cap and for a located error no context has been filled for (only an
+    /// embedded entry point returns one).
     pub fn report(&self) -> Option<ErrorReport> {
         if let Repr::Refused {
             frame, start, end, ..
@@ -654,6 +664,7 @@ impl Error {
     /// Reject a source longer than the `u32` span offsets can index (> 4 GiB − 1).
     /// Every public parse entry point calls this before touching the source; the
     /// lexers and `Span`/`Token` assume the cap holds rather than re-checking.
+    #[doc(hidden)]
     pub fn ensure_source_fits(source: &str) -> Result<()> {
         // `try_from` rather than `len > u32::MAX as usize`: on a 32-bit target (wasm32)
         // `usize` is `u32`, the comparison is vacuous, and clippy rejects it as such.
@@ -685,6 +696,7 @@ impl Error {
     /// parser's tokens are document offsets). Nor does the Svelte lexer: it always scans
     /// the whole document, resuming at a document offset after a jumped scan, so its
     /// positions are document offsets by construction.
+    #[doc(hidden)]
     #[cold]
     #[inline(never)]
     pub fn shift_position(mut self, base_offset: usize) -> Self {
@@ -711,6 +723,7 @@ impl Error {
     /// ```ignore
     /// parser::parse(source).map_err(|e| e.with_context(source, WIRE_COORDINATES))
     /// ```
+    #[doc(hidden)]
     #[must_use]
     pub fn with_context(mut self, source: &str, coordinates: WireCoordinates) -> Self {
         // Filling in place rather than rebuilding the variant: the payload is already
@@ -734,9 +747,9 @@ impl Error {
     /// the numbers its message header prints, as `line:column+1`.
     ///
     /// `None` for the kinds that are not syntax errors (a source over the `u32` cap, a
-    /// [`Error::refusal`] — whose span is [`Error::report`]'s) and for an
-    /// error no [`Error::with_context`] has filled — which only the embedded entry points
-    /// return, ahead of their host's fill; no whole-document parse entry point does.
+    /// refusal — whose span is [`Error::report`]'s) and for an error no context has been
+    /// filled for — which only the embedded entry points return, ahead of their host's
+    /// fill; no whole-document parse entry point does.
     pub fn wire_point(&self) -> Option<WirePoint> {
         self.0
             .kind

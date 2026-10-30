@@ -1,6 +1,13 @@
-//! Language-agnostic foundation primitives for tsv
+//! Support crate for tsv's language crates — `tsv_ts`, `tsv_css` and `tsv_svelte`.
 //!
-//! This crate provides core types shared across all language implementations:
+//! **No stability promise outside the items they re-export:** [`Span`], [`Error`],
+//! [`ErrorKind`], [`ErrorReport`], [`Result`], [`WirePoint`], [`WireCoordinates`],
+//! [`LineRule`] and [`LeadingBom`]. Everything else here is the plumbing the three share —
+//! the doc IR, the printing helpers, the wire-JSON writer, the comment scans, the depth
+//! limits — hidden from these docs and free to change in any release. Depend on a language
+//! crate, not on this one.
+//!
+//! A map of the source, most of it hidden:
 //! - `Span` - source code location tracking
 //! - `WireCoordinates` / `WirePoint` - a language's position coordinates (its line rule
 //!   and how it counts a leading BOM), and one position in them
@@ -27,28 +34,36 @@
 //! - `swar` - word-at-a-time byte-search kernels shared by the line scans, the
 //!   wire-JSON escape prescan, and the lexers' token-body scans
 
+#[doc(hidden)]
 pub mod census;
 mod comment;
 #[cfg(feature = "comment_check")]
+#[doc(hidden)]
 pub mod comment_ledger;
 mod config;
 mod depth;
+#[doc(hidden)]
 pub mod doc;
 mod error;
 mod escapes;
+#[doc(hidden)]
 pub mod fanout_probe;
 mod hash;
 #[cfg(feature = "json")]
 mod json_writer;
 mod location;
 mod output;
+#[doc(hidden)]
 pub mod printing;
 mod sizing;
+#[doc(hidden)]
 pub mod source_scan;
 mod span;
+#[doc(hidden)]
 pub mod swar;
 mod whitespace;
 
+#[doc(hidden)]
 pub use comment::{
     ClassifiedComments, Comment, CommentFreeWindow, CommentPosition, GapTrail, GapTrailScan,
     classify_comment, classify_comment_scan, comments_in_source_after,
@@ -65,22 +80,30 @@ pub use comment::{
     merge_nestled_block_comments, nestled_run_start, owned_leading_comment_at,
     range_too_narrow_for_a_comment,
 };
+#[doc(hidden)]
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
+#[doc(hidden)]
 pub use depth::{
     DepthBudget, DepthLimit, NESTING_FLOOR, NESTING_LIMIT, NESTING_SPINE_WEIGHT, SPINE_LIMIT,
     SpineCount,
 };
 pub use error::{Error, ErrorKind, ErrorReport, Result};
-pub use hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
+#[doc(hidden)]
+pub use hash::{FxHashMap, FxHashSet, FxHasher};
 #[cfg(feature = "json")]
-pub use json_writer::{JsonWriter, StageRun, StagedDigits, write_array, write_or_null};
+#[doc(hidden)]
+pub use json_writer::{JsonWriter, StageRun, write_array, write_or_null};
+#[doc(hidden)]
 pub use location::{
-    BOM, LeadingBom, LineRule, LocationMapper, Position, Wire, WireCoordinates, WirePoint,
-    WirePositions, WireTables, leading_bom_len,
+    BOM, LocationMapper, Position, Wire, WirePositions, WireTables, leading_bom_len,
 };
+pub use location::{LeadingBom, LineRule, WireCoordinates, WirePoint};
+#[doc(hidden)]
 pub use output::{OutputBuffer, write_indent};
+#[doc(hidden)]
 pub use sizing::{estimated_ast_arena_capacity, estimated_json_capacity};
 pub use span::Span;
+#[doc(hidden)]
 pub use whitespace::{
     is_js_whitespace, trim_end_js_whitespace, trim_js_whitespace, trim_start_js_whitespace,
 };

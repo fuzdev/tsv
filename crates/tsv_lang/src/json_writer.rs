@@ -842,7 +842,7 @@ pub struct StageRun<'a> {
 /// A width of `0` (no decimal is that narrow) marks a value that took the wide
 /// arm, whose digits were written straight to the scratch and so not kept.
 #[derive(Clone, Copy)]
-pub struct StagedDigits {
+pub(crate) struct StagedDigits {
     word: u64,
     digits: usize,
 }
@@ -1009,7 +1009,7 @@ impl StageRun<'_> {
     /// it again — a node's `loc` names its start line and its end line, and for
     /// most nodes they are one line.
     #[inline(always)]
-    pub fn usize_kept(&mut self, n: usize) -> StagedDigits {
+    pub(crate) fn usize_kept(&mut self, n: usize) -> StagedDigits {
         if let Ok(n) = u32::try_from(n) {
             let (word, digits) = digit_word(n);
             if digits <= WORD_DIGITS {
@@ -1028,7 +1028,7 @@ impl StageRun<'_> {
     /// is still an argument because a value that took the wide arm kept no
     /// digits and is converted again.
     #[inline(always)]
-    pub fn repeat(&mut self, kept: StagedDigits, n: usize) {
+    pub(crate) fn repeat(&mut self, kept: StagedDigits, n: usize) {
         if kept.digits == 0 {
             self.wide(n as u64);
             return;

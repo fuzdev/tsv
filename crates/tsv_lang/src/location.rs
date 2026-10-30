@@ -111,9 +111,9 @@ pub enum LineRule {
 /// The coordinates one language's wire reports positions in: how its offsets count a
 /// leading byte-order mark, and which characters end its lines. Each language crate
 /// states its own once (`tsv_ts::WIRE_COORDINATES` and its siblings), and everything that
-/// reports a position for that language — the wire writers' tables
-/// ([`WireTables::new`]) and a parse error's point ([`crate::Error::wire_point`]) —
-/// reads that one statement rather than restating it.
+/// reports a position for that language — the wire writers' tables and a parse error's
+/// point ([`crate::Error::wire_point`]) — reads that one statement rather than restating
+/// it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WireCoordinates {
     /// Which characters end a line.
@@ -144,7 +144,7 @@ impl WireCoordinates {
     /// One walk over the characters ahead of the position. The error path's answer, so a
     /// walk rather than a table: it runs once, on a source that failed to parse. The wire
     /// writers answer the same question from the tables they build anyway
-    /// ([`LocationTracker`] + [`ByteToCharMap`]). `tests/error_coordinates.rs` grades this
+    /// (`LocationTracker` + `ByteToCharMap`). `tests/error_coordinates.rs` grades this
     /// walk against an independent count of its own, and against the `loc` those tables
     /// put on the wire at every node position of a set of sources holding each feature
     /// the coordinates turn on.

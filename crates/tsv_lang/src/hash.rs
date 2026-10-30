@@ -97,7 +97,7 @@ impl Hasher for FxHasher {
 }
 
 /// `BuildHasher` for [`FxHasher`] — the `S` parameter of the aliases below.
-pub type FxBuildHasher = BuildHasherDefault<FxHasher>;
+pub(crate) type FxBuildHasher = BuildHasherDefault<FxHasher>;
 
 /// `HashMap` over [`FxHasher`]. Construct with `default()`, not `new()`.
 pub type FxHashMap<K, V> = std::collections::HashMap<K, V, FxBuildHasher>;
