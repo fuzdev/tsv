@@ -20,11 +20,11 @@ export const RELEASE_PATHS: ReadonlyArray<string> = [CARGO_PATH, LOCKFILE_PATH, 
 export const release_commit_message = (version: string): string => `chore: publish v${version}`;
 
 /** Write `version` into `Cargo.toml`'s `[workspace.package]` table and every exact pin on a
- * `[workspace.dependencies]` path entry, in one write. */
+ * `[workspace.dependencies]` path entry, in one write — or nothing, when the setter refuses. */
 export const bump_cargo_version = async (version: string): Promise<Result> => {
 	const next = cargo_workspace_version_set(await Deno.readTextFile(CARGO_PATH), version);
-	if (next === null) return { ok: false, error: `no [workspace.package] version in ${CARGO_PATH}` };
-	await Deno.writeTextFile(CARGO_PATH, next);
+	if (!next.ok) return next;
+	await Deno.writeTextFile(CARGO_PATH, next.text);
 	return { ok: true };
 };
 

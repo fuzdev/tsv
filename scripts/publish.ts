@@ -96,6 +96,7 @@ import {
 	type BumpLevel,
 	CARGO_PATH,
 	cargo_workspace_version,
+	cargo_workspace_version_set,
 	is_bump_level,
 	version_tag
 } from './release/version.ts';
@@ -160,7 +161,8 @@ console.log(`\n=== tsv publish ${wetrun ? '(wetrun)' : '(dry-run)'} ===\n`);
 
 console.log('=== Step 1: Preflight checks ===');
 
-const version_before = cargo_workspace_version(Deno.readTextFileSync(CARGO_PATH));
+const cargo_toml = Deno.readTextFileSync(CARGO_PATH);
+const version_before = cargo_workspace_version(cargo_toml);
 if (version_before === null) {
 	console.error('  FAIL: could not find [workspace.package] version in Cargo.toml');
 	Deno.exit(1);
@@ -207,6 +209,12 @@ const refuse_or_warn = (message: string): void => {
 };
 
 if (plan.kind === 'fresh') for (const problem of plan.problems) refuse_or_warn(problem);
+// the bump's own write, previewed: a sibling pin it cannot move refuses here, before the bump,
+// rather than at the lockfile update after it
+if (plan.kind === 'fresh' && plan.target !== null) {
+	const set = cargo_workspace_version_set(cargo_toml, plan.target);
+	if (!set.ok) refuse_or_warn(set.error);
+}
 
 const branch = await git_current_branch();
 if (branch === null) refuse_or_warn('git branch failed — is this a git repository?');

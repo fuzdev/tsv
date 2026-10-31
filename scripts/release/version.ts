@@ -6,6 +6,8 @@
  * @module
  */
 
+import type { Result } from './command.ts';
+
 export const CARGO_PATH = 'Cargo.toml';
 
 export const BUMP_LEVELS = ['patch', 'minor', 'major'] as const;
@@ -26,21 +28,48 @@ export const cargo_workspace_version = (cargo_toml: string): string | null =>
 /** The `[workspace.dependencies]` table's body: every line up to the next `[` heading. */
 const WORKSPACE_DEPENDENCIES = /(^\[workspace\.dependencies\]\n)((?:(?!\[).*\n?)*)/m;
 
-/** An exact `version = "=x.y.z"` requirement inside one entry's inline table. */
-const EXACT_VERSION = /(\bversion\s*=\s*")=[^"]*(")/;
+/** An exact `version = "=x.y.z"` requirement inside one entry's inline table — the whole
+ * requirement, so a compound one (`"=0.7.1, <1"`) is not a pin the bump can move. */
+const EXACT_VERSION = /(\bversion\s*=\s*")=\s*\d+\.\d+\.\d+(")/;
 
 /** Whether a `[workspace.dependencies]` line is a workspace member's entry: an inline table
  * naming a `path` (a registry dependency has none, so its own requirement is never touched). */
-const is_path_entry = (line: string): boolean => /^[\w-]+\s*=\s*\{[^#]*\bpath\s*=/.test(line);
+const is_path_entry = (line: string): boolean =>
+	/^[ \t]*(?:[\w-]+|"[^"]*")\s*=\s*\{[^#]*\bpath\s*=/.test(line);
+
+/** A `[workspace.dependencies.<name>]` table heading: an entry the line reader below cannot see. */
+const WORKSPACE_DEPENDENCY_TABLE = /^[ \t]*\[[ \t]*workspace\.dependencies\.[^\]]*\]/m;
+
+/** Any `version` key inside one entry's inline table, however its requirement is spelled (read
+ * ahead of a trailing `#` comment, which no requirement or crate path here contains). */
+const ANY_VERSION = /\bversion\s*=/;
 
 /** The `Cargo.toml` text with its `[workspace.package]` version replaced, along with every exact
  * `=x.y.z` pin on a `[workspace.dependencies]` path entry, so the sibling requirements move in
  * the same write as the version they name (cargo refuses a path dependency whose pin its own
- * version does not meet). Null when it declares no workspace version. Every other byte is kept,
- * and setting the version a text already holds returns it unchanged (idempotent). */
-export const cargo_workspace_version_set = (cargo_toml: string, version: string): string | null => {
-	if (!WORKSPACE_VERSION.test(cargo_toml)) return null;
-	return cargo_toml
+ * version does not meet). Every other byte is kept, and setting the version a text already holds
+ * returns it unchanged (idempotent).
+ *
+ * Refuses, rather than writing a text that still names the old version, when there is no
+ * workspace version or a path entry's requirement is one the setter cannot rewrite: not an exact
+ * double-quoted `"=x.y.z"` pin, or an entry declared as its own `[workspace.dependencies.<name>]`
+ * table. Either would leave a sibling pinned to the old version, which the release's
+ * `cargo update --workspace` refuses only after the bump is written. */
+export const cargo_workspace_version_set = (
+	cargo_toml: string,
+	version: string
+): Result<{ text: string }> => {
+	if (!WORKSPACE_VERSION.test(cargo_toml))
+		return { ok: false, error: `no [workspace.package] version in ${CARGO_PATH}` };
+	const table = WORKSPACE_DEPENDENCY_TABLE.exec(cargo_toml);
+	if (table) {
+		return {
+			ok: false,
+			error: `${CARGO_PATH} declares ${table[0]} — the version bump rewrites inline [workspace.dependencies] entries only`
+		};
+	}
+	const unpinned: Array<string> = [];
+	const text = cargo_toml
 		.replace(WORKSPACE_VERSION, `$1"${version}"`)
 		.replace(
 			WORKSPACE_DEPENDENCIES,
@@ -48,11 +77,21 @@ export const cargo_workspace_version_set = (cargo_toml: string, version: string)
 				heading +
 				body
 					.split('\n')
-					.map((line) =>
-						is_path_entry(line) ? line.replace(EXACT_VERSION, `$1=${version}$2`) : line
-					)
+					.map((line) => {
+						if (!is_path_entry(line)) return line;
+						if (EXACT_VERSION.test(line)) return line.replace(EXACT_VERSION, `$1=${version}$2`);
+						if (ANY_VERSION.test(line.split('#')[0]!)) unpinned.push(line.trim());
+						return line;
+					})
 					.join('\n')
 		);
+	if (unpinned.length > 0) {
+		return {
+			ok: false,
+			error: `${CARGO_PATH} has a [workspace.dependencies] path entry whose version is not an exact "=x.y.z" pin the bump can move:\n${unpinned.map((line) => `    ${line}`).join('\n')}`
+		};
+	}
+	return { ok: true, text };
 };
 
 /** A release version: `<major>.<minor>.<patch>`, no prerelease or build suffix. */
