@@ -198,7 +198,7 @@ function bakedSkeleton(code: string): string {
 // Membership is keyed on UNCONDITIONAL `display: block` (or a block-level `display`) in the
 // HTML spec's UA stylesheet — a tag whose display is attribute-conditional does NOT belong,
 // however it is classified for formatting. `<dialog>` is the standing example and the reason
-// this set is not simply `tsv_html`'s: `dialog:not([open]) { display: none; }` makes the
+// this set is not simply `tsv_svelte`'s block set: `dialog:not([open]) { display: none; }` makes the
 // attribute-less spelling generate no box at all, so the whitespace on either side stays in
 // ONE inline formatting context and collapses to a RENDERED space — `a<dialog>x</dialog>b`
 // paints `ab`, its spaced twin paints `a b`. Admitting it would buy a false equivalence, the

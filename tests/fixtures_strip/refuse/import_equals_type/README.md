@@ -1,6 +1,6 @@
 # import_equals_type
 
-`import type X = require(...)` is refused (`UnsupportedKind::ImportEquals`) like a value import-equals; the span is the declaration. ts-blank-space refuses it, and tsc's `erasableSyntaxOnly` rejects it (TS1294).
+`import type X = require(...)` is refused (`UnsupportedConstruct::ImportEquals`) like a value import-equals; the span is the declaration. ts-blank-space refuses it, and tsc's `erasableSyntaxOnly` rejects it (TS1294).
 
 ## Divergence
 

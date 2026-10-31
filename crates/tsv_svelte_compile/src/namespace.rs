@@ -72,7 +72,7 @@ pub(crate) struct ChildNamespace {
 /// ancestor is svg — approximated by `inherited` (the namespace the element sits
 /// in, i.e. its parent context's namespace), which the compiler already threads.
 /// Intercepting `a`/`title` before the base list also sidesteps the stale `"title"`
-/// entry in `tsv_html`'s SVG set (`SVG_NAMES`; Svelte's base list omits it, so a bare
+/// entry in `tsv_svelte`'s SVG set (`SVG_NAMES`; Svelte's base list omits it, so a bare
 /// `<title>` at html scope must NOT be svg).
 ///
 /// Non-circular: `<a>`/`<title>`'s svg-ness keys on the INHERITED namespace (the
@@ -84,7 +84,7 @@ pub(crate) fn element_is_svg(name: &str, inherited: Namespace) -> bool {
     if name == "a" || name == "title" {
         inherited == Namespace::Svg
     } else {
-        tsv_html::svelte::is_svg_element(name)
+        tsv_svelte::__private::is_svg_element(name)
     }
 }
 
@@ -92,7 +92,7 @@ pub(crate) fn element_is_svg(name: &str, inherited: Namespace) -> bool {
 /// mathml set matches the oracle). A thin wrapper so every classification site
 /// routes through this module and the two can never drift.
 pub(crate) fn element_is_mathml(name: &str) -> bool {
-    tsv_html::svelte::is_mathml_element(name)
+    tsv_svelte::__private::is_mathml_element(name)
 }
 
 /// `(is_svg, is_mathml)` for a regular element in a fragment whose inherited

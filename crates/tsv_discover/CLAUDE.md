@@ -18,9 +18,12 @@ The three discovery surfaces — the native CLI (`tsv_cli`), the WASM CLI
 reimplementing the decision, so they agree **by construction** rather than by
 hand-mirrored constants and templates (the drift here caused real extension bugs).
 
-**Published for tsv's own tools.** Its public signatures follow 0.x semver like every tsv
-crate (a breaking change only at a minor release); the verdicts and the warnings' wording
-track `tsv format` and may change in any release; `#[doc(hidden)]` items are outside semver.
+**No public API.** Published only because `tsv_cli` (a published crate) depends on it; it
+exists for tsv's own tools (`tsv_cli`, `tsv_wasm`, `tsv_napi`). Every public item is
+`#[doc(hidden)]` (the re-exports in `lib.rs`, as `tsv_cli`'s lib modules are), so none of its
+signatures is semver-graded and any may change in any release. No public doc (rustdoc,
+README) may link one of its items — a hidden link renders dead, which `docs:audit:docsrs`
+fails.
 
 ## Architecture Position
 
@@ -58,11 +61,11 @@ crate adds none — it is the policy half of the one sanctioned *scope* carve-ou
 (which files get reformatted). See
 [docs/architecture.md §Closed Scope, Open Convention](../../docs/architecture.md#closed-scope-open-convention).
 
-## Public API
+## API (hidden)
 
-The full discovery vocabulary is public — usually consumed via the verdicts, but
-the pieces are exposed for inspection, reuse, and third-party `tsv_*` discovery
-crates (the open-convention stance):
+The full discovery vocabulary is reachable from the crate root, every re-export
+`#[doc(hidden)]` — usually consumed via the verdicts, the pieces exposed for tsv's
+own surfaces (the CLI, the WASM and N-API bindings):
 
 - `SAFETY_NET_DIRS` / `HEURISTIC_DIRS` / `FORMATTABLE_EXTENSIONS` — the three
   name/extension-set constants.

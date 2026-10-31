@@ -1,3 +1,3 @@
 # const_enum
 
-A `const enum` is refused like any non-`declare` enum (`UnsupportedKind::Enum`).
+A `const enum` is refused like any non-`declare` enum (`UnsupportedConstruct::Enum`).

@@ -97,6 +97,7 @@ pub mod __private;
 #[expect(rustdoc::private_intra_doc_links)]
 pub mod ast;
 mod formatter;
+mod html;
 mod lexer;
 mod parser;
 mod printer;
@@ -107,10 +108,9 @@ mod whitespace;
 use __private::{format_folded_in, parse_folded};
 use ast::Root;
 pub use formatter::Formatter;
-pub use tsv_lang::{
-    Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, STACK_SIZE, WireCoordinates,
-    WirePoint, run_with_stack,
-};
+pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, STACK_SIZE, WirePoint, run_with_stack};
+#[doc(hidden)]
+pub use tsv_lang::{LeadingBom, LineRule, WireCoordinates};
 
 // `tests/public_reexports.rs` (outside this crate) names every item above through this
 // crate's path: cargo-semver-checks cannot see a dropped or demoted re-export.
@@ -120,7 +120,9 @@ pub use tsv_lang::{
 /// BOM-less string, its acorn islands included), and `\n` alone ending a line, in the
 /// markup and in every `<script>`, template expression and `<style>` alike. The wire
 /// writer's tables and every parse error's point (`Error::wire_point`, and the
-/// `line:col` its message prints) read this one statement.
+/// `line:col` its message prints) read this one statement. Hidden: plumbing for the sibling
+/// crates.
+#[doc(hidden)]
 pub const WIRE_COORDINATES: WireCoordinates =
     WireCoordinates::new(LineRule::Lf, LeadingBom::Elided);
 

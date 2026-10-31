@@ -3,10 +3,10 @@
 //! Depend on one of those, not on this one.
 //!
 //! **No stability promise outside the items they re-export:** [`Error`], [`ErrorKind`],
-//! [`ErrorReport`], [`Result`], [`WirePoint`], [`WireCoordinates`], [`LineRule`],
-//! [`LeadingBom`], and the sized-stack pair [`STACK_SIZE`] and [`run_with_stack`].
-//! Everything else here — the source spans, the doc IR, the printing helpers, the wire-JSON
-//! writer, the comment scans, the depth limits, every item hidden from these docs — and the
+//! [`ErrorReport`], [`Result`], [`WirePoint`], and the sized-stack pair [`STACK_SIZE`] and
+//! [`run_with_stack`].
+//! Everything else here — the source spans, the wire coordinates, the doc IR, the printing
+//! helpers, the wire-JSON writer, the comment scans, the depth limits, every item hidden from these docs — and the
 //! underscored features (`_json`, `_locations`, `_internal_*`) are tsv's own plumbing for its sibling crates, which pin each other
 //! exactly; they change in any release, outside semver.
 //!
@@ -113,11 +113,13 @@ pub use hash::{FxHashMap, FxHashSet, FxHasher};
 #[cfg(feature = "_json")]
 #[doc(hidden)]
 pub use json_writer::{JsonWriter, StageRun, write_array, write_or_null};
+pub use location::WirePoint;
 #[doc(hidden)]
 pub use location::{
     BOM, LocationMapper, Position, Wire, WirePositions, WireTables, leading_bom_len,
 };
-pub use location::{LeadingBom, LineRule, WireCoordinates, WirePoint};
+#[doc(hidden)]
+pub use location::{LeadingBom, LineRule, WireCoordinates};
 #[doc(hidden)]
 pub use output::{OutputBuffer, write_indent};
 #[doc(hidden)]

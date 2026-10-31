@@ -1,6 +1,6 @@
 # assertion_grouping_exponent_await
 
-`assertion_grouping_exponent` with `await`: the blanked `await x as number ** 2` reads `await x ** 2`, a syntax error. Refused (`UnsupportedKind::AssertionGrouping`); the span is the assertion expression.
+`assertion_grouping_exponent` with `await`: the blanked `await x as number ** 2` reads `await x ** 2`, a syntax error. Refused (`UnsupportedConstruct::AssertionGrouping`); the span is the assertion expression.
 
 ## Override
 

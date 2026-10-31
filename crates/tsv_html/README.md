@@ -1,17 +1,14 @@
 # tsv_html
 
-HTML element classification, whitespace rules, and the WHATWG named character reference table — part
-of [tsv](https://github.com/fuzdev/tsv), published for tsv's Svelte support
-([`tsv_svelte`](https://crates.io/crates/tsv_svelte)).
-
-The crate root is reserved for answers that follow the HTML spec (today the optional-end-tag table
-and the custom-element name class); the `svelte` module holds the answers Svelte's compiler and
-prettier-plugin-svelte give, which tsv's Svelte support reproduces exactly. The long-term target is
-a spec-faithful HTML library.
+HTML spec data and the answers the HTML spec gives — the WHATWG named character references table
+(matched as the tokenizer matches it), the optional-end-tag table and the custom-element name
+class — part of [tsv](https://github.com/fuzdev/tsv), published for tsv's Svelte support
+([`tsv_svelte`](https://crates.io/crates/tsv_svelte)). The long-term target is a spec-faithful HTML
+library.
 
 The public signatures follow 0.x semver like every tsv crate: a breaking change ships only in a
-minor release. What the functions answer, and the wording of anything they return, may change in
-any release, tracking what tsv needs; `#[doc(hidden)]` items are outside semver.
+minor release. What the functions answer may change in any release, tracking the spec and what tsv
+needs; `#[doc(hidden)]` items are outside semver.
 
 API docs: [docs.rs/tsv_html](https://docs.rs/tsv_html).
 

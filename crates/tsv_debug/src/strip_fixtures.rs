@@ -7,7 +7,7 @@
 //! - one input: `input.ts`, `input.mts`, or `input.svelte.ts`;
 //! - its claim, exactly one of
 //!   - `expected.js` / `expected.mjs` / `expected.svelte.js` — the stripped JS, or
-//!   - `refusal.txt` — `UnsupportedKind<TAB>line:column<TAB>line:column`: the refused kind
+//!   - `refusal.txt` — `UnsupportedConstruct<TAB>line:column<TAB>line:column`: the refused kind
 //!     and its span's two ends (1-based line, 0-based UTF-16 column, ECMAScript line
 //!     terminators — `tsv_ts::WIRE_COORDINATES`);
 //! - optionally `divergences.txt` — the oracles the claim departs from, one per line
@@ -296,11 +296,11 @@ pub struct Finding {
     pub detail: String,
 }
 
-/// A refusal fixture's claim: the kind (`UnsupportedKind`'s variant name) and the span's
+/// A refusal fixture's claim: the kind (`UnsupportedConstruct`'s variant name) and the span's
 /// two ends as `(line, column)`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RefusalClaim {
-    /// `tsv_ts::UnsupportedKind`'s variant name.
+    /// `tsv_ts::UnsupportedConstruct`'s variant name.
     pub kind: String,
     /// The span's start, `(1-based line, 0-based UTF-16 column)`.
     pub start: (u32, u32),
@@ -337,9 +337,16 @@ fn point_of(source: &str, position: usize) -> (u32, u32) {
 
 /// A refusal of `source` as `refusal.txt` spells it — `Kind<TAB>line:column<TAB>line:column`
 /// and a newline — the record the oracle side derives from ts-blank-space too.
-pub fn refusal_line(source: &str, kind: tsv_ts::UnsupportedKind, span: Range<usize>) -> String {
+pub fn refusal_line(
+    source: &str,
+    construct: tsv_ts::UnsupportedConstruct,
+    span: Range<usize>,
+) -> String {
     let (start, end) = (point_of(source, span.start), point_of(source, span.end));
-    format!("{kind:?}\t{}:{}\t{}:{}\n", start.0, start.1, end.0, end.1)
+    format!(
+        "{construct:?}\t{}:{}\t{}:{}\n",
+        start.0, start.1, end.0, end.1
+    )
 }
 
 const fn is_terminator(unit: u16) -> bool {
@@ -455,12 +462,17 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
                 format!("tsv's parser rejects the input: {e:#}"),
             );
         }
-        (Claim::Expected(_), Err(tsv_ts::StripError::Unsupported { kind, error, .. })) => {
+        (
+            Claim::Expected(_),
+            Err(tsv_ts::StripError::Unsupported {
+                construct, error, ..
+            }),
+        ) => {
             let span = error.span().unwrap_or_default();
             push(
                 StripCheck::Output,
                 format!(
-                    "refused {kind:?} at {:?}–{:?} where the fixture expects output",
+                    "refused {construct:?} at {:?}–{:?} where the fixture expects output",
                     point_of(&input, span.start),
                     point_of(&input, span.end)
                 ),
@@ -489,10 +501,15 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
                 claimed.kind, claimed.start, claimed.end
             ),
         ),
-        (Claim::Refusal(claimed), Err(tsv_ts::StripError::Unsupported { kind, error, .. })) => {
+        (
+            Claim::Refusal(claimed),
+            Err(tsv_ts::StripError::Unsupported {
+                construct, error, ..
+            }),
+        ) => {
             let span = error.span().unwrap_or_default();
             let got = RefusalClaim {
-                kind: format!("{kind:?}"),
+                kind: format!("{construct:?}"),
                 start: point_of(&input, span.start),
                 end: point_of(&input, span.end),
             };

@@ -47,7 +47,8 @@ builds on `IgnoreStack` (consuming `is_ignored_leaf` / `is_reincluded` /
 `negation_under` / `has_gitignore_layers` / `has_gitignore_above`, plus `exclusion` /
 `override_exclusion` / `gitignore_exclusion` — the ancestor-walking answer's witnesses — with
 `override_layer_source` and `split_segments` to bound and warn about a path an argument
-named). Deliberately: `IgnoreStack` stays a pure gitignore(5) matcher, reusable beyond
+named; every one of those but `is_ignored_leaf`, `exclusion` and `split_segments` is
+`#[doc(hidden)]`). Deliberately: `IgnoreStack` stays a pure gitignore(5) matcher, reusable beyond
 tsv's own discovery rules, and the three surfaces share the prune *decision* through
 `tsv_discover` rather than re-deriving it from these primitives.
 
@@ -148,7 +149,10 @@ holds two parallel per-directory layer stacks (`.gitignore` and override):
 
 `IgnoreStack` is `const`-asserted `Send + Sync + UnwindSafe + RefUnwindSafe`; `IgnoreSource`
 and `Exclusion` are `Hash`. **Stability** (crate docs §Stability): the public signatures follow
-0.x semver; the hidden `negation_under` / `Negation*` are tsv's plumbing, outside semver. The
+0.x semver; the queries that exist only for `tsv_discover` — `negation_under` / `Negation*`,
+`has_gitignore_layers`, `has_gitignore_above`, `is_reincluded`, `gitignore_exclusion`,
+`override_exclusion`, `override_layer_source` — are `#[doc(hidden)]`, tsv's plumbing, outside
+semver. No public doc may link one (`docs:audit:docsrs` fails a dead render). The
 README's Rust example is a doctest (`ReadmeDoctests` in `lib.rs`).
 
 **Which** files feed the stack is the caller's choice. tsv reads `.formatignore`

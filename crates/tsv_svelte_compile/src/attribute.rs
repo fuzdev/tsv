@@ -66,7 +66,8 @@ pub(crate) fn escape_html_attr(s: &str) -> String {
 
 /// The DOM boolean attributes (the oracle's `DOM_BOOLEAN_ATTRIBUTES`): a
 /// dynamic value on one of these emits `$.attr(name, value, true)`.
-// TODO: consider a home in tsv_html beside the element classification tables.
+// TODO: consider a home in `tsv_svelte`'s private `html` module beside the element
+// classification tables.
 const DOM_BOOLEAN_ATTRIBUTES: &[&str] = &[
     "allowfullscreen",
     "async",

@@ -57,7 +57,10 @@ pub enum Goal {
 impl Goal {
     /// The acorn `sourceType` string this goal serializes to in the public AST
     /// (`Program.sourceType`) — `"module"` or `"script"`, the vocabulary its
-    /// [`FromStr`] reads back and its [`Display`](fmt::Display) writes.
+    /// [`FromStr`] reads back and its [`Display`](fmt::Display) writes. Hidden: `Display`
+    /// and `FromStr` are the public spelling; this is the `const` form the wire writer and
+    /// tsv's tooling read.
+    #[doc(hidden)]
     #[must_use]
     pub const fn source_type(self) -> &'static str {
         match self {
@@ -110,8 +113,8 @@ impl Goal {
     }
 }
 
-/// Reads a goal from its [`source_type`](Goal::source_type) string (`"module"` /
-/// `"script"`), the inverse of `source_type`, case-sensitively — the vocabulary acorn's
+/// Reads a goal from the string its [`Display`](fmt::Display) writes (`"module"` /
+/// `"script"`), case-sensitively — the vocabulary acorn's
 /// `sourceType` and the `tsv` CLI's `--source-type` use.
 ///
 /// ```
@@ -136,7 +139,7 @@ impl FromStr for Goal {
     }
 }
 
-/// Writes [`Goal::source_type`].
+/// Writes the goal's acorn `sourceType` string: `"module"` or `"script"`.
 impl fmt::Display for Goal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.source_type())

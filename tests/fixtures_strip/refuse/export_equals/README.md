@@ -1,3 +1,3 @@
 # export_equals
 
-`export =` is refused (`UnsupportedKind::ExportEquals`).
+`export =` is refused (`UnsupportedConstruct::ExportEquals`).

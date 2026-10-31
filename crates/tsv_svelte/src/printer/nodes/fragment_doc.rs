@@ -1374,7 +1374,7 @@ impl<'a> Printer<'a> {
     ///   spec calls it a line break *opportunity*, a hint inside prose rather than a break, and
     ///   prettier formats it exactly as it formats a `<span>` in these shapes (so its flowing is
     ///   an instance of the cataloged inline-flow divergence, not a class of its own). The class
-    ///   is [`tsv_html::svelte::is_line_break_element`], packed as `TagFacts::is_line_break`;
+    ///   is [`crate::html::is_line_break_element`], packed as `TagFacts::is_line_break`;
     /// - a **block element**, which owns its own line via `handle_block_child`;
     /// - a **blank line** (2+ newlines), a Tier-2 authoring signal, screened by the callers;
     /// - a **control-flow block** (`{#if}` / `{#each}` / `{#key}` / `{#await}` / `{#snippet}`),
@@ -1414,7 +1414,7 @@ impl<'a> Printer<'a> {
             | FragmentNode::RenderTag(_)
             | FragmentNode::HtmlTag(_) => true,
             // A `<br>` is a rendered line break — line-owning, like a comment (the doc comment's
-            // second exclusion). The class argument lives on `tsv_html::svelte::is_line_break_element`;
+            // second exclusion). The class argument lives on `crate::html::is_line_break_element`;
             // it is deliberately narrower than `TagFacts::is_void` — the other void elements
             // render inline.
             FragmentNode::Element(el) if el.facts.is_line_break() => false,
@@ -1751,7 +1751,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build the content of a **whitespace-collapsing container** (`<table>`, `<select>`, … —
-    /// `tsv_html::svelte::collapses_child_whitespace`) block-style: every non-whitespace child on its own
+    /// `crate::html::collapses_child_whitespace`) block-style: every non-whitespace child on its own
     /// line, with the inter-sibling whitespace **trimmed**. Svelte's compiler removes that
     /// whitespace entirely (`clean_nodes` `can_remove_entirely`), so this is render-equivalent to
     /// the inline form and reproduces the block-authored form both formatters already keep — see

@@ -1,6 +1,6 @@
 # assertion_grouping_exponent_typeof
 
-`assertion_grouping_exponent` with `typeof`: the blanked `typeof x as any ** 2` reads `typeof x ** 2`, a syntax error. Refused (`UnsupportedKind::AssertionGrouping`); the span is the assertion expression.
+`assertion_grouping_exponent` with `typeof`: the blanked `typeof x as any ** 2` reads `typeof x ** 2`, a syntax error. Refused (`UnsupportedConstruct::AssertionGrouping`); the span is the assertion expression.
 
 ## Override
 

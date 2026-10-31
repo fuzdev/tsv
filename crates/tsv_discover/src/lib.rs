@@ -3,13 +3,10 @@
 //! [`tsv_ignore::IgnoreStack`] (the matcher) plus the entry name and its
 //! format-root-relative path. Part of [tsv](https://github.com/fuzdev/tsv).
 //!
-//! **Published for tsv's own tools.** A tool that wants gitignore matching alone should
-//! depend on [`tsv_ignore`].
-//!
-//! **Stability.** The public signatures follow 0.x semver like every tsv crate: a breaking
-//! change ships only in a minor release. The verdicts and the warnings' wording follow
-//! `tsv format`'s behavior and may change with it in any release. `#[doc(hidden)]` items are
-//! outside semver.
+//! **No public API.** The crate exists for tsv's own tools — the `tsv` CLI and its WASM and
+//! N-API bindings — and every item in it is `#[doc(hidden)]`: outside semver, free to change
+//! in any release. A tool that wants gitignore matching alone should depend on
+//! [`tsv_ignore`].
 //!
 //! This is the single home of the build-output heuristic, the always-pruned
 //! safety nets, the formattable-extension check (both as a discovery filter and
@@ -59,13 +56,16 @@ mod policy;
 mod quote;
 mod warnings;
 
+#[doc(hidden)]
 pub use policy::{
     BuildOutputHeuristic, DirVerdict, FORMATTABLE_EXTENSIONS, HEURISTIC_DIRS, SAFETY_NET_DIRS,
     classify_dir, formattable_extension_list, is_formattable, is_path_pruned, is_safety_net,
     path_shadow_warning, should_format_file, unstrippable_extension_error,
     unsupported_extension_error,
 };
+#[doc(hidden)]
 pub use quote::{quote_path, quote_path_bytes, quote_path_owned};
+#[doc(hidden)]
 pub use warnings::{
     DirIgnoreFiles, excluded_argument_warning, gitignore_symlink_warning,
     prettierignore_outside_repo_warning, prettierignore_shadowed_warning, shadow_warning,

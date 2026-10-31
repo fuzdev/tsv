@@ -102,7 +102,7 @@ enum Failure {
     /// A failure the source causes, RETURNED as `{ok: false, error}`: `kind` `'parse'` (a
     /// syntax error), `'refused'` (a format's refusal of a source that parses), or
     /// `'unsupported'` (a strip refusal, with its `construct`, the construct's wire name —
-    /// `tsv_ts::UnsupportedKind::name`), over the report's summary, frame and span.
+    /// `tsv_ts::UnsupportedConstruct::as_str`), over the report's summary, frame and span.
     Returned {
         kind: &'static str,
         construct: Option<&'static str>,
@@ -392,10 +392,12 @@ fn strip_typescript_engine(source: &str, source_type: Option<String>) -> Result<
             Ok(stripped) => Ok(stripped.code),
             Err(tsv_ts::StripError::Parse(e)) => Err(Failure::parse(&e)),
             // a refusal always reports; the `None` arm is unreachable, thrown with its message
-            Err(tsv_ts::StripError::Unsupported { kind, error, .. }) => match error.to_report() {
+            Err(tsv_ts::StripError::Unsupported {
+                construct, error, ..
+            }) => match error.to_report() {
                 Some(report) => Err(Failure::Returned {
                     kind: "unsupported",
-                    construct: Some(kind.name()),
+                    construct: Some(construct.as_str()),
                     report,
                 }),
                 None => Err(Failure::Plain(format!("{error:#}"))),

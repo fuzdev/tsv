@@ -124,7 +124,7 @@ kind takes `sourceType` as a format's does), and an engine failure with no point
 itself. The raw export is `strip_typescript(source, source_type?)` — the flat shape, its unset
 source type read as a format reads one (`tsv_arena::Family::Strip`) — returning the code or the
 `{ok: false, error}` it built, the refusal's `construct` the construct's snake_case name
-(`UnsupportedKind::name`), which `api_strip.js` checks against the set it knows. `api_strip.js`
+(`UnsupportedConstruct::as_str`), which `api_strip.js` checks against the set it knows. `api_strip.js`
 imports nothing but `api.js`'s readers, and the patcher stages it into the `all` variant alone.
 
 **Why the reader is JS.** Both package sets need it, and the native one has no WASM to host a

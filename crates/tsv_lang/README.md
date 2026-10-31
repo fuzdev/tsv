@@ -5,8 +5,8 @@
 [`tsv_svelte`](https://crates.io/crates/tsv_svelte).
 
 The shared foundation of tsv's language crates. Its public items — the error types (`Error`,
-`ErrorKind`, `ErrorReport`, `Result`), the wire coordinates (`WireCoordinates`, `WirePoint`,
-`LineRule`, `LeadingBom`) and the sized-stack pair (`STACK_SIZE`, `run_with_stack`) — are
+`ErrorKind`, `ErrorReport`, `Result`, and `WirePoint`, the position an `ErrorReport` carries)
+and the sized-stack pair (`STACK_SIZE`, `run_with_stack`) — are
 re-exported by the language crates whose APIs use them; the rest is hidden plumbing, as are
 the underscored features (`_json`, `_locations`, `_internal_*`), which change in any release outside semver. Part of [tsv](https://github.com/fuzdev/tsv).
 

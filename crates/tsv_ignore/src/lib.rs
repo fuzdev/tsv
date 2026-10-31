@@ -134,9 +134,9 @@
 //! ## Stability
 //!
 //! The public signatures follow 0.x semver like every tsv crate: a breaking change ships
-//! only in a minor release. The items hidden from these docs —
-//! `IgnoreStack::negation_under` and the `Negation*` types it returns — are tsv's own
-//! plumbing for `tsv_discover`, outside semver.
+//! only in a minor release. The items hidden from these docs — the `IgnoreStack` queries
+//! that exist for tsv's discovery policy, and the `Negation*` types one of them returns —
+//! are tsv's own plumbing for `tsv_discover`, outside semver.
 
 #![warn(missing_docs)]
 // The README's example compiles as a doctest, so the crates.io page cannot drift.
@@ -463,8 +463,7 @@ impl IgnoreStack {
     /// Push one directory's `.prettierignore` as an override layer — the file a caller reads in
     /// place of a `.formatignore` the directory does not have. Matched exactly as a
     /// [`push_formatignore`](Self::push_formatignore) layer is; the two differ only in the
-    /// file a diagnostic names ([`Exclusion::source`],
-    /// [`override_layer_source`](Self::override_layer_source)). The same order rule holds:
+    /// file a diagnostic names ([`Exclusion::source`]). The same order rule holds:
     /// it **must** be pushed after every ancestor directory's override layer.
     ///
     /// # Panics
@@ -494,6 +493,7 @@ impl IgnoreStack {
     /// caller's heuristic off (matching git, for which an empty `.gitignore`
     /// still establishes the gitignore regime). tsv's discovery uses this to
     /// assert that an active build-output heuristic has no `.gitignore` layer pushed.
+    #[doc(hidden)]
     pub fn has_gitignore_layers(&self) -> bool {
         !self.gitignore.is_empty()
     }
@@ -506,6 +506,7 @@ impl IgnoreStack {
     /// VS Code extension formats one open document at a time — reconstruct, for each
     /// ancestor directory, whether the build-output heuristic applies: it is off at a level
     /// once a `.gitignore` anchored above it is present.
+    #[doc(hidden)]
     #[must_use]
     pub fn has_gitignore_above(&self, dir: &str) -> bool {
         let dir = split_segments(dir);
@@ -547,6 +548,7 @@ impl IgnoreStack {
     /// applied. Distinct from `!is_ignored`: a path no rule mentions is neither
     /// ignored nor re-included. tsv's discovery uses this to let an explicit
     /// re-include override the build-output heuristic.
+    #[doc(hidden)]
     pub fn is_reincluded(&self, path: &str, kind: PathKind) -> bool {
         self.leaf_polarity(path, kind.is_dir()) == Some(false)
     }
@@ -672,6 +674,7 @@ impl IgnoreStack {
     /// [`exclusion`](Self::exclusion) names there, so this is how a diagnostic learns a
     /// `.gitignore` rule stands behind it, at that depth or below (narrowing the override rule
     /// alone would leave the path excluded).
+    #[doc(hidden)]
     pub fn gitignore_exclusion(&self, path: &str, kind: PathKind) -> Option<Exclusion> {
         first_exclusion(path, kind.is_dir(), |prefix, dir| {
             last_match_layer(self.gitignore.iter(), prefix, dir)
@@ -688,6 +691,7 @@ impl IgnoreStack {
     /// argument NAMED, since an override rule excluding the path is the one to report even where a
     /// `.gitignore` excludes it first — re-including the path past the `.gitignore` would
     /// leave that rule standing.
+    #[doc(hidden)]
     pub fn override_exclusion(&self, path: &str, kind: PathKind) -> Option<Exclusion> {
         first_exclusion(path, kind.is_dir(), |prefix, dir| {
             last_match_layer(self.overrides.iter(), prefix, dir)
@@ -699,6 +703,7 @@ impl IgnoreStack {
     /// name the file a directory actually uses: telling someone to create a
     /// `.formatignore` beside the `.prettierignore` a directory reads would shadow every
     /// rule in it.
+    #[doc(hidden)]
     pub fn override_layer_source(&self, anchor: &str) -> Option<IgnoreSource> {
         let anchor = split_segments(anchor);
         self.overrides

@@ -266,8 +266,14 @@ pub fn strip_typescript(source: &str, source_type: JsValue) -> Result<JsValue, J
             Ok(stripped) => Ok(JsValue::from_str(&stripped.code)),
             Err(tsv_ts::StripError::Parse(e)) => parse_failure(&e).into_return(),
             // a refusal always reports; the `None` arm is unreachable, thrown with its message
-            Err(tsv_ts::StripError::Unsupported { kind, error, .. }) => match error.to_report() {
-                Some(report) => Ok(failure_result("unsupported", Some(kind.name()), &report)),
+            Err(tsv_ts::StripError::Unsupported {
+                construct, error, ..
+            }) => match error.to_report() {
+                Some(report) => Ok(failure_result(
+                    "unsupported",
+                    Some(construct.as_str()),
+                    &report,
+                )),
                 None => Err(err(format!("{error:#}"))),
             },
             // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is

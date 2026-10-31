@@ -9,7 +9,6 @@ publish = false
 
 [dependencies]
 tsv_lang.workspace = true
-tsv_html.workspace = true
 tsv_ts.workspace = true
 tsv_svelte.workspace = true
 # `json` (off in the workspace default) exposes `CssAtrule::public_prelude`, the

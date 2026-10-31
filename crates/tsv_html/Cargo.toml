@@ -4,9 +4,9 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
-description = "HTML element classification, whitespace rules and character-reference decoding, as Svelte reads HTML (support crate for tsv)"
+description = "HTML spec data: the named character references table, optional end tags and custom-element names (support crate for tsv)"
 categories = ["development-tools", "parser-implementations", "web-programming"]
-keywords = ["html", "svelte", "entities", "whitespace"]
+keywords = ["html", "whatwg", "entities", "parser"]
 # The named-reference table (`src/entities_table.rs`) is WHATWG's list incorporated into source
 # code, which WHATWG licenses under BSD-3-Clause; the rest is tsv's 0BSD. NOTICE carries both.
 license = "0BSD AND BSD-3-Clause"

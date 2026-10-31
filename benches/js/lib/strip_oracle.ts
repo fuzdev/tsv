@@ -10,7 +10,7 @@
  *   tsv's contract that every terminator survives verbatim. On an input holding none the
  *   derivation IS ts-blank-space's output, byte for byte.
  * - **Refusals.** When ts-blank-space reports a node through its `onError` callback the
- *   outcome is a refusal, recorded as `refusal.txt` spells it: tsv's `UnsupportedKind` name
+ *   outcome is a refusal, recorded as `refusal.txt` spells it: tsv's `UnsupportedConstruct` name
  *   and the node's start and end as `line:column` (1-based line, 0-based UTF-16 column,
  *   ECMAScript line terminators — tsv's `WirePoint`), the first reported node in source
  *   order.
@@ -40,7 +40,7 @@ export const ORACLE_VERSIONS = {
 	oxc_parser: (require('oxc-parser/package.json') as { version: string }).version
 };
 
-/** tsv's `UnsupportedKind` variant names: what a refusal record may name. */
+/** tsv's `UnsupportedConstruct` variant names: what a refusal record may name. */
 export const UNSUPPORTED_KINDS = [
 	'Enum',
 	'ValueNamespace',
@@ -50,7 +50,7 @@ export const UNSUPPORTED_KINDS = [
 	'TypeAssertion',
 	'AssertionGrouping'
 ] as const;
-export type UnsupportedKind = (typeof UNSUPPORTED_KINDS)[number];
+export type UnsupportedConstruct = (typeof UNSUPPORTED_KINDS)[number];
 
 /** What one strip produced: JS, or a refusal record (`Kind\tline:column\tline:column\n`). */
 export type Outcome = { code: string } | { refusal: string };
@@ -115,8 +115,8 @@ export function run_ts_blank_space(text: string, positions_in: string): Outcome 
 	};
 }
 
-/** tsv's `UnsupportedKind` name for a node ts-blank-space refuses. */
-function unsupported_kind(node: import('typescript').Node): UnsupportedKind {
+/** tsv's `UnsupportedConstruct` name for a node ts-blank-space refuses. */
+function unsupported_kind(node: import('typescript').Node): UnsupportedConstruct {
 	const k = ts.SyntaxKind;
 	switch (node.kind) {
 		case k.EnumDeclaration:

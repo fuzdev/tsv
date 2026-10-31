@@ -488,7 +488,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             || opening.self_closing
         {
             // Void and self-closing elements have no children or closing tag
-            // (classification lives in tsv_html, shared with the printer).
+            // (classification lives in `crate::html`, shared with the printer).
             self.advance()?; // consume >
             (&[], opening.after_gt as u32)
         } else if facts.is_raw_text() {

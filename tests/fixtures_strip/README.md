@@ -30,7 +30,7 @@ Every fixture directory holds one input — `input.ts`, `input.mts`, or `input.s
 and exactly one claim:
 
 - `expected.js` / `expected.mjs` / `expected.svelte.js` — the stripped JS, or
-- `refusal.txt` — `UnsupportedKind<TAB>line:column<TAB>line:column`, the refused kind and
+- `refusal.txt` — `UnsupportedConstruct<TAB>line:column<TAB>line:column`, the refused kind and
   its span (1-based line, 0-based UTF-16 column, ECMAScript line terminators).
 
 Plus a `README.md` saying what the fixture pins, and, when the claim departs from an
@@ -98,7 +98,7 @@ Where ts-blank-space is wrong, a fixture's `divergences.txt` holds `override ts-
 in place of a plain `ts-blank-space`, and its claim is hand-reviewed rather than derived.
 `strip:fixtures:update` never writes it; both tasks validate it instead, as they validate a
 derived claim — an expected output must parse under oxc-parser in JS mode and keep the
-position contract, a `refusal.txt` must name an `UnsupportedKind` and a span inside the
+position contract, a `refusal.txt` must name an `UnsupportedConstruct` and a span inside the
 input — then grade it against both oracles, so ts-blank-space's derivation must still
 disagree with it (a stale override fails, like a stale divergence) and a departure from
 Node must be declared with a plain `node` line. Node never derives a claim, so it takes no

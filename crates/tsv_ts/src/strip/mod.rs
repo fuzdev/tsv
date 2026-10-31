@@ -74,21 +74,22 @@ use tsv_lang::{Error, ErrorKind, ErrorReport};
 /// [`strip_with_goal`] names one exactly.
 ///
 /// ```
-/// use tsv_ts::{StripError, UnsupportedKind, WIRE_COORDINATES, strip};
+/// use tsv_ts::{StripError, UnsupportedConstruct, strip};
 ///
 /// assert_eq!(strip("let x: number = 1;").unwrap().code, "let x         = 1;");
 ///
 /// // an angle-bracket assertion cannot be blanked away: refused, with its span
 /// let source = "let x = <T>y;";
 /// let error = strip(source).unwrap_err();
-/// let StripError::Unsupported { kind, .. } = &error else {
+/// let StripError::Unsupported { construct, .. } = &error else {
 ///     panic!("expected a refusal");
 /// };
-/// assert_eq!(*kind, UnsupportedKind::TypeAssertion);
-/// let span = error.span().unwrap();
-/// assert_eq!(span, 8..12);
-/// let point = WIRE_COORDINATES.point(source, span.start);
-/// assert_eq!((point.line, point.column), (1, 8));
+/// assert_eq!(*construct, UnsupportedConstruct::TypeAssertion);
+/// assert_eq!(construct.as_str(), "type_assertion");
+/// // the refused bytes, and where they start as the JS a binding returns reports it
+/// assert_eq!(error.span(), Some(8..12));
+/// let report = error.to_report().unwrap();
+/// assert_eq!((report.start.line, report.start.column), (1, 8));
 /// assert_eq!(error.to_string(), "cannot strip an angle-bracket type assertion (1:9)");
 /// assert_eq!(
 ///     format!("{error:#}"),
@@ -190,10 +191,12 @@ pub struct Stripped {
 /// one line under `{}`, the `line:col` header, excerpt and caret under `{:#}`.
 ///
 /// ```
-/// use tsv_ts::{ErrorKind, StripError, UnsupportedKind, strip};
+/// use tsv_ts::{ErrorKind, StripError, UnsupportedConstruct, strip};
 ///
 /// match strip("enum E { A }") {
-///     Err(StripError::Unsupported { kind, .. }) => assert_eq!(kind, UnsupportedKind::Enum),
+///     Err(StripError::Unsupported { construct, .. }) => {
+///         assert_eq!(construct, UnsupportedConstruct::Enum);
+///     }
 ///     other => panic!("expected a refusal, got {other:?}"),
 /// }
 /// let err = strip("let x =").unwrap_err();
@@ -213,10 +216,10 @@ pub enum StripError {
     #[non_exhaustive]
     Unsupported {
         /// What was refused.
-        kind: UnsupportedKind,
+        construct: UnsupportedConstruct,
         /// The refusal as an [`Error`] of [`ErrorKind::Refusal`]: its span the refused
         /// construct's bytes, its message `cannot strip <the construct>` over the frame of
-        /// the span's start, in [`crate::WIRE_COORDINATES`].
+        /// the span's start ([`Error::to_report`]'s `start`).
         error: Error,
     },
 }
@@ -225,7 +228,7 @@ pub enum StripError {
 /// erasure would have to transform it rather than blank it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum UnsupportedKind {
+pub enum UnsupportedConstruct {
     /// A non-`declare` `enum`, `const enum` included.
     Enum,
     /// A non-`declare` `namespace` holding a value member.
@@ -248,12 +251,12 @@ pub enum UnsupportedKind {
     AssertionGrouping,
 }
 
-impl UnsupportedKind {
+impl UnsupportedConstruct {
     /// The construct's wire name — snake_case, the `construct` a JS refusal carries
     /// (`enum`, `value_namespace`, `parameter_property`, `import_equals`, `export_equals`,
     /// `type_assertion`, `assertion_grouping`).
     #[must_use]
-    pub const fn name(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Enum => "enum",
             Self::ValueNamespace => "value_namespace",
@@ -265,7 +268,9 @@ impl UnsupportedKind {
         }
     }
 
-    /// The construct as a refusal's message names it, after `cannot strip `.
+    /// The construct as a refusal's message names it, after `cannot strip `. Hidden: the
+    /// message's wording, read only by the refusal's own rendering.
+    #[doc(hidden)]
     #[must_use]
     pub const fn description(self) -> &'static str {
         match self {
@@ -281,9 +286,9 @@ impl UnsupportedKind {
 }
 
 impl StripError {
-    /// A refusal of `kind` over the bytes `span` of `source`, the text that was stripped.
-    fn unsupported(kind: UnsupportedKind, source: &str, span: Range<usize>) -> Self {
-        let message = format!("cannot strip {}", kind.description());
+    /// A refusal of `construct` over the bytes `span` of `source`, the text that was stripped.
+    fn unsupported(construct: UnsupportedConstruct, source: &str, span: Range<usize>) -> Self {
+        let message = format!("cannot strip {}", construct.description());
         let error = Error::refusal(
             &message,
             source,
@@ -291,7 +296,7 @@ impl StripError {
             span.end,
             crate::WIRE_COORDINATES,
         );
-        StripError::Unsupported { kind, error }
+        StripError::Unsupported { construct, error }
     }
 
     /// The failure as a [`tsv_lang::Error`]: a parse error's own, or the refusal's — one
@@ -357,7 +362,7 @@ impl std::error::Error for StripError {
 
 #[cfg(test)]
 mod tests {
-    use super::{StripError, UnsupportedKind, strip};
+    use super::{StripError, UnsupportedConstruct, strip};
 
     fn strip_error(source: &str) -> StripError {
         match strip(source) {
@@ -375,7 +380,7 @@ mod tests {
         assert!(matches!(
             error,
             StripError::Unsupported {
-                kind: UnsupportedKind::Enum,
+                construct: UnsupportedConstruct::Enum,
                 ..
             }
         ));
@@ -623,10 +628,10 @@ mod tests {
     fn a_chain_assertion_is_refused_before_its_operand_is_walked() {
         let source = "x = <T>a + b as U * c;\n";
         let error = strip_error(source);
-        let StripError::Unsupported { kind, .. } = &error else {
+        let StripError::Unsupported { construct, .. } = &error else {
             panic!("expected a refusal");
         };
-        assert_eq!(*kind, UnsupportedKind::AssertionGrouping);
+        assert_eq!(*construct, UnsupportedConstruct::AssertionGrouping);
         assert_eq!(
             &source[error.span().expect("a refusal has a span")],
             "<T>a + b as U"
@@ -653,18 +658,24 @@ mod tests {
     }
 
     #[test]
-    fn every_kind_has_a_snake_case_name() {
-        for (kind, name) in [
-            (UnsupportedKind::Enum, "enum"),
-            (UnsupportedKind::ValueNamespace, "value_namespace"),
-            (UnsupportedKind::ParameterProperty, "parameter_property"),
-            (UnsupportedKind::ImportEquals, "import_equals"),
-            (UnsupportedKind::ExportEquals, "export_equals"),
-            (UnsupportedKind::TypeAssertion, "type_assertion"),
-            (UnsupportedKind::AssertionGrouping, "assertion_grouping"),
+    fn every_construct_has_a_snake_case_name() {
+        for (construct, name) in [
+            (UnsupportedConstruct::Enum, "enum"),
+            (UnsupportedConstruct::ValueNamespace, "value_namespace"),
+            (
+                UnsupportedConstruct::ParameterProperty,
+                "parameter_property",
+            ),
+            (UnsupportedConstruct::ImportEquals, "import_equals"),
+            (UnsupportedConstruct::ExportEquals, "export_equals"),
+            (UnsupportedConstruct::TypeAssertion, "type_assertion"),
+            (
+                UnsupportedConstruct::AssertionGrouping,
+                "assertion_grouping",
+            ),
         ] {
-            assert_eq!(kind.name(), name);
-            assert!(!kind.description().is_empty());
+            assert_eq!(construct.as_str(), name);
+            assert!(!construct.description().is_empty());
         }
     }
 }

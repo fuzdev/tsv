@@ -1,3 +1,3 @@
 # enum
 
-A non-`declare` `enum` is refused (`UnsupportedKind::Enum`); the span is the declaration.
+A non-`declare` `enum` is refused (`UnsupportedConstruct::Enum`); the span is the declaration.

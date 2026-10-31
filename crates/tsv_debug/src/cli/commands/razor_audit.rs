@@ -469,7 +469,7 @@ fn for_each_eligible_text(source: &str, f: &mut dyn FnMut(&str, usize)) {
                 FragmentNode::Element(e) => {
                     if !emits_verbatim_body(e, source) {
                         let child_preserve =
-                            preserve || tsv_html::svelte::preserves_whitespace(e.name(source));
+                            preserve || tsv_svelte::__private::preserves_whitespace(e.name(source));
                         walk(&e.fragment, source, child_preserve, f);
                     }
                 }

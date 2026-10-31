@@ -1,3 +1,3 @@
 # type_assertion
 
-An angle-bracket type assertion is refused (`UnsupportedKind::TypeAssertion`); the span is the assertion expression.
+An angle-bracket type assertion is refused (`UnsupportedConstruct::TypeAssertion`); the span is the assertion expression.

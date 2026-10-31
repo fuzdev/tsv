@@ -17,7 +17,7 @@
 //!   significant, kind — space vs newline — is not);
 //! - whitespace at the **start and end of an element's content** is removed
 //!   completely;
-//! - exceptions: `<pre>` / `<textarea>` (`tsv_html::svelte::preserves_whitespace`),
+//! - exceptions: `<pre>` / `<textarea>` (`tsv_svelte::__private::preserves_whitespace`),
 //!   inside which whitespace is verbatim.
 //!
 //! Only **ASCII** whitespace (space, tab, LF, CR, FF) collapses; U+00A0
@@ -333,7 +333,7 @@ pub(crate) fn for_each_fragment(
 fn node_preserves_whitespace(map: &serde_json::Map<String, Value>) -> bool {
     map.get("name")
         .and_then(Value::as_str)
-        .is_some_and(tsv_html::svelte::preserves_whitespace)
+        .is_some_and(tsv_svelte::__private::preserves_whitespace)
 }
 
 /// Apply collapse + content-boundary trim to one fragment's node list.

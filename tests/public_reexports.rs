@@ -11,13 +11,16 @@ macro_rules! names_every_reexport {
             let _: PhantomData<$krate::Error> = PhantomData;
             let _: PhantomData<$krate::ErrorKind> = PhantomData;
             let _: PhantomData<$krate::ErrorReport> = PhantomData;
-            let _: PhantomData<$krate::LeadingBom> = PhantomData;
-            let _: PhantomData<$krate::LineRule> = PhantomData;
             let _: PhantomData<$krate::Result<()>> = PhantomData;
-            let _: PhantomData<$krate::WireCoordinates> = PhantomData;
             let _: PhantomData<$krate::WirePoint> = PhantomData;
             let _: usize = $krate::STACK_SIZE;
             let _ = $krate::run_with_stack::<fn(), ()>;
+            // plumbing: `#[doc(hidden)]` re-exports, outside semver, named here only because
+            // the sibling crates and tsv's tooling reach them through these paths
+            let _: PhantomData<$krate::LeadingBom> = PhantomData;
+            let _: PhantomData<$krate::LineRule> = PhantomData;
+            let _: PhantomData<$krate::WireCoordinates> = PhantomData;
+            let _ = $krate::WIRE_COORDINATES;
         };
     };
 }

@@ -719,7 +719,7 @@ fn collect_blank_skip(node: &Value, map: &Utf16ToByte, out: &mut Vec<(usize, usi
                     if obj
                         .get("name")
                         .and_then(Value::as_str)
-                        .is_some_and(tsv_html::svelte::preserves_whitespace) =>
+                        .is_some_and(tsv_svelte::__private::preserves_whitespace) =>
                 {
                     if let Some(span) = map.node_byte_span(node) {
                         out.push(span);

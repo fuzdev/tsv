@@ -126,10 +126,12 @@ pub struct WireCoordinates {
     pub bom: LeadingBom,
 }
 
-/// One position in a language's wire coordinates ([`WireCoordinates`]): the offset a
-/// wire node starting at that byte would carry as its `start`, and the `loc` point
-/// `tsv parse --locations` (and the npm packages' `create_locator(…).position_at(start)`)
-/// gives it.
+/// One position in a language's wire coordinates: the offset a wire node starting at that
+/// byte would carry as its `start`, and the `loc` point `tsv parse --locations` (and the npm
+/// packages' `create_locator(…).position_at(start)`) gives it. The coordinates are the
+/// language's canonical parser's: a leading byte-order mark counted for TypeScript (acorn)
+/// and elided for Svelte and CSS, and lines ended by ECMAScript's terminators for
+/// TypeScript and by `\n` alone for Svelte and CSS.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct WirePoint {

@@ -86,6 +86,9 @@ const DEFERRED_BUG: &str = "delimiter-deferred-bug";
 ///   (url/color paren finds — not candidates).
 /// - `at-rule-range` — connector keyword in a normalized CSS at-rule range prelude.
 /// - `jsdoc-tag` — scans a value/comment string for `@type`/`@satisfies` cast tags.
+/// - `char-reference` — the `&` opening an HTML character reference, over decoded-to-be
+///   template text or an attribute value: neither holds a comment or a string, so every `&`
+///   is a candidate.
 /// - `raw-text-close` — the `<` hop inside a raw-text close scan (`</script>` /
 ///   `</style>`). Comment/string blindness is this scan's **contract**, not an
 ///   oversight: it ports Svelte's own `read_until(regex_closing_script_tag)`, so a
@@ -153,6 +156,11 @@ const ALLOW: &[Allow] = &[
         "terminator-fold",
     ),
     // ── tsv_svelte ───────────────────────────────────────────────────────────
+    (
+        "tsv_svelte/src/html/entities.rs",
+        "let Some(first) = html.find('&') else {",
+        "char-reference",
+    ),
     (
         "tsv_svelte/src/parser/mod.rs",
         "while let Some(rel) = source.get(i..)?.find('<') {",

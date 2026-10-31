@@ -76,13 +76,13 @@ The formatter can absorb looseness; a tool built on a loose model inherits it as
 ```
 tsv/
 ├── tsv_lang     # Foundation (Span, Doc, errors, printing utilities)
-├── tsv_html     # HTML classification (pure functions)
+├── tsv_html     # HTML spec data: named character references, optional end tags (pure functions)
 ├── tsv_ignore   # gitignore-aware discovery matcher (hierarchical .gitignore + .formatignore/.prettierignore)
 ├── tsv_discover # file-discovery policy (build-output heuristic + safety-net pruning) over tsv_ignore
 ├── tsv_ts       # TypeScript parser/formatter (standalone)
 ├── tsv_css      # CSS parser/formatter (standalone)
 ├── tsv_svelte   # Svelte parser/formatter (uses tsv_ts + tsv_css)
-├── tsv_svelte_compile # experimental Svelte→JS compiler + JS canonicalizer (uses tsv_svelte + tsv_ts + tsv_css + tsv_html; consumed only by tsv_debug and the integration tests)
+├── tsv_svelte_compile # experimental Svelte→JS compiler + JS canonicalizer (uses tsv_svelte + tsv_ts + tsv_css; consumed only by tsv_debug and the integration tests)
 ├── tsv_check    # experimental TypeScript binder/checker, may never ship (uses tsv_ts + tsv_lang; consumed only by tsv_debug)
 ├── tsv_cli      # Production CLI binary (pure Rust)
 ├── tsv_debug    # Dev utilities (uses embedded Deno sidecar for JS tools)
@@ -123,7 +123,7 @@ closed-scope/open-convention stance below.
                         depends on tsv_lang + tsv_ts; consumed ONLY by tsv_debug,
                         so no shipped format/parse artifact links it)
             tsv_svelte_compile  (experimental Svelte→JS compiler + JS canonicalizer —
-                        depends on tsv_lang + tsv_html + tsv_ts + tsv_css + tsv_svelte;
+                        depends on tsv_lang + tsv_ts + tsv_css + tsv_svelte;
                         consumed ONLY by tsv_debug and the integration tests, so no shipped artifact links it)
 
    tsv_cli, tsv_wasm, and tsv_napi also consume tsv_discover (→ tsv_ignore).
@@ -508,7 +508,7 @@ All parsers are fail-fast. Error context is computed **once, on the error path**
 parser.parse().map_err(|e| e.with_context(source, WIRE_COORDINATES))
 ```
 
-The context holds two things. The error's **point** (`Error::wire_point`) is where it sits in the wire's coordinates — the `start` a wire node there would carry and the `loc` the document's line rule gives it ([§`loc` lines](#loc-lines-one-rule-per-document)) — and the message's `line:col` header prints it. The **excerpt** under the message is a display line, bounded by every ECMAScript terminator whatever the language and never echoing a leading BOM, with a caret padded by display width. A format entry point parses the CR-folded text, so its error is mapped back onto the caller's bytes (`FoldedSource::parse_with`): its point is in the caller's own coordinates, the one a parse at the same goal reports for the same error. The npm packages return it as the `{kind: 'parse', message, frame, start, end, loc}` error of an `{ok: false}` result — the summary and the header-excerpt-caret frame apart (`Error::to_report`), the point as a span whose `end` is its `start` ([docs/cli.md §Parse errors](./cli.md#parse-errors)).
+The context holds two things. The error's **point** (`Error::to_report`'s `start`) is where it sits in the wire's coordinates — the `start` a wire node there would carry and the `loc` the document's line rule gives it ([§`loc` lines](#loc-lines-one-rule-per-document)) — and the message's `line:col` header prints it. The **excerpt** under the message is a display line, bounded by every ECMAScript terminator whatever the language and never echoing a leading BOM, with a caret padded by display width. A format entry point parses the CR-folded text, so its error is mapped back onto the caller's bytes (`FoldedSource::parse_with`): its point is in the caller's own coordinates, the one a parse at the same goal reports for the same error. The npm packages return it as the `{kind: 'parse', message, frame, start, end, loc}` error of an `{ok: false}` result — the summary and the header-excerpt-caret frame apart (`Error::to_report`), the point as a span whose `end` is its `start` ([docs/cli.md §Parse errors](./cli.md#parse-errors)).
 
 ## Printer Architecture
 
@@ -565,7 +565,7 @@ nodes/                        # Element and fragment printing
   tags_doc.rs                 #   Doc construction for template tags (@html, @const, {const}/{let}, @debug, @render)
   special_doc.rs              #   Doc construction for svelte:* special elements
   helpers.rs                  #   Node-specific helpers
-classification/               # HTML element classification (delegates to tsv_html)
+classification/               # HTML element classification (delegates to the crate's `html` module)
   element.rs                  #   Element type classification
 ```
 
@@ -894,33 +894,38 @@ The `fits()` lookahead runs on an inline `SmallVec` stack, and the render loop's
 
 Profiling methodology — including when to reach for heap profiling — is in [performance.md](./performance.md).
 
-## HTML Classification (tsv_html)
+## HTML Classification (tsv_html, tsv_svelte's `html`)
 
-Pure functions for element classification, independent of any tool. The crate root is reserved
-for answers that follow the HTML spec; the `svelte` module holds the answers Svelte's compiler
-and prettier-plugin-svelte give, which tsv's Svelte support must reproduce exactly:
+Two homes, split by whose answer it is. `tsv_html` (published) holds HTML spec data and the
+answers the spec gives — the long-term target is a spec-faithful HTML library:
 
 ```rust
-// The crate root: spec-grounded
+pub fn match_named_character_reference(input: &str) -> Option<(usize, &'static str)>; // the named character references table
 pub fn optional_end_tag(name: &str) -> Option<OptionalEndTag>; // then `is_closed_by(next)`
 pub fn is_custom_element_name_char(c: char) -> bool;
-pub enum ReferenceContext { Text, AttributeValue, /* … */ }
+```
 
-// tsv_html::svelte — element classification
+The answers Svelte's compiler and prettier-plugin-svelte give, which tsv's Svelte support must
+reproduce exactly, are private to `tsv_svelte` (its `html` module; `tsv_svelte_compile` and
+`tsv_debug` reach the few they read through `tsv_svelte::__private`):
+
+```rust
+// element classification
 pub fn is_block_element(name: &str) -> bool;
 pub fn is_void_element(name: &str) -> bool;
 pub fn is_foreign_element(name: &str) -> bool;  // SVG/MathML
 pub fn is_svg_element(name: &str) -> bool;
 pub fn is_mathml_element(name: &str) -> bool;
 
-// tsv_html::svelte — whitespace and entities
+// whitespace and entities
 pub fn preserves_whitespace(name: &str) -> bool;
 pub fn decode_character_references(html: &str, context: ReferenceContext) -> Cow<'_, str>;
 ```
 
-Inline-ness is derived by negation in consumers (`!is_block_element(...)`) — no positive inline list is exported.
+Inline-ness is derived by negation in consumers (`!is_block_element(...)`) — no positive inline list exists.
 
-Enables reuse across formatter, linter, LSP, compiler without duplication.
+Pure functions over names and text, independent of any one tool, so the formatter, a linter, an
+LSP and the compiler share them without duplication.
 
 ## Fixture-Driven Development
 

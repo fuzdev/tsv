@@ -10,7 +10,8 @@ Depends on:
 - `tsv_svelte` — component parsing (`parse`) and the internal Svelte AST the transform walks
 - `tsv_ts` — the internal TS AST the generator constructs, plus `parse_with_goal` and the canonical reprint (`format_canonical`)
 - `tsv_css` — the parsed stylesheet the scoping analysis reads
-- `tsv_html` — element classification (SVG / MathML); void elements come through
+- element classification (SVG / MathML) through `tsv_svelte::__private` (`is_svg_element`,
+  `is_mathml_element`, `tsv_svelte`'s private `html` module); void elements come through
   `tsv_svelte::ast::is_svelte_void`, Svelte's `is_void` (the element set plus `!doctype`)
 
 Oracle: Svelte's own `compile()`. The compiler is measured against it not on raw

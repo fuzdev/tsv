@@ -6,7 +6,7 @@
 //! code generator or JSON parser into a consumer's build. `entities_table_is_fresh` renders
 //! the table and fails when the committed file differs; `deno task entities:update` (the
 //! same test with `TSV_ENTITIES_UPDATE=1`) writes it instead. A unit test rather than an
-//! integration test because it builds the table with the decoder's own private hash. So a
+//! integration test because it builds the table with the lookup's own private hash. So a
 //! table too broken to compile (deleted, or a merge conflict in it) is restored from git
 //! first; the generator reads none of it. The JSON stays in the repository (the published
 //! crate excludes it), so the test skips when it is absent rather than failing a test run

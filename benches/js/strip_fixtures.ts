@@ -14,7 +14,7 @@
  *   is tsv's contract that every terminator survives verbatim. On an input holding none
  *   the derivation IS ts-blank-space's output, byte for byte.
  * - **Refusals.** When ts-blank-space reports a node through its `onError` callback the
- *   fixture is a refusal: `refusal.txt` records tsv's `UnsupportedKind` name and the
+ *   fixture is a refusal: `refusal.txt` records tsv's `UnsupportedConstruct` name and the
  *   node's start and end as `line:column` (1-based line, 0-based UTF-16 column,
  *   ECMAScript line terminators — tsv's `WirePoint`), the first reported node in source
  *   order.
@@ -30,7 +30,7 @@
  *   place of a plain `ts-blank-space`) makes the claim a hand-reviewed one: the committed
  *   `expected.*` or `refusal.txt` is not derived and never written, but validated — an
  *   output must keep the position contract below and pass the JS-validity guard, a refusal
- *   must name an `UnsupportedKind` and a span inside the input — and graded against both
+ *   must name an `UnsupportedConstruct` and a span inside the input — and graded against both
  *   oracles like a derived claim. The derivation must still disagree with it, or the
  *   override is stale and fails. Node never derives a claim, so a plain `node` line
  *   already declares a claim that stands against Node; only ts-blank-space is overridden.
@@ -188,7 +188,7 @@ function offset_of(text: string, line: number, column: number): number | null {
 
 /**
  * What is wrong with a hand-reviewed `refusal.txt`, or `null`: one line
- * `Kind<TAB>line:column<TAB>line:column`, the kind an `UnsupportedKind`, both points inside
+ * `Kind<TAB>line:column<TAB>line:column`, the kind an `UnsupportedConstruct`, both points inside
  * the input and in order.
  */
 function refusal_failure(input: string, refusal: string): string | null {
@@ -196,7 +196,7 @@ function refusal_failure(input: string, refusal: string): string | null {
 	if (!match) return 'malformed — expected `Kind<TAB>line:column<TAB>line:column`';
 	const [, kind, start_line, start_column, end_line, end_column] = match;
 	if (!(UNSUPPORTED_KINDS as ReadonlyArray<string>).includes(kind!)) {
-		return `${kind} is no UnsupportedKind (${UNSUPPORTED_KINDS.join(', ')})`;
+		return `${kind} is no UnsupportedConstruct (${UNSUPPORTED_KINDS.join(', ')})`;
 	}
 	const start = offset_of(input, Number(start_line), Number(start_column));
 	const end = offset_of(input, Number(end_line), Number(end_column));

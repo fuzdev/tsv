@@ -3248,7 +3248,7 @@ const spaced_tag_travel: DivergencePattern = {
 /**
  * Void elements have no content fragment, so a run after their tag is inter-sibling.
  *
- * The authority is the Rust list — `VOID_ELEMENTS` in `crates/tsv_html/src/elements.rs`
+ * The authority is the Rust list — `VOID_NAMES` in `crates/tsv_svelte/src/html/elements.rs`
  * (mirroring Svelte's `VOID_ELEMENT_NAMES`), which the formatter itself classifies
  * against; this is a hand-copy of it and must track it. `command` and `keygen` are
  * obsolete in the HTML spec but ARE void there, so they belong here too: omitting one

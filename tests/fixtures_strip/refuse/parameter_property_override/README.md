@@ -1,6 +1,6 @@
 # parameter_property_override
 
-`override` on a constructor parameter makes it a parameter property, like `public` or `readonly`: TypeScript emits the `this.a = a` assignment. Refused (`UnsupportedKind::ParameterProperty`); the span is the modifier.
+`override` on a constructor parameter makes it a parameter property, like `public` or `readonly`: TypeScript emits the `this.a = a` assignment. Refused (`UnsupportedConstruct::ParameterProperty`); the span is the modifier.
 
 ## Override
 

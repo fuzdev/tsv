@@ -47,7 +47,7 @@ use crate::render_normalize::{
 /// Membership asks one question — does this tag's **UA-stylesheet display**
 /// (`../html/source`, rendering section) make adjacent collapsible whitespace
 /// non-rendering? — and it must be answered UNCONDITIONALLY. That is a different
-/// question from `tsv_html::svelte::is_block_element`, the *formatting* set, and the two
+/// question from `tsv_svelte`'s private `is_block_element`, the *formatting* set, and the two
 /// differ in **both** directions rather than one being a subset of the other:
 ///
 /// - Here but not there: `thead`/`tbody`/`tr`/`td`/`th`. Their display is
@@ -67,7 +67,7 @@ use crate::render_normalize::{
 /// The five tags that ARE shared with the formatting set — `details`, `hgroup`,
 /// `menu`, `pre`, `summary` — are unconditionally block there, and they are also
 /// the whole of this oracle's exposure: a break can only ever appear at a
-/// `tsv_html` block element, so any tag outside that set costs nothing to omit and
+/// formatting-block element, so any tag outside that set costs nothing to omit and
 /// omitting it keeps the sensitivity.
 ///
 /// TODO: neither arm models `display: none` at all, so a closed `<dialog>`'s
@@ -332,7 +332,7 @@ mod tests {
     /// The five tags the formatting set carries that this one lacked. Each is
     /// UNCONDITIONALLY `display: block` in the UA stylesheet, so a formatter break
     /// at its boundary is not a render change — and since a break can only appear
-    /// at a `tsv_html` block element, these five were the whole of the gap.
+    /// at a formatting-block element, these five were the whole of the gap.
     #[test]
     fn unconditionally_block_tags_drop_boundary_whitespace() {
         for tag in ["details", "hgroup", "menu", "pre", "summary"] {
@@ -345,7 +345,7 @@ mod tests {
         }
     }
 
-    /// ⚠️ `dialog` is deliberately NOT a member, though `tsv_html` classifies it
+    /// ⚠️ `dialog` is deliberately NOT a member, though `tsv_svelte` classifies it
     /// block for formatting. `dialog:not([open]) { display: none; }` means the
     /// attribute-less spelling generates no box, so its neighbours share one inline
     /// formatting context and the boundary whitespace collapses to a RENDERED

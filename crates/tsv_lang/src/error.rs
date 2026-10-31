@@ -411,7 +411,7 @@ pub struct ErrorReport {
 /// # Equality
 ///
 /// Two errors are equal when they are observably the same error: the same
-/// [`Error::kind`], [`Error::span`] and [`Error::wire_point`], and the same full message
+/// [`Error::kind`] and [`Error::span`], the same located point, and the same full message
 /// (the `{:#}` form, which carries the summary and the frame). Nothing else is compared —
 /// no internal classification an error carries beside its message.
 ///
@@ -626,8 +626,8 @@ impl Error {
     /// The surfaces split on it: the CLI prints `Parse error:` for [`ErrorKind::Syntax`]
     /// and [`ErrorKind::TooDeep`] (both located, so both carry a frame) and `Error:` for the
     /// rest, and a binding reads the refusal line from [`ErrorReport::kind`]. A
-    /// whole-document parse entry point fills every located error's context, so on its
-    /// errors `Syntax | TooDeep` is exactly `wire_point().is_some()`.
+    /// whole-document parse entry point fills every located error's context, so every
+    /// error it returns but [`ErrorKind::TooLarge`] has an [`Error::to_report`].
     #[inline]
     #[must_use]
     pub fn kind(&self) -> ErrorKind {
@@ -686,7 +686,7 @@ impl Error {
     /// The message is rendered here, with the `line:col` header and excerpt of `start` in
     /// `source` under `coordinates` that a located error prints, so it reads like every other
     /// error, and the span is kept ([`Error::to_report`]). But it is **not a syntax error** —
-    /// no [`Error::position`], no [`Error::wire_point`], [`Error::kind`]
+    /// no [`Error::position`], no `Error::wire_point`, [`Error::kind`]
     /// [`ErrorKind::Refusal`]: the source is not malformed (`parse` accepts it),
     /// so every surface reports it apart from a parse failure — the CLI's `Error:` prefix, the
     /// npm facade's `kind: 'refused'`.
@@ -800,7 +800,7 @@ impl Error {
 
     /// Fill in where the error sits in `source` — the document every position of this
     /// error indexes — under the document's `coordinates`: the point its message header
-    /// prints and [`Error::wire_point`] reports, and the line excerpted under it. Each
+    /// prints and `Error::wire_point` reports, and the line excerpted under it. Each
     /// language crate's public parse entry points call this with that language's
     /// coordinates (`tsv_ts::WIRE_COORDINATES` and its siblings). The embedded entry points
     /// `tsv_svelte` uses for `<script>` / `<style>` bodies do not: their source is a slice of
@@ -836,7 +836,9 @@ impl Error {
     /// `None` for a source over the `u32` cap ([`ErrorKind::TooLarge`]) and for a refusal,
     /// whose span is [`Error::to_report`]'s (and, as for [`Error::to_report`], for an error from
     /// tsv's embedded plumbing its host has not located yet, which no public entry point
-    /// returns).
+    /// returns). Hidden: [`Error::to_report`]'s `start` is the public spelling, and it
+    /// answers a refusal too.
+    #[doc(hidden)]
     #[must_use]
     pub fn wire_point(&self) -> Option<WirePoint> {
         self.0

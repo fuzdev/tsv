@@ -153,10 +153,9 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
 use tsv_lang::{CommentFreeWindow, EmbedContext};
-pub use tsv_lang::{
-    Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, STACK_SIZE, WireCoordinates,
-    WirePoint, run_with_stack,
-};
+pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, STACK_SIZE, WirePoint, run_with_stack};
+#[doc(hidden)]
+pub use tsv_lang::{LeadingBom, LineRule, WireCoordinates};
 
 // `tests/public_reexports.rs` (outside this crate) names every item above through this
 // crate's path: cargo-semver-checks cannot see a dropped or demoted re-export.
@@ -168,13 +167,15 @@ struct ReadmeDoctests;
 
 pub use formatter::Formatter;
 pub use goal::{Goal, ParseGoalError};
-pub use strip::{StripError, Stripped, UnsupportedKind, strip, strip_with_goal};
+pub use strip::{StripError, Stripped, UnsupportedConstruct, strip, strip_with_goal};
 
 /// The coordinates a TypeScript document's positions are reported in — acorn's: a
 /// leading BOM **counted** (acorn reads U+FEFF as whitespace, so it is one UTF-16 unit at
 /// offset 0), and ECMAScript's line terminators (LF, CR, CRLF as one, U+2028, U+2029).
 /// The wire writer's tables and every parse error's point (`Error::wire_point`, and
-/// the `line:col` its message prints) read this one statement.
+/// the `line:col` its message prints) read this one statement. Hidden: plumbing for the
+/// sibling crates.
+#[doc(hidden)]
 pub const WIRE_COORDINATES: WireCoordinates =
     WireCoordinates::new(LineRule::Ecmascript, LeadingBom::Counted);
 

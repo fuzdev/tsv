@@ -1,6 +1,7 @@
 tsv includes the WHATWG HTML Living Standard's list of named character references. It
-is the table of the tsv_html crate's entity decoder, which tsv's Svelte support compiles
-in, and with it every tsv binary, N-API addon and WebAssembly module; this notice ships
+is the tsv_html crate's table (`match_named_character_reference`), which tsv's Svelte
+parser decodes character references against and so compiles into every tsv binary, N-API
+addon and WebAssembly module; this notice ships
 with the tsv_html crate and with each tsv npm package and GitHub Release.
 
   Source:   https://html.spec.whatwg.org/entities.json

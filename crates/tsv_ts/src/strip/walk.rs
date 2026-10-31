@@ -31,7 +31,7 @@ use crate::ast::{
 
 use super::blank::{Edit, Mark};
 use super::scan::{Continuation, EXPONENT_PRECEDENCE, Source};
-use super::{StripError, UnsupportedKind};
+use super::{StripError, UnsupportedConstruct};
 
 /// Where a statement stands: an element of a statement list, or the lone body of an `if` /
 /// loop / label / `with`, where a statement blanked whole always becomes an empty statement
@@ -48,7 +48,7 @@ pub(super) struct Walk<'s, 'b> {
     src: Source<'s>,
     edits: BumpVec<'b, Edit>,
     /// The refusal with the earliest start — the one ts-blank-space reports first.
-    refusal: Option<(UnsupportedKind, Span)>,
+    refusal: Option<(UnsupportedConstruct, Span)>,
     /// The end of the last JS node marked (`Walk::mark`), `None` where nothing is marked yet (the
     /// start of the program, and of a function body): ts-blank-space's `semicolonNeeded` (module docs), read through
     /// `Walk::semicolon_needed`.
@@ -172,7 +172,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         self.blank_whole(span, hazard || position == Position::Nested);
     }
 
-    fn refuse(&mut self, kind: UnsupportedKind, span: Span) {
+    fn refuse(&mut self, kind: UnsupportedConstruct, span: Span) {
         if self
             .refusal
             .is_none_or(|(_, earlier)| span.start < earlier.start)
@@ -276,7 +276,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                     self.blank_statement(outer, position);
                     return false;
                 }
-                self.refuse(UnsupportedKind::Enum, outer);
+                self.refuse(UnsupportedConstruct::Enum, outer);
                 true
             }
             StatementKind::TSModuleDeclaration(decl) => {
@@ -284,7 +284,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                     self.blank_statement(outer, position);
                     return false;
                 }
-                self.refuse(UnsupportedKind::ValueNamespace, outer);
+                self.refuse(UnsupportedConstruct::ValueNamespace, outer);
                 true
             }
             StatementKind::ReturnStatement(s) => {
@@ -323,7 +323,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 true
             }
             StatementKind::TSExportAssignment(_) => {
-                self.refuse(UnsupportedKind::ExportEquals, outer);
+                self.refuse(UnsupportedConstruct::ExportEquals, outer);
                 true
             }
             // `export as namespace N;` is kept verbatim, as both oracles keep it: it declares
@@ -331,7 +331,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             StatementKind::TSNamespaceExportDeclaration(_) => true,
             StatementKind::ImportDeclaration(import) => self.import(import, outer, position),
             StatementKind::TSImportEqualsDeclaration(_) => {
-                self.refuse(UnsupportedKind::ImportEquals, outer);
+                self.refuse(UnsupportedConstruct::ImportEquals, outer);
                 true
             }
             StatementKind::IfStatement(s) => {
@@ -924,7 +924,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             ExpressionKind::RestElement(rest) => self.rest_element(rest),
             ExpressionKind::TSTypeAssertion(assertion) => {
-                self.refuse(UnsupportedKind::TypeAssertion, e.span);
+                self.refuse(UnsupportedConstruct::TypeAssertion, e.span);
                 self.expr(assertion.expression);
             }
             ExpressionKind::TSAsExpression(assertion) => {
@@ -1057,7 +1057,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     ) -> Option<u32> {
         let blank_from = self.assertion_blank_start(operand, ty, keyword);
         if self.assertion_regroups(span, operand, blank_from != operand.span.end) {
-            self.refuse(UnsupportedKind::AssertionGrouping, span);
+            self.refuse(UnsupportedConstruct::AssertionGrouping, span);
             return None;
         }
         Some(blank_from)
@@ -1158,7 +1158,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             })
             .min_by_key(|found| found.start)
             .unwrap_or_else(|| Span::new(span.start, end));
-        self.refuse(UnsupportedKind::ParameterProperty, first);
+        self.refuse(UnsupportedConstruct::ParameterProperty, first);
     }
 
     //

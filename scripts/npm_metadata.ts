@@ -41,7 +41,7 @@ export const NPM_SHARED_METADATA = {
 /**
  * The third-party notice every published tsv package ships, and every GitHub Release
  * carries beside its CLI binaries: the WHATWG license for the named character references
- * table compiled into each engine (`tsv_html`'s entity decoder). BSD 3-Clause, which
+ * table compiled into each engine (`tsv_html`'s named-reference table). BSD 3-Clause, which
  * governs the table as source code, requires its notice in the documentation of any
  * binary distribution, and every wasm bundle, N-API addon and CLI binary is one.
  *

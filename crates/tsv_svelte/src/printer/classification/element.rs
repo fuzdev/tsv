@@ -3,8 +3,8 @@
 // The name-derived facts are computed once at parse
 // ([`TagFacts`](crate::ast::TagFacts), stored on `Element::facts`); this module holds
 // the printer-specific overlay on top of them — a Component is inline, and a `<script>`/`<style>`
-// with content is block. The pure per-name classification lives in the `tsv_html` crate and can
-// be reused by other tools (linter, type-checker, language server).
+// with content is block. The pure per-name classification lives in the crate's `html` module and
+// can be reused by other tools (linter, type-checker, language server).
 
 use crate::ast;
 use crate::ast::ElementKind;
@@ -65,7 +65,7 @@ pub(crate) fn has_raw_content(element: &ast::Element<'_>) -> bool {
 mod tests {
     use super::*;
     use crate::ast::FragmentNode;
-    use tsv_html::svelte as html;
+    use crate::html;
 
     /// Find the first child element of `parent` whose resolved tag name is `tag`.
     fn child<'p, 'arena>(
@@ -96,7 +96,7 @@ mod tests {
             other => panic!("expected a <div>, got: {other:?}"),
         };
 
-        // Plain HTML tags delegate straight to tsv_html: <div> block, <span> inline.
+        // Plain HTML tags delegate straight to `crate::html`: <div> block, <span> inline.
         assert!(printer.is_block_element(div));
         assert!(!printer.is_block_element(child(&printer, div, "span")));
         // A component is always inline, regardless of its (uppercase) name.
@@ -106,7 +106,7 @@ mod tests {
     #[test]
     fn block_adapter_promotes_nonempty_script_style_to_block() {
         // The overlay is the printer-specific part: a <script>/<style> with content
-        // is block (its body formats on its own lines), even though tsv_html
+        // is block (its body formats on its own lines), even though `crate::html`
         // classifies the bare tag as inline.
         assert!(!html::is_block_element("script"));
         assert!(!html::is_block_element("style"));

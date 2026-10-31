@@ -4,6 +4,10 @@
 
 use super::*;
 
+/// The Svelte-shaped HTML answers `tsv_svelte_compile` and `tsv_debug` read — the crate's own
+/// `html` module, where each item's doc says where it departs from the spec.
+pub use crate::html::{is_mathml_element, is_svg_element, preserves_whitespace};
+
 /// Parse a document the format path folded (`tsv_lang::printing::normalize_carriage_returns`)
 /// — the parse every Svelte format entry point runs: the CLI, the bindings' `parse_format!`
 /// and [`format()`]. A parse error is reported in the caller's own coordinates
