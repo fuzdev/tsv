@@ -45,6 +45,14 @@
 # Sigstore provenance attestation
 # (actions/attest-build-provenance; `gh attestation verify <file> -R fuzdev/tsv`).
 #
+# Last, the `crates` job rehearses the crates.io release of the workspace's
+# publishable crates (scripts/publish_crates.ts): every crate packaged and
+# built from its own tarball, and the public-API gate (cargo semver-checks)
+# against each crate's published baseline. It is a DRY RUN on every trigger —
+# the first publish is by token from a maintainer's machine, and a publishing
+# leg waits on crates.io trusted publishing (configured per crate once it
+# exists, naming this workflow file).
+#
 # workflow_dispatch runs the whole matrix and gates with `npm publish
 # --dry-run` by default — the pre-tag rehearsal; set dry_run=false for a real
 # publish (the recovery path for a failed tag run). That recovery must be
@@ -63,7 +71,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Build and gate everything; npm publish --dry-run'
+        description: 'Build and gate everything; npm publish --dry-run (the crates job always dry-runs)'
         type: boolean
         default: true
   schedule:
@@ -499,3 +507,61 @@ jobs:
             gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/assets/* --verify-tag \
               --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release_notes.md"
           fi
+
+  # The crates.io half of the release, as a rehearsal: scripts/publish_crates.ts
+  # dry-runs on every trigger — the tag push, a dispatch (dry_run or not) and
+  # the weekly cron. It packages every publishable crate and builds each one
+  # alone from its tarball against its siblings' tarballs, in dependency order
+  # (`cargo publish --workspace --dry-run --locked`), and runs the public-API
+  # gate: `cargo semver-checks` per crate at its docs.rs feature set, against
+  # its published baseline on crates.io — a crate with none is SKIPPED, loudly,
+  # never passed. On the tag the version is new, so each crate with a release
+  # on crates.io is graded at the level the version change states; on the cron
+  # the version is usually already live, so the gate skips (`--bump` grades it
+  # locally). A runner is fresh, so the stale-overlay trap the script clears
+  # (an unchanged version reusing an earlier run's unpacked tarballs) cannot
+  # bite here, and the job restores no cache that could bring it back.
+  #
+  # After `publish` and `release` (skipped on a rehearsal) because the crates
+  # publish last, once the version's npm packages and GitHub Release exist.
+  # Nothing here publishes: the step never passes --wetrun, and the job holds
+  # no token.
+  crates:
+    needs: [publish, release]
+    if: always() && needs.publish.result == 'success' && (needs.release.result == 'success' || needs.release.result == 'skipped')
+    runs-on: ubuntu-24.04
+    # A cold packaging build of every crate plus the semver-checks rustdoc
+    # builds, with headroom.
+    timeout-minutes: 45
+
+    steps:
+      # persist-credentials: false keeps the GITHUB_TOKEN out of .git/config (no step here pushes via git).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The toolchain pinned in rust-toolchain.toml (see the build job).
+      - name: Install Rust
+        run: |
+          rustup toolchain install --no-self-update
+          rustup show active-toolchain
+
+      # Pinned to the version the gate is written against; bump deliberately.
+      - name: Install cargo-semver-checks
+        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
+        with:
+          tool: cargo-semver-checks@0.51.0
+
+      - name: Install Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: 2.9.7
+
+      # `--expect-tag` follows the REF, as in the publish job. Never --wetrun.
+      - name: Publish crates (dry run)
+        run: |
+          flags=()
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            flags+=(--expect-tag "$GITHUB_REF_NAME")
+          fi
+          deno task publish:crates "${flags[@]}"

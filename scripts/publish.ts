@@ -1,6 +1,11 @@
 /**
  * Publish script for the tsv npm packages.
  *
+ * The WASM packages only: the N-API set publishes from `.github/workflows/release.yml`
+ * (triggered by the tag this script pushes), and the crates from
+ * `scripts/publish_crates.ts`, run after that workflow's GitHub Release. The bump here
+ * writes every version all three read (the workspace version and its `=x.y.z` sibling pins).
+ *
  * Dry-run by default — runs all validation but does not mutate the workspace.
  * Pass `--wetrun` to bump, build, validate, publish to npm, and finalize git
  * (commit + tag + push). The build step covers the npm packages AND the deno
@@ -746,6 +751,13 @@ if (wetrun) {
 			? '  Finish the finalize above, then watch that run.'
 			: '  The release is complete only once that run is green; if the matrix fails, re-run it\n' +
 					'  from the Actions tab — dispatching ON THE TAG, so the version assertion still holds.'
+	);
+	// The crates.io half is separate again (scripts/publish_crates.ts): that workflow's
+	// `crates` job only rehearses it, and the crates publish last, after the GitHub Release.
+	console.log(
+		'  The crates publish last, once that run has made the GitHub Release:\n' +
+			`  \`deno task publish:crates --wetrun\` from a clean checkout of v${version}, which it\n` +
+			'  requires (its `crates` job is a dry run).'
 	);
 }
 if (conformance_skip_reason !== null) {

@@ -35,8 +35,8 @@
  * It reads the listing, not a built `.crate`: a symlinked `LICENSE` that resolves
  * differently on another platform is caught only by the content compare on the machine
  * that runs it, and it never compiles the packaged sources (`cargo publish --workspace
- * --dry-run --locked` does; no task or CI job runs it). It grades that a README exists and
- * links absolutely, never what it says.
+ * --dry-run --locked` does: `deno task publish:crates`, in CI). It grades that a README
+ * exists and links absolutely, never what it says.
  * `--allow-dirty` lists the working tree as it stands, untracked files included, so a run
  * on a dirty tree grades what a publish from that tree would upload.
  */

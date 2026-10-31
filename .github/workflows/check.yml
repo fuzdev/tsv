@@ -18,9 +18,9 @@
 #               cadence, in audit:corpus).
 #   artifacts — publish-parity: builds the WASM/npm packages, checks size
 #               bounds, runs the Node package tests, covers the Linux half
-#               of the N-API npm shape and its size bounds, and grades the depth
+#               of the N-API npm shape and its size bounds, grades the depth
 #               limits' stack contract in the shipped native build and the WASM
-#               engine (see the job comment).
+#               engine, and dry-runs the crates.io packaging (see the job comment).
 #   platforms — macOS + Windows confidence for the native builds: the full
 #               `cargo test --workspace` suite plus the N-API JS-boundary and
 #               npm-package tests, per OS (see the job comment). Linux is
@@ -116,7 +116,7 @@ jobs:
       - name: Check
         run: deno task check
 
-  # Publish-parity gate for BOTH published sets: builds every WASM/npm artifact,
+  # Publish-parity gate for the published sets: builds every WASM/npm artifact,
   # checks the size bounds, runs the Node package tests, and stages, tests and
   # size-checks the Linux N-API package — none of which `check` exercises, so a packaging break
   # surfaces on PRs instead of at release time. Runs the same `build:packages`
@@ -242,6 +242,18 @@ jobs:
       # already compiled (deno.json `//test:depth:wasm`).
       - name: Depth contract, WASM engine
         run: deno task test:depth:wasm
+
+      # The crates.io packaging, every commit: each publishable crate packaged
+      # and built ALONE from its tarball, against its siblings' tarballs, at its
+      # own default features (`cargo publish --workspace --dry-run --locked`,
+      # via `deno task publish:crates:package`). Nothing else builds a crate
+      # without the workspace's feature unification, so a crate that compiles
+      # only beside its siblings fails here instead of at publish. The public-API
+      # gate is skipped (there is no release between releases to grade); the
+      # release workflow's `crates` job runs it, and with it skipped this step
+      # reads no crates.io API — only the index cargo resolves through.
+      - name: Crates packaging (publish dry run)
+        run: deno task publish:crates:package
 
   # Platform confidence for the native builds: the committed-tree test suite
   # (fixtures, CLI integration, the napi in-crate tests) plus the real N-API

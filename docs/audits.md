@@ -35,6 +35,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [docs.rs build](#docsrs-build-audit-docsauditdocsrs) | `docs:audit:docsrs` | a crate meant for docs.rs whose own doc build fails at its docs.rs feature set or at its defaults — a link to an item behind a feature that build leaves off, which the all-features workspace build resolves; a public item's doc linking a private item; a dead render — a link to a hidden item, which resolves but renders a dead `#anchor` or inert bracketed code | `deno task check` |
 | [Published deps](#published-graph-dependency-audit-depsaudit) | `deps:audit` | a crate meant for publishing reaching `serde_json` through a normal or build dependency, at any feature set or target — the workspace entry's features would unify into a consumer's own `serde_json` and change how it deserializes | `deno task check` |
 | [Package contents](#package-contents-audit-packageaudit) | `package:audit` | a crate meant for publishing whose crates.io tarball lacks its `README.md`, `LICENSE` (the root's bytes) or a required `NOTICE`, ships any other Markdown (`CLAUDE.md`), links relatively from its README, or states a `rust-version` other than the pinned toolchain's major.minor — plus cargo's publishable set drifting from the shared reader's | `deno task check` |
+| [Crates publish rehearsal](#crates-publish-rehearsal-publishcrates) | `publish:crates` · `publish:crates:package` | a publishable crate that does not build ALONE from its tarball against its siblings' tarballs (what workspace feature unification hides); with the public-API gate, a crate whose public API breaks its published baseline at the level the version change states — a crate with no published baseline is SKIPPED loudly, never passed | CI's `artifacts` job (`publish:crates:package`, every commit); the release workflow's `crates` job (the full dry run: tag, dispatch, weekly) |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
 | [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `deno task bench:install`, so NOT in `deno task check`) |
 | [Loc cross-grade](#loc-cross-grade-checkloc) | `check:loc` | tsv's loc wire and the shipped `locations.js` reconstruction of its span-only wire disagreeing on any fixture input — the two implementations of the one `loc` definition drifting apart | `deno task check` |
@@ -1234,11 +1235,52 @@ unset) must be exactly the crates it lists, so a `publish = false` its regex can
 here instead of grading a crate nothing publishes.
 
 **Blind spots.** It reads the listing, not a built `.crate`, and never compiles the packaged
-sources — `cargo publish --workspace --dry-run --locked` does both, and no task or CI job runs
-it. A symlinked `LICENSE` that a checkout without symlink support turns into a text file fails
+sources — `cargo publish --workspace --dry-run --locked` does both
+([`publish:crates`](#crates-publish-rehearsal-publishcrates), which needs the network, so it
+gates in CI rather than in `check`). A symlinked `LICENSE` that a checkout without symlink support turns into a text file fails
 the content compare on that machine only. It grades that a README exists and links absolutely,
 never what it says. `--allow-dirty` lists the working tree as it stands, untracked files
 included, so a run on a dirty tree grades what a publish from that tree would upload.
+
+## Crates Publish Rehearsal (`publish:crates`)
+
+```bash
+deno task publish:crates            # dry run: crates.io API read, semver-checks, cargo publish --dry-run
+deno task publish:crates --bump minor   # also grade an already-live version as the next minor
+deno task publish:crates:package    # the packaging half alone (semver-checks and the API read skipped, said so)
+```
+
+**What it proves.** That each crate meant for publishing (`scripts/docsrs_crates.ts`, checked
+against cargo's own reading of `publish`) packages and **builds alone from its tarball**, in
+dependency order, against its siblings' tarballs through cargo's local overlay registry —
+`cargo publish --workspace --dry-run --locked`, the build no workspace command reaches, since
+there features unify across members. With the public-API gate on (`publish:crates`), each
+crate's public API is graded by `cargo semver-checks` at the crate's docs.rs feature set named
+explicitly, against its **published** baseline on crates.io (the highest release below the
+version, so a release is graded at the level the version change states; an already-live
+version only at a `--bump <level>`). The tool's own default would enable every feature but a
+few names, the `internal_*` debugging features included, and read their hidden items as
+removals.
+
+**Blind spots.** A crate with **no published release has no baseline**: the gate SKIPS it,
+per crate and again in the run's summary, and grades nothing — so until the first publish it
+proves nothing about the public API, and an already-live version without `--bump` (every run
+between releases) skips the same way. There is no committed API snapshot. It needs the
+network (the crates.io API, whose failed lookup fails the run, and the index), so it is not in
+`check`; `publish:crates:package` reads no API, only the index. At an unchanged version cargo
+reuses an earlier run's `package/` under the target directory and its overlay unpacks under
+the cargo home, which would verify an earlier tree's sources; the script removes both first
+— the target directory as `cargo metadata` reports it, so `CARGO_TARGET_DIR` and
+`build.target-dir` are honored — along with any overlay directory the removal empties
+(non-recursively). The task's write fence names only `target/package` and
+`$HOME/.cargo/registry/src`, so a target directory or cargo home anywhere else FAILS the run
+rather than going uncleared. The packaging build is cargo's default `dev` profile, not a
+shipped one.
+
+**The real publish** (`--wetrun`, never in CI) refuses a checkout that is not the release:
+HEAD must be the commit `v<version>` names (a missing local tag refuses too) and the tree
+clean, untracked files included — crates published from any other commit would carry, under
+the released version and for good, source the release never had.
 
 ## Wire-Type Drift Check (`check:ast-types`)
 

@@ -76,3 +76,44 @@ export const command_stream = async (
 		return { success: false, code: 127 };
 	}
 };
+
+export interface CommandTee extends CommandStream {
+	/** The command's stderr, as it was also shown. */
+	err: string;
+}
+
+/** Run a command with its output shown as it runs, keeping a copy of its stderr for the caller
+ * to read the failure from (a registry's refusal, say). No stdin: nothing here prompts. A
+ * missing binary exits 127. */
+export const command_tee = async (
+	cmd: string,
+	args: ReadonlyArray<string>,
+	options: CommandOptions = {}
+): Promise<CommandTee> => {
+	let child: Deno.ChildProcess;
+	try {
+		child = new Deno.Command(cmd, {
+			args: [...args],
+			cwd: options.cwd,
+			env: options.env,
+			stdin: 'null',
+			stdout: 'inherit',
+			stderr: 'piped'
+		}).spawn();
+	} catch (error) {
+		if (!(error instanceof Deno.errors.NotFound)) throw error;
+		console.error(`${cmd}: command not found`);
+		return { success: false, code: 127, err: `${cmd}: command not found` };
+	}
+	const chunks: Array<string> = [];
+	const stream_decoder = new TextDecoder();
+	for await (const chunk of child.stderr) {
+		for (let written = 0; written < chunk.length;) {
+			written += await Deno.stderr.write(chunk.subarray(written));
+		}
+		chunks.push(stream_decoder.decode(chunk, { stream: true }));
+	}
+	chunks.push(stream_decoder.decode());
+	const { success, code } = await child.status;
+	return { success, code, err: chunks.join('') };
+};
