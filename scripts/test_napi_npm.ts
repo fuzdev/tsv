@@ -546,6 +546,9 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		const loose = new api.IgnoreStack();
 		loose.push_formatignore('', '!dist/a.ts\n');
 		assert.match(loose.path_shadow_warning('dist/a.ts')!, /build-output heuristic/);
+		// the re-include popped, `dist` is pruned with nothing written under it
+		loose.pop_override();
+		assert.strictEqual(loose.path_shadow_warning('dist/a.ts'), undefined);
 		// A formattable extension yields no error, spelled `undefined` like wasm's.
 		assert.strictEqual(stack.unsupported_extension_error('a.ts'), undefined);
 		assert.match(stack.unsupported_extension_error('a.txt')!, /unsupported file extension/);

@@ -96,7 +96,7 @@ export class IgnoreStack {
 	/** Push one directory's `.prettierignore` (read where a directory has no `.formatignore`), applied after every `.gitignore`. */
 	push_prettierignore(anchor: string, content: string): void;
 	/** Pop the most recently pushed override layer. */
-	pop_tsv(): void;
+	pop_override(): void;
 	/** Whether `path` is ignored; `is_dir` makes trailing-`/` patterns apply (a symbolic link is not a directory here, as for git). */
 	is_ignored(path: string, is_dir: boolean): boolean;
 	/** Discovery verdict for a child directory: `'descend'`, `'prune'`, or `'prune_warn'`. */

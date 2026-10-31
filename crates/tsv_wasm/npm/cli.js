@@ -2345,7 +2345,7 @@ function push_layers(stack, dir, anchor, in_repo, presence, warnings) {
  * `null` `push_dir_layers` returns for a directory a rule excludes, which pushed nothing.
  * Mirrors the native `PushedLayers::pop_from`. */
 function pop_layers(stack, pushed) {
-	if (pushed?.overrides) stack.pop_tsv();
+	if (pushed?.overrides) stack.pop_override();
 	if (pushed?.gitignore) stack.pop_gitignore();
 }
 

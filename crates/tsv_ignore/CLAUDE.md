@@ -77,7 +77,7 @@ holds two parallel per-directory layer stacks (`.gitignore` and override):
 - `PathKind { File, Directory }` — the `kind` every path query takes (whether the path
   itself is a directory, which trailing-`/` patterns turn on); `PathKind::from_is_dir(bool)`
   converts a flag. The binding wrappers keep their JS-facing `(path, is_dir: bool)` and
-  `pop_tsv` names and convert at the boundary.
+  convert at the boundary.
 - `IgnoreStack::is_ignored(path, kind)` — `path` relative to the format root;
   walks the ancestor prefixes (git's parent-directory prune). The arbitrary-path
   query, and `exclusion` with its witness dropped — one prefix walk

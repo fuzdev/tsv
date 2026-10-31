@@ -551,7 +551,7 @@ matcher *and* prune decision by construction. The caller builds it up: `new Igno
 `push_gitignore(anchor, content)` per discovered `.gitignore` and
 `push_formatignore(anchor, content)` per discovered `.formatignore` and, inside a repo,
 `push_prettierignore(anchor, content)` per `.prettierignore` a directory reads in its
-place (all shallowest-first; `pop_gitignore()`/`pop_tsv()` to unwind a DFS — override
+place (all shallowest-first; `pop_gitignore()`/`pop_override()` to unwind a DFS — override
 layers are hierarchical, and the two override pushes match identically, differing only in
 the file a warning names), then queries:
 

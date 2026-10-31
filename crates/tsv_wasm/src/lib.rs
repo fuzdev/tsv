@@ -332,7 +332,7 @@ impl IgnoreStack {
 
     /// Pop the most recently pushed override layer (a traversal unwinding out of a
     /// directory).
-    pub fn pop_tsv(&mut self) {
+    pub fn pop_override(&mut self) {
         self.inner.pop_override();
     }
 

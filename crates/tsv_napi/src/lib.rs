@@ -501,8 +501,8 @@ impl IgnoreStack {
 
     /// Pop the most recently pushed override layer (a traversal unwinding out of a
     /// directory).
-    #[napi(js_name = "pop_tsv", catch_unwind)]
-    pub fn pop_tsv(&mut self) {
+    #[napi(js_name = "pop_override", catch_unwind)]
+    pub fn pop_override(&mut self) {
         self.inner.pop_override();
     }
 
