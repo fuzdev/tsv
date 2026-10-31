@@ -269,7 +269,7 @@ run and the native `tests/discovery_parity.rs`). Runs per OS in CI (the
 
 ### Release
 
-The set publishes **only** through `.github/workflows/release_napi.yml`, **never**
+The set publishes **only** through `.github/workflows/release.yml`, **never**
 `scripts/publish.ts` (whose single machine can build only its own triple); the WASM
 release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
 

@@ -104,7 +104,7 @@ function read_pkg_version(path: string): string | null {
 /**
  * Every `<tool>-version:` pin under `.github/workflows/`, as `file -> version`
  * pairs (one per distinct version a file carries) — empty when the directory can't
- * be read. EVERY workflow, not just `check.yml`: `release_napi.yml` installs the
+ * be read. EVERY workflow, not just `check.yml`: `release.yml` installs the
  * same runtimes for the tag-triggered publish, and a pin that drifts there is
  * graded by nothing else.
  *

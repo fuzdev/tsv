@@ -1,6 +1,7 @@
-# Release workflow for the N-API npm packages — the @fuzdev/tsv loader +
-# the six @fuzdev/tsv-<triple> platform packages. This is the per-platform
-# matrix the single-machine scripts/publish.ts deliberately does NOT own:
+# The release workflow: the N-API npm packages — the @fuzdev/tsv loader + the
+# six @fuzdev/tsv-<triple> platform packages — and the tag's GitHub Release.
+# This is the per-platform matrix the single-machine scripts/publish.ts
+# deliberately does NOT own:
 # publish.ts releases the WASM set and pushes the annotated v* tag, and that tag
 # triggers this workflow. The tag is also the assertion that the local
 # external-oracle conformance gates (publish Step 3b) ran — they read sibling
@@ -54,7 +55,7 @@
 # the release commit, and mint no Release — is REFUSED before any target
 # builds. A branch dispatch can only rehearse.
 
-name: release_napi
+name: release
 
 on:
   push:
@@ -81,7 +82,7 @@ permissions:
 
 # Never cancel a release mid-publish; queue instead.
 concurrency:
-  group: release-napi-${{ github.ref }}
+  group: release-${{ github.ref }}
 
 defaults:
   run:

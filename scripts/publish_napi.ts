@@ -176,7 +176,7 @@ let published = 0;
 let skipped = 0;
 for (const { name, dir } of to_publish) {
 	// A dry run checks nothing against the registry first: it exists to run `npm publish
-	// --dry-run` over every package (the rehearsal release_napi.yml's dispatch and weekly
+	// --dry-run` over every package (the rehearsal release.yml's dispatch and weekly
 	// cron promise), and the staged version is usually already live there — skipping
 	// those would rehearse nothing.
 	if (!args['dry-run'] && already_published(name)) {

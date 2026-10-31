@@ -250,7 +250,7 @@ else {
 	}
 }
 
-// The tag Step 8 pushes triggers release_napi.yml, so it must land on the release commit:
+// The tag Step 8 pushes triggers release.yml, so it must land on the release commit:
 // a fresh release's tag must not exist yet (a stale local one would be pushed in its
 // place, building the native set from the wrong commit; one on origin would fail the push
 // after npm publish), and a resume's may exist only on HEAD.
@@ -344,11 +344,11 @@ if (missing_typecheck_install.length > 0) {
 }
 
 // The N-API half of the release is a different machine's: the tag Step 8 pushes triggers
-// release_napi.yml, AFTER this script has published the wasm packages — so a matrix that
+// release.yml, AFTER this script has published the wasm packages — so a matrix that
 // fails then leaves a half-released version. Its dispatch dry run on this commit is the
 // rehearsal that answers that ahead of time, and nothing here can ask GitHub for it.
 console.log(
-	'  REMINDER: the release_napi workflow_dispatch dry run must be green on this commit ' +
+	'  REMINDER: the release.yml workflow_dispatch dry run must be green on this commit ' +
 		'before a --wetrun (the wasm packages publish before the tag starts the N-API matrix)'
 );
 
@@ -628,7 +628,7 @@ if (bun_skip_reason === null) {
 	console.warn(`  WARN: skipping deno task test:bun — ${bun_skip_reason}`);
 }
 // The merged published declarations, as a consumer's compiler sees them, for every npm
-// package this release ships. The napi loader publishes from release_napi.yml, but its
+// package this release ships. The napi loader publishes from release.yml, but its
 // staging is a file copy (no cargo build), so it is staged here at this version and graded
 // beside the three wasm packages — all four named, so each is required. Needs the
 // benches/js install whatever --no-check says: it grades what is about to ship.
@@ -732,13 +732,13 @@ for (const { label, dir } of packages) {
 }
 if (wetrun) {
 	// This script releases the WASM half only. The N-API set publishes from
-	// release_napi.yml, triggered by the tag Step 8 pushes — so a green run here
+	// release.yml, triggered by the tag Step 8 pushes — so a green run here
 	// is not a finished release, and saying so beats leaving it to the runbook.
 	// (Before the skip warnings below: those keep the last word.)
 	console.log(
 		no_git
 			? `\n  The N-API set does NOT publish until the v${version} tag is pushed —`
-			: `\n  The pushed v${version} tag triggers release_napi.yml —`
+			: `\n  The pushed v${version} tag triggers release.yml —`
 	);
 	console.log('  the N-API set (@fuzdev/tsv + its platform packages) publishes there.');
 	console.log(
@@ -830,7 +830,7 @@ async function finalize_git(): Promise<void> {
 			if (!tagged.ok) git_fail(tagged.error);
 			console.log(`  Tagged ${tag}`);
 		} else console.log(`  Tag ${tag} already exists`);
-		// this push is what triggers release_napi.yml — until it lands, the wasm packages
+		// this push is what triggers release.yml — until it lands, the wasm packages
 		// are public with no tag, so the N-API set never builds
 		if (!(await git_push_main_with_tags())) git_fail('git push --follow-tags origin main failed');
 	}
