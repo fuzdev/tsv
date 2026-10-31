@@ -7,6 +7,7 @@ use crate::ast::{
     Expression, ExpressionKind, Statement, TSTypeAnnotation, TSTypeParameterDeclaration,
     VariableDeclaration,
 };
+use tsv_lang::Span;
 
 pub use crate::parser::TopLevelAs;
 pub use crate::strip::strip_in;

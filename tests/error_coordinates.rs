@@ -87,10 +87,10 @@ fn point_violations(source: &str, language: Language, error: &Error) -> Vec<Stri
         return vec!["a located error with no point".to_string()];
     };
     let expected = reference_point(source, position, language);
-    if (point.start, point.line, point.column) != expected {
+    if (point.offset, point.line, point.column) != expected {
         out.push(format!(
             "point {:?} != reference {expected:?} at byte {position}",
-            (point.start, point.line, point.column)
+            (point.offset, point.line, point.column)
         ));
     }
     let rendered = format!("{error:#}");
@@ -633,7 +633,7 @@ fn the_point_of_every_wire_position_is_its_loc() {
                             point.get("column").and_then(serde_json::Value::as_u64),
                         );
                         let ours = (
-                            u64::from(ours.start),
+                            u64::from(ours.offset),
                             Some(u64::from(ours.line)),
                             Some(u64::from(ours.column)),
                         );

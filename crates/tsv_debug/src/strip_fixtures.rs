@@ -46,6 +46,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::fs;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use tsv_cli::cli::input::ParserType;
@@ -335,14 +336,14 @@ fn parse_point(text: &str) -> Option<(u32, u32)> {
 
 /// The `(line, column)` of byte offset `position` in `source`, in tsv's TypeScript
 /// coordinates.
-fn point_of(source: &str, position: u32) -> (u32, u32) {
-    let point = tsv_ts::WIRE_COORDINATES.point(source, position as usize);
+fn point_of(source: &str, position: usize) -> (u32, u32) {
+    let point = tsv_ts::WIRE_COORDINATES.point(source, position);
     (point.line, point.column)
 }
 
 /// A refusal of `source` as `refusal.txt` spells it — `Kind<TAB>line:column<TAB>line:column`
 /// and a newline — the record the oracle side derives from ts-blank-space too.
-pub fn refusal_line(source: &str, kind: tsv_ts::UnsupportedKind, span: tsv_lang::Span) -> String {
+pub fn refusal_line(source: &str, kind: tsv_ts::UnsupportedKind, span: Range<usize>) -> String {
     let (start, end) = (point_of(source, span.start), point_of(source, span.end));
     format!("{kind:?}\t{}:{}\t{}:{}\n", start.0, start.1, end.0, end.1)
 }

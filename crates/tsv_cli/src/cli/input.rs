@@ -267,9 +267,10 @@ pub fn refuse_directory(path: &str) -> Result<(), String> {
 pub fn parse_source_type_arg(source_type: Option<&str>) -> Result<Option<tsv_ts::Goal>, String> {
     match source_type {
         None => Ok(None),
-        Some(s) => tsv_ts::Goal::from_source_type(s)
+        Some(s) => s
+            .parse::<tsv_ts::Goal>()
             .map(Some)
-            .ok_or_else(|| format!("invalid --source-type '{s}' (expected 'script' or 'module')")),
+            .map_err(|_| format!("invalid --source-type '{s}' (expected 'script' or 'module')")),
     }
 }
 

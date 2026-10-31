@@ -104,7 +104,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
     // (`Script`, `scrip`, an empty file) a silent Module regrade — self-catching only
     // where the parse actually differs by goal. Refuse any spelling but the two.
     if let Ok(content) = read_file(&goal_marker_path(fixture_dir))
-        && tsv_ts::Goal::from_source_type(content.trim()).is_none()
+        && content.trim().parse::<tsv_ts::Goal>().is_err()
     {
         return Err(format!(
             "{GOAL_FILENAME} marker holds {:?}, which names no parse goal.

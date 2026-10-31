@@ -11,6 +11,10 @@
 //! what strict code disallows is decided separately, by the parser's `strict`
 //! state.
 
+use std::fmt;
+use std::path::Path;
+use std::str::FromStr;
+
 /// The syntactic goal symbol a parse runs against.
 ///
 /// Defaults to [`Goal::Module`], which is correct for Svelte `<script>` blocks
@@ -29,7 +33,7 @@
 /// | top-level `import` / `export` *declarations* | allowed | syntax error |
 ///
 /// Dynamic `import(...)` is a call expression valid under both goals.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Goal {
     /// `ParseModule` — the default. Top-level `import`/`export`, `import.meta`,
     /// and top-level `await` expressions are available; `await` is reserved as
@@ -48,34 +52,13 @@ pub enum Goal {
 
 impl Goal {
     /// The acorn `sourceType` string this goal serializes to in the public AST
-    /// (`Program.sourceType`).
+    /// (`Program.sourceType`) — `"module"` or `"script"`, the vocabulary its
+    /// [`FromStr`] reads back and its [`Display`](fmt::Display) writes.
+    #[must_use]
     pub const fn source_type(self) -> &'static str {
         match self {
             Goal::Module => "module",
             Goal::Script => "script",
-        }
-    }
-
-    /// Parse a goal from its [`source_type`](Goal::source_type) string
-    /// (`"module"` / `"script"`), the inverse of `source_type`. Returns `None`
-    /// for any other string (the match is case-sensitive). The vocabulary acorn's
-    /// `sourceType` and the `tsv` CLI's `--source-type` use.
-    ///
-    /// ```
-    /// use tsv_ts::Goal;
-    ///
-    /// assert_eq!(Goal::from_source_type("script"), Some(Goal::Script));
-    /// assert_eq!(Goal::from_source_type("Module"), None);
-    /// ```
-    // The single source of truth for the goal vocabulary, shared by the CLI
-    // `--source-type` flag (`tsv_cli`), the WASM bindings (`tsv_wasm`), and the fixture
-    // goal-marker reader (`tsv_debug`); callers layer their own default and error
-    // formatting on top.
-    pub fn from_source_type(s: &str) -> Option<Goal> {
-        match s {
-            "module" => Some(Goal::Module),
-            "script" => Some(Goal::Script),
-            _ => None,
         }
     }
 
@@ -104,21 +87,70 @@ impl Goal {
     /// (`legacy.MJS`), as every extension dispatch in the CLIs reads one.
     ///
     /// ```
+    /// use std::path::Path;
     /// use tsv_ts::Goal;
     ///
     /// assert_eq!(Goal::from_extension("src/legacy.MJS"), Some(Goal::Module));
+    /// assert_eq!(Goal::from_extension(Path::new("a.mjs")), Some(Goal::Module));
     /// assert_eq!(Goal::from_extension("a.mts"), Some(Goal::Module));
     /// // `.js`, `.ts` and the CommonJS names settle nothing
     /// assert_eq!(Goal::from_extension("a.cjs"), None);
     /// assert_eq!(Goal::from_extension("a.ts"), None);
     /// ```
-    pub fn from_extension(path: &str) -> Option<Goal> {
-        std::path::Path::new(path)
+    pub fn from_extension(path: impl AsRef<Path>) -> Option<Goal> {
+        path.as_ref()
             .extension()
             .is_some_and(|ext| ext.eq_ignore_ascii_case("mjs") || ext.eq_ignore_ascii_case("mts"))
             .then_some(Goal::Module)
     }
 }
+
+/// Reads a goal from its [`source_type`](Goal::source_type) string (`"module"` /
+/// `"script"`), the inverse of `source_type`, case-sensitively — the vocabulary acorn's
+/// `sourceType` and the `tsv` CLI's `--source-type` use.
+///
+/// ```
+/// use tsv_ts::Goal;
+///
+/// assert_eq!("script".parse::<Goal>(), Ok(Goal::Script));
+/// let error = "Module".parse::<Goal>().unwrap_err();
+/// assert_eq!(error.to_string(), "expected \"module\" or \"script\"");
+/// ```
+// The single source of truth for the goal vocabulary, shared by the CLI `--source-type`
+// flag (`tsv_cli`), the bindings (`tsv_wasm`, `tsv_napi`), and the fixture goal-marker
+// reader (`tsv_debug`); callers layer their own default and error formatting on top.
+impl FromStr for Goal {
+    type Err = ParseGoalError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "module" => Ok(Goal::Module),
+            "script" => Ok(Goal::Script),
+            _ => Err(ParseGoalError),
+        }
+    }
+}
+
+/// Writes [`Goal::source_type`].
+impl fmt::Display for Goal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.source_type())
+    }
+}
+
+/// The error [`Goal`]'s [`FromStr`] returns for a string that names no goal — anything but
+/// `"module"` or `"script"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ParseGoalError;
+
+impl fmt::Display for ParseGoalError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("expected \"module\" or \"script\"")
+    }
+}
+
+impl std::error::Error for ParseGoalError {}
 
 #[cfg(test)]
 mod tests {
@@ -127,7 +159,8 @@ mod tests {
     #[test]
     fn source_type_round_trips() {
         for goal in [Goal::Module, Goal::Script] {
-            assert_eq!(Goal::from_source_type(goal.source_type()), Some(goal));
+            assert_eq!(goal.source_type().parse::<Goal>(), Ok(goal));
+            assert_eq!(goal.to_string(), goal.source_type());
         }
     }
 
@@ -144,10 +177,10 @@ mod tests {
     }
 
     #[test]
-    fn from_source_type_rejects_unknown() {
-        assert_eq!(Goal::from_source_type("sloppy"), None);
-        assert_eq!(Goal::from_source_type("Module"), None); // case-sensitive
-        assert_eq!(Goal::from_source_type(""), None);
+    fn from_str_rejects_unknown() {
+        assert!("sloppy".parse::<Goal>().is_err());
+        assert!("Module".parse::<Goal>().is_err()); // case-sensitive
+        assert!("".parse::<Goal>().is_err());
     }
 
     #[test]

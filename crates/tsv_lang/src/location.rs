@@ -118,6 +118,7 @@ pub enum LineRule {
 /// point ([`crate::Error::wire_point`]) — reads that one statement rather than restating
 /// it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct WireCoordinates {
     /// Which characters end a line.
     pub lines: LineRule,
@@ -125,14 +126,16 @@ pub struct WireCoordinates {
     pub bom: LeadingBom,
 }
 
-/// One position in a language's wire coordinates ([`WireCoordinates`]): the `start`
-/// offset a wire node at that byte would carry, and the `loc` point `tsv parse
-/// --locations` (and the npm packages' `create_locator(…).position_at(start)`) gives it.
+/// One position in a language's wire coordinates ([`WireCoordinates`]): the offset a
+/// wire node starting at that byte would carry as its `start`, and the `loc` point
+/// `tsv parse --locations` (and the npm packages' `create_locator(…).position_at(start)`)
+/// gives it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct WirePoint {
     /// UTF-16 code units from the start of the text the wire indexes (a leading BOM not
     /// counted where the coordinates elide it).
-    pub start: u32,
+    pub offset: u32,
     /// 1-based line.
     pub line: u32,
     /// 0-based column, in UTF-16 code units from the line's start.
@@ -140,6 +143,13 @@ pub struct WirePoint {
 }
 
 impl WireCoordinates {
+    /// The coordinates whose lines end under `lines` and which count a leading
+    /// byte-order mark as `bom` says.
+    #[must_use]
+    pub const fn new(lines: LineRule, bom: LeadingBom) -> Self {
+        Self { lines, bom }
+    }
+
     /// The [`WirePoint`] of byte offset `position` in `source` — total: a position past
     /// the end is clamped to it, and one inside a multibyte character is floored to that
     /// character's start, so a malformed position still names a point in the text.
@@ -161,7 +171,7 @@ impl WireCoordinates {
         let ecmascript = self.lines == LineRule::Ecmascript;
         let bytes = source.as_bytes();
         let mut point = WirePoint {
-            start: 0,
+            offset: 0,
             line: 1,
             column: 0,
         };
@@ -170,7 +180,7 @@ impl WireCoordinates {
                 continue;
             }
             let units = ch.len_utf16() as u32;
-            point.start = point.start.saturating_add(units);
+            point.offset = point.offset.saturating_add(units);
             let breaks = match ch {
                 '\n' => true,
                 // CRLF is one terminator, so its CR does not end the line — its LF does.

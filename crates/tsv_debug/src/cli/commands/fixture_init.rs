@@ -72,9 +72,9 @@ impl FixtureInitCommand {
                 // This flag keeps the marker file's own word, `goal`, rather
                 // than the shipped CLIs' `--source-type`, so it states the
                 // expectation itself instead of borrowing their message.
-                match Goal::from_source_type(goal_arg) {
-                    Some(goal) => Some(goal),
-                    None => {
+                match goal_arg.parse::<Goal>() {
+                    Ok(goal) => Some(goal),
+                    Err(_) => {
                         eprintln!(
                             "Error: invalid --goal '{goal_arg}' (expected 'script' or 'module')"
                         );

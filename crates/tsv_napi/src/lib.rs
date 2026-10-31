@@ -84,12 +84,9 @@ fn napi_source_type(
     // the refusal names the export family, as the npm facade's options reader and
     // `tsv_wasm` spell it — this addon is published on its own (`@fuzdev/tsv-<triple>`),
     // so it says the whole sentence itself
-    tsv_arena::decode_source_type(
-        source_type.as_deref(),
-        allowed,
-        family,
-        tsv_ts::Goal::from_source_type,
-    )
+    tsv_arena::decode_source_type(source_type.as_deref(), allowed, family, |source_type| {
+        source_type.parse::<tsv_ts::Goal>().ok()
+    })
     .map_err(Failure::Plain)
 }
 
@@ -121,7 +118,11 @@ impl Failure {
     fn parse(e: &Error) -> Self {
         match e.report() {
             Some(report) => Failure::Returned {
-                kind: if report.refused { "refused" } else { "parse" },
+                kind: if report.kind == tsv_ts::ErrorKind::Refusal {
+                    "refused"
+                } else {
+                    "parse"
+                },
                 construct: None,
                 report,
             },
@@ -176,8 +177,8 @@ fn failure_result<'env>(
     }
     error.set("message", report.summary.as_str())?;
     error.set("frame", report.frame.as_str())?;
-    error.set("start", report.start.start)?;
-    error.set("end", report.end.start)?;
+    error.set("start", report.start.offset)?;
+    error.set("end", report.end.offset)?;
     let mut loc = Object::new(env)?;
     loc.set("start", position(env, report.start)?)?;
     loc.set("end", position(env, report.end)?)?;
@@ -993,10 +994,16 @@ mod tests {
         }
     }
 
+    /// A point as `(offset, line, column)` — `WirePoint` is `#[non_exhaustive]`, so a test
+    /// outside `tsv_lang` compares its fields rather than building one.
+    fn point(point: WirePoint) -> (u32, u32, u32) {
+        (point.offset, point.line, point.column)
+    }
+
     /// The start of a returned failure's span, for the tests that read only the point.
-    fn failure_start(failure: &Failure) -> Option<WirePoint> {
+    fn failure_start(failure: &Failure) -> Option<(u32, u32, u32)> {
         match failure {
-            Failure::Returned { report, .. } => Some(report.start),
+            Failure::Returned { report, .. } => Some(point(report.start)),
             Failure::Plain(_) => None,
         }
     }
@@ -1008,15 +1015,7 @@ mod tests {
     fn format_failure_point_is_the_sources() {
         let src = "const a = '\u{1D49C}';\r\nconst = ;\r\n";
         let parse_err = at_default(typescript_engine::parse_json, src).unwrap_err();
-        assert_eq!(
-            failure_start(&parse_err),
-            Some(WirePoint {
-                start: 23,
-                line: 2,
-                column: 6,
-            }),
-            "{parse_err:?}"
-        );
+        assert_eq!(failure_start(&parse_err), Some((23, 2, 6)), "{parse_err:?}");
         assert_eq!(
             at_default(typescript_engine::format, src).unwrap_err(),
             parse_err
@@ -1046,19 +1045,8 @@ mod tests {
         assert!(!report.summary.contains('\n'), "{report:?}");
         assert!(report.frame.starts_with("2:10 <div // c\n"), "{report:?}");
         assert_eq!(
-            (report.start, report.end),
-            (
-                WirePoint {
-                    start: 18,
-                    line: 2,
-                    column: 9,
-                },
-                WirePoint {
-                    start: 19,
-                    line: 2,
-                    column: 10,
-                }
-            )
+            (point(report.start), point(report.end)),
+            ((18, 2, 9), (19, 2, 10))
         );
     }
 
@@ -1089,19 +1077,8 @@ mod tests {
         };
         assert_eq!(construct, "enum");
         assert_eq!(
-            (report.start, report.end),
-            (
-                WirePoint {
-                    start: 15,
-                    line: 2,
-                    column: 0
-                },
-                WirePoint {
-                    start: 24,
-                    line: 2,
-                    column: 9
-                }
-            )
+            (point(report.start), point(report.end)),
+            ((15, 2, 0), (24, 2, 9))
         );
         assert_eq!(report.summary, "cannot strip an enum");
         assert_eq!(report.frame, "2:1 enum E {}\n    ^ here");

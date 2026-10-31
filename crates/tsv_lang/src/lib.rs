@@ -2,12 +2,12 @@
 //! [`tsv_css`](https://docs.rs/tsv_css) and [`tsv_svelte`](https://docs.rs/tsv_svelte).
 //! Depend on one of those, not on this one.
 //!
-//! **No stability promise outside the items they re-export:** [`Span`], [`Error`],
-//! [`ErrorKind`], [`ErrorReport`], [`Result`], [`WirePoint`], [`WireCoordinates`],
-//! [`LineRule`], [`LeadingBom`], and the sized-stack pair [`STACK_SIZE`] and
-//! [`run_with_stack`]. Everything else here is the plumbing the three share —
-//! the doc IR, the printing helpers, the wire-JSON writer, the comment scans, the depth
-//! limits — hidden from these docs and free to change in any release.
+//! **No stability promise outside the items they re-export:** [`Error`], [`ErrorKind`],
+//! [`ErrorReport`], [`Result`], [`WirePoint`], [`WireCoordinates`], [`LineRule`],
+//! [`LeadingBom`], and the sized-stack pair [`STACK_SIZE`] and [`run_with_stack`].
+//! Everything else here is the plumbing the three share — the source spans, the doc IR,
+//! the printing helpers, the wire-JSON writer, the comment scans, the depth limits —
+//! hidden from these docs and free to change in any release.
 //!
 //! Part of [tsv](https://github.com/fuzdev/tsv).
 
@@ -121,6 +121,7 @@ pub use location::{LeadingBom, LineRule, WireCoordinates, WirePoint};
 pub use output::{OutputBuffer, write_indent};
 #[doc(hidden)]
 pub use sizing::{estimated_ast_arena_capacity, estimated_json_capacity};
+#[doc(hidden)]
 pub use span::Span;
 pub use stack::{STACK_SIZE, run_with_stack};
 #[doc(hidden)]

@@ -82,10 +82,8 @@ pub use tsv_lang::{
 /// markup and in every `<script>`, template expression and `<style>` alike. The wire
 /// writer's tables and every parse error's point (`Error::wire_point`, and the
 /// `line:col` its message prints) read this one statement.
-pub const WIRE_COORDINATES: WireCoordinates = WireCoordinates {
-    lines: LineRule::Lf,
-    bom: LeadingBom::Elided,
-};
+pub const WIRE_COORDINATES: WireCoordinates =
+    WireCoordinates::new(LineRule::Lf, LeadingBom::Elided);
 
 /// `parse_folded`'s refusal: parse the author's own bytes, and refuse the first in-tag `//`
 /// comment that holds a lone `<CR>`. Its parse lands in `arena` beside the folded one, which
@@ -171,7 +169,7 @@ pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
 /// # {
 /// use tsv_svelte::{JsonOptions, parse_to_json_with};
 ///
-/// let json = parse_to_json_with("<p>x</p>", &JsonOptions::new().locations(true)).unwrap();
+/// let json = parse_to_json_with("<p>x</p>", JsonOptions::new().locations(true)).unwrap();
 /// assert!(json.contains(r#""loc":"#));
 /// assert!(json.contains(r#""name_loc":"#));
 /// # }
@@ -230,7 +228,7 @@ const _: () = {
 /// A parse error.
 #[cfg(feature = "json")]
 pub fn parse_to_json(source: &str) -> Result<String> {
-    parse_to_json_with(source, &JsonOptions::new())
+    parse_to_json_with(source, JsonOptions::new())
 }
 
 /// [`parse_to_json`] under `options`: whether the wire carries `loc`.
@@ -242,7 +240,7 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 ///
 /// A parse error.
 #[cfg(feature = "json")]
-pub fn parse_to_json_with(source: &str, options: &JsonOptions) -> Result<String> {
+pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> {
     let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
     let ast = __private::parse(source, &arena)?;
     #[cfg(feature = "locations")]

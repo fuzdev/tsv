@@ -64,7 +64,7 @@ use std::borrow::Cow;
 use std::fmt;
 use std::ops::Range;
 
-use tsv_lang::{Error, ErrorKind, ErrorReport, Span};
+use tsv_lang::{Error, ErrorKind, ErrorReport};
 
 /// Strip the types from TypeScript `source`, keeping every surviving character at its line
 /// and UTF-16 column.
@@ -85,8 +85,8 @@ use tsv_lang::{Error, ErrorKind, ErrorReport, Span};
 ///     panic!("expected a refusal");
 /// };
 /// assert_eq!(kind, UnsupportedKind::TypeAssertion);
-/// assert_eq!(span.range(), 8..12);
-/// let point = WIRE_COORDINATES.point(source, span.start as usize);
+/// assert_eq!(span, 8..12);
+/// let point = WIRE_COORDINATES.point(source, span.start);
 /// assert_eq!((point.line, point.column), (1, 8));
 /// assert_eq!(
 ///     strip(source).unwrap_err().message(source),
@@ -184,9 +184,10 @@ pub enum StripError {
     Unsupported {
         /// What was refused.
         kind: UnsupportedKind,
-        /// Its byte range in the source; [`crate::WIRE_COORDINATES`] converts each end to
-        /// a line and UTF-16 column.
-        span: Span,
+        /// Its byte range in the source — UTF-8 byte offsets, as [`StripError::span`] and
+        /// [`Error::span`] give them; [`crate::WIRE_COORDINATES`] converts each end to a
+        /// line and UTF-16 column.
+        span: Range<usize>,
     },
 }
 
@@ -270,7 +271,7 @@ impl StripError {
     pub fn span(&self) -> Option<Range<usize>> {
         match self {
             Self::Parse(error) => error.span(),
-            Self::Unsupported { span, .. } => Some(span.range()),
+            Self::Unsupported { span, .. } => Some(span.clone()),
         }
     }
 
@@ -284,9 +285,21 @@ impl StripError {
         match self {
             Self::Parse(error) => format!("{error:#}"),
             Self::Unsupported { kind, span } => {
-                let report = kind.report(*span, source);
+                let report = kind.report(span.clone(), source);
                 format!("{}\n{}", report.summary, report.frame)
             }
+        }
+    }
+
+    /// The same report a binding builds, against `source`, the text that was stripped —
+    /// the same shape for both kinds: a parse error's [`Error::report`] (`None` only for a
+    /// source over the size cap), and a refusal's [`UnsupportedKind::report`] over its
+    /// span (always `Some`).
+    #[must_use]
+    pub fn report(&self, source: &str) -> Option<ErrorReport> {
+        match self {
+            Self::Parse(error) => error.report(),
+            Self::Unsupported { kind, span } => Some(kind.report(span.clone(), source)),
         }
     }
 }
@@ -298,12 +311,12 @@ impl UnsupportedKind {
     /// [`crate::WIRE_COORDINATES`]. Infallible, unlike a parse error's
     /// [`Error::report`]: a refusal always has its span.
     #[must_use]
-    pub fn report(self, span: Span, source: &str) -> ErrorReport {
+    pub fn report(self, span: Range<usize>, source: &str) -> ErrorReport {
         ErrorReport::refusal(
             &format!("cannot strip {}", self.description()),
             source,
-            span.start as usize,
-            span.end as usize,
+            span.start,
+            span.end,
             crate::WIRE_COORDINATES,
         )
     }
@@ -601,10 +614,7 @@ mod tests {
             panic!("expected a refusal");
         };
         assert_eq!(kind, UnsupportedKind::AssertionGrouping);
-        assert_eq!(
-            &source[span.start as usize..span.end as usize],
-            "<T>a + b as U"
-        );
+        assert_eq!(&source[span], "<T>a + b as U");
     }
 
     /// A chain over a thousand links long strips on a small stack: its links cost heap, not

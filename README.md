@@ -184,7 +184,7 @@ none named, format and strip try the module grammar, then the script one, and pa
 module.
 
 This release exposes no AST: parsing returns the wire JSON, whose shape the npm
-packages type in `tsv_ast.d.ts`. `parse_to_json_with(source, &JsonOptions)` adds `loc`
+packages type in `tsv_ast.d.ts`. `parse_to_json_with(source, JsonOptions)` adds `loc`
 (the `locations` cargo feature); the default `json` feature can be turned off for a build
 without `parse_to_json*`.
 

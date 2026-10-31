@@ -79,10 +79,8 @@ pub use tsv_lang::{
 /// BOM-less string), and `\n` alone ending a line. The wire writer's tables and every
 /// parse error's point (`Error::wire_point`, and the `line:col` its message prints)
 /// read this one statement.
-pub const WIRE_COORDINATES: WireCoordinates = WireCoordinates {
-    lines: LineRule::Lf,
-    bom: LeadingBom::Elided,
-};
+pub const WIRE_COORDINATES: WireCoordinates =
+    WireCoordinates::new(LineRule::Lf, LeadingBom::Elided);
 
 /// Parse and format `source` in one call.
 ///
@@ -126,7 +124,7 @@ pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
 /// # {
 /// use tsv_css::{JsonOptions, parse_to_json_with};
 ///
-/// let json = parse_to_json_with("a{}", &JsonOptions::new().locations(true)).unwrap();
+/// let json = parse_to_json_with("a{}", JsonOptions::new().locations(true)).unwrap();
 /// assert!(json.contains(r#""loc":"#));
 /// # }
 /// ```
@@ -183,7 +181,7 @@ const _: () = {
 /// A parse error.
 #[cfg(feature = "json")]
 pub fn parse_to_json(source: &str) -> Result<String> {
-    parse_to_json_with(source, &JsonOptions::new())
+    parse_to_json_with(source, JsonOptions::new())
 }
 
 /// [`parse_to_json`] under `options`: whether the wire carries `loc`.
@@ -195,7 +193,7 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 ///
 /// A parse error.
 #[cfg(feature = "json")]
-pub fn parse_to_json_with(source: &str, options: &JsonOptions) -> Result<String> {
+pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> {
     let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
     let ast = __private::parse(source, &arena)?;
     #[cfg(feature = "locations")]

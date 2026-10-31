@@ -191,9 +191,9 @@ impl Family {
 /// language with none (Svelte hard-wires `Module`; CSS has no goal) is refused rather
 /// than ignored, `"module"` included, so a caller cannot believe it selected a goal that
 /// was silently dropped; the refusal names the export `family`. A value naming neither
-/// goal is refused with the value echoed. `from_source_type` is the language crate's own
-/// spelling table (`tsv_ts::Goal::from_source_type`), passed in so this crate depends on
-/// no language crate.
+/// goal is refused with the value echoed. `parse_goal` is the language crate's own
+/// spelling table (`tsv_ts::Goal`'s `FromStr`), passed in so this crate depends on no
+/// language crate.
 ///
 /// One spelling of both refusals for the two string-axis bindings — the npm facade both
 /// package sets publish through (`crates/tsv_wasm/npm/api.js`) restates them by hand in
@@ -210,7 +210,7 @@ pub fn decode_source_type<G>(
     source_type: Option<&str>,
     allowed: bool,
     family: Family,
-    from_source_type: impl FnOnce(&str) -> Option<G>,
+    parse_goal: impl FnOnce(&str) -> Option<G>,
 ) -> Result<Option<G>, String> {
     let Some(source_type) = source_type else {
         return Ok(None);
@@ -221,7 +221,7 @@ pub fn decode_source_type<G>(
             family.noun()
         ));
     }
-    from_source_type(source_type).map(Some).ok_or_else(|| {
+    parse_goal(source_type).map(Some).ok_or_else(|| {
         format!("invalid sourceType '{source_type}' (expected 'script' or 'module')")
     })
 }
@@ -350,7 +350,7 @@ macro_rules! parse_ast_for_format {
 /// (`tsv_lang::printing::FoldedSource::parse_with`) and then through `$map_err`, each
 /// binding's own error type (a message string, a located failure, a JS value). A Svelte
 /// refusal (`tsv_lang::Error::refusal`) takes the same road; a binding that reports a
-/// span reads the refusal's own (`Error::report`, `refused` set) and marks it a refusal,
+/// span reads the refusal's own (`Error::report`, `kind` `Refusal`) and marks it a refusal,
 /// never a parse failure.
 ///
 /// Expands to `Result<String, _>` inside the caller's `with_*_arena` closures, so the

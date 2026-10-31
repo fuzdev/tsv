@@ -191,13 +191,17 @@ impl Failure {
 
 /// A parse error as the export ends on it: every pointed error RETURNED as
 /// `{ok: false, error}` — `kind` `'parse'` for a syntax error, `'refused'` for a format's
-/// refusal of a source that parses (`Error::report`'s `refused`) — and a positionless
-/// one (a source over the size cap) thrown as a plain `Error`.
+/// refusal of a source that parses (`Error::report`'s `kind`, `ErrorKind::Refusal`) — and a
+/// positionless one (a source over the size cap) thrown as a plain `Error`.
 #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 fn parse_failure(e: &Error) -> Failure {
     match e.report() {
         Some(report) => Failure::Returned(failure_result(
-            if report.refused { "refused" } else { "parse" },
+            if report.kind == tsv_ts::ErrorKind::Refusal {
+                "refused"
+            } else {
+                "parse"
+            },
             None,
             &report,
         )),
@@ -222,8 +226,8 @@ fn failure_result(kind: &str, construct: Option<&str>, report: &tsv_ts::ErrorRep
     let _ = construct;
     error.set_message(&report.summary);
     error.set_frame(&report.frame);
-    error.set_start(report.start.start);
-    error.set_end(report.end.start);
+    error.set_start(report.start.offset);
+    error.set_end(report.end.offset);
     let loc = PlainObject::new();
     loc.set_start_position(&position(report.start));
     loc.set_end_position(&position(report.end));
@@ -580,12 +584,9 @@ fn wasm_source_type(
             ));
         }
     };
-    tsv_arena::decode_source_type(
-        source_type.as_deref(),
-        allowed,
-        family,
-        tsv_ts::Goal::from_source_type,
-    )
+    tsv_arena::decode_source_type(source_type.as_deref(), allowed, family, |source_type| {
+        source_type.parse::<tsv_ts::Goal>().ok()
+    })
 }
 
 /// The wire string behind both parse exports (`parse_<lang>` and `parse_<lang>_json`), or

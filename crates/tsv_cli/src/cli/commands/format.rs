@@ -494,7 +494,7 @@ impl WorkerFormatters {
         // name), and where it does the module-then-script fallback has nothing to fall
         // back to — see `tsv_ts::Goal::from_extension`. Everything else stays unnamed and
         // takes the fallback, which is what reaches a legacy sloppy script.
-        let goal = tsv_ts::Goal::from_extension(&name);
+        let goal = tsv_ts::Goal::from_extension(path);
         // catch_unwind isolates formatter bugs to the file; the prebuilt binaries use
         // panic=abort, so this pays off in dev/corpus profiles and in a `cargo install`
         // build, which takes cargo's default unwinding profile. A formatter a panic

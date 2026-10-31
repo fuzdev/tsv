@@ -288,12 +288,12 @@ pub fn goal_marker_path(dir: &Path) -> PathBuf {
 ///
 /// Lenient: absent, unreadable, or unrecognized → `Goal::Module` (the default);
 /// only a marker trimming to `script`/`module` selects a goal, through the
-/// shared `Goal::from_source_type` vocabulary. The one reader, so the validator
+/// shared vocabulary of `Goal`'s `FromStr`. The one reader, so the validator
 /// (via `Fixture::goal`) and `fixture_init` agree on what a directory declares.
 pub fn read_goal_marker(dir: &Path) -> Goal {
     std::fs::read_to_string(goal_marker_path(dir))
         .ok()
-        .and_then(|s| Goal::from_source_type(s.trim()))
+        .and_then(|s| s.trim().parse::<Goal>().ok())
         .unwrap_or(Goal::Module)
 }
 

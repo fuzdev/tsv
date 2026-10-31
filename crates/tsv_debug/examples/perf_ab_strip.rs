@@ -113,7 +113,7 @@ fn run(args: &Args) -> ExitCode {
                 continue;
             }
         };
-        let goal = path.to_str().and_then(tsv_ts::Goal::from_extension);
+        let goal = tsv_ts::Goal::from_extension(path);
         parse_times.clear();
         strip_times.clear();
         let mut failed = false;

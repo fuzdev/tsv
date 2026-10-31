@@ -97,7 +97,7 @@ fn strip_at_path<'s>(
     source: &'s str,
     arena: &bumpalo::Bump,
 ) -> Result<tsv_ts::Stripped<'s>, tsv_ts::StripError> {
-    let goal = path.to_str().and_then(tsv_ts::Goal::from_extension);
+    let goal = tsv_ts::Goal::from_extension(path);
     tsv_ts::__private::strip_in(source, goal, arena)
 }
 

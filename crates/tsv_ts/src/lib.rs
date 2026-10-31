@@ -49,7 +49,7 @@
 //!     "Expected expression, found end of file\n1:9 const x=\n            ^ here"
 //! );
 //! let report = err.report().unwrap();
-//! assert_eq!((report.start.start, report.start.line, report.start.column), (8, 1, 8));
+//! assert_eq!((report.start.offset, report.start.line, report.start.column), (8, 1, 8));
 //! ```
 //!
 //! A refusal ([`ErrorKind::Refusal`]) is a source that parses but that an operation cannot
@@ -135,12 +135,12 @@ use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
 use tsv_lang::{CommentFreeWindow, EmbedContext};
 pub use tsv_lang::{
-    Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, STACK_SIZE, Span, WireCoordinates,
+    Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, STACK_SIZE, WireCoordinates,
     WirePoint, run_with_stack,
 };
 
 pub use formatter::Formatter;
-pub use goal::Goal;
+pub use goal::{Goal, ParseGoalError};
 pub use strip::{StripError, Stripped, UnsupportedKind, strip, strip_with_goal};
 
 /// The coordinates a TypeScript document's positions are reported in — acorn's: a
@@ -148,10 +148,8 @@ pub use strip::{StripError, Stripped, UnsupportedKind, strip, strip_with_goal};
 /// offset 0), and ECMAScript's line terminators (LF, CR, CRLF as one, U+2028, U+2029).
 /// The wire writer's tables and every parse error's point (`Error::wire_point`, and
 /// the `line:col` its message prints) read this one statement.
-pub const WIRE_COORDINATES: WireCoordinates = WireCoordinates {
-    lines: LineRule::Ecmascript,
-    bom: LeadingBom::Counted,
-};
+pub const WIRE_COORDINATES: WireCoordinates =
+    WireCoordinates::new(LineRule::Ecmascript, LeadingBom::Counted);
 
 /// Build an *output* printer — pre-sizes the output buffer to the source
 /// length for the rendering path. Used by the entry points that write the
@@ -322,7 +320,7 @@ fn format_program_in(
 /// use tsv_ts::{Goal, JsonOptions, parse_to_json_with};
 ///
 /// let options = JsonOptions::new().goal(Goal::Script).locations(true);
-/// let json = parse_to_json_with("with (a) b;", &options).unwrap();
+/// let json = parse_to_json_with("with (a) b;", options).unwrap();
 /// assert!(json.contains(r#""sourceType":"script""#));
 /// assert!(json.contains(r#""loc":"#));
 /// # }
@@ -400,7 +398,7 @@ const _: () = {
 /// A parse error at the module goal.
 #[cfg(feature = "json")]
 pub fn parse_to_json(source: &str) -> Result<String> {
-    parse_to_json_with(source, &JsonOptions::new())
+    parse_to_json_with(source, JsonOptions::new())
 }
 
 /// [`parse_to_json`] under `options`: the goal it parses at (exact, no retry) and whether
@@ -413,7 +411,7 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 ///
 /// A parse error at the options' goal.
 #[cfg(feature = "json")]
-pub fn parse_to_json_with(source: &str, options: &JsonOptions) -> Result<String> {
+pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> {
     let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
     let program = __private::parse_with_goal(source, options.goal, &arena)?;
     #[cfg(feature = "locations")]

@@ -286,7 +286,7 @@ impl ErrorReport {
             frame: context.frame(),
             start: context.point,
             end: coordinates.point(source, end.max(start)),
-            refused: true,
+            kind: ErrorKind::Refusal,
         }
     }
 }
@@ -329,8 +329,11 @@ pub struct ErrorReport {
     /// Where it ends — `start` itself for a syntax error, which knows a point and no span;
     /// a refusal's own end.
     pub end: WirePoint,
-    /// A refusal of a source that parses ([`ErrorKind::Refusal`]), not a syntax error.
-    pub refused: bool,
+    /// What kind of failure this is: [`ErrorKind::Refusal`] for a refusal of a source
+    /// that parses, otherwise the located error's own kind ([`ErrorKind::Syntax`] or
+    /// [`ErrorKind::TooDeep`]) — never [`ErrorKind::TooLarge`], which has no point to
+    /// report.
+    pub kind: ErrorKind,
 }
 
 // 8 bytes, because the payload lives behind the `Box`. The size is the point: a
@@ -540,7 +543,7 @@ impl Error {
     ///
     /// The surfaces split on it: the CLI prints `Parse error:` for [`ErrorKind::Syntax`]
     /// and [`ErrorKind::TooDeep`] (both located, so both carry a frame) and `Error:` for the
-    /// rest, and a binding reads the refusal line from [`ErrorReport::refused`]. A
+    /// rest, and a binding reads the refusal line from [`ErrorReport::kind`]. A
     /// whole-document parse entry point fills every located error's context, so on its
     /// errors `Syntax | TooDeep` is exactly `wire_point().is_some()`.
     #[inline]
@@ -632,7 +635,7 @@ impl Error {
 
     /// The error as a binding reports it — summary, frame and span — for every error with a
     /// point: a syntax error or a depth limit (its span the point alone: `end == start`)
-    /// and a refusal (its own span, `refused` set). `None` for a source
+    /// and a refusal (its own span, `kind` [`ErrorKind::Refusal`]). `None` for a source
     /// over the size cap ([`ErrorKind::TooLarge`]).
     pub fn report(&self) -> Option<ErrorReport> {
         if let Repr::Refused {
@@ -644,7 +647,7 @@ impl Error {
                 frame: frame.to_string(),
                 start: *start,
                 end: *end,
-                refused: true,
+                kind: ErrorKind::Refusal,
             });
         }
         let (_, context) = self.0.kind.located()?;
@@ -654,7 +657,7 @@ impl Error {
             frame: context.frame(),
             start: context.point,
             end: context.point,
-            refused: false,
+            kind: self.kind(),
         })
     }
 
@@ -739,7 +742,7 @@ impl Error {
     }
 
     /// Where the error sits, in the wire coordinates of the document it was parsed from:
-    /// the `start` offset a wire node there would carry, and the `loc` point
+    /// the offset a wire node starting there would carry, and the `loc` point
     /// (`line` 1-based, `column` 0-based UTF-16 units) the document's line rule gives it —
     /// the numbers its message header prints, as `line:column+1`.
     ///
@@ -823,19 +826,13 @@ mod tests {
     use crate::location::{LeadingBom, LineRule};
 
     /// A TypeScript document's coordinates: ECMAScript lines, a BOM counted.
-    const ECMA: WireCoordinates = WireCoordinates {
-        lines: LineRule::Ecmascript,
-        bom: LeadingBom::Counted,
-    };
+    const ECMA: WireCoordinates = WireCoordinates::new(LineRule::Ecmascript, LeadingBom::Counted);
     /// A Svelte or CSS document's coordinates: `\n` lines, a BOM elided.
-    const LF: WireCoordinates = WireCoordinates {
-        lines: LineRule::Lf,
-        bom: LeadingBom::Elided,
-    };
+    const LF: WireCoordinates = WireCoordinates::new(LineRule::Lf, LeadingBom::Elided);
 
-    fn point(start: u32, line: u32, column: u32) -> WirePoint {
+    fn point(offset: u32, line: u32, column: u32) -> WirePoint {
         WirePoint {
-            start,
+            offset,
             line,
             column,
         }
@@ -1195,7 +1192,7 @@ mod tests {
                 frame: "2:2 c\n     ^ here".to_owned(),
                 start: point(4, 2, 1),
                 end: point(5, 2, 2),
-                refused: true,
+                kind: ErrorKind::Refusal,
             })
         );
         assert_eq!(
@@ -1256,7 +1253,7 @@ mod tests {
         assert_eq!(report.frame, "2:1 y\n    ^ here");
         assert_eq!(report.start, point(8, 2, 0));
         assert_eq!(report.end, report.start);
-        assert!(!report.refused);
+        assert_eq!(report.kind, ErrorKind::Syntax);
         assert_eq!(
             format!("{e:#}"),
             format!("{}\n{}", report.summary, report.frame)

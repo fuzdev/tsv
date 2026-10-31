@@ -453,10 +453,8 @@ mod tests {
     /// its limit.
     #[test]
     fn the_depth_error_is_a_located_syntax_error_naming_its_limit() {
-        let coordinates = crate::WireCoordinates {
-            lines: crate::LineRule::Ecmascript,
-            bom: crate::LeadingBom::Counted,
-        };
+        let coordinates =
+            crate::WireCoordinates::new(crate::LineRule::Ecmascript, crate::LeadingBom::Counted);
         let nesting = Error::too_deep(DepthLimit::Nesting, 2).with_context("((x", coordinates);
         assert_eq!(nesting.kind(), crate::ErrorKind::TooDeep);
         assert!(nesting.wire_point().is_some());

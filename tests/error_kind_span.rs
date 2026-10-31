@@ -66,7 +66,7 @@ fn a_leading_bom_is_a_counted_byte_in_every_language() {
     let semicolon = ts.find(';').expect("a `;`");
     assert_eq!(error.span(), Some(semicolon..semicolon));
     let report = error.report().expect("a located error reports");
-    assert_eq!(report.start.start as usize, semicolon - 2);
+    assert_eq!(report.start.offset as usize, semicolon - 2);
 
     // Svelte: the wire elides the mark, so the report's start is one UTF-16 unit lower still
     // — the span is not.
@@ -75,7 +75,7 @@ fn a_leading_bom_is_a_counted_byte_in_every_language() {
     let b = svelte.find(" b}").expect("the `b`") + 1;
     assert_eq!(error.span(), Some(b..b));
     let report = error.report().expect("a located error reports");
-    assert_eq!(report.start.start as usize, b - 3);
+    assert_eq!(report.start.offset as usize, b - 3);
 
     // CSS: elided on the wire as Svelte's is.
     let css = "\u{FEFF}a { color: red; } }";
@@ -83,7 +83,7 @@ fn a_leading_bom_is_a_counted_byte_in_every_language() {
     let brace = css.rfind('}').expect("a `}`");
     assert_eq!(error.span(), Some(brace..brace));
     let report = error.report().expect("a located error reports");
-    assert_eq!(report.start.start as usize, brace - 3);
+    assert_eq!(report.start.offset as usize, brace - 3);
 }
 
 #[test]

@@ -139,7 +139,7 @@ closed-scope/open-convention stance below.
 
 **Compile-Time Isolation** — Cargo prevents circular dependencies. CSS changes don't trigger TypeScript recompilation.
 
-**Clean API Boundaries** — Each language exports `parse_to_json()` / `parse_to_json_with(&JsonOptions)`, `format()` and a `Formatter` (`format()` over arenas kept warm across calls), over the hidden AST-taking `__private::parse()` and `__private::convert_ast_json_bytes()` / `convert_ast_json_string()` (the span-only wire every binding ships; `convert_ast_json_bytes_with_locations` adds `loc`; no shipped crate reads the wire back — `tsv_debug::json` is the one reader). tsv_ts and tsv_css also carry hidden embedding APIs in `__private` (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
+**Clean API Boundaries** — Each language exports `parse_to_json()` / `parse_to_json_with(JsonOptions)`, `format()` and a `Formatter` (`format()` over arenas kept warm across calls), over the hidden AST-taking `__private::parse()` and `__private::convert_ast_json_bytes()` / `convert_ast_json_string()` (the span-only wire every binding ships; `convert_ast_json_bytes_with_locations` adds `loc`; no shipped crate reads the wire back — `tsv_debug::json` is the one reader). tsv_ts and tsv_css also carry hidden embedding APIs in `__private` (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
 
 **Scalability** — New capabilities land as crate additions (`tsv_ffi`, `tsv_wasm`, `tsv_napi`, `tsv_arena`, `tsv_ignore` + `tsv_discover`, the experimental, may-never-ship `tsv_check` / `tsv_svelte_compile`; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
 
@@ -153,7 +153,7 @@ trait:
 ```rust
 // public
 pub fn parse_to_json(source: &str) -> Result<String, Error>;
-pub fn parse_to_json_with(source: &str, options: &JsonOptions) -> Result<String, Error>;
+pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String, Error>;
 pub fn format(source: &str) -> Result<String, Error>;
 pub struct Formatter; // many sources on one thread, arenas kept warm
 impl Formatter {

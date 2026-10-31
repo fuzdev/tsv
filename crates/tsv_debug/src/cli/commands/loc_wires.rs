@@ -310,8 +310,9 @@ fn answer(request: &WireRequest, arena: &mut bumpalo::Bump) -> Result<Vec<u8>, S
     let language = request.language;
     let goal = match request.goal.as_deref() {
         None => tsv_ts::Goal::Module,
-        Some(goal) if language == WireLanguage::Typescript => tsv_ts::Goal::from_source_type(goal)
-            .ok_or_else(|| format!("unknown goal {goal:?} in a loc_wires request"))?,
+        Some(goal) if language == WireLanguage::Typescript => goal
+            .parse::<tsv_ts::Goal>()
+            .map_err(|_| format!("unknown goal {goal:?} in a loc_wires request"))?,
         Some(goal) => {
             return Err(format!(
                 "goal {goal:?} on {:?}, which has no goal axis",

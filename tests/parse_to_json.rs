@@ -1,7 +1,7 @@
 // the `utf8` helper isn't a `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach it
 #![expect(clippy::expect_used)]
 
-//! The public one-shot parse, `parse_to_json` / `parse_to_json_with(&JsonOptions)` in each
+//! The public one-shot parse, `parse_to_json` / `parse_to_json_with(JsonOptions)` in each
 //! language crate: the same wire bytes the hidden AST-taking path writes
 //! (`__private::parse*` + `__private::convert_ast_json_*`, what the bindings and the CLI
 //! call), the same error, and `JsonOptions`'s defaults equal to the bare form's.
@@ -44,7 +44,7 @@ fn ts_parse_to_json_is_the_module_span_wire() {
         );
         let options = tsv_ts::JsonOptions::new().locations(true);
         assert_eq!(
-            tsv_ts::parse_to_json_with(source, &options),
+            tsv_ts::parse_to_json_with(source, options),
             Ok(loc),
             "{source:?}"
         );
@@ -60,9 +60,9 @@ fn ts_json_options_goal_is_exact() {
         &ast, SCRIPT,
     ));
     let script = tsv_ts::JsonOptions::new().goal(Goal::Script);
-    assert_eq!(tsv_ts::parse_to_json_with(SCRIPT, &script), Ok(span));
+    assert_eq!(tsv_ts::parse_to_json_with(SCRIPT, script), Ok(span));
     assert_eq!(
-        tsv_ts::parse_to_json_with(SCRIPT, &script.locations(true)),
+        tsv_ts::parse_to_json_with(SCRIPT, script.locations(true)),
         Ok(loc)
     );
     // no fallback: the bare form is the module goal alone, and its error the module parse's
@@ -70,7 +70,7 @@ fn ts_json_options_goal_is_exact() {
     let bare = tsv_ts::parse_to_json(SCRIPT).expect_err("the bare form is Module");
     assert_eq!(format!("{bare:#}"), format!("{module_error:#}"));
     let named = tsv_ts::JsonOptions::new().goal(Goal::Module);
-    let exact = tsv_ts::parse_to_json_with(SCRIPT, &named).expect_err("Module is exact");
+    let exact = tsv_ts::parse_to_json_with(SCRIPT, named).expect_err("Module is exact");
     assert_eq!(format!("{exact:#}"), format!("{module_error:#}"));
 }
 
@@ -114,7 +114,7 @@ fn css_parse_to_json_is_the_span_wire() {
         );
         let options = tsv_css::JsonOptions::new().locations(true);
         assert_eq!(
-            tsv_css::parse_to_json_with(source, &options),
+            tsv_css::parse_to_json_with(source, options),
             Ok(loc),
             "{source:?}"
         );
@@ -135,7 +135,7 @@ fn svelte_parse_to_json_is_the_span_wire() {
         );
         let options = tsv_svelte::JsonOptions::new().locations(true);
         assert_eq!(
-            tsv_svelte::parse_to_json_with(source, &options),
+            tsv_svelte::parse_to_json_with(source, options),
             Ok(loc),
             "{source:?}"
         );
