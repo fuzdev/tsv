@@ -1617,7 +1617,7 @@ function run_strip({ values, positionals }) {
 		if (is_dir) {
 			exit_with_error(2, `Error: ${quote_path(path)}: is a directory (one file is expected)`);
 		}
-		// `tsv_discover::strip_unsupported_extension_error`, restated by hand: the binding
+		// `tsv_discover::unstrippable_extension_error`, restated by hand: the binding
 		// exports no strip policy (the `format` refusal it does export names a different list)
 		if (!STRIPPABLE_EXTENSIONS.some((ext) => has_extension_ignoring_case(path, ext))) {
 			const reason = JAVASCRIPT_EXTENSIONS.some((ext) => has_extension_ignoring_case(path, ext))

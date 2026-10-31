@@ -111,13 +111,14 @@ holds two parallel per-directory layer stacks (`.gitignore` and override):
   `.gitignore` layers are not consulted.
 - `IgnoreStack::has_gitignore_layers()` — whether any `.gitignore` layer is pushed
   (true even for an empty one — mere presence turns a caller's heuristic off, as in
-  git). `tsv_discover` uses it to assert its `heuristic_active ⟹ no .gitignore layer`
-  invariant.
-- `IgnoreStack::gitignore_anchors()` — the format-root-relative directory anchors
-  (`/`-joined; `""` = root) of the pushed `.gitignore` layers. Lets a per-file
-  discovery replay with **no** top-down walk (the VS Code extension, via
-  `tsv_discover::is_path_pruned`) reconstruct each ancestor's `heuristic_active` —
-  the heuristic is off at a level once a `.gitignore` anchored above it is present.
+  git). `tsv_discover` uses it to assert that an active build-output heuristic has no
+  `.gitignore` layer pushed.
+- `IgnoreStack::gitignore_anchors() -> impl Iterator<Item = &[String]>` — the
+  format-root-relative directory anchors of the pushed `.gitignore` layers, each as its
+  `split_segments` segments (empty = root), borrowed from the stack (no allocation).
+  Lets a per-file discovery replay with **no** top-down walk (the VS Code extension, via
+  `tsv_discover::is_path_pruned`) reconstruct, per ancestor, whether the build-output
+  heuristic applies — it is off at a level once a `.gitignore` anchored above it is present.
 - `IgnoreStack::exclusion(path, kind) -> Option<Exclusion>` — the witness behind
   `is_ignored`: the shallowest excluded prefix of `path` (`Exclusion::depth`), the
   directory holding the excluding rule's file (`anchor_depth`), both counted in
@@ -142,7 +143,8 @@ holds two parallel per-directory layer stacks (`.gitignore` and override):
   remedy names the file the root reads rather than one whose creation would shadow it.
 - `split_segments(path) -> Vec<&str>` — a path's meaningful segments (empty and `.`
   components dropped): the unit every query splits a path into and `Exclusion`'s
-  depths count in, public so a caller slicing by those depths splits the same way.
+  depths count in, public so a caller slicing by those depths splits the same way. A
+  `Vec` rather than an iterator because every caller indexes or slices it by depth.
 
 **Which** files feed the stack is the caller's choice. tsv reads `.formatignore`
 hierarchically (one override layer per directory) and, inside a git repo,

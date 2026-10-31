@@ -530,9 +530,14 @@ impl IgnoreStack {
     /// the two type-check interchangeably.
     #[napi(js_name = "classify_dir", catch_unwind)]
     pub fn classify_dir(&self, name: String, child_rel: String, heuristic_active: bool) -> String {
-        tsv_discover::classify_dir(&name, &child_rel, heuristic_active, &self.inner)
-            .as_tag()
-            .to_string()
+        tsv_discover::classify_dir(
+            &name,
+            &child_rel,
+            tsv_discover::BuildOutputHeuristic::from_active(heuristic_active),
+            &self.inner,
+        )
+        .as_tag()
+        .to_string()
     }
 
     /// Whether a child **file** should be formatted (a formattable extension and
@@ -622,9 +627,11 @@ impl IgnoreStack {
     ) -> Either<String, Undefined> {
         or_undefined(tsv_discover::prettierignore_outside_repo_warning(
             &dir,
-            in_repo,
-            has_prettierignore,
-            has_formatignore,
+            tsv_discover::DirIgnoreFiles {
+                in_repo,
+                formatignore: has_formatignore,
+                prettierignore: has_prettierignore,
+            },
         ))
     }
 
@@ -642,9 +649,11 @@ impl IgnoreStack {
     ) -> Either<String, Undefined> {
         or_undefined(tsv_discover::prettierignore_shadowed_warning(
             &dir,
-            in_repo,
-            has_prettierignore,
-            has_formatignore,
+            tsv_discover::DirIgnoreFiles {
+                in_repo,
+                formatignore: has_formatignore,
+                prettierignore: has_prettierignore,
+            },
         ))
     }
 

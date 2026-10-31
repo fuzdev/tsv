@@ -21,7 +21,7 @@ pub const SAFETY_NET_DIRS: [&str; 6] = ["node_modules", ".git", ".sl", ".hg", ".
 
 /// Heuristic-only directory skips — tsv's fallback guess at "generated /
 /// vendored / build output", applied **only** while no `.gitignore` governs the
-/// directory (`heuristic_active`). Hidden directories (a leading `.`) are skipped
+/// directory ([`BuildOutputHeuristic::Active`]). Hidden directories (a leading `.`) are skipped
 /// by the same heuristic. Once a `.gitignore` is in play the project's own rules
 /// decide, so these are recursed unless the project ignores them.
 pub const HEURISTIC_DIRS: [&str; 3] = ["dist", "build", "target"];
@@ -40,7 +40,7 @@ pub const FORMATTABLE_EXTENSIONS: [&str; 8] =
 /// The discovery verdict for one child **directory**: descend into it, prune it
 /// (skip its whole subtree), or prune it **and** surface a diagnostic.
 #[non_exhaustive]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DirVerdict {
     /// Recurse into the directory.
     Descend,
@@ -71,6 +71,34 @@ impl DirVerdict {
     }
 }
 
+/// Whether the build-output heuristic applies at one level of a walk ([`classify_dir`]):
+/// [`Active`](Self::Active) while no `.gitignore` governs the level, so a hidden or
+/// [build-output](HEURISTIC_DIRS) directory prunes unless an override-layer `!`
+/// re-includes it; [`Inactive`](Self::Inactive) once a `.gitignore` at or above the
+/// level has been read, whose rules then decide alone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuildOutputHeuristic {
+    /// No `.gitignore` governs the level: the heuristic prunes.
+    Active,
+    /// A `.gitignore` governs the level: the heuristic is off.
+    Inactive,
+}
+
+impl BuildOutputHeuristic {
+    /// [`Active`](Self::Active) for `true`, [`Inactive`](Self::Inactive) for `false` — for
+    /// a boundary that carries the state as a flag (the bindings' `heuristic_active`).
+    #[must_use]
+    pub const fn from_active(active: bool) -> Self {
+        if active { Self::Active } else { Self::Inactive }
+    }
+
+    /// Whether the heuristic prunes at this level.
+    #[must_use]
+    pub const fn is_active(self) -> bool {
+        matches!(self, Self::Active)
+    }
+}
+
 /// Whether a file name has a [formattable extension](FORMATTABLE_EXTENSIONS)
 /// (the JS/TS family, `.svelte`, `.css` — compound forms like `.svelte.ts` are
 /// covered by the `.ts` match). Matches `Path::extension`, so a bare dotfile like
@@ -90,7 +118,7 @@ pub fn is_formattable(name: &str) -> bool {
 
 /// Whether `path`'s extension (`Path::extension`, so a bare dotfile has none) is one of
 /// `set`, read without regard to ASCII case — the one match [`is_formattable`] and
-/// [`strip_unsupported_extension_error`] share.
+/// [`unstrippable_extension_error`] share.
 fn has_extension_in(path: &str, set: &[&str]) -> bool {
     Path::new(path)
         .extension()
@@ -99,7 +127,7 @@ fn has_extension_in(path: &str, set: &[&str]) -> bool {
 }
 
 /// `set` rendered as dotted names joined by `separator` (`".ts, .mts, …"`) — the one
-/// rendering [`formattable_extension_list`] and [`strip_unsupported_extension_error`]
+/// rendering [`formattable_extension_list`] and [`unstrippable_extension_error`]
 /// share.
 fn extension_list(set: &[&str], separator: &str) -> String {
     let mut list = String::new();
@@ -161,7 +189,7 @@ const JAVASCRIPT_EXTENSIONS: [&str; 3] = ["js", "mjs", "cjs"];
 /// reach the TypeScript parser and fail on its markup, and a JavaScript file would be
 /// read as TypeScript. A JavaScript file's message says why it is refused.
 #[must_use]
-pub fn strip_unsupported_extension_error(path: &str) -> Option<String> {
+pub fn unstrippable_extension_error(path: &str) -> Option<String> {
     (!has_extension_in(path, &STRIPPABLE_EXTENSIONS)).then(|| {
         let list = extension_list(&STRIPPABLE_EXTENSIONS, ", ");
         let reason = if has_extension_in(path, &JAVASCRIPT_EXTENSIONS) {
@@ -191,7 +219,7 @@ pub fn formattable_extension_list(separator: &str) -> String {
 /// decision — safety nets prune in every mode, with no ignore-file or heuristic
 /// override — so a caller doing its own walk can short-circuit on it before
 /// building an [`IgnoreStack`]. (The build-output heuristic, by contrast, is
-/// contextual — it needs the stack and `heuristic_active` — so it has no
+/// contextual — it needs the stack and the [`BuildOutputHeuristic`] — so it has no
 /// standalone predicate; use [`classify_dir`].)
 pub fn is_safety_net(name: &str) -> bool {
     SAFETY_NET_DIRS.contains(&name)
@@ -199,8 +227,9 @@ pub fn is_safety_net(name: &str) -> bool {
 
 /// Classify a child **directory** during discovery. `name` is its final path
 /// segment; `child_rel` is its format-root-relative, `/`-separated path;
-/// `heuristic_active` is true while no `.gitignore` governs this level; `stack`
-/// is the matcher built from the ancestor chain. Pure — no filesystem access.
+/// `heuristic` is [`BuildOutputHeuristic::Active`] while no `.gitignore` governs this
+/// level; `stack` is the matcher built from the ancestor chain. Pure — no filesystem
+/// access.
 ///
 /// The order mirrors discovery: the [safety nets](SAFETY_NET_DIRS) prune
 /// unconditionally; then, only while the heuristic is active, a hidden or
@@ -218,34 +247,34 @@ pub fn is_safety_net(name: &str) -> bool {
 pub fn classify_dir(
     name: &str,
     child_rel: &str,
-    heuristic_active: bool,
+    heuristic: BuildOutputHeuristic,
     stack: &IgnoreStack,
 ) -> DirVerdict {
-    // `heuristic_active` implies no `.gitignore` layer is pushed, so the
+    // an active heuristic implies no `.gitignore` layer is pushed, so the
     // `is_reincluded` consulted below sees only the override layer. That implication is load-bearing (a stray `.gitignore` negation would
     // otherwise leak into the heuristic override), so the CLI/JS walkers' threading
-    // of `heuristic_active` is enforced here, not trusted. The per-file
+    // of the heuristic is enforced here, not trusted. The per-file
     // `is_path_pruned` replay assembles the full ancestor stack up front rather
     // than pushing incrementally, so it can't satisfy this whole-stack invariant
     // and calls `classify_dir_inner` directly — sound for a different reason (see
-    // there), with `heuristic_active` reconstructed per level.
+    // there), with the heuristic reconstructed per level.
     debug_assert!(
-        !heuristic_active || !stack.has_gitignore_layers(),
-        "heuristic_active with a .gitignore layer pushed: is_reincluded would consult .gitignore negations in the heuristic override",
+        !heuristic.is_active() || !stack.has_gitignore_layers(),
+        "an active heuristic with a .gitignore layer pushed: is_reincluded would consult .gitignore negations in the heuristic override",
     );
     debug_assert!(
         child_rel.rsplit('/').next() == Some(name),
         "classify_dir: {name:?} is not the last segment of child_rel {child_rel:?}",
     );
-    classify_dir_inner(name, child_rel, heuristic_active, stack)
+    classify_dir_inner(name, child_rel, heuristic, stack)
 }
 
-/// The [`classify_dir`] decision without its `heuristic_active ⟹ no .gitignore
-/// layer` whole-stack debug-assert. A top-down traversal ([`classify_dir`]) pushes
+/// The [`classify_dir`] decision without its `Active ⟹ no .gitignore layer`
+/// whole-stack debug-assert. A top-down traversal ([`classify_dir`]) pushes
 /// layers incrementally, so when it classifies a level no deeper `.gitignore` is
 /// present and the assert holds. The per-file [`is_path_pruned`] replay instead
 /// assembles the file's *full* ancestor stack once and reconstructs each level's
-/// `heuristic_active` itself — so a deeper `.gitignore` may sit in the stack while
+/// [`BuildOutputHeuristic`] itself — so a deeper `.gitignore` may sit in the stack while
 /// a shallower level's heuristic is active. That is still faithful: the matcher's
 /// `last_match_at` only consults layers whose anchor is a prefix of the queried
 /// path (a deeper layer fails to `relativize`), so the leaf / re-include queries
@@ -255,7 +284,7 @@ pub fn classify_dir(
 fn classify_dir_inner(
     name: &str,
     child_rel: &str,
-    heuristic_active: bool,
+    heuristic: BuildOutputHeuristic,
     stack: &IgnoreStack,
 ) -> DirVerdict {
     // safety nets prune unconditionally
@@ -265,7 +294,7 @@ fn classify_dir_inner(
     // the heuristic prunes hidden + build-output dirs only while no `.gitignore`
     // governs this level — but an explicit override-layer `!` re-include overrides the
     // guess (an explicit directive beats it).
-    if heuristic_active
+    if heuristic.is_active()
         && (name.starts_with('.') || HEURISTIC_DIRS.contains(&name))
         && !stack.is_reincluded(child_rel, PathKind::Directory)
     {
@@ -303,7 +332,7 @@ fn classify_dir_inner(
 /// before the walk reaches it; `rel` itself is never graded. The per-file companion to
 /// [`classify_dir`] for a consumer that has **no top-down traversal**: the VS Code
 /// extension formats one open document at a time, so it can't thread
-/// `heuristic_active` down a walk. The CLIs never ask it of a path an argument named —
+/// a [`BuildOutputHeuristic`] down a walk. The CLIs never ask it of a path an argument named —
 /// the safety nets and the heuristic grade no such path — and bound one by the ignore
 /// files alone ([`excluded_argument_warning`](crate::excluded_argument_warning)).
 ///
@@ -311,7 +340,7 @@ fn classify_dir_inner(
 /// `.gitignore` / override layer from the root down — the same stack a file-level
 /// [`is_ignored`](tsv_ignore::IgnoreStack::is_ignored) check uses). This walks the
 /// ancestor directories shallow→deep, reconstructing each level's
-/// `heuristic_active` from the stack's own pushed `.gitignore` anchors
+/// [`BuildOutputHeuristic`] from the stack's own pushed `.gitignore` anchors
 /// ([`gitignore_anchors`](tsv_ignore::IgnoreStack::gitignore_anchors)) — off at a
 /// level once a `.gitignore` anchored *above* it is present — and returns `true`
 /// at the first ancestor [`classify_dir`] would not `Descend` into. It does the
@@ -362,17 +391,17 @@ fn first_pruned_ancestor(rel: &str, stack: &IgnoreStack) -> Option<(String, DirV
     if segments.len() < 2 {
         return None;
     }
-    let git_anchors = stack.gitignore_anchors();
     let mut child_rel = String::new();
-    for &name in &segments[..segments.len() - 1] {
+    for (depth, &name) in segments[..segments.len() - 1].iter().enumerate() {
         if child_rel.is_empty() {
             child_rel.push_str(name);
         } else {
             child_rel.push('/');
             child_rel.push_str(name);
         }
-        let heuristic_active = !gitignore_above(&git_anchors, &child_rel);
-        let verdict = classify_dir_inner(name, &child_rel, heuristic_active, stack);
+        let heuristic =
+            BuildOutputHeuristic::from_active(!gitignore_above(stack, &segments[..=depth]));
+        let verdict = classify_dir_inner(name, &child_rel, heuristic, stack);
         if verdict != DirVerdict::Descend {
             return Some((child_rel, verdict));
         }
@@ -380,19 +409,16 @@ fn first_pruned_ancestor(rel: &str, stack: &IgnoreStack) -> Option<(String, DirV
     None
 }
 
-/// Whether any `.gitignore` anchor in `anchors` sits at a **strict ancestor**
-/// directory of `dir`. The root anchor `""` is an ancestor of every non-root
-/// directory; an anchor *equal* to `dir` is the directory's own `.gitignore`
-/// (pushed only when descending *into* it during a real walk, so it doesn't
-/// classify the directory itself) and does **not** count. This reconstructs how
-/// the traversal turns `heuristic_active` off for a directory once a `.gitignore`
+/// Whether any of `stack`'s `.gitignore` anchors sits at a **strict ancestor**
+/// directory of `dir` (its segments). The root anchor (no segments) is an ancestor of
+/// every non-root directory; an anchor *equal* to `dir` is the directory's own
+/// `.gitignore` (pushed only when descending *into* it during a real walk, so it doesn't
+/// classify the directory itself) and does **not** count. This reconstructs how the
+/// traversal turns the build-output heuristic off for a directory once a `.gitignore`
 /// governs a level at or above it.
-fn gitignore_above(anchors: &[String], dir: &str) -> bool {
-    anchors.iter().any(|anchor| {
-        anchor.is_empty()
-            || (dir.len() > anchor.len()
-                && dir.starts_with(anchor.as_str())
-                && dir.as_bytes()[anchor.len()] == b'/')
+fn gitignore_above(stack: &IgnoreStack, dir: &[&str]) -> bool {
+    stack.gitignore_anchors().any(|anchor| {
+        anchor.len() < dir.len() && anchor.iter().zip(dir).all(|(a, d)| a.as_str() == *d)
     })
 }
 
@@ -493,31 +519,31 @@ mod tests {
     }
 
     #[test]
-    fn strip_unsupported_extension_error_takes_the_typescript_family() {
+    fn unstrippable_extension_error_takes_the_typescript_family() {
         for ext in STRIPPABLE_EXTENSIONS {
             assert!(
-                strip_unsupported_extension_error(&format!("src/file.{ext}")).is_none(),
+                unstrippable_extension_error(&format!("src/file.{ext}")).is_none(),
                 "{ext}"
             );
         }
         for path in ["counter.svelte.ts", "types.d.ts", "LEGACY.MTS"] {
-            assert!(strip_unsupported_extension_error(path).is_none(), "{path}");
+            assert!(unstrippable_extension_error(path).is_none(), "{path}");
         }
         for path in ["a.svelte", "a.css", "README.md", "Makefile", ".ts", "a.tsx"] {
-            assert!(strip_unsupported_extension_error(path).is_some(), "{path}");
+            assert!(unstrippable_extension_error(path).is_some(), "{path}");
         }
         // pinned verbatim: `cli.js` restates this text by hand
         assert_eq!(
-            strip_unsupported_extension_error("a.svelte").unwrap(),
+            unstrippable_extension_error("a.svelte").unwrap(),
             "a.svelte: unsupported file extension (tsv strip handles .ts, .mts, .cts)"
         );
     }
 
     #[test]
-    fn strip_unsupported_extension_error_refuses_javascript() {
+    fn unstrippable_extension_error_refuses_javascript() {
         for path in ["a.js", "a.mjs", "a.cjs", "LEGACY.MJS"] {
             assert_eq!(
-                strip_unsupported_extension_error(path).as_deref(),
+                unstrippable_extension_error(path).as_deref(),
                 Some(
                     format!(
                         "{path}: a JavaScript file has no types to strip (tsv strip handles .ts, .mts, .cts)"
@@ -553,7 +579,7 @@ mod tests {
         let stack = IgnoreStack::new();
         for name in SAFETY_NET_DIRS {
             assert_eq!(
-                classify_dir(name, name, false, &stack),
+                classify_dir(name, name, BuildOutputHeuristic::Inactive, &stack),
                 DirVerdict::Prune,
                 "{name}"
             );
@@ -564,19 +590,19 @@ mod tests {
     fn heuristic_prunes_hidden_and_build_dirs_when_active() {
         let stack = IgnoreStack::new();
         assert_eq!(
-            classify_dir(".cache", ".cache", true, &stack),
+            classify_dir(".cache", ".cache", BuildOutputHeuristic::Active, &stack),
             DirVerdict::Prune
         );
         for name in HEURISTIC_DIRS {
             assert_eq!(
-                classify_dir(name, name, true, &stack),
+                classify_dir(name, name, BuildOutputHeuristic::Active, &stack),
                 DirVerdict::Prune,
                 "{name}"
             );
         }
         // a normal dir descends
         assert_eq!(
-            classify_dir("src", "src", true, &stack),
+            classify_dir("src", "src", BuildOutputHeuristic::Active, &stack),
             DirVerdict::Descend
         );
     }
@@ -587,11 +613,11 @@ mod tests {
         // build-output dir is not a heuristic prune — only the matcher can prune it
         let stack = IgnoreStack::new();
         assert_eq!(
-            classify_dir("build", "build", false, &stack),
+            classify_dir("build", "build", BuildOutputHeuristic::Inactive, &stack),
             DirVerdict::Descend
         );
         assert_eq!(
-            classify_dir(".cache", ".cache", false, &stack),
+            classify_dir(".cache", ".cache", BuildOutputHeuristic::Inactive, &stack),
             DirVerdict::Descend
         );
     }
@@ -600,7 +626,7 @@ mod tests {
     fn explicit_dir_reinclude_overrides_heuristic() {
         let stack = override_stack("!build/\n");
         assert_eq!(
-            classify_dir("build", "build", true, &stack),
+            classify_dir("build", "build", BuildOutputHeuristic::Active, &stack),
             DirVerdict::Descend
         );
     }
@@ -609,7 +635,7 @@ mod tests {
     fn anchored_negation_under_pruned_dir_warns() {
         let stack = override_stack("!build/keep.ts\n");
         assert_eq!(
-            classify_dir("build", "build", true, &stack),
+            classify_dir("build", "build", BuildOutputHeuristic::Active, &stack),
             DirVerdict::PruneWithWarning,
         );
     }
@@ -620,7 +646,7 @@ mod tests {
         // not `build/` specifically, so it is a plain prune (no warning)
         let stack = override_stack("!keep.ts\n");
         assert_eq!(
-            classify_dir("build", "build", true, &stack),
+            classify_dir("build", "build", BuildOutputHeuristic::Active, &stack),
             DirVerdict::Prune
         );
     }
@@ -631,11 +657,16 @@ mod tests {
         // is the only thing that can prune it
         let stack = override_stack("vendored/\n");
         assert_eq!(
-            classify_dir("vendored", "vendored", false, &stack),
+            classify_dir(
+                "vendored",
+                "vendored",
+                BuildOutputHeuristic::Inactive,
+                &stack
+            ),
             DirVerdict::Prune
         );
         assert_eq!(
-            classify_dir("src", "src", false, &stack),
+            classify_dir("src", "src", BuildOutputHeuristic::Inactive, &stack),
             DirVerdict::Descend
         );
     }
@@ -809,6 +840,6 @@ mod tests {
     #[should_panic(expected = "child_rel")]
     fn classify_dir_asserts_the_name_is_the_paths_last_segment() {
         let stack = IgnoreStack::new();
-        let _ = classify_dir("src", "build", true, &stack);
+        let _ = classify_dir("src", "build", BuildOutputHeuristic::Active, &stack);
     }
 }

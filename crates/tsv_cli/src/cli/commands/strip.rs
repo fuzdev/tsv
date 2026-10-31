@@ -58,7 +58,7 @@ impl StripCommand {
             if let Err(e) = refuse_directory(path) {
                 exit_with_error(2, format_args!("Error: {e}"));
             }
-            if let Some(e) = tsv_discover::strip_unsupported_extension_error(path) {
+            if let Some(e) = tsv_discover::unstrippable_extension_error(path) {
                 exit_with_error(2, format_args!("Error: {e}"));
             }
         }

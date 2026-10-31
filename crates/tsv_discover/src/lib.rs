@@ -31,15 +31,16 @@
 //! Convention" stance.
 //!
 //! ```
-//! use tsv_discover::{DirVerdict, classify_dir, should_format_file};
+//! use tsv_discover::{BuildOutputHeuristic, DirVerdict, classify_dir, should_format_file};
 //! use tsv_ignore::IgnoreStack;
 //!
 //! let mut stack = IgnoreStack::new();
 //! stack.push_gitignore("", "dist/\n"); // a .gitignore present → heuristic off
+//! let heuristic = BuildOutputHeuristic::Inactive;
 //!
 //! // gitignored `dist` → pruned; clean `src` → descend
-//! assert_eq!(classify_dir("dist", "dist", false, &stack), DirVerdict::Prune);
-//! assert_eq!(classify_dir("src", "src", false, &stack), DirVerdict::Descend);
+//! assert_eq!(classify_dir("dist", "dist", heuristic, &stack), DirVerdict::Prune);
+//! assert_eq!(classify_dir("src", "src", heuristic, &stack), DirVerdict::Descend);
 //! // a non-ignored `.ts` file → format it
 //! assert!(should_format_file("app.ts", "src/app.ts", &stack));
 //! ```
@@ -51,14 +52,16 @@ mod quote;
 mod warnings;
 
 pub use policy::{
-    DirVerdict, FORMATTABLE_EXTENSIONS, HEURISTIC_DIRS, SAFETY_NET_DIRS, classify_dir,
-    formattable_extension_list, is_formattable, is_path_pruned, is_safety_net, path_shadow_warning,
-    should_format_file, strip_unsupported_extension_error, unsupported_extension_error,
+    BuildOutputHeuristic, DirVerdict, FORMATTABLE_EXTENSIONS, HEURISTIC_DIRS, SAFETY_NET_DIRS,
+    classify_dir, formattable_extension_list, is_formattable, is_path_pruned, is_safety_net,
+    path_shadow_warning, should_format_file, unstrippable_extension_error,
+    unsupported_extension_error,
 };
 pub use quote::{quote_path, quote_path_bytes, quote_path_owned};
 pub use warnings::{
-    excluded_argument_warning, gitignore_symlink_warning, prettierignore_outside_repo_warning,
-    prettierignore_shadowed_warning, shadow_warning, unresolvable_root_error,
+    DirIgnoreFiles, excluded_argument_warning, gitignore_symlink_warning,
+    prettierignore_outside_repo_warning, prettierignore_shadowed_warning, shadow_warning,
+    unresolvable_root_error,
 };
 
 /// The stacks the modules' tests build — one override layer at the root, or any number of

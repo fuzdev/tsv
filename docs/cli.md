@@ -255,7 +255,7 @@ document whose own bytes do not parse reports that parse error first, exactly as
 every line terminator, a leading BOM and a hashbang kept. The file is never written. It
 takes no `--parser` (the strip is TypeScript's), and a file path's extension must be one of
 `.ts` `.mts` `.cts` (a `.svelte.ts` rune module and a `.d.ts` are `.ts`) — anything else is
-an argument error naming that list (`tsv_discover::strip_unsupported_extension_error`), as is
+an argument error naming that list (`tsv_discover::unstrippable_extension_error`), as is
 a directory. A JavaScript path (`.js` `.mjs` `.cjs`) is refused with a reason of its own
 (`a JavaScript file has no types to strip`) rather than read as TypeScript, where
 `f(a < b, c > (d))` is a generic call whose type arguments the strip would blank and

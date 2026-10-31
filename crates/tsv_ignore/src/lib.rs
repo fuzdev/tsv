@@ -341,22 +341,19 @@ impl IgnoreStack {
     /// empty/comments-only `.gitignore`, since its mere presence is what turns a
     /// caller's heuristic off (matching git, for which an empty `.gitignore`
     /// still establishes the gitignore regime). tsv's discovery uses this to
-    /// assert its `heuristic_active ⟹ no .gitignore layer` invariant.
+    /// assert that an active build-output heuristic has no `.gitignore` layer pushed.
     pub fn has_gitignore_layers(&self) -> bool {
         !self.gitignore.is_empty()
     }
 
-    /// The format-root-relative directory anchors (`/`-joined; `""` = the root)
-    /// of the pushed `.gitignore` layers, shallow→deep. Lets a per-file discovery
-    /// replay that has no top-down walk — the VS Code extension formats one open
-    /// document at a time — reconstruct `heuristic_active` for each ancestor
-    /// directory: the build-output heuristic is off at a level once a `.gitignore`
-    /// anchored above it is present. Allocates; off the matcher's hot path.
-    pub fn gitignore_anchors(&self) -> Vec<String> {
-        self.gitignore
-            .iter()
-            .map(|layer| layer.anchor.join("/"))
-            .collect()
+    /// The format-root-relative directory anchors of the pushed `.gitignore` layers,
+    /// shallow→deep, each as its [`split_segments`] segments (empty for the root). Lets a
+    /// per-file discovery replay that has no top-down walk — the VS Code extension
+    /// formats one open document at a time — reconstruct, for each ancestor directory,
+    /// whether the build-output heuristic applies: it is off at a level once a
+    /// `.gitignore` anchored above it is present.
+    pub fn gitignore_anchors(&self) -> impl Iterator<Item = &[String]> + '_ {
+        self.gitignore.iter().map(|layer| layer.anchor.as_slice())
     }
 
     /// Whether `path` (relative to the format root, `/`-separated) is ignored.
@@ -400,7 +397,7 @@ impl IgnoreStack {
     /// [`is_reincluded`](Self::is_reincluded), which are its two readings.
     /// `Some(true)` excludes, `Some(false)` re-includes, `None` is a path no rule
     /// mentions — which a segment-less path (`""`, `"."`) always is, since there is
-    /// nothing for a rule to match. Stating that once is the point: the two public
+    /// nothing for a rule to match. Stating that once is the point: the two
     /// forms spelled the empty case twice, in two styles, and neither spelling was the
     /// interesting half of either answer.
     fn leaf_polarity(&self, path: &str, is_dir: bool) -> Option<bool> {
@@ -614,6 +611,7 @@ impl IgnoreSource {
 /// Where [`IgnoreStack::exclusion`] found a path ignored. Both depths count the queried
 /// path's segments as [`split_segments`] splits it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Exclusion {
     /// How many leading segments name the excluded path: all of them when a rule excluded
     /// the path itself, fewer when it excluded an ancestor directory.

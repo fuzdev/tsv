@@ -31,15 +31,15 @@ use tsv_ignore::{IgnoreSource, IgnoreStack, Negation, NegationTail, PathKind};
 /// instead — adding the lines that pass a `.gitignore` rule standing behind it
 /// ([`IgnoreStack::gitignore_exclusion`]), which narrowing alone would leave in force.
 ///
-/// `d` is the pruned directory relative to the format root, `/`-separated; `loose_root`
+/// `dir` is the pruned directory relative to the format root, `/`-separated; `loose_root`
 /// is [`excluded_argument_warning`]'s, the format root's display path outside a git
 /// repo. Produced **once**, here, so the native CLI and the WASM binding emit the
 /// identical text.
 #[must_use]
-pub fn shadow_warning(d: &str, loose_root: Option<&str>, stack: &IgnoreStack) -> Option<String> {
-    let negation = stack.negation_under(d)?;
-    let segments = tsv_ignore::split_segments(d);
-    let dir = path_display(&segments, loose_root);
+pub fn shadow_warning(dir: &str, loose_root: Option<&str>, stack: &IgnoreStack) -> Option<String> {
+    let negation = stack.negation_under(dir)?;
+    let segments = tsv_ignore::split_segments(dir);
+    let shown = path_display(&segments, loose_root);
     let rule_file = ignore_file_display(
         &segments[..negation.anchor_depth],
         negation.source,
@@ -61,7 +61,7 @@ pub fn shadow_warning(d: &str, loose_root: Option<&str>, stack: &IgnoreStack) ->
         )),
         None => None,
     };
-    let cause = match stack.exclusion(d, PathKind::Directory) {
+    let cause = match stack.exclusion(dir, PathKind::Directory) {
         Some(exclusion) => {
             let excluding_file = ignore_file_display(
                 &segments[..exclusion.anchor_depth],
@@ -75,7 +75,7 @@ pub fn shadow_warning(d: &str, loose_root: Option<&str>, stack: &IgnoreStack) ->
                 // added there, so it is the user's to narrow — and where a `.gitignore`
                 // rule stands behind it, narrowing alone leaves that one in force, so the
                 // lines that pass it go beside the narrowing: one warning, not one per rerun
-                let remedy = match stack.gitignore_exclusion(d, PathKind::Directory) {
+                let remedy = match stack.gitignore_exclusion(dir, PathKind::Directory) {
                     None => "narrow or negate that rule to format it".to_string(),
                     Some(git) => {
                         let git_file = ignore_file_display(
@@ -99,7 +99,7 @@ pub fn shadow_warning(d: &str, loose_root: Option<&str>, stack: &IgnoreStack) ->
                     }
                 };
                 return Some(format!(
-                    "{dir} is excluded by a rule in {excluding_file}, so a re-include under it in {rule_file} does nothing; {remedy}"
+                    "{shown} is excluded by a rule in {excluding_file}, so a re-include under it in {rule_file} does nothing; {remedy}"
                 ));
             }
             format!("excluded by a rule in {excluding_file}")
@@ -111,7 +111,7 @@ pub fn shadow_warning(d: &str, loose_root: Option<&str>, stack: &IgnoreStack) ->
         None => UNSPELLABLE_REASON.to_string(),
     };
     Some(format!(
-        "{dir} is {cause}, so a re-include under it in {rule_file} does nothing; {remedy}"
+        "{shown} is {cause}, so a re-include under it in {rule_file} does nothing; {remedy}"
     ))
 }
 
@@ -235,6 +235,20 @@ enum Opening {
     Whole,
 }
 
+/// One directory's override-layer ignore files, as a walk found them, and the regime it
+/// reads them under — what [`prettierignore_outside_repo_warning`] and
+/// [`prettierignore_shadowed_warning`] decide over. Presence only: the caller learns it
+/// from the directory listing it already holds.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DirIgnoreFiles {
+    /// The walk is inside a git repo (where `.prettierignore` is read hierarchically).
+    pub in_repo: bool,
+    /// The directory holds a `.formatignore`.
+    pub formatignore: bool,
+    /// The directory holds a `.prettierignore`.
+    pub prettierignore: bool,
+}
+
 /// The stderr warning when a `.prettierignore` sits in the **target root**
 /// directory but the run is **outside a git repo** — where tsv reads
 /// `.formatignore` (hierarchically) but never `.prettierignore`. Prettier would
@@ -242,11 +256,10 @@ enum Opening {
 /// points at the two fixes (rename to `.formatignore`, or `git init`). `dir` is
 /// the target root's display path.
 ///
-/// Returns `None` unless **all** hold: outside a repo (`!in_repo`), a
-/// `.prettierignore` is present (`has_prettierignore`), and no sibling
-/// `.formatignore` supersedes it (`!has_formatignore` — its presence means the
-/// native file was adopted, so the `.prettierignore` is vestigial and silence is
-/// correct).
+/// Returns `None` unless **all** hold in `files`: outside a repo (`!in_repo`), a
+/// `.prettierignore` is present (`prettierignore`), and no sibling `.formatignore`
+/// supersedes it (`!formatignore` — its presence means the native file was adopted, so
+/// the `.prettierignore` is vestigial and silence is correct).
 ///
 /// The caller invokes this **once, at the target root**. An ancestor
 /// `.prettierignore` of a subdirectory target is deliberately *not* this case
@@ -262,13 +275,8 @@ enum Opening {
 /// `shadow_warning`, so the native CLI and the WASM binding emit the
 /// identical text.
 #[must_use]
-pub fn prettierignore_outside_repo_warning(
-    dir: &str,
-    in_repo: bool,
-    has_prettierignore: bool,
-    has_formatignore: bool,
-) -> Option<String> {
-    (!in_repo && has_prettierignore && !has_formatignore).then(|| {
+pub fn prettierignore_outside_repo_warning(dir: &str, files: DirIgnoreFiles) -> Option<String> {
+    (!files.in_repo && files.prettierignore && !files.formatignore).then(|| {
         let dir = quote_path(dir);
         format!(
             ".prettierignore in {dir} is not read outside a git repo (tsv reads .formatignore there); rename it to .formatignore, or run `git init`, for it to apply"
@@ -288,15 +296,10 @@ pub fn prettierignore_outside_repo_warning(
 /// from the directory listing (an empty or comments-only `.prettierignore` still
 /// warns — rare, and the fix still applies), so it costs no extra filesystem
 /// access. Both decision and text live here, so the native CLI and WASM binding
-/// stay in lockstep. Same argument order as `prettierignore_outside_repo_warning`.
+/// stay in lockstep. Same arguments as [`prettierignore_outside_repo_warning`].
 #[must_use]
-pub fn prettierignore_shadowed_warning(
-    dir: &str,
-    in_repo: bool,
-    has_prettierignore: bool,
-    has_formatignore: bool,
-) -> Option<String> {
-    (in_repo && has_prettierignore && has_formatignore).then(|| {
+pub fn prettierignore_shadowed_warning(dir: &str, files: DirIgnoreFiles) -> Option<String> {
+    (files.in_repo && files.prettierignore && files.formatignore).then(|| {
         let dir = quote_path(dir);
         format!(
             ".prettierignore in {dir} is shadowed by a sibling .formatignore and is not applied; move its patterns into .formatignore to keep them"
@@ -712,7 +715,7 @@ mod tests {
             let mut fixed = IgnoreStack::new();
             fixed.push_formatignore(anchor, &format!("{rule}{}\n", lines.join("\n")));
             assert_eq!(
-                classify_dir(name, &d, true, &fixed),
+                classify_dir(name, &d, BuildOutputHeuristic::Active, &fixed),
                 DirVerdict::Descend,
                 "{d}: {lines:?}"
             );
@@ -741,7 +744,7 @@ mod tests {
                 opened.push_str(seg);
                 if opened.len() > d.len() {
                     assert_eq!(
-                        classify_dir(seg, &opened, true, &fixed),
+                        classify_dir(seg, &opened, BuildOutputHeuristic::Active, &fixed),
                         DirVerdict::Descend,
                         "{d}: {lines:?} at {opened}"
                     );
@@ -752,12 +755,22 @@ mod tests {
                 "{d}: {lines:?}"
             );
             assert_eq!(
-                classify_dir("sibling", &under(&format!("{dir}/sibling")), true, &fixed),
+                classify_dir(
+                    "sibling",
+                    &under(&format!("{dir}/sibling")),
+                    BuildOutputHeuristic::Active,
+                    &fixed
+                ),
                 DirVerdict::Prune,
                 "{d}: {lines:?}"
             );
             assert_eq!(
-                classify_dir(name, &under(&format!("lib/{name}")), true, &fixed),
+                classify_dir(
+                    name,
+                    &under(&format!("lib/{name}")),
+                    BuildOutputHeuristic::Active,
+                    &fixed
+                ),
                 DirVerdict::Prune,
                 "{d}: {lines:?}"
             );
@@ -768,13 +781,53 @@ mod tests {
     fn prettierignore_outside_repo_warns_only_when_unshadowed_outside_a_repo() {
         // the footgun: outside a repo, a target-root `.prettierignore` with no
         // `.formatignore` beside it is silently skipped → warn
-        assert!(prettierignore_outside_repo_warning("proj", false, true, false).is_some());
+        assert!(
+            prettierignore_outside_repo_warning(
+                "proj",
+                DirIgnoreFiles {
+                    in_repo: false,
+                    prettierignore: true,
+                    formatignore: false,
+                },
+            )
+            .is_some()
+        );
         // inside a repo `.prettierignore` IS read (hierarchically) → no warning
-        assert!(prettierignore_outside_repo_warning("proj", true, true, false).is_none());
+        assert!(
+            prettierignore_outside_repo_warning(
+                "proj",
+                DirIgnoreFiles {
+                    in_repo: true,
+                    prettierignore: true,
+                    formatignore: false,
+                },
+            )
+            .is_none()
+        );
         // a sibling `.formatignore` supersedes it (native file adopted) → no warning
-        assert!(prettierignore_outside_repo_warning("proj", false, true, true).is_none());
+        assert!(
+            prettierignore_outside_repo_warning(
+                "proj",
+                DirIgnoreFiles {
+                    in_repo: false,
+                    prettierignore: true,
+                    formatignore: true,
+                },
+            )
+            .is_none()
+        );
         // no `.prettierignore` present → nothing to warn about
-        assert!(prettierignore_outside_repo_warning("proj", false, false, false).is_none());
+        assert!(
+            prettierignore_outside_repo_warning(
+                "proj",
+                DirIgnoreFiles {
+                    in_repo: false,
+                    prettierignore: false,
+                    formatignore: false,
+                },
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -782,7 +835,15 @@ mod tests {
         // pinned verbatim — the native CLI and the WASM binding emit this exact
         // string, so both surfaces stay in lockstep
         assert_eq!(
-            prettierignore_outside_repo_warning(".", false, true, false).unwrap(),
+            prettierignore_outside_repo_warning(
+                ".",
+                DirIgnoreFiles {
+                    in_repo: false,
+                    prettierignore: true,
+                    formatignore: false,
+                },
+            )
+            .unwrap(),
             ".prettierignore in . is not read outside a git repo (tsv reads .formatignore there); rename it to .formatignore, or run `git init`, for it to apply"
         );
     }
@@ -791,14 +852,54 @@ mod tests {
     fn prettierignore_shadowed_warns_only_inside_a_repo_with_both_files() {
         // inside a repo, both a `.formatignore` and a `.prettierignore` in one
         // directory: the sibling `.formatignore` shadows → warn
-        assert!(prettierignore_shadowed_warning("src", true, true, true).is_some());
+        assert!(
+            prettierignore_shadowed_warning(
+                "src",
+                DirIgnoreFiles {
+                    in_repo: true,
+                    prettierignore: true,
+                    formatignore: true,
+                },
+            )
+            .is_some()
+        );
         // only `.prettierignore` (no sibling `.formatignore`) → it IS read, nothing shadowed
-        assert!(prettierignore_shadowed_warning("src", true, true, false).is_none());
+        assert!(
+            prettierignore_shadowed_warning(
+                "src",
+                DirIgnoreFiles {
+                    in_repo: true,
+                    prettierignore: true,
+                    formatignore: false,
+                },
+            )
+            .is_none()
+        );
         // only `.formatignore` → nothing to shadow
-        assert!(prettierignore_shadowed_warning("src", true, false, true).is_none());
+        assert!(
+            prettierignore_shadowed_warning(
+                "src",
+                DirIgnoreFiles {
+                    in_repo: true,
+                    prettierignore: false,
+                    formatignore: true,
+                },
+            )
+            .is_none()
+        );
         // outside a repo `.prettierignore` isn't read regardless — the outside-repo
         // warning owns that case, so this one stays quiet
-        assert!(prettierignore_shadowed_warning("src", false, true, true).is_none());
+        assert!(
+            prettierignore_shadowed_warning(
+                "src",
+                DirIgnoreFiles {
+                    in_repo: false,
+                    prettierignore: true,
+                    formatignore: true,
+                },
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -806,7 +907,15 @@ mod tests {
         // pinned verbatim — the native CLI and the WASM binding emit this exact
         // string, so both surfaces stay in lockstep
         assert_eq!(
-            prettierignore_shadowed_warning("src", true, true, true).unwrap(),
+            prettierignore_shadowed_warning(
+                "src",
+                DirIgnoreFiles {
+                    in_repo: true,
+                    prettierignore: true,
+                    formatignore: true,
+                },
+            )
+            .unwrap(),
             ".prettierignore in src is shadowed by a sibling .formatignore and is not applied; move its patterns into .formatignore to keep them"
         );
     }
@@ -835,14 +944,28 @@ mod tests {
         );
         assert!(unresolvable_root_error("e\"f").starts_with("\"e\\\"f\": cannot resolve"));
         assert!(
-            prettierignore_outside_repo_warning("/tmp/x\ty", false, true, false)
-                .unwrap()
-                .starts_with(".prettierignore in \"/tmp/x\\ty\" is not read")
+            prettierignore_outside_repo_warning(
+                "/tmp/x\ty",
+                DirIgnoreFiles {
+                    in_repo: false,
+                    prettierignore: true,
+                    formatignore: false,
+                },
+            )
+            .unwrap()
+            .starts_with(".prettierignore in \"/tmp/x\\ty\" is not read")
         );
         assert!(
-            prettierignore_shadowed_warning("pkg\u{1b}", true, true, true)
-                .unwrap()
-                .starts_with(".prettierignore in \"pkg\\033\" is shadowed")
+            prettierignore_shadowed_warning(
+                "pkg\u{1b}",
+                DirIgnoreFiles {
+                    in_repo: true,
+                    prettierignore: true,
+                    formatignore: true,
+                },
+            )
+            .unwrap()
+            .starts_with(".prettierignore in \"pkg\\033\" is shadowed")
         );
         // a directory in the path, the ignore file named by its directory, and the
         // re-include lines: the first two quoted, the lines spelled literally (a tab is a
@@ -1261,7 +1384,7 @@ mod tests {
         // line wins in the same file
         let stack = stack_from(&[("", "dist/\n")], &[("", "!dist/keep.ts\n")]);
         assert_eq!(
-            classify_dir("dist", "dist", false, &stack),
+            classify_dir("dist", "dist", BuildOutputHeuristic::Inactive, &stack),
             DirVerdict::PruneWithWarning
         );
         assert_eq!(
@@ -1282,7 +1405,7 @@ mod tests {
         // added there can override it: that rule is the one to narrow
         let stack = stack_from(&[], &[("", "!pkg/dist/keep.ts\n"), ("pkg", "dist/\n")]);
         assert_eq!(
-            classify_dir("dist", "pkg/dist", false, &stack),
+            classify_dir("dist", "pkg/dist", BuildOutputHeuristic::Inactive, &stack),
             DirVerdict::PruneWithWarning
         );
         assert_eq!(
@@ -1299,7 +1422,7 @@ mod tests {
         // no re-include under it: a plain prune, and nothing to say
         let stack = stack_from(&[("", "dist/\n")], &[]);
         assert_eq!(
-            classify_dir("dist", "dist", false, &stack),
+            classify_dir("dist", "dist", BuildOutputHeuristic::Inactive, &stack),
             DirVerdict::Prune
         );
         assert_eq!(shadow_warning("dist", None, &stack), None);
@@ -1353,7 +1476,12 @@ mod tests {
             // nothing beside what the rule reaches: a sibling directory stays pruned, and
             // a sibling file too unless the rule's own glob admits it
             assert_eq!(
-                classify_dir("sibling", "dist/sibling", false, &fixed),
+                classify_dir(
+                    "sibling",
+                    "dist/sibling",
+                    BuildOutputHeuristic::Inactive,
+                    &fixed
+                ),
                 DirVerdict::Prune,
                 "{lines:?}"
             );
@@ -1654,7 +1782,12 @@ mod tests {
                 };
                 let fixed = apply(&lines);
                 assert_eq!(
-                    classify_dir("dist", "dist", !gitignored, &fixed),
+                    classify_dir(
+                        "dist",
+                        "dist",
+                        BuildOutputHeuristic::from_active(!gitignored),
+                        &fixed
+                    ),
                     DirVerdict::Descend,
                     "{rules:?}: {lines:?}"
                 );
@@ -1675,7 +1808,12 @@ mod tests {
                 // every ladder line is load-bearing: without it, the lines no longer
                 // do all three of the above
                 let readmits = |fixed: &IgnoreStack| {
-                    classify_dir("dist", "dist", !gitignored, fixed) == DirVerdict::Descend
+                    classify_dir(
+                        "dist",
+                        "dist",
+                        BuildOutputHeuristic::from_active(!gitignored),
+                        fixed,
+                    ) == DirVerdict::Descend
                         && chosen.iter().all(|(_, targets, _)| {
                             targets
                                 .iter()

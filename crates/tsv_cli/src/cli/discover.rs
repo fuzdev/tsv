@@ -4,8 +4,9 @@ use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use tsv_discover::{
-    DirVerdict, classify_dir, prettierignore_outside_repo_warning, prettierignore_shadowed_warning,
-    quote_path, should_format_file, unsupported_extension_error,
+    BuildOutputHeuristic, DirIgnoreFiles, DirVerdict, classify_dir,
+    prettierignore_outside_repo_warning, prettierignore_shadowed_warning, quote_path,
+    should_format_file, unsupported_extension_error,
 };
 use tsv_ignore::{IgnoreStack, PathKind};
 
@@ -356,7 +357,7 @@ fn collect_root(root: &Path, symlink: bool, cwd: Option<&Path>, out: &mut Walk<'
     // itself is excluded: `collect_recursive` reads its ignore files from the
     // listing it fetches anyway.
     let chain = ancestor_chain(&format_root.path, &root_abs);
-    let (mut stack, heuristic_active) =
+    let (mut stack, heuristic) =
         preload_ancestors(&chain[..chain.len() - 1], &format_root, &mut out.warnings);
 
     // A named root is bounded by the ignore files alone, gated here once with the full,
@@ -397,7 +398,7 @@ fn collect_root(root: &Path, symlink: bool, cwd: Option<&Path>, out: &mut Walk<'
         true,
         &format_root,
         &mut stack,
-        heuristic_active,
+        heuristic,
         out,
     );
     false
@@ -411,17 +412,17 @@ fn preload_ancestors(
     dirs: &[PathBuf],
     format_root: &FormatRoot,
     warnings: &mut Vec<String>,
-) -> (IgnoreStack, bool) {
+) -> (IgnoreStack, BuildOutputHeuristic) {
     let mut stack = IgnoreStack::new();
-    let mut heuristic_active = true;
+    let mut heuristic = BuildOutputHeuristic::Active;
     for dir in dirs {
         if push_dir_layers(dir, format_root, &mut stack, warnings)
             .is_some_and(|pushed| pushed.gitignore)
         {
-            heuristic_active = false;
+            heuristic = BuildOutputHeuristic::Inactive;
         }
     }
-    (stack, heuristic_active)
+    (stack, heuristic)
 }
 
 /// Push the ignore layers of `dir` — a directory no listing is held for — onto `stack`,
@@ -799,9 +800,11 @@ fn override_layer_content(
 ) -> Option<TsvLayer> {
     if let Some(warning) = prettierignore_shadowed_warning(
         &dir.to_string_lossy(),
-        in_repo,
-        has_prettierignore,
-        has_formatignore,
+        DirIgnoreFiles {
+            in_repo,
+            formatignore: has_formatignore,
+            prettierignore: has_prettierignore,
+        },
     ) {
         warnings.push(warning);
     }
@@ -865,7 +868,7 @@ fn collect_recursive(
     // whether the build-output heuristic is active at *this* dir's level (no
     // `.gitignore` governs `dir` or above). `dir`'s own `.gitignore`, read below,
     // turns it off for `dir`'s children.
-    heuristic_active: bool,
+    heuristic: BuildOutputHeuristic,
     out: &mut Walk<'_>,
 ) {
     let in_repo = format_root.in_repo;
@@ -956,9 +959,11 @@ fn collect_recursive(
     if is_target_root
         && let Some(warning) = prettierignore_outside_repo_warning(
             &dir.abs.to_string_lossy(),
-            in_repo,
-            presence.prettierignore,
-            presence.formatignore,
+            DirIgnoreFiles {
+                in_repo,
+                formatignore: presence.formatignore,
+                prettierignore: presence.prettierignore,
+            },
         )
     {
         out.warnings.push(warning);
@@ -966,7 +971,11 @@ fn collect_recursive(
     // this dir's own `.gitignore`, if `push_layers` pushed one, turns the heuristic off
     // for its children — an unreadable or symlinked one pushes nothing, so the heuristic
     // stays on for the subtree and the warning it raised is what makes that visible
-    let child_heuristic = heuristic_active && !pushed.gitignore;
+    let child_heuristic = if pushed.gitignore {
+        BuildOutputHeuristic::Inactive
+    } else {
+        heuristic
+    };
 
     for (name_os, file_type) in &entries {
         // the matcher and the extension test read the name as text, lossily for the

@@ -79,7 +79,7 @@ crates (the open-convention stance):
   the same line ("No parser could be inferred"). The message's extension list
   renders from `FORMATTABLE_EXTENSIONS`, so a new language flows through; the text
   is produced once here, like `shadow_warning`.
-- `strip_unsupported_extension_error(path) -> Option<String>` (over the crate-private `STRIPPABLE_EXTENSIONS`) — the
+- `unstrippable_extension_error(path) -> Option<String>` (over the crate-private `STRIPPABLE_EXTENSIONS`) — the
   extensions `tsv strip` takes (the TypeScript extensions alone; a `.svelte.ts` and a `.d.ts`
   are `.ts`) and the argument error for a file named to it outside them (read without regard
   to ASCII case, as `is_formattable` reads one) — a JavaScript file's saying why, since it
@@ -113,9 +113,12 @@ crates (the open-convention stance):
   A **complete, context-free** decision (safety nets prune in every mode, no
   override), so a caller walking its own tree can short-circuit before building an
   `IgnoreStack`. The build-output heuristic has **no** standalone predicate by
-  design — it's contextual (needs the stack + `heuristic_active`), so `classify_dir`
+  design — it's contextual (needs the stack + a `BuildOutputHeuristic`), so `classify_dir`
   is its only entry point.
-- `classify_dir(name, child_rel, heuristic_active, &IgnoreStack) -> DirVerdict`
+- `classify_dir(name, child_rel, BuildOutputHeuristic, &IgnoreStack) -> DirVerdict`
+  — `BuildOutputHeuristic { Active, Inactive }` is `Active` while no `.gitignore` governs
+  the level (`from_active(bool)` for a flag-carrying boundary — the bindings keep their JS
+  `heuristic_active: boolean` and convert)
   — the per-directory decision: safety-net prune → heuristic prune (with the
   shadow-warning sub-case) → matcher prune → descend.
 - `should_format_file(name, child_rel, &IgnoreStack) -> bool` — the per-file
@@ -134,20 +137,20 @@ crates (the open-convention stance):
 - `is_path_pruned(rel, &IgnoreStack) -> bool` — the per-file companion to
   `classify_dir` for a consumer with **no top-down traversal** (the VS Code
   extension formats one open document at a time, so it can't thread
-  `heuristic_active` down a walk). Given the matcher assembled from `rel`'s full
+  a `BuildOutputHeuristic` down a walk). Given the matcher assembled from `rel`'s full
   ancestor chain, it walks the ancestor directories itself and reconstructs each
-  level's `heuristic_active` from the stack's own `.gitignore` anchors
+  level's `BuildOutputHeuristic` from the stack's own `.gitignore` anchors
   (`IgnoreStack::gitignore_anchors`) — off at a level once a `.gitignore` anchored
   above it is present — returning `true` at the first ancestor `classify_dir` would
   not descend into. It runs the decision through a private assert-free
   `classify_dir` half: the full-stack assembly can't satisfy the incremental walk's
-  `heuristic_active ⟹ no .gitignore layer` invariant, yet stays faithful because the
+  `Active ⟹ no .gitignore layer` invariant, yet stays faithful because the
   matcher's per-level query ignores layers anchored below the queried directory (a
   deeper layer fails to `relativize`), as does the `negation_under` query picking
   `Prune` vs `PruneWithWarning`, which reads only layers anchored above the directory.
   Pair with `IgnoreStack::is_ignored(rel, PathKind::File)` for the file-level match.
   `classify_dir` stays the primitive for real traversers, which thread
-  `heuristic_active` naturally as they descend. The CLIs never ask it of a path an
+  the heuristic naturally as they descend. The CLIs never ask it of a path an
   argument named: see `excluded_argument_warning`.
 - `path_shadow_warning(rel, loose_root, &IgnoreStack) -> Option<String>` —
   the same replay's warning: `shadow_warning` for the first ancestor
@@ -206,13 +209,13 @@ crates (the open-convention stance):
   such a file can still exclude the path once the directory is re-included.
   `loose_root` is the format root's display path outside a repo, where paths are named
   absolutely; inside one (`None`) they read relative to the repo root.
-- `DirVerdict { Descend, Prune, PruneWithWarning }` (`#[non_exhaustive]`, so a
+- `DirVerdict { Descend, Prune, PruneWithWarning }` (`Copy`; `#[non_exhaustive]`, so a
   caller's `match` carries a wildcard arm; the CLI's prunes) — on `PruneWithWarning` the
   caller fetches the text from `shadow_warning`, which takes display context
   (`loose_root`) the per-directory verdict has no other use for — the same fetch
   `npm/cli.js` makes across the binding boundary (which can't carry a tagged-union
   payload as one primitive — see below).
-- `shadow_warning(d, loose_root, &IgnoreStack) -> Option<String>` — the
+- `shadow_warning(dir, loose_root, &IgnoreStack) -> Option<String>` — the
   warning when a pruned directory has an override-layer `!` re-include written under it;
   `None` when none is (`IgnoreStack::negation_under`, the query behind
   `PruneWithWarning`).
@@ -265,8 +268,10 @@ crates (the open-convention stance):
   directory root that cannot be made absolute because the working directory itself is
   gone: walked anyway it would anchor on no format root and read no ancestor's ignore
   files, silently widening the scope, so the walk refuses it.
-- `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore,
-  has_formatignore) -> Option<String>` — the heads-up when, **outside a git
+- `prettierignore_outside_repo_warning(dir, DirIgnoreFiles) -> Option<String>` (`DirIgnoreFiles
+  { in_repo, formatignore, prettierignore }`, a `Copy` struct of named presence flags, so a
+  call site cannot transpose two bools; the bindings keep their JS positional booleans and
+  build it at the boundary) — the heads-up when, **outside a git
   repo**, a `.prettierignore` sits in the **target root** with no sibling
   `.formatignore` shadowing it. tsv reads `.formatignore` (not `.prettierignore`)
   outside a repo, so prettier would have honored a file tsv silently skips; the
@@ -276,15 +281,14 @@ crates (the open-convention stance):
   read from the directory listing, so the check costs no extra filesystem access.
   Decision and text both live here, keeping the native CLI and WASM binding in
   lockstep.
-- `prettierignore_shadowed_warning(dir, in_repo, has_prettierignore,
-  has_formatignore) -> Option<String>` — the heads-up when, **inside a git repo**,
+- `prettierignore_shadowed_warning(dir, DirIgnoreFiles) -> Option<String>` — the heads-up when, **inside a git repo**,
   a directory holds both a `.formatignore` and a `.prettierignore`: the sibling
   `.formatignore` shadows the `.prettierignore` (one override layer per directory), so
   its rules go unread there — the drop-in counterpart to Prettier, which applies
   *both* files. The message points at merging the patterns into `.formatignore`.
   Unlike `prettierignore_outside_repo_warning` (target-root only), this fires at
   **every** directory the walk reaches — a shadow is per-directory. Presence-only,
-  from the flags the caller already holds; same argument order and single-source
+  from the flags the caller already holds; same arguments and single-source
   text discipline.
 
 ## Consumers
