@@ -263,7 +263,7 @@ pub(crate) fn emit_element<'arena>(
         parent_ctx.namespace,
     )?;
 
-    if tsv_html::is_void_element(&emit_name) {
+    if tsv_svelte::ast::is_svelte_void(&emit_name) {
         // XHTML-compliant self-close, matching the oracle.
         out.push_text("/>");
         if !element.fragment.nodes.is_empty() {

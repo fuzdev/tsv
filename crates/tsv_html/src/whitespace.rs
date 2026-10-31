@@ -3,14 +3,18 @@
 // Pure functions for determining which HTML elements preserve whitespace.
 // These are language-level utilities independent of any specific tool.
 //
-// Reference: HTML spec `white-space: pre` UA rule — ../html/source, Rendering §"Flow content"
+// The set is Svelte's and prettier-plugin-svelte's (`<pre>`, `<textarea>`), not the HTML
+// spec's `white-space: pre` UA rule (../html/source, Rendering §"Flow content"), which also
+// names `listing`, `plaintext` and `xmp` and gives `textarea` `pre-wrap`.
 
-/// Check if an HTML element preserves whitespace
+/// Whether an HTML element preserves the whitespace of its content: `<pre>` and `<textarea>`,
+/// whose content is rendered with every space and line break kept, so a formatter must not
+/// collapse, trim or re-indent it.
 ///
-/// Elements like `<pre>` and `<textarea>` render whitespace literally,
-/// without collapsing multiple spaces or trimming leading/trailing whitespace.
-///
-/// Examples: `<pre>`, `<textarea>`
+/// The set is the one Svelte's compiler and prettier-plugin-svelte treat that way, not the
+/// HTML spec's: the spec's user-agent stylesheet also sets `white-space: pre` on the obsolete
+/// `<listing>`, `<plaintext>` and `<xmp>`, which neither tool special-cases (they format as
+/// ordinary inline elements), so a Svelte-compatible formatter leaves them out too.
 #[inline]
 pub fn preserves_whitespace(tag_name: &str) -> bool {
     matches!(tag_name, "pre" | "textarea")

@@ -5,8 +5,9 @@
 // linter, type-checker, etc.)
 //
 // References:
-// - HTML spec flow content (block): ../html/source, Rendering §"Flow content"
-//   (the UA stylesheet `display: block` element list)
+// - the block set: the UA stylesheet's `display: block` element list — ../html/source,
+//   Rendering §"Flow content" (the section's title; HTML's flow-content *category* is wider,
+//   holding every inline element too) — as prettier-plugin-svelte lists it
 // - Svelte void elements: node_modules/svelte/src/utils.js:16-41
 // - prettier-plugin-svelte: isInlineElement = !isBlockElement (negation, no positive list)
 //
@@ -134,8 +135,9 @@ element_set! {
     VOID_NAMES,
     "Void (self-closing) elements — Svelte's `VOID_ELEMENT_NAMES`.\n\n\
      `command` and `keygen` are obsolete (removed from the HTML spec) but included for Svelte \
-     parity — the parser (tsv_svelte) also includes them. `!doctype` is NOT here: it is the one \
-     case-insensitive member, so `is_void_element` matches it separately.",
+     parity — the parser (tsv_svelte) also includes them. Svelte's `is_void` also answers \
+     `true` for a `!doctype` declaration; that is no element, so it is not here — a caller \
+     that reads Svelte's answer adds it (`tsv_svelte`'s `is_svelte_void`).",
     [
         "area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link",
         "meta", "param", "source", "track", "wbr",
@@ -177,27 +179,30 @@ element_set! {
     ]
 }
 
-/// Check if an HTML element is block (flow content)
+/// Whether an HTML element is **block-level for formatting**: the elements whose user-agent
+/// style renders a box of its own — `display: block` (`<div>`, `<p>`, `<section>`, …), plus
+/// `<li>` (`list-item`) and `<table>` (`table`) — as prettier-plugin-svelte lists them, with
+/// `<menu>` and `<summary>` added where the plugin omits them.
 ///
-/// Block elements create rectangular blocks and typically start on new lines.
-/// Examples: `<div>`, `<p>`, `<section>`
+/// Not "flow content": in HTML's content model flow content includes every inline
+/// (phrasing) element too, while this set holds only elements that render as blocks — and
+/// not all of them: `<center>`, `<legend>`, `<search>`, `<listing>`, `<plaintext>` and
+/// `<xmp>` render as blocks but format inline, as in the plugin. Everything outside the set
+/// formats as inline, table cells included (prettier's `isInlineElement = !isBlockElement`).
 #[inline]
 pub fn is_block_element(tag_name: &str) -> bool {
     shape_admits(&BLOCK_SHAPE, tag_name) && block_set_contains(tag_name)
 }
 
-/// Check if an HTML element is void (self-closing)
+/// Whether an HTML element is **void**: it cannot have children and takes no closing tag —
+/// `<br>`, `<img>`, `<input>`, … — Svelte's `VOID_ELEMENT_NAMES`, the obsolete `<command>` and
+/// `<keygen>` included.
 ///
-/// Void elements cannot have children and don't need closing tags.
-/// Examples: `<br>`, `<img>`, `<input>`
+/// Elements only: a `<!doctype>` declaration is not one, though Svelte's own `is_void` answers
+/// `true` for it.
 #[inline]
 pub fn is_void_element(tag_name: &str) -> bool {
-    // `!doctype` is the one case-insensitive member and the one that does not fit the shape (it
-    // opens on `!`), so it sits outside the set and is matched on its own — behind its `!`, so
-    // the case-folding compare (an out-of-line call) runs only for a declaration-shaped name
-    // and not for every name the set rejects.
-    (shape_admits(&VOID_SHAPE, tag_name) && void_set_contains(tag_name))
-        || (tag_name.starts_with('!') && tag_name.eq_ignore_ascii_case("!doctype"))
+    shape_admits(&VOID_SHAPE, tag_name) && void_set_contains(tag_name)
 }
 
 /// Whether this element IS a rendered line break — `<br>` alone. The [spec][br] says it
@@ -240,19 +245,21 @@ pub fn collapses_child_whitespace(tag_name: &str) -> bool {
     )
 }
 
-/// Check if an element is an SVG element
+/// Whether an element is an SVG element — Svelte's `SVG_ELEMENTS`, in SVG's own spelling
+/// (`clipPath`, `foreignObject`: the camelCase names are members as written, and only so).
 #[inline]
 pub fn is_svg_element(tag_name: &str) -> bool {
     shape_admits(&SVG_SHAPE, tag_name) && svg_set_contains(tag_name)
 }
 
-/// Check if an element is a MathML element
+/// Whether an element is a MathML element — Svelte's MathML Core list.
 #[inline]
 pub fn is_mathml_element(tag_name: &str) -> bool {
     shape_admits(&MATHML_SHAPE, tag_name) && mathml_set_contains(tag_name)
 }
 
-/// Check if an element is foreign content (SVG or MathML)
+/// Whether an element is foreign content: an SVG ([`is_svg_element`]) or MathML
+/// ([`is_mathml_element`]) element.
 #[inline]
 pub fn is_foreign_element(tag_name: &str) -> bool {
     is_svg_element(tag_name) || is_mathml_element(tag_name)
@@ -440,7 +447,7 @@ mod tests {
             );
             assert_eq!(
                 is_void_element(tag),
-                VOID_NAMES.contains(&tag.as_str()) || tag.eq_ignore_ascii_case("!doctype"),
+                VOID_NAMES.contains(&tag.as_str()),
                 "is_void_element disagrees with a plain scan on {tag:?}"
             );
             assert_eq!(
@@ -501,11 +508,9 @@ mod tests {
         // Regular void elements are case-sensitive.
         assert!(!is_void_element("BR"));
         assert!(!is_void_element("div"));
-        // `!doctype` is the one case-insensitive special case.
-        assert!(is_void_element("!doctype"));
-        assert!(is_void_element("!DOCTYPE"));
-        assert!(is_void_element("!DocType"));
-        // ...but it needs the leading '!'.
+        // A doctype declaration is no element, in any spelling.
+        assert!(!is_void_element("!doctype"));
+        assert!(!is_void_element("!DOCTYPE"));
         assert!(!is_void_element("doctype"));
     }
 

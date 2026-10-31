@@ -20,8 +20,13 @@ not here. This crate stays AST-agnostic.
 
 ## Public API
 
-- **Element classification** (`elements.rs`): `is_block_element`,
-  `is_void_element`, `is_svg_element`, `is_mathml_element`,
+- **Element classification** (`elements.rs`): `is_block_element` (the elements that render
+  a box of their own — UA `display: block`, plus `<li>` and `<table>` — as prettier-plugin-svelte
+  lists them — a subset: `<center>`, `<legend>`, `<search>`, `<listing>`, `<plaintext>` and
+  `<xmp>` render as blocks but format inline, as in the plugin; not HTML's "flow content",
+  which holds the inline elements too),
+  `is_void_element` (elements only — Svelte's `is_void` also answers for `!doctype`, which
+  `tsv_svelte::ast::is_svelte_void` adds for the callers reading Svelte's answer), `is_svg_element`, `is_mathml_element`,
   `is_foreign_element`, `is_line_break_element` (`<br>` alone — the
   element that IS a rendered line break; deliberately narrower than
   void, and `<wbr>` — a break *opportunity* — is not a member).
@@ -34,7 +39,8 @@ not here. This crate stays AST-agnostic.
   tokenizer (keep a whole custom-element name in one token) and its name
   validator (the hyphen-tail run) — one source of truth for the ranges.
 - **Whitespace** (`whitespace.rs`): `preserves_whitespace` (`<pre>`,
-  `<textarea>`).
+  `<textarea>`) — Svelte's and prettier-plugin-svelte's set, not the HTML spec's
+  `white-space: pre` rule (which also names the obsolete `listing`, `plaintext`, `xmp`).
 - **Compiler whitespace removal** (`elements.rs`): `collapses_child_whitespace`
   — whether inter-sibling whitespace inside an element is removed **entirely**
   by Svelte's compiler (`clean_nodes` `can_remove_entirely`) rather than
@@ -81,3 +87,9 @@ not here. This crate stays AST-agnostic.
 - **Pure `&str` API**: classification predicates take tag names, not
   AST nodes or a parser's name representation, so the crate stays
   independent of any particular parser.
+- **Exact, case-sensitive names**: every predicate matches a name in its canonical spelling
+  (lowercase for HTML/MathML, SVG's camelCase where it has one), as authored; a caller with a
+  case-insensitive HTML name lowercases it first. Stated once in the crate `//!` docs.
+- **Naming convention** (crate `//!` docs): verb predicates say what an element does
+  (`preserves_whitespace`, `collapses_child_whitespace`); `is_*` names category membership.
+  Docs read "Whether …".

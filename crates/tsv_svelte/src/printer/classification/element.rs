@@ -11,7 +11,7 @@ use crate::ast::ElementKind;
 use crate::printer::Printer;
 
 impl<'a> Printer<'a> {
-    /// Check if element is block (flow content)
+    /// Whether the element is block-level for formatting.
     ///
     /// Reads the parse-time name facts (`Element::facts`) plus the two element-instance overlays.
     ///

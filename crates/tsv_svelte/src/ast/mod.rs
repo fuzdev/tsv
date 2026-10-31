@@ -1098,6 +1098,17 @@ pub(crate) fn is_component_name(name: &str) -> bool {
     name_shape(name) == NameShape::Component
 }
 
+/// Whether `name` is void as Svelte's `is_void` (`utils.js`) answers it: a void HTML element
+/// (`tsv_html::is_void_element`), or a `!doctype` declaration in any ASCII case — which
+/// Svelte's parser reads as an element and its compiler closes like a void one, though no
+/// element it is. The parser's element facts and the compiler's server output read this.
+pub fn is_svelte_void(name: &str) -> bool {
+    // the declaration test behind its `!`, so the case-folding compare (an out-of-line call)
+    // runs only for a declaration-shaped name, never for every name the element set rejects
+    tsv_html::is_void_element(name)
+        || (name.starts_with('!') && name.eq_ignore_ascii_case("!doctype"))
+}
+
 /// What a tag name's own punctuation makes it: `:`-namespaced, else component-shaped
 /// ([`is_component_name`]), else neither.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -1143,9 +1154,9 @@ fn name_shape(name: &str) -> NameShape {
 pub(crate) struct TagFacts(u16);
 
 impl TagFacts {
-    /// `tsv_html::is_block_element` (flow content).
+    /// `tsv_html::is_block_element` (block-level for formatting).
     const BLOCK: u16 = 1 << 0;
-    /// `tsv_html::is_void_element` (`<br>`, `<img>`, `!doctype`).
+    /// [`is_svelte_void`] (`<br>`, `<img>`, `!doctype`).
     const VOID: u16 = 1 << 1;
     /// `tsv_html::is_foreign_element` (SVG or MathML).
     const FOREIGN: u16 = 1 << 2;
@@ -1186,7 +1197,7 @@ impl TagFacts {
         if tsv_html::is_block_element(tag_name) {
             bits |= Self::BLOCK;
         }
-        if tsv_html::is_void_element(tag_name) {
+        if is_svelte_void(tag_name) {
             bits |= Self::VOID;
         }
         if tsv_html::is_foreign_element(tag_name) {
@@ -2375,6 +2386,20 @@ mod tests {
         }
     }
 
+    /// Svelte's `is_void` is the element set plus the `!doctype` declaration, which
+    /// `tsv_html::is_void_element` leaves out (no element) and Svelte matches in any ASCII case.
+    #[test]
+    fn svelte_void_adds_the_doctype_declaration() {
+        use super::is_svelte_void;
+        for void in ["br", "img", "!doctype", "!DOCTYPE", "!DocType"] {
+            assert!(is_svelte_void(void), "{void:?}");
+        }
+        for not_void in ["div", "BR", "doctype", "!", "!doctypex", "!DOCTYPEX"] {
+            assert!(!is_svelte_void(not_void), "{not_void:?}");
+        }
+        assert!(!tsv_html::is_void_element("!doctype"));
+    }
+
     /// Grade every packed [`TagFacts`](super::TagFacts) accessor against the pure predicate it
     /// encodes, over an alphabet covering each bit's positive and negative cases. This is the gate
     /// with power over the bit packing: a swapped constant or an accessor reading its neighbour's
@@ -2382,7 +2407,7 @@ mod tests {
     /// relied on to see.
     #[test]
     fn tag_facts_bits_agree_with_the_pure_predicates() {
-        use super::{ElementKind, TagFacts, is_component_name};
+        use super::{ElementKind, TagFacts, is_component_name, is_svelte_void};
         let probes = [
             // block members (hr is also void; pre is also ws-sensitive)
             "div",
@@ -2467,11 +2492,7 @@ mod tests {
                 tsv_html::is_block_element(tag),
                 "block: {tag:?}"
             );
-            assert_eq!(
-                facts.is_void(),
-                tsv_html::is_void_element(tag),
-                "void: {tag:?}"
-            );
+            assert_eq!(facts.is_void(), is_svelte_void(tag), "void: {tag:?}");
             assert_eq!(
                 facts.is_foreign(),
                 tsv_html::is_foreign_element(tag),
