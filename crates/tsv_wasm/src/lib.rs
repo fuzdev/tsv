@@ -48,7 +48,7 @@ use tsv_arena::parse_format;
 use tsv_arena::{parse_convert, parse_internal};
 
 // The one parse-error type, shared by every language crate: each re-exports
-// `tsv_lang::Error` (and the `ErrorReport` its `report` returns, whose span is two
+// `tsv_lang::Error` (and the `ErrorReport` its `to_report` returns, whose span is two
 // `WirePoint`s), so the shared error helpers below take a Svelte or CSS failure as readily as
 // a TypeScript one. Named through `tsv_ts`, as the language surface spells it; this crate's
 // own `tsv_lang` edge serves the wasm32 layout pins alone (`layout`).
@@ -191,11 +191,11 @@ impl Failure {
 
 /// A parse error as the export ends on it: every pointed error RETURNED as
 /// `{ok: false, error}` — `kind` `'parse'` for a syntax error, `'refused'` for a format's
-/// refusal of a source that parses (`Error::report`'s `kind`, `ErrorKind::Refusal`) — and a
+/// refusal of a source that parses (`Error::to_report`'s `kind`, `ErrorKind::Refusal`) — and a
 /// positionless one (a source over the size cap) thrown as a plain `Error`.
 #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
 fn parse_failure(e: &Error) -> Failure {
-    match e.report() {
+    match e.to_report() {
         Some(report) => Failure::Returned(failure_result(
             if report.kind == tsv_ts::ErrorKind::Refusal {
                 "refused"
@@ -266,7 +266,7 @@ pub fn strip_typescript(source: &str, source_type: JsValue) -> Result<JsValue, J
             Ok(stripped) => Ok(JsValue::from_str(&stripped.code)),
             Err(tsv_ts::StripError::Parse(e)) => parse_failure(&e).into_return(),
             // a refusal always reports; the `None` arm is unreachable, thrown with its message
-            Err(tsv_ts::StripError::Unsupported { kind, error, .. }) => match error.report() {
+            Err(tsv_ts::StripError::Unsupported { kind, error, .. }) => match error.to_report() {
                 Some(report) => Ok(failure_result("unsupported", Some(kind.name()), &report)),
                 None => Err(err(format!("{error:#}"))),
             },

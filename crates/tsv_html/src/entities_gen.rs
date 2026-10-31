@@ -8,7 +8,9 @@
 //! same test with `TSV_ENTITIES_UPDATE=1`) writes it instead. A unit test rather than an
 //! integration test because it builds the table with the decoder's own private hash. So a
 //! table too broken to compile (deleted, or a merge conflict in it) is restored from git
-//! first; the generator reads none of it.
+//! first; the generator reads none of it. The JSON stays in the repository (the published
+//! crate excludes it), so the test skips when it is absent rather than failing a test run
+//! from the crate's tarball.
 //!
 //! The construction is CHD (hash, displace and compress), the algorithm `phf_generator`
 //! runs: names are grouped into buckets by hash, and the buckets, largest first, each search
@@ -180,7 +182,16 @@ fn render(table: &Table<'_>) -> String {
 #[test]
 fn entities_table_is_fresh() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let json = fs::read_to_string(root.join("src/entities.json")).unwrap();
+    let json_path = root.join("src/entities.json");
+    if !json_path.exists() {
+        // The published crate excludes the JSON (it ships only the generated table), so a
+        // test run from the crates.io tarball has nothing to grade the table against.
+        eprintln!(
+            "skipping entities_table_is_fresh: src/entities.json is absent (a packaged crate)"
+        );
+        return;
+    }
+    let json = fs::read_to_string(&json_path).unwrap();
     let entities: BTreeMap<String, String> = serde_json::from_str(&json).unwrap();
     // A broken or truncated entities.json fails here rather than shipping a short table.
     assert!(

@@ -8,11 +8,11 @@ The shared foundation of tsv's language crates. Its public items — the error t
 `ErrorKind`, `ErrorReport`, `Result`), the wire coordinates (`WireCoordinates`, `WirePoint`,
 `LineRule`, `LeadingBom`) and the sized-stack pair (`STACK_SIZE`, `run_with_stack`) — are
 re-exported by the language crates whose APIs use them; the rest is hidden plumbing, as are
-the `_internal_*` features, which change in any release outside semver. Part of [tsv](https://github.com/fuzdev/tsv).
+the underscored features (`_json`, `_locations`, `_internal_*`), which change in any release outside semver. Part of [tsv](https://github.com/fuzdev/tsv).
 
 API docs: [docs.rs/tsv_lang](https://docs.rs/tsv_lang).
 
-Minimum supported Rust version: 1.94. Release notes:
+Minimum supported Rust version: 1.94; raising it ships in a minor release. Release notes:
 [CHANGELOG.md](https://github.com/fuzdev/tsv/blob/main/CHANGELOG.md).
 
 License: [0BSD](https://github.com/fuzdev/tsv/blob/main/LICENSE)

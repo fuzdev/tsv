@@ -12,9 +12,9 @@
 //! the next request is read:
 //!
 //! - `{"code", "findings"}` — the stripped JS, and what it breaks of the strip's own
-//!   contract (`strip_fixtures::contract_violations`), its idempotence
-//!   (`strip_fixtures::idempotence_failure`), or the no-copy promise (an output equal to
-//!   its source must be borrowed), one message each; `findings` is empty on a clean strip;
+//!   contract (`strip_fixtures::contract_violations`) or its idempotence
+//!   (`strip_fixtures::idempotence_failure`), one message each; `findings` is empty on a
+//!   clean strip;
 //! - `{"refusal"}` — the refusal as `refusal.txt` spells it
 //!   (`Kind<TAB>line:column<TAB>line:column` and a newline);
 //! - `{"error"}` — tsv's parser rejects the source;
@@ -27,7 +27,6 @@
 use crate::cli::CliError;
 use crate::strip_fixtures::{contract_violations, idempotence_failure, refusal_line};
 use argh::FromArgs;
-use std::borrow::Cow;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -93,11 +92,11 @@ fn strip_file(path: &std::path::Path) -> Result<(), CliError> {
 
 /// Strip `source` read from `path`, at the goal the path's extension settles — a `.mts` is
 /// a module by name, as the shipped `tsv strip` reads a path; any other the fallback.
-fn strip_at_path<'s>(
+fn strip_at_path(
     path: &std::path::Path,
-    source: &'s str,
+    source: &str,
     arena: &bumpalo::Bump,
-) -> Result<tsv_ts::Stripped<'s>, tsv_ts::StripError> {
+) -> Result<tsv_ts::Stripped, tsv_ts::StripError> {
     let goal = tsv_ts::Goal::from_extension(path);
     tsv_ts::__private::strip_in(source, goal, arena)
 }
@@ -152,16 +151,13 @@ fn answer(source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
         let arena: &bumpalo::Bump = arena;
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             tsv_ts::__private::strip_in(source, None, arena).map(|stripped| {
-                let code = stripped.code.as_ref();
-                let mut findings: Vec<String> = contract_violations(source, code)
+                let code = stripped.code;
+                let mut findings: Vec<String> = contract_violations(source, &code)
                     .into_iter()
                     .map(|(_, detail)| detail)
                     .collect();
-                if code == source && matches!(stripped.code, Cow::Owned(_)) {
-                    findings.push("nothing is type-only, yet the output is a copy".to_string());
-                }
-                findings.extend(idempotence_failure(source, code).map(|f| f.to_string()));
-                (code.to_string(), findings)
+                findings.extend(idempotence_failure(source, &code).map(|f| f.to_string()));
+                (code, findings)
             })
         }))
     };

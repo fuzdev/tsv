@@ -23,10 +23,10 @@ targets = ["x86_64-unknown-linux-gnu"]
 default = ["json"]
 # The wire-JSON layer: `parse_to_json*` and the writer behind it (`ast/convert/write.rs`). Forwards to
 # tsv_ts/tsv_css because the writer composes their embedded emitters.
-json = ["tsv_lang/json", "tsv_ts/json", "tsv_css/json"]
+json = ["tsv_lang/_json", "tsv_ts/json", "tsv_css/json"]
 # The loc-bearing wire (`JsonOptions::locations`) — see `tsv_lang`'s
-# `locations` feature. Off in every binding.
-locations = ["json", "tsv_lang/locations", "tsv_ts/locations", "tsv_css/locations"]
+# `_locations` feature. Off in every binding.
+locations = ["json", "tsv_lang/_locations", "tsv_ts/locations", "tsv_css/locations"]
 # Opt-in print-once comment ledger (`tsv_lang::comment_ledger`): the format entry points
 # register `Root.comments`, the four JS-comment doc builders record each emit, and the
 # format-ignore seams (raw `<script>`/`<style>`, the template node + range forms) record

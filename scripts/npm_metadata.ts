@@ -12,11 +12,14 @@
  * `require(esm)` is NOT guaranteed in-range, so dynamic `import()` stays the
  * universal CommonJS-host path (`scripts/test_napi_npm.ts` gates it).
  *
+ * `license` is an SPDX expression: tsv's own code is 0BSD, and every package compiles in
+ * the WHATWG named-reference table, which is BSD-3-Clause as source code (`THIRD_PARTY_NOTICE`).
+ *
  * Per-package fields (`description`, `keywords`, `files`, `exports`, `bin`,
  * `sideEffects`) stay in each staging script — they genuinely differ.
  */
 export const NPM_SHARED_METADATA = {
-	license: '0BSD',
+	license: '0BSD AND BSD-3-Clause',
 	homepage: 'https://github.com/fuzdev/tsv',
 	author: {
 		name: 'Ryan Atkinson',

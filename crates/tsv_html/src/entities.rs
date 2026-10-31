@@ -121,8 +121,10 @@ pub(crate) fn entity_hash_seeded(name: &[u8], seed: u64) -> u64 {
 }
 
 /// Where a run of text whose character references are decoded sits — the one fact about
-/// it [`decode_character_references`] reads.
+/// it [`decode_character_references`] reads, and the context a spec decoder would read too.
+/// Variants may be added, so a match over it outside this crate carries a wildcard arm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum ReferenceContext {
     /// Text content: every valid reference is decoded.
     Text,
@@ -153,7 +155,8 @@ pub enum ReferenceContext {
 /// # Examples
 ///
 /// ```
-/// use tsv_html::{ReferenceContext, decode_character_references};
+/// use tsv_html::ReferenceContext;
+/// use tsv_html::svelte::decode_character_references;
 ///
 /// // Named entities
 /// assert_eq!(decode_character_references("&lt;tag&gt;", ReferenceContext::Text), "<tag>");

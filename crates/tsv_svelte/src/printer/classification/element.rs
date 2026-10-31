@@ -65,7 +65,7 @@ pub(crate) fn has_raw_content(element: &ast::Element<'_>) -> bool {
 mod tests {
     use super::*;
     use crate::ast::FragmentNode;
-    use tsv_html as html;
+    use tsv_html::svelte as html;
 
     /// Find the first child element of `parent` whose resolved tag name is `tag`.
     fn child<'p, 'arena>(

@@ -7,7 +7,7 @@
 //! `span` is the error's byte range in the text the CALLER handed over: a format entry
 //! point's error is mapped back through its `<CR>` fold, an embedded `<script>`'s is
 //! absolute in the host document, and a leading byte-order mark is counted in every
-//! language — unlike `report()`, whose points are UTF-16 and whose Svelte and CSS wires
+//! language — unlike `to_report()`, whose points are UTF-16 and whose Svelte and CSS wires
 //! elide the mark. `Display` is one line (`summary (line:col)`); `{:#}` is the full frame
 //! the CLI prints.
 
@@ -65,7 +65,7 @@ fn a_leading_bom_is_a_counted_byte_in_every_language() {
     let error = ts_parse_error(ts);
     let semicolon = ts.find(';').expect("a `;`");
     assert_eq!(error.span(), Some(semicolon..semicolon));
-    let report = error.report().expect("a located error reports");
+    let report = error.to_report().expect("a located error reports");
     assert_eq!(report.start.offset as usize, semicolon - 2);
 
     // Svelte: the wire elides the mark, so the report's start is one UTF-16 unit lower still
@@ -74,7 +74,7 @@ fn a_leading_bom_is_a_counted_byte_in_every_language() {
     let error = svelte_parse_error(svelte);
     let b = svelte.find(" b}").expect("the `b`") + 1;
     assert_eq!(error.span(), Some(b..b));
-    let report = error.report().expect("a located error reports");
+    let report = error.to_report().expect("a located error reports");
     assert_eq!(report.start.offset as usize, b - 3);
 
     // CSS: elided on the wire as Svelte's is.
@@ -82,7 +82,7 @@ fn a_leading_bom_is_a_counted_byte_in_every_language() {
     let error = css_parse_error(css);
     let brace = css.rfind('}').expect("a `}`");
     assert_eq!(error.span(), Some(brace..brace));
-    let report = error.report().expect("a located error reports");
+    let report = error.to_report().expect("a located error reports");
     assert_eq!(report.start.offset as usize, brace - 3);
 }
 
@@ -152,8 +152,8 @@ fn display_is_one_line_and_the_alternate_is_the_frame() {
         .map(|(at, _)| at)
         .expect("a header");
     assert_eq!(one, format!("{summary} ({header})"));
-    // and `report()` holds the same two parts apart
-    let report = error.report().expect("a located error reports");
+    // and `to_report()` holds the same two parts apart
+    let report = error.to_report().expect("a located error reports");
     assert_eq!(full, format!("{}\n{}", report.summary, report.frame));
 
     // the strip's parse error forwards both forms

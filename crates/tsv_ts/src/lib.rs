@@ -5,27 +5,33 @@
 //! single quotes and no trailing commas. Formatting output is not frozen — it changes
 //! between releases as formatting bugs are fixed.
 //!
+//! JSX and TSX are not supported: JSX is never read as JSX, so a source holding it fails
+//! to parse or is misread.
+//!
 //! ## Usage
 //!
 //! ```
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! use tsv_ts::{Formatter, Goal, format, format_with_goal, strip};
 //!
 //! // Format in one call: Module, retried as Script only if that fails
-//! assert_eq!(format("const x=42;").unwrap(), "const x = 42;\n");
+//! assert_eq!(format("const x=42;")?, "const x = 42;\n");
 //! // ...or at exactly one goal, with no retry
 //! assert!(format_with_goal("with (a) b;", Goal::Module).is_err());
 //! // Many sources on one thread: a `Formatter` keeps its arenas warm between calls
 //! let mut formatter = Formatter::new();
-//! assert_eq!(formatter.format("let y=1").unwrap(), "let y = 1;\n");
+//! assert_eq!(formatter.format("let y=1")?, "let y = 1;\n");
 //!
 //! // Strip the types, keeping every surviving character at its line and column
-//! assert_eq!(strip("let x: number = 1;").unwrap().code, "let x         = 1;");
+//! assert_eq!(strip("let x: number = 1;")?.code, "let x         = 1;");
 //!
 //! // Parse to the wire JSON AST (the `json` feature, on by default)
 //! # #[cfg(feature = "json")]
 //! # {
-//! let json = tsv_ts::parse_to_json("const x: number = 42;").unwrap();
+//! let json = tsv_ts::parse_to_json("const x: number = 42;")?;
 //! assert!(json.starts_with(r#"{"type":"Program""#));
+//! # }
+//! # Ok(())
 //! # }
 //! ```
 //!
@@ -33,7 +39,7 @@
 //!
 //! Formatting and parsing return an [`Error`] that says what kind of failure it is
 //! ([`Error::kind`]), where it is in the input's UTF-8 bytes ([`Error::span`]), and how a
-//! binding reports it ([`Error::report`]: the summary and the frame apart, positions in
+//! binding reports it ([`Error::to_report`]: the summary and the frame apart, positions in
 //! UTF-16 offsets and 1-based lines). `{}` prints one line; `{:#}` adds the frame the
 //! `tsv` CLI prints.
 //!
@@ -48,7 +54,7 @@
 //!     format!("{err:#}"),
 //!     "Expected expression, found end of file\n1:9 const x=\n            ^ here"
 //! );
-//! let report = err.report().unwrap();
+//! let report = err.to_report().expect("a located error reports");
 //! assert_eq!((report.start.offset, report.start.line, report.start.column), (8, 1, 8));
 //! ```
 //!
@@ -152,6 +158,14 @@ pub use tsv_lang::{
     WirePoint, run_with_stack,
 };
 
+// `tests/public_reexports.rs` (outside this crate) names every item above through this
+// crate's path: cargo-semver-checks cannot see a dropped or demoted re-export.
+
+// The README's example compiles as a doctest, so the crates.io page cannot drift.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 pub use formatter::Formatter;
 pub use goal::{Goal, ParseGoalError};
 pub use strip::{StripError, Stripped, UnsupportedKind, strip, strip_with_goal};
@@ -216,6 +230,13 @@ fn with_doc_printer<'a, R>(
 /// retried at `Script` only if that fails — which is what every format surface that takes
 /// no source type from its caller runs. [`format_with_goal`] is the exact-goal twin.
 ///
+/// ```
+/// # fn main() -> tsv_ts::Result<()> {
+/// assert_eq!(tsv_ts::format("let x:number=1")?, "let x: number = 1;\n");
+/// # Ok(())
+/// # }
+/// ```
+///
 /// # Errors
 ///
 /// A parse error under both goals (the one [Goals](crate#goals) picks).
@@ -232,10 +253,13 @@ pub fn format(source: &str) -> Result<String> {
 /// returns ahead of the parse like [`format()`].
 ///
 /// ```
+/// # fn main() -> tsv_ts::Result<()> {
 /// use tsv_ts::{Goal, format_with_goal};
 ///
-/// assert_eq!(format_with_goal("with (a) b", Goal::Script).unwrap(), "with (a) b;\n");
+/// assert_eq!(format_with_goal("with (a) b", Goal::Script)?, "with (a) b;\n");
 /// assert!(format_with_goal("with (a) b", Goal::Module).is_err());
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// # Errors
@@ -328,14 +352,17 @@ fn format_program_in(
 /// [`parse_to_json`]'s: [`Goal::Module`], the span-only wire.
 ///
 /// ```
+/// # fn main() -> tsv_ts::Result<()> {
 /// # #[cfg(feature = "locations")]
 /// # {
 /// use tsv_ts::{Goal, JsonOptions, parse_to_json_with};
 ///
 /// let options = JsonOptions::new().goal(Goal::Script).locations(true);
-/// let json = parse_to_json_with("with (a) b;", options).unwrap();
+/// let json = parse_to_json_with("with (a) b;", options)?;
 /// assert!(json.contains(r#""sourceType":"script""#));
 /// assert!(json.contains(r#""loc":"#));
+/// # }
+/// # Ok(())
 /// # }
 /// ```
 #[cfg(feature = "json")]
@@ -399,6 +426,14 @@ const _: () = {
 /// The goal is [`Goal::Module`], with no retry (see [Goals](crate#goals));
 /// [`parse_to_json_with`] names another.
 ///
+/// ```
+/// # fn main() -> tsv_ts::Result<()> {
+/// let json = tsv_ts::parse_to_json("let x;")?;
+/// assert!(json.starts_with(r#"{"type":"Program","start":0,"end":6,"#));
+/// # Ok(())
+/// # }
+/// ```
+///
 /// # Errors
 ///
 /// A parse error at the module goal.
@@ -412,6 +447,16 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 ///
 /// Each call parses into a fresh arena sized to the source, dropped once the wire is
 /// written.
+///
+/// ```
+/// # fn main() -> tsv_ts::Result<()> {
+/// use tsv_ts::{Goal, JsonOptions, parse_to_json_with};
+///
+/// let json = parse_to_json_with("with (a) b;", JsonOptions::new().goal(Goal::Script))?;
+/// assert!(json.contains(r#""sourceType":"script""#));
+/// # Ok(())
+/// # }
+/// ```
 ///
 /// # Errors
 ///

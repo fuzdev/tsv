@@ -17,7 +17,7 @@ formatting files is reported as that file's error instead of aborting the run.
 Usage: `tsv --help`, and the [README](https://github.com/fuzdev/tsv#readme). The library target is the
 CLI's internals and makes no stability promise.
 
-Minimum supported Rust version: 1.94. Release notes:
+Minimum supported Rust version: 1.94; raising it ships in a minor release. Release notes:
 [CHANGELOG.md](https://github.com/fuzdev/tsv/blob/main/CHANGELOG.md).
 
 License: [0BSD](https://github.com/fuzdev/tsv/blob/main/LICENSE)

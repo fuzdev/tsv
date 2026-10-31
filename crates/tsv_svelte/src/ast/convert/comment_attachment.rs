@@ -721,7 +721,7 @@ mod tests {
                 "span-only",
                 crate::__private::convert_ast_json_bytes(&root, source),
             ));
-            // the loc-bearing wire exists only under `tsv_lang`'s `locations` feature
+            // the loc-bearing wire exists only under `tsv_lang`'s `_locations` feature
             #[cfg(feature = "locations")]
             let wires = wires.chain(std::iter::once((
                 "loc",

@@ -3,9 +3,13 @@
 //! [`tsv_ignore::IgnoreStack`] (the matcher) plus the entry name and its
 //! format-root-relative path. Part of [tsv](https://github.com/fuzdev/tsv).
 //!
-//! **Published for tsv's own tools.** The verdicts and the warnings' wording follow
-//! `tsv format`'s behavior and change with it in any release. A tool that wants gitignore
-//! matching alone should depend on [`tsv_ignore`].
+//! **Published for tsv's own tools.** A tool that wants gitignore matching alone should
+//! depend on [`tsv_ignore`].
+//!
+//! **Stability.** The public signatures follow 0.x semver like every tsv crate: a breaking
+//! change ships only in a minor release. The verdicts and the warnings' wording follow
+//! `tsv format`'s behavior and may change with it in any release. `#[doc(hidden)]` items are
+//! outside semver.
 //!
 //! This is the single home of the build-output heuristic, the always-pruned
 //! safety nets, the formattable-extension check (both as a discovery filter and

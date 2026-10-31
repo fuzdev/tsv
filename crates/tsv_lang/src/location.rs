@@ -588,7 +588,7 @@ impl LocationMapper<'_> {
     /// from **+0.14%** instructions to **−1.72%**, with cycles moving
     /// alongside. Four call sites, so the code-size exposure is bounded (the
     /// `parse` WASM bundle moved +0.16%, and `format` — which builds without
-    /// the `json` feature — stayed flat at +21 B, confirming the growth is
+    /// the `_json` feature — stayed flat at +21 B, confirming the growth is
     /// confined to the convert path).
     #[expect(clippy::inline_always)]
     #[inline(always)]
@@ -709,7 +709,7 @@ impl LocationMapper<'_> {
 /// document, [`LocationTracker::new_with_map`] for a Svelte document (every island
 /// in it included) and a CSS one. No line table is the span-only wire.
 ///
-/// The line table exists only under the `locations` feature. Without it [`Self::lines`]
+/// The line table exists only under the `_locations` feature. Without it [`Self::lines`]
 /// is a constant `None`, so every `loc` emitter in the writers is dead code the
 /// optimizer removes — what keeps the bindings, which ship the span-only wire alone,
 /// from carrying the loc writer they never run.
@@ -719,7 +719,7 @@ impl LocationMapper<'_> {
 #[derive(Clone, Copy, Debug)]
 pub struct WirePositions<'a> {
     map: &'a ByteToCharMap,
-    #[cfg(feature = "locations")]
+    #[cfg(feature = "_locations")]
     lines: Option<&'a LocationTracker>,
 }
 
@@ -735,14 +735,14 @@ impl<'a> WirePositions<'a> {
     #[inline]
     #[must_use]
     pub fn lines(&self) -> Option<LocationMapper<'a>> {
-        #[cfg(feature = "locations")]
+        #[cfg(feature = "_locations")]
         {
             self.lines.map(|tracker| LocationMapper {
                 tracker,
                 map: self.map,
             })
         }
-        #[cfg(not(feature = "locations"))]
+        #[cfg(not(feature = "_locations"))]
         {
             None
         }
@@ -752,11 +752,11 @@ impl<'a> WirePositions<'a> {
     #[inline]
     #[must_use]
     pub const fn has_locations(&self) -> bool {
-        #[cfg(feature = "locations")]
+        #[cfg(feature = "_locations")]
         {
             self.lines.is_some()
         }
-        #[cfg(not(feature = "locations"))]
+        #[cfg(not(feature = "_locations"))]
         {
             false
         }
@@ -771,8 +771,8 @@ pub enum Wire {
     Span,
     /// The span-only wire plus a `loc` on every object carrying `start` / `end` (and, on
     /// the Svelte wire, `name_loc`) — what `tsv parse --locations` prints. Exists only
-    /// under the `locations` feature, so a binding cannot ask for it.
-    #[cfg(feature = "locations")]
+    /// under the `_locations` feature, so a binding cannot ask for it.
+    #[cfg(feature = "_locations")]
     Loc,
 }
 
@@ -782,13 +782,13 @@ pub enum Wire {
 #[derive(Debug)]
 pub struct WireTables {
     map: ByteToCharMap,
-    #[cfg(feature = "locations")]
+    #[cfg(feature = "_locations")]
     lines: Option<LocationTracker>,
 }
 
 impl WireTables {
     /// A document's tables for `wire` in its language's coordinates: the map alone for
-    /// [`Wire::Span`]; for `Wire::Loc` (the `locations` feature) the line table under
+    /// [`Wire::Span`]; for `Wire::Loc` (the `_locations` feature) the line table under
     /// `coordinates.lines` too —
     /// ECMAScript's terminators for a TypeScript document
     /// ([`LocationTracker::new_ecmascript_with_map`]), `\n` alone for a Svelte or CSS one
@@ -800,10 +800,10 @@ impl WireTables {
         match wire {
             Wire::Span => Self {
                 map: ByteToCharMap::new(source, bom),
-                #[cfg(feature = "locations")]
+                #[cfg(feature = "_locations")]
                 lines: None,
             },
-            #[cfg(feature = "locations")]
+            #[cfg(feature = "_locations")]
             Wire::Loc => {
                 let (lines, map) = match coordinates.lines {
                     LineRule::Ecmascript => LocationTracker::new_ecmascript_with_map(source, bom),
@@ -823,7 +823,7 @@ impl WireTables {
     pub fn positions(&self) -> WirePositions<'_> {
         WirePositions {
             map: &self.map,
-            #[cfg(feature = "locations")]
+            #[cfg(feature = "_locations")]
             lines: self.lines.as_ref(),
         }
     }
@@ -925,7 +925,7 @@ impl LocationTracker {
     /// path). Byte-identical to the character-walking oracle +
     /// `ByteToCharMap::new(source, bom)`.
     #[cfg_attr(
-        not(any(test, feature = "locations")),
+        not(any(test, feature = "_locations")),
         expect(
             dead_code,
             reason = "a line table is built only for the loc-bearing wire"
@@ -951,7 +951,7 @@ impl LocationTracker {
     /// `new_ecmascript_with_map`; byte-identical to the character-walking oracle
     /// + `ByteToCharMap::new(source, bom)`.
     #[cfg_attr(
-        not(any(test, feature = "locations")),
+        not(any(test, feature = "_locations")),
         expect(
             dead_code,
             reason = "a line table is built only for the loc-bearing wire"

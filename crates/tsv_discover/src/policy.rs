@@ -40,7 +40,7 @@ pub const FORMATTABLE_EXTENSIONS: &[&str] =
 /// The discovery verdict for one child **directory**: descend into it, prune it
 /// (skip its whole subtree), or prune it **and** surface a diagnostic.
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DirVerdict {
     /// Recurse into the directory.
     Descend,
@@ -76,7 +76,7 @@ impl DirVerdict {
 /// [build-output](HEURISTIC_DIRS) directory prunes unless an override-layer `!`
 /// re-includes it; [`Inactive`](Self::Inactive) once a `.gitignore` at or above the
 /// level has been read, whose rules then decide alone.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BuildOutputHeuristic {
     /// No `.gitignore` governs the level: the heuristic prunes.
     Active,

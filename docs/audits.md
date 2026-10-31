@@ -1220,12 +1220,14 @@ deno task package:audit
 should get, and states what it should. From the file list `cargo publish` would upload: a
 `README.md` and a `LICENSE` ship, the `LICENSE` holds the root `LICENSE`'s bytes (each crate
 commits a symlink to it, which cargo packages as a regular file), every `NOTICE` in the crate
-directory ships and `tsv_html` must hold one (the WHATWG entity list it carries is attributed
-there), no other Markdown ships (`CLAUDE.md` is excluded per crate; a stray doc fails), and the
+directory ships and `tsv_html` must hold one (the WHATWG entity table it carries is attributed
+there), `tsv_html`'s `src/entities.json` does not ship (the generator's input stays in the
+repository; the crate carries only the table generated from it), no other Markdown ships (`CLAUDE.md` is excluded per crate; a stray doc fails), and the
 listing names `src/lib.rs`, so an empty listing never reads as a pass. Every link in the
 README is absolute, since crates.io renders it away from the repository. From the resolved
 manifests: each crate's `rust-version` is the major.minor of the channel `rust-toolchain.toml`
-pins (the MSRV a consumer reads is the toolchain CI tests), its license is `0BSD`, and the
+pins (the MSRV a consumer reads is the toolchain CI tests), its license is `0BSD` (`tsv_html`'s
+`0BSD AND BSD-3-Clause`, for the WHATWG table it compiles in), and the
 readme cargo resolved is `README.md`. A crate that ships a binary (`tsv_cli`) carries a
 `[package.metadata.binstall]` table that `cargo binstall` can resolve to the version's GitHub
 Release: a bare-binary format, the third-party quick-install source disabled, and one override
@@ -2245,7 +2247,7 @@ Two more legs ride every attempt, over entry points the format leg never reaches
   unset-goal fallback the shipped entry points take. Properties: no panic, and on a strip the
   checks `strip:corpus` makes of its tsv side — the position contract
   (`strip_fixtures::contract_violations`: UTF-16 length, every kept character in place,
-  terminators kept), the no-copy promise, and idempotence (`idempotence_failure`). A refusal or
+  terminators kept) and idempotence (`idempotence_failure`). A refusal or
   a parse error is a verdict, not a finding.
 
 Both ride the pristine pass too, so the `fuzz --iterations 0` of `idempotency:sweep` and
@@ -2253,7 +2255,7 @@ Both ride the pristine pass too, so the `fuzz --iterations 0` of `idempotency:sw
 report: zero inputs written through the `locations` wire, or zero stripped when the run had
 TypeScript seeds, fails the run as vacuous. Every TypeScript-family seed is stripped — a `.js`
 file and an `--embedded ts` body (a `<script>` without `lang="ts"` included) alike, since the
-strip API takes any string and type-free JS is its no-copy fast path.
+strip API takes any string and type-free JS strips to itself.
 
 **Seed sets.** `tests/fixtures` holds almost all of its CSS and much of its TypeScript inside
 `.svelte` files, so as found it seeds the CSS printer and the standalone TypeScript paths (the
@@ -2314,7 +2316,7 @@ report/dump.
 
 ## F1 Idempotency Sweep (`idempotency:sweep`)
 
-The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not, since the sweep grades an invariant rather than a pinned count — plus the `svelte_styles` harvest cache and the live diff: the files of this machine's working trees of the `own` repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `corpus_robustness_seeds` / `live_diff_files`) — `format(format(x)) == format(x)` on every real file, plus the pass's two other legs: the `locations` wire of every file tsv parses (no panic) and the type strip of every TypeScript-family file (no panic, the position contract, the no-copy promise, idempotence — [the fuzzer's extra legs](#seeded-mutational-fuzzer-fuzzaudit)). NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
+The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not, since the sweep grades an invariant rather than a pinned count — plus the `svelte_styles` harvest cache and the live diff: the files of this machine's working trees of the `own` repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `corpus_robustness_seeds` / `live_diff_files`) — `format(format(x)) == format(x)` on every real file, plus the pass's two other legs: the `locations` wire of every file tsv parses (no panic) and the type strip of every TypeScript-family file (no panic, the position contract, idempotence — [the fuzzer's extra legs](#seeded-mutational-fuzzer-fuzzaudit)). NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
 
 ```bash
 deno task idempotency:sweep
@@ -2612,7 +2614,7 @@ deno task strip:fixtures:oracle            # the oracle side (Node; needs bench:
 committed `expected.*` or the refusal in `refusal.txt`; its output has the input's UTF-16
 length, keeps every line terminator at its UTF-16 offset, and holds at every other offset the
 input's character, a space, or a `;` / `(` / `)` hazard substitution — so every surviving
-character keeps its line and UTF-16 column; and stripping the output returns it borrowed,
+character keeps its line and UTF-16 column; and stripping the output returns it unchanged,
 save one excused change — the re-strip blanking a type-argument list that only the output's
 TypeScript re-read holds (`f(a < b, c        > (d))` re-read as `a<b, c>(d)`;
 `strip_fixtures::idempotence_failure`, shared with `strip:corpus` and the fuzzer's strip leg).
@@ -2652,7 +2654,7 @@ target/corpus/tsv_debug strip <file.ts>    # one file's strip, for triage
 
 **What it proves.** Over every `.ts` / `.mts` / `.cts` file (`.svelte.ts` included, declaration
 files not) of the `gates` view's snapshot tiers, `tsv_ts::strip` does not panic or reject the
-parse; its output keeps the position contract, strips to itself borrowed, and parses as a JS
+parse; its output keeps the position contract, strips to itself, and parses as a JS
 module under oxc-parser in JS mode with semantic errors; and it equals ts-blank-space's output
 byte for byte (the fixtures' derivation, `benches/js/lib/strip_oracle.ts`), or both refuse with
 the same kind and span. tsv's side is one `tsv_debug strip --stdin` process, which grades the

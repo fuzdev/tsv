@@ -10,28 +10,39 @@
 //! formatting bugs are fixed.
 //!
 //! ```
-//! use tsv_svelte::{ErrorKind, format};
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! use tsv_svelte::{Formatter, format};
 //!
 //! assert_eq!(
-//!     format("<script>let x=1</script><p>{x}</p>").unwrap(),
+//!     format("<script>let x=1</script><p>{x}</p>")?,
 //!     "<script>\n\tlet x = 1;\n</script>\n\n<p>{x}</p>\n"
 //! );
-//!
-//! // a refusal: formatting folds this `\r` to `\n`, which would end the in-tag comment early
-//! let err = format("<div // a\rb\n></div>").unwrap_err();
-//! assert_eq!(err.kind(), ErrorKind::Refusal);
-//! assert_eq!(err.span(), Some(9..10));
+//! let mut formatter = Formatter::new();
+//! assert_eq!(formatter.format("<p  class=\"a\">y</p>")?, "<p class=\"a\">y</p>\n");
 //!
 //! // Parse to the wire JSON AST (the `json` feature, on by default)
 //! # #[cfg(feature = "json")]
 //! # {
-//! let json = tsv_svelte::parse_to_json("<p>x</p>").unwrap();
+//! let json = tsv_svelte::parse_to_json("<p>x</p>")?;
 //! assert!(json.contains(r#""type":"Root""#));
+//! # }
+//! # Ok(())
 //! # }
 //! ```
 //!
+//! A source the format cannot take is an [`Error`] — here a refusal of one that parses:
+//!
+//! ```
+//! use tsv_svelte::{ErrorKind, format};
+//!
+//! // formatting folds this `\r` to `\n`, which would end the in-tag comment early
+//! let err = format("<div // a\rb\n></div>").unwrap_err();
+//! assert_eq!(err.kind(), ErrorKind::Refusal);
+//! assert_eq!(err.span(), Some(9..10));
+//! ```
+//!
 //! Every tsv language crate returns the same [`Error`]: its [`Error::kind`], its
-//! [`Error::span`] in the input's UTF-8 bytes, and [`Error::report`] in the wire's UTF-16
+//! [`Error::span`] in the input's UTF-8 bytes, and [`Error::to_report`] in the wire's UTF-16
 //! offsets and lines; one line under `{}`, the `tsv` CLI's frame under `{:#}`.
 //!
 //! ## Deep input
@@ -72,6 +83,11 @@
 
 #![warn(missing_docs)]
 
+// The README's example compiles as a doctest, so the crates.io page cannot drift.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 #[doc(hidden)]
 pub mod __private;
 #[doc(hidden)]
@@ -95,6 +111,9 @@ pub use tsv_lang::{
     Error, ErrorKind, ErrorReport, LeadingBom, LineRule, Result, STACK_SIZE, WireCoordinates,
     WirePoint, run_with_stack,
 };
+
+// `tests/public_reexports.rs` (outside this crate) names every item above through this
+// crate's path: cargo-semver-checks cannot see a dropped or demoted re-export.
 
 /// The coordinates a Svelte document's positions are reported in — Svelte's: a leading
 /// BOM **elided** (Svelte's `parse` strips it before parsing, so every offset indexes the
@@ -151,6 +170,13 @@ fn refuse_lone_cr_in_tag_line_comment(source: &str, arena: &bumpalo::Bump) -> Re
 /// Carriage returns (`\r\n` and a lone `\r`) are folded to `\n` ahead of the parse, so
 /// the output is LF-only.
 ///
+/// ```
+/// # fn main() -> tsv_svelte::Result<()> {
+/// assert_eq!(tsv_svelte::format("<p>{ x }</p>")?, "<p>{x}</p>\n");
+/// # Ok(())
+/// # }
+/// ```
+///
 /// # Errors
 ///
 /// A parse error, or a refusal of a lone `\r` inside an in-tag `//` comment, where the
@@ -185,13 +211,16 @@ pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
 /// span-only wire.
 ///
 /// ```
+/// # fn main() -> tsv_svelte::Result<()> {
 /// # #[cfg(feature = "locations")]
 /// # {
 /// use tsv_svelte::{JsonOptions, parse_to_json_with};
 ///
-/// let json = parse_to_json_with("<p>x</p>", JsonOptions::new().locations(true)).unwrap();
+/// let json = parse_to_json_with("<p>x</p>", JsonOptions::new().locations(true))?;
 /// assert!(json.contains(r#""loc":"#));
 /// assert!(json.contains(r#""name_loc":"#));
+/// # }
+/// # Ok(())
 /// # }
 /// ```
 #[cfg(feature = "json")]
@@ -243,6 +272,14 @@ const _: () = {
 /// source is read as written — no line-terminator fold — so the offsets index the caller's
 /// own text.
 ///
+/// ```
+/// # fn main() -> tsv_svelte::Result<()> {
+/// let json = tsv_svelte::parse_to_json("<p>x</p>")?;
+/// assert!(json.starts_with(r#"{"css":null,"js":[],"start":0,"end":8,"type":"Root""#));
+/// # Ok(())
+/// # }
+/// ```
+///
 /// # Errors
 ///
 /// A parse error.
@@ -255,6 +292,16 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 ///
 /// Each call parses into a fresh arena sized to the source, dropped once the wire is
 /// written.
+///
+/// ```
+/// # fn main() -> tsv_svelte::Result<()> {
+/// use tsv_svelte::{JsonOptions, parse_to_json, parse_to_json_with};
+///
+/// // the default options are `parse_to_json`'s
+/// assert_eq!(parse_to_json_with("<p>x</p>", JsonOptions::new())?, parse_to_json("<p>x</p>")?);
+/// # Ok(())
+/// # }
+/// ```
 ///
 /// # Errors
 ///

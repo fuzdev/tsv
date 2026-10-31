@@ -46,15 +46,17 @@ _internal_fanout_check = []
 # artifacts and default `tsv_debug` profile/perf builds compile all of it out.
 _internal_audits = ["_internal_swallow_check", "_internal_comment_check", "_internal_fanout_check"]
 # Shared wire-JSON writer substrate (`json_writer`), pulled in transitively by
-# each language crate's `json` feature. Off in the format-only
-# @fuzdev/tsv-format-wasm build, so `zmij` never enters that graph.
-json = ["dep:zmij"]
+# each language crate's public `json` feature. Off in the format-only
+# @fuzdev/tsv-format-wasm build, so `zmij` never enters that graph. Underscored, like
+# `_locations`, because a consumer turns them on through a language crate, never here:
+# cargo-semver-checks grades every other feature name as public API.
+_json = ["dep:zmij"]
 # The loc-bearing wire: the line table `WireTables` builds beside its map, which is the
 # only thing that makes `WirePositions::lines` non-`None`. Off in every binding (they
 # ship the span-only wire alone), so the writers' `loc` emitters compile to dead code
 # and drop out of those artifacts; `tsv_cli` (`tsv parse --locations`) and `tsv_debug`
 # turn it on through each language crate's own `locations` feature.
-locations = ["json"]
+_locations = ["_json"]
 
 [dependencies]
 smallvec.workspace = true
@@ -62,7 +64,7 @@ smallvec.workspace = true
 unicode-ident.workspace = true
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
-# Only for the `json` feature's wire-JSON writer, whose `f64` emitter formats a
+# Only for the `_json` feature's wire-JSON writer, whose `f64` emitter formats a
 # non-integral number with it, as `serde_json` does. Optional so format-only builds
 # leave it out.
 zmij = { workspace = true, optional = true }

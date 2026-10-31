@@ -133,4 +133,4 @@ The formatters are near production-ready. A long tail of rare bugs remains and A
 
 ## License
 
-[0BSD](LICENSE)
+`0BSD AND BSD-3-Clause`: tsv's own code is [0BSD](LICENSE), and the WHATWG named character reference table compiled in is BSD-3-Clause — see [NOTICE](https://github.com/fuzdev/tsv/blob/main/crates/tsv_html/NOTICE), which ships in this package.

@@ -89,7 +89,7 @@ holds two parallel per-directory layer stacks (`.gitignore` and override):
   ancestor is already known not-ignored* — a sharp contract, see Known edges.
 - `IgnoreStack::is_reincluded(path, kind)` — the per-path `!`-negation polarity
   (no ancestor prune), so a caller's heuristic can defer to an explicit re-include.
-- `IgnoreStack::negation_under(prefix) -> Option<Negation>` (`#[doc(hidden)]` with `Negation` / `NegationRule` / `NegationTail` — `tsv_discover`'s shadow-warning input, no stability promise) — every **override-layer**
+- `IgnoreStack::negation_under(prefix) -> Option<Negation>` (`#[doc(hidden)]` with `Negation` / `NegationRule` / `NegationTail` — `tsv_discover`'s shadow-warning input, outside semver) — every **override-layer**
   negation anchored *under* `prefix` (its layer anchor + leading literal segments has
   `prefix` as a prefix, and the rule reaches under it: a literal segment beyond, or a
   glob tail — `!dist/*.ts` is as inert under a pruned `dist` as `!dist/keep.ts`), as
@@ -145,6 +145,11 @@ holds two parallel per-directory layer stacks (`.gitignore` and override):
   components dropped): the unit every query splits a path into and `Exclusion`'s
   depths count in, public so a caller slicing by those depths splits the same way. A
   `Vec` rather than an iterator because every caller indexes or slices it by depth.
+
+`IgnoreStack` is `const`-asserted `Send + Sync + UnwindSafe + RefUnwindSafe`; `IgnoreSource`
+and `Exclusion` are `Hash`. **Stability** (crate docs §Stability): the public signatures follow
+0.x semver; the hidden `negation_under` / `Negation*` are tsv's plumbing, outside semver. The
+README's Rust example is a doctest (`ReadmeDoctests` in `lib.rs`).
 
 **Which** files feed the stack is the caller's choice. tsv reads `.formatignore`
 hierarchically (one override layer per directory) and, inside a git repo,

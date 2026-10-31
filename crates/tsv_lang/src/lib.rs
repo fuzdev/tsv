@@ -7,7 +7,7 @@
 //! [`LeadingBom`], and the sized-stack pair [`STACK_SIZE`] and [`run_with_stack`].
 //! Everything else here — the source spans, the doc IR, the printing helpers, the wire-JSON
 //! writer, the comment scans, the depth limits, every item hidden from these docs — and the
-//! `_internal_*` features are tsv's own plumbing for its sibling crates, which pin each other
+//! underscored features (`_json`, `_locations`, `_internal_*`) are tsv's own plumbing for its sibling crates, which pin each other
 //! exactly; they change in any release, outside semver.
 //!
 //! Part of [tsv](https://github.com/fuzdev/tsv).
@@ -19,7 +19,7 @@
 // - `WireCoordinates` / `WirePoint` - a language's position coordinates (its line rule
 //   and how it counts a leading BOM), and one position in them
 // - `WireTables` / `WirePositions` - what a wire writer emits positions from (the
-//   byte→UTF-16 map, and the line table under the `locations` feature);
+//   byte→UTF-16 map, and the line table under the `_locations` feature);
 //   `LocationMapper` - the line/column view a `loc` emitter reads from them
 // - `Error` - error types and result aliases
 // - `STACK_SIZE` / `run_with_stack` - the stack the parsers and printers are sized for,
@@ -37,7 +37,7 @@
 // - `source_scan` - trivia-aware source scanning between AST nodes
 // - `estimated_json_capacity` / `estimated_ast_arena_capacity` - pre-size heuristics
 //   for the wire-JSON output buffer and the parse-time bump arena
-// - `JsonWriter` - shared wire-JSON emission substrate (`json` feature)
+// - `JsonWriter` - shared wire-JSON emission substrate (`_json` feature)
 // - `FxHasher` / `FxHashMap` / `FxHashSet` - dep-free multiply-xor hasher for the
 //   side tables
 // - `swar` - word-at-a-time byte-search kernels shared by the line scans, the
@@ -62,7 +62,7 @@ mod escapes;
 #[doc(hidden)]
 pub mod fanout_probe;
 mod hash;
-#[cfg(feature = "json")]
+#[cfg(feature = "_json")]
 mod json_writer;
 mod location;
 mod output;
@@ -110,7 +110,7 @@ pub use depth::{
 pub use error::{Error, ErrorKind, ErrorReport, Result};
 #[doc(hidden)]
 pub use hash::{FxHashMap, FxHashSet, FxHasher};
-#[cfg(feature = "json")]
+#[cfg(feature = "_json")]
 #[doc(hidden)]
 pub use json_writer::{JsonWriter, StageRun, write_array, write_or_null};
 #[doc(hidden)]

@@ -7,26 +7,35 @@
 //! is not frozen — it changes between releases as formatting bugs are fixed.
 //!
 //! ```
-//! use tsv_css::{ErrorKind, Formatter, format};
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! use tsv_css::{Formatter, format};
 //!
-//! assert_eq!(format("a{color:red}").unwrap(), "a {\n\tcolor: red;\n}\n");
+//! assert_eq!(format("a{color:red}")?, "a {\n\tcolor: red;\n}\n");
 //! let mut formatter = Formatter::new();
-//! assert_eq!(formatter.format("b{}").unwrap(), "b {\n}\n");
-//!
-//! let err = format("a{").unwrap_err();
-//! assert_eq!(err.kind(), ErrorKind::Syntax);
-//! assert_eq!(err.span(), Some(2..2));
+//! assert_eq!(formatter.format("b{}")?, "b {\n}\n");
 //!
 //! // Parse to the wire JSON AST (the `json` feature, on by default)
 //! # #[cfg(feature = "json")]
 //! # {
-//! let json = tsv_css::parse_to_json("a{}").unwrap();
+//! let json = tsv_css::parse_to_json("a{}")?;
 //! assert!(json.starts_with(r#"{"type":"StyleSheetFile""#));
+//! # }
+//! # Ok(())
 //! # }
 //! ```
 //!
+//! A source that does not parse is an [`Error`]:
+//!
+//! ```
+//! use tsv_css::{ErrorKind, format};
+//!
+//! let err = format("a{").unwrap_err();
+//! assert_eq!(err.kind(), ErrorKind::Syntax);
+//! assert_eq!(err.span(), Some(2..2));
+//! ```
+//!
 //! Every tsv language crate returns the same [`Error`]: its [`Error::kind`], its
-//! [`Error::span`] in the input's UTF-8 bytes, and [`Error::report`] in the wire's UTF-16
+//! [`Error::span`] in the input's UTF-8 bytes, and [`Error::to_report`] in the wire's UTF-16
 //! offsets and lines; one line under `{}`, the `tsv` CLI's frame under `{:#}`.
 //!
 //! ## Deep input
@@ -65,6 +74,11 @@
 
 #![warn(missing_docs)]
 
+// The README's example compiles as a doctest, so the crates.io page cannot drift.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 #[doc(hidden)]
 pub mod __private;
 #[doc(hidden)]
@@ -92,6 +106,9 @@ pub use tsv_lang::{
     WirePoint, run_with_stack,
 };
 
+// `tests/public_reexports.rs` (outside this crate) names every item above through this
+// crate's path: cargo-semver-checks cannot see a dropped or demoted re-export.
+
 /// The coordinates a CSS document's positions are reported in — `parseCss`'s: a leading
 /// BOM **elided** (`parseCss` strips it before parsing, so every offset indexes the
 /// BOM-less string), and `\n` alone ending a line. The wire writer's tables and every
@@ -104,6 +121,13 @@ pub const WIRE_COORDINATES: WireCoordinates =
 ///
 /// Carriage returns (`\r\n` and a lone `\r`) are folded to `\n` ahead of the parse, so
 /// the output is LF-only.
+///
+/// ```
+/// # fn main() -> tsv_css::Result<()> {
+/// assert_eq!(tsv_css::format("a{color:RED}")?, "a {\n\tcolor: RED;\n}\n");
+/// # Ok(())
+/// # }
+/// ```
 ///
 /// # Errors
 ///
@@ -138,12 +162,15 @@ pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
 /// span-only wire.
 ///
 /// ```
+/// # fn main() -> tsv_css::Result<()> {
 /// # #[cfg(feature = "locations")]
 /// # {
 /// use tsv_css::{JsonOptions, parse_to_json_with};
 ///
-/// let json = parse_to_json_with("a{}", JsonOptions::new().locations(true)).unwrap();
+/// let json = parse_to_json_with("a{}", JsonOptions::new().locations(true))?;
 /// assert!(json.contains(r#""loc":"#));
+/// # }
+/// # Ok(())
 /// # }
 /// ```
 #[cfg(feature = "json")]
@@ -194,6 +221,14 @@ const _: () = {
 /// source is read as written — no line-terminator fold — so the offsets index the caller's
 /// own text.
 ///
+/// ```
+/// # fn main() -> tsv_css::Result<()> {
+/// let json = tsv_css::parse_to_json("a{}")?;
+/// assert!(json.starts_with(r#"{"type":"StyleSheetFile","start":0,"end":3,"#));
+/// # Ok(())
+/// # }
+/// ```
+///
 /// # Errors
 ///
 /// A parse error.
@@ -206,6 +241,16 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 ///
 /// Each call parses into a fresh arena sized to the source, dropped once the wire is
 /// written.
+///
+/// ```
+/// # fn main() -> tsv_css::Result<()> {
+/// use tsv_css::{JsonOptions, parse_to_json, parse_to_json_with};
+///
+/// // the default options are `parse_to_json`'s
+/// assert_eq!(parse_to_json_with("a{}", JsonOptions::new())?, parse_to_json("a{}")?);
+/// # Ok(())
+/// # }
+/// ```
 ///
 /// # Errors
 ///

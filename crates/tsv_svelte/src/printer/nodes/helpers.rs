@@ -124,7 +124,7 @@ pub(super) fn has_any_expanding_blocks(nodes: &[FragmentNode<'_>]) -> bool {
 
 /// Whether a fragment node is inline content (a non-text node that participates in fill).
 ///
-/// This is NOT the same as `!tsv_html::is_block_element` (HTML classification): a block
+/// This is NOT the same as `!tsv_html::svelte::is_block_element` (HTML classification): a block
 /// element like `<div>` is still inline *content* here. The set is elements / components /
 /// expression-or-html-or-render tags — the nodes that can break before a control-flow
 /// block. Plain text, comments, and the control-flow blocks themselves are not.

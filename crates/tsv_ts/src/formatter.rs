@@ -25,15 +25,18 @@ use tsv_lang::doc::arena::DocArena;
 /// not [`Sync`]: give each thread its own.
 ///
 /// ```
+/// # fn main() -> tsv_ts::Result<()> {
 /// use tsv_ts::{Formatter, Goal};
 ///
 /// let mut formatter = Formatter::new();
 /// for source in ["const x=42;", "let y = [1,2]"] {
-///     let formatted = formatter.format(source).unwrap();
-///     assert_eq!(formatted, tsv_ts::format(source).unwrap());
+///     let formatted = formatter.format(source)?;
+///     assert_eq!(formatted, tsv_ts::format(source)?);
 /// }
 /// assert!(formatter.format_with_goal("with (a) b;", Goal::Module).is_err());
-/// assert_eq!(formatter.format("with (a) b;").unwrap(), "with (a) b;\n");
+/// assert_eq!(formatter.format("with (a) b;")?, "with (a) b;\n");
+/// # Ok(())
+/// # }
 /// ```
 pub struct Formatter {
     ast: bumpalo::Bump,

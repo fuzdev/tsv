@@ -20,7 +20,20 @@ not here. This crate stays AST-agnostic.
 
 ## Public API
 
-- **Element classification** (`elements.rs`): `is_block_element` (the elements that render
+Two layers. The crate **root** is reserved for answers that follow the HTML spec (the
+long-term target is a spec-faithful HTML library): `optional_end_tag` + `OptionalEndTag`,
+`is_custom_element_name_char`, and `ReferenceContext` (`#[non_exhaustive]`; shared by today's
+Svelte decoder and a future spec one). The public **`svelte`** module (`src/svelte.rs`, a
+re-export list over the private `elements` / `entities` / `whitespace` files) holds the
+answers Svelte's compiler and prettier-plugin-svelte give, which tsv's Svelte support must
+reproduce exactly: the element classification, whitespace and decoder items below, each
+reachable only as `tsv_html::svelte::*`. Each item's doc says where it departs from the spec.
+
+**Stability**: the public signatures follow 0.x semver like every tsv crate (a breaking
+change only at a minor release); behavior and message wording may change in any release,
+tracking what tsv needs; `#[doc(hidden)]` items are outside semver.
+
+- **Element classification** (`elements.rs`, `svelte`): `is_block_element` (the elements that render
   a box of their own — UA `display: block`, plus `<li>` and `<table>` — as prettier-plugin-svelte
   lists them — a subset: `<center>`, `<legend>`, `<search>`, `<listing>`, `<plaintext>` and
   `<xmp>` render as blocks but format inline, as in the plugin; not HTML's "flow content",
@@ -38,10 +51,10 @@ not here. This crate stays AST-agnostic.
   `REGEX_VALID_TAG_NAME` — HTML's `PCENChar` ranges plus ASCII uppercase. Shared by `tsv_svelte`'s
   tokenizer (keep a whole custom-element name in one token) and its name
   validator (the hyphen-tail run) — one source of truth for the ranges.
-- **Whitespace** (`whitespace.rs`): `preserves_whitespace` (`<pre>`,
+- **Whitespace** (`whitespace.rs`, `svelte`): `preserves_whitespace` (`<pre>`,
   `<textarea>`) — Svelte's and prettier-plugin-svelte's set, not the HTML spec's
   `white-space: pre` rule (which also names the obsolete `listing`, `plaintext`, `xmp`).
-- **Compiler whitespace removal** (`elements.rs`): `collapses_child_whitespace`
+- **Compiler whitespace removal** (`elements.rs`, `svelte`): `collapses_child_whitespace`
   — whether inter-sibling whitespace inside an element is removed **entirely**
   by Svelte's compiler (`clean_nodes` `can_remove_entirely`) rather than
   collapsed to a rendered space; the exact Svelte set, a deliberate subset of
@@ -52,7 +65,7 @@ not here. This crate stays AST-agnostic.
   table (`<li>`, `<p>`, table parts, …), split so a parser settles whether an
   element has a row once and asks the trigger per child. Having a row at all
   is the `next` = end-of-parent answer.
-- **Entity decoding** (`entities.rs`): `decode_character_references(html, ReferenceContext) -> Cow<str>` (borrowed when nothing decodes) —
+- **Entity decoding** (`entities.rs`, `svelte`): `decode_character_references(html, ReferenceContext) -> Cow<str>` (borrowed when nothing decodes) —
   named, decimal, and hex (lower- and uppercase) character references
   with the HTML attribute-context rule and Windows-1252 / surrogate
   normalization. Svelte's decoder is the AST-parity target, so its
@@ -67,7 +80,10 @@ not here. This crate stays AST-agnostic.
   [named character references list](https://html.spec.whatwg.org/entities.json),
   name → the characters it stands for) by `deno task entities:update`. The
   generator is the `entities_table_is_fresh` unit test (`src/entities_gen.rs`),
-  which fails when the committed file is stale, so `deno task test` gates it. The
+  which fails when the committed file is stale, so `deno task test` gates it — and skips
+  (with an `eprintln!`) when `src/entities.json` is absent: the published crate excludes the
+  JSON (`exclude` in `Cargo.toml`, graded by `package:audit`), so a test run from the tarball
+  has nothing to grade the table against. The
   table is a perfect hash in `phf`'s CHD shape — a seed, a displacement pair per
   bucket, one name per slot — built with the decoder's own hash (`entity_hash` /
   `entity_slot` in `entities.rs`): one hash and one compare per lookup, hit or
@@ -78,7 +94,9 @@ not here. This crate stays AST-agnostic.
   literal would then stop compiling). The value is a `&'static str` because some
   names stand for two code points — Svelte's own table keeps only the first,
   which is one of the decoder's cataloged corrections. The list is WHATWG's
-  under CC BY 4.0 (BSD 3-Clause where incorporated into source code); `NOTICE`
+  under CC BY 4.0 (BSD 3-Clause where incorporated into source code). The crate ships
+  only the generated table, so its license is `0BSD AND BSD-3-Clause` (its own, not the
+  workspace's; every npm package states the same, `NPM_SHARED_METADATA`); `NOTICE`
   carries the attribution and both licenses, and ships in the crate — and, since
   BSD 3-Clause asks a binary distribution to carry it, in every npm package and
   every GitHub Release beside the CLI binaries (`THIRD_PARTY_NOTICE` in

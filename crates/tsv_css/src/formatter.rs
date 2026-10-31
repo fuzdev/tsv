@@ -23,13 +23,16 @@ use tsv_lang::doc::arena::DocArena;
 /// not [`Sync`]: give each thread its own.
 ///
 /// ```
+/// # fn main() -> tsv_css::Result<()> {
 /// use tsv_css::Formatter;
 ///
 /// let mut formatter = Formatter::new();
 /// for source in ["a{color:red}", "b { }"] {
-///     let formatted = formatter.format(source).unwrap();
-///     assert_eq!(formatted, tsv_css::format(source).unwrap());
+///     let formatted = formatter.format(source)?;
+///     assert_eq!(formatted, tsv_css::format(source)?);
 /// }
+/// # Ok(())
+/// # }
 /// ```
 pub struct Formatter {
     ast: bumpalo::Bump,

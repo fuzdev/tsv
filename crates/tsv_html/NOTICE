@@ -4,8 +4,8 @@ in, and with it every tsv binary, N-API addon and WebAssembly module; this notic
 with the tsv_html crate and with each tsv npm package and GitHub Release.
 
   Source:   https://html.spec.whatwg.org/entities.json
-  Files:    in the tsv_html crate, src/entities.json (the data) and
-            src/entities_table.rs (generated from it)
+  Files:    in the tsv_html crate, src/entities_table.rs (generated from the list); the
+            list itself, src/entities.json, lives in the tsv repository
   Changes:  each entry is reduced to its name without the leading `&` and the characters
             it stands for (the `codepoints` arrays are dropped), and the generated file
             restates the list as a Rust perfect hash table (each name and its characters

@@ -23,11 +23,11 @@ targets = ["x86_64-unknown-linux-gnu"]
 default = ["json"]
 # The wire-JSON layer: `parse_to_json*` and the writer behind it (`ast/convert/write/`). Off in the
 # @fuzdev/tsv-format-wasm build; on for every other consumer. Pulls in the
-# shared wire-JSON writer substrate (`tsv_lang/json`) the emitter builds on.
-json = ["tsv_lang/json"]
+# shared wire-JSON writer substrate (`tsv_lang/_json`) the emitter builds on.
+json = ["tsv_lang/_json"]
 # The loc-bearing wire (`JsonOptions::locations`) — see `tsv_lang`'s
-# `locations` feature. Off in every binding.
-locations = ["json", "tsv_lang/locations"]
+# `_locations` feature. Off in every binding.
+locations = ["json", "tsv_lang/_locations"]
 # Debug-only: exposes `debug_token_stream` for the differential lexer harness
 # (`tsv_debug lex_diff`). Off in production builds.
 _internal_debug_lex = []

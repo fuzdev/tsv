@@ -9,7 +9,7 @@
 //! ## What it mutates (safe by construction)
 //!
 //! Two site families, both confined to fragments that are **not**
-//! whitespace-significant (`<pre>`/`<textarea>`, via `tsv_html::preserves_whitespace`),
+//! whitespace-significant (`<pre>`/`<textarea>`, via `tsv_html::svelte::preserves_whitespace`),
 //! and neither ever touching a blank-line run (2+ newlines — Tier-1 significant):
 //!
 //! 1. **Between siblings** — an existing collapsible-whitespace run separating two nodes (a
@@ -405,7 +405,7 @@ fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut 
     match node {
         FragmentNode::Element(el) => {
             let tag = el.name_span.extract(src).to_ascii_lowercase();
-            let child_ws_sig = ws_sig || tsv_html::preserves_whitespace(&tag);
+            let child_ws_sig = ws_sig || tsv_html::svelte::preserves_whitespace(&tag);
             // The content boundary is render-free only outside `<pre>`/`<textarea>`, where
             // it is literal content and the dangle is mandatory.
             if !child_ws_sig {

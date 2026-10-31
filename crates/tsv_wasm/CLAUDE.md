@@ -73,10 +73,10 @@ hold — [the helper](#linecolumn-reconstruction-helper-npmlocationsjs)).
 across a worker — whose span is shaped like a wire node's. A parse failure (every family) is
 `{kind: 'parse', message, frame, start, end, loc}`: `message` the one-line summary (a line
 terminator it quotes from the source spelled `<U+XXXX>`), `frame` the
-`line:col` header with the excerpted line, then the caret line (`Error::report`'s
+`line:col` header with the excerpted line, then the caret line (`Error::to_report`'s
 `summary` / `frame` — the Rust `Error`'s full (`{:#}`) text is exactly `` `${message}\n${frame}` ``, the
 header printing `loc.start` — [docs/cli.md §Parse errors](../../docs/cli.md#parse-errors));
-`start` / `end` the UTF-16 offsets a wire node would carry (`Error::report` — a parse
+`start` / `end` the UTF-16 offsets a wire node would carry (`Error::to_report` — a parse
 error knows a point, not a span, so `end === start`), and `loc` their
 `{start: {line, column}, end: {line, column}}` under the document's line rule, so `loc` is
 `create_locator(source, {language}).loc_of(error)`. A format's refusal of a source that parses
@@ -118,7 +118,7 @@ for that case — never returned as a parse failure.
 native `@fuzdev/tsv` alone — [docs/strip.md](../../docs/strip.md)). `strip_typescript(source,
 options?)` returns `{ok: true, code}` or `{ok: false, error}`, `error.kind` `'parse'` (the error a
 parse of the source returns at the goal the error belongs to) or `'unsupported'` (`construct`,
-`message`, `frame`, `start`, `end`, `loc: {start, end}` — the refusal's `Error::report`).
+`message`, `frame`, `start`, `end`, `loc: {start, end}` — the refusal's `Error::to_report`).
 Argument misuse is still a `TypeError` (the shared `read_source` / `read_options`, whose `'strip'`
 kind takes `sourceType` as a format's does), and an engine failure with no point still throws as
 itself. The raw export is `strip_typescript(source, source_type?)` — the flat shape, its unset

@@ -272,7 +272,7 @@ feature gating the writer (`ast::convert`), the public `parse_to_json` /
 `parse_to_json_with` and the hidden span-only `__private::convert_ast_json_bytes` /
 `convert_ast_json_string`, and an opt-in `locations` feature (implying `json`) adding
 `JsonOptions::locations` and the loc-bearing `__private::convert_ast_json_bytes_with_locations` — its line table exists only under
-`tsv_lang`'s `locations`, so a build without it carries no `loc` writer at all.
+`tsv_lang`'s `_locations`, so a build without it carries no `loc` writer at all.
 `tsv_cli` (`tsv parse --locations`) and `tsv_debug` enable it; no binding does. The
 format-only WASM build (`@fuzdev/tsv-format-wasm`) declares its language deps
 `default-features = false`, excluding the wire-JSON layer at link time; the
@@ -508,7 +508,7 @@ All parsers are fail-fast. Error context is computed **once, on the error path**
 parser.parse().map_err(|e| e.with_context(source, WIRE_COORDINATES))
 ```
 
-The context holds two things. The error's **point** (`Error::wire_point`) is where it sits in the wire's coordinates — the `start` a wire node there would carry and the `loc` the document's line rule gives it ([§`loc` lines](#loc-lines-one-rule-per-document)) — and the message's `line:col` header prints it. The **excerpt** under the message is a display line, bounded by every ECMAScript terminator whatever the language and never echoing a leading BOM, with a caret padded by display width. A format entry point parses the CR-folded text, so its error is mapped back onto the caller's bytes (`FoldedSource::parse_with`): its point is in the caller's own coordinates, the one a parse at the same goal reports for the same error. The npm packages return it as the `{kind: 'parse', message, frame, start, end, loc}` error of an `{ok: false}` result — the summary and the header-excerpt-caret frame apart (`Error::report`), the point as a span whose `end` is its `start` ([docs/cli.md §Parse errors](./cli.md#parse-errors)).
+The context holds two things. The error's **point** (`Error::wire_point`) is where it sits in the wire's coordinates — the `start` a wire node there would carry and the `loc` the document's line rule gives it ([§`loc` lines](#loc-lines-one-rule-per-document)) — and the message's `line:col` header prints it. The **excerpt** under the message is a display line, bounded by every ECMAScript terminator whatever the language and never echoing a leading BOM, with a caret padded by display width. A format entry point parses the CR-folded text, so its error is mapped back onto the caller's bytes (`FoldedSource::parse_with`): its point is in the caller's own coordinates, the one a parse at the same goal reports for the same error. The npm packages return it as the `{kind: 'parse', message, frame, start, end, loc}` error of an `{ok: false}` result — the summary and the header-excerpt-caret frame apart (`Error::to_report`), the point as a span whose `end` is its `start` ([docs/cli.md §Parse errors](./cli.md#parse-errors)).
 
 ## Printer Architecture
 
@@ -639,7 +639,7 @@ lone `<CR>` in a Svelte document, the format parses the author's bytes first
 (`tsv_svelte::__private::parse_folded`, the parse every Svelte format entry point runs): their parse
 error is the format's error, and an in-tag `//` comment holding a lone `<CR>` with comment
 text after it is refused with an `Error::refusal` whose message names the `<CR>` and
-whose span (`Error::report`) is the `<CR>` — no syntax error, since the source is valid
+whose span (`Error::to_report`) is the `<CR>` — no syntax error, since the source is valid
 Svelte: the CLI prints it after `Error:` and the npm facade returns it as `kind: 'refused'`. A
 `<CR><LF>` is one line break in both readings and never refuses; a document the fold rewrote no
 lone `<CR>` in pays nothing.
@@ -693,7 +693,7 @@ tolerance.
 The writers take the line table as `Option<&LocationTracker>` inside
 `tsv_lang::WirePositions`, built at **write** time, once per document and only when `loc` is
 requested — the span-only wire builds the byte→UTF-16 map alone, and no parse path builds a
-line table at all. The table exists only under `tsv_lang`'s `locations` cargo feature, which
+line table at all. The table exists only under `tsv_lang`'s `_locations` cargo feature, which
 no binding enables, so in the bindings every `loc` emitter is dead code the optimizer
 removes ([Cargo feature surface](#cargo-feature-surface)). The fixtures pin the
 span-only wire; the definition itself is graded by
@@ -896,19 +896,26 @@ Profiling methodology — including when to reach for heap profiling — is in [
 
 ## HTML Classification (tsv_html)
 
-Pure functions for element classification, independent of any tool:
+Pure functions for element classification, independent of any tool. The crate root is reserved
+for answers that follow the HTML spec; the `svelte` module holds the answers Svelte's compiler
+and prettier-plugin-svelte give, which tsv's Svelte support must reproduce exactly:
 
 ```rust
-// Element classification
+// The crate root: spec-grounded
+pub fn optional_end_tag(name: &str) -> Option<OptionalEndTag>; // then `is_closed_by(next)`
+pub fn is_custom_element_name_char(c: char) -> bool;
+pub enum ReferenceContext { Text, AttributeValue, /* … */ }
+
+// tsv_html::svelte — element classification
 pub fn is_block_element(name: &str) -> bool;
 pub fn is_void_element(name: &str) -> bool;
 pub fn is_foreign_element(name: &str) -> bool;  // SVG/MathML
 pub fn is_svg_element(name: &str) -> bool;
 pub fn is_mathml_element(name: &str) -> bool;
 
-// Whitespace and entities
+// tsv_html::svelte — whitespace and entities
 pub fn preserves_whitespace(name: &str) -> bool;
-pub fn decode_character_references(html: &str, context: ReferenceContext) -> Cow<'_, str>; // Text | AttributeValue
+pub fn decode_character_references(html: &str, context: ReferenceContext) -> Cow<'_, str>;
 ```
 
 Inline-ness is derived by negation in consumers (`!is_block_element(...)`) — no positive inline list is exported.

@@ -1947,7 +1947,7 @@ fn write_optional_fragment(
     write_or_null(w, fragment, |w, f| write_fragment(w, f, ctx));
 }
 
-// The tests that read `name_loc` / `loc` need `tsv_lang`'s `locations` feature — on in every
+// The tests that read `name_loc` / `loc` need `tsv_lang`'s `_locations` feature — on in every
 // workspace-wide test run (`tsv_cli` and `tsv_debug` enable it), off in a bare
 // `cargo test -p tsv_svelte` — and are gated on it one by one; the rest grade the span-only
 // wire and run either way.

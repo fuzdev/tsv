@@ -738,7 +738,7 @@ impl<'arena> SpecialElementKind<'arena> {
     }
 
     /// Whether this kind's **content** prints verbatim — the whitespace-sensitive class, which
-    /// for regular elements is `tsv_html::preserves_whitespace` (`<pre>` / `<textarea>`).
+    /// for regular elements is `tsv_html::svelte::preserves_whitespace` (`<pre>` / `<textarea>`).
     ///
     /// Exactly one special kind joins it. A `TitleElement` — `<title>` as a (transparent) child
     /// of `<svelte:head>` — is compiled by visitors that walk `fragment.nodes` **directly**
@@ -1099,13 +1099,13 @@ pub(crate) fn is_component_name(name: &str) -> bool {
 }
 
 /// Whether `name` is void as Svelte's `is_void` (`utils.js`) answers it: a void HTML element
-/// (`tsv_html::is_void_element`), or a `!doctype` declaration in any ASCII case — which
+/// (`tsv_html::svelte::is_void_element`), or a `!doctype` declaration in any ASCII case — which
 /// Svelte's parser reads as an element and its compiler closes like a void one, though no
 /// element it is. The parser's element facts and the compiler's server output read this.
 pub fn is_svelte_void(name: &str) -> bool {
     // the declaration test behind its `!`, so the case-folding compare (an out-of-line call)
     // runs only for a declaration-shaped name, never for every name the element set rejects
-    tsv_html::is_void_element(name)
+    tsv_html::svelte::is_void_element(name)
         || (name.starts_with('!') && name.eq_ignore_ascii_case("!doctype"))
 }
 
@@ -1154,11 +1154,11 @@ fn name_shape(name: &str) -> NameShape {
 pub(crate) struct TagFacts(u16);
 
 impl TagFacts {
-    /// `tsv_html::is_block_element` (block-level for formatting).
+    /// `tsv_html::svelte::is_block_element` (block-level for formatting).
     const BLOCK: u16 = 1 << 0;
     /// [`is_svelte_void`] (`<br>`, `<img>`, `!doctype`).
     const VOID: u16 = 1 << 1;
-    /// `tsv_html::is_foreign_element` (SVG or MathML).
+    /// `tsv_html::svelte::is_foreign_element` (SVG or MathML).
     const FOREIGN: u16 = 1 << 2;
     /// Component-shaped name — [`is_component_name`] (Unicode-uppercase initial or a dotted member
     /// name — `Button`, `Δcomp`, `foo.bar`). Drives the `Component` element kind. A `:`-namespaced
@@ -1168,7 +1168,7 @@ impl TagFacts {
     const STYLE: u16 = 1 << 4;
     const SCRIPT: u16 = 1 << 5;
     const TEMPLATE: u16 = 1 << 6;
-    /// `tsv_html::preserves_whitespace` (`<pre>`, `<textarea>`).
+    /// `tsv_html::svelte::preserves_whitespace` (`<pre>`, `<textarea>`).
     const WS_SENSITIVE: u16 = 1 << 7;
     /// `<!DOCTYPE>`-style declaration (leading `!`), which closes with `>`, not `/>`.
     const DECLARATION: u16 = 1 << 8;
@@ -1177,10 +1177,10 @@ impl TagFacts {
     /// non-block regular element, but may still print self-closing (prettier's `didSelfClose`), so
     /// it is the third contributor to `can_self_close` alongside component and foreign.
     const NAMESPACED: u16 = 1 << 9;
-    /// `tsv_html::collapses_child_whitespace` — a whitespace-collapsing container (`<table>`,
+    /// `tsv_html::svelte::collapses_child_whitespace` — a whitespace-collapsing container (`<table>`,
     /// `<select>`, …) whose inter-sibling whitespace the compiler removes entirely.
     const WS_COLLAPSING: u16 = 1 << 10;
-    /// `tsv_html::is_line_break_element` (`<br>` alone — the element that IS a rendered line
+    /// `tsv_html::svelte::is_line_break_element` (`<br>` alone — the element that IS a rendered line
     /// break). Deliberately narrower than [`VOID`](Self::VOID): the other void elements render
     /// inline, so a `<img>`/`<input>`/`<wbr>` flows where a `<br>` owns its line.
     const LINE_BREAK: u16 = 1 << 11;
@@ -1194,13 +1194,13 @@ impl TagFacts {
     #[inline(never)]
     pub(crate) fn compute(tag_name: &str) -> Self {
         let mut bits: u16 = 0;
-        if tsv_html::is_block_element(tag_name) {
+        if tsv_html::svelte::is_block_element(tag_name) {
             bits |= Self::BLOCK;
         }
         if is_svelte_void(tag_name) {
             bits |= Self::VOID;
         }
-        if tsv_html::is_foreign_element(tag_name) {
+        if tsv_html::svelte::is_foreign_element(tag_name) {
             bits |= Self::FOREIGN;
         }
         match name_shape(tag_name) {
@@ -1217,16 +1217,16 @@ impl TagFacts {
         if tag_name == "template" {
             bits |= Self::TEMPLATE;
         }
-        if tsv_html::preserves_whitespace(tag_name) {
+        if tsv_html::svelte::preserves_whitespace(tag_name) {
             bits |= Self::WS_SENSITIVE;
         }
-        if tsv_html::collapses_child_whitespace(tag_name) {
+        if tsv_html::svelte::collapses_child_whitespace(tag_name) {
             bits |= Self::WS_COLLAPSING;
         }
         if tag_name.starts_with('!') {
             bits |= Self::DECLARATION;
         }
-        if tsv_html::is_line_break_element(tag_name) {
+        if tsv_html::svelte::is_line_break_element(tag_name) {
             bits |= Self::LINE_BREAK;
         }
         Self(bits)
@@ -2032,7 +2032,7 @@ impl Text {
 fn decode_text_data(raw: &str, context: tsv_html::ReferenceContext) -> String {
     // Owned whether or not a reference decoded: `data` is `Cow::Borrowed` exactly when
     // `data_is_raw` says so, a cheaper question than the decode.
-    tsv_html::decode_character_references(raw, context).into_owned()
+    tsv_html::svelte::decode_character_references(raw, context).into_owned()
 }
 
 /// Svelte ExpressionTag - {expression} in template
@@ -2367,8 +2367,11 @@ mod tests {
                 let expected: Cow<'_, str> = match decoding {
                     TextDecoding::Raw => Cow::Borrowed(raw),
                     _ if raw.contains('&') => Cow::Owned(
-                        tsv_html::decode_character_references(raw, decoding.reference_context())
-                            .into_owned(),
+                        tsv_html::svelte::decode_character_references(
+                            raw,
+                            decoding.reference_context(),
+                        )
+                        .into_owned(),
                     ),
                     _ => Cow::Borrowed(raw),
                 };
@@ -2389,7 +2392,7 @@ mod tests {
     }
 
     /// Svelte's `is_void` is the element set plus the `!doctype` declaration, which
-    /// `tsv_html::is_void_element` leaves out (no element) and Svelte matches in any ASCII case.
+    /// `tsv_html::svelte::is_void_element` leaves out (no element) and Svelte matches in any ASCII case.
     #[test]
     fn svelte_void_adds_the_doctype_declaration() {
         use super::is_svelte_void;
@@ -2399,7 +2402,7 @@ mod tests {
         for not_void in ["div", "BR", "doctype", "!", "!doctypex", "!DOCTYPEX"] {
             assert!(!is_svelte_void(not_void), "{not_void:?}");
         }
-        assert!(!tsv_html::is_void_element("!doctype"));
+        assert!(!tsv_html::svelte::is_void_element("!doctype"));
     }
 
     /// Grade every packed [`TagFacts`](super::TagFacts) accessor against the pure predicate it
@@ -2491,13 +2494,13 @@ mod tests {
             let facts = TagFacts::compute(tag);
             assert_eq!(
                 facts.is_block(),
-                tsv_html::is_block_element(tag),
+                tsv_html::svelte::is_block_element(tag),
                 "block: {tag:?}"
             );
             assert_eq!(facts.is_void(), is_svelte_void(tag), "void: {tag:?}");
             assert_eq!(
                 facts.is_foreign(),
-                tsv_html::is_foreign_element(tag),
+                tsv_html::svelte::is_foreign_element(tag),
                 "foreign: {tag:?}"
             );
             assert_eq!(
@@ -2528,12 +2531,12 @@ mod tests {
             assert_eq!(facts.is_template(), tag == "template", "template: {tag:?}");
             assert_eq!(
                 facts.is_ws_sensitive(),
-                tsv_html::preserves_whitespace(tag),
+                tsv_html::svelte::preserves_whitespace(tag),
                 "ws-sensitive: {tag:?}"
             );
             assert_eq!(
                 facts.collapses_child_whitespace(),
-                tsv_html::collapses_child_whitespace(tag),
+                tsv_html::svelte::collapses_child_whitespace(tag),
                 "ws-collapsing: {tag:?}"
             );
             assert_eq!(
@@ -2543,7 +2546,7 @@ mod tests {
             );
             assert_eq!(
                 facts.is_line_break(),
-                tsv_html::is_line_break_element(tag),
+                tsv_html::svelte::is_line_break_element(tag),
                 "line break: {tag:?}"
             );
         }

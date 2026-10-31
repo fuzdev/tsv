@@ -213,7 +213,7 @@ enum Repr {
     // Constructed only by `Error::refusal`. Not a located error, though it has a
     // span: see that constructor. `span` is the refused bytes in the source the refusal
     // was built over ([`Error::span`]); `start` / `end` the same two ends in its wire
-    // coordinates ([`Error::report`]).
+    // coordinates ([`Error::to_report`]).
     Refused {
         message: Box<str>,
         frame: Box<str>,
@@ -349,7 +349,7 @@ fn escape_line_terminators(summary: String) -> String {
 }
 
 /// A pointed error as a binding reports it: the summary and the frame apart, and the span
-/// in the document's wire coordinates ([`Error::report`]). The error's full message (its
+/// in the document's wire coordinates ([`Error::to_report`]). The error's full message (its
 /// `{:#}` form) is exactly `summary`, a `\n`, then `frame`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -384,8 +384,29 @@ pub struct ErrorReport {
 /// Why a parse or format produced no output — a syntax error, a depth limit, a refusal of
 /// a source that parses, or a source over the size cap ([`ErrorKind`]): what went wrong
 /// ([`Error::kind`]), where ([`Error::span`], UTF-8 byte offsets), and the pointed report a
-/// binding renders ([`Error::report`]). One pointer wide, so a `Result` carrying it costs a
+/// binding renders ([`Error::to_report`]). One pointer wide, so a `Result` carrying it costs a
 /// successful call almost nothing.
+///
+/// ```
+/// # use tsv_lang as tsv_ts;
+/// # let source = "let x = (";
+/// # let err = tsv_ts::Error::unexpected_eof(source.len())
+/// #     .with_context(source, tsv_ts::WireCoordinates::new(
+/// #         tsv_ts::LineRule::Ecmascript,
+/// #         tsv_ts::LeadingBom::Counted,
+/// #     ));
+/// use tsv_ts::ErrorKind;
+///
+/// // `err`: an end-of-file error at byte 9 of `let x = (`
+/// assert_eq!(err.kind(), ErrorKind::Syntax);
+/// assert_eq!(err.span(), Some(9..9)); // UTF-8 bytes of the caller's text
+/// assert_eq!(err.to_string(), "Unexpected end of file (1:10)");
+/// assert_eq!(format!("{err:#}"), "Unexpected end of file\n1:10 let x = (\n              ^ here");
+/// // what a binding returns: the summary and the frame apart, the points in UTF-16 units
+/// let report = err.to_report().expect("a located error reports");
+/// assert_eq!(report.summary, "Unexpected end of file");
+/// assert_eq!((report.start.offset, report.start.line, report.start.column), (9, 1, 9));
+/// ```
 ///
 /// # Equality
 ///
@@ -401,7 +422,7 @@ pub struct ErrorReport {
 /// `Unexpected end of file (3:7)`. A source over the size cap, which has no position, is
 /// the summary alone. The alternate form `{:#}` is the whole frame: the
 /// summary, a `\n`, the `line:col` header with the excerpted line, a `\n`, and the caret
-/// line — what the `tsv` CLI prints (and `summary + "\n" + frame` of [`Error::report`]).
+/// line — what the `tsv` CLI prints (and `summary + "\n" + frame` of [`Error::to_report`]).
 /// `Debug` prints the private payload's variant.
 #[derive(Clone)]
 #[repr(transparent)]
@@ -483,12 +504,16 @@ pub enum ErrorKind {
 
 impl std::error::Error for Error {}
 
-// An error crosses threads and outlives the call that made it (a worker pool's results, a
-// boxed `dyn Error`); pin that so a field added later cannot take it away unnoticed.
+// An error crosses threads, outlives the call that made it (a worker pool's results, a
+// boxed `dyn Error`) and is held across a caught panic (`catch_unwind` around a call); pin
+// that so a field added later cannot take it away unnoticed.
 const _: () = {
-    const fn assert_send_sync_static<T: Send + Sync + 'static>() {}
-    assert_send_sync_static::<Error>();
-    assert_send_sync_static::<ErrorReport>();
+    const fn assert_auto_traits<
+        T: Send + Sync + std::panic::UnwindSafe + std::panic::RefUnwindSafe + 'static,
+    >() {
+    }
+    assert_auto_traits::<Error>();
+    assert_auto_traits::<ErrorReport>();
 };
 
 /// `std::result::Result` with [`Error`] as the default error type, so a glob import
@@ -618,7 +643,7 @@ impl Error {
     }
 
     /// The error's byte range in the source the caller handed over — UTF-8 byte offsets,
-    /// not the UTF-16 wire coordinates [`Error::report`] gives. A syntax error and a depth
+    /// not the UTF-16 wire coordinates [`Error::to_report`] gives. A syntax error and a depth
     /// limit know a point, so their range is empty (`p..p`); a refusal's is the bytes it
     /// refuses; a source over the size cap has none (`None`).
     ///
@@ -660,7 +685,7 @@ impl Error {
     ///
     /// The message is rendered here, with the `line:col` header and excerpt of `start` in
     /// `source` under `coordinates` that a located error prints, so it reads like every other
-    /// error, and the span is kept ([`Error::report`]). But it is **not a syntax error** —
+    /// error, and the span is kept ([`Error::to_report`]). But it is **not a syntax error** —
     /// no [`Error::position`], no [`Error::wire_point`], [`Error::kind`]
     /// [`ErrorKind::Refusal`]: the source is not malformed (`parse` accepts it),
     /// so every surface reports it apart from a parse failure — the CLI's `Error:` prefix, the
@@ -695,8 +720,11 @@ impl Error {
     /// over the size cap ([`ErrorKind::TooLarge`]), which has no point. Every error a
     /// public parse, format or strip entry point returns is otherwise `Some`; only an error
     /// from tsv's own embedded plumbing, before its host has located it, has no frame yet.
+    ///
+    /// Each call renders the report anew (two allocated `String`s); keep the result rather
+    /// than calling it per field.
     #[must_use]
-    pub fn report(&self) -> Option<ErrorReport> {
+    pub fn to_report(&self) -> Option<ErrorReport> {
         if let Repr::Refused {
             frame, start, end, ..
         } = &self.0.kind
@@ -806,7 +834,7 @@ impl Error {
     /// the numbers its message header prints, as `line:column+1`.
     ///
     /// `None` for a source over the `u32` cap ([`ErrorKind::TooLarge`]) and for a refusal,
-    /// whose span is [`Error::report`]'s (and, as for [`Error::report`], for an error from
+    /// whose span is [`Error::to_report`]'s (and, as for [`Error::to_report`], for an error from
     /// tsv's embedded plumbing its host has not located yet, which no public entry point
     /// returns).
     #[must_use]
@@ -1283,7 +1311,7 @@ mod tests {
         assert_eq!(refusal.kind(), ErrorKind::Refusal);
         assert_eq!(refusal.span(), Some(4..5));
         assert_eq!(
-            refusal.report(),
+            refusal.to_report(),
             Some(ErrorReport {
                 summary: "no".to_owned(),
                 frame: "2:2 c\n     ^ here".to_owned(),
@@ -1314,7 +1342,7 @@ mod tests {
             ("plain", "plain"),
         ] {
             let e = Error::invalid_syntax(format!("bad '{raw}'"), 2).with_context(source, ECMA);
-            let report = e.report().expect("a filled syntax error reports");
+            let report = e.to_report().expect("a filled syntax error reports");
             assert_eq!(report.summary, format!("bad '{spelled}'"));
             assert_eq!(
                 format!("{e:#}"),
@@ -1323,11 +1351,11 @@ mod tests {
             let e = Error::unexpected_token("';'".to_string(), format!("'{raw}'"), 2)
                 .with_context(source, ECMA);
             assert_eq!(
-                e.report().expect("reports").summary,
+                e.to_report().expect("reports").summary,
                 format!("Expected ';', found '{spelled}'")
             );
             let refusal = Error::refusal(raw, source, 2, 3, LF);
-            let report = refusal.report().expect("a refusal reports");
+            let report = refusal.to_report().expect("a refusal reports");
             assert_eq!(report.summary, spelled);
             assert_eq!(
                 format!("{refusal:#}"),
@@ -1343,9 +1371,9 @@ mod tests {
     fn a_syntax_error_reports_its_summary_frame_and_point() {
         let source = "let x =\ny";
         let e = Error::unexpected_token("';'".to_string(), "'y'".to_string(), 8);
-        assert_eq!(e.report(), None);
+        assert_eq!(e.to_report(), None);
         let e = e.with_context(source, ECMA);
-        let report = e.report().expect("a filled syntax error reports");
+        let report = e.to_report().expect("a filled syntax error reports");
         assert_eq!(report.summary, "Expected ';', found 'y'");
         assert_eq!(report.frame, "2:1 y\n    ^ here");
         assert_eq!(report.start, point(8, 2, 0));
@@ -1355,7 +1383,7 @@ mod tests {
             format!("{e:#}"),
             format!("{}\n{}", report.summary, report.frame)
         );
-        assert_eq!(Error::file_too_large(5, 4).report(), None);
+        assert_eq!(Error::file_too_large(5, 4).to_report(), None);
     }
 
     /// An error raised over the folded text, unfolded, is the error a parse of the original

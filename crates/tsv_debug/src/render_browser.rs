@@ -47,7 +47,7 @@ use crate::render_normalize::{
 /// Membership asks one question — does this tag's **UA-stylesheet display**
 /// (`../html/source`, rendering section) make adjacent collapsible whitespace
 /// non-rendering? — and it must be answered UNCONDITIONALLY. That is a different
-/// question from `tsv_html::is_block_element`, the *formatting* set, and the two
+/// question from `tsv_html::svelte::is_block_element`, the *formatting* set, and the two
 /// differ in **both** directions rather than one being a subset of the other:
 ///
 /// - Here but not there: `thead`/`tbody`/`tr`/`td`/`th`. Their display is

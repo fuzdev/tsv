@@ -32,6 +32,9 @@ use std::thread;
 /// 16 MiB one in a debug build; this is the size to reserve on a thread of your own that
 /// runs tsv on input it does not control. A reservation costs address space, not memory —
 /// pages commit as they are touched.
+///
+/// The value may grow in any release, as the parsers' depth contract does: read the
+/// constant, never hard-code the number.
 pub const STACK_SIZE: usize = 32 * 1024 * 1024;
 
 /// The name of the thread [`run_with_stack`] runs on.
@@ -49,10 +52,7 @@ const THREAD_NAME: &str = "tsv";
 /// (1 MiB), or any thread whose stack you do not set. `f` runs on a scoped thread, so it
 /// may borrow from the caller, and the call returns once it has finished.
 ///
-/// A panic in `f` resumes on the calling thread (`std::panic::resume_unwind`), so a
-/// `catch_unwind` around this call sees it as it would see a panic in `f` called
-/// directly. The panic hook runs once, on the spawned thread (the default hook names it
-/// `tsv`); resuming does not run it again.
+/// A panic in `f` resumes on the calling thread (see [Panics](#panics)).
 ///
 /// ```
 /// # use tsv_lang as tsv_ts;
@@ -65,12 +65,19 @@ const THREAD_NAME: &str = "tsv";
 ///
 /// # Errors
 ///
-/// Only when the thread cannot be spawned: the OS refuses it (out of task slots, or a hard
+/// A [`std::io::Error`], only when the thread cannot be spawned: the OS refuses it (out of task slots, or a hard
 /// address-space limit), or the target has no threads at all — on `wasm32-unknown-unknown`
 /// (without the threads proposal), whose standard library cannot spawn one, every call
 /// returns `Err`. `f` has then been dropped without running; a caller that wants to fall
 /// back to the current thread keeps the work reachable outside `f` (builds it again, or
 /// hands `f` a cell it can take the work back out of).
+///
+/// # Panics
+///
+/// When `f` panics: the panic resumes on the calling thread (`std::panic::resume_unwind`),
+/// so a `catch_unwind` around this call sees it as it would see a panic in `f` called
+/// directly. The panic hook runs once, on the spawned thread (the default hook names it
+/// `tsv`); resuming does not run it again.
 pub fn run_with_stack<F, T>(f: F) -> std::io::Result<T>
 where
     F: FnOnce() -> T + Send,

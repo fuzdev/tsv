@@ -301,7 +301,7 @@ pub fn is_custom_element_name_char(c: char) -> bool {
 macro_rules! optional_end_tags {
     ($($variant:ident: $key:literal => [$($trigger:literal),+ $(,)?]),+ $(,)?) => {
         /// Which row of the table an [`OptionalEndTag`] is — one variant per key.
-        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
         enum OptionalEndTagKey {
             $($variant),+
         }
@@ -344,7 +344,7 @@ macro_rules! optional_end_tags {
 /// and `next` is either absent (the end of the parent's content / EOF — having a row at all) or
 /// one of its listed triggers ([`is_closed_by`](Self::is_closed_by)). Split in two so a parser
 /// can ask the first half once per element and the second once per child.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct OptionalEndTag(OptionalEndTagKey);
 
 // Elements whose end tag HTML lets you omit when a particular sibling or parent

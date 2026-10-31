@@ -228,7 +228,8 @@ deno task deps:audit                 # no crate meant for publishing (a `[packag
 #                                      through a normal or build edge, at any feature set or target — its workspace features
 #                                      would unify into a consumer's own `serde_json` (cargo tree, no build)
 deno task package:audit              # each publishable crate's tarball (`cargo package --list`, no build): README.md + LICENSE
-#                                      (the root's bytes) + tsv_html's NOTICE ship, no other Markdown (CLAUDE.md) does, README
+#                                      (the root's bytes) + tsv_html's NOTICE ship, tsv_html's entities.json and any other
+#                                      Markdown (CLAUDE.md) do not, the license is 0BSD (tsv_html: 0BSD AND BSD-3-Clause), README
 #                                      links absolute, `rust-version` = rust-toolchain.toml's major.minor; cargo's publishable set
 #                                      = the docs.rs-table reader's; tsv_cli's binstall table names release.yml's matrix assets
 deno task docs:audit:docsrs          # each crate with a `[package.metadata.docs.rs]` table documented ALONE at that table's
@@ -854,7 +855,7 @@ This is one instance of a broader stance: **the parser is deliberately permissiv
 
 ### Language-Level concerns (classification)
 
-HTML element classification is split between `tsv_html` — pure functions over tag names (`is_block_element()`, `is_void_element()`, `preserves_whitespace()`, and the other whitespace rules) — and thin printer adapters (`tsv_svelte/src/printer/classification/`) that resolve symbols, call tsv_html, and traverse the AST, for reuse across all planned tools (formatter, linter, compiler, LSP).
+HTML element classification is split between `tsv_html` — pure functions over tag names; its root holds the spec-grounded answers (the optional-end-tag table), its `svelte` module the Svelte- and prettier-plugin-svelte-shaped ones (`is_block_element()`, `is_void_element()`, `preserves_whitespace()`, and the other whitespace rules) — and thin printer adapters (`tsv_svelte/src/printer/classification/`) that resolve symbols, call tsv_html, and traverse the AST, for reuse across all planned tools (formatter, linter, compiler, LSP).
 
 ### AST Architecture: Internal AST vs Wire JSON
 

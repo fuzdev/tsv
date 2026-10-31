@@ -84,7 +84,7 @@ pub(crate) fn element_is_svg(name: &str, inherited: Namespace) -> bool {
     if name == "a" || name == "title" {
         inherited == Namespace::Svg
     } else {
-        tsv_html::is_svg_element(name)
+        tsv_html::svelte::is_svg_element(name)
     }
 }
 
@@ -92,7 +92,7 @@ pub(crate) fn element_is_svg(name: &str, inherited: Namespace) -> bool {
 /// mathml set matches the oracle). A thin wrapper so every classification site
 /// routes through this module and the two can never drift.
 pub(crate) fn element_is_mathml(name: &str) -> bool {
-    tsv_html::is_mathml_element(name)
+    tsv_html::svelte::is_mathml_element(name)
 }
 
 /// `(is_svg, is_mathml)` for a regular element in a fragment whose inherited

@@ -1085,7 +1085,7 @@ mod tests {
     use super::*;
 
     /// The wire variants a test runs: both, unless the build lacks the loc-bearing one
-    /// (`tsv_lang`'s `locations` feature, off in a bare `cargo test -p tsv_ts`).
+    /// (`tsv_lang`'s `_locations` feature, off in a bare `cargo test -p tsv_ts`).
     const WIRES: &[Wire] = &[
         #[cfg(feature = "locations")]
         Wire::Loc,

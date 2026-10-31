@@ -9,9 +9,9 @@
 //! field helpers, the per-language `Ctx`); only this JSON-scalar substrate is
 //! shared.
 //!
-//! Behind the `json` feature (enabled transitively by each language crate's
-//! `convert` feature) so the format-only `@fuzdev/tsv-format-wasm` build — which
-//! turns `convert` off — never links it or `zmij`.
+//! Behind the `_json` feature (enabled transitively by each language crate's
+//! public `json` feature) so the format-only `@fuzdev/tsv-format-wasm` build — which
+//! turns `json` off — never links it or `zmij`.
 //!
 //! **Escape / format parity contract**: static structure and tokens are written
 //! verbatim (debug-asserted escape-free); dynamic strings are escaped by hand,

@@ -21,6 +21,8 @@ Each `## Unreleased` section must be non-empty and carry a
 - feat: the Rust crates publish to crates.io — `cargo install --locked tsv_cli`, or
   `cargo binstall tsv_cli` for the prebuilt binary; their API is reshaped for it
   (`Error` replaces `ParseError`) and the AST is no longer part of the public API
+- chore: the npm packages declare the WHATWG named-reference table's license,
+  `0BSD AND BSD-3-Clause`
 
 - **breaking** fix: code that parsed at 0.7.1 and now rejects, as tsc does — `void` as a name
   after `new`, `@` or `extends` (`new void`), a method or accessor in an object assignment

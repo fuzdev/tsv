@@ -1,6 +1,6 @@
 //! SWAR byte-search kernels — the word-at-a-time primitives the line scans
 //! ([`crate::location`]), the width and quote scans ([`crate::printing`]), the
-//! wire-JSON escape prescan and escaper (`json_writer`, behind the `json` feature) and the
+//! wire-JSON escape prescan and escaper (`json_writer`, behind the `_json` feature) and the
 //! language lexers' token-body scans share.
 //!
 //! Every kernel here answers a question about the eight bytes packed in one
@@ -629,7 +629,7 @@ mod tests {
     /// Same, for the has-less kernel. The alphabet carries the escape prescan's
     /// `n = 0x20` boundary and the `0x80` axis a borrow must not cross, and `n`
     /// itself is swept because the guarantee is claimed for every `n <= 0x80`.
-    #[cfg(feature = "json")]
+    #[cfg(feature = "_json")]
     #[test]
     fn lanes_less_than_lowest_set_lane_is_the_first_byte_below_n() {
         for n in [0x01u8, 0x20, 0x80] {

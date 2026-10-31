@@ -40,7 +40,7 @@
 //! - **The type strip.** Every TypeScript-family input goes through `tsv_ts::strip` at
 //!   the unset-goal fallback the shipped entry points take: no panic, and on a strip,
 //!   the strip's own contract (`strip_fixtures::contract_violations` — UTF-16 length and
-//!   position identity, terminators kept), its no-copy promise, and its idempotence
+//!   position identity, terminators kept) and its idempotence
 //!   (`strip_fixtures::idempotence_failure`; a panic of its second strip is a
 //!   `strip_panic`, like one of the first). A refusal or a parse error is a verdict, not
 //!   a finding.
@@ -445,8 +445,8 @@ enum Outcome {
     /// A leg panicked (the DoS-safety violation): the parse + format leg, the
     /// `locations` wire, or the type strip.
     Panic(Leg),
-    /// The type strip produced output that breaks its own contract, its no-copy
-    /// promise, or its idempotence (the finding's detail names which).
+    /// The type strip produced output that breaks its own contract or its idempotence
+    /// (the finding's detail names which).
     StripContract,
     /// The shared F1 checks ([`f1_check`]) ran to a verdict.
     Checked(F1Outcome),
@@ -562,8 +562,8 @@ fn locations_wire(src: &str, parser: ParserType) -> bool {
 
 /// Strip `src` at the unset-goal fallback (`tsv_ts::strip`, what `tsv strip <file.ts>`
 /// and a bare `strip_typescript(source)` run) and check the output the way the strip
-/// corpus differential does (`strip --stdin`'s reply): the position contract, the
-/// no-copy promise, idempotence. Returns whether it stripped, and the finding with its
+/// corpus differential does (`strip --stdin`'s reply): the position contract and
+/// idempotence. Returns whether it stripped, and the finding with its
 /// detail: [`Outcome::StripContract`] carrying the joined breaks, or
 /// [`Outcome::Panic`] of [`Leg::Strip`] when the second strip of the idempotence check
 /// panicked (caught there, its location recorded by the capturing hook).
@@ -572,14 +572,11 @@ fn strip_check(src: &str) -> (bool, Option<(Outcome, String)>) {
     let Ok(stripped) = tsv_ts::__private::strip_in(src, None, &arena) else {
         return (false, None);
     };
-    let code = stripped.code.as_ref();
+    let code = stripped.code.as_str();
     let mut broken: Vec<String> = contract_violations(src, code)
         .into_iter()
         .map(|(check, detail)| format!("{}: {detail}", check.as_str()))
         .collect();
-    if code == src && matches!(stripped.code, std::borrow::Cow::Owned(_)) {
-        broken.push("nothing is type-only, yet the output is a copy".to_string());
-    }
     let mut outcome = Outcome::StripContract;
     if let Some(failure) = idempotence_failure(src, code) {
         if failure.is_panic() {

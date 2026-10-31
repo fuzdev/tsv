@@ -17,7 +17,7 @@ use tsv_ts::{Goal, StripError, strip, strip_with_goal};
 
 fn stripped(source: &str, goal: Goal) -> String {
     match strip_with_goal(source, goal) {
-        Ok(stripped) => stripped.code.into_owned(),
+        Ok(stripped) => stripped.code,
         Err(error) => panic!("expected {source:?} to strip at {goal:?}: {error:#}"),
     }
 }
@@ -86,8 +86,8 @@ const GOAL_CASES: [&str; 4] = [
 fn strip_is_the_unset_goal() {
     for source in GOAL_CASES {
         let arena = Bump::new();
-        let unset = strip_in(source, None, &arena).map(|s| s.code.into_owned());
-        let bare = strip(source).map(|s| s.code.into_owned());
+        let unset = strip_in(source, None, &arena).map(|s| s.code);
+        let bare = strip(source).map(|s| s.code);
         assert_eq!(unset, bare, "{source:?}");
     }
 }
@@ -99,8 +99,8 @@ fn strip_with_goal_is_the_named_goal() {
     for source in GOAL_CASES {
         for goal in [Goal::Module, Goal::Script] {
             let arena = Bump::new();
-            let named = strip_in(source, Some(goal), &arena).map(|s| s.code.into_owned());
-            let exact = strip_with_goal(source, goal).map(|s| s.code.into_owned());
+            let named = strip_in(source, Some(goal), &arena).map(|s| s.code);
+            let exact = strip_with_goal(source, goal).map(|s| s.code);
             assert_eq!(named, exact, "{source:?} at {goal:?}");
         }
     }

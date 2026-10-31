@@ -3,7 +3,7 @@
 //!
 //! Per fixture, `tsv_ts::strip` must produce the committed `expected.*` (or the refusal in
 //! `refusal.txt`), keep every surviving character's line and UTF-16 column and every line
-//! terminator, and be idempotent (stripping its output returns it borrowed). Known failures
+//! terminator, and be idempotent (stripping its output returns it unchanged). Known failures
 //! are pinned in the ratchet snapshot
 //! `crates/tsv_debug/src/cli/commands/strip_fixtures_known.txt`: a new failure fails this
 //! test, and so does a pinned one that stopped failing (re-pin with

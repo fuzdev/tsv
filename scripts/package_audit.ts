@@ -13,6 +13,9 @@
  *   `REQUIRED_NOTICE` (the third-party data they ship is attributed there) must hold one;
  * - it carries no other Markdown — no `CLAUDE.md`, no `AGENTS.md`, no stray doc — so agent
  *   notes and repo docs stay in the repository;
+ * - it carries none of the files `MUST_NOT_SHIP` names for it (`tsv_html`'s `entities.json`,
+ *   CC BY 4.0 as data, stays in the repository; the crate ships only the table generated
+ *   from it);
  * - the crate's `LICENSE` holds the root `LICENSE`'s bytes (read through the symlink each
  *   crate commits, which cargo packages as a regular file);
  * - every Markdown link in its `README.md` is absolute, since crates.io renders the README
@@ -20,7 +23,9 @@
  *
  * And from one `cargo metadata`, per crate: the `rust-version` is the toolchain
  * `rust-toolchain.toml` pins, as major.minor (the MSRV a consumer reads is the one CI
- * tests), the license is the SPDX `0BSD`, and the readme cargo resolved is `README.md`.
+ * tests), the license is the SPDX `0BSD` — or, for a crate `LICENSE_EXCEPTIONS` names, the
+ * expression it states there (`tsv_html` ships WHATWG's table under BSD-3-Clause beside
+ * tsv's 0BSD) — and the readme cargo resolved is `README.md`.
  * A crate that ships a binary (`tsv_cli`) must carry a `[package.metadata.binstall]` table
  * whose URLs name exactly the GitHub Release assets the release workflow uploads
  * (`.github/workflows/release.yml`'s build matrix, each triple's asset spelled by
@@ -62,8 +67,19 @@ const log = (...args: unknown[]) => console.error(...args);
 /** Crates whose tarball must carry a `NOTICE`, for the third-party data they ship. */
 const REQUIRED_NOTICE = ['tsv_html'];
 
-/** The SPDX license every publishable crate states. */
+/** The SPDX license every publishable crate states, unless `LICENSE_EXCEPTIONS` names it. */
 const LICENSE = '0BSD';
+
+/** The crates whose SPDX expression adds third-party code's license to tsv's own. */
+const LICENSE_EXCEPTIONS: Record<string, string> = {
+	// WHATWG's named-reference table, incorporated into source code (`src/entities_table.rs`)
+	tsv_html: '0BSD AND BSD-3-Clause'
+};
+
+/** Repository files a crate's tarball must not carry. */
+const MUST_NOT_SHIP: Record<string, Array<string>> = {
+	tsv_html: ['src/entities.json']
+};
 
 interface MetadataPackage {
 	name: string;
@@ -125,6 +141,12 @@ function grade_listing(name: string, dir: string, listing: string[]): string[] {
 		findings.push('crate holds no NOTICE, which its shipped data requires');
 	}
 	if (notice_on_disk && !files.has('NOTICE')) findings.push('tarball lacks the NOTICE');
+	for (const file of MUST_NOT_SHIP[name] ?? []) {
+		if (!existsSync(join(dir, file))) {
+			findings.push(`${file} is absent from the crate directory, so its exclusion grades nothing`);
+		}
+		if (files.has(file)) findings.push(`tarball ships ${file}, which stays in the repository`);
+	}
 	for (const file of listing) {
 		if (/\.md$/i.test(file) && file !== 'README.md') {
 			findings.push(`tarball ships ${file} (only README.md belongs in it)`);
@@ -151,8 +173,10 @@ function grade_metadata(pkg: MetadataPackage, msrv: string): string[] {
 			`rust-version is ${pkg.rust_version ?? 'unset'}, not ${msrv} (rust-toolchain.toml's channel)`
 		);
 	}
-	if (pkg.license !== LICENSE)
-		findings.push(`license is ${pkg.license ?? 'unset'}, not ${LICENSE}`);
+	const license = LICENSE_EXCEPTIONS[pkg.name] ?? LICENSE;
+	if (pkg.license !== license) {
+		findings.push(`license is ${pkg.license ?? 'unset'}, not ${license}`);
+	}
 	if (pkg.readme !== 'README.md') {
 		findings.push(`readme resolves to ${pkg.readme ?? 'nothing'}, not README.md`);
 	}

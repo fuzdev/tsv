@@ -9,6 +9,17 @@ CSS formatting and parsing to the wire JSON of Svelte's `parseCss` — part of
 - `run_with_stack` runs a call on a thread reserving `STACK_SIZE`, for a thread whose stack
   may be too small for the deepest input tsv accepts.
 
+```rust
+use tsv_css::{Formatter, format};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    assert_eq!(format("a{color:red}")?, "a {\n\tcolor: red;\n}\n");
+    let mut formatter = Formatter::new(); // warm arenas, for many sources on one thread
+    assert_eq!(formatter.format("b{margin:0}")?, "b {\n\tmargin: 0;\n}\n");
+    Ok(())
+}
+```
+
 This release exposes no AST: parsing returns the wire JSON.
 
 The formatter is non-configurable by design: Prettier's style with `printWidth` 100, tabs and
@@ -16,7 +27,7 @@ single quotes.
 
 API docs: [docs.rs/tsv_css](https://docs.rs/tsv_css).
 
-Minimum supported Rust version: 1.94. Release notes:
+Minimum supported Rust version: 1.94; raising it ships in a minor release. Release notes:
 [CHANGELOG.md](https://github.com/fuzdev/tsv/blob/main/CHANGELOG.md).
 
 License: [0BSD](https://github.com/fuzdev/tsv/blob/main/LICENSE)

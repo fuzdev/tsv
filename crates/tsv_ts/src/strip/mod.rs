@@ -60,7 +60,6 @@ mod blank;
 mod scan;
 mod walk;
 
-use std::borrow::Cow;
 use std::fmt;
 use std::ops::Range;
 
@@ -102,7 +101,7 @@ use tsv_lang::{Error, ErrorKind, ErrorReport};
 /// [`StripError::Parse`] when `source` does not parse at either goal (the error reported
 /// is the one [Goals](crate#goals) picks); [`StripError::Unsupported`] when it holds
 /// TypeScript syntax that type blanking cannot erase.
-pub fn strip(source: &str) -> Result<Stripped<'_>, StripError> {
+pub fn strip(source: &str) -> Result<Stripped, StripError> {
     strip_one_shot(source, None)
 }
 
@@ -124,13 +123,13 @@ pub fn strip(source: &str) -> Result<Stripped<'_>, StripError> {
 ///
 /// [`StripError::Parse`] when `source` does not parse at `goal`; [`StripError::Unsupported`]
 /// as [`strip`].
-pub fn strip_with_goal(source: &str, goal: crate::Goal) -> Result<Stripped<'_>, StripError> {
+pub fn strip_with_goal(source: &str, goal: crate::Goal) -> Result<Stripped, StripError> {
     strip_one_shot(source, Some(goal))
 }
 
 /// The one-shot strips' arena: a fresh one sized to the source, dropped on return — the
-/// [`Stripped`] output borrows only `source`.
-fn strip_one_shot(source: &str, goal: Option<crate::Goal>) -> Result<Stripped<'_>, StripError> {
+/// [`Stripped`] output is owned.
+fn strip_one_shot(source: &str, goal: Option<crate::Goal>) -> Result<Stripped, StripError> {
     let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
     strip_in(source, goal, &arena)
 }
@@ -145,30 +144,40 @@ fn strip_one_shot(source: &str, goal: Option<crate::Goal>) -> Result<Stripped<'_
 /// # Errors
 ///
 /// As [`strip`].
-pub fn strip_in<'s>(
-    source: &'s str,
+pub fn strip_in(
+    source: &str,
     goal: Option<crate::Goal>,
     arena: &bumpalo::Bump,
-) -> Result<Stripped<'s>, StripError> {
+) -> Result<Stripped, StripError> {
     let program = crate::__private::parse_with_goal_or_fallback(source, goal, arena)
         .map_err(StripError::Parse)?;
     let mut walk = walk::Walk::new(source, arena);
     walk.program(&program);
     let mut edits = walk.finish()?;
+    // nothing type-only: the source is the JS, copied once with no walk over the edits
     let code = if edits.is_empty() {
-        Cow::Borrowed(source)
+        source.to_owned()
     } else {
-        Cow::Owned(blank::apply(source, &mut edits))
+        blank::apply(source, &mut edits)
     };
     Ok(Stripped { code })
 }
 
 /// A successful [`strip`].
+///
+/// ```
+/// # fn main() -> Result<(), tsv_ts::StripError> {
+/// let stripped = tsv_ts::strip("function f<T>(a: T): T { return a; }")?;
+/// assert_eq!(stripped.code, "function f   (a   )    { return a; }");
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub struct Stripped<'s> {
-    /// The JS. `Cow::Borrowed(source)` when nothing is type-only: no copy.
-    pub code: Cow<'s, str>,
+pub struct Stripped {
+    /// The JS: the source with every type-only range blanked, the source itself when
+    /// nothing is type-only.
+    pub code: String,
     // TODO: `imports` — the static import and re-export specifiers the walk visits, for a
     // parallel module loader. Reserved as shape; it lands with a consumer.
 }
@@ -179,6 +188,18 @@ pub struct Stripped<'s> {
 /// Why [`strip`] produced no output. Either way the failure is a [`tsv_lang::Error`]
 /// ([`StripError::error`]), so it displays, spans and reports as every other tsv error does:
 /// one line under `{}`, the `line:col` header, excerpt and caret under `{:#}`.
+///
+/// ```
+/// use tsv_ts::{ErrorKind, StripError, UnsupportedKind, strip};
+///
+/// match strip("enum E { A }") {
+///     Err(StripError::Unsupported { kind, .. }) => assert_eq!(kind, UnsupportedKind::Enum),
+///     other => panic!("expected a refusal, got {other:?}"),
+/// }
+/// let err = strip("let x =").unwrap_err();
+/// assert!(matches!(err, StripError::Parse(_)));
+/// assert_eq!(err.kind(), ErrorKind::Syntax);
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum StripError {
@@ -291,7 +312,7 @@ impl StripError {
     }
 
     /// The failure's byte range in the source that was stripped — UTF-8 byte offsets, not
-    /// the UTF-16 wire coordinates [`StripError::report`] gives. A parse error's is
+    /// the UTF-16 wire coordinates [`StripError::to_report`] gives. A parse error's is
     /// [`Error::span`] (an empty `p..p` at a syntax error or a depth limit, `None` for a
     /// source over the size cap); a refusal's is the refused construct's bytes.
     #[must_use]
@@ -299,11 +320,11 @@ impl StripError {
         self.error().span()
     }
 
-    /// The failure as a binding reports it — [`Error::report`]: `None` only for a source
+    /// The failure as a binding reports it — [`Error::to_report`]: `None` only for a source
     /// over the size cap; a refusal always reports.
     #[must_use]
-    pub fn report(&self) -> Option<ErrorReport> {
-        self.error().report()
+    pub fn to_report(&self) -> Option<ErrorReport> {
+        self.error().to_report()
     }
 }
 
@@ -314,13 +335,17 @@ impl fmt::Display for StripError {
     }
 }
 
-// A strip's output and its failure cross threads (a loader's worker pool) and a failure
-// outlives the call (a boxed `dyn Error`); pin that so a field added later cannot take it
-// away unnoticed.
+// A strip's output and its failure cross threads (a loader's worker pool), a failure
+// outlives the call (a boxed `dyn Error`), and both are held across a caught panic
+// (`catch_unwind` around a call); pin that so a field added later cannot take it away
+// unnoticed.
 const _: () = {
-    const fn assert_send_sync_static<T: Send + Sync + 'static>() {}
-    assert_send_sync_static::<StripError>();
-    assert_send_sync_static::<Stripped<'static>>();
+    const fn assert_auto_traits<
+        T: Send + Sync + std::panic::UnwindSafe + std::panic::RefUnwindSafe + 'static,
+    >() {
+    }
+    assert_auto_traits::<StripError>();
+    assert_auto_traits::<Stripped>();
 };
 
 impl std::error::Error for StripError {
@@ -360,7 +385,7 @@ mod tests {
             "cannot strip an enum\n2:1 enum E {}\n    ^ here"
         );
         assert_eq!(error.kind(), tsv_lang::ErrorKind::Refusal);
-        let report = error.report().expect("a refusal reports");
+        let report = error.to_report().expect("a refusal reports");
         assert_eq!(report.summary, "cannot strip an enum");
         assert_eq!(report.frame, "2:1 enum E {}\n    ^ here");
         assert_eq!((report.start.line, report.start.column), (2, 0));
@@ -411,12 +436,12 @@ mod tests {
             panic!("expected a parse error: {error:?}");
         };
         assert_eq!(format!("{error:#}"), format!("{parse:#}"));
-        assert_eq!(error.report(), parse.report());
+        assert_eq!(error.to_report(), parse.to_report());
     }
 
     fn stripped(source: &str) -> String {
         match strip(source) {
-            Ok(stripped) => stripped.code.into_owned(),
+            Ok(stripped) => stripped.code,
             Err(error) => panic!("expected {source:?} to strip: {error:#}"),
         }
     }
@@ -617,7 +642,7 @@ mod tests {
             .stack_size(256 << 10)
             .spawn(move || {
                 strip(&source)
-                    .map(|stripped| stripped.code.into_owned())
+                    .map(|stripped| stripped.code)
                     .map_err(|error| format!("{error:#}"))
             })
             .expect("spawn")

@@ -10,7 +10,7 @@ it, since blanked output is no format fixed point.
 
 - `erase/` — each erasable construct, one per fixture
 - `keep/` — JS that stays: decorators, comments, TypeScript-looking JS, and
-  type-free input (the no-copy fast path)
+  type-free input (the output is the input)
 - `hazards/` — each place where pure blanking would change the parse, and the one-character
   `;` / `(` / `)` substitution that prevents it, with CR, U+2028 and U+2029 variants where a
   line break decides the hazard

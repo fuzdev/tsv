@@ -130,8 +130,19 @@
 //!   Each maximal invalid sequence is then one U+FFFD, which a `?` matches where git needs
 //!   one per byte (the per-code-point difference above), and two names that differ only
 //!   inside such a sequence read alike.
+//!
+//! ## Stability
+//!
+//! The public signatures follow 0.x semver like every tsv crate: a breaking change ships
+//! only in a minor release. The items hidden from these docs —
+//! `IgnoreStack::negation_under` and the `Negation*` types it returns — are tsv's own
+//! plumbing for `tsv_discover`, outside semver.
 
 #![warn(missing_docs)]
+// The README's example compiles as a doctest, so the crates.io page cannot drift.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
 
 mod glob;
 
@@ -316,6 +327,26 @@ impl IgnoreRules {
 /// re-include a file whose parent directory is excluded" rule. The gitignore-only
 /// behavior is byte-for-byte `git check-ignore` on case-sensitive filesystems, less
 /// the [differences](crate#differences-from-git) the crate docs list.
+///
+/// Why a path is ignored, and which file says so, is [`exclusion`](Self::exclusion):
+///
+/// ```
+/// use tsv_ignore::{IgnoreSource, IgnoreStack, PathKind};
+///
+/// let mut stack = IgnoreStack::new();
+/// stack.push_gitignore("", "dist/\n");
+/// stack.push_formatignore("src", "*.gen.ts\n");
+///
+/// // `dist/` excludes the directory, so the whole path is out of scope from depth 1
+/// let exclusion = stack.exclusion("dist/app.js", PathKind::File).unwrap();
+/// assert_eq!((exclusion.depth, exclusion.anchor_depth), (1, 0));
+/// assert_eq!(exclusion.source, IgnoreSource::Gitignore);
+///
+/// // `src/.formatignore` excludes the file itself
+/// let exclusion = stack.exclusion("src/a.gen.ts", PathKind::File).unwrap();
+/// assert_eq!(exclusion.source.file_name(), ".formatignore");
+/// assert_eq!(stack.exclusion("src/a.ts", PathKind::File), None);
+/// ```
 #[derive(Debug, Default, Clone)]
 pub struct IgnoreStack {
     /// `.gitignore` layers in shallow→deep push order.
@@ -325,6 +356,16 @@ pub struct IgnoreStack {
     /// every `.gitignore`.
     overrides: Vec<Layer>,
 }
+
+// A stack is plain data a caller may share across threads and hold across a caught panic (a
+// discovery worker pool); pin that so a field added later cannot take it away unnoticed.
+const _: () = {
+    const fn assert_auto_traits<
+        T: Send + Sync + std::panic::UnwindSafe + std::panic::RefUnwindSafe,
+    >() {
+    }
+    assert_auto_traits::<IgnoreStack>();
+};
 
 /// One directory's ignore file within an [`IgnoreStack`] — a `.gitignore` or an
 /// override file, anchored at the directory it was read from.
@@ -389,6 +430,11 @@ impl IgnoreStack {
     /// anchor depth (debug builds assert it). The layer classifies what is BELOW `anchor`,
     /// never the `anchor` directory itself — its parent's rules do — so a walk asks about a
     /// directory before pushing its layers ([A walk](crate#a-walk)).
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, when a `.gitignore` layer is already pushed in a directory below
+    /// `anchor` (the push order above is broken).
     pub fn push_gitignore(&mut self, anchor: &str, content: &str) {
         let layer = Layer::new(anchor, content, IgnoreSource::Gitignore);
         debug_assert_pushed_in_order(&self.gitignore, &layer);
@@ -405,6 +451,11 @@ impl IgnoreStack {
     /// `.gitignore`. `anchor` is the directory relative to the format root,
     /// `/`-separated (empty string = the root). It **must** be pushed after every
     /// ancestor directory's override layer: precedence is push order, not anchor depth.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, when an override layer is already pushed in a directory below
+    /// `anchor` (the push order above is broken).
     pub fn push_formatignore(&mut self, anchor: &str, content: &str) {
         self.push_override(anchor, content, IgnoreSource::Formatignore);
     }
@@ -415,6 +466,11 @@ impl IgnoreStack {
     /// file a diagnostic names ([`Exclusion::source`],
     /// [`override_layer_source`](Self::override_layer_source)). The same order rule holds:
     /// it **must** be pushed after every ancestor directory's override layer.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, when an override layer is already pushed in a directory below
+    /// `anchor` (the push order above is broken).
     pub fn push_prettierignore(&mut self, anchor: &str, content: &str) {
         self.push_override(anchor, content, IgnoreSource::Prettierignore);
     }
@@ -690,7 +746,7 @@ impl PathKind {
 /// override layer, which is read after every `.gitignore`, while an override layer's own
 /// rule is the user's to narrow.
 #[non_exhaustive]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum IgnoreSource {
     /// A `.gitignore` ([`IgnoreStack::push_gitignore`]).
     Gitignore,
@@ -713,7 +769,7 @@ impl IgnoreSource {
 
 /// Where [`IgnoreStack::exclusion`] found a path ignored. Both depths count the queried
 /// path's segments as [`split_segments`] splits it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct Exclusion {
     /// How many leading segments name the excluded path: all of them when a rule excluded

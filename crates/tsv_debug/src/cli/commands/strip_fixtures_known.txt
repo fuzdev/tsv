@@ -7,7 +7,6 @@
 #
 # Checks: OUTPUT (the output differs from expected.*), REFUSAL (no refusal, or the wrong
 # kind or span), PARSE (tsv's parser rejects the input), POSITIONS / TERMINATORS (the
-# output breaks the position contract), IDEMPOTENCE (stripping the output changes it, or
-# copies), BORROWED (a type-free input was copied). A broken fixture (FIXTURE) and a
-# PANIC are never pinned.
+# output breaks the position contract), IDEMPOTENCE (stripping the output changes it). A
+# broken fixture (FIXTURE) and a PANIC are never pinned.
 # shapes: 0

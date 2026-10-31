@@ -43,7 +43,6 @@
 //! range or at a hazard site, so deleted JS or a misplaced `;` passes it and is
 //! caught only by the comparison with the expected output.
 
-use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::fs;
 use std::ops::Range;
@@ -97,9 +96,8 @@ const SNAPSHOT_HEADER: &str = "\
 #
 # Checks: OUTPUT (the output differs from expected.*), REFUSAL (no refusal, or the wrong
 # kind or span), PARSE (tsv's parser rejects the input), POSITIONS / TERMINATORS (the
-# output breaks the position contract), IDEMPOTENCE (stripping the output changes it, or
-# copies), BORROWED (a type-free input was copied). A broken fixture (FIXTURE) and a
-# PANIC are never pinned.
+# output breaks the position contract), IDEMPOTENCE (stripping the output changes it). A
+# broken fixture (FIXTURE) and a PANIC are never pinned.
 ";
 
 /// A discovered strip fixture.
@@ -218,14 +216,12 @@ pub enum StripCheck {
     Positions,
     /// The output moved, dropped, or invented a line terminator.
     Terminators,
-    /// Stripping the output again changes it, or copies it.
+    /// Stripping the output again changes it.
     Idempotence,
-    /// A type-free input came back copied rather than borrowed.
-    Borrowed,
 }
 
 impl StripCheck {
-    const ALL: [Self; 9] = [
+    const ALL: [Self; 8] = [
         Self::Fixture,
         Self::Panic,
         Self::Parse,
@@ -234,7 +230,6 @@ impl StripCheck {
         Self::Positions,
         Self::Terminators,
         Self::Idempotence,
-        Self::Borrowed,
     ];
 
     /// The snapshot spelling.
@@ -248,7 +243,6 @@ impl StripCheck {
             Self::Positions => "POSITIONS",
             Self::Terminators => "TERMINATORS",
             Self::Idempotence => "IDEMPOTENCE",
-            Self::Borrowed => "BORROWED",
         }
     }
 
@@ -473,18 +467,12 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
             );
         }
         (Claim::Expected(expected), Ok(stripped)) => {
-            let code = stripped.code.as_ref();
+            let code = stripped.code.as_str();
             if code != expected {
                 push(StripCheck::Output, first_difference(expected, code));
             }
             for (check, detail) in contract_violations(&input, code) {
                 push(check, detail);
-            }
-            if *expected == input && matches!(stripped.code, Cow::Owned(_)) {
-                push(
-                    StripCheck::Borrowed,
-                    "nothing is type-only, yet the output is a copy".to_string(),
-                );
             }
             match idempotence_failure(&input, code) {
                 Some(failure) if failure.is_panic() => {
@@ -628,7 +616,7 @@ fn divergences_failure(content: &str) -> Option<String> {
     seen.is_empty().then(|| "empty".to_string())
 }
 
-/// Why stripping a strip's output again is not the identity on a borrowed source.
+/// Why stripping a strip's output again is not the identity.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IdempotenceFailure {
     /// The second strip panicked: [`caught_panic_report`]'s text, with the location under
@@ -636,8 +624,6 @@ pub enum IdempotenceFailure {
     Panicked(String),
     /// The second strip failed (a parse error or a refusal).
     Fails(String),
-    /// The second strip copied the output unchanged (type syntax survived?).
-    Copies,
     /// The second strip changed the output, outside what [`only_reread_type_arguments`]
     /// excuses; the first difference.
     Changes(String),
@@ -655,14 +641,12 @@ impl std::fmt::Display for IdempotenceFailure {
         match self {
             Self::Panicked(report) => write!(f, "stripping the output panicked: {report}"),
             Self::Fails(error) => write!(f, "stripping the output fails: {error}"),
-            Self::Copies => f.write_str("stripping the output copies it (type syntax survived?)"),
             Self::Changes(difference) => write!(f, "stripping the output changes it: {difference}"),
         }
     }
 }
 
-/// Why stripping `code` — the strip of `input` — again is not the identity on a borrowed
-/// source, if it is not.
+/// Why stripping `code` — the strip of `input` — again is not the identity, if it is not.
 ///
 /// One re-strip difference is excused: the JS/TS ambiguity of `<`. The output is JS, yet
 /// the second strip reads it as TypeScript, where a comparison pair may read as a
@@ -680,12 +664,14 @@ pub fn idempotence_failure(input: &str, code: &str) -> Option<IdempotenceFailure
             payload.as_ref(),
         ))),
         Ok(Err(e)) => Some(IdempotenceFailure::Fails(format!("{e:#}"))),
-        Ok(Ok(again)) => match again.code {
-            Cow::Borrowed(_) => None,
-            Cow::Owned(again) if again == code => Some(IdempotenceFailure::Copies),
-            Cow::Owned(again) if only_reread_type_arguments(input, code, &again) => None,
-            Cow::Owned(again) => Some(IdempotenceFailure::Changes(first_difference(code, &again))),
-        },
+        Ok(Ok(again)) => {
+            let again = again.code;
+            if again == code || only_reread_type_arguments(input, code, &again) {
+                None
+            } else {
+                Some(IdempotenceFailure::Changes(first_difference(code, &again)))
+            }
+        }
     }
 }
 

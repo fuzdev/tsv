@@ -23,13 +23,16 @@ use tsv_lang::doc::arena::DocArena;
 /// not [`Sync`]: give each thread its own.
 ///
 /// ```
+/// # fn main() -> tsv_svelte::Result<()> {
 /// use tsv_svelte::Formatter;
 ///
 /// let mut formatter = Formatter::new();
 /// for source in ["<p>x</p>", "<div  class=\"a\">y</div>"] {
-///     let formatted = formatter.format(source).unwrap();
-///     assert_eq!(formatted, tsv_svelte::format(source).unwrap());
+///     let formatted = formatter.format(source)?;
+///     assert_eq!(formatted, tsv_svelte::format(source)?);
 /// }
+/// # Ok(())
+/// # }
 /// ```
 pub struct Formatter {
     ast: bumpalo::Bump,

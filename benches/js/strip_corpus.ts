@@ -13,12 +13,12 @@
  *
  * **tsv's side** is one `tsv_debug strip --stdin` process (the `--profile corpus` build
  * `deno task build:check` makes, so a panic is caught and answered as one), which also grades
- * what needs tsv to grade: the position contract, idempotence, and the no-copy promise (the
- * command's module doc, `crates/tsv_debug/src/cli/commands/strip.rs`).
+ * what needs tsv to grade: the position contract and idempotence (the command's module doc,
+ * `crates/tsv_debug/src/cli/commands/strip.rs`).
  *
  * **Per file**, failing the run:
  *
- * - a panic, a tsv parse error, or a contract / idempotence / copy finding — never accepted;
+ * - a panic, a tsv parse error, or a contract / idempotence finding — never accepted;
  * - TypeScript's parser reporting a diagnostic, since ts-blank-space then grades nothing;
  * - an output that is not a JS module under oxc-parser in JS mode, semantic errors included;
  * - an output that is not ts-blank-space's byte for byte (the fixtures' derivation:

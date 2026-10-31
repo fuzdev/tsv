@@ -896,8 +896,9 @@ pkg.keywords = [
 	'webassembly'
 ];
 // The registry-identity fields shared with the N-API set (license included —
-// wasm-pack derives the same 0BSD from Cargo.toml, but the module is the
-// authority so every published tsv package presents identically).
+// wasm-pack derives 0BSD from tsv_wasm's Cargo.toml, but the bundle also compiles
+// in tsv_html's BSD-3-Clause table, and the module is the authority so every
+// published tsv package presents identically).
 Object.assign(pkg, NPM_SHARED_METADATA);
 // wasm-pack emits `sideEffects: ["./snippets/*"]`, declaring index.js
 // side-effect-free — but its top-level readFileSync + initSync IS the side

@@ -18,7 +18,7 @@ const SPAN_JSON_BYTES_PER_SOURCE_BYTE: usize = 12;
 /// (`tsv parse --locations`): the per-node `loc` object roughly doubles the wire
 /// (median ~17x TypeScript, ~19x Svelte over the same snapshot), so 20 covers the
 /// typical file and the high-ratio outliers pay one doubling.
-#[cfg(feature = "locations")]
+#[cfg(feature = "_locations")]
 const LOC_JSON_BYTES_PER_SOURCE_BYTE: usize = 20;
 
 /// Pre-size estimate for a document's compact wire-JSON output on `wire`.
@@ -30,7 +30,7 @@ const LOC_JSON_BYTES_PER_SOURCE_BYTE: usize = 20;
 pub fn estimated_json_capacity(source_len: usize, wire: Wire) -> usize {
     let per_byte = match wire {
         Wire::Span => SPAN_JSON_BYTES_PER_SOURCE_BYTE,
-        #[cfg(feature = "locations")]
+        #[cfg(feature = "_locations")]
         Wire::Loc => LOC_JSON_BYTES_PER_SOURCE_BYTE,
     };
     source_len.saturating_mul(per_byte).max(128)

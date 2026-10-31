@@ -7,10 +7,14 @@ authors.workspace = true
 description = "HTML element classification, whitespace rules and character-reference decoding, as Svelte reads HTML (support crate for tsv)"
 categories = ["development-tools", "parser-implementations", "web-programming"]
 keywords = ["html", "svelte", "entities", "whitespace"]
-license.workspace = true
+# The named-reference table (`src/entities_table.rs`) is WHATWG's list incorporated into source
+# code, which WHATWG licenses under BSD-3-Clause; the rest is tsv's 0BSD. NOTICE carries both.
+license = "0BSD AND BSD-3-Clause"
 repository.workspace = true
-# This crate's agent notes stay in the repository; `deno task package:audit` grades the tarball.
-exclude = ["CLAUDE.md"]
+# The agent notes stay in the repository, and so does the generator's input `src/entities.json`
+# (CC BY 4.0 as data; the crate ships only the generated table). `deno task package:audit`
+# grades the tarball.
+exclude = ["CLAUDE.md", "src/entities.json"]
 
 [package.metadata.docs.rs]
 # docs.rs builds this crate alone, at its default features; `deno task docs:audit:docsrs`

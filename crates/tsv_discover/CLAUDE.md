@@ -18,6 +18,10 @@ The three discovery surfaces — the native CLI (`tsv_cli`), the WASM CLI
 reimplementing the decision, so they agree **by construction** rather than by
 hand-mirrored constants and templates (the drift here caused real extension bugs).
 
+**Published for tsv's own tools.** Its public signatures follow 0.x semver like every tsv
+crate (a breaking change only at a minor release); the verdicts and the warnings' wording
+track `tsv format` and may change in any release; `#[doc(hidden)]` items are outside semver.
+
 ## Architecture Position
 
 Depends only on [`tsv_ignore`](../tsv_ignore/CLAUDE.md) (the matcher) — **no other

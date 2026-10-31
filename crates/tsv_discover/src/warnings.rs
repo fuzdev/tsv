@@ -245,7 +245,7 @@ enum Opening {
 /// reads them under — what [`prettierignore_outside_repo_warning`] and
 /// [`prettierignore_shadowed_warning`] decide over. Presence only: the caller learns it
 /// from the directory listing it already holds.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct DirIgnoreFiles {
     /// The walk is inside a git repo (where `.prettierignore` is read hierarchically).
     pub in_repo: bool,
