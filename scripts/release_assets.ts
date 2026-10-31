@@ -44,7 +44,7 @@
 
 import { parseArgs } from 'node:util';
 
-import { cli_binary_name } from './napi_host.ts';
+import { cli_binary_name, release_asset_name } from './napi_host.ts';
 import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import { command_capture } from './release/command.ts';
 import { version_from_tag } from './release/version.ts';
@@ -136,10 +136,7 @@ const collect = async (): Promise<void> => {
 				);
 			}
 			const binary = cli_binary_name(triple);
-			// the asset is the binary's own name with the triple spliced in, so the
-			// two keep one extension rule: `tsv` → `tsv-linux-x64-gnu`, `tsv.exe` →
-			// `tsv-win32-x64.exe`
-			const asset = binary.replace(/^tsv/, `tsv-${triple}`);
+			const asset = release_asset_name(triple);
 
 			const packed = JSON.parse(
 				await capture_npm(['pack', `${pkg}@${version}`, '--pack-destination', pack_dir, '--json'])

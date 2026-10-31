@@ -15,6 +15,32 @@ exclude = ["CLAUDE.md"]
 # platform-gated lines need no page of their own.
 targets = ["x86_64-unknown-linux-gnu"]
 
+# `cargo binstall tsv_cli` fetches the prebuilt `tsv` binary from the version's GitHub Release
+# (the assets the release workflow uploads, named by npm triple — hence an override per Rust
+# target). The musl asset links musl dynamically, so it stays unmapped (binstall also tries a
+# musl target as a glibc host's fallback, where it could not start); every unmapped target
+# builds from source rather than from a third-party build. `deno task package:audit` grades
+# this table against the workflow's matrix.
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/tsv-{ target }{ binary-ext }"
+pkg-fmt = "bin"
+disabled-strategies = ["quick-install"]
+
+[package.metadata.binstall.overrides.x86_64-unknown-linux-gnu]
+pkg-url = "{ repo }/releases/download/v{ version }/tsv-linux-x64-gnu"
+
+[package.metadata.binstall.overrides.aarch64-unknown-linux-gnu]
+pkg-url = "{ repo }/releases/download/v{ version }/tsv-linux-arm64-gnu"
+
+[package.metadata.binstall.overrides.aarch64-apple-darwin]
+pkg-url = "{ repo }/releases/download/v{ version }/tsv-darwin-arm64"
+
+[package.metadata.binstall.overrides.x86_64-apple-darwin]
+pkg-url = "{ repo }/releases/download/v{ version }/tsv-darwin-x64"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-url = "{ repo }/releases/download/v{ version }/tsv-win32-x64.exe"
+
 [[bin]]
 name = "tsv"
 path = "src/main.rs"

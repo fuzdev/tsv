@@ -137,6 +137,10 @@ a build provenance attestation (`gh attestation verify tsv-linux-x64-gnu -R fuzd
 The checksum file and the attestation are this channel's whole integrity story;
 it has no signed release log of its own.
 
+With [cargo-binstall](https://github.com/cargo-bins/cargo-binstall),
+`cargo binstall tsv_cli` installs that same prebuilt binary from the GitHub Release
+matching the crates.io version (Linux x64 and arm64 gnu, glibc 2.28 or newer; macOS arm64
+and x64; Windows x64); any other target, musl included, falls back to a source build.
 From crates.io, `cargo install --locked tsv_cli` builds the same `tsv` binary from source
 (the crate is `tsv_cli`; the `tsv` crate on crates.io is an unrelated project).
 That build doesn't get the release profile the prebuilt binaries ship with

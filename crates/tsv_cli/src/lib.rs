@@ -3,11 +3,12 @@
 //!
 //! Install with `cargo install --locked tsv_cli` (the binary is `tsv`), or take the prebuilt
 //! binary from the `@fuzdev/tsv` npm package or a
-//! [GitHub Release](https://github.com/fuzdev/tsv/releases). A build from crates.io does not
-//! get the profile the prebuilt binaries ship with (a workspace's profiles do not travel
-//! with a published crate), so it has no LTO and unwinds on a panic: it runs slower, and an
-//! internal panic while formatting files is reported as that file's error rather than
-//! aborting the run. Usage: `tsv --help`, and the
+//! [GitHub Release](https://github.com/fuzdev/tsv/releases) — `cargo binstall tsv_cli` fetches
+//! the Release's binary for the installing target, building from source where none ships. A
+//! build from crates.io does not get the profile the prebuilt binaries ship with (a
+//! workspace's profiles do not travel with a published crate), so it has no LTO and unwinds
+//! on a panic: it runs slower, and an internal panic while formatting files is reported as
+//! that file's error rather than aborting the run. Usage: `tsv --help`, and the
 //! [README](https://github.com/fuzdev/tsv#readme).
 //!
 //! **The library target is the CLI's internals**, shared with tsv's dev tooling (its input

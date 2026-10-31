@@ -21,6 +21,11 @@
  * And from one `cargo metadata`, per crate: the `rust-version` is the toolchain
  * `rust-toolchain.toml` pins, as major.minor (the MSRV a consumer reads is the one CI
  * tests), the license is the SPDX `0BSD`, and the readme cargo resolved is `README.md`.
+ * A crate that ships a binary (`tsv_cli`) must carry a `[package.metadata.binstall]` table
+ * whose URLs name exactly the GitHub Release assets the release workflow uploads
+ * (`.github/workflows/release.yml`'s build matrix, each triple's asset spelled by
+ * `release_asset_name`), every shipped triple but the dynamically-linked musl one mapped from
+ * its Rust target (`scripts/release/binstall.ts`); a crate with no binary carries none.
  * The same read cross-checks the publishable set: the members cargo would publish
  * (`publish` unset) must be exactly the crates `docsrs_crates.ts` lists, so the regex
  * reader the other gates share cannot drift from cargo's own reading.
@@ -46,6 +51,11 @@ import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { docs_rs_crates } from './docsrs_crates.ts';
+import {
+	binstall_findings,
+	type BinstallMetadata,
+	workflow_release_triples
+} from './release/binstall.ts';
 
 const log = (...args: unknown[]) => console.error(...args);
 
@@ -62,7 +72,13 @@ interface MetadataPackage {
 	rust_version: string | null;
 	license: string | null;
 	readme: string | null;
+	repository: string | null;
+	targets: Array<{ kind: Array<string> }>;
+	metadata: { binstall?: BinstallMetadata } | null;
 }
+
+/** The workflow whose GitHub Release carries the binaries `cargo binstall` fetches. */
+const RELEASE_WORKFLOW = '.github/workflows/release.yml';
 
 function cargo(args: string[]): { status: number; stdout: string } {
 	const result = spawnSync('cargo', args, {
@@ -158,6 +174,7 @@ function run(): never {
 	}
 	const packages: MetadataPackage[] = JSON.parse(metadata.stdout).packages;
 	const by_name = new Map(packages.map((p) => [p.name, p]));
+	const release_triples = workflow_release_triples(readFileSync(RELEASE_WORKFLOW, 'utf8'));
 
 	let failed = 0;
 
@@ -191,11 +208,29 @@ function run(): never {
 		}
 		const listing = list.stdout.split('\n').filter((line) => line !== '');
 		const findings = [...grade_listing(c.name, dir, listing), ...grade_metadata(pkg, msrv)];
+		// a crate shipping a binary must let `cargo binstall` find the Release's prebuilt one
+		const ships_bin = pkg.targets.some((t) => t.kind.includes('bin'));
+		if (ships_bin) {
+			for (const finding of binstall_findings(
+				pkg.metadata?.binstall,
+				pkg.repository,
+				release_triples
+			)) {
+				findings.push(`binstall: ${finding}`);
+			}
+		} else if (pkg.metadata?.binstall !== undefined) {
+			findings.push('binstall: a [package.metadata.binstall] table on a crate with no binary');
+		}
 		if (findings.length > 0) {
 			failed++;
 			for (const finding of findings) log(`✗ ${c.name}: ${finding}`);
 		} else {
-			log(`✓ ${c.name}: ${listing.length} file(s), README + LICENSE, rust-version ${msrv}`);
+			const binstall = pkg.metadata?.binstall
+				? `, binstall over ${release_triples.length} release triple(s)`
+				: '';
+			log(
+				`✓ ${c.name}: ${listing.length} file(s), README + LICENSE, rust-version ${msrv}${binstall}`
+			);
 		}
 	}
 	if (failed > 0) {

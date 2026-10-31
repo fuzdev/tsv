@@ -41,6 +41,12 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
   attestation (`gh attestation verify <file> -R fuzdev/tsv`). The checksum file
   and the attestation are this channel's whole integrity story; it has no
   signed release log of its own.
+- **`tsv` via `cargo binstall tsv_cli`**: the GitHub Release asset above, chosen by
+  the installing machine's Rust target (`tsv_cli`'s `[package.metadata.binstall]` maps
+  each one the release ships to its asset); the musl asset is left unmapped (it links
+  musl dynamically, and binstall also tries a musl target as a glibc host's fallback,
+  where it could not start), so a musl target, like any target with no asset, builds
+  from source as below, never from a third-party prebuilt.
 - **`tsv` from crates.io (`cargo install --locked tsv_cli`)**: the same source,
   built on the installing machine. A workspace's `[profile]` tables do not travel
   with a published crate, so this build takes cargo's default `release` profile

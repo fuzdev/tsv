@@ -34,7 +34,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
 | [docs.rs build](#docsrs-build-audit-docsauditdocsrs) | `docs:audit:docsrs` | a crate meant for docs.rs whose own doc build fails at its docs.rs feature set or at its defaults — a link to an item behind a feature that build leaves off, which the all-features workspace build resolves; a public item's doc linking a private item; a dead render — a link to a hidden item, which resolves but renders a dead `#anchor` or inert bracketed code | `deno task check` |
 | [Published deps](#published-graph-dependency-audit-depsaudit) | `deps:audit` | a crate meant for publishing reaching `serde_json` through a normal or build dependency, at any feature set or target — the workspace entry's features would unify into a consumer's own `serde_json` and change how it deserializes | `deno task check` |
-| [Package contents](#package-contents-audit-packageaudit) | `package:audit` | a crate meant for publishing whose crates.io tarball lacks its `README.md`, `LICENSE` (the root's bytes) or a required `NOTICE`, ships any other Markdown (`CLAUDE.md`), links relatively from its README, or states a `rust-version` other than the pinned toolchain's major.minor — plus cargo's publishable set drifting from the shared reader's | `deno task check` |
+| [Package contents](#package-contents-audit-packageaudit) | `package:audit` | a crate meant for publishing whose crates.io tarball lacks its `README.md`, `LICENSE` (the root's bytes) or a required `NOTICE`, ships any other Markdown (`CLAUDE.md`), links relatively from its README, or states a `rust-version` other than the pinned toolchain's major.minor — plus cargo's publishable set drifting from the shared reader's, and a binary crate's binstall table naming an asset the release workflow does not upload (or missing a shipped target) | `deno task check` |
 | [Crates publish rehearsal](#crates-publish-rehearsal-publishcrates) | `publish:crates` · `publish:crates:package` | a publishable crate that does not build ALONE from its tarball against its siblings' tarballs (what workspace feature unification hides); with the public-API gate, a crate whose public API breaks its published baseline at the level the version change states — a crate with no published baseline is SKIPPED loudly, never passed | CI's `artifacts` job (`publish:crates:package`, every commit); the release workflow's `crates` job (the full dry run: tag, dispatch, weekly) |
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
 | [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `deno task bench:install`, so NOT in `deno task check`) |
@@ -1226,7 +1226,15 @@ listing names `src/lib.rs`, so an empty listing never reads as a pass. Every lin
 README is absolute, since crates.io renders it away from the repository. From the resolved
 manifests: each crate's `rust-version` is the major.minor of the channel `rust-toolchain.toml`
 pins (the MSRV a consumer reads is the toolchain CI tests), its license is `0BSD`, and the
-readme cargo resolved is `README.md`.
+readme cargo resolved is `README.md`. A crate that ships a binary (`tsv_cli`) carries a
+`[package.metadata.binstall]` table that `cargo binstall` can resolve to the version's GitHub
+Release: a bare-binary format, the third-party quick-install source disabled, and one override
+per Rust target whose URL names exactly the asset the release workflow uploads for that
+target's triple — the triples read from `.github/workflows/release.yml`'s build matrix, the
+asset spelled by `release_asset_name` (`scripts/napi_host.ts`, the function
+`scripts/release_assets.ts` names the assets with), the dynamically-linked musl triple
+deliberately unmapped (`scripts/release/binstall.ts`; unit-tested in `test:deno`). A crate
+with no binary carries no such table.
 
 **Which crates.** The members with a `[package.metadata.docs.rs]` table
 (`scripts/docsrs_crates.ts`, the reader `deps:audit` and `docs:audit:docsrs` share). The same
@@ -1239,7 +1247,9 @@ sources — `cargo publish --workspace --dry-run --locked` does both
 ([`publish:crates`](#crates-publish-rehearsal-publishcrates), which needs the network, so it
 gates in CI rather than in `check`). A symlinked `LICENSE` that a checkout without symlink support turns into a text file fails
 the content compare on that machine only. It grades that a README exists and links absolutely,
-never what it says. `--allow-dirty` lists the working tree as it stands, untracked files
+never what it says. The binstall leg grades the URL templates against the workflow's
+matrix, never against a published Release (that needs the network: run `cargo binstall
+--dry-run tsv_cli` against a real release to see it resolve). `--allow-dirty` lists the working tree as it stands, untracked files
 included, so a run on a dirty tree grades what a publish from that tree would upload.
 
 ## Crates Publish Rehearsal (`publish:crates`)

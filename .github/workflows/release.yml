@@ -523,7 +523,8 @@ jobs:
   # bite here, and the job restores no cache that could bring it back.
   #
   # After `publish` and `release` (skipped on a rehearsal) because the crates
-  # publish last, once the version's npm packages and GitHub Release exist.
+  # publish last, once the version's npm packages and GitHub Release exist:
+  # tsv_cli's binstall metadata points at that Release's assets.
   # Nothing here publishes: the step never passes --wetrun, and the job holds
   # no token.
   crates:

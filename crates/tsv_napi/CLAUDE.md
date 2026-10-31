@@ -328,6 +328,9 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   trigger** — packaging + the per-crate isolated build, and the `cargo semver-checks`
   public-API gate (`--expect-tag` on a tag ref). Not part of the N-API set: the crates
   publish from a maintainer's machine (root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing)).
+  It follows the Release because tsv_cli's binstall metadata points at its assets
+  (`release_asset_name` in `scripts/napi_host.ts` spells both; `package:audit` grades the
+  table against this workflow's matrix).
 
 ## Marshalling & errors
 

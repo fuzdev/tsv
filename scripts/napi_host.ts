@@ -8,7 +8,8 @@
  * `engine_parity.ts` picks the host's staged package over whatever `pkg/` happens to
  * list first — a runner that has gathered several matrix artifacts holds several.
  * Also home to `cli_binary_name`, the one spelling of the CLI binary's filename per
- * triple, for the same reason.
+ * triple, and `release_asset_name`, the one spelling of its GitHub Release asset, for the
+ * same reason.
  */
 export const host_triple = (): string => {
 	const { os, arch, target } = Deno.build;
@@ -24,3 +25,10 @@ export const host_triple = (): string => {
  * stages, validates, publishes or re-fetches a platform package. */
 export const cli_binary_name = (triple: string): string =>
 	triple.startsWith('win32-') ? 'tsv.exe' : 'tsv';
+
+/** The GitHub Release asset name of a triple's CLI binary: the binary's own name with the
+ * triple spliced in, so the two keep one extension rule — `tsv` → `tsv-linux-x64-gnu`,
+ * `tsv.exe` → `tsv-win32-x64.exe`. `scripts/release_assets.ts` names the assets with it, and
+ * `package:audit` grades tsv_cli's binstall metadata against it. */
+export const release_asset_name = (triple: string): string =>
+	cli_binary_name(triple).replace(/^tsv/, `tsv-${triple}`);

@@ -6,6 +6,10 @@ The `tsv` command-line tool: format, parse and type-strip TypeScript/JS, CSS and
 Prebuilt binaries ship in the `@fuzdev/tsv` npm package (`npm i -D @fuzdev/tsv`) and on each [GitHub
 Release](https://github.com/fuzdev/tsv/releases).
 
+With [cargo-binstall](https://github.com/cargo-bins/cargo-binstall), `cargo binstall tsv_cli` installs
+the prebuilt binary from the GitHub Release of the crate's version, where one ships for the target
+(any other target builds from source).
+
 From source: `cargo install --locked tsv_cli`. A source build does not get the release profile the
 prebuilt binaries ship with (LTO, `panic = "abort"`): it runs slower, and an internal panic while
 formatting files is reported as that file's error instead of aborting the run.
