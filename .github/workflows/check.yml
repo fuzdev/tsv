@@ -79,7 +79,7 @@ jobs:
           rustup show active-toolchain
           cargo --version
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       - name: Install Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
@@ -149,7 +149,7 @@ jobs:
           rustup show active-toolchain
 
       # Caches the wasm32 dependency builds across runs (keyed on Cargo.lock).
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       # Prebuilt binary, not `cargo install` from source: a source build is keyed
       # by rust-cache on Cargo.lock, so any dep bump forced a multi-minute wasm-pack
@@ -159,7 +159,7 @@ jobs:
       # the size gate on an unrelated binaryen release. Bump the SHA and wasm-pack
       # version manually.
       - name: Install wasm-pack
-        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
+        uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with:
           tool: wasm-pack@0.15.0
 
@@ -294,7 +294,7 @@ jobs:
           rustup toolchain install --no-self-update
           rustup show active-toolchain
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       # `cargo test --workspace` needs Deno: the fixture suite drives prettier +
       # svelte through the Deno sidecar (see the `check` job comment; same
