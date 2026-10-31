@@ -9,6 +9,8 @@
 //! trailing commas. Formatting output is not frozen — it changes between releases as
 //! formatting bugs are fixed.
 //!
+//! ## Usage
+//!
 //! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! use tsv_svelte::{Formatter, format};
@@ -30,6 +32,13 @@
 //! # }
 //! ```
 //!
+//! The wire JSON is the AST as JSON in the canonical parser's shape — Svelte's modern
+//! `parse()`'s here. Its `start` / `end` are UTF-16 offsets, and the default wire is
+//! span-only: no `loc` (the `locations` feature adds it). [`Error::span`], unlike the wire, is
+//! a UTF-8 byte range.
+//!
+//! ## Errors
+//!
 //! A source the format cannot take is an [`Error`] — here a refusal of one that parses:
 //!
 //! ```
@@ -42,8 +51,9 @@
 //! ```
 //!
 //! Every tsv language crate returns the same [`Error`]: its [`Error::kind`], its
-//! [`Error::span`] in the input's UTF-8 bytes, and [`Error::to_report`] in the wire's UTF-16
-//! offsets and lines; one line under `{}`, the `tsv` CLI's frame under `{:#}`.
+//! [`Error::span`] in the input's UTF-8 bytes, and [`Error::to_report`] — how tsv's bindings
+//! (its npm packages) report it — in the wire's UTF-16 offsets and lines; one line under
+//! `{}`, the `tsv` CLI's frame under `{:#}`.
 //!
 //! ## Deep input
 //!
@@ -75,7 +85,9 @@
 //! ## Stability
 //!
 //! This release exposes no AST: parsing returns the wire JSON, in Svelte's modern
-//! `parse()` shape, which `@fuzdev/tsv-parse-wasm`'s `tsv_ast.d.ts` types.
+//! `parse()` shape, which `@fuzdev/tsv-parse-wasm`'s [`tsv_ast.d.ts`] types.
+//!
+//! [`tsv_ast.d.ts`]: https://github.com/fuzdev/tsv/blob/main/crates/tsv_wasm/types/tsv_ast.d.ts
 //!
 //! Items hidden from these docs (`__private`, `ast` and every other `#[doc(hidden)]` item)
 //! and the `_internal_*` features are tsv's own plumbing for its sibling crates, which pin
@@ -210,7 +222,7 @@ pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
 }
 
 /// What [`parse_to_json_with`]'s wire carries. The default is [`parse_to_json`]'s: the
-/// span-only wire.
+/// span-only wire. Its one option, `locations`, requires the `locations` feature.
 ///
 /// ```
 /// # fn main() -> tsv_svelte::Result<()> {
@@ -249,6 +261,7 @@ impl JsonOptions {
     /// a Svelte document and everything embedded in it (a superset of Svelte's `loc`, which
     /// acorn-parsed nodes alone carry); elements, attributes and directives also gain their
     /// `name_loc`. `tsv parse --locations` writes it. Default `false`, the span-only wire.
+    /// Requires the `locations` feature.
     #[cfg(feature = "locations")]
     #[must_use]
     pub const fn locations(mut self, locations: bool) -> Self {

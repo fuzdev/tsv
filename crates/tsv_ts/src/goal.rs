@@ -74,9 +74,9 @@ impl Goal {
     /// Two of the six extensions tsv formats carry a goal in the name rather than in
     /// the file: `.mjs` and `.mts` are ES modules whatever any config says — Node
     /// loads a `.mjs` as ESM unconditionally, and TypeScript maps `.mts`/`.mjs` to
-    /// `ModuleKind.ESNext` with the extension overriding `module`
-    /// (`src/compiler/program.ts`'s implied-format switch). Their `.c*` counterparts
-    /// are the CommonJS half of that same switch, but CommonJS is not the `Script`
+    /// `ModuleKind.ESNext` with the extension overriding `module` (the implied-format
+    /// switch in the TypeScript repository's `src/compiler/program.ts`). Their `.c*`
+    /// counterparts are the CommonJS half of that same switch, but CommonJS is not the `Script`
     /// goal in any useful sense here — a `.cjs` is script *code* yet nothing in tsv's
     /// output turns on it — so they stay unsettled with `.js`/`.ts`.
     ///
@@ -122,7 +122,7 @@ impl Goal {
 ///
 /// assert_eq!("script".parse::<Goal>(), Ok(Goal::Script));
 /// let error = "Module".parse::<Goal>().unwrap_err();
-/// assert_eq!(error.to_string(), "expected \"module\" or \"script\"");
+/// assert_eq!(error.to_string(), "expected 'script' or 'module'");
 /// ```
 // The single source of truth for the goal vocabulary, shared by the CLI `--source-type`
 // flag (`tsv_cli`), the bindings (`tsv_wasm`, `tsv_napi`), and the fixture goal-marker
@@ -154,7 +154,7 @@ pub struct ParseGoalError;
 
 impl fmt::Display for ParseGoalError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("expected \"module\" or \"script\"")
+        f.write_str("expected 'script' or 'module'")
     }
 }
 

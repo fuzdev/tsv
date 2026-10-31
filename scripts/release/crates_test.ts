@@ -12,7 +12,9 @@ import {
 	is_overlay_parent,
 	is_overlay_unpack,
 	type MetadataPackage,
+	package_state_deps_deno,
 	semver_checks_args,
+	semver_checks_release_type,
 	version_compare,
 	wetrun_checkout_refusals
 } from './crates.ts';
@@ -203,11 +205,27 @@ Deno.test('crates_semver_plan: an already-live version grades only at a named bu
 	const versions = [{ num: '0.8.0', yanked: false }];
 	const plan = crates_semver_plan(versions, '0.8.0', null);
 	ok(plan.kind === 'skip' && plan.reason.includes('already on crates.io'));
+	// at 0.x the next minor is a breaking release, so the tool grades it as major
 	deepStrictEqual(crates_semver_plan(versions, '0.8.0', 'minor'), {
 		kind: 'check',
 		baseline: '0.8.0',
+		release_type: 'major'
+	});
+	deepStrictEqual(crates_semver_plan([{ num: '1.2.0', yanked: false }], '1.2.0', 'minor'), {
+		kind: 'check',
+		baseline: '1.2.0',
 		release_type: 'minor'
 	});
+});
+
+Deno.test('semver_checks_release_type reads a bump as cargo does before 1.0', () => {
+	deepStrictEqual(semver_checks_release_type('0.8.0', 'major'), 'major');
+	deepStrictEqual(semver_checks_release_type('0.8.0', 'minor'), 'major');
+	deepStrictEqual(semver_checks_release_type('0.8.0', 'patch'), 'minor');
+	for (const bump of ['major', 'minor', 'patch'] as const) {
+		deepStrictEqual(semver_checks_release_type('0.0.3', bump), 'major');
+		deepStrictEqual(semver_checks_release_type('1.4.2', bump), bump);
+	}
 });
 
 Deno.test('semver_checks_args states the docs.rs feature set explicitly', () => {
@@ -495,3 +513,33 @@ Deno.test('clear_package_state never follows a symlinked overlay parent', () => 
 	);
 	ok(fs.entries.has(`${L}/tsv_lang-0.7.1`));
 });
+
+Deno.test(
+	'clear_package_state over the real filesystem: a cargo home with no registry/src is no error',
+	() => {
+		const root = Deno.makeTempDirSync({ prefix: 'tsv_crates_test_' });
+		try {
+			const options = {
+				package_dir: `${root}/target/package`,
+				registry_src: `${root}/cargo/registry/src`,
+				names: ['tsv_lang'],
+				version: '0.7.1'
+			};
+			// a fresh runner: neither the package dir nor `registry/src` exists
+			Deno.mkdirSync(`${root}/cargo`);
+			deepStrictEqual(clear_package_state(package_state_deps_deno, options), []);
+			// and with both present, the real wiring removes what the fake does
+			const overlay = `${options.registry_src}/-088a2fcb40cb7e05`;
+			Deno.mkdirSync(`${options.package_dir}/x`, { recursive: true });
+			Deno.mkdirSync(`${overlay}/tsv_lang-0.7.1/src`, { recursive: true });
+			deepStrictEqual(clear_package_state(package_state_deps_deno, options), [
+				options.package_dir,
+				`${overlay}/tsv_lang-0.7.1`,
+				overlay
+			]);
+			deepStrictEqual(Array.from(Deno.readDirSync(options.registry_src)), []);
+		} finally {
+			Deno.removeSync(root, { recursive: true });
+		}
+	}
+);

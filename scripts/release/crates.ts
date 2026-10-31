@@ -156,6 +156,21 @@ export const crates_publish_order = (
 	return { ok: true, order };
 };
 
+/**
+ * The `--release-type` that grades the release one `bump` past `version` as cargo's semver
+ * reads it. `cargo semver-checks` takes the flag literally — `minor` admits no breaking change
+ * — and applies cargo's 0.x reading only when it derives the type from two version numbers.
+ * Before 1.0 the left-most non-zero component is the breaking one, so a `minor` bump of `0.y.z`
+ * is graded `major` and a `patch` bump `minor`; at `0.0.z` every bump is `major`. An unparsable
+ * `version` keeps `bump` as given.
+ */
+export const semver_checks_release_type = (version: string, bump: BumpLevel): BumpLevel => {
+	const v = version_parse(version);
+	if (v === null || v.major > 0) return bump;
+	if (v.minor === 0) return 'major';
+	return bump === 'patch' ? 'minor' : 'major';
+};
+
 /** What `cargo semver-checks` grades one crate against, or why it cannot. */
 export type SemverPlan =
 	| { kind: 'skip'; reason: string }
@@ -171,7 +186,7 @@ export type SemverPlan =
  *   `cargo semver-checks` to derive from the two version numbers. A `bump` is not needed.
  * - Already released at `version` (a rehearsal between releases): there is no release to
  *   grade unless `bump` names the level the next one would take; the tree is then graded
- *   against `version` itself at that level.
+ *   against `version` itself at that level, as `semver_checks_release_type` maps it.
  */
 export const crates_semver_plan = (
 	versions: PublishedVersions,
@@ -195,7 +210,11 @@ export const crates_semver_plan = (
 				reason: `v${version} is already on crates.io, so there is no release to grade (--bump <level> grades this tree as the next one)`
 			};
 		}
-		return { kind: 'check', baseline: version, release_type: bump };
+		return {
+			kind: 'check',
+			baseline: version,
+			release_type: semver_checks_release_type(version, bump)
+		};
 	}
 	const below = releases
 		.map((v) => v.num)
@@ -296,7 +315,7 @@ export const is_overlay_parent = (name: string): boolean => /^-[0-9a-f]{16}$/.te
 
 /** The filesystem the packaging cleanup needs, injected so the tests run it over a fake. A
  * missing path throws `Deno.errors.NotFound`; anything else that throws (a permission fence
- * included) is fatal to the caller. */
+ * included) is fatal to the caller. The real wiring is `package_state_deps_deno`. */
 export interface PackageStateDeps {
 	read_dir: (path: string) => Array<string>;
 	/** Whether `path` itself is a symlink (an lstat: never followed). */
@@ -304,6 +323,18 @@ export interface PackageStateDeps {
 	/** Remove `path`: a whole tree when `recursive`, else only an empty directory. */
 	remove: (path: string, recursive: boolean) => void;
 }
+
+/**
+ * The real filesystem behind `PackageStateDeps`, on Deno's own APIs so a missing path throws
+ * `Deno.errors.NotFound` — the one error contract `clear_package_state` tolerates. (A `node:fs`
+ * call throws a Node `ENOENT` error instead, which the cleanup would read as fatal: a cargo
+ * home with no `registry/src`, as on a fresh CI runner, would fail the run.)
+ */
+export const package_state_deps_deno: PackageStateDeps = {
+	read_dir: (path) => Array.from(Deno.readDirSync(path), (entry) => entry.name),
+	is_symlink: (path) => Deno.lstatSync(path).isSymlink,
+	remove: (path, recursive) => Deno.removeSync(path, { recursive })
+};
 
 /**
  * Remove what an earlier packaging at this version left for cargo to reuse: the target

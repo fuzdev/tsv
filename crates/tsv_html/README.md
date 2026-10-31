@@ -8,7 +8,7 @@ library.
 
 The public signatures follow 0.x semver like every tsv crate: a breaking change ships only in a
 minor release. What the functions answer may change in any release, tracking the spec and what tsv
-needs; `#[doc(hidden)]` items are outside semver.
+needs.
 
 API docs: [docs.rs/tsv_html](https://docs.rs/tsv_html).
 

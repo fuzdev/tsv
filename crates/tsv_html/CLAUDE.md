@@ -26,7 +26,7 @@ of a table, a wider class), its doc says so.
 
 **Stability**: the public signatures follow 0.x semver like every tsv crate (a breaking
 change only at a minor release); what the functions answer may change in any release,
-tracking the spec and what tsv needs; `#[doc(hidden)]` items are outside semver.
+tracking the spec and what tsv needs.
 
 - **Named character references** (`entities.rs`): `match_named_character_reference(input) ->
   Option<(usize, &'static str)>` — the tokenizer's named-character-reference state: the

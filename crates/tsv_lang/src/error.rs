@@ -348,9 +348,9 @@ fn escape_line_terminators(summary: String) -> String {
     escaped
 }
 
-/// A pointed error as a binding reports it: the summary and the frame apart, and the span
-/// in the document's wire coordinates ([`Error::to_report`]). The error's full message (its
-/// `{:#}` form) is exactly `summary`, a `\n`, then `frame`.
+/// A pointed error as tsv's bindings (its npm packages) report it: the summary and the frame
+/// apart, and the span in the document's wire coordinates ([`Error::to_report`]). The error's
+/// full message (its `{:#}` form) is exactly `summary`, a `\n`, then `frame`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct ErrorReport {
@@ -383,21 +383,17 @@ pub struct ErrorReport {
 // loops pack into less instruction cache.
 /// Why a parse or format produced no output — a syntax error, a depth limit, a refusal of
 /// a source that parses, or a source over the size cap ([`ErrorKind`]): what went wrong
-/// ([`Error::kind`]), where ([`Error::span`], UTF-8 byte offsets), and the pointed report a
-/// binding renders ([`Error::to_report`]). One pointer wide, so a `Result` carrying it costs a
-/// successful call almost nothing.
+/// ([`Error::kind`]), where ([`Error::span`], UTF-8 byte offsets), and the pointed report
+/// tsv's bindings (its npm packages) render ([`Error::to_report`]). One pointer wide, so a
+/// `Result` carrying it costs a successful call almost nothing.
 ///
 /// ```
-/// # use tsv_lang as tsv_ts;
+/// # use tsv_lang::{Error, ErrorKind, LeadingBom, LineRule, WireCoordinates};
 /// # let source = "let x = (";
-/// # let err = tsv_ts::Error::unexpected_eof(source.len())
-/// #     .with_context(source, tsv_ts::WireCoordinates::new(
-/// #         tsv_ts::LineRule::Ecmascript,
-/// #         tsv_ts::LeadingBom::Counted,
-/// #     ));
-/// use tsv_ts::ErrorKind;
-///
-/// // `err`: an end-of-file error at byte 9 of `let x = (`
+/// # let err = Error::unexpected_eof(source.len())
+/// #     .with_context(source, WireCoordinates::new(LineRule::Ecmascript, LeadingBom::Counted));
+/// // `err`: a syntax error summarized `Unexpected end of file`, located at the end (byte 9) of
+/// // the one-line source `let x = (`
 /// assert_eq!(err.kind(), ErrorKind::Syntax);
 /// assert_eq!(err.span(), Some(9..9)); // UTF-8 bytes of the caller's text
 /// assert_eq!(err.to_string(), "Unexpected end of file (1:10)");
@@ -714,12 +710,13 @@ impl Error {
         })
     }
 
-    /// The error as a binding reports it — summary, frame and span — for every error with a
-    /// point: a syntax error or a depth limit (its span the point alone: `end == start`)
-    /// and a refusal (its own span, `kind` [`ErrorKind::Refusal`]). `None` for a source
-    /// over the size cap ([`ErrorKind::TooLarge`]), which has no point. Every error a
-    /// public parse, format or strip entry point returns is otherwise `Some`; only an error
-    /// from tsv's own embedded plumbing, before its host has located it, has no frame yet.
+    /// The error as tsv's bindings (its npm packages) report it — summary, frame and span —
+    /// for every error with a point: a syntax error or a depth limit (its span the point
+    /// alone: `end == start`) and a refusal (its own span, `kind` [`ErrorKind::Refusal`]).
+    /// `None` for a source over the size cap ([`ErrorKind::TooLarge`]), which has no point.
+    /// Every error a public parse, format or strip entry point returns is otherwise `Some`;
+    /// only an error from tsv's own embedded plumbing, before its host has located it, has no
+    /// frame yet.
     ///
     /// Each call renders the report anew (two allocated `String`s); keep the result rather
     /// than calling it per field.

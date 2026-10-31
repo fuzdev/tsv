@@ -47,17 +47,20 @@
  * Flags (no `--` separator: deno task forwards it literally and parseArgs rejects it):
  *   --wetrun             publish for real, from a clean checkout of the `v<version>` tag
  *   --expect-tag <tag>   fail unless the workspace version is the tag's (`v<version>`)
- *   --bump <level>       patch | minor | major — the level semver-checks grades an
- *                        already-live version at
+ *   --bump <level>       patch | minor | major — the level the next release takes, which
+ *                        semver-checks grades an already-live version at, read as cargo
+ *                        reads it before 1.0 (a `minor` bump of `0.y.z` may break)
  *   --no-semver-checks   skip the public-API gate (said loudly)
  *   --allow-dirty        package a dirty tree (dry run only)
  *   --wait               on a rate limit, sleep until crates.io's retry time and go on
+ *
+ * Recovery: crates.io never takes a version twice, so a broken release is yanked as a whole set
+ * (the siblings pin each other `=x.y.z`) and fixed forward by the next version.
  *
  * Not its job: the version bump and its `=x.y.z` sibling pins (`scripts/publish.ts`), the
  * changelog, tagging. The release workflow's `crates` job runs it as a dry run.
  */
 
-import { readdirSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -75,6 +78,7 @@ import {
 	type MetadataPackage,
 	NEW_CRATE_BURST,
 	NEW_CRATE_INTERVAL_MINUTES,
+	package_state_deps_deno,
 	type PublishedVersions,
 	semver_checks_args,
 	type VersionState,
@@ -189,7 +193,10 @@ if (wetrun) await assert_release_checkout();
 const ordered = crates_publish_order(packages, names);
 if (!ordered.ok) fail(ordered.error);
 const { order } = ordered;
-console.log(`  version ${version}; ${order.length} crates, in publish order: ${order.join(' → ')}`);
+console.log(
+	`  version ${version}; ${order.length} crates, in dependency order (cargo orders its own ` +
+		`uploads): ${order.join(' → ')}`
+);
 
 // Step 2: registry
 
@@ -277,14 +284,12 @@ const clear_stale_packaging = (): void => {
 	const package_dir = join(target_directory, 'package');
 	let removed: Array<string>;
 	try {
-		removed = clear_package_state(
-			{
-				read_dir: (path) => readdirSync(path),
-				is_symlink: (path) => Deno.lstatSync(path).isSymlink,
-				remove: (path, recursive) => Deno.removeSync(path, { recursive })
-			},
-			{ package_dir, registry_src, names: order, version }
-		);
+		removed = clear_package_state(package_state_deps_deno, {
+			package_dir,
+			registry_src,
+			names: order,
+			version
+		});
 	} catch (error) {
 		fail(
 			`could not clear the stale packaging state (${package_dir}, ${registry_src}): ${String(error)}` +

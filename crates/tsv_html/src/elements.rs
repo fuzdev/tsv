@@ -3,10 +3,10 @@
 
 /// A character Svelte admits in a tag name's run after its first hyphen
 /// (`<my-café>`, `<emotion-😍>`, `<a-·>`): the tail class of Svelte's
-/// `REGEX_VALID_TAG_NAME` (`packages/svelte/src/utils.js`), whose non-ASCII ranges are
-/// HTML's `PCENChar`. Unlike `PCENChar` it admits ASCII uppercase `A`–`Z`, as Svelte's
-/// class does. Surrogate code points are unreachable, since a Rust `char` is never a
-/// surrogate.
+/// `REGEX_VALID_TAG_NAME` (the Svelte repository's `packages/svelte/src/utils.js`), whose
+/// non-ASCII ranges are HTML's `PCENChar`. Unlike `PCENChar` it admits ASCII uppercase
+/// `A`–`Z`, as Svelte's class does. Surrogate code points are unreachable, since a Rust
+/// `char` is never a surrogate.
 ///
 /// Used both by the tokenizer (to keep a whole custom-element name in one token,
 /// including the non-alphanumeric members `·`/ZWNJ/ZWJ/astral) and by the name

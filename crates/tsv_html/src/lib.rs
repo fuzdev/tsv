@@ -32,7 +32,7 @@
 //!
 //! The public signatures follow 0.x semver like every tsv crate: a breaking change ships only
 //! in a minor release. What the functions answer may change in any release, tracking the spec
-//! and what tsv needs. `#[doc(hidden)]` items are outside semver.
+//! and what tsv needs.
 //!
 //! ## License
 //!

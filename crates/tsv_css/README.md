@@ -20,10 +20,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-This release exposes no AST: parsing returns the wire JSON.
+This release exposes no AST: parsing returns the wire JSON — the AST as JSON in the canonical
+parser's shape (Svelte's `parseCss`'s), its `start` / `end` UTF-16 offsets, span-only by default
+(no `loc`; the `locations` feature adds it), unlike an error's `span()`, a UTF-8 byte range.
 
 The formatter is non-configurable by design: Prettier's style with `printWidth` 100, tabs and
-single quotes.
+single quotes. Formatting output is not frozen: it changes between releases as formatting bugs are
+fixed.
 
 API docs: [docs.rs/tsv_css](https://docs.rs/tsv_css).
 

@@ -9,19 +9,15 @@
 //! the same grammar prettier matches via its `ignore` dependency and git matches
 //! for `.gitignore`.
 //!
-//! Two layers, one public:
-//!
-//! - `IgnoreRules` — one ignore file's rules, matched against paths relative
-//!   to that file's root. The single-file primitive, crate-private: every
-//!   consumer reaches it through a stack layer.
-//! - [`IgnoreStack`] — a hierarchical, git-faithful evaluator: a stack of
-//!   per-directory `.gitignore` layers plus a parallel stack of per-directory override
-//!   layers (`.formatignore`), evaluated against format-root-relative paths with
-//!   git's last-match-wins + parent-directory-prune semantics (oracle:
-//!   `git check-ignore --no-index`). At each path level every `.gitignore` layer is
-//!   evaluated, then every override layer, so an override-layer `!` can re-include a gitignore'd
-//!   path (subject to git's parent-dir rule) and a deeper layer wins over a
-//!   shallower one.
+//! The matcher is one type, [`IgnoreStack`] — a hierarchical, git-faithful evaluator: a
+//! stack of per-directory `.gitignore` layers plus a parallel stack of per-directory
+//! override layers (`.formatignore`), each layer one ignore file's rules anchored at its
+//! directory, evaluated against paths relative to the format root ([Paths](#paths)) with
+//! git's last-match-wins + parent-directory-prune semantics (oracle:
+//! `git check-ignore --no-index`). At each path level every `.gitignore` layer is
+//! evaluated, then every override layer, so an override-layer `!` can re-include a
+//! gitignore'd path (subject to git's parent-dir rule) and a deeper layer wins over a
+//! shallower one.
 //!
 //! Locating the files, resolving paths relative to them, and walking directories
 //! are the callers' jobs. The caller decides which files become layers (tsv reads
@@ -313,10 +309,9 @@ impl IgnoreRules {
 /// pushed shallowest-first (the order a DFS descends) — a directory's layer after every
 /// ancestor's of the same kind: precedence among them is push order, not anchor depth,
 /// so a deeper layer pushed ahead of its ancestor's loses to it and the answer is wrong.
-/// The CLI
-/// [`pop_gitignore`](IgnoreStack::pop_gitignore)s / [`pop_override`](IgnoreStack::pop_override)s
-/// on the way back up; non-traversal callers (the VS Code extension) just push
-/// the whole chain.
+/// The CLI calls [`pop_gitignore`](IgnoreStack::pop_gitignore) /
+/// [`pop_override`](IgnoreStack::pop_override) on the way back up; non-traversal callers
+/// (the VS Code extension) just push the whole chain.
 ///
 /// [`is_ignored`](IgnoreStack::is_ignored) walks the path's ancestors top-down
 /// and, at each level, evaluates every applicable `.gitignore` layer

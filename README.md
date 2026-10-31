@@ -183,8 +183,11 @@ line and `{:#}` the CLI's frame. TypeScript takes an exact parse goal (`Goal::Sc
 none named, format and strip try the module grammar, then the script one, and parsing reads a
 module.
 
-This release exposes no AST: parsing returns the wire JSON, whose shape the npm
-packages type in `tsv_ast.d.ts`. `parse_to_json_with(source, JsonOptions)` adds `loc`
+This release exposes no AST: parsing returns the wire JSON — the AST as JSON in the
+canonical parser's shape (acorn-typescript's, Svelte's, `parseCss`'s), its `start` / `end`
+UTF-16 offsets, span-only by default (no `loc`), unlike `span()`'s UTF-8 byte range — whose
+shape the npm packages type in
+[`tsv_ast.d.ts`](https://github.com/fuzdev/tsv/blob/main/crates/tsv_wasm/types/tsv_ast.d.ts). `parse_to_json_with(source, JsonOptions)` adds `loc`
 (the `locations` cargo feature); the default `json` feature can be turned off for a build
 without `parse_to_json*`.
 
@@ -203,7 +206,7 @@ without `parse_to_json*`.
 | `error.message`, `error.frame`                         | `to_report()`'s `summary`, `frame` (`format!("{e:#}")` is both)            |
 | `error.start` / `end`, `error.loc`                     | `to_report()`'s `start` / `end` (`WirePoint`: offset, line, column)        |
 | a thrown error for a source over 4 GiB                 | `ErrorKind::TooLarge`                                                      |
-| `IgnoreStack` (discovery)                              | `tsv_ignore::IgnoreStack` + `tsv_discover`                                 |
+| `IgnoreStack` (discovery)                              | `tsv_ignore::IgnoreStack` (the discovery policy has no public Rust API)    |
 
 The same 1-based lines and UTF-16 offsets appear on both sides; `span()` is the Rust-only
 byte range.

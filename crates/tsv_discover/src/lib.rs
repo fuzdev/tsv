@@ -1,54 +1,37 @@
-//! tsv's file-discovery **policy** — the per-directory and per-file decisions
-//! `tsv format` makes while walking a tree, as pure functions over a
-//! [`tsv_ignore::IgnoreStack`] (the matcher) plus the entry name and its
-//! format-root-relative path. Part of [tsv](https://github.com/fuzdev/tsv).
+//! tsv's file-discovery policy (the build-output heuristic, safety-net pruning and the
+//! warnings) over [`tsv_ignore`] — part of [tsv](https://github.com/fuzdev/tsv).
 //!
 //! **No public API.** The crate exists for tsv's own tools — the `tsv` CLI and its WASM and
-//! N-API bindings — and every item in it is `#[doc(hidden)]`: outside semver, free to change
-//! in any release. A tool that wants gitignore matching alone should depend on
-//! [`tsv_ignore`].
-//!
-//! This is the single home of the build-output heuristic, the always-pruned
-//! safety nets, the formattable-extension check (both as a discovery filter and
-//! as the unsupported-extension error for a named file argument), the
-//! heuristic-shadow warning text, the `.prettierignore`-shadowed warning, the
-//! `.prettierignore`-outside-a-repo warning, and the gate on a path an argument names
-//! (bounded by the ignore files alone, with its warning). The three discovery
-//! surfaces — the native CLI, the JS CLI in tsv's npm packages, and the VS Code
-//! extension — call it instead of reimplementing the decision, so they agree **by
-//! construction** rather than by hand-mirrored constants and templates.
-//!
-//! Everything here is **pure**: no filesystem access. Locating directories,
-//! reading ignore files, resolving the format root, and walking the tree stay in
-//! each caller; only the *verdict* is shared. The matcher this builds on
-//! ([`tsv_ignore`]) stays a pure gitignore(5) matcher and deliberately does
-//! **not** absorb this policy (the `dist`/`build`/`target` list, the hidden-dir
-//! rule, the safety nets, the warning).
-//!
-//! Every path a verdict or a warning takes (`child_rel`, `rel`, `dir`) is relative to the
-//! format root and `/`-separated, read as [`tsv_ignore`] reads one
-//! ([Paths](tsv_ignore#paths)); an entry's name is its last `/` segment.
-//!
-//! tsv is non-configurable for *style*; file *scope* (which files get
-//! reformatted) is the one sanctioned carve-out. This crate is the policy half
-//! of that carve-out. It is **not** a language abstraction — no `Language`
-//! trait, registry, or dispatch — so it doesn't touch tsv's "Closed Scope, Open
-//! Convention" stance.
-//!
-//! ```
-//! use tsv_discover::{BuildOutputHeuristic, DirVerdict, classify_dir, should_format_file};
-//! use tsv_ignore::IgnoreStack;
-//!
-//! let mut stack = IgnoreStack::new();
-//! stack.push_gitignore("", "dist/\n"); // a .gitignore present → heuristic off
-//! let heuristic = BuildOutputHeuristic::Inactive;
-//!
-//! // gitignored `dist` → pruned; clean `src` → descend
-//! assert_eq!(classify_dir("dist", heuristic, &stack), DirVerdict::Prune);
-//! assert_eq!(classify_dir("src", heuristic, &stack), DirVerdict::Descend);
-//! // a non-ignored `.ts` file → format it
-//! assert!(should_format_file("src/app.ts", &stack));
-//! ```
+//! N-API bindings, which share its discovery decisions — and every item in it is hidden from
+//! these docs: outside semver, free to change in any release. A tool that wants gitignore
+//! matching alone should depend on [`tsv_ignore`].
+
+// Maintainer notes (not rendered — the crate has no public API to document):
+//
+// The per-directory and per-file decisions `tsv format` makes while walking a tree, as pure
+// functions over a `tsv_ignore::IgnoreStack` (the matcher) plus the entry name and its
+// format-root-relative path. This is the single home of the build-output heuristic, the
+// always-pruned safety nets, the formattable-extension check (both as a discovery filter and
+// as the unsupported-extension error for a named file argument), the heuristic-shadow warning
+// text, the `.prettierignore`-shadowed warning, the `.prettierignore`-outside-a-repo warning,
+// and the gate on a path an argument names (bounded by the ignore files alone, with its
+// warning). The three discovery surfaces — the native CLI, the JS CLI in tsv's npm packages,
+// and the VS Code extension — call it instead of reimplementing the decision, so they agree
+// by construction rather than by hand-mirrored constants and templates.
+//
+// Everything here is pure: no filesystem access. Locating directories, reading ignore files,
+// resolving the format root, and walking the tree stay in each caller; only the verdict is
+// shared. The matcher this builds on (`tsv_ignore`) stays a pure gitignore(5) matcher and
+// deliberately does not absorb this policy (the `dist`/`build`/`target` list, the hidden-dir
+// rule, the safety nets, the warning).
+//
+// Every path a verdict or a warning takes (`child_rel`, `rel`, `dir`) is relative to the
+// format root and `/`-separated, read as `tsv_ignore` reads one (its §Paths); an entry's name
+// is its last `/` segment.
+//
+// tsv is non-configurable for style; file scope (which files get reformatted) is the one
+// sanctioned carve-out, and this crate is the policy half of it. It is not a language
+// abstraction — no `Language` trait, registry, or dispatch.
 
 #![warn(missing_docs)]
 

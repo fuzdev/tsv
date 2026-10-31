@@ -35,13 +35,17 @@
 //! # }
 //! ```
 //!
+//! The wire JSON is the AST as JSON in the canonical parser's shape — acorn-typescript's
+//! here. Its `start` / `end` are UTF-16 offsets, and the default wire is span-only: no `loc`
+//! (the `locations` feature adds it). [`Error::span`], unlike the wire, is a UTF-8 byte range.
+//!
 //! ## Errors
 //!
 //! Formatting and parsing return an [`Error`] that says what kind of failure it is
-//! ([`Error::kind`]), where it is in the input's UTF-8 bytes ([`Error::span`]), and how a
-//! binding reports it ([`Error::to_report`]: the summary and the frame apart, positions in
-//! UTF-16 offsets and 1-based lines). `{}` prints one line; `{:#}` adds the frame the
-//! `tsv` CLI prints.
+//! ([`Error::kind`]), where it is in the input's UTF-8 bytes ([`Error::span`]), and how tsv's
+//! bindings (its npm packages) report it ([`Error::to_report`]: the summary and the frame
+//! apart, positions in UTF-16 offsets and 1-based lines). `{}` prints one line; `{:#}` adds
+//! the frame the `tsv` CLI prints.
 //!
 //! ```
 //! use tsv_ts::{ErrorKind, format};
@@ -121,7 +125,9 @@
 //! ## Stability
 //!
 //! This release exposes no AST: parsing returns the wire JSON, in acorn-typescript's shape,
-//! which `@fuzdev/tsv-parse-wasm`'s `tsv_ast.d.ts` types.
+//! which `@fuzdev/tsv-parse-wasm`'s [`tsv_ast.d.ts`] types.
+//!
+//! [`tsv_ast.d.ts`]: https://github.com/fuzdev/tsv/blob/main/crates/tsv_wasm/types/tsv_ast.d.ts
 //!
 //! Items hidden from these docs (`__private`, `ast` and every other `#[doc(hidden)]` item)
 //! and the `_internal_*` features are tsv's own plumbing for its sibling crates, which pin
@@ -350,7 +356,8 @@ fn format_program_in(
 }
 
 /// How [`parse_to_json_with`] parses and what its wire carries. The default is
-/// [`parse_to_json`]'s: [`Goal::Module`], the span-only wire.
+/// [`parse_to_json`]'s: [`Goal::Module`], the span-only wire. The example's `locations`
+/// requires the `locations` feature.
 ///
 /// ```
 /// # fn main() -> tsv_ts::Result<()> {
@@ -398,7 +405,7 @@ impl JsonOptions {
     /// Add a `loc` to every node: the line (1-based) and column (0-based, UTF-16 code
     /// units) of its own `start` / `end`, under ECMAScript's line terminators (LF, CR, CRLF,
     /// U+2028, U+2029), which are acorn's. `tsv parse --locations` writes it. Default
-    /// `false`, the span-only wire.
+    /// `false`, the span-only wire. Requires the `locations` feature.
     #[cfg(feature = "locations")]
     #[must_use]
     pub const fn locations(mut self, locations: bool) -> Self {

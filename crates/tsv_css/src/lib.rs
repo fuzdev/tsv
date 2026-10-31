@@ -6,6 +6,8 @@
 //! Prettier's style with a print width of 100, tabs and single quotes. Formatting output
 //! is not frozen — it changes between releases as formatting bugs are fixed.
 //!
+//! ## Usage
+//!
 //! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! use tsv_css::{Formatter, format};
@@ -24,6 +26,12 @@
 //! # }
 //! ```
 //!
+//! The wire JSON is the AST as JSON in the canonical parser's shape — Svelte's `parseCss`'s
+//! here. Its `start` / `end` are UTF-16 offsets, and the default wire is span-only: no `loc`
+//! (the `locations` feature adds it). [`Error::span`], unlike the wire, is a UTF-8 byte range.
+//!
+//! ## Errors
+//!
 //! A source that does not parse is an [`Error`]:
 //!
 //! ```
@@ -35,8 +43,9 @@
 //! ```
 //!
 //! Every tsv language crate returns the same [`Error`]: its [`Error::kind`], its
-//! [`Error::span`] in the input's UTF-8 bytes, and [`Error::to_report`] in the wire's UTF-16
-//! offsets and lines; one line under `{}`, the `tsv` CLI's frame under `{:#}`.
+//! [`Error::span`] in the input's UTF-8 bytes, and [`Error::to_report`] — how tsv's bindings
+//! (its npm packages) report it — in the wire's UTF-16 offsets and lines; one line under
+//! `{}`, the `tsv` CLI's frame under `{:#}`.
 //!
 //! ## Deep input
 //!
@@ -66,7 +75,9 @@
 //! ## Stability
 //!
 //! This release exposes no AST: parsing returns the wire JSON, in `parseCss`'s shape, which
-//! `@fuzdev/tsv-parse-wasm`'s `tsv_ast.d.ts` types.
+//! `@fuzdev/tsv-parse-wasm`'s [`tsv_ast.d.ts`] types.
+//!
+//! [`tsv_ast.d.ts`]: https://github.com/fuzdev/tsv/blob/main/crates/tsv_wasm/types/tsv_ast.d.ts
 //!
 //! Items hidden from these docs (`__private`, `ast` and every other `#[doc(hidden)]` item)
 //! and the `_internal_*` features are tsv's own plumbing for its sibling crates, which pin
@@ -159,7 +170,7 @@ pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
 }
 
 /// What [`parse_to_json_with`]'s wire carries. The default is [`parse_to_json`]'s: the
-/// span-only wire.
+/// span-only wire. Its one option, `locations`, requires the `locations` feature.
 ///
 /// ```
 /// # fn main() -> tsv_css::Result<()> {
@@ -194,7 +205,8 @@ impl JsonOptions {
 
     /// Add a `loc` to every object carrying `start` / `end`: the line (1-based) and column
     /// (0-based, UTF-16 code units) of those offsets, under `\n` alone. `tsv parse
-    /// --locations` writes it. Default `false`, the span-only wire.
+    /// --locations` writes it. Default `false`, the span-only wire. Requires the `locations`
+    /// feature.
     #[cfg(feature = "locations")]
     #[must_use]
     pub const fn locations(mut self, locations: bool) -> Self {
