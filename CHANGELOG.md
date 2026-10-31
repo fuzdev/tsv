@@ -1,8 +1,8 @@
 # tsv changelog
 
-Covers the npm packages published from this repo — `@fuzdev/tsv-format-wasm`,
-`@fuzdev/tsv-parse-wasm`, and `@fuzdev/tsv-wasm`, plus the native N-API set
-(`@fuzdev/tsv` and its `@fuzdev/tsv-<triple>` platform packages). All move
+Covers the packages published from this repo — the crates.io crates and the npm packages
+`@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`, and `@fuzdev/tsv-wasm`, plus the native
+N-API set (`@fuzdev/tsv` and its `@fuzdev/tsv-<triple>` platform packages). All move
 together at the `Cargo.toml [workspace.package]` version.
 Each `## Unreleased` section must be non-empty and carry a
 `<!-- bump: patch|minor|major -->` marker; `deno task publish
@@ -14,6 +14,10 @@ Each `## Unreleased` section must be non-empty and carry a
 <!-- bump: minor -->
 
 - **breaking** chore: GitHub Release checksums are `SHA512SUMS` (`sha512sum -c`), not `SHA256SUMS`
+
+- feat: the Rust crates publish to crates.io — `cargo install --locked tsv_cli`, or
+  `cargo binstall tsv_cli` for the prebuilt binary; their API is reshaped for it
+  (`Error` replaces `ParseError`) and the AST is no longer part of the public API
 
 - fix: deeply nested or very long chained input is refused with a parse error instead of
   overflowing the host's stack
