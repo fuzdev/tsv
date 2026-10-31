@@ -146,7 +146,7 @@ fn decode_escapes_into_arena<'arena>(source: &str, arena: &'arena Bump) -> &'are
 /// Whether the `\` immediately before `text`'s end starts a valid escape — i.e. the
 /// run of backslashes ending `text` has **odd** length, so the last one is itself
 /// unescaped and escapes whatever comes next. An even run is a completed `\\`.
-fn ends_with_open_escape(text: &str) -> bool {
+pub(crate) fn ends_with_open_escape(text: &str) -> bool {
     text.bytes().rev().take_while(|&b| b == b'\\').count() % 2 == 1
 }
 

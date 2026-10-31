@@ -1205,9 +1205,27 @@ fn trim_property_part(property_part: &str) -> &str {
 }
 
 /// The searcher half of [`trim_property_part`] — one outlined copy.
+///
+/// A name ending in a **literal** escape owns the code point after its `\` (CSS Syntax 3
+/// §4.3.4 / §4.3.7), so `a\ :` names the property `a ` and its space is the escape's payload,
+/// not padding: the trim hands that one code point back rather than strand the backslash
+/// onto the colon (`a\:`, which escapes the colon and no longer parses). A hex escape's
+/// terminator is a different rule — the caller's `ends_with_live_hex_escape`.
 #[inline(never)]
 fn trim_property_part_wide(property_part: &str) -> &str {
-    property_part.trim_matches(crate::whitespace::is_boundary_whitespace)
+    let trimmed = property_part.trim_matches(crate::whitespace::is_boundary_whitespace);
+    if trimmed.len() == property_part.len() || !crate::escapes::ends_with_open_escape(trimmed) {
+        return trimmed;
+    }
+    // The part starts at the property token, so the trim shortened only its end and the
+    // payload is the first code point past `trimmed`. A newline cannot be one (`\` + newline
+    // is no escape), so the lexer never put one in the name.
+    debug_assert!(property_part.starts_with(trimmed));
+    let end = trimmed.len();
+    match property_part[end..].chars().next() {
+        Some(c) if !matches!(c, '\n' | '\r' | '\x0c') => &property_part[..end + c.len_utf8()],
+        _ => trimmed,
+    }
 }
 
 /// Canonicalize a property name's case: standard CSS property names are ASCII

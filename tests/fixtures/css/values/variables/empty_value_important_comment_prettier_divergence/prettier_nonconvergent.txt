@@ -1,0 +1,6 @@
+Prettier never reaches a fixed point on this input: it inserts a space before
+`!important` on every pass (`--a: !important /* c */` → `--a:  !important /* c */` →
+`--a:   !important /* c */` → …), so no prettier-anchored claim file
+(output_prettier.svelte, audit_signature.txt, variants) is expressible. The validator
+live-verifies this claim (rule F5). See README.md and docs/conformance_prettier_css.md
+§CSS: Values.

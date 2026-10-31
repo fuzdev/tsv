@@ -209,15 +209,49 @@ impl<'a> Printer<'a> {
         for_each_important_tail_piece(source, decl, |piece| self.write(piece));
     }
 
-    /// Emit a format-ignored declaration verbatim from source. The value span excludes
-    /// the trailing `!important` region (and any comments inside it) plus the `;`, so
-    /// `write_declaration_end` re-emits both — preserving a comment *after* the bang
-    /// (`blue !important /* y */;`) that a hand-rolled synthetic ` !important` would drop.
-    /// Shared by the rule and at-rule block loops.
+    /// The `!important` tail of an empty value, written straight after the `: ` separator:
+    /// [`Self::write_important_tail`] less the space its first piece leads with, which the
+    /// separator already supplies.
+    #[cold]
+    #[inline(never)]
+    fn write_important_tail_after_separator(&mut self, decl: &ast::CssDeclaration<'_>) {
+        let source = self.source;
+        let mut first = true;
+        for_each_important_tail_piece(source, decl, |piece| {
+            let piece = if first {
+                piece.trim_start_matches(' ')
+            } else {
+                piece
+            };
+            first = false;
+            self.write(piece);
+        });
+    }
+
+    /// Emit a format-ignored declaration verbatim from source, through its last token — the
+    /// value's, or the `!important` tail's (the keyword or a comment after it), which the
+    /// span stops short of — so the tail is the author's bytes too (`a:!important/* c */`),
+    /// and only the `;` is regenerated. Shared by the rule and at-rule block loops.
     pub(super) fn write_format_ignore_declaration(&mut self, decl: &ast::CssDeclaration<'_>) {
+        let end = match decl.important_end {
+            Some(important_end) => {
+                // Past the tail's trivia to the terminator, then back over its whitespace.
+                let from = important_end as usize;
+                let terminator = crate::comments::skip_trivia_forward(
+                    self.source.as_bytes(),
+                    from,
+                    self.source.len(),
+                );
+                let tail = self.source[from..terminator].trim_end_matches(|c: char| {
+                    c.is_ascii() && crate::lexer::is_ascii_css_whitespace(c as u8)
+                });
+                important_end + tail.len() as u32
+            }
+            None => decl.span.end,
+        };
         self.write_indent();
-        self.write_verbatim_span(self.frozen_slice_span(decl.span));
-        self.write_declaration_end(decl);
+        self.write_verbatim_span(self.frozen_slice_span(Span::new(decl.span.start, end)));
+        self.write(";\n");
     }
 
     /// Check if any value in a list requires one-per-line formatting
@@ -865,10 +899,13 @@ impl<'a> Printer<'a> {
         // extra leading space `write_declaration_end` adds — avoids `--a:  !important;`.
         // "Empty" is a CSS-whitespace question (CSS Syntax 3 §4.2): a value that is one
         // non-ASCII space (`--a: <NBSP>!important;`) is content, printed like any other.
+        // The rest of the tail is the shared walk's, so a comment around the bang
+        // (`--a: !important /* c */;`) prints where the author wrote it.
         if decl.is_important()
             && matches!(&decl.value, CssValue::Identifier { span } if crate::escapes::trim_start_css(span.extract(self.source)).is_empty())
         {
-            self.write("!important;\n");
+            self.write_important_tail_after_separator(decl);
+            self.write(";\n");
             return;
         }
         self.print_css_value(&decl.value);

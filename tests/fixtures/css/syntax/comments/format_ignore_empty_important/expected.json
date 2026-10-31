@@ -1,0 +1,146 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 299,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 290,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 41,
+							"end": 54,
+							"property": "a",
+							"value": "!important"
+						},
+						{
+							"type": "Declaration",
+							"start": 82,
+							"end": 97,
+							"property": "--b",
+							"value": "!important"
+						},
+						{
+							"type": "Declaration",
+							"start": 125,
+							"end": 144,
+							"property": "c",
+							"value": "!important"
+						},
+						{
+							"type": "Declaration",
+							"start": 228,
+							"end": 242,
+							"property": "d",
+							"value": "x!IMPORTANT"
+						},
+						{
+							"type": "Declaration",
+							"start": 270,
+							"end": 286,
+							"property": "e",
+							"value": "x ! important"
+						}
+					]
+				},
+				"start": 9,
+				"end": 290
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 17,
+				"end": 38
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 58,
+				"end": 79
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 101,
+				"end": 122
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 137,
+				"end": 144,
+				"position": 10
+			},
+			{
+				"type": "CSSComment",
+				"value": " a non-empty value keeps its tail as written too ",
+				"start": 148,
+				"end": 201
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 204,
+				"end": 225
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 246,
+				"end": 267
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 291,
+			"styles": "\n\tdiv {\n\t\t/* prettier-ignore */\n\t\ta: !important;\n\t\t/* prettier-ignore */\n\t\t--b: !important;\n\t\t/* prettier-ignore */\n\t\tc:!important/* c */;\n\t\t/* a non-empty value keeps its tail as written too */\n\t\t/* prettier-ignore */\n\t\td: x!IMPORTANT;\n\t\t/* prettier-ignore */\n\t\te: x ! important;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 300,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

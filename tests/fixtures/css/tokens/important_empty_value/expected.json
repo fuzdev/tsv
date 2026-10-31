@@ -1,0 +1,121 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 189,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 180,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 58,
+							"end": 71,
+							"property": "a",
+							"value": "!important"
+						},
+						{
+							"type": "Declaration",
+							"start": 102,
+							"end": 123,
+							"property": "b",
+							"value": "!important"
+						},
+						{
+							"type": "Declaration",
+							"start": 155,
+							"end": 176,
+							"property": "c",
+							"value": "!important"
+						}
+					]
+				},
+				"start": 9,
+				"end": 180
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an empty value before !important ",
+				"start": 17,
+				"end": 55
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comment after it ",
+				"start": 75,
+				"end": 99
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 116,
+				"end": 123,
+				"position": 11
+			},
+			{
+				"type": "CSSComment",
+				"value": " a comment before it ",
+				"start": 127,
+				"end": 152
+			},
+			{
+				"type": "CSSComment",
+				"value": " c ",
+				"start": 158,
+				"end": 165,
+				"position": 0
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 181,
+			"styles": "\n\tdiv {\n\t\t/* an empty value before !important */\n\t\ta: !important;\n\t\t/* a comment after it */\n\t\tb: !important /* c */;\n\t\t/* a comment before it */\n\t\tc: /* c */ !important;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 190,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -15,6 +15,7 @@
 # (delete its line) — on a narrowed root, only the entries under it are graded. Paths are relative to
 # tests/fixtures, sorted; a `#` starts a comment.
 
+css/declarations/escaped_whitespace_property_name_prettier_divergence/output_prettier.svelte  # canonical-accepts
 css/values/escaped_whitespace_prettier_divergence/output_prettier.svelte  # canonical-accepts
 css/values/functions/url_escaped_whitespace_prettier_divergence/output_prettier.svelte
 css/values/operators/slash_before_star_prettier_divergence/output_prettier.svelte

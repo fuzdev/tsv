@@ -314,9 +314,13 @@ pub(crate) fn parse_declaration<'arena>(
     // value optional (`<declaration-value>?`), and css-syntax-3 trims leading/trailing
     // whitespace, so the value is empty regardless of spacing. The empty value parses to
     // an empty identifier and prints as a single space (`--a: ;`), the form
-    // css-variables-1 mandates for serialization. Non-custom empty values stay an error.
+    // css-variables-1 mandates for serialization. An empty value carrying `!important`
+    // (`a: !important;`) parses too: `parseCss` accepts it, its wire value being the
+    // `!important` text alone, and the value holds the same empty identifier as the custom
+    // one. A bare empty non-custom value (`a:;`, `a: ;`) stays an error, as `parseCss`'s
+    // "Declaration cannot be empty".
     let is_custom_property = property.starts_with("--");
-    if facts.is_empty && !has_value_comment && !is_custom_property {
+    if facts.is_empty && !has_value_comment && !is_custom_property && important_end.is_none() {
         return Err(parser.error_msg_at("Empty CSS value", start));
     }
 
