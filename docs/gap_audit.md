@@ -33,7 +33,7 @@ deno task gaps:audit           # the gate: tests/fixtures, ~37 s
 deno task gaps:audit:update    # regenerate the snapshot after fixing a shape
 
 # Directly, against a real codebase — where the real yield is:
-cargo run --profile corpus -p tsv_debug --features internal_audits gap_audit ../corpora/collections/zzz/src
+cargo run --profile corpus -p tsv_debug --features _internal_audits gap_audit ../corpora/collections/zzz/src
 ```
 
 Build with **`--profile corpus`** (optimized + `panic = "unwind"`). Plain `--release` is

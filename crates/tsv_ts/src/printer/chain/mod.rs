@@ -60,6 +60,6 @@ pub(crate) use analysis::{
 pub use builder::call_prints_as_member_chain;
 pub use inline_lookups::build_lookup_after_operand_doc;
 pub(crate) use printing::find_bracket_position;
-#[cfg(feature = "internal_buffer_stats")]
+#[cfg(feature = "_internal_buffer_stats")]
 pub use types::ChainGroupVec;
 pub use types::{ChainCall, ChainNode, ChainNodeVec};

@@ -3,7 +3,9 @@ name = "tsv_ts"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-description = "TypeScript parsing and formatting library"
+authors.workspace = true
+description = "TypeScript/JS formatter, type stripper and acorn-compatible parser — part of tsv"
+categories = ["development-tools", "parser-implementations", "web-programming"]
 license.workspace = true
 repository.workspace = true
 # This crate's agent notes stay in the repository; `deno task package:audit` grades the tarball.
@@ -27,14 +29,14 @@ json = ["tsv_lang/json"]
 locations = ["json", "tsv_lang/locations"]
 # Debug-only: exposes `debug_token_stream` for the differential lexer harness
 # (`tsv_debug lex_diff`). Off in production builds.
-internal_debug_lex = []
+_internal_debug_lex = []
 # Debug-only: printer buffer-population sampling for `tsv_debug buffer_sizes`
 # (chain/comment SmallVec length histograms). Off in production builds.
-internal_buffer_stats = []
+_internal_buffer_stats = []
 # Opt-in print-once comment ledger (`tsv_lang::comment_ledger`): `format_ast_in` registers
 # the program's comments, `build_comment_doc` records each emit, and the format-ignore
 # verbatim seam records its range. Off in production builds.
-internal_comment_check = ["tsv_lang/internal_comment_check"]
+_internal_comment_check = ["tsv_lang/_internal_comment_check"]
 
 [dependencies]
 tsv_lang.workspace = true

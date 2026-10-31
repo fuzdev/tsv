@@ -301,7 +301,7 @@ pub(crate) fn spell_run(
                 separated = true;
                 continue;
             }
-            #[cfg(feature = "internal_comment_check")]
+            #[cfg(feature = "_internal_comment_check")]
             if comments == Comments::InPlace {
                 tsv_lang::comment_ledger::record_emitted(
                     source,

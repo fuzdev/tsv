@@ -81,7 +81,7 @@ use tsv_lang::{Error, ErrorKind, ErrorReport};
 ///
 /// // an angle-bracket assertion cannot be blanked away: refused, with its span
 /// let source = "let x = <T>y;";
-/// let Err(StripError::Unsupported { kind, span }) = strip(source) else {
+/// let Err(StripError::Unsupported { kind, span, .. }) = strip(source) else {
 ///     panic!("expected a refusal");
 /// };
 /// assert_eq!(kind, UnsupportedKind::TypeAssertion);
@@ -177,10 +177,14 @@ pub struct Stripped<'s> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum StripError {
-    /// The source does not parse.
+    /// The source does not parse. Transparent: it displays as the inner [`Error`] does, and
+    /// [`std::error::Error::source`] answers the inner error's own `source()` rather than the
+    /// inner error itself, so an error-chain printer prints its message once.
     Parse(Error),
     /// The source holds TypeScript syntax that type blanking cannot erase: a construct
     /// with runtime semantics, or an assertion whose blanking would regroup the expression.
+    /// Fields may be added, so a pattern over it takes `..`.
+    #[non_exhaustive]
     Unsupported {
         /// What was refused.
         kind: UnsupportedKind,
@@ -284,8 +288,8 @@ impl StripError {
     pub fn message(&self, source: &str) -> String {
         match self {
             Self::Parse(error) => format!("{error:#}"),
-            Self::Unsupported { kind, span } => {
-                let report = kind.report(span.clone(), source);
+            Self::Unsupported { kind, span, .. } => {
+                let report = kind.report(source, span.clone());
                 format!("{}\n{}", report.summary, report.frame)
             }
         }
@@ -299,19 +303,19 @@ impl StripError {
     pub fn report(&self, source: &str) -> Option<ErrorReport> {
         match self {
             Self::Parse(error) => error.report(),
-            Self::Unsupported { kind, span } => Some(kind.report(span.clone(), source)),
+            Self::Unsupported { kind, span, .. } => Some(kind.report(source, span.clone())),
         }
     }
 }
 
 impl UnsupportedKind {
-    /// A refusal of this construct over `span` as a binding reports it: the summary
+    /// A refusal of this construct over `span` of `source` as a binding reports it: the summary
     /// `cannot strip <the construct>`, the frame
     /// [`StripError::message`] prints under it, and the span, in
     /// [`crate::WIRE_COORDINATES`]. Infallible, unlike a parse error's
     /// [`Error::report`]: a refusal always has its span.
     #[must_use]
-    pub fn report(self, span: Range<usize>, source: &str) -> ErrorReport {
+    pub fn report(self, source: &str, span: Range<usize>) -> ErrorReport {
         ErrorReport::refusal(
             &format!("cannot strip {}", self.description()),
             source,
@@ -346,7 +350,8 @@ const _: () = {
 impl std::error::Error for StripError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Parse(error) => Some(error),
+            // transparent, as `Display` is: the inner error's own source, never itself
+            Self::Parse(error) => std::error::Error::source(error),
             Self::Unsupported { .. } => None,
         }
     }
@@ -401,7 +406,9 @@ mod tests {
         assert!(std::error::Error::source(&error).is_none());
     }
 
-    /// A parse error's span and source are the inner [`Error`](tsv_lang::Error)'s own.
+    /// A parse error's span is the inner [`Error`](tsv_lang::Error)'s own, and the variant is
+    /// transparent: its `source()` is the inner error's (none), not the inner error, so a
+    /// chain printer never prints the message twice.
     #[test]
     fn parse_error_span_and_source_are_the_inner_errors() {
         let source = "let \u{1d49c} = ;\n";
@@ -413,8 +420,9 @@ mod tests {
         assert_eq!(Some(span.clone()), parse.span());
         assert!(span.is_empty());
         assert_eq!(&source[span.start..], ";\n");
-        let inner = std::error::Error::source(&error).expect("a parse error has a source");
-        assert_eq!(inner.to_string(), parse.to_string());
+        assert!(std::error::Error::source(parse).is_none());
+        assert!(std::error::Error::source(&error).is_none());
+        assert_eq!(error.to_string(), parse.to_string());
     }
 
     #[test]

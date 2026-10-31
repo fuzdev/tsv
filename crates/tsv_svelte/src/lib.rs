@@ -32,23 +32,43 @@
 //!
 //! Every tsv language crate returns the same [`Error`]: its [`Error::kind`], its
 //! [`Error::span`] in the input's UTF-8 bytes, and [`Error::report`] in the wire's UTF-16
-//! offsets and lines; one line under `{}`, the `tsv` CLI's frame under `{:#}`. Deep input is
-//! refused with [`ErrorKind::TooDeep`]; a debug build handling input it does not control
-//! runs the call under [`run_with_stack`].
+//! offsets and lines; one line under `{}`, the `tsv` CLI's frame under `{:#}`.
+//!
+//! ## Deep input
+//!
+//! The parser refuses a tree past its depth limits with [`ErrorKind::TooDeep`], so every
+//! walk of an accepted tree fits a 2 MiB thread in an optimized build and a 16 MiB one in a
+//! debug build. The limits count a whole
+//! component, its `<script>`, `<style>` and template expressions included, against one
+//! budget. A stack overflow aborts the process rather than panicking, so a debug
+//! build handling input it does not control — `cargo test` runs each test on a 2 MiB thread —
+//! wraps the call in [`run_with_stack`], which runs it on a thread reserving [`STACK_SIZE`].
 //!
 //! ## Features
 //!
-//! - `json` (default) — [`parse_to_json`], [`parse_to_json_with`] and [`JsonOptions`]. Turn
+#![cfg_attr(
+    feature = "json",
+    doc = " - `json` (default) — [`parse_to_json`], [`parse_to_json_with`] and [`JsonOptions`]. Turn"
+)]
+#![cfg_attr(
+    not(feature = "json"),
+    doc = " - `json` (default) — `parse_to_json`, `parse_to_json_with` and `JsonOptions`. Turn"
+)]
 //!   default features off for a format-only build.
 //! - `locations` — `JsonOptions::locations`, adding a `loc` (line and column) to every
 //!   positioned object of the wire, and a `name_loc` to elements, attributes and directives.
 //!
-//! The `internal_*` features are tsv's own diagnostics, not for consumers.
+//! The `_internal_*` features are tsv's own diagnostics, not for consumers
+//! ([Stability](#stability)).
 //!
 //! ## Stability
 //!
 //! This release exposes no AST: parsing returns the wire JSON, in Svelte's modern
 //! `parse()` shape, which `@fuzdev/tsv-parse-wasm`'s `tsv_ast.d.ts` types.
+//!
+//! Items hidden from these docs (`__private`, `ast` and every other `#[doc(hidden)]` item)
+//! and the `_internal_*` features are tsv's own plumbing for its sibling crates, which pin
+//! each other exactly; they change in any release, outside semver.
 
 #![warn(missing_docs)]
 

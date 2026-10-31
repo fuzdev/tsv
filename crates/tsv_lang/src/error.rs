@@ -135,7 +135,7 @@ fn format_error(base_msg: &str, position: usize, context: Option<&ErrorContext>)
 /// so the constructor functions below are the whole API, and keeping the enum private
 /// makes them the only way in (which is what keeps `context` uniformly `None` at
 /// construction, filled later by [`Error::with_context`]).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 enum Repr {
     UnexpectedToken {
         expected: String,
@@ -346,9 +346,18 @@ pub struct ErrorReport {
 // `Result` shrinks at every site, including the many whose `Result` size never changed
 // because a fat AST node (`Statement`, `Expression`) already dominated it, so the hot parse
 // loops pack into less instruction cache.
-/// A parse error: what went wrong ([`Error::kind`]), where ([`Error::span`], UTF-8 byte
-/// offsets), and the pointed report a binding renders ([`Error::report`]). One pointer
-/// wide, so a `Result` carrying it costs a successful call almost nothing.
+/// Why a parse or format produced no output — a syntax error, a depth limit, a refusal of
+/// a source that parses, or a source over the size cap ([`ErrorKind`]): what went wrong
+/// ([`Error::kind`]), where ([`Error::span`], UTF-8 byte offsets), and the pointed report a
+/// binding renders ([`Error::report`]). One pointer wide, so a `Result` carrying it costs a
+/// successful call almost nothing.
+///
+/// # Equality
+///
+/// Two errors are equal when they are observably the same error: the same
+/// [`Error::kind`], [`Error::span`] and [`Error::wire_point`], and the same full message
+/// (the `{:#}` form, which carries the summary and the frame). Nothing else is compared —
+/// no internal classification an error carries beside its message.
 ///
 /// # Display
 ///
@@ -359,13 +368,25 @@ pub struct ErrorReport {
 /// summary, a `\n`, the `line:col` header with the excerpted line, a `\n`, and the caret
 /// line — what the `tsv` CLI prints (and `summary + "\n" + frame` of [`Error::report`]).
 /// `Debug` prints the private payload's variant.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 #[repr(transparent)]
 pub struct Error(Box<Payload>);
 
+impl PartialEq for Error {
+    fn eq(&self, other: &Self) -> bool {
+        // the cheap observable facts first; the message (summary + frame) last
+        self.kind() == other.kind()
+            && self.span() == other.span()
+            && self.wire_point() == other.wire_point()
+            && format!("{self:#}") == format!("{other:#}")
+    }
+}
+
+impl Eq for Error {}
+
 /// What an [`Error`] boxes: the error, and the one fact about it its message does
 /// not carry.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 struct Payload {
     kind: Repr,
     /// The error is a **goal gate**: it fired on a construct one parse goal reads and the
@@ -435,8 +456,9 @@ const _: () = {
     assert_send_sync_static::<ErrorReport>();
 };
 
-/// Result type alias for parsing operations
-pub type Result<T> = std::result::Result<T, Error>;
+/// `std::result::Result` with [`Error`] as the default error type, so a glob import
+/// leaves the two-parameter form usable.
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 impl Error {
     /// Construct a lexer error. `#[cold]` / `#[inline(never)]` outlines the construction so it
@@ -636,7 +658,10 @@ impl Error {
     /// The error as a binding reports it — summary, frame and span — for every error with a
     /// point: a syntax error or a depth limit (its span the point alone: `end == start`)
     /// and a refusal (its own span, `kind` [`ErrorKind::Refusal`]). `None` for a source
-    /// over the size cap ([`ErrorKind::TooLarge`]).
+    /// over the size cap ([`ErrorKind::TooLarge`]), which has no point. Every error a
+    /// public parse, format or strip entry point returns is otherwise `Some`; only an error
+    /// from tsv's own embedded plumbing, before its host has located it, has no frame yet.
+    #[must_use]
     pub fn report(&self) -> Option<ErrorReport> {
         if let Repr::Refused {
             frame, start, end, ..
@@ -747,7 +772,10 @@ impl Error {
     /// the numbers its message header prints, as `line:column+1`.
     ///
     /// `None` for a source over the `u32` cap ([`ErrorKind::TooLarge`]) and for a refusal,
-    /// whose span is [`Error::report`]'s.
+    /// whose span is [`Error::report`]'s (and, as for [`Error::report`], for an error from
+    /// tsv's embedded plumbing its host has not located yet, which no public entry point
+    /// returns).
+    #[must_use]
     pub fn wire_point(&self) -> Option<WirePoint> {
         self.0
             .kind

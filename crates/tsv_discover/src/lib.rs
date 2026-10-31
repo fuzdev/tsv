@@ -24,6 +24,10 @@
 //! **not** absorb this policy (the `dist`/`build`/`target` list, the hidden-dir
 //! rule, the safety nets, the warning).
 //!
+//! Every path a verdict or a warning takes (`child_rel`, `rel`, `dir`) is relative to the
+//! format root and `/`-separated, read as [`tsv_ignore`] reads one
+//! ([Paths](tsv_ignore#paths)); an entry's name is its last `/` segment.
+//!
 //! tsv is non-configurable for *style*; file *scope* (which files get
 //! reformatted) is the one sanctioned carve-out. This crate is the policy half
 //! of that carve-out. It is **not** a language abstraction — no `Language`
@@ -39,10 +43,10 @@
 //! let heuristic = BuildOutputHeuristic::Inactive;
 //!
 //! // gitignored `dist` → pruned; clean `src` → descend
-//! assert_eq!(classify_dir("dist", "dist", heuristic, &stack), DirVerdict::Prune);
-//! assert_eq!(classify_dir("src", "src", heuristic, &stack), DirVerdict::Descend);
+//! assert_eq!(classify_dir("dist", heuristic, &stack), DirVerdict::Prune);
+//! assert_eq!(classify_dir("src", heuristic, &stack), DirVerdict::Descend);
 //! // a non-ignored `.ts` file → format it
-//! assert!(should_format_file("app.ts", "src/app.ts", &stack));
+//! assert!(should_format_file("src/app.ts", &stack));
 //! ```
 
 #![warn(missing_docs)]

@@ -21,7 +21,7 @@ use tsv_ts::ast::{ImportSpecifier, Statement, StatementKind};
 ///   line-offset scratch (`borrow_line_spans_scratch`) iterates in
 ///   `comments/render.rs`.
 ///
-/// With the **`internal_buffer_stats` feature** (off by default — the record hooks sit
+/// With the **`_internal_buffer_stats` feature** (off by default — the record hooks sit
 /// in the chain printer's hot path), each file is additionally *formatted* and
 /// three printer-buffer populations are sampled at their construction
 /// chokepoints (`tsv_ts::printer::buffer_stats`), so inline-`N` claims about
@@ -59,7 +59,7 @@ impl BufferSizesCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let (files, _skipped) = resolve_profile_files(&self.paths, |_| true)?;
 
-        #[cfg(feature = "internal_buffer_stats")]
+        #[cfg(feature = "_internal_buffer_stats")]
         tsv_ts::set_buffer_stats(true);
 
         let mut named_specs: Vec<usize> = Vec::new();
@@ -86,7 +86,7 @@ impl BufferSizesCommand {
         named_specs.sort_unstable();
         comment_lines.sort_unstable();
 
-        #[cfg(feature = "internal_buffer_stats")]
+        #[cfg(feature = "_internal_buffer_stats")]
         let printer_stats = {
             let mut stats = tsv_ts::take_buffer_stats();
             stats.chain_nodes.sort_unstable();
@@ -97,16 +97,16 @@ impl BufferSizesCommand {
 
         if self.json {
             let fields = json_fields(&named_specs, &comment_lines, files_parsed, parse_errors);
-            #[cfg(feature = "internal_buffer_stats")]
+            #[cfg(feature = "_internal_buffer_stats")]
             let fields = format!("{fields},{}", printer_stats_json_fields(&printer_stats));
             println!("{{{fields}}}");
         } else {
             print_report(&named_specs, &comment_lines, files_parsed, parse_errors);
-            #[cfg(feature = "internal_buffer_stats")]
+            #[cfg(feature = "_internal_buffer_stats")]
             print_printer_stats(&printer_stats);
-            #[cfg(not(feature = "internal_buffer_stats"))]
+            #[cfg(not(feature = "_internal_buffer_stats"))]
             eprintln!(
-                "\n(chain/comment printer-buffer histograms need `--features internal_buffer_stats`)"
+                "\n(chain/comment printer-buffer histograms need `--features _internal_buffer_stats`)"
             );
         }
         Ok(())
@@ -132,9 +132,9 @@ fn collect_file(
             let ast = tsv_ts::__private::parse(source, &arena).map_err(|_| ())?;
             collect_imports(ast.body, named_specs);
             collect_comments(ast.comments, source, comment_lines);
-            // Run the real printer so the armed internal_buffer_stats hooks sample the
+            // Run the real printer so the armed _internal_buffer_stats hooks sample the
             // actual chain/comment buffer populations. Output is discarded.
-            #[cfg(feature = "internal_buffer_stats")]
+            #[cfg(feature = "_internal_buffer_stats")]
             drop(tsv_ts::__private::format_ast(&ast, source));
         }
         ParserType::Svelte => {
@@ -149,7 +149,7 @@ fn collect_file(
                 collect_imports(script.content.body, named_specs);
             }
             collect_comments(&root.comments, source, comment_lines);
-            #[cfg(feature = "internal_buffer_stats")]
+            #[cfg(feature = "_internal_buffer_stats")]
             drop(tsv_svelte::__private::format_ast(&root, source));
         }
         ParserType::Css => {}
@@ -160,7 +160,7 @@ fn collect_file(
 /// Report the three printer-buffer populations sampled during the format runs.
 /// Each label's inline `N` is read from the buffer type itself, so a re-tuned
 /// capacity can't leave a stale label here.
-#[cfg(feature = "internal_buffer_stats")]
+#[cfg(feature = "_internal_buffer_stats")]
 fn print_printer_stats(stats: &tsv_ts::BufferStats) {
     let caps = tsv_ts::inline_capacities();
     eprintln!();
@@ -194,7 +194,7 @@ fn print_printer_stats(stats: &tsv_ts::BufferStats) {
 
 /// The printer-buffer populations as JSON object fields (no braces), merged
 /// into the single `--json` object after the parse-time fields.
-#[cfg(feature = "internal_buffer_stats")]
+#[cfg(feature = "_internal_buffer_stats")]
 fn printer_stats_json_fields(stats: &tsv_ts::BufferStats) -> String {
     format!(
         "\"chain_nodes\":{},\"chain_groups\":{},\"leading_comments\":{}",

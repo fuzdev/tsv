@@ -65,10 +65,12 @@ const THREAD_NAME: &str = "tsv";
 ///
 /// # Errors
 ///
-/// Only when the OS refuses to spawn the thread (out of task slots, or a hard address-space
-/// limit). `f` has then been dropped without running; a caller that wants to fall back to
-/// the current thread keeps the work reachable outside `f` (builds it again, or hands `f` a
-/// cell it can take the work back out of).
+/// Only when the thread cannot be spawned: the OS refuses it (out of task slots, or a hard
+/// address-space limit), or the target has no threads at all — on `wasm32-unknown-unknown`
+/// (without the threads proposal), whose standard library cannot spawn one, every call
+/// returns `Err`. `f` has then been dropped without running; a caller that wants to fall
+/// back to the current thread keeps the work reachable outside `f` (builds it again, or
+/// hands `f` a cell it can take the work back out of).
 pub fn run_with_stack<F, T>(f: F) -> std::io::Result<T>
 where
     F: FnOnce() -> T + Send,

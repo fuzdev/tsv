@@ -343,7 +343,7 @@ fn finalize_chain_nodes(
     apply_paren_gaps(nodes, paren_gaps, input.printer);
     fix_callee_base_parens(nodes, input);
     let long_curried = mark_own_call_layout(nodes, input.printer);
-    #[cfg(feature = "internal_buffer_stats")]
+    #[cfg(feature = "_internal_buffer_stats")]
     crate::printer::buffer_stats::record_chain_nodes(nodes.len());
     long_curried
 }
@@ -1318,7 +1318,7 @@ pub fn group_chain_nodes<'a>(
         );
     }
 
-    #[cfg(feature = "internal_buffer_stats")]
+    #[cfg(feature = "_internal_buffer_stats")]
     crate::printer::buffer_stats::record_chain_groups(groups.len());
 
     groups

@@ -11,8 +11,8 @@ CSS formatting and parsing to the wire JSON of Svelte's `parseCss` — part of
 
 This release exposes no AST: parsing returns the wire JSON.
 
-The formatter is non-configurable by design: Prettier's style with `printWidth` 100, tabs, single
-quotes, and no trailing commas.
+The formatter is non-configurable by design: Prettier's style with `printWidth` 100, tabs and
+single quotes.
 
 API docs: [docs.rs/tsv_css](https://docs.rs/tsv_css).
 

@@ -2757,7 +2757,7 @@ function collect_recursive(
 			// build-output heuristic (+ its shadow warning), and the matcher —
 			// lives in `tsv_discover`, shared with the native CLI via the verdict.
 			// The FS walk + layer push/pop stay here.
-			const verdict = stack.classify_dir(entry.name, child_rel, child_heuristic);
+			const verdict = stack.classify_dir(child_rel, child_heuristic);
 			if (verdict !== 'descend') {
 				// on `prune_warn` fetch the message from Rust (single source of
 				// truth — the JS CLI never templates it). One warning per pruned dir.
@@ -2780,7 +2780,7 @@ function collect_recursive(
 				errors,
 				warnings
 			);
-		} else if (entry.isFile() && stack.should_format_file(entry.name, child_rel)) {
+		} else if (entry.isFile() && stack.should_format_file(child_rel)) {
 			files.push(path);
 		}
 	}

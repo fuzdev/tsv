@@ -96,7 +96,7 @@ impl<'a> Printer<'a> {
         // from the copy on its `CommentBoundPair` node rather than from the shared array (the
         // ledger keys on the span, so the copy lands on the same entry). The renderer
         // records the emit when it reaches the node.
-        #[cfg(feature = "internal_comment_check")]
+        #[cfg(feature = "_internal_comment_check")]
         d.tag_comment_doc(doc, comment.span, self.source);
 
         doc

@@ -93,7 +93,7 @@ smallvec = "1.15.2"
 thiserror = "2"
 unicode-ident = "1.0"
 unicode-segmentation = "1.13.3"
-unicode-width = "0.2.2"
+unicode-width = { version = "0.2.2", default-features = false }
 # Shortest round-trip `f64` formatting for the wire writer's non-integral numbers
 # (`tsv_lang`'s `JsonWriter::f64`): the formatter `serde_json` itself calls, called
 # directly so no shipped crate depends on `serde_json`. Featureless and dependency-free.
@@ -198,7 +198,7 @@ useless_let_if_seq = "allow"
 elidable_lifetime_names = "allow"
 
 # Cargo overrides
-cargo_common_metadata = "allow"      # keywords/categories not curated yet; README + LICENSE gated by `package:audit`
+cargo_common_metadata = "allow"      # keywords not curated yet; README + LICENSE gated by `package:audit`
 
 # Restriction lints (panic points need explicit #[allow] with justification)
 clone_on_ref_ptr = "warn"

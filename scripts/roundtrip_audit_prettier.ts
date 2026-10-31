@@ -92,7 +92,7 @@ function run(): never {
 			'-p',
 			'tsv_debug',
 			'--features',
-			'internal_audits',
+			'_internal_audits',
 			'--',
 			'roundtrip_audit',
 			'--gate',

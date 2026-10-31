@@ -35,6 +35,12 @@ use tsv_ignore::{IgnoreSource, IgnoreStack, Negation, NegationTail, PathKind};
 /// is [`excluded_argument_warning`]'s, the format root's display path outside a git
 /// repo. Produced **once**, here, so the native CLI and the WASM binding emit the
 /// identical text.
+///
+/// # Panics
+///
+/// In debug builds, when `loose_root` is not a filesystem root (`/`, a drive root such as
+/// `C:\`, or a `\\`-prefixed root): the separator a path is joined with is read off its
+/// spelling, which only a root makes sound.
 #[must_use]
 pub fn shadow_warning(dir: &str, loose_root: Option<&str>, stack: &IgnoreStack) -> Option<String> {
     let negation = stack.negation_under(dir)?;
@@ -389,6 +395,14 @@ pub fn unresolvable_root_error(root: &str) -> String {
 /// filesystem root and a path is named absolutely; inside one it is `None`, and paths read
 /// relative to the repo root. Produced **once**, here, so the native CLI and the WASM
 /// binding emit the identical text.
+///
+/// # Panics
+///
+/// In debug builds, when `loose_root` is not a filesystem root (`/`, a drive root such as
+/// `C:\`, or a `\\`-prefixed root): the separator a path is joined with is read off its
+/// spelling, which only a root makes sound. Also in debug builds, when a `.gitignore` rule
+/// excludes `rel` while `loose_root` is `Some`: a `.gitignore` is read only inside a repo,
+/// where `loose_root` is `None`.
 #[must_use]
 pub fn excluded_argument_warning(
     display: &str,
@@ -715,7 +729,7 @@ mod tests {
             let mut fixed = IgnoreStack::new();
             fixed.push_formatignore(anchor, &format!("{rule}{}\n", lines.join("\n")));
             assert_eq!(
-                classify_dir(name, &d, BuildOutputHeuristic::Active, &fixed),
+                classify_dir(&d, BuildOutputHeuristic::Active, &fixed),
                 DirVerdict::Descend,
                 "{d}: {lines:?}"
             );
@@ -726,10 +740,7 @@ mod tests {
                 .trim_end()
                 .replace('\\', "");
             let keep_rel = under(&keep);
-            assert!(
-                should_format_file("keep.ts", &keep_rel, &fixed),
-                "{d}: {lines:?}"
-            );
+            assert!(should_format_file(&keep_rel, &fixed), "{d}: {lines:?}");
             // every directory the ladder opened on the way is walked, and nothing beside
             // the file is in scope — not a sibling file, not a sibling directory
             let mut opened = String::new();
@@ -744,19 +755,18 @@ mod tests {
                 opened.push_str(seg);
                 if opened.len() > d.len() {
                     assert_eq!(
-                        classify_dir(seg, &opened, BuildOutputHeuristic::Active, &fixed),
+                        classify_dir(&opened, BuildOutputHeuristic::Active, &fixed),
                         DirVerdict::Descend,
                         "{d}: {lines:?} at {opened}"
                     );
                 }
             }
             assert!(
-                !should_format_file("other.ts", &under(&format!("{dir}/other.ts")), &fixed),
+                !should_format_file(&under(&format!("{dir}/other.ts")), &fixed),
                 "{d}: {lines:?}"
             );
             assert_eq!(
                 classify_dir(
-                    "sibling",
                     &under(&format!("{dir}/sibling")),
                     BuildOutputHeuristic::Active,
                     &fixed
@@ -766,7 +776,6 @@ mod tests {
             );
             assert_eq!(
                 classify_dir(
-                    name,
                     &under(&format!("lib/{name}")),
                     BuildOutputHeuristic::Active,
                     &fixed
@@ -1384,7 +1393,7 @@ mod tests {
         // line wins in the same file
         let stack = stack_from(&[("", "dist/\n")], &[("", "!dist/keep.ts\n")]);
         assert_eq!(
-            classify_dir("dist", "dist", BuildOutputHeuristic::Inactive, &stack),
+            classify_dir("dist", BuildOutputHeuristic::Inactive, &stack),
             DirVerdict::PruneWithWarning
         );
         assert_eq!(
@@ -1405,7 +1414,7 @@ mod tests {
         // added there can override it: that rule is the one to narrow
         let stack = stack_from(&[], &[("", "!pkg/dist/keep.ts\n"), ("pkg", "dist/\n")]);
         assert_eq!(
-            classify_dir("dist", "pkg/dist", BuildOutputHeuristic::Inactive, &stack),
+            classify_dir("pkg/dist", BuildOutputHeuristic::Inactive, &stack),
             DirVerdict::PruneWithWarning
         );
         assert_eq!(
@@ -1422,7 +1431,7 @@ mod tests {
         // no re-include under it: a plain prune, and nothing to say
         let stack = stack_from(&[("", "dist/\n")], &[]);
         assert_eq!(
-            classify_dir("dist", "dist", BuildOutputHeuristic::Inactive, &stack),
+            classify_dir("dist", BuildOutputHeuristic::Inactive, &stack),
             DirVerdict::Prune
         );
         assert_eq!(shadow_warning("dist", None, &stack), None);
@@ -1469,27 +1478,16 @@ mod tests {
             }
             fixed.push_formatignore(anchor, &format!("{rule}{}\n", lines.join("\n")));
             assert!(!fixed.is_ignored(file, PathKind::File), "{file}: {lines:?}");
-            assert!(
-                should_format_file("keep.ts", file, &fixed),
-                "{file}: {lines:?}"
-            );
+            assert!(should_format_file(file, &fixed), "{file}: {lines:?}");
             // nothing beside what the rule reaches: a sibling directory stays pruned, and
             // a sibling file too unless the rule's own glob admits it
             assert_eq!(
-                classify_dir(
-                    "sibling",
-                    "dist/sibling",
-                    BuildOutputHeuristic::Inactive,
-                    &fixed
-                ),
+                classify_dir("dist/sibling", BuildOutputHeuristic::Inactive, &fixed),
                 DirVerdict::Prune,
                 "{lines:?}"
             );
             if !rule.contains('*') {
-                assert!(
-                    !should_format_file("other.ts", "dist/other.ts", &fixed),
-                    "{lines:?}"
-                );
+                assert!(!should_format_file("dist/other.ts", &fixed), "{lines:?}");
             }
         }
     }
@@ -1784,7 +1782,6 @@ mod tests {
                 assert_eq!(
                     classify_dir(
                         "dist",
-                        "dist",
                         BuildOutputHeuristic::from_active(!gitignored),
                         &fixed
                     ),
@@ -1809,7 +1806,6 @@ mod tests {
                 // do all three of the above
                 let readmits = |fixed: &IgnoreStack| {
                     classify_dir(
-                        "dist",
                         "dist",
                         BuildOutputHeuristic::from_active(!gitignored),
                         fixed,

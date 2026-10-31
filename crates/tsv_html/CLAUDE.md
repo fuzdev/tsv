@@ -34,8 +34,8 @@ not here. This crate stays AST-agnostic.
   consumer (matches prettier-plugin-svelte: `isInline = !isBlock`); no
   positive list is exported.
 - **Custom-element name chars** (`elements.rs`): `is_custom_element_name_char` — the one
-  `char`-level predicate (the rest of the API is `&str`), a `PCENChar` per
-  the HTML "valid custom element name" grammar. Shared by `tsv_svelte`'s
+  `char`-level predicate (the rest of the API is `&str`): the tail class of Svelte's
+  `REGEX_VALID_TAG_NAME` — HTML's `PCENChar` ranges plus ASCII uppercase. Shared by `tsv_svelte`'s
   tokenizer (keep a whole custom-element name in one token) and its name
   validator (the hyphen-tail run) — one source of truth for the ranges.
 - **Whitespace** (`whitespace.rs`): `preserves_whitespace` (`<pre>`,
@@ -54,7 +54,7 @@ not here. This crate stays AST-agnostic.
   is the `next` = end-of-parent answer.
 - **Entity decoding** (`entities.rs`): `decode_character_references(html, ReferenceContext)` —
   named, decimal, and hex (lower- and uppercase) character references
-  with HTML5 attribute-context rules and Windows-1252 / surrogate
+  with the HTML attribute-context rule and Windows-1252 / surrogate
   normalization. Svelte's decoder is the AST-parity target, so its
   deliberate answers are replicated quirk for quirk while its
   implementation slips are corrected to the spec — the module docs draw

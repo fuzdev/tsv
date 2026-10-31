@@ -1,7 +1,7 @@
 //! HTML entity decoding
 //!
-//! This module provides HTML character reference decoding following the HTML5 spec.
-//! It handles:
+//! This module provides HTML character reference decoding as Svelte's parser decodes —
+//! the HTML spec's, with the deviations listed below. It handles:
 //! - Named entities (&amp;, &lt;, &nbsp;, etc.)
 //! - Numeric decimal entities (&#65;)
 //! - Numeric hex entities (&#x41; or &#X41;)
@@ -129,14 +129,23 @@ pub enum ReferenceContext {
     AttributeValue,
 }
 
-/// Decode HTML character references in a string.
+/// Decode HTML character references in a string, as Svelte's parser decodes them.
 ///
-/// This function decodes both named entities and numeric character references.
-/// The behavior differs slightly by `context` ([`ReferenceContext`]):
+/// Named and numeric (decimal and hex) references both decode. The behavior differs by
+/// `context` ([`ReferenceContext`]):
 ///
-/// - In attribute values: Named entities without semicolons are only decoded if not
-///   followed by `=` or alphanumeric characters (per HTML5 spec)
-/// - In text content: All valid entities are decoded
+/// - In an attribute value, a named reference with no `;` is decoded only when the
+///   next character is neither `=` nor an ASCII alphanumeric.
+/// - In text, every valid reference is decoded, and `&#10;` becomes a space (U+0020); in
+///   an attribute value it stays a line feed.
+///
+/// Svelte's answers are kept where they differ from the HTML spec on purpose: a numeric
+/// reference to a surrogate half or past U+10FFFF decodes to NUL rather than U+FFFD;
+/// 128–159 take their Windows-1252 characters. Where Svelte's decoder slips, tsv does not
+/// follow it: `&#0;` decodes (to that NUL) where Svelte leaves it as written, the
+/// attribute-value boundary above is ASCII alphanumeric (not the word class of JS's `\b`,
+/// which adds `_`), every other code point is emitted as itself (Svelte drops some planes
+/// to NUL), and a name that stands for two code points emits both.
 ///
 /// # Examples
 ///
@@ -307,7 +316,7 @@ fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, &
     Some((longest_len, characters))
 }
 
-/// Validate and normalize a Unicode code point per HTML5 spec
+/// Validate and normalize a numeric reference's code point, as Svelte's decoder does
 ///
 /// Some code points are verboten and must be replaced or normalized:
 /// - Line feed (10) becomes space (32) outside an attribute value

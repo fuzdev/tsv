@@ -25,12 +25,12 @@ use crate::printing::{
     next_lf, next_width_relevant, next_width_relevant_in, visual_width, visual_width_mixed,
 };
 
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 use crate::comment_ledger::{DocumentKey, comment_check_enabled, document_key};
 
 use super::DocBuf;
 use super::chain_share::ChainShareStore;
-#[cfg(feature = "internal_swallow_check")]
+#[cfg(feature = "_internal_swallow_check")]
 use super::swallow::swallow_check_enabled;
 use super::types::{
     CachedWidth, DocContext, DocText, LineKind, Mode, PoolSpan, TEXT_WIDTH_FIRST_LINE_MASK,
@@ -97,7 +97,7 @@ impl FlattenInfo {
     /// Whether the copy takes the original's comment-ledger tag
     /// ([`DocArena::flatten_retag`]): every rebuilt node's does but an atomized group's,
     /// whose copy the atomizing arm hands back untagged.
-    #[cfg(feature = "internal_comment_check")]
+    #[cfg(feature = "_internal_comment_check")]
     fn retags(&self, mode: FlattenMode) -> bool {
         !(mode == FlattenMode::Atomize && matches!(self, Self::Group { .. }))
     }
@@ -2584,9 +2584,9 @@ pub struct DocArena {
     /// recorded by `line_comment_text_pooled` only while the swallow check is
     /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
     /// the vec is sorted ascending — the renderer membership-tests via binary
-    /// search. See [`super::swallow`]. Compiled in only under the `internal_swallow_check`
+    /// search. See [`super::swallow`]. Compiled in only under the `_internal_swallow_check`
     /// feature, so production builds carry no diagnostic state.
-    #[cfg(feature = "internal_swallow_check")]
+    #[cfg(feature = "_internal_swallow_check")]
     line_comment_ids: RefCell<Vec<u32>>,
     /// Diagnostic side-set: the doc nodes that *are* a comment, recorded by
     /// [`Self::tag_comment_doc`] only while the comment ledger is enabled (empty and
@@ -2594,8 +2594,8 @@ pub struct DocArena {
     /// document it was parsed from, because the renderer — which records the emit when it
     /// reaches the node — holds no `source`. Appended in `alloc` order, so the vec is
     /// sorted ascending on the id and the renderer looks up by binary search. See
-    /// [`crate::comment_ledger`]. Compiled in only under the `internal_comment_check` feature.
-    #[cfg(feature = "internal_comment_check")]
+    /// [`crate::comment_ledger`]. Compiled in only under the `_internal_comment_check` feature.
+    #[cfg(feature = "_internal_comment_check")]
     comment_docs: RefCell<Vec<(u32, Span, DocumentKey)>>,
 }
 
@@ -2747,9 +2747,9 @@ impl DocArena {
             #[cfg(debug_assertions)]
             flow_probe_fresh: Cell::new(false),
             keyed_group_modes: RefCell::new(Vec::new()),
-            #[cfg(feature = "internal_swallow_check")]
+            #[cfg(feature = "_internal_swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
-            #[cfg(feature = "internal_comment_check")]
+            #[cfg(feature = "_internal_comment_check")]
             comment_docs: RefCell::new(Vec::new()),
         };
         seed_prelude(arena.nodes.get_mut());
@@ -2804,9 +2804,9 @@ impl DocArena {
             #[cfg(debug_assertions)]
             flow_probe_fresh: Cell::new(false),
             keyed_group_modes: RefCell::new(Vec::new()),
-            #[cfg(feature = "internal_swallow_check")]
+            #[cfg(feature = "_internal_swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
-            #[cfg(feature = "internal_comment_check")]
+            #[cfg(feature = "_internal_comment_check")]
             comment_docs: RefCell::new(Vec::new()),
         };
         seed_prelude(arena.nodes.get_mut());
@@ -2859,9 +2859,9 @@ impl DocArena {
         self.children.get_mut().clear();
         self.text_pool.get_mut().clear();
         self.layout_cache.get_mut().clear();
-        #[cfg(feature = "internal_swallow_check")]
+        #[cfg(feature = "_internal_swallow_check")]
         self.line_comment_ids.get_mut().clear();
-        #[cfg(feature = "internal_comment_check")]
+        #[cfg(feature = "_internal_comment_check")]
         self.comment_docs.get_mut().clear();
     }
 
@@ -3108,7 +3108,7 @@ impl DocArena {
     /// Create a pooled-text doc (via [`Self::text_pooled`]) for a *line comment*
     /// (`// …` or hashbang) — text whose content runs to end-of-line.
     ///
-    /// Identical to [`Self::text_pooled`] for output. Under the `internal_swallow_check`
+    /// Identical to [`Self::text_pooled`] for output. Under the `_internal_swallow_check`
     /// feature, while the check is enabled (`super::swallow` — not linked, since
     /// that module only exists under the feature) it additionally
     /// records the node's id so the renderer can flag any content emitted on the
@@ -3117,7 +3117,7 @@ impl DocArena {
     #[inline]
     pub fn line_comment_text_pooled(&self, s: &str) -> DocId {
         let id = self.text_pooled(s);
-        #[cfg(feature = "internal_swallow_check")]
+        #[cfg(feature = "_internal_swallow_check")]
         if swallow_check_enabled() {
             // Recorded in alloc order → sorted ascending (see field doc).
             self.line_comment_ids.borrow_mut().push(id.0);
@@ -3240,14 +3240,14 @@ impl DocArena {
     }
 
     /// Verbatim-source-slice form of [`Self::line_comment_text_pooled`]: emits a
-    /// [`DocText::SourceSpan`] (no allocation) and, under the `internal_swallow_check`
+    /// [`DocText::SourceSpan`] (no allocation) and, under the `_internal_swallow_check`
     /// feature while enabled, records the node so the renderer can flag content
     /// emitted on the same physical line after a `//`/hashbang comment. Without
     /// the feature it is exactly [`Self::source_span`].
     #[inline]
     pub fn line_comment_source_span(&self, span: Span, source: &str) -> DocId {
         let id = self.source_span(span, source);
-        #[cfg(feature = "internal_swallow_check")]
+        #[cfg(feature = "_internal_swallow_check")]
         if swallow_check_enabled() {
             // Recorded in alloc order → sorted ascending (see field doc).
             self.line_comment_ids.borrow_mut().push(id.0);
@@ -3258,7 +3258,7 @@ impl DocArena {
     /// Whether `id` is a line-comment text node (diagnostic; binary search over
     /// the sorted side-set). Only meaningful while the swallow check is enabled.
     /// Internal to the renderer's swallow check — not part of the builder API.
-    #[cfg(feature = "internal_swallow_check")]
+    #[cfg(feature = "_internal_swallow_check")]
     #[inline]
     pub(crate) fn is_line_comment(&self, id: DocId) -> bool {
         self.line_comment_ids.borrow().binary_search(&id.0).is_ok()
@@ -3547,8 +3547,8 @@ impl DocArena {
     /// a [`DocumentKey`] because the renderer holds no source of its own — the arena is
     /// shared across a Svelte host and a nested element's re-parsed island, whose spans
     /// live in different namespaces. A no-op unless the ledger is enabled, and compiled
-    /// out entirely without the `internal_comment_check` feature. See [`crate::comment_ledger`].
-    #[cfg(feature = "internal_comment_check")]
+    /// out entirely without the `_internal_comment_check` feature. See [`crate::comment_ledger`].
+    #[cfg(feature = "_internal_comment_check")]
     #[inline]
     pub fn tag_comment_doc(&self, id: DocId, span: Span, source: &str) {
         if comment_check_enabled() {
@@ -3563,7 +3563,7 @@ impl DocArena {
 
     /// Whether any comment-doc tags were recorded — the renderer's hoisted gate, so a
     /// document with no comments pays no per-node lookup.
-    #[cfg(feature = "internal_comment_check")]
+    #[cfg(feature = "_internal_comment_check")]
     #[inline]
     pub(crate) fn has_comment_docs(&self) -> bool {
         !self.comment_docs.borrow().is_empty()
@@ -3571,7 +3571,7 @@ impl DocArena {
 
     /// The comment a doc node emits, if it is one (binary search over the sorted
     /// side-set). Internal to the renderer's ledger hook — not part of the builder API.
-    #[cfg(feature = "internal_comment_check")]
+    #[cfg(feature = "_internal_comment_check")]
     #[inline]
     pub(crate) fn comment_doc_tag(&self, id: DocId) -> Option<(Span, DocumentKey)> {
         let tags = self.comment_docs.borrow();
@@ -3601,8 +3601,8 @@ impl DocArena {
     /// tree and discards the old, and the renderer only records emits for nodes it actually
     /// reaches (a discarded/losing subtree never does), so the old tag left in place never
     /// fires. A no-op unless the ledger is enabled and `old` was tagged; compiled out entirely
-    /// without the `internal_comment_check` feature. See [`crate::comment_ledger`].
-    #[cfg(feature = "internal_comment_check")]
+    /// without the `_internal_comment_check` feature. See [`crate::comment_ledger`].
+    #[cfg(feature = "_internal_comment_check")]
     #[inline]
     pub(crate) fn retag_comment_doc(&self, new: DocId, old: DocId) {
         if !comment_check_enabled() {
@@ -3898,9 +3898,9 @@ impl DocArena {
     /// array to materialize.
     #[expect(clippy::inline_always)]
     #[inline(always)]
-    #[cfg_attr(feature = "internal_census", track_caller)]
+    #[cfg_attr(feature = "_internal_census", track_caller)]
     pub fn concat(&self, docs: &[DocId]) -> DocId {
-        #[cfg(feature = "internal_census")]
+        #[cfg(feature = "_internal_census")]
         crate::census::site(core::panic::Location::caller(), docs.len());
         match docs {
             [single] => *single,
@@ -3982,9 +3982,9 @@ impl DocArena {
     }
 
     /// Create a fill doc for greedy line packing.
-    #[cfg_attr(feature = "internal_census", track_caller)]
+    #[cfg_attr(feature = "_internal_census", track_caller)]
     pub fn fill(&self, parts: &[DocId]) -> DocId {
-        #[cfg(feature = "internal_census")]
+        #[cfg(feature = "_internal_census")]
         crate::census::site(core::panic::Location::caller(), parts.len());
         let range = self.alloc_children(parts);
         self.alloc(DocNode::Fill(range))
@@ -5374,12 +5374,12 @@ impl DocArena {
             return known;
         }
         let info = self.flatten_info(id, mode);
-        #[cfg(feature = "internal_comment_check")]
+        #[cfg(feature = "_internal_comment_check")]
         let retags = info.retags(mode);
         let new_id = self.flatten_build(id, info, mode, &mut |kid| {
             self.flatten_lines_impl(kid, mode, memo, frames - 1)
         });
-        #[cfg(feature = "internal_comment_check")]
+        #[cfg(feature = "_internal_comment_check")]
         self.flatten_retag(id, new_id, retags);
         memo.record(id, new_id)
     }
@@ -5421,7 +5421,7 @@ impl DocArena {
                     steps.extend(kids.iter().rev().map(|&kid| Step::Enter(kid)));
                 }
                 Step::Exit(id, info, first) => {
-                    #[cfg(feature = "internal_comment_check")]
+                    #[cfg(feature = "_internal_comment_check")]
                     let retags = info.retags(mode);
                     let mut next = first;
                     let new_id = self.flatten_build(id, info, mode, &mut |_| {
@@ -5435,7 +5435,7 @@ impl DocArena {
                         "the copy took every child the loop flattened"
                     );
                     copies.truncate(first);
-                    #[cfg(feature = "internal_comment_check")]
+                    #[cfg(feature = "_internal_comment_check")]
                     self.flatten_retag(id, new_id, retags);
                     copies.push(memo.record(id, new_id));
                 }
@@ -5688,9 +5688,9 @@ impl DocArena {
     /// (a re-allocated node gets a fresh `DocId`), so the renderer never records the emit
     /// and the — verbatim-printed — comment reads as DROPPED. Carry the tag onto each
     /// rebuilt node. Every node of the walk routes through here, so a tagged comment
-    /// anywhere in the subtree is covered. `internal_comment_check`-only — production output is
+    /// anywhere in the subtree is covered. `_internal_comment_check`-only — production output is
     /// byte-identical.
-    #[cfg(feature = "internal_comment_check")]
+    #[cfg(feature = "_internal_comment_check")]
     fn flatten_retag(&self, id: DocId, new_id: DocId, retags: bool) {
         if retags && new_id != id {
             self.retag_comment_doc(new_id, id);
@@ -5726,8 +5726,8 @@ impl DocArena {
     /// caller rendering there must not substitute the slice.
     ///
     /// ⚠️ A slice written that way never reaches the renderer's two audit seams (the
-    /// `internal_swallow_check` text hook and the `internal_comment_check` tag record). That is sound only
-    /// for a printer whose docs carry neither a line-comment mark nor a comment tag — the
+    /// `_internal_swallow_check` text hook and the `_internal_comment_check` tag record). That is
+    /// sound only for a printer whose docs carry neither a line-comment mark nor a comment tag — the
     /// CSS printer, which records its comments where it writes them.
     #[inline]
     pub fn as_source_span_text(&self, id: DocId) -> Option<Span> {
@@ -7522,7 +7522,7 @@ mod walk_memo_tests {
 
     /// The loop counts the recursion's doc-walk visits ([`crate::fanout_probe::walk`]):
     /// one per node entered, a memo hit included, whichever walk enters it.
-    #[cfg(feature = "internal_fanout_check")]
+    #[cfg(feature = "_internal_fanout_check")]
     #[test]
     fn flattening_in_the_loop_counts_the_recursions_walks() {
         use crate::fanout_probe::{Budget, arm, disarm};

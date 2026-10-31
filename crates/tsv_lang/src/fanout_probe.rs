@@ -1,5 +1,5 @@
-//! Opt-in work counters for `tsv_debug build_fanout_audit` (`internal_fanout_check` feature, off by
-//! default).
+//! Opt-in work counters for `tsv_debug build_fanout_audit` (`_internal_fanout_check` feature,
+//! off by default).
 //!
 //! The fanout audit grades a format by the work it does, not by its time or memory: how often
 //! the printers built each AST node ([`build`]), how many nodes the doc walks visited
@@ -14,7 +14,7 @@
 //! **With the feature off every entry point here is an empty `#[inline]` function**, so the
 //! call sites the printers and the doc walks carry compile to nothing in every shipped build.
 //! With it on, a site costs one relaxed load of [`arm`]'s flag until the audit arms the
-//! counters, so the other audits sharing the `internal_audits` build pay only that.
+//! counters, so the other audits sharing the `_internal_audits` build pay only that.
 //!
 //! The counters are per thread: the audit arms them, formats one input on the same thread,
 //! and reads them back with [`disarm`]. A [`Budget`] bounds an armed run — the call that takes
@@ -83,7 +83,7 @@ impl Tally {
     }
 }
 
-#[cfg(feature = "internal_fanout_check")]
+#[cfg(feature = "_internal_fanout_check")]
 mod imp {
     use std::cell::RefCell;
     use std::hash::{Hash, Hasher};
@@ -250,7 +250,7 @@ mod imp {
     pub const ENABLED: bool = true;
 }
 
-#[cfg(not(feature = "internal_fanout_check"))]
+#[cfg(not(feature = "_internal_fanout_check"))]
 mod imp {
     use super::{Budget, Build, Tally};
 
@@ -280,52 +280,52 @@ mod imp {
     pub const ENABLED: bool = false;
 }
 
-/// Whether the counters are compiled in (the `internal_fanout_check` feature). Without them every
+/// Whether the counters are compiled in (the `_internal_fanout_check` feature). Without them every
 /// [`disarm`] reads an empty [`Tally`], which an audit must refuse rather than grade.
 pub const ENABLED: bool = imp::ENABLED;
 
 /// Count one build of the AST node of kind `kind` (an enum whose discriminant names it), by
 /// `dispatch`; `span` answers the node's `(start, end)`, asked only when a run is armed. A
-/// no-op without the `internal_fanout_check` feature, which never calls `span`.
+/// no-op without the `_internal_fanout_check` feature, which never calls `span`.
 #[inline]
 pub fn build<K>(dispatch: Build, kind: &K, span: impl FnOnce() -> (u32, u32)) {
     imp::build(dispatch, kind, span);
 }
 
-/// Count one doc-walk visit. A no-op without the `internal_fanout_check` feature.
+/// Count one doc-walk visit. A no-op without the `_internal_fanout_check` feature.
 #[inline]
 pub fn walk() {
     imp::walk();
 }
 
-/// Count `n` source-scan steps. A no-op without the `internal_fanout_check` feature.
+/// Count `n` source-scan steps. A no-op without the `_internal_fanout_check` feature.
 #[inline]
 pub fn scan(n: u64) {
     imp::scan(n);
 }
 
 /// Count one step of a printer's structural predicate — an AST descent or a lookahead over
-/// sibling nodes or comments. A no-op without the `internal_fanout_check` feature.
+/// sibling nodes or comments. A no-op without the `_internal_fanout_check` feature.
 #[inline]
 pub fn predicate() {
     imp::predicate();
 }
 
-/// Count one doc node allocated. A no-op without the `internal_fanout_check` feature.
+/// Count one doc node allocated. A no-op without the `_internal_fanout_check` feature.
 #[inline]
 pub fn node() {
     imp::node();
 }
 
 /// Start counting on this thread, from zero, under `budget`. A no-op without the
-/// `internal_fanout_check` feature.
+/// `_internal_fanout_check` feature.
 #[inline]
 pub fn arm(budget: Budget) {
     imp::arm(budget);
 }
 
 /// Stop counting on this thread and read what was counted since [`arm`] (empty when it was
-/// never armed, or without the `internal_fanout_check` feature).
+/// never armed, or without the `_internal_fanout_check` feature).
 #[inline]
 pub fn disarm() -> Tally {
     imp::disarm()

@@ -119,7 +119,7 @@ function run(): never {
 
 	// The production discovery, on the `--profile corpus` `tsv` binary. Exec'd by PATH rather
 	// than through `cargo run`: that form selects `-p tsv_cli` alone, which resolves features
-	// without `internal_audits` and so rebuilds the whole stack into a second corpus-profile world (see
+	// without `_internal_audits` and so rebuilds the whole stack into a second corpus-profile world (see
 	// deno.json `//build:check`). The `discovery:audit` task runs `build:check` ahead of this,
 	// so the binary is fresh on a standalone run too.
 	const list = spawnSync(TSV_BIN, ['format', '--list', tree], {

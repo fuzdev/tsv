@@ -768,7 +768,7 @@ impl<'a> Printer<'a> {
     /// verbatim seams use [`Self::source_span_covering_comments_doc`] (a frozen template node,
     /// a range) and [`Self::verbatim_source_doc`] (a frozen value inside a node).
     pub(crate) fn write_verbatim_span(&mut self, span: Span) {
-        #[cfg(feature = "internal_comment_check")]
+        #[cfg(feature = "_internal_comment_check")]
         tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
 
         self.write(span.extract(self.source));
@@ -786,7 +786,7 @@ impl<'a> Printer<'a> {
     /// one of them — it takes [`Self::source_span_covering_comments_doc`], whose line breaks
     /// break the fragment holding it.
     pub(crate) fn verbatim_source_doc(&self, span: Span) -> DocId {
-        #[cfg(feature = "internal_comment_check")]
+        #[cfg(feature = "_internal_comment_check")]
         tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
 
         self.d().verbatim_source_span(span, self.source)
@@ -800,7 +800,7 @@ impl<'a> Printer<'a> {
     /// content and inside `<pre>` alike), and a format-ignore range, whose frozen line breaks
     /// are line breaks in the output, as prettier-plugin-svelte's `literalline` makes them.
     pub(crate) fn source_span_covering_comments_doc(&self, span: Span) -> DocId {
-        #[cfg(feature = "internal_comment_check")]
+        #[cfg(feature = "_internal_comment_check")]
         tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
 
         self.d().source_span(span, self.source)
@@ -1760,7 +1760,7 @@ fn format_root<'a>(
     // `<!-- -->` (`FragmentNode::Comment`) comments are AST nodes rather than detached, so
     // they register by span through a recursive fragment walk — hoisted section comments
     // included, since they still live in `Root.fragment.nodes` (see `print_root`).
-    #[cfg(feature = "internal_comment_check")]
+    #[cfg(feature = "_internal_comment_check")]
     {
         tsv_lang::comment_ledger::register_parsed(source, &comments);
         let mut html_comment_spans = Vec::new();
@@ -1899,7 +1899,7 @@ fn format_lifted_runs(
 /// into every nested fragment (elements, special elements, and the `{#if}` / `{#each}` /
 /// `{#await}` / `{#key}` / `{#snippet}` block bodies). The print-once comment ledger reads
 /// only the span, so no `HtmlComment` need be manufactured into a `Comment`.
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 fn collect_html_comment_spans(fragment: &ast::Fragment<'_>, out: &mut Vec<Span>) {
     for node in fragment.nodes {
         match node {
@@ -2915,7 +2915,7 @@ impl<'a> Printer<'a> {
         // the write like `tsv_css`'s `print_css_comment`; the template path is the doc-tagged
         // `build_html_comment_doc`. Registered by span in `format_svelte_in`. See
         // `tsv_lang::comment_ledger`.
-        #[cfg(feature = "internal_comment_check")]
+        #[cfg(feature = "_internal_comment_check")]
         tsv_lang::comment_ledger::record_emitted(self.source, comment.span);
 
         // Verbatim whole span (`<!--…-->`), not re-assembled delimiters — see

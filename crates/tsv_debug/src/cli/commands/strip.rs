@@ -75,7 +75,7 @@ fn strip_file(path: &std::path::Path) -> Result<(), CliError> {
             print!("{}", stripped.code);
             Ok(())
         }
-        Err(tsv_ts::StripError::Unsupported { kind, span }) => {
+        Err(tsv_ts::StripError::Unsupported { kind, span, .. }) => {
             eprint!("refused: {}", refusal_line(&source, kind, span));
             Err(CliError::Failed)
         }
@@ -166,7 +166,7 @@ fn answer(source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
     };
     match result {
         Ok(Ok((code, findings))) => serde_json::json!({ "code": code, "findings": findings }),
-        Ok(Err(tsv_ts::StripError::Unsupported { kind, span })) => {
+        Ok(Err(tsv_ts::StripError::Unsupported { kind, span, .. })) => {
             serde_json::json!({ "refusal": refusal_line(source, kind, span) })
         }
         Ok(Err(tsv_ts::StripError::Parse(e))) => serde_json::json!({ "error": format!("{e:#}") }),

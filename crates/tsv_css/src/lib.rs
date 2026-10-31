@@ -27,23 +27,41 @@
 //!
 //! Every tsv language crate returns the same [`Error`]: its [`Error::kind`], its
 //! [`Error::span`] in the input's UTF-8 bytes, and [`Error::report`] in the wire's UTF-16
-//! offsets and lines; one line under `{}`, the `tsv` CLI's frame under `{:#}`. Deep input is
-//! refused with [`ErrorKind::TooDeep`]; a debug build handling input it does not control
-//! runs the call under [`run_with_stack`].
+//! offsets and lines; one line under `{}`, the `tsv` CLI's frame under `{:#}`.
+//!
+//! ## Deep input
+//!
+//! The parser refuses a tree past its depth limits with [`ErrorKind::TooDeep`], so every
+//! walk of an accepted tree fits a 2 MiB thread in an optimized build and a 16 MiB one in a
+//! debug build. A stack overflow aborts the process rather than panicking, so a debug
+//! build handling input it does not control — `cargo test` runs each test on a 2 MiB thread —
+//! wraps the call in [`run_with_stack`], which runs it on a thread reserving [`STACK_SIZE`].
 //!
 //! ## Features
 //!
-//! - `json` (default) — [`parse_to_json`], [`parse_to_json_with`] and [`JsonOptions`]. Turn
+#![cfg_attr(
+    feature = "json",
+    doc = " - `json` (default) — [`parse_to_json`], [`parse_to_json_with`] and [`JsonOptions`]. Turn"
+)]
+#![cfg_attr(
+    not(feature = "json"),
+    doc = " - `json` (default) — `parse_to_json`, `parse_to_json_with` and `JsonOptions`. Turn"
+)]
 //!   default features off for a format-only build.
 //! - `locations` — `JsonOptions::locations`, adding a `loc` (line and column) to every
 //!   positioned object of the wire.
 //!
-//! The `internal_*` features are tsv's own diagnostics, not for consumers.
+//! The `_internal_*` features are tsv's own diagnostics, not for consumers
+//! ([Stability](#stability)).
 //!
 //! ## Stability
 //!
 //! This release exposes no AST: parsing returns the wire JSON, in `parseCss`'s shape, which
 //! `@fuzdev/tsv-parse-wasm`'s `tsv_ast.d.ts` types.
+//!
+//! Items hidden from these docs (`__private`, `ast` and every other `#[doc(hidden)]` item)
+//! and the `_internal_*` features are tsv's own plumbing for its sibling crates, which pin
+//! each other exactly; they change in any release, outside semver.
 
 #![warn(missing_docs)]
 
@@ -220,7 +238,7 @@ fn wire_string(bytes: Vec<u8>) -> String {
 ///
 /// The differential gate for lexer changes: two lexer implementations are
 /// token-identical iff this string matches for every corpus file. Behind the
-/// `internal_debug_lex` feature (off in production builds); used by `tsv_debug lex_diff`.
+/// `_internal_debug_lex` feature (off in production builds); used by `tsv_debug lex_diff`.
 ///
 /// For `Identifier` tokens it prints the **resolved text** — the decoded value
 /// when escapes were present, otherwise the verbatim source slice. That keeps the
@@ -228,7 +246,7 @@ fn wire_string(bytes: Vec<u8>) -> String {
 /// decoded value equals its source slice, so the stream is stable whether the
 /// lexer allocates the decode eagerly or only when an escape is seen, while a
 /// wrong escape decode still shows up as a divergent `text=`.
-#[cfg(feature = "internal_debug_lex")]
+#[cfg(feature = "_internal_debug_lex")]
 #[doc(hidden)]
 pub fn debug_token_stream(source: &str) -> String {
     use crate::lexer::{Lexer, TokenKind};

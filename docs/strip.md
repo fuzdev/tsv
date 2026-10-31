@@ -18,7 +18,7 @@ and Node's `module.stripTypeScriptTypes` share. The implementation is `tsv_ts::s
   `Error`; `StripError::Unsupported { kind, span }` the refused construct
   (`UnsupportedKind::name` is its snake_case wire name) and its byte span.
   `StripError::message(source)` renders either as the CLI prints it, and
-  `UnsupportedKind::report(span, source)` splits a refusal — summary, frame, span — as the
+  `UnsupportedKind::report(source, span)` splits a refusal — summary, frame, span — as the
   packages return it (a parse error's is `Error::report`).
 - **npm**: `strip_typescript(source, options?)` in `@fuzdev/tsv-wasm` and the native
   `@fuzdev/tsv` — the `strip` cargo feature of `tsv_wasm` and `tsv_napi`, in each crate's

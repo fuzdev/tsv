@@ -38,6 +38,14 @@ fn collect_svelte_files(dir: &Path, out: &mut Vec<PathBuf>) {
 #[test]
 fn fixture_trees_format_identically_without_fused_spans() {
     let tests = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests");
+    // a published crate's tarball carries no workspace `tests/`; in the repo it is always there
+    if !tests.is_dir() {
+        eprintln!(
+            "skipped: {} is absent (outside the tsv repo)",
+            tests.display()
+        );
+        return;
+    }
     let mut files = Vec::new();
     collect_svelte_files(&tests.join("fixtures"), &mut files);
     collect_svelte_files(&tests.join("fixtures_compile"), &mut files);

@@ -236,7 +236,7 @@ if (!failed.ok) {
 
 ${pkg.engine === 'wasm' ? 'using stack = new IgnoreStack();' : 'const stack = new IgnoreStack();'}
 stack.push_gitignore('', 'build/\\n');
-const verdict: 'descend' | 'prune' | 'prune_warn' = stack.classify_dir('build', 'build', true);
+const verdict: 'descend' | 'prune' | 'prune_warn' = stack.classify_dir('build', true);
 const warning: string | undefined = stack.shadow_warning('src');
 void [returns, formatted, script, css, verdict, warning];
 `;

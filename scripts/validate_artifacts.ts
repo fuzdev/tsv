@@ -311,11 +311,10 @@ for (const { label, entry, has_format, has_parse, has_strip, is_npm } of smoke_t
 						push_formatignore(anchor: string, content: string): void;
 						is_ignored(path: string, is_dir: boolean): boolean;
 						classify_dir(
-							name: string,
 							child_rel: string,
 							heuristic_active: boolean
 						): 'descend' | 'prune' | 'prune_warn';
-						should_format_file(name: string, child_rel: string): boolean;
+						should_format_file(child_rel: string): boolean;
 						shadow_warning(dir: string, loose_root: string | undefined): string | undefined;
 				  })
 				| undefined;
@@ -335,24 +334,24 @@ for (const { label, entry, has_format, has_parse, has_strip, is_npm } of smoke_t
 				!stack.is_ignored('src/x.ts', false) &&
 				// the tsv_discover verdict methods (the format-only package's primary
 				// discovery exports)
-				stack.classify_dir('node_modules', 'node_modules', false) === 'prune' && // safety net
+				stack.classify_dir('node_modules', false) === 'prune' && // safety net
 				// a rule prunes `build`, and the `!build/keep.ts` written under it is inert
 				// there (git's parent-directory rule), so the verdict carries a warning
 				// rather than being a plain prune — the caller then fetches the re-include
 				// ladder from `shadow_warning`
-				stack.classify_dir('build', 'build', false) === 'prune_warn' &&
+				stack.classify_dir('build', false) === 'prune_warn' &&
 				!!stack.shadow_warning('build', undefined) &&
-				stack.classify_dir('src', 'src', false) === 'descend' &&
-				stack.should_format_file('app.ts', 'src/app.ts') === true &&
-				stack.should_format_file('ignored.ts', 'ignored.ts') === false && // leaf-matched ignore (should_format_file is leaf-only; build/ is kept out via classify_dir's dir prune above)
-				stack.should_format_file('notes.md', 'notes.md') === false; // wrong extension
+				stack.classify_dir('src', false) === 'descend' &&
+				stack.should_format_file('src/app.ts') === true &&
+				stack.should_format_file('ignored.ts') === false && // leaf-matched ignore (should_format_file is leaf-only; build/ is kept out via classify_dir's dir prune above)
+				stack.should_format_file('notes.md') === false; // wrong extension
 			// the build-output heuristic, which is active only where no `.gitignore`
 			// governs the level — so it needs a stack with none pushed
 			const loose = new ctor();
 			return (
 				gated &&
-				loose.classify_dir('dist', 'dist', true) === 'prune' &&
-				loose.classify_dir('src', 'src', true) === 'descend'
+				loose.classify_dir('dist', true) === 'prune' &&
+				loose.classify_dir('src', true) === 'descend'
 			);
 		});
 	} else {

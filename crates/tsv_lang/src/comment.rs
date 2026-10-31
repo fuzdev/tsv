@@ -73,8 +73,8 @@ pub struct Comment {
     ///
     /// Set this flag exclusively where the owning node also prints — **an owned comment
     /// nothing prints is a dropped comment.** What makes that safe to rely on is the
-    /// print-once ledger (`crate::comment_ledger`, `internal_comment_check` feature): it asserts that
-    /// every parsed comment is emitted exactly once, so a broken ownership claim fails the
+    /// print-once ledger (`crate::comment_ledger`, `_internal_comment_check` feature): it asserts
+    /// that every parsed comment is emitted exactly once, so a broken ownership claim fails the
     /// `comments:audit` gate instead of silently deleting the comment.
     pub owned_by_node: bool,
 }

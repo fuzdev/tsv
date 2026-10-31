@@ -882,7 +882,7 @@ impl<'a> Printer<'a> {
     /// `d.source_span(…)` for a glued compound selector or an unparseable one — record
     /// through `record_verbatim_range` at their own sites.
     pub(crate) fn write_verbatim_span(&mut self, span: Span) {
-        #[cfg(feature = "internal_comment_check")]
+        #[cfg(feature = "_internal_comment_check")]
         tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
 
         self.write(span.extract(self.source));
@@ -894,7 +894,7 @@ impl<'a> Printer<'a> {
         // `CssBlockChild::Comment` — whose span is registered too (by
         // `register_stylesheet_comments` at the format entry), so this emit matches a
         // registered entry and this seam records it, same as for a detached comment.
-        #[cfg(feature = "internal_comment_check")]
+        #[cfg(feature = "_internal_comment_check")]
         tsv_lang::comment_ledger::record_emitted(self.source, comment.span);
 
         // Write comment with delimiters - content is preserved exactly as written
@@ -938,7 +938,7 @@ impl<'a> Printer<'a> {
             // The crate's other comment-emission seam (see `print_css_comment`). Sound to
             // record at build time: the CSS printer builds each doc once and renders it
             // once — no `conditional_group` candidate rebuilds.
-            #[cfg(feature = "internal_comment_check")]
+            #[cfg(feature = "_internal_comment_check")]
             tsv_lang::comment_ledger::record_emitted(self.source, comment.span);
 
             if first {
@@ -1219,7 +1219,7 @@ fn css_terminator_len(gap: &[u8], i: usize) -> Option<usize> {
 /// in-block comments here is what turns a dropped/double-printed one into a ledger finding
 /// instead of a silent, unregistered emit. A declaration's *value* comments are never lexed
 /// as `Comment`s, so they stay out of scope by construction.
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 fn register_stylesheet_comments(stylesheet: &CssStyleSheet<'_>, source: &str) {
     tsv_lang::comment_ledger::register_parsed(source, &stylesheet.comments);
     let mut block_comment_spans = Vec::new();
@@ -1228,7 +1228,7 @@ fn register_stylesheet_comments(stylesheet: &CssStyleSheet<'_>, source: &str) {
 }
 
 /// Collect the spans of every in-block `CssBlockChild::Comment` under the top-level nodes.
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 fn collect_block_comment_spans(nodes: &[CssNode<'_>], out: &mut Vec<Span>) {
     for node in nodes {
         match node {
@@ -1244,7 +1244,7 @@ fn collect_block_comment_spans(nodes: &[CssNode<'_>], out: &mut Vec<Span>) {
 
 /// Recurse a block's children, collecting `Comment` spans and descending into nested rules
 /// and at-rule blocks.
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 fn collect_block_child_comment_spans(children: &[CssBlockChild<'_>], out: &mut Vec<Span>) {
     for child in children {
         match child {
@@ -1307,7 +1307,7 @@ fn format_stylesheet(
     // The print-once comment ledger's expectation for this stylesheet — detached comments
     // plus in-block `CssBlockChild::Comment` AST nodes (diagnostic; see
     // `tsv_lang::comment_ledger`).
-    #[cfg(feature = "internal_comment_check")]
+    #[cfg(feature = "_internal_comment_check")]
     register_stylesheet_comments(stylesheet, source);
 
     let mut printer = Printer::new(arena, source, &stylesheet.comments, line_breaks.table());
@@ -1348,7 +1348,7 @@ pub(crate) fn format_css_embedded_in(
     // plus in-block `CssBlockChild::Comment` AST nodes (diagnostic; see
     // `tsv_lang::comment_ledger`). The Svelte host's `Root.comments` deliberately excludes
     // `<style>` comments, so this is their only registration.
-    #[cfg(feature = "internal_comment_check")]
+    #[cfg(feature = "_internal_comment_check")]
     register_stylesheet_comments(stylesheet, source);
 
     let base = embed.base_indent_offset;

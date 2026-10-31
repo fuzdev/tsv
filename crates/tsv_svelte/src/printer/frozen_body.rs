@@ -111,7 +111,7 @@ impl<'a> Printer<'a> {
             // below is inside it, and a ledger range that stopped short of one would read as
             // a DROP.
             let body = frozen_body_span(self.source, content);
-            #[cfg(feature = "internal_comment_check")]
+            #[cfg(feature = "_internal_comment_check")]
             tsv_lang::comment_ledger::record_verbatim_range(self.source, body.start, body.end);
             // The `&'a str` field, not `self.source()` — that accessor's return borrows
             // `&self`, which the `write` calls below would conflict with.

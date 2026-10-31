@@ -1,6 +1,10 @@
 //! HTML element classification, whitespace rules and character-reference decoding — part
 //! of [tsv](https://github.com/fuzdev/tsv).
 //!
+//! **Support crate for tsv**, used by [`tsv_svelte`](https://docs.rs/tsv_svelte) — no
+//! stability promise yet. Its answers follow Svelte's reading of HTML rather than the
+//! spec's; the goal is to grow it into a standalone HTML library later.
+//!
 //! Pure functions over tag names and text, independent of any one tool (formatter, linter,
 //! type checker). The whitespace sets are the ones Svelte's compiler and
 //! prettier-plugin-svelte apply — [`collapses_child_whitespace`] is Svelte's exact set — so

@@ -1,8 +1,8 @@
-//! Opt-in perf census counters (`internal_census` feature, off by default).
+//! Opt-in perf census counters (`_internal_census` feature, off by default).
 //!
 //! A perf session that wants to know how often a loop runs, how long its runs are,
 //! or how often a predicate returns true adds `census::add` calls at the sites it is
-//! pricing, builds `tsv_debug` with `--features internal_census`, and reads the report
+//! pricing, builds `tsv_debug` with `--features _internal_census`, and reads the report
 //! `tsv_debug profile` / `json_profile` print after their tables. The counters are
 //! the *session's*, not the tree's — the call sites are throwaway and come back out
 //! before anything is measured; only this module and the report hook are durable.
@@ -31,13 +31,13 @@
 //! ```
 //!
 //! Then name them in [`LABELS`] and run
-//! `cargo run --release --features internal_census -p tsv_debug -- profile <corpus>`.
+//! `cargo run --release --features _internal_census -p tsv_debug -- profile <corpus>`.
 //! Unlabelled non-zero counters still report, as `c<index>`.
 //!
 //! One site-keyed hook is durable beside the counters: `site` (which exists only with the
-//! `internal_census` feature) records a caller location with a small count, and `DocArena::concat` /
-//! `fill` carry a `#[cfg_attr(feature = "internal_census", track_caller)]` that feeds it their part
-//! count — so "which sites assemble how many parts" is one feature flag away, the population
+//! `_internal_census` feature) records a caller location with a small count, and
+//! `DocArena::concat` / `fill` carry a `#[cfg_attr(feature = "_internal_census", track_caller)]`
+//! that feeds it their part count — so "which sites assemble how many parts" is one feature flag away, the population
 //! a board cannot show (a `concat` inlined at hundreds of sites owns no symbol). The report
 //! prints `site,<file>:<line>,<len 0>,<1>,<2>,<3>,<4–8>,<>8>` rows, largest first.
 
@@ -52,7 +52,7 @@ pub const N: usize = 64;
 /// `c<index>` when non-zero, so a forgotten label loses a name, never a number.
 pub static LABELS: &[(usize, &str)] = &[];
 
-#[cfg(feature = "internal_census")]
+#[cfg(feature = "_internal_census")]
 mod imp {
     use std::cell::RefCell;
     use std::collections::HashMap;
@@ -131,7 +131,7 @@ mod imp {
     }
 }
 
-#[cfg(not(feature = "internal_census"))]
+#[cfg(not(feature = "_internal_census"))]
 mod imp {
     #[inline]
     pub fn add(_index: usize, _n: u64) {}
@@ -139,20 +139,20 @@ mod imp {
     pub fn report() {}
 }
 
-/// Add `n` to counter `index`. A no-op without the `internal_census` feature.
+/// Add `n` to counter `index`. A no-op without the `_internal_census` feature.
 #[inline]
 pub fn add(index: usize, n: u64) {
     imp::add(index, n);
 }
 
-/// Bump counter `index` by one. A no-op without the `internal_census` feature.
+/// Bump counter `index` by one. A no-op without the `_internal_census` feature.
 #[inline]
 pub fn hit(index: usize) {
     imp::add(index, 1);
 }
 
 /// Bump counter `index` by one when `condition` holds — the success-rate shape.
-/// A no-op without the `internal_census` feature.
+/// A no-op without the `_internal_census` feature.
 #[inline]
 pub fn hit_if(index: usize, condition: bool) {
     if condition {
@@ -162,15 +162,15 @@ pub fn hit_if(index: usize, condition: bool) {
 
 /// Print every labelled counter, then every unlabelled non-zero one, as
 /// `census,<name>,<value>` lines on stderr — preceded by the site rows when any site
-/// recorded. A no-op without the `internal_census` feature.
+/// recorded. A no-op without the `_internal_census` feature.
 pub fn report() {
     imp::report();
 }
 
 /// Record that the caller at `loc` handled `count` items — the site census (see the
-/// module doc). Only exists with the `internal_census` feature; a call site pairs it with a
-/// `#[cfg_attr(feature = "internal_census", track_caller)]` on the function that asks.
-#[cfg(feature = "internal_census")]
+/// module doc). Only exists with the `_internal_census` feature; a call site pairs it with a
+/// `#[cfg_attr(feature = "_internal_census", track_caller)]` on the function that asks.
+#[cfg(feature = "_internal_census")]
 pub fn site(loc: &'static core::panic::Location<'static>, count: usize) {
     imp::site(loc, count);
 }

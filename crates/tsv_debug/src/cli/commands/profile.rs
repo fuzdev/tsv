@@ -105,7 +105,7 @@ impl ProfileCommand {
             print_table(&results, self.iterations, skipped);
         }
 
-        // Session perf counters, when built with `--features internal_census` (no-op otherwise).
+        // Session perf counters, when built with `--features _internal_census` (no-op otherwise).
         tsv_lang::census::report();
 
         // Peak resident set (VmHWM), printed once — the checker's memory anchor.
@@ -745,9 +745,7 @@ pub(crate) fn resolve_profile_files(
     // drifted three extensions behind `is_supported_file`.
     let subject = format!(
         "supported files ({})",
-        tsv_discover::FORMATTABLE_EXTENSIONS
-            .map(|e| format!(".{e}"))
-            .join(", ")
+        tsv_discover::formattable_extension_list(", ")
     );
     resolve_profile_files_named(paths, &subject, keep)
 }
@@ -852,7 +850,7 @@ pub(crate) fn resolve_seed_files(
 /// against the raw walk. Every corpus-walking audit resolves here, so the default corpus,
 /// the resolution failure, the limit, and the empty-is-an-error rule have one definition
 /// — the way [`is_input_invalid_fixture`] is shared above, and which is why this carries no
-/// `internal_comment_check` gate: seed resolution is corpus plumbing, not instrumentation.
+/// `_internal_comment_check` gate: seed resolution is corpus plumbing, not instrumentation.
 ///
 /// # Errors
 ///

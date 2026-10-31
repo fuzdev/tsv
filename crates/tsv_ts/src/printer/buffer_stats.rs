@@ -7,8 +7,8 @@
 //! construction chokepoints so the inline-`N` choice is graded against measured
 //! lengths on any corpus.
 //!
-//! Compiled in only under the `internal_buffer_stats` cargo feature (off by default,
-//! like `internal_debug_lex`), so production builds — and default `tsv_debug` builds,
+//! Compiled in only under the `_internal_buffer_stats` cargo feature (off by default,
+//! like `_internal_debug_lex`), so production builds — and default `tsv_debug` builds,
 //! whose profiles must measure production-shaped code — carry no recording. A
 //! feature-enabled binary still records nothing until armed via
 //! [`set_buffer_stats`] (the `buffer_sizes` command arms it), so other commands

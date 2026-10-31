@@ -115,14 +115,16 @@ crates (the open-convention stance):
   `IgnoreStack`. The build-output heuristic has **no** standalone predicate by
   design — it's contextual (needs the stack + a `BuildOutputHeuristic`), so `classify_dir`
   is its only entry point.
-- `classify_dir(name, child_rel, BuildOutputHeuristic, &IgnoreStack) -> DirVerdict`
+- `classify_dir(child_rel, BuildOutputHeuristic, &IgnoreStack) -> DirVerdict`
   — `BuildOutputHeuristic { Active, Inactive }` is `Active` while no `.gitignore` governs
   the level (`from_active(bool)` for a flag-carrying boundary — the bindings keep their JS
   `heuristic_active: boolean` and convert)
   — the per-directory decision: safety-net prune → heuristic prune (with the
   shadow-warning sub-case) → matcher prune → descend.
-- `should_format_file(name, child_rel, &IgnoreStack) -> bool` — the per-file
-  decision (`is_formattable && !ignored`).
+- `should_format_file(child_rel, &IgnoreStack) -> bool` — the per-file
+  decision (`is_formattable && !ignored`). Both read the entry's name off `child_rel`'s
+  last `/` segment (`child_rel` is `/`-separated and format-root-relative; a `\` is no
+  separator), so there is no name argument to disagree with the path.
 
   Both the matcher prune and the file check use the leaf-only
   `IgnoreStack::is_ignored_leaf` (not the ancestor-walking `is_ignored`): discovery
@@ -308,9 +310,9 @@ crates (the open-convention stance):
     warnings and bad-argument errors (`path_text`) — is spelled by `quote_path`.
 - **`tsv_wasm`** (and **`tsv_napi`**, whose `format`-gated `#[napi]` wrapper is a
   method-for-method twin) — the `format`-gated `IgnoreStack` wrapper exposes:
-  - `classify_dir(name, child_rel, heuristic_active) -> string`
+  - `classify_dir(child_rel, heuristic_active) -> string`
     (`"descend"|"prune"|"prune_warn"`)
-  - `should_format_file(name, child_rel) -> bool`, `is_path_pruned(rel) -> bool`
+  - `should_format_file(child_rel) -> bool`, `is_path_pruned(rel) -> bool`
   - returning `string | undefined`: `path_shadow_warning(rel, loose_root?)`,
     `excluded_argument_warning(display, rel, is_dir, loose_root?)` (the wrapper converts
     `is_dir` to the `PathKind` the Rust fn takes),

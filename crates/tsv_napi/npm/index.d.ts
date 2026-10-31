@@ -100,13 +100,9 @@ export class IgnoreStack {
 	/** Whether `path` is ignored; `is_dir` makes trailing-`/` patterns apply (a symbolic link is not a directory here, as for git). */
 	is_ignored(path: string, is_dir: boolean): boolean;
 	/** Discovery verdict for a child directory: `'descend'`, `'prune'`, or `'prune_warn'`. */
-	classify_dir(
-		name: string,
-		child_rel: string,
-		heuristic_active: boolean
-	): 'descend' | 'prune' | 'prune_warn';
+	classify_dir(child_rel: string, heuristic_active: boolean): 'descend' | 'prune' | 'prune_warn';
 	/** Whether a child file has a formattable extension and isn't ignored. */
-	should_format_file(name: string, child_rel: string): boolean;
+	should_format_file(child_rel: string): boolean;
 	/** Whether an ancestor directory of `rel` would be pruned by discovery. */
 	is_path_pruned(rel: string): boolean;
 	/** The shadow warning for the first ancestor directory of `rel` discovery prunes under an override-layer re-include, else `undefined`. `loose_root` is the format root outside a git repo. */

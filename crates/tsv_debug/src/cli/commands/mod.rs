@@ -3,8 +3,8 @@ pub mod ast_census;
 pub mod ast_diff;
 pub mod authoring_audit;
 pub mod binding_audit;
-// Requires the `internal_comment_check` feature — it drives the print-once ledger (invariant 5).
-#[cfg(feature = "internal_comment_check")]
+// Requires the `_internal_comment_check` feature — it drives the print-once ledger (invariant 5).
+#[cfg(feature = "_internal_comment_check")]
 pub mod blank_audit;
 pub mod buffer_sizes;
 pub mod build_fanout_audit;
@@ -13,7 +13,7 @@ pub mod canonical_parse;
 pub mod canonicalize_audit;
 pub mod census_audit;
 pub mod check;
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 pub mod comment_audit;
 pub mod compare;
 pub mod compile_compare;
@@ -34,10 +34,11 @@ pub mod fixtures_update_parsed;
 pub mod fixtures_validate;
 pub mod format_prettier;
 pub mod fuzz;
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 pub mod gap_audit;
-// Requires the `internal_comment_check` feature — `pristine_format`'s dirty check drives the ledger.
-#[cfg(feature = "internal_comment_check")]
+// Requires the `_internal_comment_check` feature — `pristine_format`'s dirty check drives the
+// ledger.
+#[cfg(feature = "_internal_comment_check")]
 pub mod ignore_audit;
 pub mod json_profile;
 pub mod lex_diff;
@@ -54,7 +55,7 @@ pub mod roundtrip_audit;
 pub mod scan_audit;
 pub mod strip;
 pub mod strip_fixtures_validate;
-#[cfg(feature = "internal_swallow_check")]
+#[cfg(feature = "_internal_swallow_check")]
 pub mod swallow_audit;
 pub mod test262;
 pub mod ts_fixture_audit;

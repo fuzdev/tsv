@@ -5,9 +5,10 @@
 //! **No stability promise outside the items they re-export:** [`Error`], [`ErrorKind`],
 //! [`ErrorReport`], [`Result`], [`WirePoint`], [`WireCoordinates`], [`LineRule`],
 //! [`LeadingBom`], and the sized-stack pair [`STACK_SIZE`] and [`run_with_stack`].
-//! Everything else here is the plumbing the three share — the source spans, the doc IR,
-//! the printing helpers, the wire-JSON writer, the comment scans, the depth limits —
-//! hidden from these docs and free to change in any release.
+//! Everything else here — the source spans, the doc IR, the printing helpers, the wire-JSON
+//! writer, the comment scans, the depth limits, every item hidden from these docs — and the
+//! `_internal_*` features are tsv's own plumbing for its sibling crates, which pin each other
+//! exactly; they change in any release, outside semver.
 //!
 //! Part of [tsv](https://github.com/fuzdev/tsv).
 
@@ -28,9 +29,9 @@
 // - `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` - hardcoded formatter settings, and
 //   `EmbedContext` / `LayoutMode` - the per-input embedding state
 // - `Comment` - shared comment type
-// - `census` - opt-in perf census counters (`internal_census` feature)
-// - `comment_ledger` - print-once comment ledger (`internal_comment_check` feature)
-// - `fanout_probe` - opt-in work counters for the fanout audit (`internal_fanout_check` feature)
+// - `census` - opt-in perf census counters (`_internal_census` feature)
+// - `comment_ledger` - print-once comment ledger (`_internal_comment_check` feature)
+// - `fanout_probe` - opt-in work counters for the fanout audit (`_internal_fanout_check` feature)
 // - `doc` - document builder primitives for prettier-compatible formatting
 // - `printing` - shared printing utilities for printers
 // - `source_scan` - trivia-aware source scanning between AST nodes
@@ -45,7 +46,7 @@
 #[doc(hidden)]
 pub mod census;
 mod comment;
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 #[doc(hidden)]
 pub mod comment_ledger;
 mod config;

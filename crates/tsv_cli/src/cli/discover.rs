@@ -1003,7 +1003,7 @@ fn collect_recursive(
             // lives in `tsv_discover` so the native CLI, the WASM CLI, and the VS
             // Code extension share one verdict. The FS walk + layer push/pop stay
             // here.
-            match classify_dir(&name, &child_rel, child_heuristic, stack) {
+            match classify_dir(&child_rel, child_heuristic, stack) {
                 DirVerdict::Prune => continue,
                 DirVerdict::PruneWithWarning => {
                     out.warnings.extend(tsv_discover::shadow_warning(
@@ -1037,7 +1037,7 @@ fn collect_recursive(
                 child_heuristic,
                 out,
             );
-        } else if should_format_file(&name, &child_rel, stack) {
+        } else if should_format_file(&child_rel, stack) {
             out.files.push(dir.listed.join(name_os));
         }
     }

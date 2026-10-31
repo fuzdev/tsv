@@ -684,7 +684,7 @@ cargo run -p tsv_debug arena_stats <paths> --list-errors   # list skipped files 
 Histograms for tuning the TS printer's SmallVec inline capacities. Two parse-time
 metrics (static AST properties): named-import-specifier count per import
 (`named_specs`), and line count per multi-line block comment (the population the
-parked line-offset scratch iterates). With `--features internal_buffer_stats` (off by
+parked line-offset scratch iterates). With `--features _internal_buffer_stats` (off by
 default — the record hooks sit in the chain printer's hot path), each file is also
 *formatted* and three printer-buffer populations are sampled at their construction
 chokepoints (`tsv_ts::printer::buffer_stats`), so inline-`N` claims are measured
@@ -700,7 +700,7 @@ exclude the prettier/svelte test suites (edge-case skew). Pure Rust, no Deno.
 
 ```bash
 cargo run -p tsv_debug buffer_sizes ../corpora/collections/zzz/src ../corpora/collections/gro/src
-cargo run -p tsv_debug --features internal_buffer_stats buffer_sizes <paths>  # + chain/comment histograms
+cargo run -p tsv_debug --features _internal_buffer_stats buffer_sizes <paths>  # + chain/comment histograms
 cargo run -p tsv_debug buffer_sizes <paths> --json
 ```
 
@@ -817,11 +817,11 @@ code it is pricing, names them in the `LABELS` slice in `census.rs`, and reads
 #   tsv_lang::census::add(1, run_len as u64);    // its bytes
 #   tsv_lang::census::hit_if(2, matched);        // and whether it found anything
 
-cargo run --release --features internal_census -p tsv_debug -- profile <corpus> 2>&1 >/dev/null \
+cargo run --release --features _internal_census -p tsv_debug -- profile <corpus> 2>&1 >/dev/null \
   | grep '^census,'
 ```
 
-**The feature gate is the point.** With `internal_census` off (the default, and what every
+**The feature gate is the point.** With `_internal_census` off (the default, and what every
 production artifact and every perf build uses) each entry point is an empty
 `#[inline]` function and `LABELS` is empty, so an instrumented tree is inert — the
 census and the measurement can share one working tree instead of the
@@ -3228,7 +3228,7 @@ censuses priced the population before a line was written. A patched copy of the 
 of the time (1,588 of 1.6 M buffers a tsbig pass) — the inline capacity is right-sized and
 there is no spill-side lever — and that of the 1.24 M buffers a pass consumes with anything in
 them, 41% hold ONE part and 38% TWO. Then `#[track_caller]` on `concat` / `fill` (the
-`internal_census` feature) put a `(file, line)` and a part-count histogram on every call: 2.07 M
+`_internal_census` feature) put a `(file, line)` and a part-count histogram on every call: 2.07 M
 `concat`s a pass, 894 K of them from a buffer, 674 K of those (75%) holding one or two parts — and a
 one-part `concat` returns its part, a two-part one is the register-handoff `concat_pair`. So
 the buffer was the whole cost: `print_group_inner` spent ~80 instructions of buffer machinery

@@ -3,7 +3,9 @@ name = "tsv_svelte"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-description = "Svelte parsing and formatting library"
+authors.workspace = true
+description = "Svelte formatter and parser compatible with Svelte's parse() — part of tsv"
+categories = ["development-tools", "parser-implementations", "web-programming"]
 license.workspace = true
 repository.workspace = true
 # This crate's agent notes stay in the repository; `deno task package:audit` grades the tarball.
@@ -29,7 +31,7 @@ locations = ["json", "tsv_lang/locations", "tsv_ts/locations", "tsv_css/location
 # format-ignore seams (raw `<script>`/`<style>`, the template node + range forms) record
 # their verbatim ranges. Forwards to tsv_ts/tsv_css, which emit the comments inside the
 # `<script>`/`{expr}`/`<style>` islands. Off in production builds.
-internal_comment_check = ["tsv_lang/internal_comment_check", "tsv_ts/internal_comment_check", "tsv_css/internal_comment_check"]
+_internal_comment_check = ["tsv_lang/_internal_comment_check", "tsv_ts/_internal_comment_check", "tsv_css/_internal_comment_check"]
 
 [dependencies]
 tsv_lang.workspace = true

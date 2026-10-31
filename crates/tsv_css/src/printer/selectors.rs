@@ -770,7 +770,7 @@ impl<'a> Printer<'a> {
                     };
                     // The gap's comments ride out inside the raw slice — see
                     // `tsv_lang::comment_ledger`.
-                    #[cfg(feature = "internal_comment_check")]
+                    #[cfg(feature = "_internal_comment_check")]
                     tsv_lang::comment_ledger::record_verbatim_range(
                         self.source,
                         gap.start,
@@ -1408,7 +1408,7 @@ impl<'a> Printer<'a> {
                 // a boundary gap. The bare form's span is just its name (it ends at the
                 // NEXT token's start, and a glued comment IS that token), so the
                 // unconditional range stays tight.
-                #[cfg(feature = "internal_comment_check")]
+                #[cfg(feature = "_internal_comment_check")]
                 tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
                 self.span_leaf_doc(*span, is_last_in_compound)
             }
@@ -1422,7 +1422,7 @@ impl<'a> Printer<'a> {
                 // bare `*` takes the constant instead, its span reaching to the NEXT
                 // token's start.
                 Some(_) => {
-                    #[cfg(feature = "internal_comment_check")]
+                    #[cfg(feature = "_internal_comment_check")]
                     tsv_lang::comment_ledger::record_verbatim_range(
                         self.source,
                         span.start,
@@ -1435,7 +1435,7 @@ impl<'a> Printer<'a> {
             ast::SimpleSelector::Class { span } => {
                 // A `.`-glued comment (`./* c */cls`) rides out inside the verbatim
                 // slice, like the `<wq-name>` separator's — see the `Type` arm.
-                #[cfg(feature = "internal_comment_check")]
+                #[cfg(feature = "_internal_comment_check")]
                 tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
                 self.span_leaf_doc(*span, is_last_in_compound)
             }
@@ -1511,7 +1511,7 @@ impl<'a> Printer<'a> {
                 //
                 // The parser registers whatever comments it read before the parse error,
                 // and they ride out inside this slice — see `tsv_lang::comment_ledger`.
-                #[cfg(feature = "internal_comment_check")]
+                #[cfg(feature = "_internal_comment_check")]
                 tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
                 let raw = span.extract(self.source);
                 let item = crate::escapes::trim_css(raw);
@@ -1537,7 +1537,7 @@ impl<'a> Printer<'a> {
                 // Unlike the no-args branch below, this one emits name + args rather than
                 // the whole span, so the sigil-glued comment inside `name` is declared on
                 // its own (`:/* c */not(.a)`).
-                #[cfg(feature = "internal_comment_check")]
+                #[cfg(feature = "_internal_comment_check")]
                 tsv_lang::comment_ledger::record_verbatim_range(
                     self.source,
                     span.start,
@@ -1558,7 +1558,7 @@ impl<'a> Printer<'a> {
                 // whose args the parser skipped to `)` after registering the gap comment) —
                 // those comments ride out inside this verbatim slice. See
                 // `tsv_lang::comment_ledger`.
-                #[cfg(feature = "internal_comment_check")]
+                #[cfg(feature = "_internal_comment_check")]
                 tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
                 let name = self.pseudo_name_text(span, name_end);
                 let text = if is_last_in_compound {

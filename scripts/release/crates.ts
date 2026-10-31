@@ -219,10 +219,9 @@ export interface FeatureSet {
 
 /**
  * `cargo semver-checks` arguments for one crate: its baseline, and its features stated
- * EXPLICITLY as the docs.rs feature set — the public surface a consumer reads. Without them
- * the tool enables every feature but a few named ones, which takes in the `internal_*`
- * debugging features whose items are hidden from the public API (and so reads hiding them as
- * removals).
+ * EXPLICITLY as the docs.rs feature set — the public surface a consumer reads, never the
+ * tool's own heuristic (every feature but a few name patterns), so the graded surface cannot
+ * drift from what docs.rs renders when a feature is added or renamed.
  */
 export const semver_checks_args = (
 	name: string,

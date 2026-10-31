@@ -627,7 +627,7 @@ impl<'a> Printer<'a> {
                     // A comment emission that can't route through `build_comment_doc`
                     // (the trailing space must share the node), so it tags its own
                     // ledger node.
-                    #[cfg(feature = "internal_comment_check")]
+                    #[cfg(feature = "_internal_comment_check")]
                     d.tag_comment_doc(doc, comment.span, self.source);
                     item_parts.push(doc);
                 }

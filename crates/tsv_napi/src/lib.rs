@@ -391,10 +391,10 @@ fn strip_typescript_engine(source: &str, source_type: Option<String>) -> Result<
         |arena| match tsv_ts::__private::strip_in(source, goal, arena) {
             Ok(stripped) => Ok(stripped.code.into_owned()),
             Err(tsv_ts::StripError::Parse(e)) => Err(Failure::parse(&e)),
-            Err(tsv_ts::StripError::Unsupported { kind, span }) => Err(Failure::Returned {
+            Err(tsv_ts::StripError::Unsupported { kind, span, .. }) => Err(Failure::Returned {
                 kind: "unsupported",
                 construct: Some(kind.name()),
-                report: kind.report(span, source),
+                report: kind.report(source, span),
             }),
             // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
             // thrown with its message rather than given a `kind` the facade does not declare
@@ -519,8 +519,8 @@ impl IgnoreStack {
     /// The discovery verdict for one child **directory**, delegating to
     /// `tsv_discover::classify_dir` — the safety-net / build-output-heuristic / matcher
     /// decision shared with the native CLI — as its tag (`DirVerdict::as_tag`):
-    /// `"descend"`, `"prune"`, or `"prune_warn"`. `name` is the directory's final path
-    /// segment, `child_rel` its format-root-relative `/`-separated path, and
+    /// `"descend"`, `"prune"`, or `"prune_warn"`. `child_rel` is the directory's
+    /// format-root-relative `/`-separated path (its last segment the name), and
     /// `heuristic_active` is true while no `.gitignore` governs this level. On
     /// `"prune_warn"` the caller fetches the message via
     /// [`shadow_warning`](IgnoreStack::shadow_warning).
@@ -529,9 +529,8 @@ impl IgnoreStack {
     /// the common descend path, and both packages' declarations name the three tags, so
     /// the two type-check interchangeably.
     #[napi(js_name = "classify_dir", catch_unwind)]
-    pub fn classify_dir(&self, name: String, child_rel: String, heuristic_active: bool) -> String {
+    pub fn classify_dir(&self, child_rel: String, heuristic_active: bool) -> String {
         tsv_discover::classify_dir(
-            &name,
             &child_rel,
             tsv_discover::BuildOutputHeuristic::from_active(heuristic_active),
             &self.inner,
@@ -541,11 +540,11 @@ impl IgnoreStack {
     }
 
     /// Whether a child **file** should be formatted (a formattable extension and
-    /// not ignored). `name` is the file's final path segment, `child_rel` its
-    /// format-root-relative `/`-separated path.
+    /// not ignored). `child_rel` is the file's format-root-relative `/`-separated path
+    /// (its last segment the name).
     #[napi(js_name = "should_format_file", catch_unwind)]
-    pub fn should_format_file(&self, name: String, child_rel: String) -> bool {
-        tsv_discover::should_format_file(&name, &child_rel, &self.inner)
+    pub fn should_format_file(&self, child_rel: String) -> bool {
+        tsv_discover::should_format_file(&child_rel, &self.inner)
     }
 
     /// Whether `rel` (a format-root-relative file path) is skipped because some
@@ -1170,15 +1169,12 @@ mod tests {
         assert!(stack.is_ignored("dist".to_owned(), true));
         assert!(!stack.is_ignored("src/a.ts".to_owned(), false));
         assert_eq!(
-            stack.classify_dir("node_modules".to_owned(), "node_modules".to_owned(), false),
+            stack.classify_dir("node_modules".to_owned(), false),
             "prune"
         );
-        assert_eq!(
-            stack.classify_dir("src".to_owned(), "src".to_owned(), false),
-            "descend"
-        );
-        assert!(stack.should_format_file("a.ts".to_owned(), "src/a.ts".to_owned()));
-        assert!(!stack.should_format_file("a.txt".to_owned(), "src/a.txt".to_owned()));
+        assert_eq!(stack.classify_dir("src".to_owned(), false), "descend");
+        assert!(stack.should_format_file("src/a.ts".to_owned()));
+        assert!(!stack.should_format_file("src/a.txt".to_owned()));
         assert!(stack.is_path_pruned("node_modules/x.ts".to_owned()));
         stack.pop_gitignore();
         assert!(!stack.is_ignored("dist".to_owned(), true));

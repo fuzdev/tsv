@@ -265,10 +265,10 @@ pub fn strip_typescript(source: &str, source_type: JsValue) -> Result<JsValue, J
         |arena| match tsv_ts::__private::strip_in(source, goal, arena) {
             Ok(stripped) => Ok(JsValue::from_str(&stripped.code)),
             Err(tsv_ts::StripError::Parse(e)) => parse_failure(&e).into_return(),
-            Err(tsv_ts::StripError::Unsupported { kind, span }) => Ok(failure_result(
+            Err(tsv_ts::StripError::Unsupported { kind, span, .. }) => Ok(failure_result(
                 "unsupported",
                 Some(kind.name()),
-                &kind.report(span, source),
+                &kind.report(source, span),
             )),
             // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
             // thrown with its message rather than given a `kind` the facade does not declare
@@ -351,8 +351,8 @@ impl IgnoreStack {
     /// The discovery verdict for one child **directory**, delegating to
     /// `tsv_discover::classify_dir` — the safety-net / build-output-heuristic / matcher
     /// decision shared with the native CLI — as its tag (`DirVerdict::as_tag`):
-    /// `"descend"`, `"prune"`, or `"prune_warn"`. `name` is the directory's final path
-    /// segment, `child_rel` its format-root-relative `/`-separated path, and
+    /// `"descend"`, `"prune"`, or `"prune_warn"`. `child_rel` is the directory's
+    /// format-root-relative `/`-separated path (its last segment the name), and
     /// `heuristic_active` is true while no `.gitignore` governs this level. On
     /// `"prune_warn"` the caller fetches the message via
     /// [`shadow_warning`](IgnoreStack::shadow_warning).
@@ -361,9 +361,8 @@ impl IgnoreStack {
     /// the common descend path, and both packages' declarations name the three tags, so
     /// the two type-check interchangeably.
     #[wasm_bindgen(unchecked_return_type = "'descend' | 'prune' | 'prune_warn'")]
-    pub fn classify_dir(&self, name: &str, child_rel: &str, heuristic_active: bool) -> String {
+    pub fn classify_dir(&self, child_rel: &str, heuristic_active: bool) -> String {
         tsv_discover::classify_dir(
-            name,
             child_rel,
             tsv_discover::BuildOutputHeuristic::from_active(heuristic_active),
             &self.inner,
@@ -373,11 +372,10 @@ impl IgnoreStack {
     }
 
     /// Whether a child **file** should be formatted (a formattable extension and
-    /// not ignored), delegating to `tsv_discover::should_format_file`. `name` is
-    /// the file's final path segment, `child_rel` its format-root-relative
-    /// `/`-separated path.
-    pub fn should_format_file(&self, name: &str, child_rel: &str) -> bool {
-        tsv_discover::should_format_file(name, child_rel, &self.inner)
+    /// not ignored), delegating to `tsv_discover::should_format_file`. `child_rel` is
+    /// the file's format-root-relative `/`-separated path (its last segment the name).
+    pub fn should_format_file(&self, child_rel: &str) -> bool {
+        tsv_discover::should_format_file(child_rel, &self.inner)
     }
 
     /// Whether `rel` (a format-root-relative file path) is skipped because some

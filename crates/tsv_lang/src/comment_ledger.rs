@@ -12,7 +12,7 @@
 //! sets are equal. It is prettier's `ensureAllCommentsPrinted` (its `printedComments`
 //! set, checked once the doc is built) in tsv's shape.
 //!
-//! It lives behind the **`internal_comment_check` cargo feature** (off by default, like
+//! It lives behind the **`_internal_comment_check` cargo feature** (off by default, like
 //! [`crate::doc::swallow`]), so production builds — and default `tsv_debug` builds, whose
 //! profiles must measure production-shaped code — compile it out entirely. Output is
 //! byte-identical either way; this records, it never decides.

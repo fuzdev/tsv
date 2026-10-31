@@ -17,14 +17,14 @@ use tsv_ignore::{IgnoreStack, PathKind};
 /// matched as a directory name here; its worktree/submodule *file* form is a file
 /// and is never recursed regardless. `.sl` is Sapling's metadata directory — the
 /// same VCS set prettier always ignores (`.git`/`.sl`/`.svn`/`.hg`/`.jj`).
-pub const SAFETY_NET_DIRS: [&str; 6] = ["node_modules", ".git", ".sl", ".hg", ".svn", ".jj"];
+pub const SAFETY_NET_DIRS: &[&str] = &["node_modules", ".git", ".sl", ".hg", ".svn", ".jj"];
 
 /// Heuristic-only directory skips — tsv's fallback guess at "generated /
 /// vendored / build output", applied **only** while no `.gitignore` governs the
 /// directory ([`BuildOutputHeuristic::Active`]). Hidden directories (a leading `.`) are skipped
 /// by the same heuristic. Once a `.gitignore` is in play the project's own rules
 /// decide, so these are recursed unless the project ignores them.
-pub const HEURISTIC_DIRS: [&str; 3] = ["dist", "build", "target"];
+pub const HEURISTIC_DIRS: &[&str] = &["dist", "build", "target"];
 
 /// The file extensions tsv formats — the discovery filter behind
 /// [`is_formattable`]. The whole JS/TS family (`ts`/`mts`/`cts`/`js`/`mjs`/`cjs`)
@@ -34,8 +34,8 @@ pub const HEURISTIC_DIRS: [&str; 3] = ["dist", "build", "target"];
 /// and `tsx` are deliberately absent; JSX inside a `.js` file is a parse error
 /// rather than a silent skip. Compound forms like `.svelte.ts` are covered by the
 /// `ts` entry (`Path::extension` yields the final component).
-pub const FORMATTABLE_EXTENSIONS: [&str; 8] =
-    ["ts", "mts", "cts", "js", "mjs", "cjs", "svelte", "css"];
+pub const FORMATTABLE_EXTENSIONS: &[&str] =
+    &["ts", "mts", "cts", "js", "mjs", "cjs", "svelte", "css"];
 
 /// The discovery verdict for one child **directory**: descend into it, prune it
 /// (skip its whole subtree), or prune it **and** surface a diagnostic.
@@ -113,7 +113,7 @@ impl BuildOutputHeuristic {
 // The dispatches: the CLI's `ParserType::from_extension`, `tsv_ts::Goal::from_extension`,
 // and `cli.js`'s twins.
 pub fn is_formattable(name: &str) -> bool {
-    has_extension_in(name, &FORMATTABLE_EXTENSIONS)
+    has_extension_in(name, FORMATTABLE_EXTENSIONS)
 }
 
 /// Whether `path`'s extension (`Path::extension`, so a bare dotfile has none) is one of
@@ -211,7 +211,7 @@ pub fn unstrippable_extension_error(path: &str) -> Option<String> {
 /// never does.
 #[must_use]
 pub fn formattable_extension_list(separator: &str) -> String {
-    extension_list(&FORMATTABLE_EXTENSIONS, separator)
+    extension_list(FORMATTABLE_EXTENSIONS, separator)
 }
 
 /// Whether a directory `name` is an always-pruned [safety net](SAFETY_NET_DIRS)
@@ -225,11 +225,11 @@ pub fn is_safety_net(name: &str) -> bool {
     SAFETY_NET_DIRS.contains(&name)
 }
 
-/// Classify a child **directory** during discovery. `name` is its final path
-/// segment; `child_rel` is its format-root-relative, `/`-separated path;
-/// `heuristic` is [`BuildOutputHeuristic::Active`] while no `.gitignore` governs this
-/// level; `stack` is the matcher built from the ancestor chain. Pure — no filesystem
-/// access.
+/// Classify a child **directory** during discovery. `child_rel` is its path relative to
+/// the format root, `/`-separated (a `\` is no separator), whose last segment is the name
+/// the safety nets and the heuristic read; `heuristic` is [`BuildOutputHeuristic::Active`]
+/// while no `.gitignore` governs this level; `stack` is the matcher built from the ancestor
+/// chain. Pure — no filesystem access.
 ///
 /// The order mirrors discovery: the [safety nets](SAFETY_NET_DIRS) prune
 /// unconditionally; then, only while the heuristic is active, a hidden or
@@ -244,8 +244,14 @@ pub fn is_safety_net(name: &str) -> bool {
 /// once the directory's ancestors are cleared, which holds for every directory a walk
 /// descends into but not for a walk's root — a caller gates its root with the full
 /// [`is_ignored`](tsv_ignore::IgnoreStack::is_ignored) first, as both CLIs do.
+///
+/// # Panics
+///
+/// In debug builds, when `heuristic` is [`BuildOutputHeuristic::Active`] while `stack`
+/// holds a `.gitignore` layer — a walk turns the heuristic off at the first level a
+/// `.gitignore` governs, and an active one there would let a `.gitignore` negation
+/// re-include a directory the heuristic prunes.
 pub fn classify_dir(
-    name: &str,
     child_rel: &str,
     heuristic: BuildOutputHeuristic,
     stack: &IgnoreStack,
@@ -262,11 +268,15 @@ pub fn classify_dir(
         !heuristic.is_active() || !stack.has_gitignore_layers(),
         "an active heuristic with a .gitignore layer pushed: is_reincluded would consult .gitignore negations in the heuristic override",
     );
-    debug_assert!(
-        child_rel.rsplit('/').next() == Some(name),
-        "classify_dir: {name:?} is not the last segment of child_rel {child_rel:?}",
-    );
-    classify_dir_inner(name, child_rel, heuristic, stack)
+    classify_dir_inner(last_segment(child_rel), child_rel, heuristic, stack)
+}
+
+/// The entry's own name: the last meaningful `/` segment of a format-root-relative path,
+/// skipping empty and `.` segments as `tsv_ignore::split_segments` does.
+fn last_segment(rel: &str) -> &str {
+    rel.rsplit('/')
+        .find(|s| !s.is_empty() && *s != ".")
+        .unwrap_or("")
 }
 
 /// The [`classify_dir`] decision without its `Active ⟹ no .gitignore layer`
@@ -368,6 +378,10 @@ pub fn is_path_pruned(rel: &str, stack: &IgnoreStack) -> bool {
 /// read rather than [`shadow_warning`] asked directly so a safety-net prune stays silent
 /// as it does on a walk. `stack` is [`is_path_pruned`]'s; `loose_root` is
 /// [`shadow_warning`]'s.
+///
+/// # Panics
+///
+/// As [`shadow_warning`] does, in debug builds, when `loose_root` is not a filesystem root.
 #[must_use]
 pub fn path_shadow_warning(
     rel: &str,
@@ -423,23 +437,20 @@ fn gitignore_above(stack: &IgnoreStack, dir: &[&str]) -> bool {
 }
 
 /// Whether a child **file** should be formatted: it has a formattable extension
-/// and the matcher does not ignore it. `name` is its final path segment;
-/// `child_rel` is its format-root-relative, `/`-separated path. Pure — no
-/// filesystem access. (A named file *argument* never reaches this: both halves are
-/// asked of the argument itself — its extension by [`unsupported_extension_error`],
-/// its ignore rules by [`excluded_argument_warning`](crate::excluded_argument_warning), which walks the ancestors this
-/// leaf query takes as cleared.)
+/// and the matcher does not ignore it. `child_rel` is its path relative to the format
+/// root, `/`-separated (a `\` is no separator); the extension is read off its last
+/// segment. Pure — no filesystem access. (A named file *argument* never reaches this: both
+/// halves are asked of the argument itself — its extension by
+/// [`unsupported_extension_error`], its ignore rules by
+/// [`excluded_argument_warning`](crate::excluded_argument_warning), which walks the
+/// ancestors this leaf query takes as cleared.)
 ///
 /// Uses the leaf-only [`is_ignored_leaf`](tsv_ignore::IgnoreStack::is_ignored_leaf):
 /// the discovery walk only reaches a file whose ancestor directories are already
 /// cleared (it prunes ignored dirs before descending, and the caller gates the
 /// root), so the ancestor walk would be redundant — see [`classify_dir`].
-pub fn should_format_file(name: &str, child_rel: &str, stack: &IgnoreStack) -> bool {
-    debug_assert!(
-        child_rel.rsplit('/').next() == Some(name),
-        "should_format_file: {name:?} is not the last segment of child_rel {child_rel:?}",
-    );
-    is_formattable(name) && !stack.is_ignored_leaf(child_rel, PathKind::File)
+pub fn should_format_file(child_rel: &str, stack: &IgnoreStack) -> bool {
+    is_formattable(last_segment(child_rel)) && !stack.is_ignored_leaf(child_rel, PathKind::File)
 }
 
 #[cfg(test)]
@@ -579,7 +590,7 @@ mod tests {
         let stack = IgnoreStack::new();
         for name in SAFETY_NET_DIRS {
             assert_eq!(
-                classify_dir(name, name, BuildOutputHeuristic::Inactive, &stack),
+                classify_dir(name, BuildOutputHeuristic::Inactive, &stack),
                 DirVerdict::Prune,
                 "{name}"
             );
@@ -590,19 +601,19 @@ mod tests {
     fn heuristic_prunes_hidden_and_build_dirs_when_active() {
         let stack = IgnoreStack::new();
         assert_eq!(
-            classify_dir(".cache", ".cache", BuildOutputHeuristic::Active, &stack),
+            classify_dir(".cache", BuildOutputHeuristic::Active, &stack),
             DirVerdict::Prune
         );
         for name in HEURISTIC_DIRS {
             assert_eq!(
-                classify_dir(name, name, BuildOutputHeuristic::Active, &stack),
+                classify_dir(name, BuildOutputHeuristic::Active, &stack),
                 DirVerdict::Prune,
                 "{name}"
             );
         }
         // a normal dir descends
         assert_eq!(
-            classify_dir("src", "src", BuildOutputHeuristic::Active, &stack),
+            classify_dir("src", BuildOutputHeuristic::Active, &stack),
             DirVerdict::Descend
         );
     }
@@ -613,11 +624,11 @@ mod tests {
         // build-output dir is not a heuristic prune — only the matcher can prune it
         let stack = IgnoreStack::new();
         assert_eq!(
-            classify_dir("build", "build", BuildOutputHeuristic::Inactive, &stack),
+            classify_dir("build", BuildOutputHeuristic::Inactive, &stack),
             DirVerdict::Descend
         );
         assert_eq!(
-            classify_dir(".cache", ".cache", BuildOutputHeuristic::Inactive, &stack),
+            classify_dir(".cache", BuildOutputHeuristic::Inactive, &stack),
             DirVerdict::Descend
         );
     }
@@ -626,7 +637,7 @@ mod tests {
     fn explicit_dir_reinclude_overrides_heuristic() {
         let stack = override_stack("!build/\n");
         assert_eq!(
-            classify_dir("build", "build", BuildOutputHeuristic::Active, &stack),
+            classify_dir("build", BuildOutputHeuristic::Active, &stack),
             DirVerdict::Descend
         );
     }
@@ -635,7 +646,7 @@ mod tests {
     fn anchored_negation_under_pruned_dir_warns() {
         let stack = override_stack("!build/keep.ts\n");
         assert_eq!(
-            classify_dir("build", "build", BuildOutputHeuristic::Active, &stack),
+            classify_dir("build", BuildOutputHeuristic::Active, &stack),
             DirVerdict::PruneWithWarning,
         );
     }
@@ -646,7 +657,7 @@ mod tests {
         // not `build/` specifically, so it is a plain prune (no warning)
         let stack = override_stack("!keep.ts\n");
         assert_eq!(
-            classify_dir("build", "build", BuildOutputHeuristic::Active, &stack),
+            classify_dir("build", BuildOutputHeuristic::Active, &stack),
             DirVerdict::Prune
         );
     }
@@ -657,16 +668,11 @@ mod tests {
         // is the only thing that can prune it
         let stack = override_stack("vendored/\n");
         assert_eq!(
-            classify_dir(
-                "vendored",
-                "vendored",
-                BuildOutputHeuristic::Inactive,
-                &stack
-            ),
+            classify_dir("vendored", BuildOutputHeuristic::Inactive, &stack),
             DirVerdict::Prune
         );
         assert_eq!(
-            classify_dir("src", "src", BuildOutputHeuristic::Inactive, &stack),
+            classify_dir("src", BuildOutputHeuristic::Inactive, &stack),
             DirVerdict::Descend
         );
     }
@@ -674,9 +680,9 @@ mod tests {
     #[test]
     fn should_format_file_checks_extension_and_ignore() {
         let stack = override_stack("gen.ts\n");
-        assert!(should_format_file("app.ts", "src/app.ts", &stack)); // formattable, not ignored
-        assert!(!should_format_file("notes.md", "notes.md", &stack)); // wrong extension
-        assert!(!should_format_file("gen.ts", "src/gen.ts", &stack)); // ignored by the matcher
+        assert!(should_format_file("src/app.ts", &stack)); // formattable, not ignored
+        assert!(!should_format_file("notes.md", &stack)); // wrong extension
+        assert!(!should_format_file("src/gen.ts", &stack)); // ignored by the matcher
     }
 
     #[test]
@@ -836,10 +842,18 @@ mod tests {
         assert_eq!(path_shadow_warning("dist/sub/keep.ts", None, &stack), None);
     }
 
+    /// The name a verdict reads is `child_rel`'s last `/` segment; a `\` is no separator.
     #[test]
-    #[should_panic(expected = "child_rel")]
-    fn classify_dir_asserts_the_name_is_the_paths_last_segment() {
+    fn the_name_is_the_last_slash_segment() {
         let stack = IgnoreStack::new();
-        let _ = classify_dir("src", "build", BuildOutputHeuristic::Active, &stack);
+        assert_eq!(
+            classify_dir("src/build", BuildOutputHeuristic::Active, &stack),
+            DirVerdict::Prune
+        );
+        assert_eq!(
+            classify_dir("build\\src", BuildOutputHeuristic::Active, &stack),
+            DirVerdict::Descend
+        );
+        assert!(should_format_file("a\\b.ts", &stack));
     }
 }

@@ -61,6 +61,19 @@
 //!   prettier's matcher reads it.
 //! - **A `**` glued to a literal prefix** (`foo**/bar.ts`) is two stars within one segment,
 //!   as gitignore(5) says; git's matcher crosses directories there.
+//!
+//! ## Paths
+//!
+//! Every path a query or a push takes is relative to the format root and `/`-separated:
+//!
+//! - `\` is never a separator, on any platform — a caller on Windows converts first;
+//! - empty and `.` segments are dropped, so a leading `/` (`/a` is `a`), a doubled `//`
+//!   and a `./` change nothing;
+//! - `..` is a literal segment, never a step up — a caller resolves it first;
+//! - a name that is not UTF-8 is handed over in its lossy spelling, as the `tsv` CLI does.
+//!   Each maximal invalid sequence is then one U+FFFD, which a `?` matches where git needs
+//!   one per byte (the per-code-point difference above), and two names that differ only
+//!   inside such a sequence read alike.
 
 #![warn(missing_docs)]
 
@@ -70,12 +83,12 @@ use glob::{PathSeg, Seg, Tok, match_segments, parse_segment};
 
 /// A compiled set of ignore rules, applied in source order with last-match-wins
 /// semantics (a later `!` negation re-includes an earlier exclusion).
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct IgnoreRules {
     rules: Vec<Rule>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Rule {
     segs: Vec<Seg>,
     /// `!`-prefixed: re-includes a path an earlier rule excluded.
@@ -91,7 +104,7 @@ struct Rule {
 
 /// One segment of a negated rule as its author spelled it (trailing spaces trimmed,
 /// escapes kept), and whether a `\/` rather than a bare `/` ended it.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct SpelledSeg {
     text: Box<str>,
     escaped_separator: bool,
@@ -229,8 +242,11 @@ impl IgnoreRules {
 /// [`push_formatignore`](IgnoreStack::push_formatignore) /
 /// [`push_prettierignore`](IgnoreStack::push_prettierignore) add one directory's
 /// `.gitignore` / override file, anchored at that directory
-/// relative to the format root (the caller's chosen scope root). Layers are
-/// pushed shallowest-first (the order a DFS descends), and the CLI
+/// relative to the format root (the caller's chosen scope root). Layers **must** be
+/// pushed shallowest-first (the order a DFS descends) — a directory's layer after every
+/// ancestor's of the same kind: precedence among them is push order, not anchor depth,
+/// so a deeper layer pushed ahead of its ancestor's loses to it and the answer is wrong.
+/// The CLI
 /// [`pop_gitignore`](IgnoreStack::pop_gitignore)s / [`pop_override`](IgnoreStack::pop_override)s
 /// on the way back up; non-traversal callers (the VS Code extension) just push
 /// the whole chain.
@@ -244,7 +260,7 @@ impl IgnoreRules {
 /// re-include a file whose parent directory is excluded" rule. The gitignore-only
 /// behavior is byte-for-byte `git check-ignore` on case-sensitive filesystems, less
 /// the [differences](crate#differences-from-git) the crate docs list.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct IgnoreStack {
     /// `.gitignore` layers in shallow→deep push order.
     gitignore: Vec<Layer>,
@@ -256,7 +272,7 @@ pub struct IgnoreStack {
 
 /// One directory's ignore file within an [`IgnoreStack`] — a `.gitignore` or an
 /// override file, anchored at the directory it was read from.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Layer {
     /// The directory, segments relative to the format root; empty = the root.
     anchor: Vec<String>,
@@ -297,7 +313,9 @@ impl IgnoreStack {
     }
 
     /// Push one directory's `.gitignore`. `anchor` is the directory relative to
-    /// the format root, `/`-separated (empty string = the root).
+    /// the format root, `/`-separated (empty string = the root). It **must** be pushed
+    /// after the `.gitignore` of every ancestor directory: precedence is push order, not
+    /// anchor depth.
     pub fn push_gitignore(&mut self, anchor: &str, content: &str) {
         self.gitignore
             .push(Layer::new(anchor, content, IgnoreSource::Gitignore));
@@ -311,7 +329,8 @@ impl IgnoreStack {
 
     /// Push one directory's `.formatignore` as an override layer, applied after every
     /// `.gitignore`. `anchor` is the directory relative to the format root,
-    /// `/`-separated (empty string = the root).
+    /// `/`-separated (empty string = the root). It **must** be pushed after every
+    /// ancestor directory's override layer: precedence is push order, not anchor depth.
     pub fn push_formatignore(&mut self, anchor: &str, content: &str) {
         self.push_override(anchor, content, IgnoreSource::Formatignore);
     }
@@ -320,7 +339,8 @@ impl IgnoreStack {
     /// place of a `.formatignore` the directory does not have. Matched exactly as a
     /// [`push_formatignore`](Self::push_formatignore) layer is; the two differ only in the
     /// file a diagnostic names ([`Exclusion::source`],
-    /// [`override_layer_source`](Self::override_layer_source)).
+    /// [`override_layer_source`](Self::override_layer_source)). The same order rule holds:
+    /// it **must** be pushed after every ancestor directory's override layer.
     pub fn push_prettierignore(&mut self, anchor: &str, content: &str) {
         self.push_override(anchor, content, IgnoreSource::Prettierignore);
     }

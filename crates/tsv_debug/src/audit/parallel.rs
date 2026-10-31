@@ -10,14 +10,14 @@
 //!
 //! [`run_pool`] itself is feature-free — four of its consumers drive no instrumentation seam and
 //! exist in a default build. Only [`ArmedRun`], which arms `tsv_lang::comment_ledger`, carries
-//! the `internal_comment_check` gate.
+//! the `_internal_comment_check` gate.
 
 use std::num::NonZero;
 use std::path::{Path, PathBuf};
 
 use tsv_cli::cli::stack::{clamp_worker_count, sized_thread};
 
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 use crate::audit::panic_hook::SuppressedPanicHook;
 use crate::cli::CliError;
 
@@ -36,10 +36,10 @@ use crate::cli::CliError;
 /// audit's disarm point deliberate rather than wherever scope happens to end.
 ///
 /// Gated where [`run_pool`] is not: it arms `tsv_lang::comment_ledger`, which only a
-/// `internal_comment_check` build has. The pristine sweep's own consumers that drain a sink
+/// `_internal_comment_check` build has. The pristine sweep's own consumers that drain a sink
 /// (`swallow_audit`, `comment_audit`) arm theirs directly and take the hook suppression from
 /// [`sweep`](crate::audit::sweep), which installs the same [`SuppressedPanicHook`].
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 pub(crate) struct ArmedRun {
     /// The hook suppression itself, restored by its own `Drop` — shared with
     /// the pristine sweep so there is one definition of "how a corpus walk
@@ -48,7 +48,7 @@ pub(crate) struct ArmedRun {
     swallow: bool,
 }
 
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 impl ArmedRun {
     pub(crate) fn arm(swallow: bool) -> Self {
         tsv_lang::comment_ledger::set_comment_check(true);
@@ -62,7 +62,7 @@ impl ArmedRun {
     }
 }
 
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 impl Drop for ArmedRun {
     fn drop(&mut self) {
         tsv_lang::comment_ledger::set_comment_check(false);

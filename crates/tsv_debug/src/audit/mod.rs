@@ -15,7 +15,7 @@
 //!   per-file visitor, and the human + `--json` report tails for it. Runs on
 //!   [`parallel`]'s pool, like the injection audits.
 //! - [`parallel`] — the stride-chunked worker pool every corpus walk runs on, and
-//!   the `internal_comment_check`-gated arming bracket the ledger-driven ones wrap it in.
+//!   the `_internal_comment_check`-gated arming bracket the ledger-driven ones wrap it in.
 //! - [`vacuity`] — the two-layer guard that refuses to grade nothing: the
 //!   scope-free floor every corpus-walking audit calls on its own denominator,
 //!   and the default-corpus pin above it.
@@ -55,7 +55,7 @@
 //! and no further.
 
 // Always compiled: `properties` hosts the reparse primitives the `roundtrip_audit`
-// / `fuzz` commands share, which are not behind `internal_comment_check`. (Its ledger /
+// / `fuzz` commands share, which are not behind `_internal_comment_check`. (Its ledger /
 // verify layer is internally feature-gated.)
 pub(crate) mod properties;
 
@@ -112,14 +112,14 @@ pub(crate) mod repro;
 pub(crate) mod parallel;
 
 // The injection machinery is only reachable through `gap_audit` / `blank_audit`,
-// both themselves behind the `internal_comment_check` feature (they arm
+// both themselves behind the `_internal_comment_check` feature (they arm
 // `tsv_lang::comment_ledger`), so gate these too — otherwise they read as dead
 // code in a default build.
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 pub(crate) mod examples;
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 pub(crate) mod node_edge;
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 pub(crate) mod report;
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 pub(crate) mod sites;

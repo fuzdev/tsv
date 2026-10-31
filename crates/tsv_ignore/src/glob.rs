@@ -7,7 +7,7 @@
 //! already split). This mirrors the gitignore(5) pattern grammar.
 
 /// One segment of a pattern.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum Seg {
     /// A `**` segment (or any longer run of stars) — matches zero or more path
     /// segments.
@@ -17,7 +17,7 @@ pub(crate) enum Seg {
 }
 
 /// A token within a single (non-`**`) segment.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum Tok {
     /// A literal character (escapes are resolved into this at parse time).
     Lit(char),
@@ -32,7 +32,7 @@ pub(crate) enum Tok {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum ClassItem {
     Ch(char),
     Range(char, char),

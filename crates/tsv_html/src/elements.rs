@@ -247,35 +247,40 @@ pub fn collapses_child_whitespace(tag_name: &str) -> bool {
 
 /// Whether an element is an SVG element — Svelte's `SVG_ELEMENTS`, in SVG's own spelling
 /// (`clipPath`, `foreignObject`: the camelCase names are members as written, and only so).
+/// A name list, not namespace inference: it answers the name alone, with no ancestor. It
+/// holds `title`, a name SVG shares with HTML, so `<title>` answers `true` anywhere (Svelte's
+/// list omits it and asks the ancestor instead); `a`, `script` and `style`, also shared,
+/// answer `false`.
 #[inline]
 pub fn is_svg_element(tag_name: &str) -> bool {
     shape_admits(&SVG_SHAPE, tag_name) && svg_set_contains(tag_name)
 }
 
-/// Whether an element is a MathML element — Svelte's MathML Core list.
+/// Whether an element is a MathML element — Svelte's MathML Core list (`MATHML_ELEMENTS`),
+/// by name alone, with no ancestor.
 #[inline]
 pub fn is_mathml_element(tag_name: &str) -> bool {
     shape_admits(&MATHML_SHAPE, tag_name) && mathml_set_contains(tag_name)
 }
 
 /// Whether an element is foreign content: an SVG ([`is_svg_element`]) or MathML
-/// ([`is_mathml_element`]) element.
+/// ([`is_mathml_element`]) element — by name alone, so `title` answers `true` and `a`,
+/// `script` and `style` answer `false`, as those two do.
 #[inline]
 pub fn is_foreign_element(tag_name: &str) -> bool {
     is_svg_element(tag_name) || is_mathml_element(tag_name)
 }
 
-/// A `PCENChar` — a character the [HTML "valid custom element name"][spec] grammar
-/// admits in a custom element's name after its ASCII start, i.e. in the run after the
-/// first hyphen (`<my-café>`, `<emotion-😍>`, `<a-·>`). The ranges are the grammar's
-/// (`PotentialCustomElementName`) verbatim; surrogate code points are unreachable,
-/// since a Rust `char` is never a surrogate.
+/// A character Svelte admits in a tag name's run after its first hyphen
+/// (`<my-café>`, `<emotion-😍>`, `<a-·>`): the tail class of Svelte's
+/// `REGEX_VALID_TAG_NAME` (`packages/svelte/src/utils.js`), whose non-ASCII ranges are
+/// HTML's `PCENChar`. Unlike `PCENChar` it admits ASCII uppercase `A`–`Z`, as Svelte's
+/// class does. Surrogate code points are unreachable, since a Rust `char` is never a
+/// surrogate.
 ///
 /// Used both by the tokenizer (to keep a whole custom-element name in one token,
 /// including the non-alphanumeric members `·`/ZWNJ/ZWJ/astral) and by the name
 /// validator (the hyphen-tail run) — a single source of truth for the ranges.
-///
-/// [spec]: https://html.spec.whatwg.org/multipage/custom-elements.html#valid-custom-element-name
 pub fn is_custom_element_name_char(c: char) -> bool {
     c.is_ascii_alphanumeric()
         || matches!(c, '-' | '.' | '_' | '\u{00B7}')
@@ -566,6 +571,12 @@ mod tests {
         assert!(is_foreign_element("circle"));
         assert!(is_foreign_element("math"));
         assert!(!is_foreign_element("div"));
+        // Names SVG shares with HTML, answered by name alone (the predicate docs say so).
+        assert!(is_svg_element("title"));
+        for shared in ["a", "script", "style"] {
+            assert!(!is_svg_element(shared), "{shared}");
+            assert!(!is_foreign_element(shared), "{shared}");
+        }
     }
 
     /// Svelte's `closing_tag_omitted(current, next)`, composed from the two halves the way a

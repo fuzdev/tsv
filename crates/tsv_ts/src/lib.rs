@@ -97,17 +97,29 @@
 //!
 //! ## Features
 //!
-//! - `json` (default) — [`parse_to_json`], [`parse_to_json_with`] and [`JsonOptions`]. Turn
+#![cfg_attr(
+    feature = "json",
+    doc = " - `json` (default) — [`parse_to_json`], [`parse_to_json_with`] and [`JsonOptions`]. Turn"
+)]
+#![cfg_attr(
+    not(feature = "json"),
+    doc = " - `json` (default) — `parse_to_json`, `parse_to_json_with` and `JsonOptions`. Turn"
+)]
 //!   default features off for a format-and-strip build.
 //! - `locations` — `JsonOptions::locations`, adding a `loc` (line and column) to every node
 //!   of the wire.
 //!
-//! The `internal_*` features are tsv's own diagnostics, not for consumers.
+//! The `_internal_*` features are tsv's own diagnostics, not for consumers
+//! ([Stability](#stability)).
 //!
 //! ## Stability
 //!
 //! This release exposes no AST: parsing returns the wire JSON, in acorn-typescript's shape,
 //! which `@fuzdev/tsv-parse-wasm`'s `tsv_ast.d.ts` types.
+//!
+//! Items hidden from these docs (`__private`, `ast` and every other `#[doc(hidden)]` item)
+//! and the `_internal_*` features are tsv's own plumbing for its sibling crates, which pin
+//! each other exactly; they change in any release, outside semver.
 
 #![warn(missing_docs)]
 
@@ -118,8 +130,9 @@ pub mod __private;
 #[doc(hidden)]
 // A hidden module renders nowhere public, so its links to private items are maintainer
 // navigation (`docs:audit` documents private items); only the public-only docs.rs build
-// fires the lint, which `docs:audit:docsrs` denies everywhere else.
-#[expect(rustdoc::private_intra_doc_links)]
+// fires the lint, which `docs:audit:docsrs` denies everywhere else. Its private links are
+// all in the `json` writer.
+#[cfg_attr(feature = "json", expect(rustdoc::private_intra_doc_links))]
 pub mod ast;
 mod formatter;
 mod goal;
@@ -272,7 +285,7 @@ fn format_document_in(
     // `tsv_lang::comment_ledger`) — the MERGED list, which is the one the printers emit. A
     // Svelte host registers its own `Root.comments`, so an embedded `<script>` never
     // reaches here.
-    #[cfg(feature = "internal_comment_check")]
+    #[cfg(feature = "_internal_comment_check")]
     tsv_lang::comment_ledger::register_parsed(source, &comments);
     format_program_in(program, source, &comments, line_breaks, arena, false)
 }
@@ -326,7 +339,7 @@ fn format_program_in(
 /// # }
 /// ```
 #[cfg(feature = "json")]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct JsonOptions {
     goal: Goal,
@@ -363,13 +376,6 @@ impl JsonOptions {
     pub const fn locations(mut self, locations: bool) -> Self {
         self.locations = locations;
         self
-    }
-}
-
-#[cfg(feature = "json")]
-impl Default for JsonOptions {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -505,8 +511,8 @@ pub(crate) fn closes_statement_header(bytes: &[u8], rparen: usize, lower_bound: 
 }
 
 /// Printer buffer-population sampling for `tsv_debug buffer_sizes`. Behind the
-/// `internal_buffer_stats` feature (off in production builds).
-#[cfg(feature = "internal_buffer_stats")]
+/// `_internal_buffer_stats` feature (off in production builds).
+#[cfg(feature = "_internal_buffer_stats")]
 #[doc(hidden)]
 pub use printer::buffer_stats::{
     BufferInlineCapacities, BufferStats, inline_capacities, set_buffer_stats, take_buffer_stats,
@@ -521,8 +527,8 @@ pub use printer::buffer_stats::{
 /// the parser-driven `read_regex_literal` / `continue_template_from_brace` paths
 /// aren't reached by a raw `next_token` loop (a `/` lexes as division, a `}` as a
 /// brace), so those stay gated by the AST/format byte-identity suites. Behind the
-/// `internal_debug_lex` feature (off in production builds); used by `tsv_debug lex_diff`.
-#[cfg(feature = "internal_debug_lex")]
+/// `_internal_debug_lex` feature (off in production builds); used by `tsv_debug lex_diff`.
+#[cfg(feature = "_internal_debug_lex")]
 #[doc(hidden)]
 pub fn debug_token_stream(source: &str) -> String {
     use crate::lexer::{Lexer, TokenKind};
@@ -553,7 +559,7 @@ pub fn debug_token_stream(source: &str) -> String {
 
 /// The **reserved** control-flow and declaration keywords the lexer recognizes —
 /// the 38 words that head a statement or declaration, as distinct from the
-/// type-name and literal keywords the lexer also lexes. Behind the `internal_debug_lex`
+/// type-name and literal keywords the lexer also lexes. Behind the `_internal_debug_lex`
 /// feature (off in production builds), like `debug_token_stream`.
 ///
 /// This is the independent oracle for `tsv_debug`'s `SHAPE_KEYWORDS` drift guard.
@@ -569,7 +575,7 @@ pub fn debug_token_stream(source: &str) -> String {
 /// (`number`/`string`/`boolean`/`any`/`never`/`unknown`/`object`/`symbol`/`bigint`),
 /// and `debugger`. `void` stays in the set — it is the `void` unary operator, not
 /// a type name.
-#[cfg(feature = "internal_debug_lex")]
+#[cfg(feature = "_internal_debug_lex")]
 #[doc(hidden)]
 pub fn reserved_words() -> &'static [&'static str] {
     &[

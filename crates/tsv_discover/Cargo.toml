@@ -3,7 +3,9 @@ name = "tsv_discover"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-description = "tsv file-discovery policy: build-output heuristic + safety-net pruning over a tsv_ignore matcher"
+authors.workspace = true
+description = "tsv's file-discovery policy: safety nets, the build-output heuristic and scope warnings over tsv_ignore (support crate for tsv)"
+categories = ["development-tools", "filesystem"]
 license.workspace = true
 repository.workspace = true
 # This crate's agent notes stay in the repository; `deno task package:audit` grades the tarball.

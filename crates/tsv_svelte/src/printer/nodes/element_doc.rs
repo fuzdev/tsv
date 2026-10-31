@@ -1303,7 +1303,7 @@ impl<'a> Printer<'a> {
         // The body is raw text to the canonical parser, so the host's `Root.comments` holds
         // none of its comments: they are this island's, registered here under the host
         // source they are spanned against (the MERGED view, the one the TS printer emits).
-        #[cfg(feature = "internal_comment_check")]
+        #[cfg(feature = "_internal_comment_check")]
         tsv_lang::comment_ledger::register_parsed(
             self.source,
             &tsv_lang::merge_nestled_block_comments(self.source, program.comments),
@@ -1371,7 +1371,7 @@ impl<'a> Printer<'a> {
         // line ranges it emitted verbatim would replace this second format.
         let deeper = {
             // A measurement only: its comments are the first format's, printed once.
-            #[cfg(feature = "internal_comment_check")]
+            #[cfg(feature = "_internal_comment_check")]
             let _measuring = tsv_lang::comment_ledger::SuppressEmits::new();
             format_at(level + 1)
         };
@@ -1631,7 +1631,7 @@ impl<'a> Printer<'a> {
         let doc = self.js_comment_text_doc(comment);
         // The renderer records the emit when it reaches the node — see
         // `tsv_lang::comment_ledger`.
-        #[cfg(feature = "internal_comment_check")]
+        #[cfg(feature = "_internal_comment_check")]
         self.d().tag_comment_doc(doc, comment.span, self.source);
         doc
     }

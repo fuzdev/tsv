@@ -86,8 +86,8 @@ async function run_render_audit(): Promise<void> {
 	}
 	const { status } = spawnSync(
 		'cargo',
-		// `--features internal_audits` is not needed by `render_audit` itself — it is how this
-		// leg shares the ONE `corpus` + `internal_audits` build world every other audit uses,
+		// `--features _internal_audits` is not needed by `render_audit` itself — it is how this
+		// leg shares the ONE `corpus` + `_internal_audits` build world every other audit uses,
 		// instead of forcing a second full compile of the same crates under a
 		// different feature set. The instrumentation it pulls in is inert unless armed.
 		[
@@ -98,7 +98,7 @@ async function run_render_audit(): Promise<void> {
 			'-p',
 			'tsv_debug',
 			'--features',
-			'internal_audits',
+			'_internal_audits',
 			'--',
 			'render_audit',
 			'--gate',

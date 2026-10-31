@@ -555,14 +555,14 @@ place (all shallowest-first; `pop_gitignore()`/`pop_override()` to unwind a DFS 
 layers are hierarchical, and the two override pushes match identically, differing only in
 the file a warning names), then queries:
 
-- `classify_dir(name, child_rel, heuristic_active) -> 'descend' | 'prune' |
-  'prune_warn'` — the shared per-directory verdict (`tsv_discover::classify_dir`:
+- `classify_dir(child_rel, heuristic_active) -> 'descend' | 'prune' | 'prune_warn'` — the shared per-directory verdict (`tsv_discover::classify_dir`:
   safety nets, the build-output heuristic, the matcher). On `'prune_warn'` fetch
   the message via `shadow_warning(dir, loose_root?)`. Typed as that union in both
   packages' declarations: here by `unchecked_return_type` on the `#[wasm_bindgen]`
   method (the Rust return stays a `String`), in the napi `index.d.ts` by hand.
-- `should_format_file(name, child_rel) -> bool` — the per-file verdict (a
-  formattable extension and not ignored).
+- `should_format_file(child_rel) -> bool` — the per-file verdict (a
+  formattable extension and not ignored). Both read the entry's name off `child_rel`'s
+  last `/` segment.
 - `is_path_pruned(rel) -> bool` — the per-file form of the directory-prune verdict
   for a consumer with **no top-down traversal** (the VS Code extension formats one
   open document at a time). It walks `rel`'s ancestor directories itself and

@@ -267,9 +267,9 @@ impl<'a> Printer<'a> {
                 // comment emitter — see `tsv_lang::comment_ledger`. (They *are* registered
                 // in the stylesheet's flat list; the parser records them while reading the
                 // prelude and also bakes them into `content`.)
-                #[cfg(feature = "internal_comment_check")]
+                #[cfg(feature = "_internal_comment_check")]
                 tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
-                #[cfg(not(feature = "internal_comment_check"))]
+                #[cfg(not(feature = "_internal_comment_check"))]
                 let _ = span;
                 self.write(" ");
                 self.write(content);

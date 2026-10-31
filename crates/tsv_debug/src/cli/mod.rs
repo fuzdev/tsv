@@ -1,15 +1,15 @@
 pub mod commands;
 
 use argh::FromArgs;
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 use commands::blank_audit::BlankAuditCommand;
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 use commands::comment_audit::CommentAuditCommand;
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 use commands::gap_audit::GapAuditCommand;
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 use commands::ignore_audit::IgnoreAuditCommand;
-#[cfg(feature = "internal_swallow_check")]
+#[cfg(feature = "_internal_swallow_check")]
 use commands::swallow_audit::SwallowAuditCommand;
 use commands::width_audit::WidthAuditCommand;
 use commands::{
@@ -91,22 +91,22 @@ pub enum Subcommand {
     BindingAudit(BindingAuditCommand),
     BufferSizes(BufferSizesCommand),
     BuildFanoutAudit(BuildFanoutAuditCommand),
-    // Requires the `internal_comment_check` feature so default builds keep the comment ledger's
+    // Requires the `_internal_comment_check` feature so default builds keep the comment ledger's
     // registration + record hooks compiled out (production-shaped profiles); the
     // `comments:audit` deno task passes it.
-    #[cfg(feature = "internal_comment_check")]
+    #[cfg(feature = "_internal_comment_check")]
     CommentAudit(CommentAuditCommand),
-    // Same `internal_comment_check` gate as `CommentAudit` — it drives the same ledger; the
+    // Same `_internal_comment_check` gate as `CommentAudit` — it drives the same ledger; the
     // `gaps:audit` deno task passes the feature.
-    #[cfg(feature = "internal_comment_check")]
+    #[cfg(feature = "_internal_comment_check")]
     GapAudit(GapAuditCommand),
-    // Same `internal_comment_check` gate — the blank-injection audit drives the ledger for its
+    // Same `_internal_comment_check` gate — the blank-injection audit drives the ledger for its
     // ledger-clean invariant; the `blanks:audit` deno task passes the feature.
-    #[cfg(feature = "internal_comment_check")]
+    #[cfg(feature = "_internal_comment_check")]
     BlankAudit(BlankAuditCommand),
-    // Same `internal_comment_check` gate — the ignore-directive audit drives the ledger via
+    // Same `_internal_comment_check` gate — the ignore-directive audit drives the ledger via
     // `pristine_format`; the `ignore:audit` deno task passes the feature.
-    #[cfg(feature = "internal_comment_check")]
+    #[cfg(feature = "_internal_comment_check")]
     IgnoreAudit(IgnoreAuditCommand),
     // The fourth ratchet audit, grouped with the three above — but ungated: it formats each
     // seed as authored and compares blank runs, so it drives neither the ledger nor any other
@@ -153,10 +153,10 @@ pub enum Subcommand {
     ScanAudit(ScanAuditCommand),
     Strip(StripCommand),
     StripFixturesValidate(StripFixturesValidateCommand),
-    // Requires the `internal_swallow_check` feature so default builds keep the
+    // Requires the `_internal_swallow_check` feature so default builds keep the
     // render-time swallow instrumentation compiled out (production-shaped
     // profiles); the `swallow:audit` deno task passes it.
-    #[cfg(feature = "internal_swallow_check")]
+    #[cfg(feature = "_internal_swallow_check")]
     SwallowAudit(SwallowAuditCommand),
     Test262(Test262Command),
     TscConformance(TscConformanceCommand),
@@ -182,13 +182,13 @@ impl TopLevel {
             Subcommand::BindingAudit(c) => c.run(),
             Subcommand::BufferSizes(c) => c.run(),
             Subcommand::BuildFanoutAudit(c) => c.run(),
-            #[cfg(feature = "internal_comment_check")]
+            #[cfg(feature = "_internal_comment_check")]
             Subcommand::CommentAudit(c) => c.run(),
-            #[cfg(feature = "internal_comment_check")]
+            #[cfg(feature = "_internal_comment_check")]
             Subcommand::GapAudit(c) => c.run(),
-            #[cfg(feature = "internal_comment_check")]
+            #[cfg(feature = "_internal_comment_check")]
             Subcommand::BlankAudit(c) => c.run(),
-            #[cfg(feature = "internal_comment_check")]
+            #[cfg(feature = "_internal_comment_check")]
             Subcommand::IgnoreAudit(c) => c.run(),
             Subcommand::FabricationAudit(c) => c.run(),
             Subcommand::CensusAudit(c) => c.run(),
@@ -229,7 +229,7 @@ impl TopLevel {
             Subcommand::ScanAudit(c) => c.run(),
             Subcommand::Strip(c) => c.run(),
             Subcommand::StripFixturesValidate(c) => c.run(),
-            #[cfg(feature = "internal_swallow_check")]
+            #[cfg(feature = "_internal_swallow_check")]
             Subcommand::SwallowAudit(c) => c.run(),
             Subcommand::Test262(c) => c.run(),
             Subcommand::TscConformance(c) => c.run(),

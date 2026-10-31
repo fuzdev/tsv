@@ -73,7 +73,7 @@ enum Deltas {
 /// and CSS wires *must not*, and nothing in a fixture without a BOM can tell the two apart.
 /// The parsers themselves are untouched — their spans index the author's bytes, and only
 /// the emitted position moves.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LeadingBom {
     /// The BOM is one UTF-16 unit at position 0 (acorn).
     Counted,
@@ -101,7 +101,7 @@ pub fn leading_bom_len(source: &str) -> usize {
 /// Which characters start a new line in a document's coordinates — the half of `loc`'s
 /// definition that differs by language ([`WireCoordinates::lines`]).
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LineRule {
     /// ECMAScript's `LineTerminator`s: LF, CR, CRLF (one terminator), U+2028, U+2029 —
     /// acorn's count, and a TypeScript document's.
@@ -117,7 +117,7 @@ pub enum LineRule {
 /// reports a position for that language — the wire writers' tables and a parse error's
 /// point ([`crate::Error::wire_point`]) — reads that one statement rather than restating
 /// it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct WireCoordinates {
     /// Which characters end a line.
@@ -130,7 +130,7 @@ pub struct WireCoordinates {
 /// wire node starting at that byte would carry as its `start`, and the `loc` point
 /// `tsv parse --locations` (and the npm packages' `create_locator(…).position_at(start)`)
 /// gives it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct WirePoint {
     /// UTF-16 code units from the start of the text the wire indexes (a leading BOM not

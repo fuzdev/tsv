@@ -14,7 +14,9 @@ Each `## Unreleased` section must be non-empty and carry a
 <!-- bump: minor -->
 
 - **breaking** chore: GitHub Release checksums are `SHA512SUMS` (`sha512sum -c`), not `SHA256SUMS`
-- **breaking** feat: the `IgnoreStack` binding method `pop_tsv()` is renamed `pop_override()`
+- **breaking** feat: the `IgnoreStack` binding methods change: `pop_tsv()` is renamed
+  `pop_override()`, and `classify_dir` / `should_format_file` drop their `name` argument,
+  reading it off the path
 
 - feat: the Rust crates publish to crates.io — `cargo install --locked tsv_cli`, or
   `cargo binstall tsv_cli` for the prebuilt binary; their API is reshaped for it

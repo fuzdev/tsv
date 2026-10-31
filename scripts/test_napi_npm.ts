@@ -534,10 +534,10 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		stack.push_gitignore('', 'dist/\n');
 		assert.equal(stack.is_ignored('dist', true), true);
 		assert.equal(stack.is_ignored('src/a.ts', false), false);
-		assert.equal(stack.classify_dir('node_modules', 'node_modules', false), 'prune');
-		assert.equal(stack.classify_dir('src', 'src', false), 'descend');
-		assert.equal(stack.should_format_file('a.ts', 'src/a.ts'), true);
-		assert.equal(stack.should_format_file('a.txt', 'src/a.txt'), false);
+		assert.equal(stack.classify_dir('node_modules', false), 'prune');
+		assert.equal(stack.classify_dir('src', false), 'descend');
+		assert.equal(stack.should_format_file('src/a.ts'), true);
+		assert.equal(stack.should_format_file('src/a.txt'), false);
 		assert.equal(stack.is_path_pruned('node_modules/x.ts'), true);
 		// `dist` is pruned by the `.gitignore` rule with no re-include written under it:
 		// nothing to say

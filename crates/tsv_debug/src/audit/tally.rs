@@ -3,15 +3,15 @@
 //! feature-gated where this module is not, hence no intra-doc link).
 //!
 //! `merge_shape_map` is feature-gated and the rest is not: folding a per-shape AGGREGATE is
-//! the injection audits' shape alone (a `internal_comment_check` build), while [`CappedPaths`] and its
-//! merge serve every corpus walk — the pristine [`sweep`](crate::audit::sweep)'s panicking
+//! the injection audits' shape alone (a `_internal_comment_check` build), while
+//! [`CappedPaths`] and its merge serve every corpus walk — the pristine [`sweep`](crate::audit::sweep)'s panicking
 //! inputs, the injection audits' ungradable files, and the two mutation audits'
 //! base-non-idempotent seeds.
 
 /// Merge one worker's per-key aggregates into the total's: `merge` folds a key both hold,
 /// and a key only `src` holds moves over whole. The shared body behind every injection
 /// audit's shape-map merge.
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 pub(crate) fn merge_shape_map<K: Ord, V>(
     dst: &mut std::collections::BTreeMap<K, V>,
     src: std::collections::BTreeMap<K, V>,

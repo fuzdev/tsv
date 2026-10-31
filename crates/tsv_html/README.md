@@ -1,8 +1,8 @@
 # tsv_html
 
-**Support crate for tsv** — no stability promise; depend on
-[`tsv_ts`](https://crates.io/crates/tsv_ts), [`tsv_css`](https://crates.io/crates/tsv_css) or
-[`tsv_svelte`](https://crates.io/crates/tsv_svelte).
+**Support crate for tsv**, used by [`tsv_svelte`](https://crates.io/crates/tsv_svelte) — no
+stability promise yet. Its answers follow Svelte's reading of HTML rather than the spec's; the goal
+is to grow it into a standalone HTML library later.
 
 HTML element classification, whitespace rules, and the WHATWG named character reference table — part
 of [tsv](https://github.com/fuzdev/tsv).

@@ -461,7 +461,7 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
                 format!("tsv's parser rejects the input: {e:#}"),
             );
         }
-        (Claim::Expected(_), Err(tsv_ts::StripError::Unsupported { kind, span })) => push(
+        (Claim::Expected(_), Err(tsv_ts::StripError::Unsupported { kind, span, .. })) => push(
             StripCheck::Output,
             format!(
                 "refused {kind:?} at {:?}–{:?} where the fixture expects output",
@@ -498,7 +498,7 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
                 claimed.kind, claimed.start, claimed.end
             ),
         ),
-        (Claim::Refusal(claimed), Err(tsv_ts::StripError::Unsupported { kind, span })) => {
+        (Claim::Refusal(claimed), Err(tsv_ts::StripError::Unsupported { kind, span, .. })) => {
             let got = RefusalClaim {
                 kind: format!("{kind:?}"),
                 start: point_of(&input, span.start),

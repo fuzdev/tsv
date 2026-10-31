@@ -102,8 +102,8 @@
 //!   runs only on a pending line suffix), so a map left uncleared is never read. Flow
 //!   probes are opened and read only under context flags, all refused.
 //! - **The layout memo** the fits walks fill is a cache of pure functions of the doc.
-//! - **The audit seams** (`internal_swallow_check`, `internal_comment_check`): the renderer notes a
-//!   line-comment text and what follows it on the line, and records a tagged comment
+//! - **The audit seams** (`_internal_swallow_check`, `_internal_comment_check`): the renderer
+//!   notes a line-comment text and what follows it on the line, and records a tagged comment
 //!   node as emitted. The walk makes no such note, so it refuses a doc holding either
 //!   kind of node while its check is armed: an accepted doc is one the renderer would
 //!   have noted nothing for, beyond clearing the pending line comment a render starts
@@ -123,24 +123,24 @@
 use super::arena::{DocArena, DocId, DocNode};
 #[cfg(any(
     debug_assertions,
-    feature = "internal_swallow_check",
-    feature = "internal_comment_check"
+    feature = "_internal_swallow_check",
+    feature = "_internal_comment_check"
 ))]
 use super::arena_render::{RenderCtx, render_doc_iterative};
 use super::render_config::RenderConfig;
 use super::specialize_short_len;
-#[cfg(feature = "internal_swallow_check")]
+#[cfg(feature = "_internal_swallow_check")]
 use super::swallow::SwallowTracker;
 #[cfg(doc)]
 use super::types::DocContext;
 use super::types::{CachedWidth, DocText, LineKind, resolve_text};
 #[cfg(any(
     debug_assertions,
-    feature = "internal_swallow_check",
-    feature = "internal_comment_check"
+    feature = "_internal_swallow_check",
+    feature = "_internal_comment_check"
 ))]
 use crate::EmbedContext;
-#[cfg(feature = "internal_comment_check")]
+#[cfg(feature = "_internal_comment_check")]
 use crate::comment_ledger;
 
 /// How deep the walk recurses before it refuses. A doc nested past this is rare and
@@ -206,8 +206,8 @@ pub(super) fn try_print_flat(
     let mut left = budget as isize;
     #[cfg(any(
         debug_assertions,
-        feature = "internal_swallow_check",
-        feature = "internal_comment_check"
+        feature = "_internal_swallow_check",
+        feature = "_internal_comment_check"
     ))]
     let reserved;
     let wrote = {
@@ -219,27 +219,30 @@ pub(super) fn try_print_flat(
             children: &children,
             pool: &pool,
             source,
-            #[cfg(any(feature = "internal_swallow_check", feature = "internal_comment_check"))]
+            #[cfg(any(
+                feature = "_internal_swallow_check",
+                feature = "_internal_comment_check"
+            ))]
             arena,
             // A render starts by clearing the line comment left pending by the one
             // before it, and this stands for a render.
-            #[cfg(feature = "internal_swallow_check")]
+            #[cfg(feature = "_internal_swallow_check")]
             swallow_on: SwallowTracker::begin_render().enabled(),
             // The renderer's own gate, at the purpose every output entry renders with.
-            #[cfg(feature = "internal_comment_check")]
+            #[cfg(feature = "_internal_comment_check")]
             ledger_on: comment_ledger::comment_check_enabled() && arena.has_comment_docs(),
             #[cfg(any(
                 debug_assertions,
-                feature = "internal_swallow_check",
-                feature = "internal_comment_check"
+                feature = "_internal_swallow_check",
+                feature = "_internal_comment_check"
             ))]
             reserved: std::cell::Cell::new(0),
         };
         let wrote = walk.write(doc, false, output, &mut left, 0);
         #[cfg(any(
             debug_assertions,
-            feature = "internal_swallow_check",
-            feature = "internal_comment_check"
+            feature = "_internal_swallow_check",
+            feature = "_internal_comment_check"
         ))]
         {
             reserved = walk.reserved.get();
@@ -253,8 +256,8 @@ pub(super) fn try_print_flat(
 
     #[cfg(any(
         debug_assertions,
-        feature = "internal_swallow_check",
-        feature = "internal_comment_check"
+        feature = "_internal_swallow_check",
+        feature = "_internal_comment_check"
     ))]
     {
         let mut rendered = String::new();
@@ -294,18 +297,21 @@ struct FlatWalk<'a> {
     children: &'a [DocId],
     pool: &'a str,
     source: &'a str,
-    #[cfg(any(feature = "internal_swallow_check", feature = "internal_comment_check"))]
+    #[cfg(any(
+        feature = "_internal_swallow_check",
+        feature = "_internal_comment_check"
+    ))]
     arena: &'a DocArena,
-    #[cfg(feature = "internal_swallow_check")]
+    #[cfg(feature = "_internal_swallow_check")]
     swallow_on: bool,
-    #[cfg(feature = "internal_comment_check")]
+    #[cfg(feature = "_internal_comment_check")]
     ledger_on: bool,
     /// The trailing reserves the walk has given up, which the twin takes back out of
     /// the charge to get the column.
     #[cfg(any(
         debug_assertions,
-        feature = "internal_swallow_check",
-        feature = "internal_comment_check"
+        feature = "_internal_swallow_check",
+        feature = "_internal_comment_check"
     ))]
     reserved: std::cell::Cell<usize>,
 }
@@ -325,11 +331,11 @@ impl FlatWalk<'_> {
     #[expect(clippy::inline_always)]
     #[inline(always)]
     fn renderer_notes(&self, id: DocId) -> bool {
-        #[cfg(feature = "internal_swallow_check")]
+        #[cfg(feature = "_internal_swallow_check")]
         if self.swallow_on && self.arena.is_line_comment(id) {
             return true;
         }
-        #[cfg(feature = "internal_comment_check")]
+        #[cfg(feature = "_internal_comment_check")]
         if self.ledger_on && self.arena.comment_doc_tag(id).is_some() {
             return true;
         }
@@ -454,8 +460,8 @@ impl FlatWalk<'_> {
                     }
                     #[cfg(any(
                         debug_assertions,
-                        feature = "internal_swallow_check",
-                        feature = "internal_comment_check"
+                        feature = "_internal_swallow_check",
+                        feature = "_internal_comment_check"
                     ))]
                     self.reserved
                         .set(self.reserved.get() + usize::from(reserve));
