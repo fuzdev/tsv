@@ -6,6 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 description = "gitignore-faithful hierarchical ignore matching (.gitignore, .formatignore, .prettierignore) behind tsv's file discovery"
 categories = ["development-tools", "filesystem"]
+keywords = ["gitignore", "ignore", "glob", "prettierignore"]
 license.workspace = true
 repository.workspace = true
 # This crate's agent notes stay in the repository; `deno task package:audit` grades the tarball.

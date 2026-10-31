@@ -6,6 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 description = "TypeScript/JS formatter, type stripper and acorn-compatible parser — part of tsv"
 categories = ["development-tools", "parser-implementations", "web-programming"]
+keywords = ["typescript", "javascript", "formatter", "parser", "prettier"]
 license.workspace = true
 repository.workspace = true
 # This crate's agent notes stay in the repository; `deno task package:audit` grades the tarball.

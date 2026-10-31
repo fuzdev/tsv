@@ -142,7 +142,7 @@ crates (the open-convention stance):
   a `BuildOutputHeuristic` down a walk). Given the matcher assembled from `rel`'s full
   ancestor chain, it walks the ancestor directories itself and reconstructs each
   level's `BuildOutputHeuristic` from the stack's own `.gitignore` anchors
-  (`IgnoreStack::gitignore_anchors`) — off at a level once a `.gitignore` anchored
+  (`IgnoreStack::has_gitignore_above`) — off at a level once a `.gitignore` anchored
   above it is present — returning `true` at the first ancestor `classify_dir` would
   not descend into. It runs the decision through a private assert-free
   `classify_dir` half: the full-stack assembly can't satisfy the incremental walk's

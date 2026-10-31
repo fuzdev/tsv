@@ -391,14 +391,18 @@ fn strip_typescript_engine(source: &str, source_type: Option<String>) -> Result<
         |arena| match tsv_ts::__private::strip_in(source, goal, arena) {
             Ok(stripped) => Ok(stripped.code.into_owned()),
             Err(tsv_ts::StripError::Parse(e)) => Err(Failure::parse(&e)),
-            Err(tsv_ts::StripError::Unsupported { kind, span, .. }) => Err(Failure::Returned {
-                kind: "unsupported",
-                construct: Some(kind.name()),
-                report: kind.report(source, span),
-            }),
+            // a refusal always reports; the `None` arm is unreachable, thrown with its message
+            Err(tsv_ts::StripError::Unsupported { kind, error, .. }) => match error.report() {
+                Some(report) => Err(Failure::Returned {
+                    kind: "unsupported",
+                    construct: Some(kind.name()),
+                    report,
+                }),
+                None => Err(Failure::Plain(format!("{error:#}"))),
+            },
             // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
             // thrown with its message rather than given a `kind` the facade does not declare
-            Err(other) => Err(Failure::Plain(other.message(source))),
+            Err(other) => Err(Failure::Plain(format!("{other:#}"))),
         },
     )
 }

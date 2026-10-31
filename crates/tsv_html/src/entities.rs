@@ -50,6 +50,8 @@
 //! - <https://html.spec.whatwg.org/entities.json>
 //! - Svelte implementation: packages/svelte/src/compiler/phases/1-parse/utils/html.js
 
+use std::borrow::Cow;
+
 use crate::entities_table::{ENTITIES, ENTITY_DISPLACEMENTS, ENTITY_SEED, LONGEST_ENTITY_NAME};
 
 // Windows-1252 code point replacements for the range 128-159
@@ -130,6 +132,7 @@ pub enum ReferenceContext {
 }
 
 /// Decode HTML character references in a string, as Svelte's parser decodes them.
+/// Borrows `html` when nothing in it decodes (no `&`, or none that starts a reference).
 ///
 /// Named and numeric (decimal and hex) references both decode. The behavior differs by
 /// `context` ([`ReferenceContext`]):
@@ -165,11 +168,21 @@ pub enum ReferenceContext {
 ///
 /// // A named reference with no `;` before `=` stays as written in an attribute value
 /// assert_eq!(decode_character_references("&amp=", ReferenceContext::AttributeValue), "&amp=");
+///
+/// // Nothing decodes: the input itself, borrowed
+/// use std::borrow::Cow;
+/// assert!(matches!(decode_character_references("a & b", ReferenceContext::Text), Cow::Borrowed(_)));
 /// ```
-pub fn decode_character_references(html: &str, context: ReferenceContext) -> String {
+pub fn decode_character_references(html: &str, context: ReferenceContext) -> Cow<'_, str> {
+    // No `&`, no reference: the text is its own decode, borrowed.
+    let Some(first) = html.find('&') else {
+        return Cow::Borrowed(html);
+    };
     let is_attribute_value = context == ReferenceContext::AttributeValue;
     let mut result = String::with_capacity(html.len());
-    let mut i = 0;
+    result.push_str(&html[..first]);
+    let mut i = first;
+    let mut decoded_any = false;
 
     while let Some(ch) = html[i..].chars().next() {
         if ch != '&' {
@@ -184,6 +197,7 @@ pub fn decode_character_references(html: &str, context: ReferenceContext) -> Str
         // Numeric character reference: &#... or &#x...
         if let Some((consumed, decoded)) = decode_numeric_entity(rest, is_attribute_value) {
             result.push(decoded);
+            decoded_any = true;
             i += 1 + consumed; // +1 for '&'
             continue;
         }
@@ -191,6 +205,7 @@ pub fn decode_character_references(html: &str, context: ReferenceContext) -> Str
         // Named character reference
         if let Some((consumed, decoded)) = decode_named_entity(rest, is_attribute_value) {
             result.push_str(decoded);
+            decoded_any = true;
             i += 1 + consumed; // +1 for '&'
             continue;
         }
@@ -200,7 +215,11 @@ pub fn decode_character_references(html: &str, context: ReferenceContext) -> Str
         i += 1;
     }
 
-    result
+    if decoded_any {
+        Cow::Owned(result)
+    } else {
+        Cow::Borrowed(html)
+    }
 }
 
 /// Decode a numeric character reference (decimal or hex)

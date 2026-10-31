@@ -2030,7 +2030,9 @@ impl Text {
 #[cold]
 #[inline(never)]
 fn decode_text_data(raw: &str, context: tsv_html::ReferenceContext) -> String {
-    tsv_html::decode_character_references(raw, context)
+    // Owned whether or not a reference decoded: `data` is `Cow::Borrowed` exactly when
+    // `data_is_raw` says so, a cheaper question than the decode.
+    tsv_html::decode_character_references(raw, context).into_owned()
 }
 
 /// Svelte ExpressionTag - {expression} in template
@@ -2364,10 +2366,10 @@ mod tests {
                 let text = Text::new(span, decoding, span, &source);
                 let expected: Cow<'_, str> = match decoding {
                     TextDecoding::Raw => Cow::Borrowed(raw),
-                    _ if raw.contains('&') => Cow::Owned(tsv_html::decode_character_references(
-                        raw,
-                        decoding.reference_context(),
-                    )),
+                    _ if raw.contains('&') => Cow::Owned(
+                        tsv_html::decode_character_references(raw, decoding.reference_context())
+                            .into_owned(),
+                    ),
                     _ => Cow::Borrowed(raw),
                 };
                 let data = text.data(&source);

@@ -351,7 +351,7 @@ fn classify_dir_inner(
 /// [`is_ignored`](tsv_ignore::IgnoreStack::is_ignored) check uses). This walks the
 /// ancestor directories shallow→deep, reconstructing each level's
 /// [`BuildOutputHeuristic`] from the stack's own pushed `.gitignore` anchors
-/// ([`gitignore_anchors`](tsv_ignore::IgnoreStack::gitignore_anchors)) — off at a
+/// ([`has_gitignore_above`](tsv_ignore::IgnoreStack::has_gitignore_above)) — off at a
 /// level once a `.gitignore` anchored *above* it is present — and returns `true`
 /// at the first ancestor [`classify_dir`] would not `Descend` into. It does the
 /// **directory** half of discovery only; pair it with
@@ -406,34 +406,20 @@ fn first_pruned_ancestor(rel: &str, stack: &IgnoreStack) -> Option<(String, DirV
         return None;
     }
     let mut child_rel = String::new();
-    for (depth, &name) in segments[..segments.len() - 1].iter().enumerate() {
+    for &name in &segments[..segments.len() - 1] {
         if child_rel.is_empty() {
             child_rel.push_str(name);
         } else {
             child_rel.push('/');
             child_rel.push_str(name);
         }
-        let heuristic =
-            BuildOutputHeuristic::from_active(!gitignore_above(stack, &segments[..=depth]));
+        let heuristic = BuildOutputHeuristic::from_active(!stack.has_gitignore_above(&child_rel));
         let verdict = classify_dir_inner(name, &child_rel, heuristic, stack);
         if verdict != DirVerdict::Descend {
             return Some((child_rel, verdict));
         }
     }
     None
-}
-
-/// Whether any of `stack`'s `.gitignore` anchors sits at a **strict ancestor**
-/// directory of `dir` (its segments). The root anchor (no segments) is an ancestor of
-/// every non-root directory; an anchor *equal* to `dir` is the directory's own
-/// `.gitignore` (pushed only when descending *into* it during a real walk, so it doesn't
-/// classify the directory itself) and does **not** count. This reconstructs how the
-/// traversal turns the build-output heuristic off for a directory once a `.gitignore`
-/// governs a level at or above it.
-fn gitignore_above(stack: &IgnoreStack, dir: &[&str]) -> bool {
-    stack.gitignore_anchors().any(|anchor| {
-        anchor.len() < dir.len() && anchor.iter().zip(dir).all(|(a, d)| a.as_str() == *d)
-    })
 }
 
 /// Whether a child **file** should be formatted: it has a formattable extension

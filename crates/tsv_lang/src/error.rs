@@ -7,6 +7,14 @@ use std::ops::Range;
 use crate::depth::DepthLimit;
 use crate::location::{WireCoordinates, WirePoint};
 
+/// How many characters of the error's line the excerpt keeps before the caret, and after
+/// the caret's own character.
+/// Wide enough that a formatted line (100 columns plus indent) is never cut.
+const EXCERPT_CONTEXT: usize = 120;
+
+/// What marks a cut end of the excerpt.
+const EXCERPT_CUT: char = '…';
+
 /// Where a located error sits: its point in the document's wire coordinates and the
 /// source line excerpted under the message.
 ///
@@ -22,7 +30,8 @@ use crate::location::{WireCoordinates, WirePoint};
 /// language's wire counts one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ErrorContext {
-    /// The excerpted source line (no terminator). A `Box<str>` rather than a `String`, and
+    /// The excerpted source line (no terminator), cut to a window around the caret when
+    /// longer ([`EXCERPT_CONTEXT`]). A `Box<str>` rather than a `String`, and
     /// the caret column a `u32`, to keep the context — and so the payload every located
     /// [`Repr`] variant carries — at the size the `const` assert below pins.
     source_line: Box<str>,
@@ -63,14 +72,43 @@ impl ErrorContext {
         // the terminator sequence that ends it, and to its start, which it falls short of
         // only at the dropped mark (floored to byte 0) — the caret then sits under the
         // excerpt's first character.
-        // Saturating: every source a parse accepts is under the `u32` cap, so a column
-        // past it would be one no parse could report.
         let caret_end = position.min(line_end).max(line_start);
-        let caret_column = source[line_start..caret_end].chars().count();
+
+        // A line longer than the window — minified code, a generated bundle — is cut to
+        // `EXCERPT_CONTEXT` characters either side of the caret's own character, each cut end marked with a
+        // `…`, so an error on a megabyte line is not a megabyte (twice over: the caret line
+        // pads one column per character ahead of it). The header still prints the true
+        // point; only the excerpt is windowed.
+        let (excerpt_start, cut_before) = match source[line_start..caret_end]
+            .char_indices()
+            .rev()
+            .nth(EXCERPT_CONTEXT)
+        {
+            Some((i, c)) => (line_start + i + c.len_utf8(), true),
+            None => (line_start, false),
+        };
+        let (excerpt_end, cut_after) = match source[caret_end..line_end]
+            .char_indices()
+            .nth(EXCERPT_CONTEXT + 1)
+        {
+            Some((i, _)) => (caret_end + i, true),
+            None => (line_end, false),
+        };
+        let caret_column =
+            source[excerpt_start..caret_end].chars().count() + usize::from(cut_before);
+        // Saturating, though the window bounds it far below the `u32` cap.
         let caret_column = u32::try_from(caret_column).unwrap_or(u32::MAX);
+        let mut excerpt = String::with_capacity(excerpt_end - excerpt_start + 6);
+        if cut_before {
+            excerpt.push(EXCERPT_CUT);
+        }
+        excerpt.push_str(&source[excerpt_start..excerpt_end]);
+        if cut_after {
+            excerpt.push(EXCERPT_CUT);
+        }
 
         ErrorContext {
-            source_line: source[line_start..line_end].into(),
+            source_line: excerpt.into(),
             caret_column,
             point: coordinates.point(source, position),
             coordinates,
@@ -266,14 +304,11 @@ impl fmt::Display for Repr {
 }
 
 impl ErrorReport {
-    /// A refusal's report — what [`Error::refusal`] reports for the same arguments —
-    /// built directly, for a caller whose refusal is no `Error` (the type strip's,
-    /// `tsv_ts::UnsupportedKind::report`): `message` as the summary (its line terminators
-    /// spelled out), the frame of `start` in `source` under `coordinates`, and the span
+    /// A refusal's report — what [`Error::refusal`] reports for the same arguments, and
+    /// the parts it renders from: `message` as the summary (its line terminators spelled
+    /// out), the frame of `start` in `source` under `coordinates`, and the span
     /// `start..end`.
-    #[doc(hidden)]
-    #[must_use]
-    pub fn refusal(
+    fn refusal(
         message: &str,
         source: &str,
         start: usize,
@@ -316,7 +351,7 @@ fn escape_line_terminators(summary: String) -> String {
 /// A pointed error as a binding reports it: the summary and the frame apart, and the span
 /// in the document's wire coordinates ([`Error::report`]). The error's full message (its
 /// `{:#}` form) is exactly `summary`, a `\n`, then `frame`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct ErrorReport {
     /// What went wrong — the message's first part.
@@ -620,9 +655,8 @@ impl Error {
     /// A **refusal**: `source` parses, but an operation cannot handle what it holds — a
     /// format that cannot print it without changing what it means (a Svelte in-tag `//`
     /// comment holding a lone `<CR>`, which the format path's line-terminator fold would end
-    /// early). It covers the bytes `start..end`. The type strip's refusals take the same
-    /// report shape without an `Error` ([`ErrorReport::refusal`], via
-    /// `tsv_ts::UnsupportedKind::report`).
+    /// early), or a type strip that cannot erase a construct (`tsv_ts::StripError`). It
+    /// covers the bytes `start..end`.
     ///
     /// The message is rendered here, with the `line:col` header and excerpt of `start` in
     /// `source` under `coordinates` that a located error prints, so it reads like every other
@@ -1196,6 +1230,41 @@ mod tests {
         for (folded, original_pos) in expected.into_iter().enumerate() {
             assert_eq!(unfold_position(original, folded), original_pos, "{folded}");
         }
+    }
+
+    /// A line longer than the window is cut to `EXCERPT_CONTEXT` characters each side of the
+    /// caret's character, each cut end marked, the caret still under the error and the header still the
+    /// true point; a line inside the window is echoed whole.
+    #[test]
+    fn a_long_line_is_excerpted_around_the_caret() {
+        let before = "a".repeat(EXCERPT_CONTEXT + 50);
+        let after = "b".repeat(EXCERPT_CONTEXT + 50);
+        let source = format!("{before}X{after}");
+        let position = before.len();
+        let frame = ErrorContext::from_source(&source, position, ECMA).frame();
+        let (line, caret) = frame.split_once('\n').expect("two lines");
+        let header = format!("1:{}", position + 1);
+        assert_eq!(
+            line,
+            format!(
+                "{header} …{}X{}…",
+                "a".repeat(EXCERPT_CONTEXT),
+                "b".repeat(EXCERPT_CONTEXT)
+            )
+        );
+        // the caret sits under the `X`: the header, its space, the mark, the kept prefix
+        let column = caret.find('^').expect("a caret");
+        assert_eq!(column, header.len() + 1 + 1 + EXCERPT_CONTEXT);
+        assert_eq!(line.chars().nth(column), Some('X'));
+
+        // at the window's edge nothing is cut
+        let fits = format!(
+            "{}X{}",
+            "a".repeat(EXCERPT_CONTEXT),
+            "b".repeat(EXCERPT_CONTEXT - 1)
+        );
+        let frame = ErrorContext::from_source(&fits, EXCERPT_CONTEXT, ECMA).frame();
+        assert!(!frame.contains(EXCERPT_CUT), "{frame}");
     }
 
     /// A refusal renders the located error's `line:col` header and excerpt and reports its

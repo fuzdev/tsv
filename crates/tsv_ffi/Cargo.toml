@@ -101,8 +101,6 @@ unnecessary_literal_bound = "allow"
 equatable_if_let = "allow"
 useless_let_if_seq = "allow"
 elidable_lifetime_names = "allow"
-# Cargo overrides
-cargo_common_metadata = "allow"      # internal crates, not published to crates.io
 # Restriction lints (panic points need explicit #[allow] with justification)
 clone_on_ref_ptr = "warn"
 dbg_macro = "warn"

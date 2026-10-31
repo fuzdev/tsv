@@ -81,15 +81,18 @@ use tsv_lang::{Error, ErrorKind, ErrorReport};
 ///
 /// // an angle-bracket assertion cannot be blanked away: refused, with its span
 /// let source = "let x = <T>y;";
-/// let Err(StripError::Unsupported { kind, span, .. }) = strip(source) else {
+/// let error = strip(source).unwrap_err();
+/// let StripError::Unsupported { kind, .. } = &error else {
 ///     panic!("expected a refusal");
 /// };
-/// assert_eq!(kind, UnsupportedKind::TypeAssertion);
+/// assert_eq!(*kind, UnsupportedKind::TypeAssertion);
+/// let span = error.span().unwrap();
 /// assert_eq!(span, 8..12);
 /// let point = WIRE_COORDINATES.point(source, span.start);
 /// assert_eq!((point.line, point.column), (1, 8));
+/// assert_eq!(error.to_string(), "cannot strip an angle-bracket type assertion (1:9)");
 /// assert_eq!(
-///     strip(source).unwrap_err().message(source),
+///     format!("{error:#}"),
 ///     "cannot strip an angle-bracket type assertion\n1:9 let x = <T>y;\n            ^ here"
 /// );
 /// ```
@@ -173,7 +176,9 @@ pub struct Stripped<'s> {
 // A new variant compiles silently at every in-workspace match, which `#[non_exhaustive]`
 // forces to carry a `_` arm: give it an arm of its own in tsv_wasm's and tsv_napi's
 // `strip_typescript` and in tsv_debug's `strip` command and strip-fixture grader.
-/// Why [`strip`] produced no output.
+/// Why [`strip`] produced no output. Either way the failure is a [`tsv_lang::Error`]
+/// ([`StripError::error`]), so it displays, spans and reports as every other tsv error does:
+/// one line under `{}`, the `line:col` header, excerpt and caret under `{:#}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum StripError {
@@ -188,10 +193,10 @@ pub enum StripError {
     Unsupported {
         /// What was refused.
         kind: UnsupportedKind,
-        /// Its byte range in the source — UTF-8 byte offsets, as [`StripError::span`] and
-        /// [`Error::span`] give them; [`crate::WIRE_COORDINATES`] converts each end to a
-        /// line and UTF-16 column.
-        span: Range<usize>,
+        /// The refusal as an [`Error`] of [`ErrorKind::Refusal`]: its span the refused
+        /// construct's bytes, its message `cannot strip <the construct>` over the frame of
+        /// the span's start, in [`crate::WIRE_COORDINATES`].
+        error: Error,
     },
 }
 
@@ -255,86 +260,57 @@ impl UnsupportedKind {
 }
 
 impl StripError {
+    /// A refusal of `kind` over the bytes `span` of `source`, the text that was stripped.
+    fn unsupported(kind: UnsupportedKind, source: &str, span: Range<usize>) -> Self {
+        let message = format!("cannot strip {}", kind.description());
+        let error = Error::refusal(
+            &message,
+            source,
+            span.start,
+            span.end,
+            crate::WIRE_COORDINATES,
+        );
+        StripError::Unsupported { kind, error }
+    }
+
+    /// The failure as a [`tsv_lang::Error`]: a parse error's own, or the refusal's — one
+    /// type to print, span and report whichever variant it is.
+    #[must_use]
+    pub fn error(&self) -> &Error {
+        match self {
+            Self::Parse(error) | Self::Unsupported { error, .. } => error,
+        }
+    }
+
     /// What kind of failure this is: a refusal ([`ErrorKind::Refusal`]) for
     /// [`StripError::Unsupported`], and the parse error's own kind for
     /// [`StripError::Parse`] — a syntax error, a depth limit or a source over the size cap.
     #[must_use]
     pub fn kind(&self) -> ErrorKind {
-        match self {
-            Self::Parse(error) => error.kind(),
-            Self::Unsupported { .. } => ErrorKind::Refusal,
-        }
+        self.error().kind()
     }
 
     /// The failure's byte range in the source that was stripped — UTF-8 byte offsets, not
-    /// the UTF-16 wire coordinates [`StripError::message`] and [`UnsupportedKind::report`]
-    /// render. A parse error's is [`Error::span`] (an empty `p..p` at a syntax error or a
-    /// depth limit, `None` for a source over the size cap); a refusal's is the refused
-    /// construct's bytes.
+    /// the UTF-16 wire coordinates [`StripError::report`] gives. A parse error's is
+    /// [`Error::span`] (an empty `p..p` at a syntax error or a depth limit, `None` for a
+    /// source over the size cap); a refusal's is the refused construct's bytes.
     #[must_use]
     pub fn span(&self) -> Option<Range<usize>> {
-        match self {
-            Self::Parse(error) => error.span(),
-            Self::Unsupported { span, .. } => Some(span.clone()),
-        }
+        self.error().span()
     }
 
-    /// The error's message rendered against `source`, the text that was stripped: a parse
-    /// error's own text (what goes wrong, then the `line:column` header, the line and a
-    /// caret), and a refusal as `cannot strip <the construct>` over the same header,
-    /// line and caret at the refused span's start, in [`crate::WIRE_COORDINATES`] — one
-    /// shape for both, so a caller prints either the same way.
+    /// The failure as a binding reports it — [`Error::report`]: `None` only for a source
+    /// over the size cap; a refusal always reports.
     #[must_use]
-    pub fn message(&self, source: &str) -> String {
-        match self {
-            Self::Parse(error) => format!("{error:#}"),
-            Self::Unsupported { kind, span, .. } => {
-                let report = kind.report(source, span.clone());
-                format!("{}\n{}", report.summary, report.frame)
-            }
-        }
-    }
-
-    /// The same report a binding builds, against `source`, the text that was stripped —
-    /// the same shape for both kinds: a parse error's [`Error::report`] (`None` only for a
-    /// source over the size cap), and a refusal's [`UnsupportedKind::report`] over its
-    /// span (always `Some`).
-    #[must_use]
-    pub fn report(&self, source: &str) -> Option<ErrorReport> {
-        match self {
-            Self::Parse(error) => error.report(),
-            Self::Unsupported { kind, span, .. } => Some(kind.report(source, span.clone())),
-        }
+    pub fn report(&self) -> Option<ErrorReport> {
+        self.error().report()
     }
 }
 
-impl UnsupportedKind {
-    /// A refusal of this construct over `span` of `source` as a binding reports it: the summary
-    /// `cannot strip <the construct>`, the frame
-    /// [`StripError::message`] prints under it, and the span, in
-    /// [`crate::WIRE_COORDINATES`]. Infallible, unlike a parse error's
-    /// [`Error::report`]: a refusal always has its span.
-    #[must_use]
-    pub fn report(self, source: &str, span: Range<usize>) -> ErrorReport {
-        ErrorReport::refusal(
-            &format!("cannot strip {}", self.description()),
-            source,
-            span.start,
-            span.end,
-            crate::WIRE_COORDINATES,
-        )
-    }
-}
-
-/// A parse error as its [`Error`] displays — one line, the frame under `{:#}` — and a
-/// refusal's summary alone, without its position (a refusal's position is the source's to
-/// render: [`StripError::message`]).
+/// The inner [`Error`]'s own display, for both variants: one line, the frame under `{:#}`.
 impl fmt::Display for StripError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Parse(error) => fmt::Display::fmt(error, f),
-            Self::Unsupported { kind, .. } => write!(f, "cannot strip {}", kind.description()),
-        }
+        fmt::Display::fmt(self.error(), f)
     }
 }
 
@@ -349,11 +325,8 @@ const _: () = {
 
 impl std::error::Error for StripError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            // transparent, as `Display` is: the inner error's own source, never itself
-            Self::Parse(error) => std::error::Error::source(error),
-            Self::Unsupported { .. } => None,
-        }
+        // transparent, as `Display` is: the inner error's own source, never itself
+        std::error::Error::source(self.error())
     }
 }
 
@@ -381,11 +354,16 @@ mod tests {
                 ..
             }
         ));
-        assert_eq!(error.to_string(), "cannot strip an enum");
+        assert_eq!(error.to_string(), "cannot strip an enum (2:1)");
         assert_eq!(
-            error.message(source),
+            format!("{error:#}"),
             "cannot strip an enum\n2:1 enum E {}\n    ^ here"
         );
+        assert_eq!(error.kind(), tsv_lang::ErrorKind::Refusal);
+        let report = error.report().expect("a refusal reports");
+        assert_eq!(report.summary, "cannot strip an enum");
+        assert_eq!(report.frame, "2:1 enum E {}\n    ^ here");
+        assert_eq!((report.start.line, report.start.column), (2, 0));
     }
 
     /// A refusal's span is the refused construct's UTF-8 bytes — counted past a
@@ -432,13 +410,14 @@ mod tests {
         let StripError::Parse(parse) = &error else {
             panic!("expected a parse error: {error:?}");
         };
-        assert_eq!(error.message(source), format!("{parse:#}"));
+        assert_eq!(format!("{error:#}"), format!("{parse:#}"));
+        assert_eq!(error.report(), parse.report());
     }
 
     fn stripped(source: &str) -> String {
         match strip(source) {
             Ok(stripped) => stripped.code.into_owned(),
-            Err(error) => panic!("expected {source:?} to strip: {}", error.message(source)),
+            Err(error) => panic!("expected {source:?} to strip: {error:#}"),
         }
     }
 
@@ -618,11 +597,15 @@ mod tests {
     #[test]
     fn a_chain_assertion_is_refused_before_its_operand_is_walked() {
         let source = "x = <T>a + b as U * c;\n";
-        let StripError::Unsupported { kind, span } = strip_error(source) else {
+        let error = strip_error(source);
+        let StripError::Unsupported { kind, .. } = &error else {
             panic!("expected a refusal");
         };
-        assert_eq!(kind, UnsupportedKind::AssertionGrouping);
-        assert_eq!(&source[span], "<T>a + b as U");
+        assert_eq!(*kind, UnsupportedKind::AssertionGrouping);
+        assert_eq!(
+            &source[error.span().expect("a refusal has a span")],
+            "<T>a + b as U"
+        );
     }
 
     /// A chain over a thousand links long strips on a small stack: its links cost heap, not
@@ -635,7 +618,7 @@ mod tests {
             .spawn(move || {
                 strip(&source)
                     .map(|stripped| stripped.code.into_owned())
-                    .map_err(|error| error.message(&source))
+                    .map_err(|error| format!("{error:#}"))
             })
             .expect("spawn")
             .join()

@@ -115,10 +115,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// The collected edits, or the refusal.
     pub fn finish(self) -> Result<BumpVec<'b, Edit>, StripError> {
         match self.refusal {
-            Some((kind, span)) => Err(StripError::Unsupported {
-                kind,
-                span: span.range(),
-            }),
+            Some((kind, span)) => Err(StripError::unsupported(kind, self.src.text, span.range())),
             None => Ok(self.edits),
         }
     }

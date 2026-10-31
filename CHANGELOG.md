@@ -22,6 +22,14 @@ Each `## Unreleased` section must be non-empty and carry a
   `cargo binstall tsv_cli` for the prebuilt binary; their API is reshaped for it
   (`Error` replaces `ParseError`) and the AST is no longer part of the public API
 
+- **breaking** fix: code that parsed at 0.7.1 and now rejects, as tsc does — `void` as a name
+  after `new`, `@` or `extends` (`new void`), a method or accessor in an object assignment
+  pattern (`({ f() {} } = x)`), a modifier on a class static block (`public static {}`), a
+  decorator on a constructor, and a member access after `export default @dec class Foo {}`
+- fix: decorators on a class static block or index signature are kept — the formatter dropped
+  them — and the AST carries them as `decorators` (`StaticBlock`, `TSIndexSignature`)
+- fix: an error on a very long line (minified code) excerpts the 120 characters either side of
+  the error, not the whole line
 - fix: deeply nested or very long chained input is refused with a parse error instead of
   overflowing the host's stack
 - fix: formatting deeply nested ternaries, callbacks, member chains and parenthesized

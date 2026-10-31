@@ -55,7 +55,7 @@ formatter runs; formatting itself is non-configurable.
 
 JS export names are kept **snake_case** via `#[napi(js_name = "…")]` (napi-rs would otherwise camelCase them) so the addon's names match `tsv_wasm`'s. The per-call shape matches too: `tsv_wasm`'s raw exports take the same trailing optional source type, and `tsv_ffi` spells it as a `u32` code. Coverage matches — each binding has its own `lang_bindings!`, but all three build their bodies from the **same** [`tsv_arena`](../tsv_arena/) macros (`parse_convert!` / `parse_internal!` / `parse_format!`, over one `goal_allowed!` tag), so which languages have a goal axis is one fact in one place. The published `@fuzdev/tsv` loader wraps the addon in the same `(source, options?)` facade the wasm packages publish — see §The npm packages.
 
-Outside the macro, the `strip` feature exports **`strip_typescript(source, sourceType?)`** — the trailing optional source type every export takes, read as the format exports read it (`Family::Strip`: unset is none named, the module grammar retried as a script) — returning the JS, a parse failure as the parse exports return one, and a refusal as `{ok: false, error}` with `kind: 'unsupported'`, its `construct` and its span (`Failure::Returned` over `tsv_ts::UnsupportedKind::report`, the object `tsv_wasm` builds), which the loader's facade (`api_strip.js`) checks and hands back ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §The npm Facade).
+Outside the macro, the `strip` feature exports **`strip_typescript(source, sourceType?)`** — the trailing optional source type every export takes, read as the format exports read it (`Family::Strip`: unset is none named, the module grammar retried as a script) — returning the JS, a parse failure as the parse exports return one, and a refusal as `{ok: false, error}` with `kind: 'unsupported'`, its `construct` and its span (`Failure::Returned` over the refusal's `Error::report`, the object `tsv_wasm` builds), which the loader's facade (`api_strip.js`) checks and hands back ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §The npm Facade).
 
 Outside the macro, the `format` feature also exports **`IgnoreStack`** — a `#[napi]` class over `tsv_ignore::IgnoreStack` plus the `tsv_discover` verdicts, method for method with `tsv_wasm`'s `#[wasm_bindgen]` twin (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Discovery Matcher + Policy). ⚠️ Its maybe-a-warning methods return **`Either<String, Undefined>`, not `Option<String>`**: napi-rs maps `None` to JS `null` where wasm-bindgen maps it to `undefined`, and a package that exists to be swapped for the other must not change which one a caller sees. `Undefined` is napi-rs's `()`, so the none arm allocates nothing. Two tests pin it — the in-crate one on the `Either::B` variant, `scripts/test_napi_npm.ts` on the JS value, since only the latter can observe it.
 
@@ -343,8 +343,8 @@ napi-rs marshals the JS string into a Rust `String` and the returned `String` ba
   `Plain(message)` for an argument refusal or the size cap, and `Returned { kind, construct,
   report }` for a pointed one: `kind` `'parse'` (a syntax error), `'refused'` (a format's
   refusal of a source that parses) or `'unsupported'` (a strip refusal, with its `construct`),
-  over the `ErrorReport` `Error::report` / `tsv_ts::UnsupportedKind::report` gives (the summary,
-  the frame, and the span as two `WirePoint`s).
+  over the `ErrorReport` `Error::report` gives — a strip refusal's own `Error` included — (the
+  summary, the frame, and the span as two `WirePoint`s).
 - **The `#[napi]` wrapper**, which takes the `Env` napi-rs injects (`&Env`, not a JS argument,
   so the arity is unchanged) and returns `Either<String, Object>` (`Either<Undefined, Object>`
   for `parse_internal_*`): the product as before, or the `{ok: false, error}` object

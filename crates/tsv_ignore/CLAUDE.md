@@ -44,7 +44,7 @@ this path." tsv's discovery *policy* — the build-output heuristic, the
 always-pruned safety nets, the formattable-extension check, the heuristic-shadow
 warning — lives one layer up in [`tsv_discover`](../tsv_discover/CLAUDE.md), which
 builds on `IgnoreStack` (consuming `is_ignored_leaf` / `is_reincluded` /
-`negation_under` / `has_gitignore_layers` / `gitignore_anchors`, plus `exclusion` /
+`negation_under` / `has_gitignore_layers` / `has_gitignore_above`, plus `exclusion` /
 `override_exclusion` / `gitignore_exclusion` — the ancestor-walking answer's witnesses — with
 `override_layer_source` and `split_segments` to bound and warn about a path an argument
 named). Deliberately: `IgnoreStack` stays a pure gitignore(5) matcher, reusable beyond
@@ -113,12 +113,12 @@ holds two parallel per-directory layer stacks (`.gitignore` and override):
   (true even for an empty one — mere presence turns a caller's heuristic off, as in
   git). `tsv_discover` uses it to assert that an active build-output heuristic has no
   `.gitignore` layer pushed.
-- `IgnoreStack::gitignore_anchors() -> impl Iterator<Item = &[String]>` — the
-  format-root-relative directory anchors of the pushed `.gitignore` layers, each as its
-  `split_segments` segments (empty = root), borrowed from the stack (no allocation).
-  Lets a per-file discovery replay with **no** top-down walk (the VS Code extension, via
-  `tsv_discover::is_path_pruned`) reconstruct, per ancestor, whether the build-output
-  heuristic applies — it is off at a level once a `.gitignore` anchored above it is present.
+- `IgnoreStack::has_gitignore_above(dir) -> bool` — whether a `.gitignore` layer is
+  anchored at a strict ancestor of `dir` (a layer anchored AT `dir` is its own and does
+  not count). Lets a per-file discovery replay with **no** top-down walk (the VS Code
+  extension, via `tsv_discover::is_path_pruned`) reconstruct, per ancestor, whether the
+  build-output heuristic applies — it is off at a level once a `.gitignore` anchored above
+  it is present. A question, not the anchors themselves, so the layer storage stays private.
 - `IgnoreStack::exclusion(path, kind) -> Option<Exclusion>` — the witness behind
   `is_ignored`: the shallowest excluded prefix of `path` (`Exclusion::depth`), the
   directory holding the excluding rule's file (`anchor_depth`), both counted in

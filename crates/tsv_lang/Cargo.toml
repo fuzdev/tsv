@@ -6,6 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 description = "Shared foundation of tsv's language crates: errors, wire coordinates and the parsers' sized stack (support crate for tsv)"
 categories = ["development-tools", "parser-implementations"]
+keywords = ["typescript", "svelte", "css", "parser", "formatter"]
 license.workspace = true
 repository.workspace = true
 # This crate's agent notes stay in the repository; `deno task package:audit` grades the tarball.

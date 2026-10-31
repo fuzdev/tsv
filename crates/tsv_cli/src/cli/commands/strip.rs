@@ -86,7 +86,7 @@ impl StripCommand {
             // a parse error (or the size cap) is the error channel, as `tsv parse` prints it
             Err(tsv_ts::StripError::Parse(e)) => exit_with_parse_error(2, &e),
             // a refusal is the strip's verdict, as `format --check`'s "would change" is
-            Err(error) => exit_with_error(1, format_args!("Error: {}", error.message(source))),
+            Err(error) => exit_with_error(1, format_args!("Error: {error:#}")),
         }
     }
 }

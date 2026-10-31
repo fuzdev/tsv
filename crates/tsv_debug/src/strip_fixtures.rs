@@ -461,14 +461,17 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
                 format!("tsv's parser rejects the input: {e:#}"),
             );
         }
-        (Claim::Expected(_), Err(tsv_ts::StripError::Unsupported { kind, span, .. })) => push(
-            StripCheck::Output,
-            format!(
-                "refused {kind:?} at {:?}–{:?} where the fixture expects output",
-                point_of(&input, span.start),
-                point_of(&input, span.end)
-            ),
-        ),
+        (Claim::Expected(_), Err(tsv_ts::StripError::Unsupported { kind, error, .. })) => {
+            let span = error.span().unwrap_or_default();
+            push(
+                StripCheck::Output,
+                format!(
+                    "refused {kind:?} at {:?}–{:?} where the fixture expects output",
+                    point_of(&input, span.start),
+                    point_of(&input, span.end)
+                ),
+            );
+        }
         (Claim::Expected(expected), Ok(stripped)) => {
             let code = stripped.code.as_ref();
             if code != expected {
@@ -498,7 +501,8 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
                 claimed.kind, claimed.start, claimed.end
             ),
         ),
-        (Claim::Refusal(claimed), Err(tsv_ts::StripError::Unsupported { kind, span, .. })) => {
+        (Claim::Refusal(claimed), Err(tsv_ts::StripError::Unsupported { kind, error, .. })) => {
+            let span = error.span().unwrap_or_default();
             let got = RefusalClaim {
                 kind: format!("{kind:?}"),
                 start: point_of(&input, span.start),
@@ -516,10 +520,7 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
         }
         (_, Err(other)) => push(
             StripCheck::Output,
-            format!(
-                "a strip failure this grader does not know: {}",
-                other.message(&input)
-            ),
+            format!("a strip failure this grader does not know: {other:#}"),
         ),
     }
     findings

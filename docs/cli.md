@@ -222,6 +222,9 @@ where a module-only `parse` reports the module's — at one goal the two agree. 
 display line, bounded by every ECMAScript terminator whatever the language, since a raw CR,
 U+2028 or U+2029 printed mid-line garbles the text the caret points into; it never echoes a
 leading byte-order mark, in any language (the header alone carries the wire's reading of one).
+A line reaching more than 120 characters either side of the error's character — minified code, a generated
+bundle — is cut to that window, each cut end marked with a `…`, so an error on a megabyte line
+is not a megabyte; the header still prints the true point.
 The caret is padded by the display width of what the excerpt prints ahead of it (a tab echoed
 as a tab), so it sits under the error's character even where the header's UTF-16 column and
 the screen column differ. The text is `tsv_lang`'s `Error` in its full (`{:#}`) form and is the same

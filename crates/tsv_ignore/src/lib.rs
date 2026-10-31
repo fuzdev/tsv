@@ -18,7 +18,7 @@
 //!   per-directory `.gitignore` layers plus a parallel stack of per-directory override
 //!   layers (`.formatignore`), evaluated against format-root-relative paths with
 //!   git's last-match-wins + parent-directory-prune semantics (oracle:
-//!   `git check-ignore`). At each path level every `.gitignore` layer is
+//!   `git check-ignore --no-index`). At each path level every `.gitignore` layer is
 //!   evaluated, then every override layer, so an override-layer `!` can re-include a gitignore'd
 //!   path (subject to git's parent-dir rule) and a deeper layer wins over a
 //!   shallower one.
@@ -47,8 +47,11 @@
 //!
 //! ## Differences from git
 //!
-//! The `.gitignore` half answers as `git check-ignore` does, except:
+//! The `.gitignore` half answers as `git check-ignore --no-index` does, except:
 //!
+//! - **No index.** A matcher reads rules, not git's index, so a tracked file a rule matches
+//!   is ignored here, where plain `git check-ignore` (and `git status`) exempt it. A caller
+//!   that wants git's view of a tracked file asks git.
 //! - **Always case-sensitive.** Git on macOS and Windows sets `core.ignorecase` and matches
 //!   case-insensitively there; reading machine-local git config would make the answer
 //!   differ between machines.
@@ -62,14 +65,67 @@
 //! - **A `**` glued to a literal prefix** (`foo**/bar.ts`) is two stars within one segment,
 //!   as gitignore(5) says; git's matcher crosses directories there.
 //!
+//! ## A walk
+//!
+//! A directory's own `.gitignore` never classifies that directory — its parent's rules do —
+//! so a walk asks about a child directory BEFORE pushing the child's layers, then descends,
+//! then pops them. Below the root, only a directory the stack did not ignore is entered, so
+//! a file inside is asked with [`is_ignored_leaf`](IgnoreStack::is_ignored_leaf), which
+//! skips the ancestor walk [`is_ignored`](IgnoreStack::is_ignored) repeats:
+//!
+//! ```
+//! use tsv_ignore::{IgnoreStack, PathKind};
+//!
+//! // walks `tree` (a stand-in filesystem: each directory's `.gitignore` and entries)
+//! fn walk(stack: &mut IgnoreStack, dir: &str, tree: &Tree, found: &mut Vec<String>) {
+//!     let pushed = tree.gitignore(dir).is_some();
+//!     if let Some(content) = tree.gitignore(dir) {
+//!         stack.push_gitignore(dir, content);
+//!     }
+//!     for (name, is_dir) in tree.children(dir) {
+//!         let child = if dir.is_empty() { name.to_string() } else { format!("{dir}/{name}") };
+//!         if is_dir {
+//!             if !stack.is_ignored_leaf(&child, PathKind::Directory) {
+//!                 walk(stack, &child, tree, found);
+//!             }
+//!         } else if !stack.is_ignored_leaf(&child, PathKind::File) {
+//!             found.push(child);
+//!         }
+//!     }
+//!     if pushed {
+//!         stack.pop_gitignore();
+//!     }
+//! }
+//! # struct Tree;
+//! # impl Tree {
+//! #     fn gitignore(&self, dir: &str) -> Option<&'static str> {
+//! #         match dir { "" => Some("build/\n"), "src" => Some("*.gen.ts\n"), _ => None }
+//! #     }
+//! #     fn children(&self, dir: &str) -> Vec<(&'static str, bool)> {
+//! #         match dir {
+//! #             "" => vec![("build", true), ("src", true), ("a.ts", false)],
+//! #             "src" => vec![("b.ts", false), ("c.gen.ts", false)],
+//! #             _ => vec![("out.ts", false)],
+//! #         }
+//! #     }
+//! # }
+//!
+//! let mut found = Vec::new();
+//! walk(&mut IgnoreStack::new(), "", &Tree, &mut found);
+//! assert_eq!(found, ["src/b.ts", "a.ts"]);
+//! ```
+//!
 //! ## Paths
 //!
-//! Every path a query or a push takes is relative to the format root and `/`-separated:
+//! Every path a query or a push takes is relative to the **format root** — the directory
+//! the caller scopes its walk to, typically the repository root — and `/`-separated:
 //!
 //! - `\` is never a separator, on any platform — a caller on Windows converts first;
 //! - empty and `.` segments are dropped, so a leading `/` (`/a` is `a`), a doubled `//`
 //!   and a `./` change nothing;
 //! - `..` is a literal segment, never a step up — a caller resolves it first;
+//! - a trailing `/` is an empty segment, dropped like the rest: whether a path is a
+//!   directory is the [`PathKind`] a query takes, never its spelling;
 //! - a name that is not UTF-8 is handed over in its lossy spelling, as the `tsv` CLI does.
 //!   Each maximal invalid sequence is then one U+FFFD, which a `?` matches where git needs
 //!   one per byte (the per-code-point difference above), and two names that differ only
@@ -306,6 +362,21 @@ impl Layer {
     }
 }
 
+/// The push-order rule, checked in debug builds: no layer already on `stack` may sit in a
+/// directory BELOW `layer`'s, since precedence is push order and that deeper layer would
+/// then lose to its ancestor's. A sibling's layer left on the stack is harmless (it never
+/// applies to the same path) and passes.
+fn debug_assert_pushed_in_order(stack: &[Layer], layer: &Layer) {
+    debug_assert!(
+        !stack.iter().any(|pushed| {
+            pushed.anchor.len() > layer.anchor.len()
+                && pushed.anchor.iter().zip(&layer.anchor).all(|(p, a)| p == a)
+        }),
+        "ignore layer {:?} pushed after a layer below it; push shallowest-first",
+        layer.anchor.join("/")
+    );
+}
+
 impl IgnoreStack {
     /// An empty stack (ignores nothing until layers are added).
     pub fn new() -> Self {
@@ -315,10 +386,13 @@ impl IgnoreStack {
     /// Push one directory's `.gitignore`. `anchor` is the directory relative to
     /// the format root, `/`-separated (empty string = the root). It **must** be pushed
     /// after the `.gitignore` of every ancestor directory: precedence is push order, not
-    /// anchor depth.
+    /// anchor depth (debug builds assert it). The layer classifies what is BELOW `anchor`,
+    /// never the `anchor` directory itself — its parent's rules do — so a walk asks about a
+    /// directory before pushing its layers ([A walk](crate#a-walk)).
     pub fn push_gitignore(&mut self, anchor: &str, content: &str) {
-        self.gitignore
-            .push(Layer::new(anchor, content, IgnoreSource::Gitignore));
+        let layer = Layer::new(anchor, content, IgnoreSource::Gitignore);
+        debug_assert_pushed_in_order(&self.gitignore, &layer);
+        self.gitignore.push(layer);
     }
 
     /// Pop the most recently pushed `.gitignore` layer (a DFS unwinding out of a
@@ -348,7 +422,9 @@ impl IgnoreStack {
     /// The one override-layer push behind the two public names, which differ only in the
     /// file a diagnostic names.
     fn push_override(&mut self, anchor: &str, content: &str, source: IgnoreSource) {
-        self.overrides.push(Layer::new(anchor, content, source));
+        let layer = Layer::new(anchor, content, source);
+        debug_assert_pushed_in_order(&self.overrides, &layer);
+        self.overrides.push(layer);
     }
 
     /// Pop the most recently pushed override layer — a `.formatignore` or
@@ -366,14 +442,21 @@ impl IgnoreStack {
         !self.gitignore.is_empty()
     }
 
-    /// The format-root-relative directory anchors of the pushed `.gitignore` layers,
-    /// shallow→deep, each as its [`split_segments`] segments (empty for the root). Lets a
-    /// per-file discovery replay that has no top-down walk — the VS Code extension
-    /// formats one open document at a time — reconstruct, for each ancestor directory,
-    /// whether the build-output heuristic applies: it is off at a level once a
-    /// `.gitignore` anchored above it is present.
-    pub fn gitignore_anchors(&self) -> impl Iterator<Item = &[String]> + '_ {
-        self.gitignore.iter().map(|layer| layer.anchor.as_slice())
+    /// Whether a `.gitignore` layer is anchored at a **strict ancestor** of directory `dir`
+    /// (relative to the format root, `/`-separated, normalized as every path here is). The
+    /// root anchor is an ancestor of every directory but the root itself; a layer anchored
+    /// AT `dir` is that directory's own `.gitignore`, which never classifies the directory,
+    /// and does not count. Lets a per-file discovery replay that has no top-down walk — the
+    /// VS Code extension formats one open document at a time — reconstruct, for each
+    /// ancestor directory, whether the build-output heuristic applies: it is off at a level
+    /// once a `.gitignore` anchored above it is present.
+    #[must_use]
+    pub fn has_gitignore_above(&self, dir: &str) -> bool {
+        let dir = split_segments(dir);
+        self.gitignore.iter().any(|layer| {
+            layer.anchor.len() < dir.len()
+                && layer.anchor.iter().zip(&dir).all(|(a, d)| a.as_str() == *d)
+        })
     }
 
     /// Whether `path` (relative to the format root, `/`-separated) is ignored.
@@ -947,6 +1030,26 @@ mod tests {
     use super::{
         Exclusion, IgnoreRules, IgnoreSource, IgnoreStack, NegationRule, NegationTail, PathKind,
     };
+
+    /// Pushing an ancestor's layer after a descendant's breaks precedence; debug builds say so.
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "pushed after a layer below it")]
+    fn pushing_an_ancestor_layer_after_a_descendants_asserts() {
+        let mut stack = IgnoreStack::new();
+        stack.push_gitignore("a", "!x.log\n");
+        stack.push_gitignore("", "*.log\n");
+    }
+
+    /// A sibling's layer left on the stack never applies to the same path, so it passes.
+    #[test]
+    fn a_siblings_layer_on_the_stack_is_no_order_violation() {
+        let mut stack = IgnoreStack::new();
+        stack.push_formatignore("a", "x\n");
+        stack.push_formatignore("b", "y\n");
+        assert!(stack.is_ignored("b/y", PathKind::File));
+        assert!(!stack.is_ignored("b/x", PathKind::File));
+    }
 
     fn ig(content: &str) -> IgnoreRules {
         IgnoreRules::parse(content)

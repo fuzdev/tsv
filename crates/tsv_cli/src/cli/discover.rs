@@ -797,7 +797,7 @@ fn override_layer_content(
     has_prettierignore: bool,
     in_repo: bool,
     warnings: &mut Vec<String>,
-) -> Option<TsvLayer> {
+) -> Option<OverrideLayer> {
     if let Some(warning) = prettierignore_shadowed_warning(
         &dir.to_string_lossy(),
         DirIgnoreFiles {
@@ -816,7 +816,7 @@ fn override_layer_content(
         return None;
     };
     let content = read_ignore_file(&dir.join(file), warnings)?;
-    Some(TsvLayer {
+    Some(OverrideLayer {
         content,
         prettierignore,
     })
@@ -824,12 +824,12 @@ fn override_layer_content(
 
 /// One directory's override layer: its content, and which of the two files it was read from —
 /// the file a warning about one of its rules names.
-struct TsvLayer {
+struct OverrideLayer {
     content: String,
     prettierignore: bool,
 }
 
-impl TsvLayer {
+impl OverrideLayer {
     /// Push the layer onto `stack` at `anchor`, as the file it was read from.
     fn push_onto(&self, stack: &mut IgnoreStack, anchor: &str) {
         if self.prettierignore {

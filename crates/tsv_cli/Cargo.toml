@@ -6,6 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 description = "The tsv command-line tool: format, parse and type-strip TypeScript, JavaScript, CSS and Svelte"
 categories = ["development-tools", "command-line-utilities", "web-programming"]
+keywords = ["formatter", "typescript", "svelte", "css", "cli"]
 license.workspace = true
 repository.workspace = true
 # This crate's agent notes stay in the repository; `deno task package:audit` grades the tarball.

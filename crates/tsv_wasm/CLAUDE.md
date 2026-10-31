@@ -118,7 +118,7 @@ for that case — never returned as a parse failure.
 native `@fuzdev/tsv` alone — [docs/strip.md](../../docs/strip.md)). `strip_typescript(source,
 options?)` returns `{ok: true, code}` or `{ok: false, error}`, `error.kind` `'parse'` (the error a
 parse of the source returns at the goal the error belongs to) or `'unsupported'` (`construct`,
-`message`, `frame`, `start`, `end`, `loc: {start, end}` — `tsv_ts::UnsupportedKind::report`).
+`message`, `frame`, `start`, `end`, `loc: {start, end}` — the refusal's `Error::report`).
 Argument misuse is still a `TypeError` (the shared `read_source` / `read_options`, whose `'strip'`
 kind takes `sourceType` as a format's does), and an engine failure with no point still throws as
 itself. The raw export is `strip_typescript(source, source_type?)` — the flat shape, its unset

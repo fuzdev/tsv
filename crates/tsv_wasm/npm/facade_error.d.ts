@@ -38,7 +38,8 @@ export interface TsvError {
 	 * that is narrower than the document line the header counts in: the excerpt can start
 	 * after a lone CR or U+2028 that the header's line count does not break on, so the
 	 * header's column counts from the start of the document line, not from the start of the
-	 * excerpt.
+	 * excerpt. A line longer than 120 characters either side of the error's character (minified code) is
+	 * cut to that window, each cut end marked with a `…`.
 	 */
 	frame: string;
 	/**

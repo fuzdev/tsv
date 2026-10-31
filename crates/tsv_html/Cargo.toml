@@ -6,6 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 description = "HTML element classification, whitespace rules and character-reference decoding, as Svelte reads HTML (support crate for tsv)"
 categories = ["development-tools", "parser-implementations", "web-programming"]
+keywords = ["html", "svelte", "entities", "whitespace"]
 license.workspace = true
 repository.workspace = true
 # This crate's agent notes stay in the repository; `deno task package:audit` grades the tarball.

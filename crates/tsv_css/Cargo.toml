@@ -6,6 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 description = "CSS formatter and parser compatible with Svelte's parseCss — part of tsv"
 categories = ["development-tools", "parser-implementations", "web-programming"]
+keywords = ["css", "formatter", "parser", "prettier", "svelte"]
 license.workspace = true
 repository.workspace = true
 # This crate's agent notes stay in the repository; `deno task package:audit` grades the tarball.

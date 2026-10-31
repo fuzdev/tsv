@@ -221,6 +221,7 @@ fn write_goal_marker(dir: &Path, goal: Goal) -> Result<(), String> {
             }
             Ok(())
         }
+        other => Err(format!("no `goal` marker spelling for {other:?}")),
     }
 }
 

@@ -18,10 +18,7 @@ use tsv_ts::{Goal, StripError, strip, strip_with_goal};
 fn stripped(source: &str, goal: Goal) -> String {
     match strip_with_goal(source, goal) {
         Ok(stripped) => stripped.code.into_owned(),
-        Err(error) => panic!(
-            "expected {source:?} to strip at {goal:?}: {}",
-            error.message(source)
-        ),
+        Err(error) => panic!("expected {source:?} to strip at {goal:?}: {error:#}"),
     }
 }
 

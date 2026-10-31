@@ -265,14 +265,14 @@ pub fn strip_typescript(source: &str, source_type: JsValue) -> Result<JsValue, J
         |arena| match tsv_ts::__private::strip_in(source, goal, arena) {
             Ok(stripped) => Ok(JsValue::from_str(&stripped.code)),
             Err(tsv_ts::StripError::Parse(e)) => parse_failure(&e).into_return(),
-            Err(tsv_ts::StripError::Unsupported { kind, span, .. }) => Ok(failure_result(
-                "unsupported",
-                Some(kind.name()),
-                &kind.report(source, span),
-            )),
+            // a refusal always reports; the `None` arm is unreachable, thrown with its message
+            Err(tsv_ts::StripError::Unsupported { kind, error, .. }) => match error.report() {
+                Some(report) => Ok(failure_result("unsupported", Some(kind.name()), &report)),
+                None => Err(err(format!("{error:#}"))),
+            },
             // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
             // thrown with its message rather than given a `kind` the facade does not declare
-            Err(other) => Err(err(other.message(source))),
+            Err(other) => Err(err(format!("{other:#}"))),
         },
     )
 }

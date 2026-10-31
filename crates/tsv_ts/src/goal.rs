@@ -33,7 +33,11 @@ use std::str::FromStr;
 /// | top-level `import` / `export` *declarations* | allowed | syntax error |
 ///
 /// Dynamic `import(...)` is a call expression valid under both goals.
+///
+/// A goal may be added (a CommonJS-style one, say, where a top-level `return` is legal), so a
+/// match outside this crate carries a wildcard arm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[non_exhaustive]
 pub enum Goal {
     /// `ParseModule` — the default. Top-level `import`/`export`, `import.meta`,
     /// and top-level `await` expressions are available; `await` is reserved as
@@ -97,6 +101,7 @@ impl Goal {
     /// assert_eq!(Goal::from_extension("a.cjs"), None);
     /// assert_eq!(Goal::from_extension("a.ts"), None);
     /// ```
+    #[must_use]
     pub fn from_extension(path: impl AsRef<Path>) -> Option<Goal> {
         path.as_ref()
             .extension()
@@ -140,7 +145,7 @@ impl fmt::Display for Goal {
 
 /// The error [`Goal`]'s [`FromStr`] returns for a string that names no goal — anything but
 /// `"module"` or `"script"`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct ParseGoalError;
 

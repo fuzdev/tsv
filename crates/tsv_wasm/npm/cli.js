@@ -2229,7 +2229,7 @@ function override_layer_content(
 
 /** Push a `override_layer_content` layer onto `stack` at `anchor`, as the file it was read
  * from — the file a warning about one of its rules names. Mirrors the native
- * `TsvLayer::push_onto`. */
+ * `OverrideLayer::push_onto`. */
 function push_override_layer(stack, anchor, layer) {
 	if (layer.prettierignore) stack.push_prettierignore(anchor, layer.content);
 	else stack.push_formatignore(anchor, layer.content);

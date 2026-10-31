@@ -147,7 +147,7 @@ pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
 /// # }
 /// ```
 #[cfg(feature = "json")]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[non_exhaustive]
 pub struct JsonOptions {
     #[cfg(feature = "locations")]

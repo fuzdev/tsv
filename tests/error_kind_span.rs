@@ -164,7 +164,6 @@ fn display_is_one_line_and_the_alternate_is_the_frame() {
     assert_eq!(strip.kind(), ErrorKind::Syntax);
     assert_eq!(strip.to_string(), one);
     assert_eq!(format!("{strip:#}"), full);
-    assert_eq!(strip.message(source), full);
 
     // a strip refusal is a refusal, and its message keeps the frame
     let enumerated = "enum E { A }\n";
@@ -173,12 +172,9 @@ fn display_is_one_line_and_the_alternate_is_the_frame() {
         tsv_ts::__private::strip_in(enumerated, None, &arena).expect_err("an enum is refused")
     };
     assert_eq!(refusal.kind(), ErrorKind::Refusal);
-    assert_eq!(refusal.to_string(), "cannot strip an enum");
+    assert_eq!(refusal.to_string(), "cannot strip an enum (1:1)");
     assert!(
-        refusal
-            .message(enumerated)
-            .starts_with("cannot strip an enum\n1:1 "),
-        "{}",
-        refusal.message(enumerated)
+        format!("{refusal:#}").starts_with("cannot strip an enum\n1:1 "),
+        "{refusal:#}"
     );
 }

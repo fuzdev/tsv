@@ -339,7 +339,7 @@ fn format_program_in(
 /// # }
 /// ```
 #[cfg(feature = "json")]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[non_exhaustive]
 pub struct JsonOptions {
     goal: Goal,

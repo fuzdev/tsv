@@ -75,7 +75,8 @@ fn strip_file(path: &std::path::Path) -> Result<(), CliError> {
             print!("{}", stripped.code);
             Ok(())
         }
-        Err(tsv_ts::StripError::Unsupported { kind, span, .. }) => {
+        Err(tsv_ts::StripError::Unsupported { kind, error, .. }) => {
+            let span = error.span().unwrap_or_default();
             eprint!("refused: {}", refusal_line(&source, kind, span));
             Err(CliError::Failed)
         }
@@ -84,7 +85,7 @@ fn strip_file(path: &std::path::Path) -> Result<(), CliError> {
             Err(CliError::Failed)
         }
         Err(other) => {
-            eprintln!("error: {}", other.message(&source));
+            eprintln!("error: {other:#}");
             Err(CliError::Failed)
         }
     }
@@ -166,11 +167,12 @@ fn answer(source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
     };
     match result {
         Ok(Ok((code, findings))) => serde_json::json!({ "code": code, "findings": findings }),
-        Ok(Err(tsv_ts::StripError::Unsupported { kind, span, .. })) => {
+        Ok(Err(tsv_ts::StripError::Unsupported { kind, error, .. })) => {
+            let span = error.span().unwrap_or_default();
             serde_json::json!({ "refusal": refusal_line(source, kind, span) })
         }
         Ok(Err(tsv_ts::StripError::Parse(e))) => serde_json::json!({ "error": format!("{e:#}") }),
-        Ok(Err(other)) => serde_json::json!({ "error": other.message(source) }),
+        Ok(Err(other)) => serde_json::json!({ "error": format!("{other:#}") }),
         Err(payload) => {
             // a panicked strip may leave the arena mid-allocation; start the next one fresh
             *arena = bumpalo::Bump::new();

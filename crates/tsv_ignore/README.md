@@ -4,7 +4,8 @@ gitignore-faithful hierarchical ignore matching (`.gitignore`, `.formatignore`, 
 behind `tsv format`'s file discovery — part of [tsv](https://github.com/fuzdev/tsv).
 
 The matcher is pure: locating the ignore files, reading them and walking directories are the
-caller's jobs. Its contract is `git check-ignore`.
+caller's jobs. Its contract is `git check-ignore --no-index` (no index: a tracked file a rule
+matches is ignored), less the differences its docs list.
 
 API docs: [docs.rs/tsv_ignore](https://docs.rs/tsv_ignore).
 

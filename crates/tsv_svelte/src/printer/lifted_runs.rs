@@ -205,9 +205,10 @@ fn glued_seam_respell(left: &str, right: &str) -> Option<char> {
         return None;
     }
     let continuation = &right[..continuation_len];
-    let decode =
-        |text: &str| tsv_html::decode_character_references(text, tsv_html::ReferenceContext::Text);
-    let apart = decode(open) + &decode(continuation);
+    fn decode(text: &str) -> std::borrow::Cow<'_, str> {
+        tsv_html::decode_character_references(text, tsv_html::ReferenceContext::Text)
+    }
+    let apart = decode(open).into_owned() + &decode(continuation);
     // The continuation is ASCII, so its first byte is `right`'s first character.
     (decode(&format!("{open}{continuation}")) != apart).then(|| char::from(right.as_bytes()[0]))
 }
