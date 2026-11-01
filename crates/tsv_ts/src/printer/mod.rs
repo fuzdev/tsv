@@ -55,7 +55,7 @@ use analysis::{
     is_string_literal, next_printed_stmt, next_printed_stmt_start, object_pattern_should_expand,
     statement_gap_floor, template_literal_has_newlines,
 };
-pub(crate) use calls::call_may_print_whole;
+pub(crate) use calls::{call_may_print_whole, spine_first_call_within};
 pub(crate) use comments::leading_regex_start;
 use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, ContinuationValue,

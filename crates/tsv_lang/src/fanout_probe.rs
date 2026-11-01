@@ -6,7 +6,8 @@
 //! ([`walk`]), how many positions the source scans asked `skip_trivia` about ([`scan`]), and
 //! how many steps the printers' structural predicates took ([`predicate`]: the type printer's
 //! leading-edge descents, the statement-list comment-run lookahead, the Svelte root
-//! inline-run lookahead) — each placed where a blowup that no other counter sees was found.
+//! inline-run lookahead, the TypeScript parser's chain-link spine walks) — each placed where a
+//! blowup that no other counter sees was found.
 //! Counts are deterministic, so a growth curve over them is a gate where a timing would be
 //! noise. Beside them, [`node`] counts every doc node the arena allocates, whichever printer
 //! asks: it is budgeted, not reported (the audit reads the arena's own length for that).

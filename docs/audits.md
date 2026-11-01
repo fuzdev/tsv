@@ -768,8 +768,10 @@ it; with it, a relaxed load until this audit arms the counters). The counters ar
 - **predicates** — one per step of a printer predicate where a blowup no other counter saw was
   found: the type printer's leading-edge shell descents (`head_stripped_paren_shell_uncached`, whose memo hits are not steps,
   `leading_edge_shell`, `stripped_paren_hang_has_leading_run`), the statement-list comment-run
-  lookahead (`comment_leads_next_item`) and the Svelte root inline-run lookahead
-  (`detect_root_inline_run`);
+  lookahead (`comment_leads_next_item`), the Svelte root inline-run lookahead
+  (`detect_root_inline_run`), and the TypeScript parser's chain-link spine walks
+  (`spine_first_call` and its bounded twin, `Parser::call_link_units` and the memo walks past
+  their bound), which price every member, `!` and call link of a chain;
 - **nodes** — one per doc node the arena allocates (`DocArena::alloc`, the one allocation site),
   whichever printer asks. Budgeted, not graded: the work leg reads the arena's length instead.
 
@@ -792,13 +794,13 @@ The legs, and the inputs they run over:
   combination the parser rejects is skipped and counted;
 - a shape per **known blowup** (`k<N>_*`, in `build_fanout_audit/legs.rs`), which a fix must
   turn green — a hand-written shape that stops parsing fails the run;
-- **flat runs** no bug is known in (statements, array elements, object members, call arguments,
-  a binary chain, union members, template parts, class members, Svelte elements, blocks,
 - **linear nests** (`linear_*`): template literals nested in each other's interpolations — plain,
   tagged, behind a call, and in a Svelte template expression. Each level flattens its
   interpolation onto one line over the inner levels' already-flattened docs (`DocArena::atomize`
   takes an atomized subtree as it stands), so its work is graded on the flat exponent over the
   chain sweep's depths, as a chain's links are;
+- **flat runs** no bug is known in (statements, array elements, object members, call arguments,
+  a binary chain, union members, template parts, class members, Svelte elements, blocks,
   attributes and text, CSS rules, declarations and selectors) — the work leg's linear baseline;
 - each doc-node-growth construct at its deepest depth (multiplicity and density only).
 
@@ -832,9 +834,9 @@ the family's bug that leaves one member quadratic keeps the line.
 **What it is blind to.**
 
 - **Work no counter sits on.** The renderer and its fits walk are not counted, nor the parsers'
-  work outside `skip_trivia`, the comment lookups, or any printer predicate beyond the three
-  above; a blowup there shows as time alone. The predicate counter exists because two of the known blowups (the type
-  leading-edge descent, the two flat lookaheads) were invisible to the rest — when a time-only
+  work outside `skip_trivia` and the chain-link spine walks, the comment lookups, or any printer
+  predicate beyond the ones above; a blowup there shows as time alone. The predicate counter exists because the known blowups (the type
+  leading-edge descent, the two flat lookaheads, the parser's per-link spine walk) were invisible to the rest — when a time-only
   blowup is found, put a counter where it lives and add its shape.
 - **Builds no dispatch counts.** Only the TS printer's expression, type and statement dispatch
   count builds, so a leaf, the internals of a binary or member chain, and every Svelte and CSS

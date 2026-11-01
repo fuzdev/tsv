@@ -1566,9 +1566,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::ParenOpen | TokenKind::LessThan | TokenKind::LeftShift
         );
         let charged = if call {
-            Self::call_link_units(left)
+            self.call_link_units(left)
         } else {
-            Self::member_link_units(left)
+            self.member_link_units(left)
         };
         self.spine_link(charged)?;
 
@@ -1720,7 +1720,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             match self.current_kind() {
                 TokenKind::Dot => {
                     // Member access: obj.prop or obj.#private
-                    self.spine_link(Self::member_link_units(left))?;
+                    let units = self.member_link_units(left);
+                    self.spine_link(units)?;
                     self.chain_base_pair(left, start)?;
                     self.advance()?; // consume '.'
                     let (property, prop_end) = self.parse_dot_property()?;
@@ -1746,7 +1747,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 TokenKind::BracketOpen => {
                     // Computed member access: arr[0]
-                    self.spine_link(Self::member_link_units(left))?;
+                    let units = self.member_link_units(left);
+                    self.spine_link(units)?;
                     self.advance()?; // consume '['
                     self.enter_grouping()?;
 
@@ -1772,7 +1774,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 TokenKind::ParenOpen => {
                     // Call expression: foo()
-                    self.spine_link(Self::call_link_units(left))?;
+                    let units = self.call_link_units(left);
+                    self.spine_link(units)?;
                     self.function_head_pair(left, start, ParenContext::Callee)?;
                     self.advance()?; // consume '('
                     let (arguments, paren_end) = self.parse_call_arguments()?;
@@ -1861,7 +1864,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     else {
                         break;
                     };
-                    self.spine_link(Self::call_link_units(left))?;
+                    let units = self.call_link_units(left);
+                    self.spine_link(units)?;
                     // the pair the printer keeps around an instantiation instantiated
                     // again (`(f<T>)<U>`, a call's or tag's list included, which flatten
                     // this one), a level of the output's nesting
@@ -1876,7 +1880,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 TokenKind::Bang if !self.had_line_terminator => {
                     // TypeScript non-null assertion: `expr!`.
-                    self.spine_link(Self::non_null_link_units(left))?;
+                    let units = self.non_null_link_units(left);
+                    self.spine_link(units)?;
                     left = self.wrap_non_null_assertion(left, start)?;
                 }
                 _ => break,
@@ -3322,7 +3327,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         loop {
             match self.current_kind() {
                 TokenKind::Dot => {
-                    self.spine_link(Self::member_link_units(callee))?;
+                    let units = self.member_link_units(callee);
+                    self.spine_link(units)?;
                     self.advance()?; // consume '.'
                     // The same seam the ordinary `.` / `?.` chains use, so a `new`
                     // callee takes every property name they do — keywords
@@ -3345,7 +3351,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     );
                 }
                 TokenKind::BracketOpen => {
-                    self.spine_link(Self::member_link_units(callee))?;
+                    let units = self.member_link_units(callee);
+                    self.spine_link(units)?;
                     self.advance()?; // consume '['
                     self.enter_grouping()?;
                     let index = self.parse_expression_ref()?;
@@ -3378,7 +3385,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 TokenKind::Bang if !self.had_line_terminator => {
                     // Non-null assertion on the callee: `new (a?.b)!()`. The trailing `(`
                     // then binds as the `new` argument list, not a call on the callee.
-                    self.spine_link(Self::non_null_link_units(callee))?;
+                    let units = self.non_null_link_units(callee);
+                    self.spine_link(units)?;
                     callee = self.wrap_non_null_assertion(callee, callee_start)?;
                 }
                 TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {

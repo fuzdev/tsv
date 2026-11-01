@@ -8,6 +8,7 @@ use crate::printer::ParenContext;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use std::collections::BTreeSet;
+use std::ops::ControlFlow;
 use tsv_lang::{DepthBudget, DepthLimit, Error, Span, SpineCount};
 
 // Import parsing implementations
@@ -371,6 +372,54 @@ pub(super) const LINK_ASSERTION: u32 = 8;
 /// The spine units of a type's `[]` / `[K]` suffix link.
 pub(super) const LINK_TYPE_SUFFIX: u32 = 5;
 
+/// The links a link's spine walk takes before it consults [`SpineMemo`]
+/// ([`Parser::member_link_units`], [`Parser::call_link_units`]): a spine the walk ends
+/// within — most of them — pays only the walk, which a bound this small keeps compact where
+/// it is inlined.
+const SPINE_WALK_LINKS: u32 = 4;
+
+/// What the last walk past [`SPINE_WALK_LINKS`] found, keyed by the address of the node its
+/// bounded walk stopped at (`0`: none yet). The link over a chain's operand stops one link
+/// above where the link before it stopped, so its walk past the bound takes one step to a
+/// key: a chain of `n` links walks `n` times the bound, not `n²` steps. Sound because an
+/// arena node is never mutated or freed while the parser lives, so a node's answer is fixed
+/// once it is built; a walk that meets no key (another chain's walk took the memo) walks to
+/// the end of its spine — slower, never wrong.
+///
+/// Deliberately left out of [`Checkpoint`]: a rewind need not restore it, since an abandoned
+/// branch's nodes stay allocated in the arena and their addresses are never reused, so a key
+/// one of them left names that node alone and its answer stays true.
+#[derive(Clone, Copy, Default)]
+struct SpineMemo {
+    /// The node [`Parser::spine_whole_past`] last stopped at.
+    whole_at: usize,
+    /// Whether the first call down that node's spine may be one the printer prints whole.
+    whole: bool,
+    /// The node [`Parser::call_units_past`] last stopped at.
+    call_at: usize,
+    /// [`Parser::call_link_units`] of that node.
+    call_units: u32,
+}
+
+/// One step of [`Parser::call_link_units`]' walk down a call link's operand: through a `!`'s
+/// operand or an instantiation's expression, or the walk's end — [`LINK_REENTRY`] at a call
+/// or a tagged template, else [`LINK_SUBSCRIPT`]. The one statement of the call rule, which
+/// both the bounded walk and its continuation past the bound ([`Parser::call_units_past`])
+/// take.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn call_spine_step<'e>(inner: &'e Expression<'e>) -> ControlFlow<u32, &'e Expression<'e>> {
+    tsv_lang::fanout_probe::predicate();
+    match &inner.kind {
+        ExpressionKind::TSNonNullExpression(n) => ControlFlow::Continue(n.expression),
+        ExpressionKind::TSInstantiationExpression(i) => ControlFlow::Continue(i.expression),
+        ExpressionKind::CallExpression(_) | ExpressionKind::TaggedTemplateExpression(_) => {
+            ControlFlow::Break(LINK_REENTRY)
+        }
+        _ => ControlFlow::Break(LINK_SUBSCRIPT),
+    }
+}
+
 /// The parser state [`Parser::rewind`] restores after one of the grammar's
 /// speculative parses ([`Parser::parse_arrow_or_rewind`],
 /// [`Parser::parse_type_arguments_or_rewind`], [`Parser::type_arguments_follower_settled`]
@@ -525,6 +574,9 @@ pub struct Parser<'a, 'arena> {
     /// ([`Parser::chain`], [`Parser::statement_list`]). A [`Checkpoint`] carries it, so a
     /// rewind cannot leave what an abandoned branch counted.
     spine: SpineCount,
+    /// What the link pricing's spine walks found past their bound, carried from link to link
+    /// ([`SpineMemo`]).
+    spine_memo: SpineMemo,
     /// When `true`, grouping parens `(expr)` are preserved as an internal
     /// `ParenthesizedExpression` node instead of being discarded. Off by default
     /// (matching acorn/Svelte, whose public AST is paren-free); enabled only for
@@ -909,6 +961,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             grouping_depth: 0,               // Not inside any grouping delimiters
             depth: DepthBudget::at(0),       // An embedded parse seeds the host's nesting
             spine: SpineCount::default(),    // No link counted yet
+            spine_memo: SpineMemo::default(), // No long walk taken yet
             preserve_parens: false,          // Discard grouping parens (paren-free public AST)
             preserved_a_paren: false,        // No pair wrapped yet
             record_grouping_parens: false,   // Only while a binding pattern is read
@@ -1609,20 +1662,45 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// apart from the chain below them — or on a tagged template, which the member-chain
     /// printer takes for its chain's base and prints by re-entering the expression printer
     /// (`` a`t`() ``) — else [`LINK_SUBSCRIPT`].
+    ///
+    /// A run longer than [`SPINE_WALK_LINKS`] is walked past the bound by
+    /// [`Parser::call_units_past`], so a run of `n` `!` costs `n` steps, not `n²`.
     #[expect(clippy::inline_always)]
     #[inline(always)]
-    pub(super) fn call_link_units(operand: &Expression<'_>) -> u32 {
+    pub(super) fn call_link_units(&mut self, operand: &Expression<'_>) -> u32 {
         let mut inner = operand;
+        let mut links = SPINE_WALK_LINKS;
         loop {
-            inner = match &inner.kind {
-                ExpressionKind::TSNonNullExpression(n) => n.expression,
-                ExpressionKind::TSInstantiationExpression(i) => i.expression,
-                ExpressionKind::CallExpression(_) | ExpressionKind::TaggedTemplateExpression(_) => {
-                    return LINK_REENTRY;
-                }
-                _ => return LINK_SUBSCRIPT,
-            };
+            match call_spine_step(inner) {
+                ControlFlow::Continue(next) => inner = next,
+                ControlFlow::Break(units) => return units,
+            }
+            links -= 1;
+            if links == 0 {
+                return self.call_units_past(inner);
+            }
         }
+    }
+
+    /// [`Parser::call_link_units`]'s walk from `cut`, the node its bounded walk stopped at,
+    /// answered by [`SpineMemo`] where the walk reaches the node the last such walk stopped
+    /// at — one link below `cut` when the link before this one was a `!` or instantiation
+    /// over it.
+    #[inline(never)]
+    fn call_units_past(&mut self, cut: &Expression<'_>) -> u32 {
+        let mut inner = cut;
+        let units = loop {
+            if std::ptr::from_ref(inner).addr() == self.spine_memo.call_at {
+                break self.spine_memo.call_units;
+            }
+            match call_spine_step(inner) {
+                ControlFlow::Continue(next) => inner = next,
+                ControlFlow::Break(units) => break units,
+            }
+        };
+        self.spine_memo.call_at = std::ptr::from_ref(cut).addr();
+        self.spine_memo.call_units = units;
+        units
     }
 
     /// The spine units of a member access over `object`: [`LINK_REENTRY`] where `object` is
@@ -1630,15 +1708,43 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// printer for (`` a`t`.b ``), or where the first call down `object`'s spine may be one
     /// the printer prints whole, which a member over it prints over whole, re-entering too
     /// (`printer::call_may_print_whole`) — else [`LINK_SUBSCRIPT`].
-    #[inline]
-    pub(super) fn member_link_units(object: &Expression<'_>) -> u32 {
-        if matches!(object.kind, ExpressionKind::TaggedTemplateExpression(_))
-            || crate::printer::call_may_print_whole(object, true)
-        {
-            LINK_REENTRY
-        } else {
-            LINK_SUBSCRIPT
-        }
+    ///
+    /// A spine longer than [`SPINE_WALK_LINKS`] is walked past the bound by
+    /// [`Parser::spine_whole_past`], so a chain of `n` members costs `n` steps, not `n²`.
+    ///
+    /// Forced inline: it is asked of every member link, and the walk past the bound is
+    /// outlined, so a call site keeps only the bounded walk.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub(super) fn member_link_units(&mut self, object: &Expression<'_>) -> u32 {
+        let whole = matches!(object.kind, ExpressionKind::TaggedTemplateExpression(_))
+            || match crate::printer::spine_first_call_within(object, SPINE_WALK_LINKS) {
+                Ok(call) => call.is_some_and(crate::printer::call_may_print_whole),
+                Err(cut) => self.spine_whole_past(cut),
+            };
+        if whole { LINK_REENTRY } else { LINK_SUBSCRIPT }
+    }
+
+    /// Whether the first call down the spine from `cut`, the node
+    /// [`Parser::member_link_units`]'s bounded walk stopped at, may be one the printer prints
+    /// whole — answered by [`SpineMemo`] where the walk reaches the node the last such walk
+    /// stopped at, one link below `cut` when the link before this one was a member or `!`
+    /// over it.
+    #[inline(never)]
+    fn spine_whole_past(&mut self, cut: &Expression<'_>) -> bool {
+        let mut node = cut;
+        let whole = loop {
+            if std::ptr::from_ref(node).addr() == self.spine_memo.whole_at {
+                break self.spine_memo.whole;
+            }
+            match crate::printer::spine_first_call_within(node, 1) {
+                Ok(call) => break call.is_some_and(crate::printer::call_may_print_whole),
+                Err(next) => node = next,
+            }
+        };
+        self.spine_memo.whole_at = std::ptr::from_ref(cut).addr();
+        self.spine_memo.whole = whole;
+        whole
     }
 
     /// Whether `call` is one the printer may print whole (`printer::call_may_print_whole`),
@@ -1658,7 +1764,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         ExpressionKind::TemplateLiteral(_)
                             | ExpressionKind::TaggedTemplateExpression(_)
                     )
-                )) && crate::printer::call_may_print_whole(call, false)
+                )) && crate::printer::call_may_print_whole(c)
             }
             _ => false,
         }
@@ -1668,9 +1774,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// a curried call's ([`Parser::call_link_units`]), a member's
     /// ([`Parser::member_link_units`]) and its own ([`LINK_NON_NULL`]).
     #[inline]
-    pub(super) fn non_null_link_units(operand: &Expression<'_>) -> u32 {
-        Self::call_link_units(operand)
-            .max(Self::member_link_units(operand))
+    pub(super) fn non_null_link_units(&mut self, operand: &Expression<'_>) -> u32 {
+        self.call_link_units(operand)
+            .max(self.member_link_units(operand))
             .max(LINK_NON_NULL)
     }
 
@@ -1689,7 +1795,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if Self::call_prints_whole(call)
             && let ExpressionKind::CallExpression(c) = &call.kind
         {
-            let charged = Self::call_link_units(c.callee);
+            let charged = self.call_link_units(c.callee);
             if charged < LINK_REENTRY {
                 self.spine_link(LINK_REENTRY - charged)?;
             }

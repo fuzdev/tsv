@@ -53,6 +53,7 @@ use arg_predicates::is_block_function;
 use arg_wrapping::{
     build_args_split_last, is_sole_multiline_template_arg, multiline_template_hug_applies,
 };
+use std::ops::ControlFlow;
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 
@@ -661,49 +662,82 @@ fn callee_is_curried_member_chain_call(callee: &ast::Expression<'_>) -> bool {
     )
 }
 
-/// The first call down `expr`'s object spine — through member objects and `!` operands —
-/// with its span, or `None` where the spine reaches anything else first. The walk
-/// [`Printer::spine_first_call_prints_whole`] and the parser's depth limit
-/// ([`call_may_print_whole`]) share.
+/// One link of `expr`'s object spine — through a member's object or a `!`'s operand — or the
+/// spine's end: the call it reaches first, with its span, or `None` where it reaches anything
+/// else. The one statement of the spine rule, so the walk the printer takes
+/// ([`spine_first_call`]) and the one the parser's depth limit prices
+/// ([`spine_first_call_within`]) cannot drift apart.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn spine_step<'e>(
+    expr: &'e ast::Expression<'e>,
+) -> ControlFlow<Option<(&'e ast::CallExpression<'e>, Span)>, &'e ast::Expression<'e>> {
+    tsv_lang::fanout_probe::predicate();
+    match &expr.kind {
+        ast::ExpressionKind::MemberExpression(member) => ControlFlow::Continue(member.object),
+        ast::ExpressionKind::TSNonNullExpression(non_null) => {
+            ControlFlow::Continue(non_null.expression)
+        }
+        ast::ExpressionKind::CallExpression(call) => ControlFlow::Break(Some((call, expr.span))),
+        _ => ControlFlow::Break(None),
+    }
+}
+
+/// The first call down `expr`'s object spine ([`spine_step`]) with its span, or `None` where
+/// the spine reaches anything else first. The walk
+/// [`Printer::spine_first_call_prints_whole`] takes; the parser's depth limit takes the same
+/// walk a bounded number of links at a time ([`spine_first_call_within`]).
 fn spine_first_call<'e>(
     expr: &'e ast::Expression<'e>,
 ) -> Option<(&'e ast::CallExpression<'e>, Span)> {
     let mut expr = expr;
     loop {
-        expr = match &expr.kind {
-            ast::ExpressionKind::MemberExpression(member) => member.object,
-            ast::ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
-            ast::ExpressionKind::CallExpression(call) => return Some((call, expr.span)),
-            _ => return None,
-        };
+        match spine_step(expr) {
+            ControlFlow::Continue(next) => expr = next,
+            ControlFlow::Break(found) => return found,
+        }
     }
 }
 
-/// Whether the call a chain link is printed over may be one the printer prints WHOLE,
-/// re-entering the expression printer for its callee: a call on a curried call on a member
-/// chain ([`callee_is_curried_member_chain_call`]), or one whose sole argument is a
+/// [`spine_first_call`]'s walk, `links` links at most (`links` > 0): `Ok` with the first
+/// call down `expr`'s object spine, or `None` where the spine reaches anything else first,
+/// when the walk ends within them; else `Err` with the node the walk stopped at, still on
+/// the spine. The parser's depth limit walks a chain's spine once per link, so it takes a
+/// bounded walk and carries what lies past the bound from link to link
+/// (`Parser::member_link_units`).
+pub(crate) fn spine_first_call_within<'e>(
+    expr: &'e ast::Expression<'e>,
+    links: u32,
+) -> Result<Option<&'e ast::CallExpression<'e>>, &'e ast::Expression<'e>> {
+    let mut expr = expr;
+    let mut links = links;
+    loop {
+        match spine_step(expr) {
+            ControlFlow::Continue(next) => expr = next,
+            ControlFlow::Break(found) => return Ok(found.map(|(call, _)| call)),
+        }
+        links -= 1;
+        if links == 0 {
+            return Err(expr);
+        }
+    }
+}
+
+/// Whether `call`, the call a chain link is printed over, may be one the printer prints
+/// WHOLE, re-entering the expression printer for its callee: a call on a curried call on a
+/// member chain ([`callee_is_curried_member_chain_call`]), or one whose sole argument is a
 /// multi-line template — the shape test [`Printer::call_takes_template_bypass`] opens with,
-/// so a superset of the calls that take the bypass. Of `operand` itself (`spine: false`,
-/// the call link's own question, asked once its arguments are read) or of the first call
-/// down its object spine (`spine: true`, the question of a member or `!` over it, which
-/// prints over such a call whole — [`Printer::spine_first_call_prints_whole`]).
+/// so a superset of the calls that take the bypass. Of the call link itself (asked once its
+/// arguments are read) or of the first call down the object spine of a member or `!` over
+/// it ([`spine_first_call_within`]), which prints over such a call whole
+/// ([`Printer::spine_first_call_prints_whole`]).
 ///
 /// The parser's question (`Parser::member_link_units`, `Parser::settle_call_link`),
 /// asked of the printer's own predicates so the depth limit prices the walk the printer
 /// takes.
-pub(crate) fn call_may_print_whole(operand: &ast::Expression<'_>, spine: bool) -> bool {
-    let call = if spine {
-        spine_first_call(operand).map(|(call, _)| call)
-    } else {
-        match &operand.kind {
-            ast::ExpressionKind::CallExpression(call) => Some(call),
-            _ => None,
-        }
-    };
-    call.is_some_and(|call| {
-        callee_is_curried_member_chain_call(call.callee)
-            || is_sole_multiline_template_arg(call.arguments)
-    })
+pub(crate) fn call_may_print_whole(call: &ast::CallExpression<'_>) -> bool {
+    callee_is_curried_member_chain_call(call.callee)
+        || is_sole_multiline_template_arg(call.arguments)
 }
 
 /// Whether `call`'s callee is a call taking more arguments than `call` does, and `call` takes
