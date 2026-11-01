@@ -6,10 +6,11 @@
 //! [`collapses_child_whitespace`] are the sets Svelte's compiler applies,
 //! [`is_line_break_element`] is the plugin's line-breaking set, [`is_void_element`],
 //! [`is_svg_element`], [`is_mathml_element`] and [`is_foreign_element`] are Svelte's name
-//! lists, and [`decode_character_references`] decodes as Svelte's parser decodes. Each item's
-//! doc says where it departs from the spec. The spec's own data and answers — the named
-//! character references table, the optional-end-tag table, the custom-element name class —
-//! live in `tsv_html`, which this module builds on.
+//! lists, [`is_custom_element_name_char`] is the tail class of Svelte's tag-name pattern,
+//! [`optional_end_tag`] is the table Svelte's parser closes an element by when its end tag is
+//! omitted, and [`decode_character_references`] decodes as Svelte's parser decodes. Each item's
+//! doc says where it departs from the spec. The spec's own data — the named character
+//! references table — lives in `tsv_html`, which the decoder builds on.
 //!
 //! **Tag names are compared exactly, as authored.** Every predicate is case-sensitive and
 //! matches a name in its canonical spelling — lowercase for HTML and MathML, SVG's own
@@ -28,6 +29,7 @@
 
 mod elements;
 mod entities;
+mod tags;
 mod whitespace;
 
 pub use elements::{
@@ -35,4 +37,5 @@ pub use elements::{
     is_mathml_element, is_svg_element, is_void_element,
 };
 pub use entities::{ReferenceContext, decode_character_references};
+pub use tags::{is_custom_element_name_char, optional_end_tag};
 pub use whitespace::preserves_whitespace;

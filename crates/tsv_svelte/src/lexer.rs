@@ -229,7 +229,7 @@ fn name_run_end_from_non_ascii(source: &str, mut i: usize) -> usize {
         // only past U+007F, which is the whole of what either adds. Over-admitting
         // (e.g. a PCENChar with no preceding hyphen) is harmless — the parser's
         // `is_valid_tag_name` gate rejects any name that isn't valid.
-        if ch.is_alphanumeric() || tsv_html::is_custom_element_name_char(ch) {
+        if ch.is_alphanumeric() || crate::html::is_custom_element_name_char(ch) {
             i += width;
         } else {
             break;
@@ -1113,7 +1113,7 @@ mod tests {
                 ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | '-' | ':' | '|' | '.')
             } else {
                 !is_svelte_ws(ch)
-                    && (ch.is_alphanumeric() || tsv_html::is_custom_element_name_char(ch))
+                    && (ch.is_alphanumeric() || crate::html::is_custom_element_name_char(ch))
             };
             if !continues {
                 break;

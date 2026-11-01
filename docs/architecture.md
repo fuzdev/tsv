@@ -76,7 +76,7 @@ The formatter can absorb looseness; a tool built on a loose model inherits it as
 ```
 tsv/
 ├── tsv_lang     # Foundation (Span, Doc, errors, printing utilities)
-├── tsv_html     # HTML spec data: named character references, optional end tags (pure functions)
+├── tsv_html     # HTML spec data: named character references (pure functions)
 ├── tsv_ignore   # gitignore-aware discovery matcher (hierarchical .gitignore + .formatignore/.prettierignore)
 ├── tsv_discover # file-discovery policy (build-output heuristic + safety-net pruning) over tsv_ignore
 ├── tsv_ts       # TypeScript parser/formatter (standalone)
@@ -901,8 +901,6 @@ answers the spec gives — the long-term target is a spec-faithful HTML library:
 
 ```rust
 pub fn match_named_character_reference(input: &str) -> Option<(usize, &'static str)>; // the named character references table
-pub fn optional_end_tag(name: &str) -> Option<OptionalEndTag>; // then `is_closed_by(next)`
-pub fn is_custom_element_name_char(c: char) -> bool;
 ```
 
 The answers Svelte's compiler and prettier-plugin-svelte give, which tsv's Svelte support must
@@ -916,6 +914,10 @@ pub fn is_void_element(name: &str) -> bool;
 pub fn is_foreign_element(name: &str) -> bool;  // SVG/MathML
 pub fn is_svg_element(name: &str) -> bool;
 pub fn is_mathml_element(name: &str) -> bool;
+
+// tag names: Svelte's auto-close table and the tag-name tail class
+pub fn optional_end_tag(name: &str) -> Option<OptionalEndTag>; // then `is_closed_by(next)`
+pub fn is_custom_element_name_char(c: char) -> bool;
 
 // whitespace and entities
 pub fn preserves_whitespace(name: &str) -> bool;

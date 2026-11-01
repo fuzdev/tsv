@@ -6,10 +6,10 @@
 //! Svelte's parser omits closing tags for a subset of HTML elements — a `<li>`
 //! auto-closes at a sibling `<li>` or a parent `</ul>`, a `<p>` at a block-level
 //! sibling, `<td>`/`<th>`/`<tr>`/`<dt>`/`<dd>`/`<option>`/… at their structural
-//! boundaries — matching the WHATWG optional-end-tag table (the
+//! boundaries — Svelte's own reading of the WHATWG optional-tags rules (the
 //! `autoclosing_children` map + `closing_tag_omitted` in
-//! `../svelte/packages/svelte/src/html-tree-validation.js`). A parser without the
-//! optional-end-tag rules rejects all of it (`Mismatched tags`), an over-rejection
+//! `../svelte/packages/svelte/src/html-tree-validation.js`). A parser without
+//! those rules rejects all of it (`Mismatched tags`), an over-rejection
 //! of ordinary Svelte markup.
 //!
 //! Coverage is split by what each vehicle can see. The *formatter* side — that the
@@ -97,7 +97,7 @@ fn implicitly_closed_by_sibling() {
     );
 }
 
-/// The full HTML optional-end-tag matrix: li/dt/dd/p/rt/rp/option/optgroup and the
+/// Svelte's full auto-close matrix: li/dt/dd/p/rt/rp/option/optgroup and the
 /// table family (thead/tbody/tfoot/tr/td/th), each auto-closing on its own trigger.
 #[test]
 fn autoclosed_tags_matrix() {

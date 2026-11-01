@@ -3,26 +3,25 @@
 > HTML spec data and the answers the HTML spec gives — pure functions, no AST.
 
 The published home of what tsv reads from the HTML spec: the named character references
-table, the optional-end-tag table, the custom-element name class. The long-term target is a
-spec-faithful HTML library, so the public surface holds only spec data and spec answers. The
-answers Svelte's compiler and prettier-plugin-svelte give (block / void / foreign
-classification, the whitespace sets, Svelte's character-reference decoder) are tool answers,
-not the spec's, and live privately in `tsv_svelte` (`src/html/`). See the root
-[CLAUDE.md §Language-Level concerns (classification)](../../CLAUDE.md#language-level-concerns-classification).
+table. The long-term target is a spec-faithful HTML library, so the public surface holds only
+spec data and spec answers — an item whose answer is a tool's reading of the spec, however
+close, does not belong here. The answers Svelte's compiler and prettier-plugin-svelte give
+(block / void / foreign classification, the whitespace sets, Svelte's auto-close table and
+tag-name tail class, Svelte's character-reference decoder) are tool answers, not the spec's,
+and live privately in `tsv_svelte` (`src/html/`). A spec-faithful optional-tags table or
+custom-element name check would be added here as new items, beside Svelte's private ones. See
+the root [CLAUDE.md §Language-Level concerns (classification)](../../CLAUDE.md#language-level-concerns-classification).
 
 ## Architecture Position
 
 Zero dependencies: no `tsv_*` crate, no external crate, no build script (`serde_json`
 is a dev-dependency, for the entity-table generator alone).
-Current consumer: `tsv_svelte` — its tokenizer and name validator (the custom-element name
-class), its parser (implicit tag closing), and its private character-reference decoder (the
+Current consumer: `tsv_svelte` — its private character-reference decoder (the
 named-reference match).
 
 ## Public API
 
-All at the crate root (`src/lib.rs`, re-exports over the private `elements` / `entities`
-files). Where an item takes Svelte's reading of the spec rather than the spec's own (a subset
-of a table, a wider class), its doc says so.
+All at the crate root (`src/lib.rs`, a re-export over the private `entities` file).
 
 **Stability**: the public signatures follow 0.x semver like every tsv crate (a breaking
 change only at a minor release); what the functions answer may change in any release,
@@ -34,16 +33,6 @@ tracking the spec and what tsv needs.
   (its `;` included when the name has one) and the characters it stands for. What a caller
   does with a match — the attribute-value rule for a legacy name, the parse errors — is the
   caller's (`tsv_svelte`'s decoder applies Svelte's).
-- **Optional end tags** (`elements.rs`): `optional_end_tag(current)` →
-  `Option<OptionalEndTag>`, then `OptionalEndTag::is_closed_by(next)` — Svelte's
-  `closing_tag_omitted(current, next)` over the optional-end-tag table (`<li>`, `<p>`, table
-  parts, …; the subset of the spec's tag-omission rules Svelte's parser implements), split so
-  a parser settles whether an element has a row once and asks the trigger per child. Having a
-  row at all is the `next` = end-of-parent answer.
-- **Custom-element name chars** (`elements.rs`): `is_custom_element_name_char` — the tail
-  class of Svelte's `REGEX_VALID_TAG_NAME`: HTML's `PCENChar` ranges plus ASCII uppercase.
-  Shared by `tsv_svelte`'s tokenizer (keep a whole custom-element name in one token) and its
-  name validator (the hyphen-tail run).
 
 ## Distinctives
 
@@ -82,6 +71,6 @@ tracking the spec and what tsv needs.
   workspace's 0BSD.
 - **Pure `&str` API**: lookups take names and text, not AST nodes or a parser's name
   representation, so the crate stays independent of any particular parser.
-- **Exact, case-sensitive names**: every lookup matches a name in its canonical spelling,
-  as authored; a caller with a case-insensitive HTML name lowercases it first. Stated once
-  in the crate `//!` docs.
+- **Exact, case-sensitive names**: the lookup matches a name as authored, as the spec's
+  table does (`&Aacute;` and `&aacute;` are different references). Stated once in the crate
+  `//!` docs.

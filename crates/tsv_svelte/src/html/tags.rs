@@ -1,12 +1,19 @@
-// HTML element facts the parser reads: the custom-element name class and the
-// optional-end-tag table.
+//! Svelte's tag-name answers: the character class its tag-name pattern admits after a hyphen,
+//! and the table its parser closes elements by when an end tag is omitted.
+//!
+//! Both are Svelte's, not the HTML spec's. The class is the tail of Svelte's
+//! `REGEX_VALID_TAG_NAME`, which follows an older `PCENChar` production the spec has since
+//! replaced (a custom element name is now any valid element local name that starts with an ASCII
+//! lowercase letter, holds a hyphen and no ASCII uppercase). The table is Svelte's
+//! `autoclosing_children`, a reading of the spec's "Optional tags" section that departs from it
+//! in both directions (see [`OptionalEndTag`]).
 
 /// A character Svelte admits in a tag name's run after its first hyphen
 /// (`<my-café>`, `<emotion-😍>`, `<a-·>`): the tail class of Svelte's
 /// `REGEX_VALID_TAG_NAME` (the Svelte repository's `packages/svelte/src/utils.js`), whose
-/// non-ASCII ranges are HTML's `PCENChar`. Unlike `PCENChar` it admits ASCII uppercase
-/// `A`–`Z`, as Svelte's class does. Surrogate code points are unreachable, since a Rust
-/// `char` is never a surrogate.
+/// non-ASCII ranges are the `PCENChar` production the HTML spec once defined custom element
+/// names by. Unlike `PCENChar` it admits ASCII uppercase `A`–`Z`, as Svelte's class does.
+/// Surrogate code points are unreachable, since a Rust `char` is never a surrogate.
 ///
 /// Used both by the tokenizer (to keep a whole custom-element name in one token,
 /// including the non-alphanumeric members `·`/ZWNJ/ZWJ/astral) and by the name
@@ -36,9 +43,9 @@ macro_rules! optional_end_tags {
             $($variant),+
         }
 
-        /// The table's row for `tag_name`: whether `tag_name` is an element whose end tag HTML
-        /// lets the author omit, and if so which following tags omit it. `None` for every other
-        /// element, which never auto-closes.
+        /// The table's row for `tag_name`: whether Svelte's parser closes `tag_name` without an
+        /// end tag, and if so which following tags close it. `None` for every other element,
+        /// which never auto-closes.
         ///
         /// Exact and case-sensitive: tag names arrive as authored.
         #[inline]
@@ -66,9 +73,17 @@ macro_rules! optional_end_tags {
     };
 }
 
-/// An element whose end tag HTML lets the author omit (auto-close) when a particular following
-/// tag or the end of its parent arrives — a row of the optional-end-tag table, found by
-/// [`optional_end_tag`].
+/// An element Svelte's parser closes without an end tag (auto-close) when a particular following
+/// tag or the end of its parent arrives — a row of Svelte's `autoclosing_children` table, found
+/// by [`optional_end_tag`].
+///
+/// Svelte's table, not the spec's "Optional tags" rules: it has no row for the elements whose
+/// end tag the spec lets an author omit only at a whitespace or comment boundary (`html`,
+/// `head`, `body`, `colgroup`, `caption`); its `<p>` triggers lack `details`, `dialog`,
+/// `figcaption`, `figure` and `search`, and its `<option>` / `<optgroup>` triggers lack `hr`;
+/// it closes `<tr>` at `<tbody>`, `<td>` / `<th>` at `<tr>` and `<tfoot>` at `<tbody>`, which
+/// the spec does not; and every row closes at the end of its parent, where the spec excepts
+/// `dt` and `thead`, and `p` inside some parents.
 ///
 /// Mirrors Svelte's `closing_tag_omitted(current, next)`: `current` auto-closes when it has a row
 /// and `next` is either absent (the end of the parent's content / EOF — having a row at all) or
@@ -77,10 +92,9 @@ macro_rules! optional_end_tags {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct OptionalEndTag(OptionalEndTagKey);
 
-// Elements whose end tag HTML lets you omit when a particular sibling or parent
-// boundary follows — the WHATWG optional-end-tag subset Svelte's parser implements
-// (../svelte/packages/svelte/src/html-tree-validation.js `autoclosing_children`,
-// based on http://developers.whatwg.org/syntax.html#syntax-tag-omission).
+// Svelte's `autoclosing_children` (the Svelte repository's
+// `packages/svelte/src/html-tree-validation.js`),
+// which it bases on the spec's tag-omission section.
 //
 // Each entry lists the "next" tag names that force the key element to auto-close.
 // Svelte's source splits these into `direct` (immediate child) and `descendant`

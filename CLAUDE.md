@@ -571,7 +571,7 @@ tsv/
 ├── crates/
 │   ├── tsv_lang/    # Foundation (span, location, error, doc builder, printing utils)
 │   ├── tsv_arena/   # Shared binding substrate (tsv_ffi, tsv_napi, tsv_wasm): per-thread reusable AST/doc arenas + the goal axis
-│   ├── tsv_html/    # HTML spec data: named character references, optional end tags
+│   ├── tsv_html/    # HTML spec data: named character references
 │   ├── tsv_ignore/  # gitignore-aware matcher: hierarchical .gitignore + .formatignore/.prettierignore
 │   ├── tsv_discover/# file-discovery policy (build-output heuristic + safety nets) over tsv_ignore
 │   ├── tsv_ts/      # TypeScript: parse_to_json(), format(), strip()
@@ -858,7 +858,7 @@ This is one instance of a broader stance: **the parser is deliberately permissiv
 
 ### Language-Level concerns (classification)
 
-HTML knowledge lives in two places, split by whose answer it is. `tsv_html` (published) holds HTML spec data and the spec's answers — the named character references table (`match_named_character_reference()`), the optional-end-tag table, the custom-element name class — and its long-term target is a spec-faithful HTML library. The Svelte- and prettier-plugin-svelte-shaped answers (`is_block_element()`, `is_void_element()`, `preserves_whitespace()`, the other whitespace rules, Svelte's character-reference decoder) are private to `tsv_svelte` (`tsv_svelte/src/html/`, pure functions over tag names; `tsv_svelte_compile` and `tsv_debug` reach the ones they read through `tsv_svelte::__private`), with thin printer adapters (`tsv_svelte/src/printer/classification/`) that resolve symbols, call them, and traverse the AST, for reuse across all planned tools (formatter, linter, compiler, LSP).
+HTML knowledge lives in two places, split by whose answer it is. `tsv_html` (published) holds HTML spec data and the spec's answers — today the named character references table (`match_named_character_reference()`) — and its long-term target is a spec-faithful HTML library. The Svelte- and prettier-plugin-svelte-shaped answers (`is_block_element()`, `is_void_element()`, `preserves_whitespace()`, the other whitespace rules, Svelte's auto-close table and tag-name class, Svelte's character-reference decoder) are private to `tsv_svelte` (`tsv_svelte/src/html/`, pure functions over tag names; `tsv_svelte_compile` and `tsv_debug` reach the ones they read through `tsv_svelte::__private`), with thin printer adapters (`tsv_svelte/src/printer/classification/`) that resolve symbols, call them, and traverse the AST, for reuse across all planned tools (formatter, linter, compiler, LSP).
 
 ### AST Architecture: Internal AST vs Wire JSON
 

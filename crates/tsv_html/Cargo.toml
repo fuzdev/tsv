@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
-description = "HTML spec data: the named character references table, optional end tags and custom-element names (support crate for tsv)"
+description = "HTML spec data: the named character references table (support crate for tsv)"
 categories = ["development-tools", "parser-implementations", "web-programming"]
 keywords = ["html", "whatwg", "entities", "parser"]
 # The named-reference table (`src/entities_table.rs`) is WHATWG's list incorporated into source
