@@ -36,8 +36,9 @@
  *
  * Exit codes: `format` — 0 clean, 1 would-change (`--check`), 2 errors;
  * `parse` — 0 ok, 1 error; `strip` — 0 stripped, 1 refused, 2 a parse or usage error.
- * Flag-parsing errors exit 1 (every command); `format`'s and `strip`'s post-parse
- * usage/validation errors (an invalid `--source-type`, conflicting inputs) exit 2.
+ * A malformed command line (argh's own refusals, `--version` beside a subcommand) exits 2
+ * for every command; `format`'s and `strip`'s post-parse usage/validation errors (an invalid
+ * `--source-type`, conflicting inputs) exit 2 too, `parse`'s 1.
  */
 
 import { Buffer } from 'node:buffer';
@@ -327,7 +328,7 @@ Options:
   --content <s>     content to strip, printed to stdout
   --stdin           read from stdin, print to stdout
   --source-type <t> TypeScript parse goal: script | module (default: module, retried as a script; --content/--stdin only)
-  --check           print nothing: exit 1 on a refusal, 2 on a parse error
+  --check           write nothing to stdout: exit 1 on a refusal, 2 on a parse error
 
 Exit codes: 0 stripped, 1 refused (TypeScript that type blanking cannot erase,
 such as an enum), 2 a parse error or a usage error.
@@ -428,7 +429,7 @@ async function main() {
 	if (values.version) {
 		if (subcommand !== undefined) {
 			exit_with_error(
-				1,
+				2,
 				'Error: --version cannot be combined with a subcommand\n\nRun tsv --help for more information.'
 			);
 		}
@@ -449,7 +450,7 @@ async function main() {
 			// no subcommand: argh's required-subcommand refusal, the bytes argh prints for the
 			// native CLI (`main` answers a bare `--version` ahead of it, so the subcommand stays required)
 			exit_with_error(
-				1,
+				2,
 				'One of the following subcommands must be present:\n    help\n    parse\n    format\n    strip\n\nRun tsv --help for more information.'
 			);
 	}
@@ -1754,9 +1755,9 @@ function exit_with_error(code, message) {
 }
 
 /** An argh early exit as the native `main` prints it: argh's own output, the `Run tsv
- * --help` pointer, exit 1. */
+ * --help` pointer, exit 2 (a usage error). */
 function exit_argh(output) {
-	exit_with_error(1, `${output}\nRun tsv --help for more information.`);
+	exit_with_error(2, `${output}\nRun tsv --help for more information.`);
 }
 
 /** Read all of stdin, exiting with the calling command's error code on

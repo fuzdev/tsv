@@ -17,7 +17,8 @@ const CMD_NAME: &str = "tsv";
 
 fn main() {
     // `argh::from_env` with the command name fixed — same early-exit contract:
-    // `--help` to stdout with exit 0, a parse error to stderr with exit 1.
+    // `--help` to stdout with exit 0, a parse error to stderr with exit 2 — a malformed
+    // command line is a usage error, the code `format` and `strip` give their own.
     let args: Vec<String> = std::env::args_os()
         .skip(1)
         .map(std::ffi::OsString::into_string)
@@ -30,7 +31,7 @@ fn main() {
                 "Invalid utf8: {}",
                 tsv_discover::quote_path_owned(arg.to_string_lossy().into_owned())
             );
-            std::process::exit(1)
+            std::process::exit(2)
         });
     let arg_strs: Vec<&str> = args.iter().map(String::as_str).collect();
 
@@ -52,7 +53,7 @@ fn main() {
                         "{}\nRun {CMD_NAME} --help for more information.",
                         early_exit.output
                     );
-                    1
+                    2
                 }
             })
         });

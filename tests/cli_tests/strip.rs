@@ -454,17 +454,17 @@ fn test_strip_missing_file() {
     );
 }
 
-/// argh's own refusals exit 1, as for every command.
+/// argh's own refusals exit 2 — a usage error, as for every command.
 #[test]
 fn test_strip_argument_parser_refusals() {
     assert_refused(
         &tsv(&["strip", "a.ts", "b.ts"]),
-        1,
+        2,
         "Unrecognized argument: b.ts",
     );
     assert_refused(
         &tsv(&["strip", "--parser", "ts", "--content", "let x: T;"]),
-        1,
+        2,
         "Unrecognized argument: --parser",
     );
 }

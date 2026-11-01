@@ -53,7 +53,7 @@ fn test_format_help_extension_list_is_rendered_from_the_const() {
 #[test]
 fn test_version_with_a_subcommand_is_refused() {
     let output = tsv(&["--version", "format", "--check", "/nonexistent"]);
-    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -69,11 +69,11 @@ fn test_version_with_a_subcommand_is_refused() {
 /// A bare `tsv` is argh's own required-subcommand refusal — `main` answers only a bare
 /// `--version` ahead of argh, so the subcommand stays required and nothing restates this
 /// text by hand on the native side. The bytes are pinned because the JS mirror prints
-/// the same ones (`cli.js`'s `main`), exit 1 on both.
+/// the same ones (`cli.js`'s `main`), exit 2 on both — a malformed command line.
 #[test]
 fn test_no_command() {
     let output = tsv(&[]);
-    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());
     assert_eq!(
         String::from_utf8_lossy(&output.stderr),
@@ -161,7 +161,7 @@ fn test_command_name_is_independent_of_argv0() {
 
     // The error path carries the same name (argh's `Run <cmd> --help` line).
     let bad = run(&["format", "--parser", "bogus", "--content", "x"]);
-    assert_eq!(bad.status.code(), Some(1));
+    assert_eq!(bad.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&bad.stderr);
     assert!(
         stderr.contains("Run tsv --help for more information."),
@@ -172,9 +172,9 @@ fn test_command_name_is_independent_of_argv0() {
 #[test]
 fn test_version_is_top_level_only() {
     // Subcommands don't take --version — argh's unrecognized-argument error, which
-    // the JS mirror's transcription of argh repeats word for word (exit 1).
+    // the JS mirror's transcription of argh repeats word for word (exit 2, a usage error).
     let output = tsv(&["format", "--version"]);
-    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.status.code(), Some(2));
     assert!(
         String::from_utf8_lossy(&output.stderr).contains("Unrecognized argument: --version"),
         "should fail as an unknown subcommand argument, not print a version"

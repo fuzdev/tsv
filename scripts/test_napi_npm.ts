@@ -965,10 +965,10 @@ describe('cli (bin.js): the tsv bin dispatching to the native CLI binary', () =>
 		assert.match(result.stderr, /Parse error/);
 	});
 
-	it('a bad --parser value exits 1 in both commands (argument-parsing error)', () => {
+	it('a bad --parser value exits 2 in both commands (argument-parsing error)', () => {
 		for (const command of ['format', 'parse']) {
 			const result = run_cli([command, '--content', 'const x = 1;', '--parser', 'bogus']);
-			assert.equal(result.status, 1);
+			assert.equal(result.status, 2);
 			assert.match(result.stderr, /Unknown parser type/);
 		}
 	});
@@ -1327,54 +1327,54 @@ const USAGE_ROWS: Array<{ args: Array<string>; exit: number; says: string }> = [
 	// and the extra positional refused before any value is looked at
 	{
 		args: ['format', '--content=x', '--parser', 'ts'],
-		exit: 1,
+		exit: 2,
 		says: 'Unrecognized argument: --content=x'
 	},
-	{ args: ['format', '--check=1', 'x.ts'], exit: 1, says: 'Unrecognized argument: --check=1' },
-	{ args: ['format', '-x', 'x.ts'], exit: 1, says: 'Unrecognized argument: -x' },
-	{ args: ['format', '-', 'x.ts'], exit: 1, says: 'Unrecognized argument: -' },
-	{ args: ['format', '--content'], exit: 1, says: "No value provided for option '--content'." },
-	{ args: ['help', 'bogus'], exit: 1, says: 'Unrecognized argument: bogus' },
+	{ args: ['format', '--check=1', 'x.ts'], exit: 2, says: 'Unrecognized argument: --check=1' },
+	{ args: ['format', '-x', 'x.ts'], exit: 2, says: 'Unrecognized argument: -x' },
+	{ args: ['format', '-', 'x.ts'], exit: 2, says: 'Unrecognized argument: -' },
+	{ args: ['format', '--content'], exit: 2, says: "No value provided for option '--content'." },
+	{ args: ['help', 'bogus'], exit: 2, says: 'Unrecognized argument: bogus' },
 	{
 		args: ['parse', 'a.ts', 'b.ts', '--source-type', 'bogus'],
-		exit: 1,
+		exit: 2,
 		says: 'Unrecognized argument: b.ts'
 	},
 	// a help word sets a flag and parsing CONTINUES: a later flag refuses, an earlier
 	// bad value or a later extra positional still errors, and a help word ahead of the
 	// subcommand is handed down to it
-	{ args: ['format', 'help', '--check'], exit: 1, says: 'Trailing arguments are not allowed' },
-	{ args: ['--help', '--version'], exit: 1, says: 'Trailing arguments are not allowed' },
-	{ args: ['help', 'format', '--check'], exit: 1, says: 'Trailing arguments are not allowed' },
+	{ args: ['format', 'help', '--check'], exit: 2, says: 'Trailing arguments are not allowed' },
+	{ args: ['--help', '--version'], exit: 2, says: 'Trailing arguments are not allowed' },
+	{ args: ['help', 'format', '--check'], exit: 2, says: 'Trailing arguments are not allowed' },
 	{
 		args: ['format', '--parser', 'bogus', 'help'],
-		exit: 1,
+		exit: 2,
 		says: "Error parsing option '--parser' with value 'bogus'"
 	},
-	{ args: ['parse', 'a.ts', 'b.ts', 'help'], exit: 1, says: 'Unrecognized argument: b.ts' },
-	{ args: ['help', 'parse', 'a', 'b'], exit: 1, says: 'Unrecognized argument: b' },
+	{ args: ['parse', 'a.ts', 'b.ts', 'help'], exit: 2, says: 'Unrecognized argument: b.ts' },
+	{ args: ['help', 'parse', 'a', 'b'], exit: 2, says: 'Unrecognized argument: b' },
 	// values are parsed with argv: a duplicate, an unparseable width, argv order kept
 	{
 		args: ['format', '--parser', 'ts', '--parser', 'css', '--bogus'],
-		exit: 1,
+		exit: 2,
 		says: 'duplicate values provided'
 	},
-	{ args: ['format', '--jobs', 'abc', 'x.ts'], exit: 1, says: 'invalid digit found in string' },
-	{ args: ['parse', 'a.ts', 'b.ts', '--bogus'], exit: 1, says: 'Unrecognized argument: b.ts' },
+	{ args: ['format', '--jobs', 'abc', 'x.ts'], exit: 2, says: 'invalid digit found in string' },
+	{ args: ['parse', 'a.ts', 'b.ts', '--bogus'], exit: 2, says: 'Unrecognized argument: b.ts' },
 	{
 		args: ['parse', '--parser', 'bogus', 'a.ts', 'b.ts'],
-		exit: 1,
+		exit: 2,
 		says: "Error parsing option '--parser' with value 'bogus'"
 	},
 	// a flag named like an `Object.prototype` key is as unrecognized as any other
 	{
 		args: ['format', '--constructor', 'a.ts'],
-		exit: 1,
+		exit: 2,
 		says: 'Unrecognized argument: --constructor'
 	},
-	{ args: ['bogus'], exit: 1, says: 'Unrecognized argument: bogus' },
+	{ args: ['bogus'], exit: 2, says: 'Unrecognized argument: bogus' },
 	// no subcommand at all: argh's required-subcommand refusal, word for word
-	{ args: [], exit: 1, says: 'One of the following subcommands must be present' }
+	{ args: [], exit: 2, says: 'One of the following subcommands must be present' }
 ];
 
 /** Rows that SUCCEED on both bins with byte-identical stdout: the word `help` in a
@@ -1733,7 +1733,7 @@ describe('invalid UTF-8 parity: both CLIs refuse, and neither rewrites the file'
 function assert_verdict_parity(args: Array<string>, accepted: boolean): void {
 	const native = run_native(args);
 	const mirror = run_mirror(args);
-	assert.equal(native.status, accepted ? 0 : 1, `native disagrees with the row: ${native.stderr}`);
+	assert.equal(native.status, accepted ? 0 : 2, `native disagrees with the row: ${native.stderr}`);
 	assert.equal(
 		mirror.status,
 		native.status,
@@ -1745,7 +1745,7 @@ function assert_verdict_parity(args: Array<string>, accepted: boolean): void {
 }
 
 // Repeated value-taking options. argh refuses a second `--content`/`--parser`/
-// `--source-type`/`--jobs` ("duplicate values provided", exit 1), and `cli.js`,
+// `--source-type`/`--jobs` ("duplicate values provided", exit 2), and `cli.js`,
 // parsing by argh's grammar, refuses the same way — the
 // `--jobs` grammar's sibling, and the sharper half: an unrefused
 // `--parser ts --parser css` does not merely pick, it formats the input under
@@ -1808,7 +1808,7 @@ describe('repeated-option parity: both CLIs refuse a second value, and neither r
 
 	for (const { args, refused, why } of repeated) {
 		it(`${args.join(' ')} is ${refused ? 'refused' : 'accepted'} by both (${why})`, () => {
-			// A refusal is exit 1 (an argument error on both sides); acceptance is
+			// A refusal is exit 2 (an argument error on both sides); acceptance is
 			// a clean 0, which is why the controls are invocations that do no work.
 			assert_verdict_parity(args, !refused);
 		});

@@ -17,9 +17,9 @@
  *   as a script only if that fails. Only argument misuse throws, as a `TypeError` in the
  *   facade's own words;
  * - **the CLI** (`register_strip_cli_suite`): `tsv strip <file>` / `--content` / `--stdin`
- *   print the stripped code to stdout verbatim, `--check` prints nothing, and the exit code
+ *   print the stripped code to stdout verbatim, `--check` writes nothing to stdout, and the exit code
  *   is 0 stripped, 1 refused, 2 a parse error or a usage error (argh's own flag-parsing
- *   refusals exit 1, as for every command).
+ *   refusals included, as for every command).
  *
  * The rows reach what the strip's position invariant turns on: a blanked range holding a
  * multi-unit character, CRLF and U+2028 kept verbatim, a leading BOM and a hashbang kept,
@@ -685,14 +685,14 @@ export const STRIP_CLI_ROWS: ReadonlyArray<StripCliRow> = [
 	{
 		name: 'a second positional is refused by the argument parser',
 		args: ['strip', 'a.ts', 'b.ts'],
-		status: 1,
+		status: 2,
 		stdout: '',
 		stderr_starts: 'Unrecognized argument: b.ts'
 	},
 	{
 		name: '--parser is not a strip flag',
 		args: ['strip', '--parser', 'ts', '--content', 'let x: T;'],
-		status: 1,
+		status: 2,
 		stdout: '',
 		stderr_starts: 'Unrecognized argument: --parser'
 	},

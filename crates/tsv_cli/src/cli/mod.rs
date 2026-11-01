@@ -51,7 +51,7 @@ impl TopLevel {
         // things at once, refused rather than silently dropping either
         if self.version {
             out::exit_with_error(
-                1,
+                2,
                 "Error: --version cannot be combined with a subcommand\n\nRun tsv --help for more information.",
             );
         }

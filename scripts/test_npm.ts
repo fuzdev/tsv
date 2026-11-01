@@ -1580,7 +1580,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 
 	it('--version with a subcommand is refused', () => {
 		const result = run_cli(['--version', 'format', '--check', '/nonexistent']);
-		assert.equal(result.status, 1);
+		assert.equal(result.status, 2);
 		assert.equal(result.stdout, '');
 		assert.match(result.stderr, /^Error: --version cannot be combined with a subcommand$/m);
 		assert.match(result.stderr, /Run tsv --help for more information\./);
@@ -1932,15 +1932,15 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.ok(result.stderr.startsWith(`Error: ${LONE_CR_REFUSAL}\n`), result.stderr);
 	});
 
-	it('unknown flags exit 1', () => {
+	it('unknown flags exit 2 (a usage error)', () => {
 		const result = run_cli(['format', '--bogus']);
-		assert.equal(result.status, 1);
+		assert.equal(result.status, 2);
 	});
 
-	it('a bad --parser value exits 1 in both commands (argument-parsing error)', () => {
+	it('a bad --parser value exits 2 in both commands (argument-parsing error)', () => {
 		for (const command of ['format', 'parse']) {
 			const result = run_cli([command, '--content', 'const x = 1;', '--parser', 'bogus']);
-			assert.equal(result.status, 1);
+			assert.equal(result.status, 2);
 			assert.match(result.stderr, /Unknown parser type/);
 		}
 	});
@@ -2981,9 +2981,9 @@ try {
 		assert.match(result.stderr, /--jobs applies to file paths/);
 	});
 
-	it('format --jobs with a non-integer value exits 1 (argument-parsing error)', () => {
+	it('format --jobs with a non-integer value exits 2 (argument-parsing error)', () => {
 		const result = run_cli(['format', '--jobs', 'many', 'a.ts']);
-		assert.equal(result.status, 1);
+		assert.equal(result.status, 2);
 		assert.ok(
 			result.stderr.includes(
 				"Error parsing option '--jobs' with value 'many': invalid digit found in string"
@@ -3133,13 +3133,13 @@ try {
 
 	it('parse rejects a second positional', () => {
 		const result = run_cli(['parse', 'a.ts', 'b.ts']);
-		assert.equal(result.status, 1);
+		assert.equal(result.status, 2);
 		assert.match(result.stderr, /Unrecognized argument/);
 	});
 
-	it('no command refuses as argh does and exits 1', () => {
+	it('no command refuses as argh does and exits 2', () => {
 		const result = run_cli([]);
-		assert.equal(result.status, 1);
+		assert.equal(result.status, 2);
 		assert.match(result.stderr, /^One of the following subcommands must be present:/);
 	});
 

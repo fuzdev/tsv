@@ -753,7 +753,7 @@ fn test_format_hard_links_are_two_names_in_scope() {
 fn test_format_non_utf8_argument_is_refused_at_the_argv_boundary() {
     // a path ARGUMENT that is not UTF-8 is refused before any command runs — argh reads
     // `&str`, so the walk's byte-faithful join reaches such a name only through a
-    // directory. The refusal is a plain exit 1 with the name spelled lossily, not a panic
+    // directory. The refusal is a usage error (exit 2) with the name spelled lossily, not a panic
     use std::ffi::OsStr;
     use std::os::unix::ffi::OsStrExt;
     let dir = temp_dir("non_utf8_argument");
@@ -764,7 +764,7 @@ fn test_format_non_utf8_argument_is_refused_at_the_argv_boundary() {
         .arg(&file)
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.starts_with("Invalid utf8: "), "stderr: {stderr}");
     assert!(!stderr.contains("panicked"), "stderr: {stderr}");
@@ -777,7 +777,7 @@ fn test_format_non_utf8_argument_is_refused_at_the_argv_boundary() {
         .arg(OsStr::from_bytes(b"bad\nname\xff.ts"))
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.status.code(), Some(2));
     assert_eq!(
         String::from_utf8_lossy(&output.stderr),
         "Invalid utf8: \"bad\\nname\u{fffd}.ts\"\n"
