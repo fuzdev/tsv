@@ -3,25 +3,27 @@
 //! ([`tsv_svelte`](https://docs.rs/tsv_svelte)). The long-term target is a spec-faithful HTML
 //! library; today the crate holds what tsv's Svelte parser reads from the spec: the
 //! [named character references][table] table, matched as the tokenizer matches it
-//! ([`match_named_character_reference`]).
+//! ([`match_named_character_reference`], answering a [`NamedCharacterReference`]).
 //!
-//! Pure functions over text, independent of any one parser or tool. Names are matched
-//! exactly, as authored: the lookup is case-sensitive, as the spec's table is (`&Aacute;` and
-//! `&aacute;` are different references).
+//! The lookup is a pure function over text, independent of any one parser or tool. Names are
+//! matched exactly, as authored: the lookup is case-sensitive, as the spec's table is
+//! (`&Aacute;` and `&aacute;` are different references).
 //!
 //! ```
 //! use tsv_html::match_named_character_reference;
 //!
 //! // `&lt;` names `<`, its `;` included
-//! assert_eq!(match_named_character_reference("lt;"), Some((3, "<")));
+//! let lt = match_named_character_reference("lt;").unwrap();
+//! assert_eq!((lt.name(), lt.characters()), ("lt;", "<"));
 //! // the longest name that starts the text wins: `&notin;` over `&not`
-//! assert_eq!(match_named_character_reference("notin;"), Some((6, "∉")));
+//! let notin = match_named_character_reference("notin;").unwrap();
+//! assert_eq!((notin.name(), notin.characters()), ("notin;", "∉"));
 //! ```
 //!
 //! ## Stability
 //!
 //! The public signatures follow 0.x semver like every tsv crate: a breaking change ships only
-//! in a minor release. What the functions answer may change in any release, tracking the spec
+//! in a minor release. What the lookup answers may change in any release, tracking the spec
 //! and what tsv needs.
 //!
 //! ## License
@@ -39,4 +41,4 @@ mod entities;
 mod entities_gen;
 mod entities_table;
 
-pub use entities::match_named_character_reference;
+pub use entities::{NamedCharacterReference, match_named_character_reference};

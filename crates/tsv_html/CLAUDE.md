@@ -1,6 +1,6 @@
 # tsv_html
 
-> HTML spec data and the answers the HTML spec gives — pure functions, no AST.
+> HTML spec data and the answers the HTML spec gives — a pure function over text, no AST.
 
 The published home of what tsv reads from the HTML spec: the named character references
 table. The long-term target is a spec-faithful HTML library, so the public surface holds only
@@ -24,15 +24,18 @@ named-reference match).
 All at the crate root (`src/lib.rs`, a re-export over the private `entities` file).
 
 **Stability**: the public signatures follow 0.x semver like every tsv crate (a breaking
-change only at a minor release); what the functions answer may change in any release,
+change only at a minor release); what the lookup answers may change in any release,
 tracking the spec and what tsv needs.
 
 - **Named character references** (`entities.rs`): `match_named_character_reference(input) ->
-  Option<(usize, &'static str)>` — the tokenizer's named-character-reference state: the
-  longest name in the table that starts `input` (the text after a `&`), as the bytes it takes
-  (its `;` included when the name has one) and the characters it stands for. What a caller
-  does with a match — the attribute-value rule for a legacy name, the parse errors — is the
-  caller's (`tsv_svelte`'s decoder applies Svelte's).
+  Option<NamedCharacterReference>` — the tokenizer's named-character-reference state: the
+  longest name in the table that starts `input` (the text after a `&`). The match is a row of
+  the spec's table in its own terms, private fields behind two `const` accessors: `name()`
+  (the table's `'static` spelling, its `;` included when the match took one — byte-equal to
+  the start of `input`, so its length is the bytes consumed and `ends_with(';')` says whether
+  a `;` closed it) and `characters()` (the one or two characters it stands for). What a
+  caller does with a match — the attribute-value rule for a legacy name, the parse errors —
+  is the caller's (`tsv_svelte`'s decoder applies Svelte's).
 
 ## Distinctives
 
@@ -69,8 +72,9 @@ tracking the spec and what tsv needs.
   `validate:artifacts` and the package suites fail a package without it). `tsv_svelte`
   carries none of the table (it calls `match_named_character_reference`), so its license stays the
   workspace's 0BSD.
-- **Pure `&str` API**: lookups take names and text, not AST nodes or a parser's name
-  representation, so the crate stays independent of any particular parser.
+- **Pure `&str` API**: the lookup takes text, not AST nodes or a parser's name
+  representation, and answers the table's own `'static` strings, borrowing nothing from its
+  input, so the crate stays independent of any particular parser.
 - **Exact, case-sensitive names**: the lookup matches a name as authored, as the spec's
   table does (`&Aacute;` and `&aacute;` are different references). Stated once in the crate
   `//!` docs.

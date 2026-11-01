@@ -8,7 +8,7 @@
 //!   `entities_table_is_fresh` test, which fails when the two disagree. The crate's `NOTICE`
 //!   attributes the list and states its license
 //! - Some names stand for **two** code points — a combining mark, a variation selector, or a
-//!   second character — which is why a match answers a `&str`
+//!   second character — which is why a match's characters are a `&str`
 //!
 //! References:
 //! - <https://html.spec.whatwg.org/multipage/named-characters.html#named-character-references>
@@ -16,15 +16,52 @@
 
 use crate::entities_table::{ENTITIES, ENTITY_DISPLACEMENTS, ENTITY_SEED, LONGEST_ENTITY_NAME};
 
+/// A named character reference [`match_named_character_reference`] found: a row of the
+/// spec's [named character references][table] table, its **name** and the **characters** it
+/// stands for.
+///
+/// Only a match makes one; both halves are the table's own `'static` strings, so it borrows
+/// nothing from the input it was matched in.
+///
+/// [table]: https://html.spec.whatwg.org/multipage/named-characters.html#named-character-references
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct NamedCharacterReference {
+    name: &'static str,
+    characters: &'static str,
+}
+
+impl NamedCharacterReference {
+    /// The matched name as the table spells it, without the `&` and with its `;` when the
+    /// match took one (`"amp;"`, or the legacy `"amp"` where no `;` follows).
+    ///
+    /// Names are ASCII and matched exactly, so the name is byte-equal to the start of the
+    /// input: `name().len()` is the count of input bytes the match consumed (always on a
+    /// character boundary), and `name().ends_with(';')` says whether the match ended on a
+    /// `;` — the question the tokenizer's next step asks.
+    #[inline]
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        self.name
+    }
+
+    /// The one or two characters the reference stands for (`"&"` for `amp;`,
+    /// `"\u{2242}\u{338}"` for `NotEqualTilde;`).
+    #[inline]
+    #[must_use]
+    pub const fn characters(self) -> &'static str {
+        self.characters
+    }
+}
+
 /// The longest named character reference at the start of `input`, or `None` when no name in
 /// the table starts it.
 ///
-/// `input` is the text **after** the `&` (the `&` itself is not part of any name). On a match
-/// the answer is the count of `input` **bytes** the name consumed, then the characters the
-/// reference stands for. The count is the name's length, which varies by more than the name:
-/// a name with a `;` consumes it (`amp;` is 4), a legacy name without one does not (`amp` is
-/// 3, whatever follows), so the caller reads the byte before the count to learn whether the
-/// match ended on a `;`.
+/// `input` is the text **after** the `&` (the `&` itself is not part of any name). A match
+/// answers the name it consumed and the characters that name stands for
+/// ([`NamedCharacterReference`]). One reference can match with or without its `;`: `amp;`
+/// takes 4 bytes, the legacy `amp` takes 3 whatever follows, so
+/// [`NamedCharacterReference::name`] carries both how much of `input` the match took and
+/// whether it ended on a `;`.
 ///
 /// This is the HTML tokenizer's [named character reference state][state]: "consume the
 /// maximum number of characters possible, where the consumed characters are one of the
@@ -34,9 +71,6 @@ use crate::entities_table::{ENTITIES, ENTITY_DISPLACEMENTS, ENTITY_SEED, LONGEST
 /// a match — the attribute-value rule for a legacy name, the parse errors — is the state's
 /// next step, and the caller's.
 ///
-/// Names are ASCII and matched exactly, so a match always ends on a character boundary of
-/// `input`.
-///
 /// [state]: https://html.spec.whatwg.org/multipage/parsing.html#named-character-reference-state
 /// [table]: https://html.spec.whatwg.org/multipage/named-characters.html#named-character-references
 ///
@@ -45,18 +79,26 @@ use crate::entities_table::{ENTITIES, ENTITY_DISPLACEMENTS, ENTITY_SEED, LONGEST
 /// ```
 /// use tsv_html::match_named_character_reference;
 ///
-/// assert_eq!(match_named_character_reference("amp;rest"), Some((4, "&")));
+/// let amp = match_named_character_reference("amp;rest").unwrap();
+/// assert_eq!((amp.name(), amp.characters()), ("amp;", "&"));
+/// // How much of the input the match consumed, and whether a `;` closed it
+/// assert_eq!(amp.name().len(), 4);
+/// assert!(amp.name().ends_with(';'));
+///
+/// let matched = |input: &str| {
+///     match_named_character_reference(input).map(|r| (r.name(), r.characters()))
+/// };
 /// // A legacy name without its `;`
-/// assert_eq!(match_named_character_reference("lt "), Some((2, "<")));
+/// assert_eq!(matched("lt "), Some(("lt", "<")));
 /// // The longest name that matches, not the whole run
-/// assert_eq!(match_named_character_reference("notit;"), Some((3, "\u{ac}")));
+/// assert_eq!(matched("notit;"), Some(("not", "\u{ac}")));
 /// // Two code points
-/// assert_eq!(match_named_character_reference("NotEqualTilde;"), Some((14, "\u{2242}\u{338}")));
-/// assert_eq!(match_named_character_reference("bogus;"), None);
+/// assert_eq!(matched("NotEqualTilde;"), Some(("NotEqualTilde;", "\u{2242}\u{338}")));
+/// assert_eq!(matched("bogus;"), None);
 /// ```
 #[inline]
 #[must_use]
-pub fn match_named_character_reference(input: &str) -> Option<(usize, &'static str)> {
+pub fn match_named_character_reference(input: &str) -> Option<NamedCharacterReference> {
     // Every name is an ASCII alphanumeric run with at most a trailing `;`, so a match lies
     // within the input's leading alphanumeric run (plus the `;` after it). The run ends at the
     // first byte that could not appear in a name — for a multibyte character its first byte —
@@ -69,9 +111,9 @@ pub fn match_named_character_reference(input: &str) -> Option<(usize, &'static s
     // A `;` can only close the whole run, and that name is the longest candidate: try it first
     // (the common case, `&amp;`).
     if input.as_bytes().get(run_len) == Some(&b';')
-        && let Some(characters) = entity(&input[..=run_len])
+        && let Some(reference) = entity(&input[..=run_len])
     {
-        return Some((run_len + 1, characters));
+        return Some(reference);
     }
 
     // Otherwise the longest prefix of the run that is a name. No name is longer than
@@ -79,24 +121,28 @@ pub fn match_named_character_reference(input: &str) -> Option<(usize, &'static s
     // end it would look up every prefix of the run, quadratic in a long alphanumeric run.
     (1..=run_len.min(LONGEST_ENTITY_NAME))
         .rev()
-        .find_map(|len| entity(&input[..len]).map(|characters| (len, characters)))
+        .find_map(|len| entity(&input[..len]))
 }
 
-/// The characters the named reference `name` stands for (`name` without its `&`, with its
-/// semicolon if it has one), or `None` when no reference has that name.
+/// The table's row for the named reference `name` (`name` without its `&`, with its
+/// semicolon if it has one), or `None` when no reference has that name. The row's name is the
+/// table's `'static` copy, byte-equal to `name`.
 ///
 /// [`ENTITIES`] is a perfect hash table, in the hash-and-displace shape (CHD) `phf` builds:
 /// the hash picks a bucket, the bucket's displacement pair picks the one slot a name of that
 /// hash can occupy, and the slot's name is compared with `name`. One hash and one compare,
-/// whether or not `name` is a reference — [`match_named_character_reference`]'s prefix search asks for
-/// up to [`LONGEST_ENTITY_NAME`] names that mostly are not. The generator
+/// whether or not `name` is a reference — [`match_named_character_reference`]'s prefix search
+/// asks for up to [`LONGEST_ENTITY_NAME`] names that mostly are not. The generator
 /// (`entities_table_is_fresh`) searches the seed and the displacements, through this same
 /// [`entity_hash`] and [`entity_slot`]. Marked `#[inline]`, like the hash beneath it, so the
 /// whole lookup compiles into a caller in another crate.
 #[inline]
-fn entity(name: &str) -> Option<&'static str> {
+fn entity(name: &str) -> Option<NamedCharacterReference> {
     let (name_slot, characters) = *ENTITIES.get(entity_slot(entity_hash(name.as_bytes())))?;
-    (name_slot == name).then_some(characters)
+    (name_slot == name).then_some(NamedCharacterReference {
+        name: name_slot,
+        characters,
+    })
 }
 
 /// The slot of [`ENTITIES`] a name with hash `hash` can occupy: phf's `get_index` over the
@@ -150,11 +196,17 @@ pub(crate) fn entity_hash_seeded(name: &[u8], seed: u64) -> u64 {
 mod tests {
     use super::*;
 
-    /// The generated table's shape, which [`match_named_character_reference`] reads as a given: a name
-    /// is an ASCII run with at most a trailing semicolon (its byte scan ends every name run on
-    /// `is_ascii_alphanumeric`, and slices by byte), and a value is the one or two characters
-    /// the reference stands for. A regeneration that dropped the second character would leave
-    /// this the only guard — no corpus file in any gate uses a two-character reference.
+    /// The match a test expects: `name` as the table spells it, standing for `characters`.
+    fn reference(name: &'static str, characters: &'static str) -> NamedCharacterReference {
+        NamedCharacterReference { name, characters }
+    }
+
+    /// The generated table's shape, which [`match_named_character_reference`] reads as a given:
+    /// a name is an ASCII run with at most a trailing semicolon (its byte scan ends every name
+    /// run on `is_ascii_alphanumeric`, and slices by byte), and a value is the one or two
+    /// characters the reference stands for. A regeneration that dropped the second character
+    /// would leave this the only guard — no corpus file in any gate uses a two-character
+    /// reference.
     #[test]
     fn test_entity_table_shape() {
         let mut two_character = 0;
@@ -176,12 +228,17 @@ mod tests {
 
     /// Every legacy name (no `;`) has a twin with one, standing for the same characters. So a
     /// run closed by `;` that is not itself a name is never a legacy name either, and a decoder
-    /// built on [`match_named_character_reference`] cannot see the `;` of a whole-run legacy match.
+    /// built on [`match_named_character_reference`] cannot see the `;` of a whole-run legacy
+    /// match.
     #[test]
     fn test_legacy_names_have_semicolon_twins() {
         for &(name, characters) in &ENTITIES {
             if !name.ends_with(';') {
-                assert_eq!(entity(&format!("{name};")), Some(characters), "{name:?}");
+                assert_eq!(
+                    entity(&format!("{name};")).map(NamedCharacterReference::characters),
+                    Some(characters),
+                    "{name:?}"
+                );
             }
         }
     }
@@ -191,7 +248,7 @@ mod tests {
     fn test_entity_table_lookup() {
         for (slot, &(name, characters)) in ENTITIES.iter().enumerate() {
             assert_eq!(entity_slot(entity_hash(name.as_bytes())), slot, "{name:?}");
-            assert_eq!(entity(name), Some(characters), "{name:?}");
+            assert_eq!(entity(name), Some(reference(name, characters)), "{name:?}");
         }
         for absent in ["", "amp;;", "AMp;", "nbsp;x", "notin", "&amp;", "\u{e9}"] {
             assert_eq!(entity(absent), None, "{absent:?}");
@@ -206,10 +263,12 @@ mod tests {
             ENTITIES.iter().map(|(name, _)| name.len()).max(),
             Some(LONGEST_ENTITY_NAME)
         );
+        let longest = match_named_character_reference("CounterClockwiseContourIntegral;");
         assert_eq!(
-            match_named_character_reference("CounterClockwiseContourIntegral;"),
-            Some((LONGEST_ENTITY_NAME, "\u{2233}"))
+            longest,
+            Some(reference("CounterClockwiseContourIntegral;", "\u{2233}"))
         );
+        assert_eq!(longest.map(|r| r.name().len()), Some(LONGEST_ENTITY_NAME));
     }
 
     /// Every name matches whole, as itself; with a `;` or alphanumeric tail after a legacy
@@ -219,28 +278,28 @@ mod tests {
         for &(name, characters) in &ENTITIES {
             assert_eq!(
                 match_named_character_reference(name),
-                Some((name.len(), characters)),
+                Some(reference(name, characters)),
                 "{name:?}"
             );
             assert_eq!(
                 match_named_character_reference(&format!("{name} tail")),
-                Some((name.len(), characters)),
+                Some(reference(name, characters)),
                 "{name:?}"
             );
         }
         // A legacy name followed by more of the run: the longest name in the run wins.
         assert_eq!(
             match_named_character_reference("COPYRIGHT"),
-            Some((4, "\u{a9}"))
+            Some(reference("COPY", "\u{a9}"))
         );
         // A `;` closing a run that is no name: the longest prefix that is one.
         assert_eq!(
             match_named_character_reference("notit;"),
-            Some((3, "\u{ac}"))
+            Some(reference("not", "\u{ac}"))
         );
         assert_eq!(
             match_named_character_reference("notin;"),
-            Some((6, "\u{2209}"))
+            Some(reference("notin;", "\u{2209}"))
         );
     }
 
@@ -252,9 +311,29 @@ mod tests {
         // A multibyte character ends the run on a boundary.
         assert_eq!(
             match_named_character_reference("amp\u{4e2d}"),
-            Some((3, "&"))
+            Some(reference("amp", "&"))
         );
         assert_eq!(match_named_character_reference("a\u{4e2d}pos;"), None);
+    }
+
+    /// The name a match answers is the start of `input`, byte for byte: what the caller skips.
+    #[test]
+    fn test_name_is_the_consumed_prefix() {
+        for input in [
+            "amp;",
+            "amp",
+            "amp tail",
+            "amp\u{4e2d}",
+            "ampamp;",
+            "COPYRIGHT",
+            "notit;",
+            "notin;x",
+            "\u{e9}",
+        ] {
+            if let Some(matched) = match_named_character_reference(input) {
+                assert!(input.starts_with(matched.name()), "{input:?}");
+            }
+        }
     }
 
     /// A long alphanumeric run names no reference; the search is bounded by the longest name,
@@ -264,7 +343,7 @@ mod tests {
         assert_eq!(match_named_character_reference(&"a".repeat(10_000)), None);
         assert_eq!(
             match_named_character_reference(&format!("amp{}", "a".repeat(10_000))),
-            Some((3, "&"))
+            Some(reference("amp", "&"))
         );
     }
 }

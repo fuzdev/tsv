@@ -899,7 +899,8 @@ Two homes, split by whose answer it is. `tsv_html` (published) holds HTML spec d
 answers the spec gives — the long-term target is a spec-faithful HTML library:
 
 ```rust
-pub fn match_named_character_reference(input: &str) -> Option<(usize, &'static str)>; // the named character references table
+pub fn match_named_character_reference(input: &str) -> Option<NamedCharacterReference>; // the named character references table
+// NamedCharacterReference::name() / characters(): the matched row's two columns
 ```
 
 The answers Svelte's compiler and prettier-plugin-svelte give, which tsv's Svelte support must

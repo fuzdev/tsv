@@ -6,7 +6,7 @@ published for tsv's Svelte support ([`tsv_svelte`](https://crates.io/crates/tsv_
 long-term target is a spec-faithful HTML library.
 
 The public signatures follow 0.x semver like every tsv crate: a breaking change ships only in a
-minor release. What the functions answer may change in any release, tracking the spec and what tsv
+minor release. What the lookup answers may change in any release, tracking the spec and what tsv
 needs.
 
 API docs: [docs.rs/tsv_html](https://docs.rs/tsv_html).

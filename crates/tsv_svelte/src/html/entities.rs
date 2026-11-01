@@ -194,7 +194,10 @@ fn decode_numeric_entity(rest: &str, is_attribute_value: bool) -> Option<(usize,
 /// decide here is the attribute-value rule.
 #[inline]
 fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, &'static str)> {
-    let (len, characters) = tsv_html::match_named_character_reference(rest)?;
+    let reference = tsv_html::match_named_character_reference(rest)?;
+    // The matched name is byte-equal to the start of `rest`, so its length is what it consumed.
+    let name = reference.name();
+    let len = name.len();
 
     // In an attribute value, a match not closed by `;` is left as written when followed by
     // `=` or an ASCII alphanumeric — the spec's named-character-reference state, verbatim. The
@@ -203,14 +206,14 @@ fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, &
     // the shorthand Svelte reaches for). A match ends on a character boundary (names are
     // ASCII), so `rest[len..]` cannot slice mid-character.
     if is_attribute_value
-        && rest.as_bytes()[len - 1] != b';'
+        && !name.ends_with(';')
         && let Some(next) = rest[len..].chars().next()
         && (next == '=' || next.is_ascii_alphanumeric())
     {
         return None;
     }
 
-    Some((len, characters))
+    Some((len, reference.characters()))
 }
 
 /// Validate and normalize a numeric reference's code point, as Svelte's decoder does
