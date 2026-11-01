@@ -218,7 +218,7 @@ fn test_stdin_source_type_refusal_does_not_wait_for_input() {
                 "--source-type",
                 "script",
             ][..],
-            1,
+            2,
         ),
     ] {
         let mut child = Command::new(built_tsv())
@@ -350,7 +350,7 @@ fn test_format_content_unset_source_type_falls_back_to_script() {
 fn test_source_type_refused_on_a_goalless_language() {
     // Svelte hard-wires `Module` and CSS has no goal, so a `--source-type` there is
     // a request that cannot be honored — an error on both commands, as on every
-    // binding, never a silent drop. The exit code is each command's own usage code.
+    // binding, never a silent drop. Both commands exit 2, the usage-error code.
     let parse = tsv(&[
         "parse",
         "--content",
@@ -362,7 +362,7 @@ fn test_source_type_refused_on_a_goalless_language() {
     ]);
     assert_eq!(
         parse.status.code(),
-        Some(1),
+        Some(2),
         "parse: --source-type on svelte is an error"
     );
     let stderr = String::from_utf8_lossy(&parse.stderr);
@@ -394,7 +394,7 @@ fn test_source_type_refused_on_a_goalless_language() {
     // A path's extension settles the parser ahead of the read, so the refusal does not
     // turn on whether the file exists: a missing `.css` names the flag, not the file.
     let missing = tsv(&["parse", "definitely_missing.css", "--source-type", "script"]);
-    assert_eq!(missing.status.code(), Some(1));
+    assert_eq!(missing.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&missing.stderr);
     assert!(
         stderr.contains("--source-type is only supported for typescript"),
@@ -411,7 +411,7 @@ fn test_source_type_refused_on_a_goalless_language() {
         "--source-type",
         "commonjs",
     ]);
-    assert_eq!(bad.status.code(), Some(1));
+    assert_eq!(bad.status.code(), Some(2));
     assert!(
         String::from_utf8_lossy(&bad.stderr).contains("invalid --source-type"),
         "an invalid value is reported as such"
@@ -638,8 +638,8 @@ fn test_format_refuses_a_lone_cr_in_an_in_tag_line_comment() {
 }
 
 /// Reading is strict UTF-8 on every input arm, each with its own message: `--stdin`
-/// refuses the stream (exit 2 for `format`, 1 for `parse` — each command's own
-/// argument-error code), and `parse <file>` refuses the file the way `format <file>`
+/// refuses the stream (exit 2, a read error, in both commands), and `parse <file>`
+/// refuses the file the way `format <file>`
 /// does (`test_format_invalid_utf8_file_is_reported_and_left_alone`). Nothing is
 /// repaired with U+FFFD and parsed anyway.
 #[test]
@@ -650,7 +650,7 @@ fn test_invalid_utf8_on_stdin_and_a_parsed_file_is_refused() {
 
     for (args, code) in [
         (["format", "--stdin", "--parser", "typescript"], 2),
-        (["parse", "--stdin", "--parser", "typescript"], 1),
+        (["parse", "--stdin", "--parser", "typescript"], 2),
     ] {
         let mut child = Command::new(built_tsv())
             .args(args)
@@ -679,7 +679,7 @@ fn test_invalid_utf8_on_stdin_and_a_parsed_file_is_refused() {
     fs::write(dir.join("bad.ts"), BAD).unwrap();
     let parsed = tsv(&["parse", dir.join("bad.ts").to_str().unwrap()]);
     let stderr = String::from_utf8_lossy(&parsed.stderr);
-    assert_eq!(parsed.status.code(), Some(1), "stderr: {stderr}");
+    assert_eq!(parsed.status.code(), Some(2), "stderr: {stderr}");
     assert!(
         stderr.contains("Error: Error reading file ")
             && stderr.contains("bad.ts: stream did not contain valid UTF-8"),

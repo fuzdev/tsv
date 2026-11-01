@@ -4,6 +4,8 @@ use crate::json_utils::indent_json_with_tabs;
 use argh::FromArgs;
 
 /// Parse source code into AST JSON.
+///
+/// Exit codes: 0 parsed, 1 the input does not parse, 2 a usage or read error.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "parse")]
 pub struct ParseCommand {
@@ -56,7 +58,9 @@ impl ParseCommand {
             file: self.file,
         }
         .resolve_with_source_type(self.source_type.as_deref())
-        .unwrap_or_else(|e| exit_with_error(1, format_args!("Error: {e}")));
+        // an argument the command refuses, or an input it cannot read, is trouble running
+        // it (2, the code `format` and `strip` give theirs); 1 is the verdict on the input
+        .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
         // An unnamed source type is `Module` here: the wire carries
         // `Program.sourceType`, a claim about which grammar produced the AST, so
         // one settled goal has to produce it (`format`, which exposes neither the
@@ -70,6 +74,7 @@ impl ParseCommand {
             goal,
             self.locations,
         )
+        // the input does not parse: a syntax error, a depth refusal, the size cap
         .unwrap_or_else(|e| exit_with_parse_error(1, &e));
         // The wire bytes are UTF-8 by construction; writing them directly skips the
         // O(output) validation a `String` round trip would pay on JSON several times
@@ -80,8 +85,8 @@ impl ParseCommand {
         // writes cost the same syscalls either way.
         //
         // A consumer that closed the pipe stops the write without failing the run —
-        // the rule `write_stdout` holds for both commands. This used to `exit(1)`
-        // there, reporting a closed reader as the parse error it wasn't.
+        // the rule `write_stdout` holds for every command: a closed reader is no parse
+        // error.
         write_stdout(&json);
         write_stdout(b"\n");
     }

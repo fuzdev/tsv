@@ -1265,7 +1265,7 @@ const USAGE_ROWS: Array<{ args: Array<string>; exit: number; says: string }> = [
 	},
 	{ args: ['format', '--list', '--check', 'x.ts'], exit: 2, says: '--list and --check' },
 	// `parse` — a directory is refused by name, ahead of the extension check
-	{ args: ['parse', '.'], exit: 1, says: '.: is a directory (one file is expected)' },
+	{ args: ['parse', '.'], exit: 2, says: '.: is a directory (one file is expected)' },
 	// PRECEDENCE — each row is faulty in two or more ways, and names the winner
 	{
 		args: ['format', '--content', 'x', '--parser', 'ts', '--jobs', '2', '--list', 'x.ts'],
@@ -1309,17 +1309,17 @@ const USAGE_ROWS: Array<{ args: Array<string>; exit: number; says: string }> = [
 		exit: 2,
 		says: '--source-type applies to'
 	},
-	// `parse` — the same questions, answered with its own exit code
-	{ args: ['parse'], exit: 1, says: 'No input provided' },
-	{ args: ['parse', '--content', 'x'], exit: 1, says: '--content requires --parser' },
+	// `parse` — the same questions, the same usage-error code
+	{ args: ['parse'], exit: 2, says: 'No input provided' },
+	{ args: ['parse', '--content', 'x'], exit: 2, says: '--content requires --parser' },
 	{
 		args: ['parse', '--content', 'x', '--source-type', 'bogus'],
-		exit: 1,
+		exit: 2,
 		says: "invalid --source-type 'bogus'"
 	},
 	{
 		args: ['parse', '--content', 'x', '--parser', 'css', '--source-type', 'bogus'],
-		exit: 1,
+		exit: 2,
 		says: "invalid --source-type 'bogus'"
 	},
 	// argh's own grammar, transcribed by the mirror (`parse_argv`):
@@ -1511,9 +1511,10 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 	// `--locations` stringifies the reconstructed tree — and `JSON.stringify` recurses per
 	// nesting level on the JS stack, which a tree the native engine parsed fine outgrows.
 	// That is the serialization failing, neither the input nor the engine: its own line,
-	// exit 1 as every parse failure exits, never an uncaught stack trace. (The native bin
-	// re-indents the wire's bytes without reading them back, so it has no such ceiling —
-	// not compared here: its `--pretty` of this tree is hundreds of megabytes of indent.)
+	// exit 2 (trouble running, not a verdict on the input, which parsed), never an uncaught
+	// stack trace. (The native bin re-indents the wire's bytes without reading them back,
+	// so it has no such ceiling — not compared here: its `--pretty` of this tree is
+	// hundreds of megabytes of indent.)
 	// The input is the deepest flat `+` chain the spine limit admits, found by bisecting on
 	// the engine itself so the test follows the limit's constants rather than restating them
 	// (`docs/cli.md` §The depth limits; `tests/depth_limit.rs` grades the limit) — a `+` chain
@@ -1539,7 +1540,7 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 			const mirror = spawnSync(process.execPath, ['--stack-size=500', cli_path, ...args], {
 				encoding: 'utf-8'
 			});
-			assert.equal(mirror.status, 1, mirror.stderr);
+			assert.equal(mirror.status, 2, mirror.stderr);
 			assert.equal(mirror.stdout, '');
 			assert.match(
 				mirror.stderr,
@@ -1691,10 +1692,10 @@ describe('invalid UTF-8 parity: both CLIs refuse, and neither rewrites the file'
 		const mirror_file = write_case('mirror_parse.ts');
 		const native = run_native(['parse', native_file]);
 		const mirror = run_mirror(['parse', mirror_file]);
-		assert.equal(native.status, 1, `native: ${native.stderr}`);
+		assert.equal(native.status, 2, `native: ${native.stderr}`);
 		assert.equal(
 			mirror.status,
-			1,
+			2,
 			`cli.js parsed undecodable bytes: ${mirror.stdout.slice(0, 200)}`
 		);
 		assert.equal(mirror.stdout, '');
@@ -1703,7 +1704,7 @@ describe('invalid UTF-8 parity: both CLIs refuse, and neither rewrites the file'
 
 	for (const [command, code] of [
 		['format', 2],
-		['parse', 1]
+		['parse', 2]
 	] as Array<[string, number]>) {
 		it(`${command} --stdin refuses on both, with the same message and exit ${code}`, () => {
 			const args = [command, '--stdin', '--parser', 'ts'];

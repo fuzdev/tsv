@@ -35,10 +35,11 @@
  * `recover_engine_suffix`).
  *
  * Exit codes: `format` — 0 clean, 1 would-change (`--check`), 2 errors;
- * `parse` — 0 ok, 1 error; `strip` — 0 stripped, 1 refused, 2 a parse or usage error.
+ * `parse` — 0 parsed, 1 the input does not parse, 2 a usage or read error;
+ * `strip` — 0 stripped, 1 refused, 2 a parse or usage error.
  * A malformed command line (argh's own refusals, `--version` beside a subcommand) exits 2
- * for every command; `format`'s and `strip`'s post-parse usage/validation errors (an invalid
- * `--source-type`, conflicting inputs) exit 2 too, `parse`'s 1.
+ * for every command, as every command's post-parse usage/validation errors (an invalid
+ * `--source-type`, conflicting inputs) and read errors do.
  */
 
 import { Buffer } from 'node:buffer';
@@ -313,6 +314,8 @@ Options:
   --parser <p>      parser type: svelte | typescript | css
   --source-type <t> TypeScript parse goal: script | module (default: module; an error with svelte/css)
   --locations       emit per-node loc (line/column) beside the start/end offsets (svelte also name_loc); the default wire is span-only
+
+Exit codes: 0 parsed, 1 the input does not parse, 2 a usage or read error.
 `;
 
 const STRIP_HELP = `Usage: tsv strip [<file>] [--content <s> | --stdin] [--source-type <t>] [--check]
@@ -570,20 +573,20 @@ function usize_from_str(text) {
 	return { value };
 }
 
-/** Validate a `--source-type` value (the TypeScript goal axis), or exit `code` —
- * the native CLI validates it after argh, in the command (`parse_source_type_arg`),
- * so a bad value exits with the command's usage code (`parse` 1, `format` 2). Absent →
+/** Validate a `--source-type` value (the TypeScript goal axis), or exit 2 — the native
+ * CLI validates it after argh, in the command (`parse_source_type_arg`), and a bad value
+ * is a usage error in every command. Absent →
  * `undefined` (the `module` default); the source type only affects the TypeScript
  * parser. */
-function resolve_source_type(source_type, code) {
+function resolve_source_type(source_type) {
 	if (source_type === undefined || source_type === 'module' || source_type === 'script') {
 		return source_type;
 	}
 	eprint(`Error: invalid --source-type '${source_type}' (expected 'script' or 'module')\n`);
-	process.exit(code);
+	process.exit(2);
 }
 
-/** Refuse a `--source-type` on a language that has no goal axis, or exit `code` —
+/** Refuse a `--source-type` on a language that has no goal axis, exit 2 —
  * the native CLI's `check_source_type_language`, word for word. Svelte hard-wires
  * `Module` and css has no goal, so a caller naming one there asked for something
  * that cannot be honored and must be told; every binding takes that stance
@@ -591,12 +594,12 @@ function resolve_source_type(source_type, code) {
  * surface that drops the flag silently. Called once the parser is resolved and
  * before the parse/format call, so `source_type` is thereafter `undefined` on
  * every goalless language and one options bag still serves whichever engine. */
-function refuse_source_type_language(parser, source_type, code) {
+function refuse_source_type_language(parser, source_type) {
 	if (source_type !== undefined && parser !== 'typescript') {
 		eprint(
 			`Error: --source-type is only supported for typescript (the ${parser} parser has no source type)\n`
 		);
-		process.exit(code);
+		process.exit(2);
 	}
 }
 
@@ -709,13 +712,13 @@ function format_single(values, positionals) {
 	// usage error (exit 2). Checked AFTER the paths/--jobs/--list refusals, in the
 	// native CLI's order, so a doubly-bad invocation names the same error on both
 	// bins. Path mode rejects --source-type in format_paths.
-	const source_type = resolve_source_type(values.source_type, 2);
+	const source_type = resolve_source_type(values.source_type);
 	const flag = values.content !== undefined ? '--content' : '--stdin';
 	if (values.parser === undefined) {
 		exit_with_error(2, `Error: ${flag} requires --parser <svelte|typescript|css>`);
 	}
-	refuse_source_type_language(values.parser, source_type, 2);
-	const input = values.content !== undefined ? values.content : read_stdin(2);
+	refuse_source_type_language(values.parser, source_type);
+	const input = values.content !== undefined ? values.content : read_stdin();
 	let result;
 	try {
 		// one bag, handed to whichever formatter — the refusal above leaves
@@ -940,6 +943,17 @@ function is_engine_failure(error) {
 	return error instanceof WebAssembly.RuntimeError || error instanceof RangeError;
 }
 
+/** Whether a throw is an output past the JS string ceiling, which says nothing about the
+ * input — rather than a trap or a stack overflow (the input's nesting) or the size cap:
+ * Node's `ERR_STRING_TOO_LONG`, a plain `Error` the wasm glue's `TextDecoder` raises
+ * decoding the engine's wire string, or V8's `Invalid string length` `RangeError`. */
+function is_output_ceiling(error) {
+	return (
+		error?.code === 'ERR_STRING_TOO_LONG' ||
+		(error instanceof RangeError && !/call stack/i.test(error_message(error)))
+	);
+}
+
 /**
  * The line a single-input run — `--content`/`--stdin` (`format_single`), `parse` on any of
  * its three inputs, a file path included (`run_parse`), or `strip` — dies with when the
@@ -961,8 +975,9 @@ function failure_text(error) {
 }
 
 /**
- * The line a single-input run dies with when the engine THROWS: `Error:` for the size cap,
- * a plain `Error` with no point; and `Error:` naming the engine for a trap or a stack
+ * The line a single-input run dies with when the engine THROWS: `Error:` for a plain
+ * `Error` — the size cap, or Node's `ERR_STRING_TOO_LONG` past the string ceiling — with no
+ * point; and `Error:` naming the engine for a trap or a stack
  * overflow — the one mode where the message is the whole output, so calling
  * `memory access out of bounds` a parse error blamed the input for the engine's ceiling.
  * No recovery is attempted: the process exits on this line. (On the N-API engine a native
@@ -976,8 +991,7 @@ function single_input_failure(error) {
 	// a trap and V8's `Maximum call stack size exceeded` are the input's nesting; the one
 	// other `RangeError` the engine can throw — `Invalid string length`, an output past
 	// V8's string ceiling — is not, so the nesting clause is stated only for the first two
-	const nested = !(error instanceof RangeError) || /call stack/i.test(message);
-	return nested
+	return !is_output_ceiling(error)
 		? `Error: the engine failed on this input (${message}): it is nested past the engine's stack`
 		: `Error: the engine failed on this input (${message})`;
 }
@@ -1475,9 +1489,9 @@ function run_format_worker() {
 
 function run_parse({ values, positionals }) {
 	const flag_parser = values.parser;
-	// --source-type is validated upfront (exit 1) like the native CLI; it only
+	// --source-type is validated upfront (exit 2) like the native CLI; it only
 	// affects the TypeScript parser (svelte is always a module, css has no goal).
-	const source_type = resolve_source_type(values.source_type, 1);
+	const source_type = resolve_source_type(values.source_type);
 	// The parser is settled — and `--source-type` graded against it — before the input
 	// is read, whichever arm picks it, as the native `InputArgs::parser_type` orders it: a
 	// `--stdin` this turns away never waits on its writer, and a file arm's refusal does
@@ -1487,12 +1501,12 @@ function run_parse({ values, positionals }) {
 	let path;
 	if (values.content !== undefined) {
 		if (flag_parser === undefined) {
-			exit_with_error(1, 'Error: --content requires --parser <svelte|typescript|css>');
+			exit_with_error(2, 'Error: --content requires --parser <svelte|typescript|css>');
 		}
 		parser = flag_parser;
 	} else if (values.stdin) {
 		if (flag_parser === undefined) {
-			exit_with_error(1, 'Error: --stdin requires --parser <svelte|typescript|css>');
+			exit_with_error(2, 'Error: --stdin requires --parser <svelte|typescript|css>');
 		}
 		parser = flag_parser;
 	} else if (positionals.length > 0) {
@@ -1507,7 +1521,7 @@ function run_parse({ values, positionals }) {
 			// not there, or unreadable: the read below reports it
 		}
 		if (is_dir) {
-			exit_with_error(1, `Error: ${quote_path(path)}: is a directory (one file is expected)`);
+			exit_with_error(2, `Error: ${quote_path(path)}: is a directory (one file is expected)`);
 		}
 		if (flag_parser === undefined) {
 			// The path's extension picks the parser, so it must be one tsv handles: the
@@ -1517,16 +1531,16 @@ function run_parse({ values, positionals }) {
 			// `--parser` is the override.
 			const unsupported = unsupported_extension_error(path);
 			if (unsupported !== undefined) {
-				exit_with_error(1, `Error: ${unsupported}`);
+				exit_with_error(2, `Error: ${unsupported}`);
 			}
 			parser = parser_from_extension(path);
 		} else {
 			parser = flag_parser;
 		}
 	} else {
-		exit_with_error(1, 'Error: No input provided. Use a file path, --content, or --stdin');
+		exit_with_error(2, 'Error: No input provided. Use a file path, --content, or --stdin');
 	}
-	refuse_source_type_language(parser, source_type, 1);
+	refuse_source_type_language(parser, source_type);
 
 	// the read, by the precedence the arms above settled the parser under
 	// (`InputArgs::read`)
@@ -1534,12 +1548,12 @@ function run_parse({ values, positionals }) {
 	if (values.content !== undefined) {
 		input = values.content;
 	} else if (values.stdin) {
-		input = read_stdin(1);
+		input = read_stdin();
 	} else {
 		try {
 			input = decode_source(readFileSync(path));
 		} catch (error) {
-			exit_with_error(1, `Error: Error reading file ${quote_path(path)}: ${error_message(error)}`);
+			exit_with_error(2, `Error: Error reading file ${quote_path(path)}: ${error_message(error)}`);
 		}
 	}
 
@@ -1559,7 +1573,9 @@ function run_parse({ values, positionals }) {
 			? OBJECT_PARSERS[parser](input, { locations: true, sourceType: source_type })
 			: PARSERS[parser](input, { sourceType: source_type });
 	} catch (error) {
-		exit_with_error(1, single_input_failure(error));
+		// a trap or stack overflow is the input's nesting, a failed parse as the native depth
+		// refusal is (1); an output past the JS string ceiling is no verdict on the input (2)
+		exit_with_error(is_output_ceiling(error) ? 2 : 1, single_input_failure(error));
 	}
 	if (!result.ok) exit_with_error(1, result_failure(result.error));
 	const parsed = values.locations ? result.ast : result.json;
@@ -1580,7 +1596,7 @@ function run_parse({ values, positionals }) {
 			json = parsed;
 		}
 	} catch (error) {
-		exit_with_error(1, serialization_failure(error));
+		exit_with_error(2, serialization_failure(error));
 	}
 	print(`${json}\n`);
 }
@@ -1633,13 +1649,13 @@ function run_strip({ values, positionals }) {
 	}
 	// a `.mts` is a module by name and takes no retry
 	const source_type =
-		resolve_source_type(values.source_type, 2) ??
+		resolve_source_type(values.source_type) ??
 		(path === undefined ? undefined : source_type_from_extension(path));
 	let input;
 	if (values.content !== undefined) {
 		input = values.content;
 	} else if (values.stdin) {
-		input = read_stdin(2);
+		input = read_stdin();
 	} else if (path !== undefined) {
 		try {
 			input = decode_source(readFileSync(path));
@@ -1667,9 +1683,9 @@ function run_strip({ values, positionals }) {
  * input's fault, and never the engine's: `JSON.stringify` (and `JSON.parse`, for `--pretty`'s
  * re-read) recurse once per nesting level on the JS stack, which a tree the engine's own
  * stack handled can outgrow (the N-API engine parses on the native stack, past where the
- * JS one ends). Exit 1, as every `parse` failure exits, the native CLI's included; the
- * native CLI itself never meets this, since it re-indents the wire's bytes without reading
- * them back.
+ * JS one ends). Exit 2, trouble running the command: the input parsed, so the verdict
+ * code 1 would misreport it. The native CLI never meets this, since it re-indents the
+ * wire's bytes without reading them back.
  */
 function serialization_failure(error) {
 	const message = error_message(error);
@@ -1760,13 +1776,13 @@ function exit_argh(output) {
 	exit_with_error(2, `${output}\nRun tsv --help for more information.`);
 }
 
-/** Read all of stdin, exiting with the calling command's error code on
- * failure (`format` uses 2, `parse` uses 1 — mirroring the native CLI). */
-function read_stdin(exit_code) {
+/** Read all of stdin, exiting 2 on failure — a read error, in every command, as the
+ * native CLI exits. */
+function read_stdin() {
 	try {
 		return decode_source(read_fd_to_end(0));
 	} catch (error) {
-		exit_with_error(exit_code, `Error: Error reading from stdin: ${error.message}`);
+		exit_with_error(2, `Error: Error reading from stdin: ${error.message}`);
 	}
 }
 

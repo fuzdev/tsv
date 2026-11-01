@@ -299,12 +299,12 @@ fn test_parse_source_type_invalid_value() {
         "bogus",
     ]);
 
-    // parse reports usage errors with its own exit-1 convention (see
-    // `test_parse_invalid_syntax`).
+    // a usage error exits 2, as in every command; 1 is the verdict that the input does
+    // not parse (`test_parse_invalid_syntax`)
     assert_eq!(
         output.status.code(),
-        Some(1),
-        "Invalid --source-type should exit 1 for parse"
+        Some(2),
+        "Invalid --source-type should exit 2 for parse"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -317,7 +317,8 @@ fn test_parse_source_type_invalid_value() {
 fn test_parse_invalid_syntax() {
     let output = tsv(&["parse", "--content", "const x = ", "--parser", "typescript"]);
 
-    // parse exits 1 on a parse error (distinct from format's 2 for errors).
+    // parse exits 1 on a parse error, its one verdict (format and strip spend 1 on their
+    // own verdicts and report a parse error as 2).
     assert_eq!(
         output.status.code(),
         Some(1),
@@ -334,11 +335,11 @@ fn test_parse_invalid_syntax() {
 fn test_parse_missing_parser() {
     let output = tsv(&["parse", "--content", "<div>test</div>"]);
 
-    // Missing --parser is a resolve error → exit 1 (parse's error code).
+    // Missing --parser is a usage error → exit 2.
     assert_eq!(
         output.status.code(),
-        Some(1),
-        "Parse without --parser should exit 1"
+        Some(2),
+        "Parse without --parser should exit 2"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -363,7 +364,7 @@ fn test_parse_refuses_a_directory_by_name() {
         vec!["parse", "--pretty", path],
     ] {
         let output = tsv(&args);
-        assert_eq!(output.status.code(), Some(1), "{args:?}");
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
         assert_eq!(
             String::from_utf8_lossy(&output.stderr),
             expected,
@@ -385,7 +386,7 @@ fn test_parse_file_rejects_unsupported_extension_unless_parser_is_named() {
     fs::write(&md, "x = 1\n").unwrap();
 
     let output = tsv(&["parse", md.to_str().unwrap()]);
-    assert_eq!(output.status.code(), Some(1), "parse keeps its 0/1 codes");
+    assert_eq!(output.status.code(), Some(2), "a usage error");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("unsupported file extension") && stderr.contains(".svelte"),

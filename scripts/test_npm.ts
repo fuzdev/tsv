@@ -1621,7 +1621,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	it('a --stdin refusal does not wait for input', async () => {
 		for (const [args, code] of [
 			[['format', '--stdin', '--parser', 'css', '--source-type', 'module'], 2],
-			[['parse', '--stdin', '--parser', 'svelte', '--source-type', 'script'], 1]
+			[['parse', '--stdin', '--parser', 'svelte', '--source-type', 'script'], 2]
 		] as Array<[Array<string>, number]>) {
 			const child = spawn(process.execPath, [cli_path, ...args], {
 				stdio: ['pipe', 'pipe', 'pipe']
@@ -1851,7 +1851,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			assert.equal(missing.status, 2);
 			assert.equal(missing.stderr, `error: "${tree}/no\\nfile.ts": not a file or directory\n`);
 			const parse = run_cli(['parse', join(tree, 'no\nfile.ts')]);
-			assert.equal(parse.status, 1);
+			assert.equal(parse.status, 2);
 			assert.ok(
 				parse.stderr.startsWith(`Error: Error reading file "${tree}/no\\nfile.ts": `),
 				parse.stderr
@@ -1875,7 +1875,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 				['parse', '--pretty', dir]
 			]) {
 				const result = run_cli(args);
-				assert.equal(result.status, 1, args.join(' '));
+				assert.equal(result.status, 2, args.join(' '));
 				assert.equal(result.stderr, expected, args.join(' '));
 				assert.equal(result.stdout, '', args.join(' '));
 			}
@@ -2042,16 +2042,16 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.equal(result.stdout, '(await) => 1;\n');
 	});
 
-	it('an invalid --source-type value exits 1 for parse, 2 for format (arg-error parity)', () => {
+	it('an invalid --source-type value exits 2 in both commands (arg-error parity)', () => {
 		const p = run_cli(['parse', '--content', 'x;', '--parser', 'ts', '--source-type', 'bogus']);
-		assert.equal(p.status, 1);
+		assert.equal(p.status, 2);
 		assert.match(p.stderr, /invalid --source-type/);
 		const f = run_cli(['format', '--content', 'x;', '--parser', 'ts', '--source-type', 'bogus']);
 		assert.equal(f.status, 2);
 		assert.match(f.stderr, /invalid --source-type/);
 	});
 
-	it('--source-type on a goalless language is refused (parse 1, format 2)', () => {
+	it('--source-type on a goalless language is refused (exit 2 in both commands)', () => {
 		// the native CLI's `check_source_type_language`, mirrored word for word — svelte
 		// hard-wires Module and css has no goal, so naming one must be told, not dropped
 		const p = run_cli([
@@ -2063,7 +2063,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			'--source-type',
 			'script'
 		]);
-		assert.equal(p.status, 1);
+		assert.equal(p.status, 2);
 		assert.match(p.stderr, /--source-type is only supported for typescript/);
 		const f = run_cli([
 			'format',

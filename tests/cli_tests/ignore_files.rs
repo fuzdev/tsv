@@ -274,7 +274,7 @@ fn test_argument_errors_quote_a_path_holding_a_control_character() {
     );
 
     let parse = tsv(&["parse", missing]);
-    assert_eq!(parse.status.code(), Some(1));
+    assert_eq!(parse.status.code(), Some(2));
     assert!(
         String::from_utf8_lossy(&parse.stderr).starts_with(&format!(
             "Error: Error reading file \"{root}/no\\nfile.ts\": "

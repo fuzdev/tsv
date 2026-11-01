@@ -18,7 +18,7 @@ const CMD_NAME: &str = "tsv";
 fn main() {
     // `argh::from_env` with the command name fixed — same early-exit contract:
     // `--help` to stdout with exit 0, a parse error to stderr with exit 2 — a malformed
-    // command line is a usage error, the code `format` and `strip` give their own.
+    // command line is a usage error, the code every command gives its own.
     let args: Vec<String> = std::env::args_os()
         .skip(1)
         .map(std::ffi::OsString::into_string)

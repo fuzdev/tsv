@@ -1355,7 +1355,7 @@ fn test_dangling_symlink_argument_fails_the_run_upfront() {
 
     let parsed = tsv(&["parse", dangling.to_str().unwrap()]);
     let stderr = String::from_utf8_lossy(&parsed.stderr);
-    assert_eq!(parsed.status.code(), Some(1), "stderr: {stderr}");
+    assert_eq!(parsed.status.code(), Some(2), "stderr: {stderr}");
     assert!(
         stderr.contains("Error: Error reading file ") && stderr.contains("dangling.ts"),
         "stderr: {stderr}"

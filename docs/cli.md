@@ -251,6 +251,33 @@ other, and in the packages a returned `{kind: 'refused', message, frame, start, 
 error spanning the CR rather than a `kind: 'parse'` one (`tsv_svelte::__private::parse_folded`). A
 document whose own bytes do not parse reports that parse error first, exactly as `parse` does.
 
+### `tsv parse` exit codes
+
+`parse` exits as `grep` does — a verdict on the input, or trouble running:
+
+- **0** — parsed; the wire is on stdout;
+- **1** — the input does not parse: every error the parse itself returns, which is a syntax
+  error and a depth refusal (`Parse error: …`, above) and a source over the size cap
+  (`Error: …`);
+- **2** — the command could not run: a malformed command line (as for every command), a
+  `--content`/`--stdin` without `--parser`, a `--source-type` naming neither goal or given for
+  Svelte or CSS, no input, a directory, an unsupported extension, or a file or stdin that
+  cannot be read or is not UTF-8.
+
+`format` and `strip` report the same parse failures as 2, their error code, because each
+spends 1 on a verdict of its own (would change, refused); the usage and read errors are 2
+in all three. A closed stdout changes none of these
+([§Multi-File Formatting](#multi-file-formatting)). The JS mirror (`npm/cli.js`) answers every row alike,
+and has rows of its own where its engine meets a JavaScript limit the native bin does not: a
+trap or stack overflow inside the engine is the input's nesting, a failed parse (1), as the
+native depth refusal is; an output past the JS string ceiling (Node's `ERR_STRING_TOO_LONG`
+decoding the engine's wire, or V8's `Invalid string length`), or `--pretty` / `--locations` on
+a tree the engine parsed but too deep for `JSON.stringify` on the JS stack, is no verdict on
+the input (2) — the native bin writes and re-indents the wire's bytes without reading them
+back, so it never meets either limit.
+
+Implemented in `tsv_cli/src/cli/commands/parse.rs`
+
 ## Stripping types (`tsv strip`)
 
 `tsv strip` runs the type strip ([strip.md](./strip.md)) on **one** input — a file path,
