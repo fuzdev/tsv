@@ -164,7 +164,7 @@ as a category error at the call site rather than as plausible code.
 
 **to emit** — "which comments must *I* print here?" — **skips** owned:
 
-- `comments_to_emit_in_range()` / `has_comments_to_emit_in_range()` / `comments_to_emit_after()`
+- `comments_to_emit_in_range()` / `has_comments_to_emit_in_range()`
   (index twins `comments_to_emit_from()` / `has_comments_to_emit_from()`)
 
 **on page** — "does any comment occupy the page here?" — **counts** owned. Every layout gate
@@ -176,12 +176,12 @@ as a category error at the call site rather than as plausible code.
 **in source** — "what comment bytes are physically here?" — **counts** owned. Every cursor
 (blank-line scan, offset, `prev_end`):
 
-- `comments_in_source_range()` / `comments_in_source_after()` /
-  `comments_in_source_after_comment()` — the last from a comment the caller holds rather than
-  from a position: its successors by INDEX (recovered from the reference's address in the
-  slice, `ptr::eq`-verified, the search as fallback). A blank scan or a glue test asked from a
-  comment's own end is a guaranteed hint miss the other way — the hint sits at that comment —
-  so every such walk goes through this one and never moves the hint
+- `comments_in_source_range()` / `comments_in_source_after_comment()` — the second from a
+  comment the caller holds rather than from a position: its successors by INDEX (recovered from
+  the reference's address in the slice, `ptr::eq`-verified, the search as fallback). A blank
+  scan or a glue test asked from a comment's own end is a guaranteed hint miss the other way —
+  the hint sits at that comment — so every such walk goes through this one and never moves the
+  hint
 
 Axis-free (provably): `has_line_comments_in_range()` — ownership only ever binds a **block**
 comment, so skip ≡ count. If a line comment ever becomes ownable, it must grow an axis.
@@ -219,7 +219,6 @@ Shared:
   narrow asks paid the call, and the split was worth 0.4% of a TypeScript format pass's
   instructions with no search spelled at any site)
 - `classify_comment()` — Classify as Trailing, LeadingOwnLine, or LeadingInline
-- `classify_comment_scan()` — Same, against the document's line table (a bounded scan of the source, the table as the fallback)
 - `ClassifiedComments::from_index()` — Batch classify all four categories (trailing / leading × block / line) in one pass from a found first index (emit-keyed); `from_index_advancing()` advances the trailing run's anchor over each comment it takes
 
 ### Print-Once Ledger (`_internal_comment_check` feature)

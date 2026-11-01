@@ -99,8 +99,9 @@ const _: () = assert!(size_of::<Token>() == 12);
 ///
 /// The whole ASCII class, not a fast subset of it: the two Unicode classes the non-ASCII
 /// arm asks add nothing under U+0080 — `char::is_alphanumeric` agrees with
-/// `is_ascii_alphanumeric` there, and `is_custom_element_name_char`'s only other ASCII members are `-`,
-/// `.` and `_` — so every other ASCII byte ends the run, Svelte whitespace included.
+/// `is_ascii_alphanumeric` there, and `is_svelte_tag_name_tail_char`'s only other ASCII
+/// members are `-`, `.` and `_` — so every other ASCII byte ends the run, Svelte whitespace
+/// included.
 const NAME_RUN_ASCII: [bool; 256] = {
     let mut t = [false; 256];
     let mut i = 0;
@@ -223,13 +224,13 @@ fn name_run_end_from_non_ascii(source: &str, mut i: usize) -> usize {
             break;
         }
         // `is_alphanumeric` covers the non-ASCII Unicode *letters* the ASCII table
-        // leaves (so `<my-café>` works); `is_custom_element_name_char` adds the non-alphanumeric
+        // leaves (so `<my-café>` works); `is_svelte_tag_name_tail_char` adds the non-alphanumeric
         // members of the HTML custom-element name grammar (`·`, ZWNJ/ZWJ, astral
         // emoji) so a whole custom-element name stays in one token. Both are asked
         // only past U+007F, which is the whole of what either adds. Over-admitting
         // (e.g. a PCENChar with no preceding hyphen) is harmless — the parser's
         // `is_valid_tag_name` gate rejects any name that isn't valid.
-        if ch.is_alphanumeric() || crate::html::is_custom_element_name_char(ch) {
+        if ch.is_alphanumeric() || crate::html::is_svelte_tag_name_tail_char(ch) {
             i += width;
         } else {
             break;
@@ -1113,7 +1114,7 @@ mod tests {
                 ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | '-' | ':' | '|' | '.')
             } else {
                 !is_svelte_ws(ch)
-                    && (ch.is_alphanumeric() || crate::html::is_custom_element_name_char(ch))
+                    && (ch.is_alphanumeric() || crate::html::is_svelte_tag_name_tail_char(ch))
             };
             if !continues {
                 break;

@@ -86,9 +86,8 @@ mod whitespace;
 #[doc(hidden)]
 pub use comment::{
     ClassifiedComments, Comment, CommentFreeWindow, CommentPosition, GapTrail, GapTrailScan,
-    classify_comment, classify_comment_scan, comments_in_source_after,
-    comments_in_source_after_comment, comments_in_source_from, comments_in_source_range,
-    comments_on_page_from, comments_on_page_in_range, comments_to_emit_after,
+    classify_comment, comments_in_source_after_comment, comments_in_source_from,
+    comments_in_source_range, comments_on_page_from, comments_on_page_in_range,
     comments_to_emit_from, comments_to_emit_in_range, directive_alone_on_line,
     find_first_comment_from, has_comments_on_page_from, has_comments_on_page_in_range,
     has_comments_to_emit_from, has_comments_to_emit_in_range, has_line_comments_from,

@@ -2039,7 +2039,7 @@ impl<'a> Printer<'a> {
     }
 
     /// **in source**: every comment physically at or after `pos`, to the document's end —
-    /// the printer's form of `tsv_lang::comments_in_source_after`. An unbounded walk has
+    /// `tsv_lang::comments_in_source_from` with no end bound. An unbounded walk has
     /// no range for the window to answer, but its search still refreshes the window
     /// ([`Self::search_comments_from`]) for the asks that follow; a caller whose question
     /// is only *where the next comment starts* asks the window itself first

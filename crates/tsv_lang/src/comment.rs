@@ -549,44 +549,6 @@ pub fn classify_comment(
     CommentPosition::LeadingOwnLine
 }
 
-/// [`classify_comment`] against the document's line-break table — the two same-line
-/// questions answered by [`printing::is_same_line_scan`] (a bounded scan of `source`, the
-/// bytes the table was built from, with the table search as the fallback) rather than by
-/// the unbounded source walk.
-///
-/// # Arguments
-///
-/// * `comment` - The comment to classify
-/// * `prev_end` - End position of the previous element
-/// * `curr_start` - Start position of the next element
-/// * `source` - The document's bytes
-/// * `table` - The document's line-break table with its builder's verdict
-///
-/// # Returns
-///
-/// The comment's position classification.
-#[inline]
-pub fn classify_comment_scan(
-    comment: &Comment,
-    prev_end: u32,
-    curr_start: u32,
-    source: &[u8],
-    table: LineTable<'_>,
-) -> CommentPosition {
-    // Check if trailing (same line as prev_end)
-    if printing::is_same_line_scan(source, table, prev_end, comment.span.start) {
-        return CommentPosition::Trailing;
-    }
-
-    // Check if inline leading (same line as curr_start)
-    if printing::is_same_line_scan(source, table, comment.span.end, curr_start) {
-        return CommentPosition::LeadingInline;
-    }
-
-    // Otherwise, it's on its own line
-    CommentPosition::LeadingOwnLine
-}
-
 /// How a chain gap's comment stands to what precedes the gap — [`GapTrailScan::read`]'s
 /// answer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1156,12 +1118,6 @@ pub fn has_comments_to_emit_from(comments: &[Comment], first_idx: usize, end: u3
         .is_some()
 }
 
-/// **to emit**: the comments at or after `pos` that *this* caller must print.
-#[inline]
-pub fn comments_to_emit_after(comments: &[Comment], pos: u32) -> impl Iterator<Item = &Comment> {
-    comments_in_source_after(comments, pos).filter(|c| !c.owned_by_node)
-}
-
 /// **on page**: whether any comment occupies the page in `[start, end)` —
 /// [`Comment::owned_by_node`] comments **counted**.
 ///
@@ -1347,14 +1303,6 @@ pub fn comments_in_source_from(
     comments[first_idx..]
         .iter()
         .take_while(move |c| c.span.end <= end)
-}
-
-/// **in source**: every comment physically at or after `pos` —
-/// [`Comment::owned_by_node`] comments **counted**.
-#[inline]
-pub fn comments_in_source_after(comments: &[Comment], pos: u32) -> impl Iterator<Item = &Comment> {
-    let first_idx = find_first_comment_from(comments, pos);
-    comments[first_idx..].iter()
 }
 
 /// **in source**: every comment physically after `comment` — its successors in
@@ -1834,7 +1782,7 @@ mod tests {
     }
 
     #[test]
-    fn classify_comment_slow_and_scan_agree() {
+    fn classify_comment_reads_trailing_own_line_and_inline() {
         // Offsets: 'x'=0, "// trail"=[2,10), '\n'=10, "/* own */"=[11,20),
         // '\n'=20, "/* inline */"=[21,33), ' '=33, 'y'=34.
         let source = "x // trail\n/* own */\n/* inline */ y";
@@ -1855,17 +1803,5 @@ mod tests {
             classify_comment(&inline, 1, 34, source),
             CommentPosition::LeadingInline
         );
-
-        // The table-backed variant must never disagree with the source-scanning one.
-        let line_breaks = LineBreaks::of(source);
-        let table = line_breaks.table();
-        for c in [&line, &own, &inline] {
-            assert_eq!(
-                classify_comment(c, 1, 34, source),
-                classify_comment_scan(c, 1, 34, source.as_bytes(), table),
-                "slow/scan disagree for span {:?}",
-                c.span
-            );
-        }
     }
 }

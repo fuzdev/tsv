@@ -28,7 +28,7 @@ use smallvec::SmallVec;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::doc::{DocBuf, LeadingBreak};
+use tsv_lang::doc::{DocBuf, arena::LeadingBreak};
 
 /// Byte length of the leading `import`/`export` keyword (both 6 chars). Added to
 /// a declaration's span start to reach the position just past the keyword.

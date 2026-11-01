@@ -14,7 +14,10 @@ use crate::printer::{
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
-use tsv_lang::doc::{DocBuf, LeadingBreak, arena::DocId};
+use tsv_lang::doc::{
+    DocBuf,
+    arena::{DocId, LeadingBreak},
+};
 
 /// Holds information about an operand in a binary expression chain
 /// Used to track position information for comment placement

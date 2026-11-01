@@ -6,11 +6,11 @@
 //! [`collapses_child_whitespace`] are the sets Svelte's compiler applies,
 //! [`is_line_break_element`] is the plugin's line-breaking set, [`is_void_element`],
 //! [`is_svg_element`], [`is_mathml_element`] and [`is_foreign_element`] are Svelte's name
-//! lists, [`is_custom_element_name_char`] is the tail class of Svelte's tag-name pattern,
-//! [`optional_end_tag`] is the table Svelte's parser closes an element by when its end tag is
-//! omitted, and [`decode_character_references`] decodes as Svelte's parser decodes. Each item's
-//! doc says where it departs from the spec. The spec's own data — the named character
-//! references table — lives in `tsv_html`, which the decoder builds on.
+//! lists, [`is_svelte_tag_name_tail_char`] is the tail class of Svelte's tag-name pattern,
+//! [`svelte_autoclosing_row`] is the table Svelte's parser closes an element by when its end
+//! tag is omitted, and [`decode_character_references`] decodes as Svelte's parser decodes.
+//! Each item's doc says where it departs from the spec. The spec's own data — the named
+//! character references table — lives in `tsv_html`, which the decoder builds on.
 //!
 //! **Tag names are compared exactly, as authored.** Every predicate is case-sensitive and
 //! matches a name in its canonical spelling — lowercase for HTML and MathML, SVG's own
@@ -38,5 +38,5 @@ pub(crate) use elements::{
 };
 pub use elements::{is_mathml_element, is_svg_element};
 pub(crate) use entities::{ReferenceContext, decode_character_references};
-pub(crate) use tags::{is_custom_element_name_char, optional_end_tag};
+pub(crate) use tags::{is_svelte_tag_name_tail_char, svelte_autoclosing_row};
 pub use whitespace::preserves_whitespace;

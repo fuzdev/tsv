@@ -6,7 +6,7 @@
 //! replaced (a custom element name is now any valid element local name that starts with an ASCII
 //! lowercase letter, holds a hyphen and no ASCII uppercase). The table is Svelte's
 //! `autoclosing_children`, a reading of the spec's "Optional tags" section that departs from it
-//! in both directions (see [`OptionalEndTag`]).
+//! in both directions (see [`SvelteAutoclosingRow`]).
 
 /// A character Svelte admits in a tag name's run after its first hyphen
 /// (`<my-café>`, `<emotion-😍>`, `<a-·>`): the tail class of Svelte's
@@ -19,7 +19,7 @@
 /// including the non-alphanumeric members `·`/ZWNJ/ZWJ/astral) and by the name
 /// validator (the hyphen-tail run) — a single source of truth for the ranges.
 #[must_use]
-pub(crate) fn is_custom_element_name_char(c: char) -> bool {
+pub(crate) fn is_svelte_tag_name_tail_char(c: char) -> bool {
     c.is_ascii_alphanumeric()
         || matches!(c, '-' | '.' | '_' | '\u{00B7}')
         || matches!(c,
@@ -29,18 +29,18 @@ pub(crate) fn is_custom_element_name_char(c: char) -> bool {
             | '\u{F900}'..='\u{FDCF}' | '\u{FDF0}'..='\u{FFFD}' | '\u{10000}'..='\u{EFFFF}')
 }
 
-/// Declare the optional-end-tag table once: [`optional_end_tag`], a `match` over the keys, and
-/// [`OptionalEndTag::is_closed_by`], a `match` per key over its triggers — plus, for the tests,
-/// the same table as a plain slice to grade both against.
+/// Declare the auto-close table once: [`svelte_autoclosing_row`], a `match` over the keys,
+/// and [`SvelteAutoclosingRow::is_closed_by`], a `match` per key over its triggers — plus,
+/// for the tests, the same table as a plain slice to grade both against.
 ///
 /// A `match` rather than a perfect hash: the keys and triggers are a few short names, which a
 /// length switch and a few word compares answer outright, where a hash reads every byte of the
 /// name through SipHash before it can compare anything.
-macro_rules! optional_end_tags {
+macro_rules! svelte_autoclosing_children {
     ($($variant:ident: $key:literal => [$($trigger:literal),+ $(,)?]),+ $(,)?) => {
-        /// Which row of the table an [`OptionalEndTag`] is — one variant per key.
+        /// Which row of the table a [`SvelteAutoclosingRow`] is — one variant per key.
         #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-        enum OptionalEndTagKey {
+        enum SvelteAutoclosingKey {
             $($variant),+
         }
 
@@ -51,34 +51,34 @@ macro_rules! optional_end_tags {
         /// Exact and case-sensitive: tag names arrive as authored.
         #[inline]
         #[must_use]
-        pub(crate) fn optional_end_tag(tag_name: &str) -> Option<OptionalEndTag> {
-            Some(OptionalEndTag(match tag_name {
-                $($key => OptionalEndTagKey::$variant,)+
+        pub(crate) fn svelte_autoclosing_row(tag_name: &str) -> Option<SvelteAutoclosingRow> {
+            Some(SvelteAutoclosingRow(match tag_name {
+                $($key => SvelteAutoclosingKey::$variant,)+
                 _ => return None,
             }))
         }
 
-        impl OptionalEndTag {
+        impl SvelteAutoclosingRow {
             /// Whether `next`, as the next opening tag in the markup, implicitly closes this
             /// element — one of the key's listed triggers.
             #[inline]
             #[must_use]
             pub(crate) fn is_closed_by(self, next: &str) -> bool {
                 match self.0 {
-                    $(OptionalEndTagKey::$variant => matches!(next, $($trigger)|+),)+
+                    $(SvelteAutoclosingKey::$variant => matches!(next, $($trigger)|+),)+
                 }
             }
         }
 
         /// The table as a plain slice — what the equivalence test grades both lookups against.
         #[cfg(test)]
-        const OPTIONAL_END_TAG_TABLE: &[(&str, &[&str])] = &[$(($key, &[$($trigger),+])),+];
+        const SVELTE_AUTOCLOSING_CHILDREN: &[(&str, &[&str])] = &[$(($key, &[$($trigger),+])),+];
     };
 }
 
 /// An element Svelte's parser closes without an end tag (auto-close) when a particular following
 /// tag or the end of its parent arrives — a row of Svelte's `autoclosing_children` table, found
-/// by [`optional_end_tag`].
+/// by [`svelte_autoclosing_row`].
 ///
 /// Svelte's table, not the spec's "Optional tags" rules: it has no row for the elements whose
 /// end tag the spec lets an author omit only at a whitespace or comment boundary (`html`,
@@ -93,7 +93,7 @@ macro_rules! optional_end_tags {
 /// one of its listed triggers ([`is_closed_by`](Self::is_closed_by)). Split in two so a parser
 /// can ask the first half once per element and the second once per child.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct OptionalEndTag(OptionalEndTagKey);
+pub(crate) struct SvelteAutoclosingRow(SvelteAutoclosingKey);
 
 // Svelte's `autoclosing_children` (the Svelte repository's
 // `packages/svelte/src/html-tree-validation.js`),
@@ -109,7 +109,7 @@ pub(crate) struct OptionalEndTag(OptionalEndTagKey);
 // table (`disallowed_children` + `is_tag_valid_with_parent`/`_ancestor`, which do
 // need the direct/descendant/`reset_by`/`only` distinctions) belongs to a future
 // diagnostics layer and is a separate port from the same source file.
-optional_end_tags! {
+svelte_autoclosing_children! {
     Li: "li" => ["li"],
     Dt: "dt" => ["dt", "dd"],
     Dd: "dd" => ["dt", "dd"],
@@ -189,7 +189,8 @@ mod tests {
     /// Svelte's `closing_tag_omitted(current, next)`, composed from the two halves the way a
     /// caller asks them: a row for `current`, then `next` absent or among its triggers.
     fn closing_tag_omitted(current: &str, next: Option<&str>) -> bool {
-        optional_end_tag(current).is_some_and(|row| next.is_none_or(|next| row.is_closed_by(next)))
+        svelte_autoclosing_row(current)
+            .is_some_and(|row| next.is_none_or(|next| row.is_closed_by(next)))
     }
 
     /// Grade both `match`es against a plain scan of the table they were generated from, over
@@ -197,8 +198,8 @@ mod tests {
     /// three ways and one byte off in both directions, plus [`NEIGHBOR_PROBES`] and the empty and
     /// non-ASCII inputs. Lookups are exact: a case variant is a different name, never a member.
     #[test]
-    fn optional_end_tag_agrees_with_a_plain_scan() {
-        let mut probes: Vec<String> = OPTIONAL_END_TAG_TABLE
+    fn svelte_autoclosing_row_agrees_with_a_plain_scan() {
+        let mut probes: Vec<String> = SVELTE_AUTOCLOSING_CHILDREN
             .iter()
             .flat_map(|(key, triggers)| std::iter::once(key).chain(triggers.iter()))
             .chain(NEIGHBOR_PROBES)
@@ -225,18 +226,18 @@ mod tests {
 
         let mut cases = 0usize;
         for current in &probes {
-            let row = OPTIONAL_END_TAG_TABLE
+            let row = SVELTE_AUTOCLOSING_CHILDREN
                 .iter()
                 .find(|(key, _)| *key == current.as_str());
             assert_eq!(
-                optional_end_tag(current).is_some(),
+                svelte_autoclosing_row(current).is_some(),
                 row.is_some(),
-                "optional_end_tag disagrees with the table on {current:?}"
+                "svelte_autoclosing_row disagrees with the table on {current:?}"
             );
             for next in &probes {
                 let expected = row.is_some_and(|(_, triggers)| triggers.contains(&next.as_str()));
                 assert_eq!(
-                    optional_end_tag(current).is_some_and(|row| row.is_closed_by(next)),
+                    svelte_autoclosing_row(current).is_some_and(|row| row.is_closed_by(next)),
                     expected,
                     "is_closed_by disagrees with the table on {current:?} then {next:?}"
                 );

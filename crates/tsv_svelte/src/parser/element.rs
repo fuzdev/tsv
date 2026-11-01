@@ -136,7 +136,7 @@ fn is_root_slot_meta_tag(name: &str) -> bool {
 /// name goes first because it is what nearly every tag is (`div`, `Button`, `my-elem`), and
 /// it answers those in one walk with no search for a `:` the other two arms would begin with.
 fn is_valid_element_name(name: &str) -> bool {
-    is_valid_element_local_name(name) || is_doctype_name(name) || is_namespaced_name(name)
+    is_regex_valid_tag_name(name) || is_doctype_name(name) || is_namespaced_name(name)
 }
 
 /// `regex_doctype_name` = `/^![a-zA-Z]+$/` — `!` then one or more ASCII letters.
@@ -173,14 +173,14 @@ fn is_namespaced_name(name: &str) -> bool {
 
 /// `REGEX_VALID_TAG_NAME` (`utils.js`): `/^[a-zA-Z][a-zA-Z0-9]*(-[…PCENChar…]*)?$/u` — an
 /// ASCII-alpha start, ASCII alphanumerics, then optionally a hyphen introducing a run of
-/// [`PCENChar`](crate::html::is_custom_element_name_char) (custom-element names such as `<my-café>`). The Unicode
-/// ranges are literal, so no general-category lookup is needed.
+/// [tag-name tail characters](crate::html::is_svelte_tag_name_tail_char) (custom-element names such as
+/// `<my-café>`). The Unicode ranges are literal, so no general-category lookup is needed.
 ///
 /// The head is read on bytes: its whole class is ASCII, so a byte that is not an ASCII
 /// alphanumeric or the hyphen — every byte of a non-ASCII character included — fails the
 /// name there. Only the tail past the hyphen can hold a non-ASCII character, and it is
 /// asked a character at a time, out of line: a custom-element name is the rare tag.
-fn is_valid_element_local_name(name: &str) -> bool {
+fn is_regex_valid_tag_name(name: &str) -> bool {
     let bytes = name.as_bytes();
     if !bytes.first().is_some_and(u8::is_ascii_alphabetic) {
         return false;
@@ -193,17 +193,18 @@ fn is_valid_element_local_name(name: &str) -> bool {
     match bytes.get(i) {
         None => true,
         // the hyphen that opens the PCENChar tail; ASCII, so the cut is a char boundary
-        Some(b'-') => is_pcen_run(&name[i + 1..]),
+        Some(b'-') => is_tag_name_tail_run(&name[i + 1..]),
         Some(_) => false,
     }
 }
 
-/// Whether every character of `tail` is a [`PCENChar`](crate::html::is_custom_element_name_char) — the run a
-/// custom-element name carries after its first hyphen (an empty one is valid).
+/// Whether every character of `tail` is a
+/// [tag-name tail character](crate::html::is_svelte_tag_name_tail_char) — the run a custom-element name
+/// carries after its first hyphen (an empty one is valid).
 #[cold]
 #[inline(never)]
-fn is_pcen_run(tail: &str) -> bool {
-    tail.chars().all(crate::html::is_custom_element_name_char)
+fn is_tag_name_tail_run(tail: &str) -> bool {
+    tail.chars().all(crate::html::is_svelte_tag_name_tail_char)
 }
 
 /// Result type for parsing elements - either a regular element or a special element.
@@ -229,7 +230,7 @@ pub(super) struct OpeningTagEnd {
 /// `parent.type === 'RegularElement'`).
 ///
 /// One byte, held by [`SvelteParser::parse_children`] across every child — a frame paid once
-/// per level of element nesting. It settles whether the element has a row in the optional-end-tag
+/// per level of element nesting. It settles whether the element has a row in the auto-close
 /// table once, so an element without one never looks the table up per child; an element with one
 /// looks its row up again at each child's opening tag (see
 /// [`SvelteParser::next_open_tag_closes`] for why the row itself is not carried).
@@ -240,7 +241,7 @@ enum ImplicitClose {
     Never,
     /// An HTML element: an ancestor's `</other>` also closes it, where it stands.
     AtAncestorClose,
-    /// An HTML element with a row in the optional-end-tag table (`<li>`, `<p>`, table parts,
+    /// An HTML element with a row in the auto-close table (`<li>`, `<p>`, table parts,
     /// …): an opening tag among the row's triggers also closes it.
     AlsoAtNextTag,
 }
@@ -248,7 +249,7 @@ enum ImplicitClose {
 impl ImplicitClose {
     /// The regime for an HTML element named `tag_name`.
     fn for_html_element(tag_name: &str) -> Self {
-        if crate::html::optional_end_tag(tag_name).is_some() {
+        if crate::html::svelte_autoclosing_row(tag_name).is_some() {
             Self::AlsoAtNextTag
         } else {
             Self::AtAncestorClose
@@ -811,7 +812,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     };
                     return Ok((child_nodes, end));
                 }
-                // An opening tag `<next>` that the optional-end-tag table says closes
+                // An opening tag `<next>` that the auto-close table says closes
                 // this element — leave it for the parent to adopt as a sibling. Only an element
                 // with a row in the table asks (most have none, so most children skip the peeked
                 // name and the lookup), and skipping changes nothing: `is_next_token` above has
@@ -852,7 +853,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Whether the opening tag at the current `<` implicitly closes the element `tag_name` —
-    /// its name is one of the triggers in `tag_name`'s row of the optional-end-tag table. Only
+    /// its name is one of the triggers in `tag_name`'s row of the auto-close table. Only
     /// asked for an element that has a row ([`ImplicitClose::AlsoAtNextTag`]), so the lookup
     /// here always finds one.
     ///
@@ -865,7 +866,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let Some(next_name) = self.peek_open_tag_name()? else {
             return Ok(false);
         };
-        Ok(crate::html::optional_end_tag(tag_name).is_some_and(|row| row.is_closed_by(next_name)))
+        Ok(crate::html::svelte_autoclosing_row(tag_name)
+            .is_some_and(|row| row.is_closed_by(next_name)))
     }
 
     /// The "Unclosed element" error for `parse_children`, outlined so the `format!` of the
@@ -1089,8 +1091,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 #[cfg(test)]
 mod tests {
     use super::{
-        RootOnlyMetaTag, is_doctype_name, is_namespaced_name, is_reserved_namespace_miss,
-        is_root_slot_meta_tag, is_valid_element_local_name, is_valid_element_name,
+        RootOnlyMetaTag, is_doctype_name, is_namespaced_name, is_regex_valid_tag_name,
+        is_reserved_namespace_miss, is_root_slot_meta_tag, is_valid_element_name,
         is_valid_tag_name, tag_name_end,
     };
     use crate::ast::is_component_name;
@@ -1247,9 +1249,9 @@ mod tests {
     }
 
     /// `REGEX_VALID_TAG_NAME` as one character loop — the predicate
-    /// [`is_valid_element_local_name`]'s byte head and character tail split between them,
+    /// [`is_regex_valid_tag_name`]'s byte head and character tail split between them,
     /// spelled whole so the split is graded against something that never made it.
-    fn element_local_name_reference(name: &str) -> bool {
+    fn regex_valid_tag_name_reference(name: &str) -> bool {
         let mut chars = name.chars();
         if !chars.next().is_some_and(|c| c.is_ascii_alphabetic()) {
             return false;
@@ -1257,7 +1259,7 @@ mod tests {
         let mut after_hyphen = false;
         for c in chars {
             if after_hyphen {
-                if !crate::html::is_custom_element_name_char(c) {
+                if !crate::html::is_svelte_tag_name_tail_char(c) {
                     return false;
                 }
             } else if c.is_ascii_alphanumeric() {
@@ -1293,8 +1295,8 @@ mod tests {
                 format!("a--{c}"),
             ] {
                 assert_eq!(
-                    is_valid_element_local_name(&name),
-                    element_local_name_reference(&name),
+                    is_regex_valid_tag_name(&name),
+                    regex_valid_tag_name_reference(&name),
                     "U+{cp:04X} in {name:?}"
                 );
                 checked += 1;
@@ -1329,13 +1331,13 @@ mod tests {
             let namespaced = namespaced_name_reference(name);
             assert_eq!(is_namespaced_name(name), namespaced, "{name:?}");
             assert_eq!(
-                is_valid_element_local_name(name),
-                element_local_name_reference(name),
+                is_regex_valid_tag_name(name),
+                regex_valid_tag_name_reference(name),
                 "{name:?}"
             );
             assert_eq!(
                 is_valid_element_name(name),
-                is_doctype_name(name) || namespaced || is_valid_element_local_name(name),
+                is_doctype_name(name) || namespaced || is_regex_valid_tag_name(name),
                 "{name:?}"
             );
         });

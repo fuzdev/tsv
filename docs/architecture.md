@@ -809,18 +809,17 @@ range lookup names the axis it answers on** — there is deliberately no axis-le
 comment counts, and a caller that doesn't say which it means is the bug. The axis
 table (which caller asks which) is in [comments.md](./comments.md); the functions are:
 
-| axis | range | after a position | existence |
+| axis | range | after a comment | existence |
 | --- | --- | --- | --- |
-| **to emit** — "which must *I* print here?" (owned skipped) | `comments_to_emit_in_range()` | `comments_to_emit_after()` | `has_comments_to_emit_in_range()` |
+| **to emit** — "which must *I* print here?" (owned skipped) | `comments_to_emit_in_range()` | — | `has_comments_to_emit_in_range()` |
 | **on page** — "does any comment occupy the page here?" (owned counted) | `comments_on_page_in_range()` | — | `has_comments_on_page_in_range()`, `has_multiline_block_comments_on_page_in_range()` |
-| **in source** — "what bytes are physically here?" (owned counted) | `comments_in_source_range()` | `comments_in_source_after()`; `comments_in_source_after_comment()` from a comment the caller holds (by index, never through the hint) | — |
+| **in source** — "what bytes are physically here?" (owned counted) | `comments_in_source_range()` | `comments_in_source_after_comment()`: the comment's successors, by index, never through the hint | — |
 
 Each range walk and existence check has an index-keyed `*_from` twin (`comments_to_emit_from()`, `comments_on_page_from()`, `comments_in_source_from()`, `has_*_from()`) for a caller that already holds the range's first index. The TS printer wraps them all (`Printer::comments_to_emit_between()` and siblings), reading its comment-free window ahead of the search.
 
 Plus the axis-independent primitives:
 
 - `classify_comment()` — Determine if trailing, leading-own-line, or inline
-- `classify_comment_scan()` — Same, against the document's line table (a bounded scan of the source, the table as the fallback)
 - `ClassifiedComments::from_index()` — Batch classify all categories in one pass, from the index the caller's window-reading lookup found
 - `find_first_comment_from()` — Binary-search index of first comment with `span.start >= pos`
 - `CommentFreeWindow` — the comment-free window a printer keeps over its array: every search refreshes it (`search_from()`), each printer's inline `first_index_between` gate reads it (`contains()`) ahead of one outlined search, `next_comment_start()` answers an unbounded walk, and `take_from()` hands it between printers over the same array (a Svelte printer and the island TS printers it constructs)
@@ -909,19 +908,19 @@ reproduce exactly, are private to `tsv_svelte` (its `html` module; `tsv_svelte_c
 
 ```rust
 // element classification
-pub fn is_block_element(name: &str) -> bool;
-pub fn is_void_element(name: &str) -> bool;
-pub fn is_foreign_element(name: &str) -> bool;  // SVG/MathML
-pub fn is_svg_element(name: &str) -> bool;
-pub fn is_mathml_element(name: &str) -> bool;
+fn is_block_element(name: &str) -> bool;
+fn is_void_element(name: &str) -> bool;
+fn is_foreign_element(name: &str) -> bool;  // SVG/MathML
+fn is_svg_element(name: &str) -> bool;
+fn is_mathml_element(name: &str) -> bool;
 
 // tag names: Svelte's auto-close table and the tag-name tail class
-pub fn optional_end_tag(name: &str) -> Option<OptionalEndTag>; // then `is_closed_by(next)`
-pub fn is_custom_element_name_char(c: char) -> bool;
+fn svelte_autoclosing_row(name: &str) -> Option<SvelteAutoclosingRow>; // then `is_closed_by(next)`
+fn is_svelte_tag_name_tail_char(c: char) -> bool;
 
 // whitespace and entities
-pub fn preserves_whitespace(name: &str) -> bool;
-pub fn decode_character_references(html: &str, context: ReferenceContext) -> Cow<'_, str>;
+fn preserves_whitespace(name: &str) -> bool;
+fn decode_character_references(html: &str, context: ReferenceContext) -> Cow<'_, str>;
 ```
 
 Inline-ness is derived by negation in consumers (`!is_block_element(...)`) — no positive inline list exists.

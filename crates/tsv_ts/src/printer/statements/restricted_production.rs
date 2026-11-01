@@ -19,7 +19,10 @@ use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::statements::TerminatorGap;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::doc::{DocBuf, GapCommentLine, LeadingBreak};
+use tsv_lang::doc::{
+    DocBuf,
+    arena::{GapCommentLine, LeadingBreak},
+};
 use tsv_lang::source_scan::{
     find_char_skipping_comments, has_newline_after_position, has_newline_before_position,
     rfind_char_skipping_comments,
@@ -348,7 +351,7 @@ impl<'a> Printer<'a> {
     }
 
     /// What a restricted production's argument doc prints ahead of its first token, read
-    /// for ASI ([`tsv_lang::doc::LeadingEdge::asi`]): a line a comment ends there, a line
+    /// for ASI ([`tsv_lang::doc::arena::LeadingEdge::asi`]): a line a comment ends there, a line
     /// the doc opens with, or a multi-line block's interior.
     ///
     /// [`LeadingBreak::Hard`] — a line ended in every layout — can only be printed inside

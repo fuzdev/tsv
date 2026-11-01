@@ -34,7 +34,6 @@ pub mod swallow;
 mod types;
 
 // Types
-pub use arena::{GapCommentLine, GroupId, LeadingBreak, LeadingEdge};
 pub use types::{CachedWidth, DocContext, DocText, LineKind, Mode, PoolSpan};
 
 /// Run `$copy` under a `match` on `$len` that names each short length in
@@ -121,10 +120,6 @@ pub(crate) use specialize_short_len;
 /// opening a buffer, and a site whose count is decidable at the site pairs or returns
 /// directly. A `DocBuf` is for the site that genuinely accumulates.
 pub type DocBuf = smallvec::SmallVec<[arena::DocId; 8]>;
-
-// Diagnostic: line-comment swallow check (opt-in, render-time; `_internal_swallow_check` feature)
-#[cfg(feature = "_internal_swallow_check")]
-pub use swallow::{SwallowReport, set_swallow_check, take_swallow_reports};
 
 // Arena render
 pub use arena_render::{

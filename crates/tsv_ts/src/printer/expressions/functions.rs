@@ -29,7 +29,7 @@ use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::after_operator::hang_after_operator;
 use tsv_lang::doc::arena::{DocArena, DocId};
-use tsv_lang::doc::{DocBuf, GroupId};
+use tsv_lang::doc::{DocBuf, arena::GroupId};
 use tsv_lang::source_scan::has_newline_before_position;
 
 /// Whether an arrow body stays on the `=>` line for a reason that a forced chain break
