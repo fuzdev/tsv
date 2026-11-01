@@ -9,7 +9,7 @@
 //! reads `Expected ')'` at the head's end, the control below. Svelte's own scanner
 //! (`match_bracket` with `pointy_bois`, in a `lang="ts"` document) is not bounded by the
 //! head and walks to the end of the template, reporting `Unexpected end of input` there;
-//! the message is tsv's own either way, and a mid-document `Unexpected end of file` names
+//! the message is tsv's own either way, and an end-of-input error at the head's end names
 //! neither.
 //!
 //! Not fixturable: `input_invalid_*` asserts only that both parsers reject, never the

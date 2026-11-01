@@ -3879,7 +3879,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let mut in_prologue = prologue == DirectivePrologue::Present;
             while !p.check(&TokenKind::BraceClose) {
                 if p.check(&TokenKind::Eof) {
-                    return Err(p.error_msg("Unexpected end of file in block"));
+                    return Err(p.error_msg("Unexpected end of input in block"));
                 }
 
                 let mut stmt = p.parse_statement()?;

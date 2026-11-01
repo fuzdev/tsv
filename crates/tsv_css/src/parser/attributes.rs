@@ -336,10 +336,7 @@ fn parse_attribute_matcher(parser: &mut CssParser<'_, '_>) -> Result<AttributeMa
             return Ok(AttributeMatcher::Substring);
         }
         _ => {
-            return Err(parser.error_msg(&format!(
-                "Unsupported attribute matcher: {:?}",
-                parser.current_kind()
-            )));
+            return Err(parser.error_expected_found("attribute matcher or ']'"));
         }
     };
 

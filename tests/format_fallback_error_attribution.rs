@@ -73,9 +73,9 @@ fn fallback_error_at(source: &str) -> (usize, usize, String) {
 }
 
 /// The typo every case below carries: an unclosed object pattern in a parameter list,
-/// which fails at end of file under both goals.
+/// which fails at the end of its input under both goals.
 const TYPO: &str = "function f( {\n";
-const TYPO_MESSAGE: &str = "Expected property key, found end of file";
+const TYPO_MESSAGE: &str = "Expected property key, found end of input";
 
 /// A legacy sloppy script with a typo: the module attempt dies on the sloppy construct
 /// (which the script retry admits), the script attempt on the typo. The typo is the

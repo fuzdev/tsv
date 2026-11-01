@@ -522,7 +522,7 @@ impl fmt::Display for TokenKind {
             TokenKind::RegexLiteral => write!(f, "regular expression"),
             TokenKind::At => write!(f, "'@'"),
             TokenKind::Hash => write!(f, "'#'"),
-            TokenKind::Eof => write!(f, "end of file"),
+            TokenKind::Eof => write!(f, "end of input"),
         }
     }
 }

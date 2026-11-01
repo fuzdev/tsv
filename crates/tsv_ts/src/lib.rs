@@ -53,10 +53,10 @@
 //! let err = format("const x=").unwrap_err();
 //! assert_eq!(err.kind(), ErrorKind::Syntax);
 //! assert_eq!(err.span(), Some(8..8));
-//! assert_eq!(err.to_string(), "Expected expression, found end of file (1:9)");
+//! assert_eq!(err.to_string(), "Expected expression, found end of input (1:9)");
 //! assert_eq!(
 //!     format!("{err:#}"),
-//!     "Expected expression, found end of file\n1:9 const x=\n            ^ here"
+//!     "Expected expression, found end of input\n1:9 const x=\n            ^ here"
 //! );
 //! let report = err.to_report().expect("a located error reports");
 //! assert_eq!((report.start.offset, report.start.line, report.start.column), (8, 1, 8));

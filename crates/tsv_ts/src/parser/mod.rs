@@ -3597,7 +3597,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             _ => Err(Error::unexpected_token(
                 "'>'".to_string(),
-                format!("'{}'", self.current.kind),
+                self.current.kind.to_string(),
                 self.current_pos().0,
             )),
         }
@@ -3631,7 +3631,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             _ => Err(Error::unexpected_token(
                 "'<'".to_string(),
-                format!("'{}'", self.current.kind),
+                self.current.kind.to_string(),
                 self.current_pos().0,
             )),
         }

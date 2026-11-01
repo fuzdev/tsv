@@ -357,7 +357,7 @@ fn a_tail_the_printer_would_complete_stays_rejected() {
     // The fixture's first line, with the message its `tsv_rejects.txt` pins.
     assert_eq!(
         error("fn(a < b, (c).d > (e, f));"),
-        ("Expected '>', found ''.''".to_owned(), "1:14".to_owned())
+        ("Expected '>', found '.'".to_owned(), "1:14".to_owned())
     );
 }
 
@@ -537,13 +537,13 @@ fn when_both_readings_fail_the_error_that_reached_further_is_reported() {
         // Both stopped at one token: the list's error, the first reading tried.
         (
             "fn(a < b, c : d > (e));",
-            "Expected '>', found '':''",
+            "Expected '>', found ':'",
             "1:13",
         ),
         // A refused fallback reports the list's error where the list stopped.
         (
             "fn(a < b, (c).d > (e, f));",
-            "Expected '>', found ''.''",
+            "Expected '>', found '.'",
             "1:14",
         ),
     ] {

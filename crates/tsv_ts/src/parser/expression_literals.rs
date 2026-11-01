@@ -425,7 +425,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 break;
             } else {
                 return Err(Error::invalid_expression(
-                    format!("'{}'", self.current_kind()),
+                    self.current_kind().to_string(),
                     self.current_pos().0,
                 ));
             }

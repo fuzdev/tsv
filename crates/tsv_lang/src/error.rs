@@ -238,7 +238,7 @@ impl Repr {
             Repr::UnexpectedToken {
                 expected, found, ..
             } => format!("Expected {expected}, found {found}"),
-            Repr::UnexpectedEof { .. } => "Unexpected end of file".to_owned(),
+            Repr::UnexpectedEof { .. } => "Unexpected end of input".to_owned(),
             Repr::InvalidSyntax { message, .. } => message.clone(),
             Repr::InvalidExpression { found, .. } => {
                 format!("Expected expression, found {found}")
@@ -392,15 +392,15 @@ pub struct ErrorReport {
 /// # let source = "let x = (";
 /// # let err = Error::unexpected_eof(source.len())
 /// #     .with_context(source, WireCoordinates::new(LineRule::Ecmascript, LeadingBom::Counted));
-/// // `err`: a syntax error summarized `Unexpected end of file`, located at the end (byte 9) of
+/// // `err`: a syntax error summarized `Unexpected end of input`, located at the end (byte 9) of
 /// // the one-line source `let x = (`
 /// assert_eq!(err.kind(), ErrorKind::Syntax);
 /// assert_eq!(err.span(), Some(9..9)); // UTF-8 bytes of the caller's text
-/// assert_eq!(err.to_string(), "Unexpected end of file (1:10)");
-/// assert_eq!(format!("{err:#}"), "Unexpected end of file\n1:10 let x = (\n              ^ here");
+/// assert_eq!(err.to_string(), "Unexpected end of input (1:10)");
+/// assert_eq!(format!("{err:#}"), "Unexpected end of input\n1:10 let x = (\n              ^ here");
 /// // what a binding returns: the summary and the frame apart, the points in UTF-16 units
 /// let report = err.to_report().expect("a located error reports");
-/// assert_eq!(report.summary, "Unexpected end of file");
+/// assert_eq!(report.summary, "Unexpected end of input");
 /// assert_eq!((report.start.offset, report.start.line, report.start.column), (9, 1, 9));
 /// ```
 ///
@@ -415,7 +415,7 @@ pub struct ErrorReport {
 ///
 /// `{}` is **one line**: the summary, then the error's `line:col` (1-based line, 1-based
 /// UTF-16 column, the point its frame's header prints) in parentheses —
-/// `Unexpected end of file (3:7)`. A source over the size cap, which has no position, is
+/// `Unexpected end of input (3:7)`. A source over the size cap, which has no position, is
 /// the summary alone. The alternate form `{:#}` is the whole frame: the
 /// summary, a `\n`, the `line:col` header with the excerpted line, a `\n`, and the caret
 /// line — what the `tsv` CLI prints (and `summary + "\n" + frame` of [`Error::to_report`]).
@@ -1001,7 +1001,7 @@ mod tests {
 
         assert_eq!(
             format!("{:#}", Error::unexpected_eof(9)),
-            "Unexpected end of file at position 9"
+            "Unexpected end of input at position 9"
         );
         assert_eq!(
             format!("{:#}", Error::invalid_expression("'='".to_string(), 6)),
@@ -1061,7 +1061,7 @@ mod tests {
                 coordinates: ECMA,
             }),
         });
-        assert_eq!(at_cap.to_string(), "Unexpected end of file (1:4294967296)");
+        assert_eq!(at_cap.to_string(), "Unexpected end of input (1:4294967296)");
     }
 
     /// `kind()` names each payload; `span()` is the point as an empty range for a located

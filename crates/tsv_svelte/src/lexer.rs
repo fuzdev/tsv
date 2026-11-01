@@ -66,7 +66,7 @@ impl fmt::Display for TokenKind {
             TokenKind::String => write!(f, "string"),
             TokenKind::Identifier => write!(f, "identifier"),
             TokenKind::Comment => write!(f, "comment"),
-            TokenKind::Eof => write!(f, "end of file"),
+            TokenKind::Eof => write!(f, "end of input"),
         }
     }
 }

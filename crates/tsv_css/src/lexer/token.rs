@@ -94,7 +94,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Url => write!(f, "url"),
             TokenKind::Comment => write!(f, "comment"),
             TokenKind::Whitespace => write!(f, "whitespace"),
-            TokenKind::Eof => write!(f, "end of file"),
+            TokenKind::Eof => write!(f, "end of input"),
         }
     }
 }

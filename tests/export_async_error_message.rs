@@ -68,7 +68,7 @@ fn export_async_names_the_token_after_async() {
         ),
         (
             "export async",
-            "Expected 'function' after 'export async', found end of file",
+            "Expected 'function' after 'export async', found end of input",
             "1:13",
         ),
     ]);
