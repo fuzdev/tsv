@@ -17,6 +17,9 @@ Each `## Unreleased` section must be non-empty and carry a
 - **breaking** feat: the `IgnoreStack` binding methods change: `pop_tsv()` is renamed
   `pop_override()`, and `classify_dir` / `should_format_file` drop their `name` argument,
   reading it off the path
+- **breaking** fix: a malformed command line — an unknown flag, a missing value, an extra
+  positional, `--version` beside a subcommand — exits 2 on both CLIs, the usage-error code, not
+  1, which `format --check` and `strip` keep for "would change" and "refused"
 
 - feat: the Rust crates publish to crates.io — `cargo install --locked tsv_cli`, or
   `cargo binstall tsv_cli` for the prebuilt binary; their API is reshaped for it
@@ -30,14 +33,14 @@ Each `## Unreleased` section must be non-empty and carry a
   decorator on a constructor, and a member access after `export default @dec class Foo {}`
 - fix: decorators on a class static block or index signature are kept — the formatter dropped
   them — and the AST carries them as `decorators` (`StaticBlock`, `TSIndexSignature`)
-- fix: an error on a very long line (minified code) excerpts the 120 characters either side of
-  the error, not the whole line
 - fix: deeply nested or very long chained input is refused with a parse error instead of
   overflowing the host's stack
-- fix: formatting deeply nested ternaries, callbacks, member chains and parenthesized
-  conditional types no longer takes time and memory exponential in the nesting depth
+- fix: formatting deeply nested ternaries, callbacks, member chains, template literals and
+  parenthesized conditional types, and parsing very long member chains, no longer take time
+  and memory that grow faster than the input
 - fix: an ignore pattern with several `**` no longer takes exponential time to match
-- fix: parser and formatter fixes across TypeScript edge cases, comment placement and layout
+- fix: parser and formatter fixes across TypeScript and CSS edge cases, comment placement,
+  layout and error messages
 
 ## 0.7.1
 
