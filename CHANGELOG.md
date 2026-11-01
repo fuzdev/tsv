@@ -41,7 +41,7 @@ Each `## Unreleased` section must be non-empty and carry a
   parenthesized conditional types, and parsing very long member chains, no longer take time
   and memory that grow faster than the input
 - fix: an ignore pattern with several `**` no longer takes exponential time to match
-- fix: parser and formatter fixes across TypeScript and CSS edge cases, comment placement,
+- fix: parser and formatter fixes across TypeScript, CSS and Svelte edge cases, comment placement,
   layout and error messages
 
 ## 0.7.1
