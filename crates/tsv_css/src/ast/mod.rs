@@ -337,11 +337,12 @@ pub enum PseudoClassArgs<'arena> {
     /// Examples: `label`, `tab`, `tab active`, `button primary`
     ///
     /// `span` covers the argument content (inside the parentheses). `ident_spans`
-    /// is parallel to `idents` (one span per part name), so the printer can find
-    /// the comments in every gap — around the run (before the first name, after
-    /// the last) and *between* names — and derive the whole-run span (first
-    /// name's start .. last name's end). Always non-empty (the parser rejects an
-    /// empty `::part()`).
+    /// holds one span per part name, and the names are read from them: the printer
+    /// emits each verbatim (an escaped name included), so no decoded copy is stored.
+    /// The spans also let the printer find the comments in every gap — around the
+    /// run (before the first name, after the last) and *between* names — and derive
+    /// the whole-run span (first name's start .. last name's end). Always non-empty
+    /// (the parser rejects an empty `::part()`).
     ///
     /// ⚠️ The **wire** reads `ident_spans` too. `parseCss` has no `::part` grammar
     /// — it reads every pseudo-element argument as a selector list — so the writer
@@ -352,8 +353,7 @@ pub enum PseudoClassArgs<'arena> {
     /// but a plain ident run — must move the projection in the same breath, or the
     /// wire goes wrong rather than merely different.
     Part {
-        idents: &'arena [&'arena str], // Space-separated part names
-        ident_spans: &'arena [Span],   // Per-ident spans, parallel to `idents`
+        ident_spans: &'arena [Span], // One span per space-separated part name
         span: Span,
     },
 }

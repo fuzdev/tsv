@@ -1214,7 +1214,9 @@ fn trim_property_part(property_part: &str) -> &str {
 #[inline(never)]
 fn trim_property_part_wide(property_part: &str) -> &str {
     let trimmed = property_part.trim_matches(crate::whitespace::is_boundary_whitespace);
-    if trimmed.len() == property_part.len() || !crate::escapes::ends_with_open_escape(trimmed) {
+    if trimmed.len() == property_part.len()
+        || !tsv_lang::printing::ends_with_open_escape(trimmed.as_bytes())
+    {
         return trimmed;
     }
     // The part starts at the property token, so the trim shortened only its end and the

@@ -2,8 +2,10 @@
 //!
 //! [`arena_try_print_flat_into`] stands in for
 //! [`arena_print_doc_with_indent_resolved_preserve_whitespace_into`](super::arena_print_doc_with_indent_resolved_preserve_whitespace_into)
-//! on the docs that entry would print on one line, and refuses every other doc, which
-//! the caller then hands to the renderer. The module is the argument that the two agree.
+//! and for [`arena_print_css_doc_into`](super::arena_print_css_doc_into) on the docs those
+//! entries would print on one line, and refuses every other doc, which the caller then
+//! hands to the renderer. The module is the argument that the walk and the renderer
+//! agree.
 //!
 //! # The claim
 //!
@@ -89,9 +91,12 @@
 //!
 //! - **No trim.** The renderer trims trailing whitespace before a line break, which an
 //!   accepted doc never reaches, and once more at the end on every entry but the
-//!   preserve-whitespace one. That is why this stands in for that entry alone: a flat
-//!   doc may end in a space (a trailing flat `line`, a CSS escape's payload) which the
-//!   other entries would strip. It is also why the walk may append to a buffer that
+//!   preserve-whitespace and CSS ones. That is why this stands in for those two alone: a
+//!   flat doc may end in a space (a trailing flat `line`, a CSS escape's payload) which
+//!   the other entries would strip. The two differ only in
+//!   `RenderConfig::keeps_escaped_whitespace`, the CSS entry's escape-aware line-break
+//!   trim — and an accepted doc breaks no line, so that flag never applies and the one
+//!   walk answers for both. It is also why the walk may append to a buffer that
 //!   already holds text, where the renderer needs an empty one: nothing here reaches
 //!   backwards.
 //! - **Keyed groups and flow probes.** The renderer clears the arena's keyed-group map
@@ -151,15 +156,18 @@ const MAX_DEPTH: u32 = 48;
 /// returning whether it did. On `false` the buffer is exactly as it was, and the caller
 /// renders the doc through
 /// [`arena_print_doc_with_indent_resolved_preserve_whitespace_into`](super::arena_print_doc_with_indent_resolved_preserve_whitespace_into)
-/// with the same arguments; on `true` the buffer holds what that render would have
-/// produced, appended. The arguments are that entry's less its `embed`, which the renderer
-/// does not read, plus `reserve`: the columns the caller writes after the doc on the same
+/// or [`arena_print_css_doc_into`](super::arena_print_css_doc_into) with the same
+/// arguments; on `true` the buffer holds what that render would have produced, appended.
+/// The arguments are those entries' less their `embed`, which the renderer does not read,
+/// plus `reserve`: the columns the caller writes after the doc on the same
 /// line, charged against the budget here as the caller's fallback render charges them
 /// through a trailing reserve node (a flat write is one line, its last). `output` need
 /// not be empty.
 ///
-/// It replaces that entry only — a trimming entry strips a trailing space this keeps.
-/// The module doc carries the argument, node kind by node kind.
+/// It replaces those two entries only — a trimming entry strips a trailing space this
+/// keeps. The CSS entry's escape-aware line-break trim is no difference here: an accepted
+/// doc breaks no line, so it never runs. The module doc carries the argument, node kind
+/// by node kind.
 #[inline]
 pub fn arena_try_print_flat_into(
     arena: &DocArena,

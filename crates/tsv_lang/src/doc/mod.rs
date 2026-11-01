@@ -128,7 +128,8 @@ pub use swallow::{SwallowReport, set_swallow_check, swallow_check_enabled, take_
 
 // Arena render
 pub use arena_render::{
-    arena_measure_doc_flat_resolved, arena_print_doc, arena_print_doc_with_indent_resolved_into,
+    arena_measure_doc_flat_resolved, arena_print_css_doc_into, arena_print_doc,
+    arena_print_doc_with_indent_resolved_into,
     arena_print_doc_with_indent_resolved_preserve_whitespace_into,
 };
 pub use arena_render_flat::arena_try_print_flat_into;
@@ -173,6 +174,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width,
             indent: "  ",
+            keeps_escaped_whitespace: false,
             #[cfg(feature = "_internal_comment_check")]
             purpose: RenderPurpose::Output,
         };
@@ -184,6 +186,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width,
             indent: "\t",
+            keeps_escaped_whitespace: false,
             #[cfg(feature = "_internal_comment_check")]
             purpose: RenderPurpose::Output,
         };
@@ -782,6 +785,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width: 12,
             indent: "\t",
+            keeps_escaped_whitespace: false,
             #[cfg(feature = "_internal_comment_check")]
             purpose: RenderPurpose::Output,
         };
@@ -883,6 +887,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width: 100,
             indent: "\t",
+            keeps_escaped_whitespace: false,
             #[cfg(feature = "_internal_comment_check")]
             purpose: RenderPurpose::Output,
         };

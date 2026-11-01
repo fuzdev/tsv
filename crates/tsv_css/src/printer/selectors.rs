@@ -1692,9 +1692,7 @@ impl<'a> Printer<'a> {
                 }
             }
             ast::PseudoClassArgs::Part {
-                idents,
-                ident_spans,
-                span,
+                ident_spans, span, ..
             } => {
                 // The identifier run spans the first name's start to the last name's
                 // end (`ident_spans` is non-empty — the parser rejects empty
@@ -1706,7 +1704,7 @@ impl<'a> Printer<'a> {
                 // Interleave any interior comments between the names, then wrap the
                 // leading/trailing comments outside the run
                 // (`::part(/* lead */ a /* mid */ b /* trail */)`).
-                let run = self.build_part_idents_doc(idents, ident_spans, run_span);
+                let run = self.build_part_idents_doc(ident_spans, run_span);
                 // The runs the argument-list start and the `)` gap skipped — `::part` rebuilds
                 // its names from spans, so nothing else carries them. Each is claimed whole,
                 // its comments in place, and the comment wrapper below then leaves that side
@@ -1778,29 +1776,33 @@ impl<'a> Printer<'a> {
     /// separation — the shared selector-comment normalization (`comments_to_emit_in_range`
     /// lookup, the same rule as `:is()`/combinator-boundary comments). The common
     /// comment-free case (`run_span` has no comment, or a single name) stays a
-    /// plain single-space join. `run_span` bounds the run between the first and
+    /// plain single-space join. Each name prints as its **source** slice, never the
+    /// AST's decoded ident: a part name is an `<ident>`, whose escapes stay verbatim as
+    /// in every other ident position — decoded, `name1\ name2` would print as two names,
+    /// `\41 x` as `Ax`, and `\a` as a raw line break. `run_span` bounds the run between the first and
     /// last name; leading/trailing comments sit outside it and are handled by the
     /// caller's `wrap_args_gap_comments`.
-    fn build_part_idents_doc(
-        &self,
-        idents: &[&str],
-        ident_spans: &[Span],
-        run_span: Span,
-    ) -> DocId {
+    fn build_part_idents_doc(&self, ident_spans: &[Span], run_span: Span) -> DocId {
         let d = self.d();
         // ⚠️ The fast path must ask about the boundary run too, not comments alone: every
         // inter-ident gap is an `allow_comment_or_whitespace` juncture the parser steps a run
         // at (`::part(a <NBSP>b)`), and `join(" ")` regenerates the gap from nothing. This
         // rebuild is the only thing that can carry those characters, so a comment-keyed gate
         // in front of it deletes them — which it did, on input canonical accepts.
-        if idents.len() < 2
-            || (!self.has_comments_to_emit_between(run_span.start, run_span.end)
-                && !self.gap_may_hold_boundary_ws(run_span.start, run_span.end))
+        if ident_spans.len() == 1 {
+            return d.source_span(ident_spans[0], self.source);
+        }
+        if !self.has_comments_to_emit_between(run_span.start, run_span.end)
+            && !self.gap_may_hold_boundary_ws(run_span.start, run_span.end)
         {
-            return d.text_pooled(&idents.join(" "));
+            return d.concat_iter(ident_spans.iter().enumerate().flat_map(|(i, &span)| {
+                let sep = (i > 0).then(|| d.text(" "));
+                sep.into_iter()
+                    .chain(std::iter::once(d.source_span(span, self.source)))
+            }));
         }
         let mut parts = DocBuf::new();
-        for (i, ident) in idents.iter().enumerate() {
+        for (i, &ident) in ident_spans.iter().enumerate() {
             if i > 0 {
                 parts.push(d.text(" "));
                 // A gap holding a member is printed whole, its comments in place among the
@@ -1819,7 +1821,7 @@ impl<'a> Printer<'a> {
                     parts.push(d.text_pooled(&kept));
                 }
             }
-            parts.push(d.text_pooled(ident));
+            parts.push(d.source_span(ident, self.source));
         }
         d.concat(&parts)
     }

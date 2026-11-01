@@ -1,0 +1,271 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 456,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 164,
+					"end": 184,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 164,
+							"end": 184,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "part",
+											"start": 164,
+											"end": 184,
+											"args": {
+												"type": "SelectorList",
+												"start": 171,
+												"end": 183,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 171,
+														"end": 183,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name1\\ name2",
+																		"start": 171,
+																		"end": 183
+																	}
+																],
+																"start": 171,
+																"end": 183
+															}
+														]
+													}
+												]
+											}
+										}
+									],
+									"start": 164,
+									"end": 184
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 185,
+					"end": 203,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 189,
+							"end": 199,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 164,
+				"end": 203
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 280,
+					"end": 297,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 280,
+							"end": 297,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "part",
+											"start": 280,
+											"end": 297,
+											"args": {
+												"type": "SelectorList",
+												"start": 287,
+												"end": 296,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 287,
+														"end": 296,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "Aname3",
+																		"start": 287,
+																		"end": 296
+																	}
+																],
+																"start": 287,
+																"end": 296
+															}
+														]
+													}
+												]
+											}
+										}
+									],
+									"start": 280,
+									"end": 297
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 298,
+					"end": 317,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 302,
+							"end": 313,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 280,
+				"end": 317
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 411,
+					"end": 426,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 411,
+							"end": 426,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "part",
+											"start": 411,
+											"end": 426,
+											"args": {
+												"type": "SelectorList",
+												"start": 418,
+												"end": 425,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 418,
+														"end": 425,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "name4\n",
+																		"start": 418,
+																		"end": 425
+																	}
+																],
+																"start": 418,
+																"end": 425
+															}
+														]
+													}
+												]
+											}
+										}
+									],
+									"start": 411,
+									"end": 426
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 427,
+					"end": 447,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 431,
+							"end": 443,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 411,
+				"end": 447
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a part name is an ident, so its escapes stay verbatim: an escaped space is inside the one\n\t   name `name1 name2`, not a separator between two names ",
+				"start": 9,
+				"end": 162
+			},
+			{
+				"type": "CSSComment",
+				"value": " a hex escape and its terminator whitespace are one code point, `A` ",
+				"start": 206,
+				"end": 278
+			},
+			{
+				"type": "CSSComment",
+				"value": " an escaped newline code point (`\\a`) is content of the name, never a raw line break ",
+				"start": 320,
+				"end": 409
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 448,
+			"styles": "\n\t/* a part name is an ident, so its escapes stay verbatim: an escaped space is inside the one\n\t   name `name1 name2`, not a separator between two names */\n\t::part(name1\\ name2) {\n\t\tcolor: red;\n\t}\n\n\t/* a hex escape and its terminator whitespace are one code point, `A` */\n\t::part(\\41 name3) {\n\t\tcolor: blue;\n\t}\n\n\t/* an escaped newline code point (`\\a`) is content of the name, never a raw line break */\n\t::part(name4\\a) {\n\t\tcolor: green;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 457,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

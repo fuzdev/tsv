@@ -281,10 +281,9 @@ fn parse_part_args<'arena>(
 ) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
     parser.skip_boundary_whitespace_registering_comments()?;
 
-    let mut idents = parser.bvec();
-    // Per-ident spans, parallel to `idents`, so the printer can find comments in
-    // the interior gaps between the names (and derive the whole-run span: first
-    // start .. last end).
+    // One span per name: the printer emits each name verbatim from its span, finds
+    // comments in the interior gaps between them, and derives the whole-run span
+    // (first start .. last end); the wire projects the run from them too.
     let mut ident_spans: bumpalo::collections::Vec<'_, Span> = parser.bvec();
 
     // Parse space-separated identifiers
@@ -293,8 +292,6 @@ fn parse_part_args<'arena>(
             return Err(parser.error_msg("::part() requires identifier arguments"));
         }
 
-        let ident = parser.current_identifier_in_arena();
-        idents.push(ident);
         ident_spans.push(Span {
             start: parser.span_pos(parser.current_start()),
             end: parser.span_pos(parser.current_end()),
@@ -304,7 +301,7 @@ fn parse_part_args<'arena>(
         parser.skip_boundary_whitespace_registering_comments()?;
     }
 
-    if idents.is_empty() {
+    if ident_spans.is_empty() {
         return Err(parser.error_msg_at(
             "::part() requires at least one identifier",
             parser.base_offset() + args_start,
@@ -315,7 +312,6 @@ fn parse_part_args<'arena>(
 
     Ok((
         Some(PseudoClassArgs::Part {
-            idents: idents.into_bump_slice(),
             ident_spans: ident_spans.into_bump_slice(),
             span: Span {
                 start: parser.span_pos(args_start),

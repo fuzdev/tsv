@@ -334,7 +334,7 @@ impl<'a> Printer<'a> {
             #[cfg(debug_assertions)]
             {
                 let mut rendered = String::new();
-                tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
+                tsv_lang::doc::arena_print_css_doc_into(
                     self.arena,
                     doc,
                     &self.embed,

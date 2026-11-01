@@ -188,6 +188,30 @@ pub fn format_string_literal(raw_content: &str, original_quote: char) -> String 
     result
 }
 
+/// Whether the `\` immediately before `bytes`' end starts a valid escape — the run of
+/// backslashes ending `bytes` has **odd** length, so the last one is itself unescaped
+/// and escapes whatever comes next. An even run is a completed `\\`.
+///
+/// The single definition of this question for a backslash-escaping language (CSS's
+/// css-syntax-3 §4.3.4/§4.3.7 escapes, whose literal form makes `\` + a space or tab one
+/// code point). Its readers: `tsv_css`'s escape-aware trims, which hand an open escape
+/// back its payload, and the doc renderer's line-break trim under CSS's render entry,
+/// which spares that payload before a newline. Bytes, not chars: `\` is ASCII, which no
+/// UTF-8 continuation byte equals.
+///
+/// ```
+/// use tsv_lang::printing::ends_with_open_escape;
+///
+/// assert!(ends_with_open_escape(br"a\"));
+/// assert!(!ends_with_open_escape(br"a\\"));
+/// assert!(ends_with_open_escape(br"a\\\"));
+/// assert!(!ends_with_open_escape(b"a"));
+/// ```
+#[inline]
+pub fn ends_with_open_escape(bytes: &[u8]) -> bool {
+    bytes.iter().rev().take_while(|&&b| b == b'\\').count() % 2 == 1
+}
+
 /// Check if two positions are on the same line (no newline between them)
 ///
 /// Returns `true` if there is no newline character between `prev_end` and `curr_start`.

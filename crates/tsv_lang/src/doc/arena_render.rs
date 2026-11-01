@@ -240,9 +240,10 @@ fn remaining_width(pos: usize, render: &RenderConfig) -> isize {
 }
 
 /// Trim trailing whitespace (spaces and tabs) from the end of the output buffer.
-/// Matches Prettier's `trim()` / `trimIndentation()` — called before each
-/// non-literal newline to strip trailing indentation/spaces from code lines, and
-/// once more when a render finishes, as the **final-line** trim.
+/// Matches Prettier's `trim()` / `trimIndentation()` — run when a render finishes,
+/// as the **final-line** trim, and (through [`trim_line_end`], which shares its
+/// scan) before each non-literal newline, to strip trailing indentation/spaces
+/// from code lines.
 ///
 /// ⚠️ **Those two are one question, and the final-line trim's "find the last line
 /// first" step was inert.** It used to `rposition` back to the last `\n` and trim
@@ -255,26 +256,58 @@ fn remaining_width(pos: usize, render: &RenderConfig) -> isize {
 /// their own break, so reaching one again would be a no-op regardless; the point
 /// is that it *cannot* reach one.)
 ///
-/// One of the printer's hottest calls: every non-literal line break of every
-/// document reaches it (140,851 a fuz_app pass). So it is spelled as a guarded
-/// reverse **byte** scan rather than `str::trim_end_matches([' ', '\t'])`, which
-/// pays twice for what is usually a no-op — the array pattern searches backwards
-/// over `char_indices`, decoding UTF-8 that the two ASCII bytes it seeks can
-/// never be part of, and the `truncate` runs whether or not the length moved. A
-/// formatted line ends in content, so the common answer is "nothing to trim", and
-/// the guard turns that answer into one load and two compares.
+/// Its scan, [`trailing_blank_start`], is one of the printer's hottest: every
+/// non-literal line break of every document reaches it through [`trim_line_end`]
+/// (140,851 a fuz_app pass). So it is spelled as a guarded reverse **byte** scan
+/// rather than `str::trim_end_matches([' ', '\t'])`, which pays twice for what is
+/// usually a no-op — the array pattern searches backwards over `char_indices`,
+/// decoding UTF-8 that the two ASCII bytes it seeks can never be part of, and the
+/// `truncate` runs whether or not the length moved. A formatted line ends in
+/// content, so the common answer is "nothing to trim", and the guard turns that
+/// answer into one load and two compares.
 #[inline]
 pub(super) fn trim_trailing_whitespace(output: &mut String) {
-    let bytes = output.as_bytes();
-    let Some(&last) = bytes.last() else { return };
-    if last != b' ' && last != b'\t' {
-        return;
+    if let Some(end) = trailing_blank_start(output.as_bytes()) {
+        output.truncate(end);
     }
-    // Only ASCII bytes are ever stepped over, so `end` lands exactly where a
-    // character ends — the same index `trim_end_matches` would have computed.
+}
+
+/// Where the trailing run of spaces and tabs in `bytes` starts, or `None` when the
+/// last byte is neither (an empty slice included) — the guard that keeps the common
+/// "nothing to trim" answer to one load and two compares.
+///
+/// Only ASCII bytes are ever stepped over, so the index lands exactly where a
+/// character ends — the same index `trim_end_matches` would have computed.
+#[inline]
+fn trailing_blank_start(bytes: &[u8]) -> Option<usize> {
+    let &last = bytes.last()?;
+    if last != b' ' && last != b'\t' {
+        return None;
+    }
     let mut end = bytes.len() - 1;
     while end > 0 && matches!(bytes[end - 1], b' ' | b'\t') {
         end -= 1;
+    }
+    Some(end)
+}
+
+/// The trailing-whitespace trim a non-literal line break runs:
+/// [`trim_trailing_whitespace`], except that under
+/// [`RenderConfig::keeps_escaped_whitespace`] the trimmed run's first byte survives
+/// when it is a literal escape's payload — an odd run of `\` right before it
+/// ([`crate::printing::ends_with_open_escape`]). Two backslashes are an escaped
+/// backslash, so the space after them is padding again.
+///
+/// The "nothing to trim" guard ([`trailing_blank_start`]) comes first, ahead of the
+/// flag, so the common answer stays one load and two compares.
+#[inline]
+pub(super) fn trim_line_end(output: &mut String, render: &RenderConfig) {
+    let bytes = output.as_bytes();
+    let Some(mut end) = trailing_blank_start(bytes) else {
+        return;
+    };
+    if render.keeps_escaped_whitespace && crate::printing::ends_with_open_escape(&bytes[..end]) {
+        end += 1;
     }
     output.truncate(end);
 }
@@ -303,7 +336,7 @@ pub(super) fn render_line_break(
         } else {
             // Non-literal line: trim trailing whitespace before newline
             // (matches Prettier's trim() call before non-literal newlines)
-            trim_trailing_whitespace(output);
+            trim_line_end(output, render);
             output.push('\n');
             write_indentation(output, indent, render);
             *pos = line_start_column(indent, render);
@@ -613,14 +646,73 @@ pub fn arena_print_doc_with_indent_resolved_preserve_whitespace_into(
     source: &str,
     output: &mut String,
 ) {
-    let render = RenderConfig::default();
+    render_untrimmed_into(
+        &RenderConfig::default(),
+        arena,
+        doc,
+        embed,
+        start_column,
+        start_indent_level,
+        source,
+        output,
+    );
+}
+
+/// The CSS printer's render entry: [`arena_print_doc_with_indent_resolved_preserve_whitespace_into`]
+/// with every line break's trim made escape-aware
+/// ([`RenderConfig::keeps_escaped_whitespace`]). A CSS token can end in a literal
+/// escape of a space or tab (`.a\ `, a class named `a `; `f(b\ )`), and when a break
+/// lands right after it, the escape's payload is content, not padding — trimming it
+/// leaves `\` before the newline, which is not a valid escape, and the output no
+/// longer parses. The final-line trim is skipped for the same reason (the caller
+/// appends the `;`, `,` or ` {` after the piece).
+pub fn arena_print_css_doc_into(
+    arena: &DocArena,
+    doc: DocId,
+    embed: &EmbedContext,
+    start_column: usize,
+    start_indent_level: usize,
+    source: &str,
+    output: &mut String,
+) {
+    render_untrimmed_into(
+        &RenderConfig {
+            keeps_escaped_whitespace: true,
+            ..RenderConfig::default()
+        },
+        arena,
+        doc,
+        embed,
+        start_column,
+        start_indent_level,
+        source,
+        output,
+    );
+}
+
+/// The body the two final-line-preserving entries share
+/// ([`arena_print_doc_with_indent_resolved_preserve_whitespace_into`],
+/// [`arena_print_css_doc_into`]): a source-resolved render under `render`, with no
+/// final-line trim.
+#[expect(clippy::too_many_arguments)]
+#[inline]
+fn render_untrimmed_into(
+    render: &RenderConfig,
+    arena: &DocArena,
+    doc: DocId,
+    embed: &EmbedContext,
+    start_column: usize,
+    start_indent_level: usize,
+    source: &str,
+    output: &mut String,
+) {
     let mut pos: usize = start_column;
 
     output.reserve(arena.estimated_output_capacity());
     render_doc_iterative(
         &RenderCtx {
             arena,
-            render: &render,
+            render,
             embed,
             source: Some(source),
         },
@@ -1711,7 +1803,7 @@ mod column_arithmetic_tests {
     #[cfg(feature = "_internal_comment_check")]
     use super::RenderPurpose;
     use super::{
-        INDENT_RUN, RenderIndent, indent_str_width, indent_width, line_start_column,
+        INDENT_RUN, RenderIndent, indent_str_width, indent_width, line_start_column, trim_line_end,
         update_pos_for_text, write_indentation,
     };
     use crate::config::TAB_WIDTH;
@@ -1830,9 +1922,40 @@ mod column_arithmetic_tests {
         RenderConfig {
             print_width: 100,
             indent,
+            keeps_escaped_whitespace: false,
             #[cfg(feature = "_internal_comment_check")]
             purpose: RenderPurpose::Output,
         }
+    }
+
+    // --- the line-break trim: plain, and CSS's escape-aware rule ---
+
+    fn trimmed(text: &str, keeps_escaped_whitespace: bool) -> String {
+        let render = RenderConfig {
+            keeps_escaped_whitespace,
+            ..cfg("\t")
+        };
+        let mut output = text.to_string();
+        trim_line_end(&mut output, &render);
+        output
+    }
+
+    #[test]
+    fn trim_line_end_spares_an_escaped_whitespace_payload_only_when_asked() {
+        // plain: every trailing space and tab goes, escape or not
+        assert_eq!(trimmed("a\\ ", false), "a\\");
+        assert_eq!(trimmed("a\\\t \t", false), "a\\");
+        // escape-aware: the one byte an odd run of `\` escapes stays, the padding after it goes
+        assert_eq!(trimmed("a\\ ", true), "a\\ ");
+        assert_eq!(trimmed("a\\  \t", true), "a\\ ");
+        assert_eq!(trimmed("a\\\t ", true), "a\\\t");
+        assert_eq!(trimmed("a\\\\\\ ", true), "a\\\\\\ ");
+        // an even run is an escaped backslash: the space after it is padding again
+        assert_eq!(trimmed("a\\\\ ", true), "a\\\\");
+        // nothing to trim, or nothing but whitespace
+        assert_eq!(trimmed("a\\", true), "a\\");
+        assert_eq!(trimmed("  ", true), "");
+        assert_eq!(trimmed("\\ ", true), "\\ ");
     }
 
     #[test]
@@ -1977,7 +2100,7 @@ mod render_base_contract_tests {
         assert_eq!(appended, "x\t\nb");
         assert_eq!(
             in_place, "x\nb",
-            "`trim_trailing_whitespace` runs before the doc's first newline and \
+            "`trim_line_end` runs before the doc's first newline and \
              has no floor, so it eats the tab the doc never wrote"
         );
         assert_ne!(

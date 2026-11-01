@@ -527,12 +527,15 @@ impl<'a> Printer<'a> {
     /// `!important` tail) is appended to the buffer *afterwards* by `write_declaration_end`,
     /// so that escaped space sits at the very end of the piece. The default entry point's
     /// final-line trim would strip it and strand the backslash onto the `;`, whose output no
-    /// longer parses — so this uses the preserve-whitespace entry point (the same one HTML
-    /// `<pre>`/`<textarea>` use, for the same reason).
+    /// longer parses — so this uses the CSS entry point (`arena_print_css_doc_into`),
+    /// which skips the final-line trim as the HTML `<pre>`/`<textarea>` entry does.
     ///
-    /// Interior lines are still trimmed inline by `render_line_break`; only the final-line
-    /// trim is skipped, and an ordinary value's rendered piece never ends in whitespace, so
-    /// this is a no-op everywhere else — except a selector, which can end in an escaped
+    /// The same payload can end an **interior** line too, where a break lands right after
+    /// it (the last argument of a wrapped `f(…, b\ )` or `:not(…, .c\ )`, a value fill
+    /// breaking after `b\ `): that entry's line-break trim spares the one whitespace byte
+    /// an odd run of `\` escapes, and trims as everywhere else otherwise. An ordinary
+    /// value's rendered piece never ends in whitespace, so the final-line rule is a no-op
+    /// everywhere else — except a selector, which can end in an escaped
     /// space too (`.a\ `, a class named `a `), with the `,` / ` {` its caller appends landing
     /// right after it: trim the payload and the stranded backslash escapes that punctuation
     /// instead (`.a\ , .b` → `.a\,`, one class named `a,` — the selector list is gone).
@@ -560,13 +563,14 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// Render a doc through the preserve-whitespace entry point and write it.
+    /// Render a doc through the CSS entry point (escape-aware line trims, no final-line
+    /// trim) and write it.
     fn render_arena_doc(&mut self, d: DocId) {
         let current_col = self.current_column();
         // Render into the arena-parked scratch: one warm buffer across the
         // file's rules instead of an alloc/free per rule.
         let mut output = self.arena.take_render_scratch();
-        doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
+        doc::arena_print_css_doc_into(
             self.arena,
             d,
             &self.embed,

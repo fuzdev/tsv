@@ -8,7 +8,7 @@ use smallvec::SmallVec;
 use super::arena::{ArenaCommand, DocArena, DocId, RenderIndent, WeldedEntry};
 use super::arena_fits::{arena_fits_multi, arena_fits_with_lookahead};
 use super::arena_render::{
-    RenderCtx, line_start_column, render_single_doc, trim_trailing_whitespace, write_indentation,
+    RenderCtx, line_start_column, render_single_doc, trim_line_end, write_indentation,
 };
 use super::types::{DocContext, Mode};
 
@@ -234,7 +234,7 @@ pub(super) fn render_fill_iterative(
                     if *pos != line_start_pos
                         && !on_shallower_indentation(output, *pos, line_start_pos)
                     {
-                        trim_trailing_whitespace(output);
+                        trim_line_end(output, render);
                         output.push('\n');
                         write_indentation(output, indent, render);
                         *pos = line_start_pos;
@@ -464,7 +464,7 @@ pub(super) fn render_fill_iterative(
                 }
 
                 if !on_shallower_indentation(output, *pos, line_start_pos) {
-                    trim_trailing_whitespace(output);
+                    trim_line_end(output, render);
                     output.push('\n');
                     write_indentation(output, indent, render);
                     *pos = line_start_pos;

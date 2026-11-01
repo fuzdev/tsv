@@ -41,9 +41,9 @@ impl OutputBuffer {
     /// buffer already holds text**.
     ///
     /// The doc renderer appends into a caller-provided `String`, and its trim —
-    /// `trim_trailing_whitespace`, run before every non-literal line break and once
-    /// more at the end as the final-line trim — walks backwards from the end with no
-    /// floor. Handing it a buffer that already holds text lets it strip bytes the
+    /// `trim_line_end` before every non-literal line break, `trim_trailing_whitespace`
+    /// once more at the end as the final-line trim — walks backwards from the end with
+    /// no floor. Handing it a buffer that already holds text lets it strip bytes the
     /// doc never wrote (a doc whose first command is a hard line break eats the
     /// indentation the printer wrote imperatively before it), so a caller may render
     /// straight into this buffer only while it is empty and must otherwise render

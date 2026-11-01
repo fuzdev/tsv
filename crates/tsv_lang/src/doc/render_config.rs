@@ -55,6 +55,13 @@ impl RenderPurpose {
 pub(crate) struct RenderConfig {
     pub print_width: usize,
     pub indent: &'static str,
+    /// Whether a line break's trailing-whitespace trim spares a whitespace byte that
+    /// is the payload of a literal escape (`\` + that space or tab) — CSS's escape
+    /// rule (css-syntax-3 §4.3.4/§4.3.7), where `\ ` is one code point and trimming its
+    /// payload strands the `\` onto the newline, which is no escape at all. Only the
+    /// CSS printer's entry point ([`super::arena_render::arena_print_css_doc_into`])
+    /// sets it; every other language's breaks trim as prettier's `trim()` does.
+    pub keeps_escaped_whitespace: bool,
     /// Read only by the `_internal_comment_check` ledger — see [`RenderPurpose`]. Absent without
     /// the feature, so production builds carry no diagnostic state.
     #[cfg(feature = "_internal_comment_check")]
@@ -66,6 +73,7 @@ impl Default for RenderConfig {
         Self {
             print_width: PRINT_WIDTH,
             indent: INDENT,
+            keeps_escaped_whitespace: false,
             #[cfg(feature = "_internal_comment_check")]
             purpose: RenderPurpose::Output,
         }

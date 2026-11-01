@@ -1480,10 +1480,10 @@ impl<'a> Printer<'a> {
         let current_col = self.current_column();
         // An empty buffer *is* the render target, and `as_empty_render_target`
         // hands it over only while it is one. The renderer's trim
-        // (`trim_trailing_whitespace`, at every non-literal break and once more at
-        // the end) is the only thing that reads back past what the doc wrote, and
-        // with nothing in front of the doc's first byte it cannot reach text
-        // this render did not produce — every other `output.len()` the render
+        // (`trim_line_end` at every non-literal break, `trim_trailing_whitespace`
+        // once more at the end) is the only thing that reads back past what the
+        // doc wrote, and with nothing in front of the doc's first byte it cannot
+        // reach text this render did not produce — every other `output.len()` the render
         // loop takes is a marker captured mid-render, so it is already relative.
         // Rendering in place is therefore byte-identical to rendering into the
         // scratch and copying, and it retires the copy: `print_program` — today

@@ -143,13 +143,6 @@ fn decode_escapes_into_arena<'arena>(source: &str, arena: &'arena Bump) -> &'are
     result.into_bump_str()
 }
 
-/// Whether the `\` immediately before `text`'s end starts a valid escape — i.e. the
-/// run of backslashes ending `text` has **odd** length, so the last one is itself
-/// unescaped and escapes whatever comes next. An even run is a completed `\\`.
-pub(crate) fn ends_with_open_escape(text: &str) -> bool {
-    text.bytes().rev().take_while(|&b| b == b'\\').count() % 2 == 1
-}
-
 /// Whether `c` is a character [`trim_end_preserving_escape`] must hand back to an escape
 /// as its **payload**.
 ///
@@ -346,9 +339,14 @@ fn decoded_bytes_eq_ignore_ascii_case(s: &str, kw: &[u8]) -> bool {
 /// whitespace character is never eaten in the first place. There is no "restore what the
 /// Unicode trim took" case, because nothing takes it.
 ///
-/// The single definition of this rule. The parser's value/argument spans, the printer's
-/// whitespace normalizer and top-level splitter, the selector leaf/pseudo printers, the
-/// at-rule prelude, and `url()` trimming all route through it, so they cannot drift.
+/// The single definition of this rule for a CSS slice. The parser's value/argument spans,
+/// the printer's whitespace normalizer and top-level splitter, the selector leaf/pseudo
+/// printers, the at-rule prelude, and `url()` trimming all route through it, so they cannot
+/// drift. Its "open escape" question is `tsv_lang`'s
+/// [`ends_with_open_escape`](tsv_lang::printing::ends_with_open_escape), which the doc
+/// renderer's line-break trim also asks under the CSS render entry
+/// (`tsv_lang::doc::arena_print_css_doc_into`) — the same payload kept where a break lands
+/// right after it, so the two trims cannot drift either.
 ///
 /// This is **not** the lexer's escape-terminator rule (`lexer::identifiers`), which is
 /// Unicode-wide because its oracle is `parseCss`'s `\s`-based regex. Different question,
@@ -373,7 +371,7 @@ pub(crate) fn trim_end_preserving_escape(s: &str) -> &str {
 #[cold]
 #[inline(never)]
 fn restore_escape_payload<'a>(s: &'a str, trimmed: &'a str) -> &'a str {
-    if !ends_with_open_escape(trimmed) {
+    if !tsv_lang::printing::ends_with_open_escape(trimmed.as_bytes()) {
         return trimmed;
     }
     match s[trimmed.len()..].chars().next() {
