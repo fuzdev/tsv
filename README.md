@@ -138,7 +138,7 @@ The checksum file and the attestation are this channel's whole integrity story;
 it has no signed release log of its own.
 
 With [cargo-binstall](https://github.com/cargo-bins/cargo-binstall),
-`cargo binstall tsv_cli` installs that same prebuilt binary from the GitHub Release
+`cargo binstall` [`tsv_cli`](https://crates.io/crates/tsv_cli) installs that same prebuilt binary from the GitHub Release
 matching the crates.io version (Linux x64 and arm64 gnu, glibc 2.28 or newer; macOS arm64
 and x64; Windows x64); any other target, musl included, falls back to a source build.
 From crates.io, `cargo install --locked tsv_cli` builds the same `tsv` binary from source
@@ -210,6 +210,10 @@ without `parse_to_json*`.
 
 The same 1-based lines and UTF-16 offsets appear on both sides; `span()` is the Rust-only
 byte range.
+
+Also published: [`tsv_ignore`](https://docs.rs/tsv_ignore), the gitignore-faithful matcher
+behind discovery, and [`tsv_html`](https://docs.rs/tsv_html), the WHATWG named character
+references; `tsv_lang` and `tsv_discover` are support crates.
 
 ## Design
 
