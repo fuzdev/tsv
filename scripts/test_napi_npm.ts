@@ -878,7 +878,7 @@ const run_cli = (args: Array<string>, stdin?: string) =>
  * else pins the dispatch — this leaves the parity verdicts with nothing to
  * degrade into.
  */
-const run_native = (args: Array<string>, input: string | Buffer = '', cwd?: string) =>
+const run_native = (args: Array<string>, input: string | Uint8Array = '', cwd?: string) =>
 	spawnSync(native_path, args, { encoding: 'utf-8', input, cwd });
 
 describe('cli (bin.js): the tsv bin dispatching to the native CLI binary', () => {
@@ -1149,7 +1149,7 @@ const advertised_flags = (help: string, source: string, command: string): Array<
 	return flags;
 };
 
-const run_mirror = (args: Array<string>, input: string | Buffer = '', cwd?: string) =>
+const run_mirror = (args: Array<string>, input: string | Uint8Array = '', cwd?: string) =>
 	spawnSync(process.execPath, [cli_path, ...args], { encoding: 'utf-8', input, cwd });
 
 // The three parity suites below all compare `run_native` against `run_mirror`,

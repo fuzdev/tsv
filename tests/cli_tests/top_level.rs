@@ -10,7 +10,11 @@ use crate::common::{built_tsv, temp_dir, tsv};
 fn test_unknown_command() {
     let output = tsv(&["unknown-command"]);
 
-    assert!(!output.status.success(), "Unknown command should fail");
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "Unknown command is a malformed command line"
+    );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("Unrecognized argument"),

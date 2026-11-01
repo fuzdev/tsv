@@ -331,6 +331,46 @@ fn test_parse_invalid_syntax() {
     );
 }
 
+/// `parse` splits a verdict from trouble, as `grep` does: 1 only when the input does not
+/// parse, 2 when the command could not run — a malformed command line (argh's refusal,
+/// the code every command gives it) or an argument the command refuses itself.
+#[test]
+fn test_parse_exit_codes_split_a_failed_parse_from_trouble() {
+    let failed = tsv(&["parse", "--content", "const = ;", "--parser", "ts"]);
+    assert_eq!(failed.status.code(), Some(1), "the input does not parse");
+    let rows: &[&[&str]] = &[
+        &["parse", "a.ts", "b.ts"],
+        &["parse", "--bogus", "--content", "x", "--parser", "ts"],
+        &["parse", "--content"],
+        &[
+            "parse",
+            "--content",
+            "x",
+            "--content",
+            "y",
+            "--parser",
+            "ts",
+        ],
+        &["parse", "--content", "x", "--parser", "bogus"],
+        &["parse", "--version"],
+        &[
+            "parse",
+            "--content",
+            "x",
+            "--parser",
+            "ts",
+            "--source-type",
+            "bogus",
+        ],
+    ];
+    for &args in rows {
+        let output = tsv(args);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(output.status.code(), Some(2), "{args:?}: {stderr}");
+        assert!(output.stdout.is_empty(), "{args:?}: nothing parsed");
+    }
+}
+
 #[test]
 fn test_parse_missing_parser() {
     let output = tsv(&["parse", "--content", "<div>test</div>"]);

@@ -7,7 +7,7 @@
 use std::fs;
 use std::process::Output;
 
-use crate::common::{temp_dir, tsv, tsv_in_dir, tsv_stdin};
+use crate::common::{built_tsv, temp_dir, tsv, tsv_in_dir, tsv_stdin};
 
 /// The run's exit code, stdout and stderr, each read as UTF-8.
 /// Test helper; panicking on a signal death or non-UTF-8 output is the desired behavior.
@@ -451,6 +451,48 @@ fn test_strip_missing_file() {
         &tsv_in_dir(&dir, &["strip", "missing_file_for_strip.ts"]),
         2,
         "Error: Error reading file missing_file_for_strip.ts: ",
+    );
+}
+
+/// Input that is not UTF-8 is a read error, exit 2 — a file and stdin alike, nothing on
+/// stdout. `scripts/strip_suite.ts` holds the JS mirror to the same two rows.
+#[test]
+fn test_strip_input_that_is_not_utf8_is_a_read_error() {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    const BAD: &[u8] = b"let a: string = '\xff';\n";
+
+    let dir = temp_dir("strip_invalid_utf8");
+    fs::write(dir.join("a.ts"), BAD).expect("write the file");
+    let (status, stdout, stderr) = outcome(&tsv_in_dir(&dir, &["strip", "a.ts"]));
+    assert_eq!(status, 2, "stderr: {stderr}");
+    assert_eq!(stdout, "");
+    assert!(
+        stderr.starts_with("Error: Error reading file ")
+            && stderr.ends_with("a.ts: stream did not contain valid UTF-8\n"),
+        "stderr: {stderr:?}"
+    );
+
+    let mut child = Command::new(built_tsv())
+        .args(["strip", "--stdin"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn tsv");
+    child
+        .stdin
+        .take()
+        .expect("child stdin")
+        .write_all(BAD)
+        .expect("write stdin");
+    let (status, stdout, stderr) = outcome(&child.wait_with_output().expect("wait"));
+    assert_eq!(status, 2, "stderr: {stderr}");
+    assert_eq!(stdout, "");
+    assert_eq!(
+        stderr,
+        "Error: Error reading from stdin: stream did not contain valid UTF-8\n"
     );
 }
 

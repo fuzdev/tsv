@@ -88,7 +88,7 @@ fn test_format_source_type_invalid_value() {
         "bogus",
     ]);
 
-    // format uses exit 2 for argument/usage errors (distinct from parse's 1).
+    // a usage error exits 2, in every command
     assert_eq!(
         output.status.code(),
         Some(2),
@@ -132,9 +132,10 @@ fn test_format_source_type_rejected_in_path_mode() {
 fn test_format_missing_parser() {
     let output = tsv(&["format", "--content", "<div>test</div>"]);
 
-    assert!(
-        !output.status.success(),
-        "Format without --parser should fail"
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "Format without --parser is a usage error"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(

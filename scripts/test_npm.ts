@@ -3158,6 +3158,15 @@ try {
 		assert.equal(result.stdout, `tsv ${pkg.version}\n`);
 	});
 
+	// a subcommand takes no --version: argh's unrecognized-argument refusal, as the native
+	// CLI prints it (`tests/cli_tests/top_level.rs`)
+	it('format --version is refused as argh refuses it and exits 2', () => {
+		const result = run_cli(['format', '--version']);
+		assert.equal(result.status, 2);
+		assert.equal(result.stdout, '');
+		assert.match(result.stderr, /^Unrecognized argument: --version\n/);
+	});
+
 	it('help subcommand exits 0 (mirrors argh)', () => {
 		const result = run_cli(['help', 'format']);
 		assert.equal(result.status, 0);

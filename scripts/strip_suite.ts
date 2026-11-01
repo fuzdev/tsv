@@ -399,16 +399,21 @@ export interface CliResult {
 }
 
 /** Run one `tsv` bin with `args` (and `stdin`, when given), in `cwd` when given. */
-export type CliRunner = (args: Array<string>, stdin?: string, cwd?: string) => CliResult;
+export type CliRunner = (
+	args: Array<string>,
+	stdin?: string | Uint8Array,
+	cwd?: string
+) => CliResult;
 
 /** One CLI row: the argv (with `FILE` standing for a temp file holding `file`, when given),
- * the stdin, and the outcome. `stderr_starts` is a prefix; `stdout` is exact. */
+ * the stdin, and the outcome. `stderr_starts` is a prefix; `stdout` is exact. Bytes rather
+ * than a string, for `stdin` or `file`, reach input that is not UTF-8. */
 export interface StripCliRow {
 	name: string;
 	args: Array<string>;
-	stdin?: string;
+	stdin?: string | Uint8Array;
 	/** Written to a temp file named `file_name` (default `a.ts`); `FILE` in `args` is its path. */
-	file?: string;
+	file?: string | Uint8Array;
 	file_name?: string;
 	status: number;
 	stdout?: string;
@@ -422,6 +427,13 @@ export interface StripCliRow {
 }
 
 const ENUM = 'enum E { A }\n';
+
+/** A TypeScript source holding a byte that is not UTF-8 (a lone `0xff` in a string). */
+const INVALID_UTF8 = new Uint8Array([
+	...new TextEncoder().encode("let a: string = '"),
+	0xff,
+	...new TextEncoder().encode("';\n")
+]);
 
 export const STRIP_CLI_ROWS: ReadonlyArray<StripCliRow> = [
 	{
@@ -683,6 +695,23 @@ export const STRIP_CLI_ROWS: ReadonlyArray<StripCliRow> = [
 		stderr_starts: 'Error: Error reading file missing_file_for_strip.ts: '
 	},
 	{
+		name: 'a file that is not UTF-8 is a read error',
+		args: ['strip', 'FILE'],
+		file: INVALID_UTF8,
+		status: 2,
+		stdout: '',
+		stderr_starts: 'Error: Error reading file ',
+		stderr_includes: 'a.ts: stream did not contain valid UTF-8\n'
+	},
+	{
+		name: 'stdin that is not UTF-8 is a read error',
+		args: ['strip', '--stdin'],
+		stdin: INVALID_UTF8,
+		status: 2,
+		stdout: '',
+		stderr: 'Error: Error reading from stdin: stream did not contain valid UTF-8\n'
+	},
+	{
 		name: 'a second positional is refused by the argument parser',
 		args: ['strip', 'a.ts', 'b.ts'],
 		status: 2,
@@ -740,7 +769,10 @@ export function register_strip_cli_suite(label: string, run: CliRunner): void {
 						assert.ok(result.stdout.includes('--source-type'), result.stdout);
 					}
 					if (row.file !== undefined) {
-						assert.equal(readFileSync(file_path, 'utf8'), row.file, 'strip never writes the file');
+						const written = readFileSync(file_path);
+						const expected =
+							typeof row.file === 'string' ? new TextEncoder().encode(row.file) : row.file;
+						assert.ok(written.equals(expected), 'strip never writes the file');
 					}
 				} finally {
 					rmSync(dir, { recursive: true, force: true });
