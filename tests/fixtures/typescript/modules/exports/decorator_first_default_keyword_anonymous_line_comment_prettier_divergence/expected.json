@@ -1,0 +1,110 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 163,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment in the `default`→`class` gap of a decorators-first anonymous class",
+			"start": 20,
+			"end": 104
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 127,
+			"end": 131
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 162,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 153,
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 112,
+					"end": 152,
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassDeclaration",
+						"start": 106,
+						"end": 152,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 106,
+								"end": 110,
+								"expression": {
+									"type": "Identifier",
+									"start": 107,
+									"end": 110,
+									"name": "dec"
+								}
+							}
+						],
+						"id": null,
+						"superClass": {
+							"type": "Identifier",
+							"start": 148,
+							"end": 149,
+							"name": "B",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 127,
+									"end": 131
+								}
+							]
+						},
+						"body": {
+							"type": "ClassBody",
+							"start": 150,
+							"end": 152,
+							"body": []
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment in the `default`→`class` gap of a decorators-first anonymous class",
+							"start": 20,
+							"end": 104
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

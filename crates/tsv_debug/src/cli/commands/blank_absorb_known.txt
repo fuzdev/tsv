@@ -35,7 +35,7 @@
 # fix — or a vanished site; re-pin either way).
 #
 # Format: (NODE_TYPE, LEFT→RIGHT)
-# shapes: 537
+# shapes: 540
 (AnimateDirective, ^→expression)
 (AnimateDirective, expression→$)
 (ArrayExpression, ^→$)
@@ -105,11 +105,14 @@
 (ClassBody, ^→$)
 (ClassBody, ^→body)
 (ClassBody, body→$)
+(ClassDeclaration, ^→body)
 (ClassDeclaration, ^→id)
 (ClassDeclaration, ^→implements)
 (ClassDeclaration, ^→typeParameters)
+(ClassDeclaration, decorators→body)
 (ClassDeclaration, decorators→decorators)
 (ClassDeclaration, decorators→id)
+(ClassDeclaration, decorators→superClass)
 (ClassDeclaration, id→body)
 (ClassDeclaration, id→implements)
 (ClassDeclaration, id→superClass)

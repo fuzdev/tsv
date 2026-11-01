@@ -83,9 +83,18 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
 
+        // The first keyword after any decorators (declare/abstract/class) is where this
+        // class's own text starts; the `class` keyword is located from it, since the span
+        // may open earlier (at a decorator, ahead of a decorators-first `export default`).
+        let keyword_start = self.class_declaration_keyword_start(decl);
+        let search_end = decl.id.as_ref().map_or(decl.span.end, |id| id.span.start);
+        // Found past any comments between the modifiers; the modifier loop below reuses it.
+        let class_pos = self.find_keyword_in_range(keyword_start, search_end, "class");
+        let class_keyword_start = class_pos.unwrap_or(keyword_start);
+
         // Compute heritage positions once (shared with the class-expression printer).
         let positions = self.class_heritage_positions(
-            decl.span.start,
+            class_keyword_start,
             decl.id.as_ref(),
             decl.type_parameters.as_ref(),
             decl.super_class,
@@ -103,10 +112,7 @@ impl<'a> Printer<'a> {
 
         let mut parts = smallvec![];
 
-        // Decorators, each on its own line; the first keyword after them
-        // (declare/abstract/class) is where this class's own text starts.
-        let keyword_start = self.class_declaration_keyword_start(decl);
-
+        // Decorators, each on its own line.
         if include_decorators
             && let Some(dec_doc) = self.build_decorators_doc(decl.decorators, keyword_start)
         {
@@ -115,7 +121,6 @@ impl<'a> Printer<'a> {
 
         // Emit modifiers with comments preserved between each keyword pair
         // e.g., `abstract/* b */class B` → `abstract /* b */ class B`
-        let search_end = decl.id.as_ref().map_or(decl.span.end, |id| id.span.start);
         let mut cursor = keyword_start;
 
         if decl.declare {
@@ -136,8 +141,6 @@ impl<'a> Printer<'a> {
                 cursor = ap + "abstract".len() as u32;
             }
         }
-        // Find "class" in source after cursor, skipping comments
-        let class_pos = self.find_keyword_in_range(cursor, search_end, "class");
         if let Some(cp) = class_pos {
             if let Some(c) = self.build_inline_comments_between_doc_opt(cursor, cp) {
                 parts.push(c);

@@ -114,9 +114,15 @@ pub(in crate::printer) struct ClassHeaderOptions {
 
 impl<'a> Printer<'a> {
     /// Compute the heritage positions shared by both class printers.
+    ///
+    /// `class_keyword_start` is the `class` keyword itself, never the node's span start:
+    /// a decorated or `abstract`/`declare` class opens its span earlier (a decorators-first
+    /// `@dec export default class {}` opens at the `@`), and an anonymous class measures its
+    /// keyword→heritage / →body gap from that keyword's end — measured from the span, the gap
+    /// would reach back over comments the caller already printed.
     pub(in crate::printer) fn class_heritage_positions(
         &self,
-        span_start: u32,
+        class_keyword_start: u32,
         id: Option<&ast::Identifier<'_>>,
         type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
         super_class: Option<&ast::Expression<'_>>,
@@ -124,7 +130,7 @@ impl<'a> Printer<'a> {
         implements: &[ast::TSInterfaceHeritage<'_>],
     ) -> ClassHeritagePositions {
         let pre_heritage_end = type_parameters.map_or_else(
-            || id.map_or(span_start + "class".len() as u32, |id| id.span.end),
+            || id.map_or(class_keyword_start + "class".len() as u32, |id| id.span.end),
             |tp| tp.span.end,
         );
         // Find `extends`/`implements` keyword positions (not expression starts) so
@@ -152,7 +158,7 @@ impl<'a> Printer<'a> {
             .or(extends_clause_end)
             .or_else(|| type_parameters.map(|tp| tp.span.end))
             .or_else(|| id.map(|id| id.span.end))
-            .unwrap_or(span_start + "class".len() as u32);
+            .unwrap_or(class_keyword_start + "class".len() as u32);
 
         ClassHeritagePositions {
             pre_heritage_end,
