@@ -1993,7 +1993,7 @@ and the other sites where the same reach was the whole bug.
 
 tsv refuses a document nested deeper than 256 wire levels, or holding a left-nested chain
 (an operator, member, call or type chain) longer than 6,000 spine units, with a syntax
-error — `Nesting exceeds tsv's depth limit of 256 levels`, or `Chain of operators, member
+error — `Nesting exceeds tsv's depth limit of 256 wire levels`, or `Chain of operators, member
 accesses, calls, assertions or type suffixes exceeds tsv's length limit` — in every
 language and across the islands of a Svelte document, which share one count. Svelte's
 parser, acorn and acorn-typescript accept deeper input, until V8's own stack stops them

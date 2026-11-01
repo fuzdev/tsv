@@ -462,7 +462,7 @@ fn test_parse_depth_refusal_prints_as_a_parse_error() {
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.starts_with("Parse error: Nesting exceeds tsv's depth limit of 256 levels\n1:"),
+        stderr.starts_with("Parse error: Nesting exceeds tsv's depth limit of 256 wire levels\n1:"),
         "{stderr}"
     );
     assert!(stderr.trim_end().ends_with("^ here"), "{stderr}");

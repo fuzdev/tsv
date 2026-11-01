@@ -461,11 +461,12 @@ mod tests {
         assert_eq!(nesting.position(), Some(2));
         assert_eq!(nesting.span(), Some(2..2));
         assert!(
-            format!("{nesting:#}").starts_with("Nesting exceeds tsv's depth limit of 256 levels\n")
+            format!("{nesting:#}")
+                .starts_with("Nesting exceeds tsv's depth limit of 256 wire levels\n")
         );
         assert_eq!(
             nesting.to_string(),
-            "Nesting exceeds tsv's depth limit of 256 levels (1:3)"
+            "Nesting exceeds tsv's depth limit of 256 wire levels (1:3)"
         );
         let spine = Error::too_deep(DepthLimit::Spine, 0);
         assert_eq!(spine.kind(), crate::ErrorKind::TooDeep);

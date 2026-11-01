@@ -245,7 +245,7 @@ impl Repr {
             }
             Repr::TooDeep { limit, .. } => match limit {
                 DepthLimit::Nesting => format!(
-                    "Nesting exceeds tsv's depth limit of {} levels",
+                    "Nesting exceeds tsv's depth limit of {} wire levels",
                     limit.value()
                 ),
                 // no number: the limit counts weighted units, not links, with the nesting

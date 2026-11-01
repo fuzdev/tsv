@@ -384,7 +384,7 @@ fn accepted_limit(shape: &'static Shape) -> Option<usize> {
         let Verdict::TooDeep(error) = verdict(shape.lang, &shape.make(lo + 1)) else {
             panic!("{}: one past the limit is accepted", shape.name)
         };
-        let nesting = format!("depth limit of {NESTING_LIMIT} levels");
+        let nesting = format!("depth limit of {NESTING_LIMIT} wire levels");
         let refused_by_limit = match shape.limit {
             Limit::Nesting => error.contains(&nesting),
             Limit::Spine => error.contains("length limit"),

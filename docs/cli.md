@@ -475,7 +475,7 @@ every chain is charged come off it first — rather than near the spine limit, a
 `- - -` or of `<T>` casts at a half or a third of the 256 levels.
 
 The refusal is an ordinary syntax error at the token where the count tripped (`Nesting
-exceeds tsv's depth limit of 256 levels`, `Chain of operators, member accesses, calls,
+exceeds tsv's depth limit of 256 wire levels`, `Chain of operators, member accesses, calls,
 assertions or type suffixes exceeds tsv's length limit` — no number, since the spine limit
 counts weighted units with the nesting charged on top, which no count of links names; a
 CSS value's at the `(` that passes the limit): `parse` and `format` report it like any other,
