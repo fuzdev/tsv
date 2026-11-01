@@ -1,6 +1,6 @@
 # tsv_lang
 
-**Support crate for tsv** — no stability promise; depend on
+**Support crate for tsv** — stable only in the items the language crates re-export; depend on
 [`tsv_ts`](https://crates.io/crates/tsv_ts), [`tsv_css`](https://crates.io/crates/tsv_css) or
 [`tsv_svelte`](https://crates.io/crates/tsv_svelte).
 

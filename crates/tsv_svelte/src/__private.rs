@@ -68,11 +68,14 @@ pub fn format_folded_in(
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```
+/// # fn main() -> tsv_svelte::Result<()> {
 /// let source = "<div>Hello</div>";
 /// let arena = bumpalo::Bump::new();
 /// let ast = tsv_svelte::__private::parse(source, &arena)?;
 /// let formatted = tsv_svelte::__private::format_ast(&ast, source);
+/// # Ok(())
+/// # }
 /// ```
 pub fn format_ast(root: &Root<'_>, source: &str) -> String {
     printer::format_svelte(root, source)
@@ -112,9 +115,12 @@ pub fn format_ast_in(
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```
+/// # fn main() -> tsv_svelte::Result<()> {
 /// let arena = bumpalo::Bump::new();
 /// let ast = tsv_svelte::__private::parse("<div>Hello</div>", &arena)?;
+/// # Ok(())
+/// # }
 /// ```
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Root<'arena>> {
     Error::ensure_source_fits(source)?;
@@ -147,11 +153,14 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Root<
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```
+/// # fn main() -> tsv_svelte::Result<()> {
 /// let source = "<div>Hello</div>";
 /// let arena = bumpalo::Bump::new();
 /// let ast = tsv_svelte::__private::parse(source, &arena)?;
 /// let wire = tsv_svelte::__private::convert_ast_json_bytes(&ast, source);
+/// # Ok(())
+/// # }
 /// ```
 #[cfg(feature = "json")]
 pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {

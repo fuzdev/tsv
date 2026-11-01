@@ -113,8 +113,7 @@ mod whitespace;
 use __private::{format_folded_in, parse_folded};
 pub use formatter::Formatter;
 pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, STACK_SIZE, WirePoint, run_with_stack};
-#[doc(hidden)]
-pub use tsv_lang::{LeadingBom, LineRule, WireCoordinates};
+use tsv_lang::{LeadingBom, LineRule, WireCoordinates};
 
 // `tests/public_reexports.rs` (outside this crate) names every item above through this
 // crate's path: cargo-semver-checks cannot see a dropped or demoted re-export.
@@ -132,6 +131,10 @@ pub const WIRE_COORDINATES: WireCoordinates =
 ///
 /// Carriage returns (`\r\n` and a lone `\r`) are folded to `\n` ahead of the parse, so
 /// the output is LF-only.
+/// A leading byte-order mark is not echoed — except ahead of a content U+FEFF at the start of
+/// the output, which needs it to survive the next read — so a caller that keeps a file's BOM
+/// writes it back only when the output does not already begin with U+FEFF. A source with
+/// nothing to print — empty, or whitespace alone — formats to the empty string, not to a newline.
 ///
 /// ```
 /// # fn main() -> tsv_css::Result<()> {

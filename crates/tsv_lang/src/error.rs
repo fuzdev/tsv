@@ -357,7 +357,10 @@ pub struct ErrorReport {
     /// What went wrong — the message's first part.
     pub summary: String,
     /// The `{line}:{col}` header with the excerpted line, a `\n`, then the caret line —
-    /// what the message prints after the summary and a `\n`.
+    /// what the message prints after the summary and a `\n`. The excerpt is display text,
+    /// cut at any line terminator (a lone `\r`, U+2028 or U+2029 included), so under a
+    /// language whose lines end at `\n` alone it can begin mid-line; positions are read from
+    /// [`start`](Self::start) / [`end`](Self::end), never off the frame.
     pub frame: String,
     /// Where the error starts: the point the header prints.
     pub start: WirePoint,
@@ -717,6 +720,13 @@ impl Error {
     /// Every error a public parse, format or strip entry point returns is otherwise `Some`;
     /// only an error from tsv's own embedded plumbing, before its host has located it, has no
     /// frame yet.
+    ///
+    /// The points are the canonical parser's coordinates, not an editor's: a TypeScript
+    /// document counts a leading BOM and ends a line at every ECMAScript terminator (a lone `\r`,
+    /// U+2028 and U+2029 included), where a Svelte or CSS document elides the BOM and ends a
+    /// line at `\n` alone. An editor position comes from
+    /// [`Error::span`] — UTF-8 bytes of the caller's own text — mapped through the editor's
+    /// text model.
     ///
     /// Each call renders the report anew (two allocated `String`s); keep the result rather
     /// than calling it per field.

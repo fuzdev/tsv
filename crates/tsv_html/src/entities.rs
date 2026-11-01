@@ -55,6 +55,7 @@ use crate::entities_table::{ENTITIES, ENTITY_DISPLACEMENTS, ENTITY_SEED, LONGEST
 /// assert_eq!(match_named_character_reference("bogus;"), None);
 /// ```
 #[inline]
+#[must_use]
 pub fn match_named_character_reference(input: &str) -> Option<(usize, &'static str)> {
     // Every name is an ASCII alphanumeric run with at most a trailing `;`, so a match lies
     // within the input's leading alphanumeric run (plus the `;` after it). The run ends at the

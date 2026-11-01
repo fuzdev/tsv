@@ -116,7 +116,7 @@ impl HostBoundaryScan {
 }
 
 #[cfg(feature = "json")]
-pub use crate::ast::convert::{CssComments, write_css_children, write_css_comments};
+pub use crate::ast::convert::{write_css_children, write_css_comments};
 
 /// Format a CSS stylesheet to a formatted string — the hidden, AST-taking primitive beneath
 /// [`format()`], the public one-shot (parse and format a `&str`). Unlike [`format()`] it does no fold.

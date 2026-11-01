@@ -186,7 +186,7 @@ pub struct Stripped {
 // A new variant compiles silently at every in-workspace match, which `#[non_exhaustive]`
 // forces to carry a `_` arm: give it an arm of its own in tsv_wasm's and tsv_napi's
 // `strip_typescript` and in tsv_debug's `strip` command and strip-fixture grader.
-/// Why [`strip`] produced no output. Either way the failure is a [`tsv_lang::Error`]
+/// Why [`strip`] produced no output. Either way the failure is a [`Error`]
 /// ([`StripError::error`]), so it displays, spans and reports as every other tsv error does:
 /// one line under `{}`, the `line:col` header, excerpt and caret under `{:#}`.
 ///
@@ -268,11 +268,10 @@ impl UnsupportedConstruct {
         }
     }
 
-    /// The construct as a refusal's message names it, after `cannot strip `. Hidden: the
-    /// message's wording, read only by the refusal's own rendering.
-    #[doc(hidden)]
+    /// The construct as a refusal's message names it, after `cannot strip `: the message's
+    /// wording, read only by the refusal's own rendering.
     #[must_use]
-    pub const fn description(self) -> &'static str {
+    pub(crate) const fn description(self) -> &'static str {
         match self {
             Self::Enum => "an enum",
             Self::ValueNamespace => "a namespace with a value member",
@@ -299,7 +298,7 @@ impl StripError {
         StripError::Unsupported { construct, error }
     }
 
-    /// The failure as a [`tsv_lang::Error`]: a parse error's own, or the refusal's — one
+    /// The failure as a [`Error`]: a parse error's own, or the refusal's — one
     /// type to print, span and report whichever variant it is.
     #[must_use]
     pub fn error(&self) -> &Error {

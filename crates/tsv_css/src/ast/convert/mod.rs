@@ -34,7 +34,7 @@ use tsv_lang::{trim_end_js_whitespace, trim_js_whitespace, trim_start_js_whitesp
 
 mod write;
 pub(crate) use write::write_stylesheet_file_bytes;
-pub use write::{CssComments, write_css_children, write_css_comments};
+pub use write::{write_css_children, write_css_comments};
 
 /// Trim a wire STRING the way `parseCss` does.
 ///

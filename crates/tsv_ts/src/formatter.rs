@@ -21,6 +21,10 @@ use tsv_lang::doc::arena::DocArena;
 /// is rewound once more as each call returns, which releases every block but the largest
 /// while the `Formatter` sits idle.
 ///
+/// Catching that panic takes [`std::panic::AssertUnwindSafe`] around the call — a closure
+/// borrowing the `Formatter` mutably is not [`UnwindSafe`](std::panic::UnwindSafe) — and the
+/// rewind is what makes the assertion sound.
+///
 /// A `Formatter` is [`Send`], so it can move to (or be created on) a worker thread, but
 /// not [`Sync`]: give each thread its own.
 ///

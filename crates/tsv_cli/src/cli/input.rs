@@ -186,7 +186,7 @@ impl InputArgs {
     /// `--stdin` this turns away must not first wait on its writer (an open, empty stdin
     /// would hang the refusal), and a file arm's refusal does not turn on whether the file
     /// exists.
-    pub fn resolve_with_source_type(
+    pub(crate) fn resolve_with_source_type(
         self,
         source_type: Option<&str>,
     ) -> Result<ResolvedInput, String> {
@@ -249,7 +249,7 @@ impl InputArgs {
 /// which would report `Is a directory` under a message that calls it one. Neutral
 /// wording, since every single-file command asks it (`tsv parse`, `tsv strip`, the
 /// `tsv_debug` commands); `cli.js` mirrors it word for word.
-pub fn refuse_directory(path: &str) -> Result<(), String> {
+pub(crate) fn refuse_directory(path: &str) -> Result<(), String> {
     if fs::metadata(path).is_ok_and(|metadata| metadata.is_dir()) {
         return Err(format!(
             "{}: is a directory (one file is expected)",
@@ -264,7 +264,9 @@ pub fn refuse_directory(path: &str) -> Result<(), String> {
 /// type means is the caller's to decide: `parse` reads it as `Module` (the wire's
 /// `Program.sourceType` is a claim, so one grammar produces it), `format` as the
 /// module-then-script fallback. Shared by both.
-pub fn parse_source_type_arg(source_type: Option<&str>) -> Result<Option<tsv_ts::Goal>, String> {
+pub(crate) fn parse_source_type_arg(
+    source_type: Option<&str>,
+) -> Result<Option<tsv_ts::Goal>, String> {
     match source_type {
         None => Ok(None),
         Some(s) => s
@@ -283,7 +285,7 @@ pub fn parse_source_type_arg(source_type: Option<&str>) -> Result<Option<tsv_ts:
 /// refusal word for word, so the two shipped `tsv` bins cannot drift. Shared by
 /// `parse` and `format`; the flag's *value* is validated ahead of this by
 /// `parse_source_type_arg`, so this only asks whether it was named at all.
-pub fn check_source_type_language(
+pub(crate) fn check_source_type_language(
     source_type: Option<&str>,
     parser_type: ParserType,
 ) -> Result<(), String> {

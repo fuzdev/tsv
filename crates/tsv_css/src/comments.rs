@@ -148,7 +148,7 @@ pub(crate) fn pseudo_name_start(bytes: &[u8], span_start: u32) -> u32 {
 /// ("between **any** of the components of a `<class-selector>`").
 ///
 /// Only the wire writer needs it — the printer reaches the same juncture through
-/// [`pseudo_name_start`] — so it is `convert`-gated: `@fuzdev/tsv-format-wasm` builds
+/// [`pseudo_name_start`] — so it is `json`-gated: `@fuzdev/tsv-format-wasm` builds
 /// without that feature, and an ungated item there is dead code in a size-bound artifact.
 #[cfg(feature = "json")]
 pub(crate) fn class_name_start(bytes: &[u8], span_start: u32) -> u32 {
@@ -175,7 +175,7 @@ pub(crate) fn class_name_start(bytes: &[u8], span_start: u32) -> u32 {
 /// declaration extent and the printer's `end_after_semicolon`, which needs the gap AFTER a
 /// declaration to start where the declaration's text really stops. That is why it lives here
 /// rather than in `ast::convert`: the printer cannot see that module (it is behind the
-/// `convert` feature, off in the format-only WASM build), and the alternative was a second
+/// `json` feature, off in the format-only WASM build), and the alternative was a second
 /// spelling of a scan whose whole value is that there is one. ⚠️ The printer's INTERNAL
 /// declaration span can end before `!important` where the wire's does not, so a caller that
 /// assumes the span already reaches the `;` is right for every shape but that one — which is

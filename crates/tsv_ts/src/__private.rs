@@ -1143,12 +1143,15 @@ pub use crate::ast::convert::{
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```
+/// # fn main() -> tsv_ts::Result<()> {
 /// let source = "const x=42;";
 /// let arena = bumpalo::Bump::new();
 /// let ast = tsv_ts::__private::parse(source, &arena)?;
 /// let formatted = tsv_ts::__private::format_ast(&ast, source);
 /// assert_eq!(formatted, "const x = 42;\n");
+/// # Ok(())
+/// # }
 /// ```
 pub fn format_ast(program: &Program<'_>, source: &str) -> String {
     let arena = DocArena::for_source(source);
@@ -1182,9 +1185,12 @@ pub fn format_ast_in(program: &Program<'_>, source: &str, arena: &DocArena) -> S
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```
+/// # fn main() -> tsv_ts::Result<()> {
 /// let arena = bumpalo::Bump::new();
 /// let ast = tsv_ts::__private::parse("const x = 42;", &arena)?;
+/// # Ok(())
+/// # }
 /// ```
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Program<'arena>> {
     Error::ensure_source_fits(source)?;

@@ -91,7 +91,7 @@ pub fn set_swallow_check(on: bool) {
 
 /// Whether the swallow check is enabled.
 #[inline]
-pub fn swallow_check_enabled() -> bool {
+pub(crate) fn swallow_check_enabled() -> bool {
     ENABLED.load(Ordering::Relaxed)
 }
 

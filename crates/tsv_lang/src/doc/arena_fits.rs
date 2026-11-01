@@ -380,13 +380,10 @@ pub(super) fn arena_fits_with_lookahead(
     }
 }
 
-/// Check if a doc fits in the remaining width (public API without look-ahead).
-///
-/// Uses the production [`crate::TAB_WIDTH`] for visual width calculations.
-/// Internal callers that need look-ahead use [`arena_fits_with_lookahead`]
-/// directly. Build-time callers have no render loop and so no pending line
-/// suffix — hence `has_line_suffix: false`.
-pub fn arena_fits(arena: &DocArena, doc: DocId, width: usize, mode: Mode) -> bool {
+/// The tests' fits check: [`arena_fits_with_lookahead`] with no look-ahead and no pending
+/// line suffix, at the production [`crate::TAB_WIDTH`].
+#[cfg(test)]
+pub(crate) fn arena_fits(arena: &DocArena, doc: DocId, width: usize, mode: Mode) -> bool {
     arena_fits_with_lookahead(arena, doc, mode, &[], width as isize, false)
 }
 

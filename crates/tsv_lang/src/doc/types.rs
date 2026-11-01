@@ -361,11 +361,11 @@ impl DocContext {
 /// comment whose first line was over-wide stayed on the line before it. Widths
 /// are clamped below the flag by the arena's `clamp_text_width`, which carries
 /// the argument that the clamp is verdict-preserving.
-pub const TEXT_WIDTH_NEWLINE_FLAG: u16 = 0x8000;
+pub(crate) const TEXT_WIDTH_NEWLINE_FLAG: u16 = 0x8000;
 
 /// The width bits of a cached text width — the whole slot when
 /// [`TEXT_WIDTH_NEWLINE_FLAG`] is clear, the first line's width when it is set.
-pub const TEXT_WIDTH_FIRST_LINE_MASK: u16 = TEXT_WIDTH_NEWLINE_FLAG - 1;
+pub(crate) const TEXT_WIDTH_FIRST_LINE_MASK: u16 = TEXT_WIDTH_NEWLINE_FLAG - 1;
 
 /// A slice into the [`super::arena::DocArena`]'s text pool — the arena-owned `String`
 /// holding every dynamically-built text body ([`DocText::Pooled`],

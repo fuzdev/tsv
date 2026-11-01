@@ -136,7 +136,7 @@ pub const fn covers_trivia_openers(needles: &[u8]) -> bool {
 /// That is a rounding error against the ~15 instructions a byte the walk it
 /// replaces costs, not a reason to specialize per keyword.
 #[must_use]
-pub const fn trivia_hop_needles(significant: u8) -> [u8; TRIVIA_OPENERS.len() + 1] {
+pub(crate) const fn trivia_hop_needles(significant: u8) -> [u8; TRIVIA_OPENERS.len() + 1] {
     let mut out = [significant; TRIVIA_OPENERS.len() + 1];
     let mut k = 0;
     while k < TRIVIA_OPENERS.len() {
@@ -970,7 +970,7 @@ pub enum ScanStart {
 ///
 /// Its arguments are the scanned bytes, the `>`'s offset, and the scan's lower bound, which
 /// bounds any backward reach.
-pub type ClosesTypeArguments = fn(bytes: &[u8], gt: usize, lower_bound: usize) -> bool;
+pub(crate) type ClosesTypeArguments = fn(bytes: &[u8], gt: usize, lower_bound: usize) -> bool;
 
 /// Whether the `)` at `rparen` closes a **statement header** — `if (c)`, `while (c)`,
 /// `for (…)`, `with (o)` — after which a statement begins, so a `!` glued to it is a
@@ -980,7 +980,7 @@ pub type ClosesTypeArguments = fn(bytes: &[u8], gt: usize, lower_bound: usize) -
 /// Asked only of a `)` a glued `!` run follows ([`OperandAnchor`]'s postfix step), never
 /// of a plain `) /` pair. Its arguments are the scanned bytes, the `)`'s offset, and the
 /// scan's lower bound, where a forward walk to the `)` may begin.
-pub type ClosesStatementHeader = fn(bytes: &[u8], rparen: usize, lower_bound: usize) -> bool;
+pub(crate) type ClosesStatementHeader = fn(bytes: &[u8], rparen: usize, lower_bound: usize) -> bool;
 
 /// Whether the `}` at `rbrace` closes a **braced operand** — an object literal (`{} / 2`),
 /// or a function or class expression's body (`x + function () {} / 2`) — so that the `/`
@@ -997,7 +997,7 @@ pub type ClosesStatementHeader = fn(bytes: &[u8], rparen: usize, lower_bound: us
 /// forward walk to the `}` begins), how the region begins ([`ScanStart`]) and the scan's
 /// place for the resolver's walk ([`BracedOperandWalk`]). A scan asks in source order, so
 /// each ask's `}` lies past the last one's.
-pub type ClosesBracedOperand = fn(
+pub(crate) type ClosesBracedOperand = fn(
     bytes: &[u8],
     rbrace: usize,
     lower_bound: usize,

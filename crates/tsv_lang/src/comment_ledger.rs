@@ -131,12 +131,12 @@ fn emits_suppressed() -> bool {
 /// The doc-node tags the renderer records through carry one of these, because the
 /// renderer holds no `source` — see [`crate::doc::arena::DocArena::tag_comment_doc`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DocumentKey(usize, usize);
+pub(crate) struct DocumentKey(usize, usize);
 
 /// The [`DocumentKey`] for `source`.
 #[inline]
 #[must_use]
-pub fn document_key(source: &str) -> DocumentKey {
+pub(crate) fn document_key(source: &str) -> DocumentKey {
     DocumentKey(source.as_ptr() as usize, source.len())
 }
 
@@ -271,7 +271,7 @@ pub fn record_emitted(source: &str, span: Span) {
 
 /// [`record_emitted`] against an already-resolved [`DocumentKey`] — what the doc
 /// renderer calls, having no `source` of its own.
-pub fn record_emitted_keyed(key: DocumentKey, span: Span) {
+pub(crate) fn record_emitted_keyed(key: DocumentKey, span: Span) {
     if !comment_check_enabled() || emits_suppressed() {
         return;
     }

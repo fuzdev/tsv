@@ -101,8 +101,8 @@ zmij = "1.0.21"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
-# Allow missing Debug - some types contain non-Debug fields (Chars, etc.)
-# TODO: Consider adding manual Debug impls for key public types (Lexer, Printer, etc.)
+# Every non-hidden public type implements Debug; the lint would fire only on hidden plumbing
+# (the doc arena and its writers, the wire writers, the hasher), where a Debug impl buys nothing.
 missing_debug_implementations = "allow"
 trivial_casts = "warn"
 trivial_numeric_casts = "warn"

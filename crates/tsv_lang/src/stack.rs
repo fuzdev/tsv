@@ -55,10 +55,10 @@ const THREAD_NAME: &str = "tsv";
 /// A panic in `f` resumes on the calling thread (see [Panics](#panics)).
 ///
 /// ```
-/// # use tsv_lang as tsv_ts;
+/// # use tsv_lang::run_with_stack;
 /// let sources = vec![String::from("const x=42;"), String::from("let y")];
 /// // `f` borrows `sources`; the thread is joined before the call returns
-/// let lengths = tsv_ts::run_with_stack(|| sources.iter().map(String::len).collect::<Vec<_>>())
+/// let lengths = run_with_stack(|| sources.iter().map(String::len).collect::<Vec<_>>())
 ///     .expect("the OS refused the thread");
 /// assert_eq!(lengths, [11, 5]);
 /// ```

@@ -535,11 +535,7 @@ fn when_both_readings_fail_the_error_that_reached_further_is_reported() {
             "1:15",
         ),
         // Both stopped at one token: the list's error, the first reading tried.
-        (
-            "fn(a < b, c : d > (e));",
-            "Expected '>', found ':'",
-            "1:13",
-        ),
+        ("fn(a < b, c : d > (e));", "Expected '>', found ':'", "1:13"),
         // A refused fallback reports the list's error where the list stopped.
         (
             "fn(a < b, (c).d > (e, f));",

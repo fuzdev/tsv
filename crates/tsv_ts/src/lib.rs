@@ -1,9 +1,10 @@
 //! TypeScript and JavaScript formatting, type stripping, and parsing to acorn-typescript's
 //! wire JSON — part of [tsv](https://github.com/fuzdev/tsv).
 //!
-//! The formatter is non-configurable: Prettier's style with a print width of 100, tabs,
-//! single quotes and no trailing commas. Formatting output is not frozen — it changes
-//! between releases as formatting bugs are fixed.
+//! [`format()`] formats one source in one call; a [`Formatter`] formats many on one thread,
+//! keeping its arenas warm between calls. The formatter is non-configurable: Prettier's style
+//! with a print width of 100, tabs, single quotes and no trailing commas. Formatting output is
+//! not frozen — it changes between releases as formatting bugs are fixed.
 //!
 //! JSX and TSX are not supported: JSX is never read as JSX, so a source holding it fails
 //! to parse or is misread.
@@ -61,6 +62,9 @@
 //! let report = err.to_report().expect("a located error reports");
 //! assert_eq!((report.start.offset, report.start.line, report.start.column), (8, 1, 8));
 //! ```
+//!
+//! Every tsv language crate re-exports this same [`Error`] (`tsv_css::Error` and
+//! `tsv_svelte::Error` are this type), so one match covers them all.
 //!
 //! A refusal ([`ErrorKind::Refusal`]) is a source that parses but that an operation cannot
 //! handle, with a span over the refused bytes; the type strip reports its refusals as
@@ -160,8 +164,7 @@ use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
 use tsv_lang::{CommentFreeWindow, EmbedContext};
 pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, STACK_SIZE, WirePoint, run_with_stack};
-#[doc(hidden)]
-pub use tsv_lang::{LeadingBom, LineRule, WireCoordinates};
+use tsv_lang::{LeadingBom, LineRule, WireCoordinates};
 
 // `tests/public_reexports.rs` (outside this crate) names every item above through this
 // crate's path: cargo-semver-checks cannot see a dropped or demoted re-export.
@@ -232,6 +235,9 @@ fn with_doc_printer<'a, R>(
 ///
 /// Carriage returns (`\r\n` and a lone `\r`) are folded to `\n` ahead of the parse, so
 /// the output is LF-only.
+/// A leading byte-order mark is dropped (a caller that keeps a file's BOM writes it back
+/// itself), and a source with nothing to print — empty, or whitespace alone — formats to the
+/// empty string, not to a newline.
 ///
 /// No goal is named, so the parse is the bare-name tier of [Goals](crate#goals) — `Module`,
 /// retried at `Script` only if that fails — which is what every format surface that takes
@@ -355,9 +361,10 @@ fn format_program_in(
     output
 }
 
-/// How [`parse_to_json_with`] parses and what its wire carries. The default is
-/// [`parse_to_json`]'s: [`Goal::Module`], the span-only wire. The example's `locations`
-/// requires the `locations` feature.
+/// How [`parse_to_json_with`] parses and what its wire carries.
+///
+/// The default is [`parse_to_json`]'s: [`Goal::Module`], the span-only wire. The example's
+/// `locations` requires the `locations` feature.
 ///
 /// ```
 /// # fn main() -> tsv_ts::Result<()> {

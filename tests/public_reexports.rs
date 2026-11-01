@@ -15,11 +15,8 @@ macro_rules! names_every_reexport {
             let _: PhantomData<$krate::WirePoint> = PhantomData;
             let _: usize = $krate::STACK_SIZE;
             let _ = $krate::run_with_stack::<fn(), ()>;
-            // plumbing: `#[doc(hidden)]` re-exports, outside semver, named here only because
-            // the sibling crates and tsv's tooling reach them through these paths
-            let _: PhantomData<$krate::LeadingBom> = PhantomData;
-            let _: PhantomData<$krate::LineRule> = PhantomData;
-            let _: PhantomData<$krate::WireCoordinates> = PhantomData;
+            // plumbing: a `#[doc(hidden)]` item, outside semver, named here because tsv's
+            // tooling reaches it through this path
             let _ = $krate::WIRE_COORDINATES;
         };
     };

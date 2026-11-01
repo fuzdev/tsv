@@ -5,7 +5,7 @@
 
 // Allow Svelte block syntax like `{:else}`, `{:then}`, `{:catch}` which
 // look like Rust format args but are valid Svelte template syntax.
-#![allow(clippy::literal_string_with_formatting_args)]
+#![expect(clippy::literal_string_with_formatting_args)]
 
 use crate::ast::{self, Fragment, FragmentNode};
 use crate::printer::{HeadExpr, Printer};

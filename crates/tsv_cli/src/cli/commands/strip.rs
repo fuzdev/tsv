@@ -25,7 +25,7 @@ pub struct StripCommand {
     #[argh(option)]
     source_type: Option<String>,
 
-    /// print nothing: exit 1 on a refusal, 2 on a parse error
+    /// write nothing to stdout: exit 1 on a refusal, 2 on a parse error
     #[argh(switch)]
     check: bool,
 

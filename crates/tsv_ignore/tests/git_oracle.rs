@@ -14,7 +14,7 @@
 // Test harness: unwrap/expect/panic on setup or oracle failure is the desired
 // behavior (a broken fixture or unusable git should fail loudly), matching the
 // crate's other test modules.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![expect(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::BTreeMap;
 use std::fs;

@@ -24,7 +24,7 @@ use unicode_width::UnicodeWidthChar;
 /// [`optimal_string_quote_in`] instead: same answer, read off the host's words rather
 /// than a slice's, and it returns the width class of the same content for free.
 #[inline]
-pub fn optimal_string_quote(raw_content: &str) -> char {
+pub(crate) fn optimal_string_quote(raw_content: &str) -> char {
     // Double quotes win only when they are STRICTLY rarer, so a content holding
     // no `'` at all takes the single-quote answer whatever its `"` count is —
     // which makes the question "is there a `'` here?", not "how many of each?".
@@ -510,13 +510,20 @@ impl<'a> FoldedSource<'a> {
     /// would ([`crate::Error::wire_point`]). Every format entry point that folds parses
     /// through this, which is what keeps the unfold from being skipped.
     ///
+    /// The size cap ([`crate::Error::ensure_source_fits`]) is checked against the text the
+    /// fold was applied to, not the folded text: dropping the `\r` of every CRLF can bring a
+    /// source over the cap under it, and the caller's offsets — which every error is mapped
+    /// back onto — would then not fit the `u32` points a report carries.
+    ///
     /// # Errors
     ///
-    /// `parse`'s error, in the coordinates of the text the fold was applied to.
+    /// [`crate::ErrorKind::TooLarge`] for a source over the cap; otherwise `parse`'s error,
+    /// in the coordinates of the text the fold was applied to.
     pub fn parse_with<'s, T>(
         &'s self,
         parse: impl FnOnce(&'s str) -> crate::Result<T>,
     ) -> crate::Result<T> {
+        crate::Error::ensure_source_fits(self.original)?;
         parse(&self.text).map_err(|error| self.unfold_error(error))
     }
 
@@ -1125,7 +1132,7 @@ const _: () = {
 /// Byte-at-a-time is sound for the exact question (`line_terminator_len`): neither `\r`
 /// nor `0xE2` is ever a UTF-8 continuation byte, so a candidate found at any offset is a
 /// character boundary.
-pub fn line_terminators_are_lf_only(bytes: &[u8]) -> bool {
+pub(crate) fn line_terminators_are_lf_only(bytes: &[u8]) -> bool {
     let mut i = 0;
     // Two words a step: with nothing firing, the bound check and the branch are the loop's
     // own overhead, and they amortize over sixteen bytes (measured against one word a

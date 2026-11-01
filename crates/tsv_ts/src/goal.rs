@@ -71,7 +71,7 @@ impl Goal {
 
     /// The goal a file's **extension** settles, or `None` when it settles nothing.
     ///
-    /// Two of the six extensions tsv formats carry a goal in the name rather than in
+    /// Two of the extensions tsv formats carry a goal in the name rather than in
     /// the file: `.mjs` and `.mts` are ES modules whatever any config says — Node
     /// loads a `.mjs` as ESM unconditionally, and TypeScript maps `.mts`/`.mjs` to
     /// `ModuleKind.ESNext` with the extension overriding `module` (the implied-format
@@ -103,6 +103,15 @@ impl Goal {
     /// // `.js`, `.ts` and the CommonJS names settle nothing
     /// assert_eq!(Goal::from_extension("a.cjs"), None);
     /// assert_eq!(Goal::from_extension("a.ts"), None);
+    ///
+    /// // a path-driven caller takes the exact tier where the name settles the goal and the
+    /// // bare one where it does not
+    /// # let source = "let x: number = 1;";
+    /// let stripped = match Goal::from_extension("a.mts") {
+    ///     Some(goal) => tsv_ts::strip_with_goal(source, goal),
+    ///     None => tsv_ts::strip(source),
+    /// };
+    /// assert_eq!(stripped.unwrap().code, "let x         = 1;");
     /// ```
     #[must_use]
     pub fn from_extension(path: impl AsRef<Path>) -> Option<Goal> {

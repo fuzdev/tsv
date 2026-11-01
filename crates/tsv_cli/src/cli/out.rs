@@ -93,7 +93,7 @@ pub fn write_stderr(bytes: &[u8]) {
 /// name C-quotes the whole path, as `git ls-files` prints it, so a line holds exactly one
 /// path and a line beginning with `"` is a quoted one). Diagnostics on stderr take
 /// [`path_text`].
-pub fn path_bytes(path: &Path) -> Cow<'_, [u8]> {
+pub(crate) fn path_bytes(path: &Path) -> Cow<'_, [u8]> {
     #[cfg(unix)]
     {
         use std::os::unix::ffi::OsStrExt;
@@ -110,7 +110,7 @@ pub fn path_bytes(path: &Path) -> Cow<'_, [u8]> {
 /// same rule as [`path_bytes`], so a name holding a line feed does not split the
 /// `error:` or `warning:` line it sits on. The warnings `tsv_discover` builds arrive
 /// quoted already; this covers the paths the CLI names itself.
-pub fn path_text(path: &Path) -> String {
+pub(crate) fn path_text(path: &Path) -> String {
     quote_path_owned(path.to_string_lossy().into_owned())
 }
 
@@ -119,7 +119,7 @@ pub fn path_text(path: &Path) -> String {
 /// exit or print through a macro this module does not own. The message is printed
 /// verbatim: the caller spells its own prefix (`Error:`, `Parse error:`), since the
 /// two commands' vocabularies differ and the JS mirror pins each text.
-pub fn exit_with_error(code: i32, message: impl std::fmt::Display) -> ! {
+pub(crate) fn exit_with_error(code: i32, message: impl std::fmt::Display) -> ! {
     write_stderr(format!("{message}\n").as_bytes());
     std::process::exit(code)
 }
@@ -132,7 +132,7 @@ pub fn exit_with_error(code: i32, message: impl std::fmt::Display) -> ! {
 /// then the `line:col` header, excerpt and caret). The JS mirror makes the same split on
 /// the facade result's `error.kind` (`cli.js`'s `result_failure`). A path-mode `format`
 /// names the file instead, with no prefix (`error: <path>: …`).
-pub fn exit_with_parse_error(code: i32, error: &tsv_lang::Error) -> ! {
+pub(crate) fn exit_with_parse_error(code: i32, error: &tsv_lang::Error) -> ! {
     let prefix = match error.kind() {
         tsv_lang::ErrorKind::Syntax | tsv_lang::ErrorKind::TooDeep => "Parse error",
         _ => "Error",

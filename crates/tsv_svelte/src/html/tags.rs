@@ -18,6 +18,7 @@
 /// Used both by the tokenizer (to keep a whole custom-element name in one token,
 /// including the non-alphanumeric members `·`/ZWNJ/ZWJ/astral) and by the name
 /// validator (the hyphen-tail run) — a single source of truth for the ranges.
+#[must_use]
 pub fn is_custom_element_name_char(c: char) -> bool {
     c.is_ascii_alphanumeric()
         || matches!(c, '-' | '.' | '_' | '\u{00B7}')
@@ -49,6 +50,7 @@ macro_rules! optional_end_tags {
         ///
         /// Exact and case-sensitive: tag names arrive as authored.
         #[inline]
+        #[must_use]
         pub fn optional_end_tag(tag_name: &str) -> Option<OptionalEndTag> {
             Some(OptionalEndTag(match tag_name {
                 $($key => OptionalEndTagKey::$variant,)+
@@ -60,6 +62,7 @@ macro_rules! optional_end_tags {
             /// Whether `next`, as the next opening tag in the markup, implicitly closes this
             /// element — one of the key's listed triggers.
             #[inline]
+            #[must_use]
             pub fn is_closed_by(self, next: &str) -> bool {
                 match self.0 {
                     $(OptionalEndTagKey::$variant => matches!(next, $($trigger)|+),)+

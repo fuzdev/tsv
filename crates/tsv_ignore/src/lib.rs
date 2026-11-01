@@ -116,7 +116,8 @@
 //! Every path a query or a push takes is relative to the **format root** — the directory
 //! the caller scopes its walk to, typically the repository root — and `/`-separated:
 //!
-//! - `\` is never a separator, on any platform — a caller on Windows converts first;
+//! - `\` is never a separator, on any platform — a caller on Windows converts first: hand a
+//!   `std::path::Path` over as its `Normal` components joined by `/`;
 //! - empty and `.` segments are dropped, so a leading `/` (`/a` is `a`), a doubled `//`
 //!   and a `./` change nothing;
 //! - `..` is a literal segment, never a step up — a caller resolves it first;
@@ -342,6 +343,10 @@ impl IgnoreRules {
 /// assert_eq!(exclusion.source.file_name(), ".formatignore");
 /// assert_eq!(stack.exclusion("src/a.ts", PathKind::File), None);
 /// ```
+///
+/// A push takes any content and returns nothing to check — a line git could never match is
+/// dropped, as git drops it (only the debug-build order assertion can panic) — and a pop with
+/// no layer of its kind pushed does nothing.
 #[derive(Debug, Default, Clone)]
 pub struct IgnoreStack {
     /// `.gitignore` layers in shallow→deep push order.
@@ -415,6 +420,7 @@ fn debug_assert_pushed_in_order(stack: &[Layer], layer: &Layer) {
 
 impl IgnoreStack {
     /// An empty stack (ignores nothing until layers are added).
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -514,6 +520,7 @@ impl IgnoreStack {
     /// Whether `path` (relative to the format root, `/`-separated) is ignored.
     /// `kind` says whether `path` itself is a directory, which trailing-`/` patterns
     /// apply to. [`exclusion`](Self::exclusion) with its witness dropped.
+    #[must_use]
     pub fn is_ignored(&self, path: &str, kind: PathKind) -> bool {
         self.exclusion(path, kind).is_some()
     }
@@ -534,6 +541,7 @@ impl IgnoreStack {
     /// prefixes per entry (the matcher dominates discovery cost). **Do not** call
     /// it for an arbitrary path whose ancestors haven't been cleared; that is what
     /// [`is_ignored`](Self::is_ignored) is for.
+    #[must_use]
     pub fn is_ignored_leaf(&self, path: &str, kind: PathKind) -> bool {
         self.leaf_polarity(path, kind.is_dir()) == Some(true)
     }
@@ -658,6 +666,7 @@ impl IgnoreStack {
     /// A diagnostic query, off the discovery hot path: tsv's discovery asks it of a path
     /// an argument NAMED, to say which directory put the path out of scope and which
     /// file's rule did.
+    #[must_use]
     pub fn exclusion(&self, path: &str, kind: PathKind) -> Option<Exclusion> {
         first_exclusion(path, kind.is_dir(), |prefix, dir| {
             last_match_layer(self.gitignore.iter().chain(&self.overrides), prefix, dir)
@@ -758,6 +767,7 @@ pub enum IgnoreSource {
 
 impl IgnoreSource {
     /// The file's name.
+    #[must_use]
     pub const fn file_name(self) -> &'static str {
         match self {
             Self::Gitignore => ".gitignore",
@@ -842,6 +852,7 @@ fn is_segment(component: &str) -> bool {
 
 /// A `/`-separated path's meaningful segments — the unit every [`IgnoreStack`] query
 /// splits a path into, and the one [`Exclusion`]'s depths count in.
+#[must_use]
 pub fn split_segments(path: &str) -> Vec<&str> {
     path.split('/').filter(|s| is_segment(s)).collect()
 }

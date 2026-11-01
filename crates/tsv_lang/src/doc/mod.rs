@@ -11,7 +11,7 @@
 //! - **DocArena**: Arena allocator that stores all doc nodes contiguously
 //! - **DocId**: Lightweight handle (u32 index) into the arena
 //! - **Mode**: Flat (try to fit on one line) vs Break (use line breaks)
-//! - **arena_fits()**: Algorithm to check if a doc fits in remaining width
+//! - **arena_fits_with_lookahead()**: the fits walk — does a doc fit in the remaining width
 //! - **arena_print_doc()**: Convert doc tree to a final formatted string
 //!
 //! ## Architecture Note: Command Stack with Look-Ahead
@@ -34,7 +34,7 @@ pub mod swallow;
 mod types;
 
 // Types
-pub use arena::{GapCommentLine, GroupId, LeadingBreak, LeadingEdge, PendingRun};
+pub use arena::{GapCommentLine, GroupId, LeadingBreak, LeadingEdge};
 pub use types::{CachedWidth, DocContext, DocText, LineKind, Mode, PoolSpan};
 
 /// Run `$copy` under a `match` on `$len` that names each short length in
@@ -124,7 +124,7 @@ pub type DocBuf = smallvec::SmallVec<[arena::DocId; 8]>;
 
 // Diagnostic: line-comment swallow check (opt-in, render-time; `_internal_swallow_check` feature)
 #[cfg(feature = "_internal_swallow_check")]
-pub use swallow::{SwallowReport, set_swallow_check, swallow_check_enabled, take_swallow_reports};
+pub use swallow::{SwallowReport, set_swallow_check, take_swallow_reports};
 
 // Arena render
 pub use arena_render::{
@@ -134,8 +134,8 @@ pub use arena_render::{
 };
 pub use arena_render_flat::arena_try_print_flat_into;
 
-// Arena fits
-pub use arena_fits::arena_fits;
+#[cfg(test)]
+use arena_fits::arena_fits;
 pub use chain_share::{ChainShareStore, ShareKey, SharedBuild};
 
 #[cfg(test)]

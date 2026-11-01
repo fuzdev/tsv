@@ -214,7 +214,7 @@ fn roots_can_overlap(args: &[Arg<'_>]) -> bool {
 /// - **only stream a single root.** Overlapping roots (`tsv format src src/a.ts`)
 ///   can yield the same file twice, and the dedup that removes it needs the whole
 ///   set. One root can't: symlinks aren't followed, so each entry is visited once.
-pub fn discover_into(
+pub(crate) fn discover_into(
     paths: &[String],
     sink: &mut dyn FileSink,
 ) -> Result<Diagnostics, Vec<String>> {
