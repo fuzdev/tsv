@@ -19,7 +19,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.7.1"
+version = "0.8.0"
 edition = "2024"
 # The toolchain CI tests (rust-toolchain.toml), stated for consumers as major.minor; it moves
 # with that pin, never apart (`deno task package:audit` grades that the two agree).
@@ -30,7 +30,7 @@ repository = "https://github.com/fuzdev/tsv"
 
 [workspace.dependencies]
 # Foundation
-tsv_lang = { path = "crates/tsv_lang", version = "=0.7.1" }
+tsv_lang = { path = "crates/tsv_lang", version = "=0.8.0" }
 # Per-thread reusable arenas for the bindings' hot loop (shared by tsv_ffi,
 # tsv_napi, and tsv_wasm). default-features = false here so consumers stay lean
 # by default — the AST-arena helper only; each binding re-enables `format` (the
@@ -38,17 +38,17 @@ tsv_lang = { path = "crates/tsv_lang", version = "=0.7.1" }
 # standalone `cargo test -p tsv_arena` still uses the crate's own `default =
 # ["format"]`, so both helpers are exercised there.
 tsv_arena = { path = "crates/tsv_arena", default-features = false }
-tsv_html = { path = "crates/tsv_html", version = "=0.7.1" }
-tsv_ignore = { path = "crates/tsv_ignore", version = "=0.7.1" }
-tsv_discover = { path = "crates/tsv_discover", version = "=0.7.1" }
+tsv_html = { path = "crates/tsv_html", version = "=0.8.0" }
+tsv_ignore = { path = "crates/tsv_ignore", version = "=0.8.0" }
+tsv_discover = { path = "crates/tsv_discover", version = "=0.8.0" }
 
 # Language implementations
 # Default-features off ships parse + format only; consumers opt into the
 # wire-JSON conversion layer with `features = ["json"]`. The format-only
 # builds leave it off (@fuzdev/tsv-format-wasm, `build:ffi:format`).
-tsv_ts = { path = "crates/tsv_ts", version = "=0.7.1", default-features = false }
-tsv_css = { path = "crates/tsv_css", version = "=0.7.1", default-features = false }
-tsv_svelte = { path = "crates/tsv_svelte", version = "=0.7.1", default-features = false }
+tsv_ts = { path = "crates/tsv_ts", version = "=0.8.0", default-features = false }
+tsv_css = { path = "crates/tsv_css", version = "=0.8.0", default-features = false }
+tsv_svelte = { path = "crates/tsv_svelte", version = "=0.8.0", default-features = false }
 # Svelte→JS compiler + JS canonicalizer. Dev-tooling consumer only (tsv_debug);
 # no shipped artifact links it yet.
 tsv_svelte_compile = { path = "crates/tsv_svelte_compile" }
