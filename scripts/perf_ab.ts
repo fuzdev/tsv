@@ -141,9 +141,11 @@ function driver_of(lang: Lang): DriverKind {
 	return lang === 'strip' ? 'strip' : 'format';
 }
 
-/** The text whose presence in a tree's `crates/tsv_ts/src` says the strip driver can build
- * against it (`strip_skip_reason`). */
-const STRIP_ENTRY_POINT = 'pub fn strip_in<';
+/** The pattern (`git grep -E`) whose match in a tree's `crates/tsv_ts/src` says the strip
+ * driver can build against it (`strip_skip_reason`): the entry point's declaration, spelled
+ * `strip_in<'s>(` while its output borrowed the source and `strip_in(` since, and both
+ * answer the driver's one call. */
+const STRIP_ENTRY_POINT = 'pub fn strip_in[<(]';
 
 const DEFAULT_ITERATIONS = 10;
 
@@ -351,11 +353,11 @@ async function build_inputs(
 	};
 }
 
-/** Whether `tree`'s `crates/tsv_ts/src` has `STRIP_ENTRY_POINT` (`git grep`: exit 1 is "no",
- * anything but 0 or 1 an error). */
-async function tree_has_strip(tree: string): Promise<boolean> {
-	const args = ['grep', '-q', '-F', STRIP_ENTRY_POINT, tree, '--', 'crates/tsv_ts/src'];
-	const result = await run('git', args);
+/** Whether `tree`'s `crates/tsv_ts/src` has `STRIP_ENTRY_POINT`, run in `cwd` (`git grep`:
+ * exit 1 is "no", anything but 0 or 1 an error). */
+export async function tree_has_strip(tree: string, cwd: string = ROOT): Promise<boolean> {
+	const args = ['grep', '-q', '-E', STRIP_ENTRY_POINT, tree, '--', 'crates/tsv_ts/src'];
+	const result = await run('git', args, { cwd });
 	if (result.code === 0) return true;
 	if (result.code === 1) return false;
 	throw new HarnessError(`git ${args.join(' ')} failed:\n${result.stderr.trim()}`);

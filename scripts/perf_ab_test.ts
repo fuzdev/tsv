@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { list_tree } from './perf_ab.ts';
+import { list_tree, tree_has_strip } from './perf_ab.ts';
 import { build_inputs_of } from './perf_ab_verdict.ts';
 
 /** The variables that point git at a repository other than the one its working directory is in.
@@ -74,5 +74,29 @@ Deno.test('the scratch repo ignores a caller git environment that names another 
 	} finally {
 		clear_git_repo_env();
 		await rm(decoy, { recursive: true, force: true });
+	}
+});
+
+/** Commit `strip_rs` as a scratch repo's `crates/tsv_ts/src/strip/mod.rs` and ask whether the
+ * tree has the strip driver's entry point. */
+async function has_strip_with(dir: string, strip_rs: string): Promise<boolean> {
+	await writeFile(join(dir, 'crates/tsv_ts/src/strip/mod.rs'), strip_rs);
+	await git(dir, ['add', '-A']);
+	return await tree_has_strip(await git(dir, ['write-tree']), dir);
+}
+
+Deno.test('the strip entry point is found in both of its spellings, and nothing else', async () => {
+	clear_git_repo_env();
+	const dir = await Deno.makeTempDir({ prefix: 'perf_ab_test-' });
+	try {
+		await git(dir, ['init', '--quiet']);
+		await mkdir(join(dir, 'crates/tsv_ts/src/strip'), { recursive: true });
+		const borrowed = "pub fn strip_in<'s>(\n    source: &'s str,\n) {}\n";
+		deepStrictEqual(await has_strip_with(dir, borrowed), true);
+		deepStrictEqual(await has_strip_with(dir, 'pub fn strip_in(\n    source: &str,\n) {}\n'), true);
+		deepStrictEqual(await has_strip_with(dir, 'pub fn strip(source: &str) {}\n'), false);
+		deepStrictEqual(await has_strip_with(dir, 'pub fn strip_input(source: &str) {}\n'), false);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
 	}
 });

@@ -142,7 +142,8 @@ deno task test:deno      # deno tests over the node-modules-free bench core (div
 #                          fake crates.io, plus its packaging cleanup on the real filesystem (own invocation, `--allow-write`);
 #                          `release/binstall_test.ts` — the binstall-table grader; `npm_api_test.ts` + `npm_api_strip_test.ts` — the
 #                          npm options facade and its strip half over a fake engine; `typecheck_packages_test.ts` — the README fence +
-#                          marker grammar; `perf_ab_verdict_test.ts` — perf:ab's verdict rule; `perf_ab_test.ts` — perf:ab's `git ls-tree -z` listing over a scratch repo, its
+#                          marker grammar; `perf_ab_verdict_test.ts` — perf:ab's verdict rule; `perf_ab_test.ts` —
+#                          perf:ab's `git ls-tree -z` listing and strip entry-point probe over a scratch repo, its
 #                          own `deno test` invocation with `--allow-write --allow-run=git` + `--allow-env` for the three
 #                          `GIT_*` variables it clears); in `check`
 deno task test:depth     # tests/depth_limit.rs optimized (`--profile corpus`): every shape the depth limits count, a catalog
