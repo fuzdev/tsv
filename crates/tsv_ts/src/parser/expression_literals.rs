@@ -424,10 +424,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             } else if self.check(&TokenKind::BracketClose) {
                 break;
             } else {
-                return Err(Error::invalid_expression(
-                    self.current_kind().to_string(),
-                    self.current_pos().0,
-                ));
+                return Err(self.error_list_separator(&TokenKind::Comma, &TokenKind::BracketClose));
             }
         }
 
