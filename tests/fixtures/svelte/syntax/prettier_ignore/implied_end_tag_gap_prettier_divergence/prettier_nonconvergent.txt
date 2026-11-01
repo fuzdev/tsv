@@ -1,0 +1,1 @@
+prettier grows the gap inside a frozen element with an implied end tag by one line on every pass

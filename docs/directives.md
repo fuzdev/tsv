@@ -28,6 +28,12 @@ from the end of a file but renders anywhere else, so that one character is writt
 character reference (`&#xA0;`), which renders the same. Nothing else inside the region
 moves.
 
+Whitespace at the trailing edge of a frozen Svelte node is boundary, not construct: a
+frozen text's trailing run, and the run in front of an end tag an element leaves implied
+(`<li>a⏎</ul>`), give way where the printer owns the boundary after them, and it prints
+that boundary once, at its own indentation (inside a `<pre>`, where the run is content,
+the slice keeps it and the implied end tags are written out after it).
+
 ```svelte
 <script lang="ts">
 	// format-ignore

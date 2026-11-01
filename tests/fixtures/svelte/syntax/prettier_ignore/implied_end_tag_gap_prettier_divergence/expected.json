@@ -1,0 +1,548 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 857,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 311,
+				"data": "\n\tA frozen element whose end tag is implied — by its parent's close or by the next sibling —\n\tends its span at that boundary, so the whitespace in front of it is inside the frozen slice.\n\tThe slice gives up that trailing whitespace run, and the printer prints the boundary once,\n\tat its own indentation.\n"
+			},
+			{
+				"type": "Text",
+				"start": 311,
+				"end": 313,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 313,
+				"end": 356,
+				"name": "ul",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 317,
+							"end": 319,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 319,
+							"end": 343,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "Text",
+							"start": 343,
+							"end": 345,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 345,
+							"end": 351,
+							"name": "li",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 349,
+										"end": 351,
+										"raw": "a\n",
+										"data": "a\n"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 356,
+				"end": 358,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 358,
+				"end": 418,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 363,
+							"end": 365,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 365,
+							"end": 411,
+							"name": "ul",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 369,
+										"end": 372,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "Comment",
+										"start": 372,
+										"end": 396,
+										"data": " prettier-ignore "
+									},
+									{
+										"type": "Text",
+										"start": 396,
+										"end": 399,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 399,
+										"end": 406,
+										"name": "li",
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 403,
+													"end": 406,
+													"raw": "a\n\t",
+													"data": "a\n\t"
+												}
+											]
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 411,
+							"end": 412,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 418,
+				"end": 420,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 420,
+				"end": 475,
+				"name": "ul",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 424,
+							"end": 426,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 426,
+							"end": 450,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "Text",
+							"start": 450,
+							"end": 452,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 452,
+							"end": 459,
+							"name": "li",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 456,
+										"end": 459,
+										"raw": "a\n\t",
+										"data": "a\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "RegularElement",
+							"start": 459,
+							"end": 469,
+							"name": "li",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 463,
+										"end": 464,
+										"raw": "b",
+										"data": "b"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 469,
+							"end": 470,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 475,
+				"end": 477,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 477,
+				"end": 551,
+				"name": "table",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 484,
+							"end": 486,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 486,
+							"end": 542,
+							"name": "tbody",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 493,
+										"end": 496,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "Comment",
+										"start": 496,
+										"end": 520,
+										"data": " prettier-ignore "
+									},
+									{
+										"type": "Text",
+										"start": 520,
+										"end": 523,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 523,
+										"end": 534,
+										"name": "tr",
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "RegularElement",
+													"start": 527,
+													"end": 534,
+													"name": "td",
+													"attributes": [],
+													"fragment": {
+														"type": "Fragment",
+														"nodes": [
+															{
+																"type": "Text",
+																"start": 531,
+																"end": 534,
+																"raw": "a\n\t",
+																"data": "a\n\t"
+															}
+														]
+													}
+												}
+											]
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 542,
+							"end": 543,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 551,
+				"end": 553,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 553,
+				"end": 591,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 556,
+							"end": 558,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 558,
+							"end": 582,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 582,
+							"end": 587,
+							"name": "b",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 585,
+										"end": 587,
+										"raw": "a\n",
+										"data": "a\n"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 591,
+				"end": 593,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 593,
+				"end": 739,
+				"data": "\n\tThrough a `<pre>` the run is content: the slice keeps it and the closers are written out after\n\tit, as the unfrozen element prints them.\n"
+			},
+			{
+				"type": "Text",
+				"start": 739,
+				"end": 741,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 741,
+				"end": 794,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 746,
+							"end": 748,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 748,
+							"end": 772,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "Text",
+							"start": 772,
+							"end": 774,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 774,
+							"end": 787,
+							"name": "pre",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 779,
+										"end": 781,
+										"raw": "a\n",
+										"data": "a\n"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 787,
+							"end": 788,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 794,
+				"end": 796,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 796,
+				"end": 856,
+				"name": "ul",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 800,
+							"end": 802,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 802,
+							"end": 826,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "Text",
+							"start": 826,
+							"end": 828,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 828,
+							"end": 850,
+							"name": "li",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "RegularElement",
+										"start": 832,
+										"end": 845,
+										"name": "pre",
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 837,
+													"end": 839,
+													"raw": "a\n",
+													"data": "a\n"
+												}
+											]
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 850,
+							"end": 851,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

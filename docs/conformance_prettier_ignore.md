@@ -24,6 +24,7 @@ For a whole-construct freeze the `prettier-ignore` family matches prettier (both
 - the range's bytes stay verbatim **through its end marker**: whitespace in front of the marker is the range's, so the marker stays on it, where prettier moves the marker to a fresh line — ◆design_choice — [range_end_marker_verbatim](../tests/fixtures/svelte/syntax/prettier_ignore/range_end_marker_verbatim_prettier_divergence/)
 - the seam a hoisted section leaves **inside** a range, the stronger whitespace run beside it kept as written — ◆prettier_bug ◆design_choice — [range_section_seam](../tests/fixtures/svelte/syntax/prettier_ignore/range_section_seam_prettier_divergence/), [range_section_seam_verbatim](../tests/fixtures/svelte/syntax/prettier_ignore/range_section_seam_verbatim_prettier_divergence/), [range_section_seam_edges](../tests/fixtures/svelte/syntax/prettier_ignore/range_section_seam_edges_prettier_divergence/)
 - the gap in front of a frozen **text** node, where prettier never converges — ◆content_preservation — [directive_gap_text](../tests/fixtures/svelte/syntax/prettier_ignore/directive_gap_text_prettier_divergence/)
+- the gap at the end of a frozen element whose **end tag is implied**, inside its own slice (closed explicitly when the chain reaches a `<pre>`), where prettier never converges — ◆content_preservation — [implied_end_tag_gap](../tests/fixtures/svelte/syntax/prettier_ignore/implied_end_tag_gap_prettier_divergence/)
 - a frozen **text** node the section reorder leaves at the end of the document — ◆content_preservation — [template_tail_ignore](../tests/fixtures/svelte/script/ordering/template_tail_ignore_prettier_divergence/)
 - the boundary **after** a frozen global `svelte:*` element, a space and a line break converged on the break — ◆stable_quirk ◆design_choice — [global_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/global_glued_before_prettier_divergence/), [global_glued_before_neighbours](../tests/fixtures/svelte/syntax/prettier_ignore/global_glued_before_neighbours_prettier_divergence/), [global_space_after](../tests/fixtures/svelte/syntax/prettier_ignore/global_space_after_prettier_divergence/), [global_glued_before_long](../tests/fixtures/svelte/syntax/prettier_ignore/global_glued_before_long_prettier_divergence/)
 - the boundary **after** a frozen declaration tag, a space and a line break converged on the break — ◆stable_quirk ◆design_choice — [declaration_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/declaration_glued_before_prettier_divergence/)
@@ -71,6 +72,15 @@ the author's slice, so the gap grows by a line on every pass. Prettier has that 
 The frozen slice's **trailing** run goes wherever the boundary after it is the printer's — the
 fragment's own close, a follower that owns its line, a whitespace-collapsing container — and stays
 where the follower would print nothing beside a slice that already ends in a break.
+The same holds at the **trailing** edge of a frozen element whose end tag is implied (a `<li>`
+closed by the next `<li>` or by `</ul>`): its span runs up to the boundary that closes it, so the
+whitespace in front of that boundary is inside the frozen slice. The slice gives up that trailing
+whitespace run, and the printer prints the boundary once, at its own indentation. Prettier grows
+that gap on every pass too — ◆content_preservation
+([implied_end_tag_gap](../tests/fixtures/svelte/syntax/prettier_ignore/implied_end_tag_gap_prettier_divergence/)).
+Where the implied-closed chain reaches a `<pre>` the run is content, so the slice keeps it and tsv
+prints the closers explicitly after it, as it closes the unfrozen element; prettier keeps the run
+and adds its own break, a line inside the `<pre>` per pass (the same fixture).
 
 **A frozen text the reorder moves to the end of the document keeps its render, not its last
 byte.** When a `<script>` or `<svelte:options>` followed the frozen text in the source and no

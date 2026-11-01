@@ -862,7 +862,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Build the verbatim doc for a format-ignored node, or `None` when the node is
-    /// whitespace-only text to skip — the pin then carries to the next real node.
+    /// whitespace-only text to skip — the pin then carries to the next real node. An element
+    /// whose implied-closed chain reaches a whitespace-preserving element (`<pre>`) also gets
+    /// that chain's end tags after its slice
+    /// ([`Self::implied_end_closers_through_ws_sensitive`]).
     /// Shared leading step of the two accumulation loops; each
     /// caller owns its sink and clears `format_ignore_next` only when this returns `Some`.
     ///
@@ -889,7 +892,13 @@ impl<'a> Printer<'a> {
         // The ignored node's subtree can hold `{expr}` / block-head comments (all in
         // `Root.comments`); they ride out inside the raw slice — see
         // `tsv_lang::comment_ledger`.
-        Some(self.source_span_covering_comments_doc(frozen))
+        let slice = self.source_span_covering_comments_doc(frozen);
+        if let FragmentNode::Element(elem) = node
+            && let Some(closers) = self.implied_end_closers_through_ws_sensitive(elem)
+        {
+            return Some(self.d().concat(&[slice, closers]));
+        }
+        Some(slice)
     }
 
     /// The span a `format-ignore` freezes for `node` — its own span, less the one run that is
@@ -906,21 +915,111 @@ impl<'a> Printer<'a> {
     /// rather than a stray space: each pass writes one more line into the frozen slice, which the
     /// next pass reads back as the author's
     /// (`syntax/prettier_ignore/directive_gap_text_prettier_divergence`).
+    ///
+    /// A frozen **element whose end tag is implied** — a `<li>` closed by the next `<li>` or by
+    /// `</ul>` — ends its span at the boundary that closes it, so the collapsible run in front of
+    /// that boundary is inside its slice too, at the end of its last text. It goes on the same
+    /// condition, and dropping it is render-free: Svelte trims an element's trailing whitespace
+    /// ([`Self::implied_end_trailing_ws`]). The leading half has no element twin — an element's
+    /// span opens at its `<`
+    /// (`syntax/prettier_ignore/implied_end_tag_gap_prettier_divergence`).
     fn format_ignore_frozen_span(&self, node: &FragmentNode<'_>, trailing_owned: bool) -> Span {
         let span = node.span();
-        if !trailing_owned {
-            return span;
-        }
-        let FragmentNode::Text(text) = node else {
-            return span;
+        let trailing = match node {
+            FragmentNode::Text(text) if trailing_owned => {
+                ast::text_edge_ws(text.raw(self.source), false).len() as u32
+            }
+            FragmentNode::Element(elem) if trailing_owned => self.implied_end_trailing_ws(elem),
+            _ => 0,
         };
-        let trailing = ast::text_edge_ws(text.raw(self.source), false).len() as u32;
         Span::new(span.start, span.end - trailing)
     }
 
+    /// The length of the collapsible run an element with an **implied** end tag carries at the end
+    /// of its span, or `0` — for an explicit end tag (the span ends at its `>`), and wherever the
+    /// run is rendered content.
+    ///
+    /// The run sits in the last text of the element's last-descendant chain (`<li><b>a⏎</ul>`
+    /// closes both), and Svelte trims every element's trailing whitespace except inside a
+    /// whitespace-preserving one (`<pre>`, `<textarea>`), where it is content: a chain through one
+    /// keeps its run, and the slice is closed explicitly instead
+    /// ([`Self::implied_end_closers_through_ws_sensitive`]).
+    fn implied_end_trailing_ws(&self, elem: &ast::Element<'_>) -> u32 {
+        let mut innermost = elem;
+        for elem in Self::last_descendant_chain(elem) {
+            if elem.facts.is_ws_sensitive() {
+                return 0;
+            }
+            innermost = elem;
+        }
+        match innermost.fragment.nodes.last() {
+            Some(FragmentNode::Text(text)) if text.span.end == innermost.span.end => {
+                ast::text_edge_ws(text.raw(self.source), false).len() as u32
+            }
+            _ => 0,
+        }
+    }
+
+    /// The element and each last descendant that ends where its parent ends, outermost first —
+    /// the chain one implied closer can close (`<li><b>a⏎</ul>` closes both). Only the innermost
+    /// can still carry an explicit end tag: every other member's span ends at its last child's.
+    fn last_descendant_chain<'s, 'n>(
+        elem: &'s ast::Element<'n>,
+    ) -> impl Iterator<Item = &'s ast::Element<'n>> + Clone {
+        std::iter::successors(Some(elem), |elem| match elem.fragment.nodes.last() {
+            Some(FragmentNode::Element(child)) if child.span.end == elem.span.end => Some(child),
+            _ => None,
+        })
+    }
+
+    /// Whether `elem`'s end tag is implied: its span ends where its last child does, or right
+    /// after its own start tag when it has none (not a void or self-closed element).
+    fn is_implied_end(&self, elem: &ast::Element<'_>) -> bool {
+        match elem.fragment.nodes.last() {
+            Some(child) => child.span().end == elem.span.end,
+            None => {
+                elem.span.end == elem.open_tag_end + 1
+                    && !elem.facts.is_void()
+                    && !self.span_was_self_closing(elem.span)
+            }
+        }
+    }
+
+    /// The end tags a frozen element's **implied-closed chain** owes after its slice when the
+    /// chain holds a whitespace-preserving element (`<pre>`), innermost first — or `None`, the
+    /// slice standing as written.
+    ///
+    /// The chain is the element and each last descendant whose end tag the same closer implies
+    /// (`<li><pre>a⏎</ul>` closes both): each ends where its last child does, or right after its
+    /// own start tag when it has none. Inside a `<pre>` everything up to that closer is content,
+    /// so the boundary the printer prints after the slice would land inside the `<pre>` — a line
+    /// more on every pass, a render change each time. Written out here, the closers put the
+    /// `<pre>`'s end where the source implied it, and the boundary after them is the printer's
+    /// as after any explicit end tag. These are the closers the unfrozen element prints
+    /// ([`Self::end_tag`]: `<div><pre>a⏎</div>` prints `<pre>a⏎</pre>⏎</div>`). A chain that
+    /// reaches no `<pre>` gives up its trailing run instead ([`Self::implied_end_trailing_ws`]),
+    /// keeping the author's implied form
+    /// (`syntax/prettier_ignore/implied_end_tag_gap_prettier_divergence`).
+    fn implied_end_closers_through_ws_sensitive(&self, elem: &ast::Element<'_>) -> Option<DocId> {
+        let implied_chain =
+            Self::last_descendant_chain(elem).take_while(|elem| self.is_implied_end(elem));
+        if !implied_chain
+            .clone()
+            .any(|elem| elem.facts.is_ws_sensitive())
+        {
+            return None;
+        }
+        let d = self.d();
+        let mut closers: DocBuf = implied_chain
+            .map(|elem| self.end_tag(d.source_span(elem.name_span, self.source)))
+            .collect();
+        closers.reverse();
+        Some(d.concat(&closers))
+    }
+
     /// Whether the boundary AFTER a format-ignored node is the **printer's** to emit rather than
-    /// the frozen slice's — the one question deciding whether a frozen text keeps its own
-    /// trailing run ([`Self::format_ignore_frozen_span`]).
+    /// the frozen slice's — the one question deciding whether a frozen text, or an element whose end
+    /// tag is implied, keeps its own trailing run ([`Self::format_ignore_frozen_span`]).
     ///
     /// Two ways it is, and they are the two the printer emits a line for unconditionally: nothing
     /// follows, so the fragment's own close is that boundary; or the follower **owns its line**
@@ -942,8 +1041,21 @@ impl<'a> Printer<'a> {
     /// `printing::text`'s three blank-line scans record, declined for the same reason. What the
     /// duplication buys back is small: the expression is one line, and each site names
     /// [`Self::is_own_line_declaration`] in its own comment.
+    ///
+    /// A frozen **element** adds one more: a **block element** follower. No follower reads an
+    /// element's trailing bytes — the whitespace a block element's break looks for is a sibling
+    /// text, and an implied end tag leaves none — so a block follower breaks whatever the slice
+    /// ends in. An inline follower (`<rt>` closing an `<rt>`) prints nothing beside it, and there
+    /// the slice's run is the boundary and stays.
     fn format_ignore_trailing_boundary_owned(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
-        i + 1 >= nodes.len() || self.is_own_line_declaration(nodes, i + 1)
+        let Some(next) = nodes.get(i + 1) else {
+            return true;
+        };
+        self.is_own_line_declaration(nodes, i + 1)
+            || matches!(
+                (&nodes[i], next),
+                (FragmentNode::Element(_), FragmentNode::Element(next)) if next.facts.is_block()
+            )
     }
 
     /// Whether the trailing run [`Self::format_ignore_frozen_span`] dropped held an authored
