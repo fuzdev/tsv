@@ -26,10 +26,11 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
   - Commands: `parse`, `format`, `strip` (plus the top-level `--version` switch)
 - **`tsv` npm bin, native (`@fuzdev/tsv`)**: the production `tsv` binary
   itself, shipped inside each `@fuzdev/tsv-<triple>` platform package and
-  exec'd by the loader's `crates/tsv_napi/npm/bin.js` dispatcher (argv,
-  stdio, exit codes, and signals forwarded verbatim) — so `npx tsv` on the
-  native package has this CLI's exact contract, real `--jobs` parallelism
-  included. When no binary is reachable the dispatcher falls back to the JS
+  exec'd by the loader's `crates/tsv_napi/npm/bin.js` dispatcher (argv as
+  Node decodes it — a non-UTF-8 argument arrives U+FFFD-spelled,
+  [§Multi-File Formatting](#multi-file-formatting) — and stdio, exit codes,
+  and signals forwarded) — so `npx tsv` on the native package has this CLI's
+  exact contract, real `--jobs` parallelism included. When no binary is reachable the dispatcher falls back to the JS
   mirror below.
 - **`tsv` GitHub Release asset**: the same production binary, one per platform
   package (`tsv-<triple>`, `tsv-win32-x64.exe`), attached to each
@@ -302,7 +303,7 @@ waits on its writer.
 
 Exit codes — the `format` scheme, with "would change" read as "refused":
 
-- **0** — stripped (printed, or with `--check` nothing printed);
+- **0** — stripped (printed, or with `--check` nothing written to stdout);
 - **1** — refused: the source holds TypeScript the strip cannot erase. stderr is
   `Error: cannot strip <the construct>` over the `line:col` header, line and caret of the
   refused span's start, in the same coordinates a parse error prints;
@@ -764,6 +765,8 @@ margin itself is graded by `tests/depth_limit.rs`.
 - **A non-UTF-8 file NAME**: the native walk joins each entry's raw bytes, so a file or directory whose name is not UTF-8 is discovered, formatted, and listed by its own bytes on unix (the changed-path report and `--list` print paths as bytes there, `cli::out::path_bytes`; elsewhere the U+FFFD spelling is all there is). A stderr diagnostic spells such a name with U+FFFD on every platform (`cli::out::path_text`), deliberately: a diagnostic is prose for a reader and a script reads stdout, and a byte-faithful stderr would put raw non-UTF-8 into the one channel every consumer reads as text.
 
   Two limits: such a name reaches the matcher in its lossy spelling, so a `?` or class counts one U+FFFD where git counts each byte (the multibyte edge `tsv_ignore`'s CLAUDE.md scopes the git parity to ASCII by), and a non-UTF-8 path given as an *argument* is refused at the argv boundary (`Invalid utf8: …`, exit 2 — argh reads `&str`), so it is reachable only through a directory.
+
+  That argv refusal — any argument, not only a path — is the binary's when it is run directly. Node decodes argv into strings, an invalid byte becoming U+FFFD, before any JS runs, and exposes it only as those strings, so `cli.js` and the `@fuzdev/tsv` dispatcher (which hands the binary Node's decoded argv) never see the bytes: a path argument names no file (exit 2, the read or argument error of whichever command), and a `--content` value is processed as substituted (exit 0 when it still parses or formats). A deliberate, permanent split, as for walked names below.
 
   `cli.js` sees such a name only as Node spells it, lossily, on every route, so it reports the file as unreadable rather than formatting it — a deliberate, permanent split: Node hands the bytes back only as `Buffer`s (`readdir`'s `encoding: 'buffer'`), which would have to travel as a second path type through the walk, the ignore-file reads, the sort, the canonical-path dedup (`realpathSync` resolves a `Buffer` path through its lossy spelling and fails), the worker handoff and the report, for a name no published repo holds.
 - **A path holding a control character or a double quote is printed C-quoted, as git prints one.** One rule for every path either bin prints — the `--list` and changed-path lines on stdout, the per-file `error:` lines, the traversal errors, the ignore-file warnings and the warning naming an excluded argument, a bad path argument, `parse`'s read failure — stated once in `tsv_discover::quote_path` (the warnings are built there already; the native CLI routes its own paths through `cli::out::path_bytes` / `path_text`, and `cli.js` restates the rule by hand, as it does `clamp_worker_count`): a path prints verbatim unless it holds a control character (U+0000–U+001F, U+007F) or a double quote, in which case the whole path is wrapped in double quotes and C-escaped the way `git ls-files` prints such a name under `core.quotePath=false` — `\a` `\b` `\t` `\n` `\v` `\f` `\r` `\"` `\\` by name, any other control character as three octal digits (`"r\033s.ts"`), every other byte as itself (a character outside ASCII prints raw even inside the quotes, as git prints it, and so does a non-UTF-8 byte on a unix stdout listing; a stderr diagnostic spells that byte as U+FFFD, above). A backslash escapes inside a quoted path but does not trigger the quoting on its own — every Windows path holds one — so a quoted path unquotes exactly as git's does while a plain `src\a.ts` prints as it is. Two things follow. A diagnostic that names such a path stays one line (raw, a line feed in the name would split the `warning:` line in two and a carriage return garble the terminal). And the stdout listings stay parseable by whatever already reads `git ls-files` or `git status`: a line beginning with `"` is a quoted path, any other line names the file exactly, so a script over `tsv format --list` or the changed-path report can unquote with the routine it uses for git (or treat the leading `"` as the tell that a name needs it).

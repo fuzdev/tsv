@@ -153,8 +153,10 @@ straight off the addon since it takes no options bag.
 **The `tsv` bin here IS the native CLI** (the esbuild/biome npm shape): the
 loader's bin is `npm/bin.js`, a dispatcher that resolves the platform
 package's `tsv`/`tsv.exe` — the real `tsv_cli` binary shipped beside the
-addon — and execs it, forwarding argv, stdio, exit codes, and signals
-verbatim. So `npx tsv format src` on this package gets the native CLI's exact
+addon — and execs it, forwarding argv (as Node decodes it: a non-UTF-8
+argument arrives U+FFFD-spelled, so the binary's `Invalid utf8` refusal is
+unreachable here — [docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)),
+stdio, exit codes, and signals. So `npx tsv format src` on this package gets the native CLI's exact
 contract: real `--jobs` parallelism, parallel discovery, native error paths.
 The dispatch never loads the addon (it resolves the package and probes the
 file, ~1 ms) and never reads PATH — only this package's own

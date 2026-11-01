@@ -335,7 +335,7 @@ tsv/
 ├── crates/
 │   ├── tsv_lang/      # shared foundation (Span, Error, the doc printer, the wire writer)
 │   ├── tsv_arena/     # shared binding substrate: per-thread reusable AST/doc arenas + the goal axis
-│   ├── tsv_html/      # HTML spec data: named character references, optional end tags
+│   ├── tsv_html/      # HTML spec data: named character references
 │   ├── tsv_ignore/    # gitignore-aware discovery matcher (.gitignore/.formatignore/.prettierignore)
 │   ├── tsv_discover/  # file-discovery policy (build-output heuristic + safety nets) over tsv_ignore
 │   ├── tsv_ts/        # TypeScript parser/formatter (standalone)

@@ -492,8 +492,8 @@ function print_version() {
  * - a positional past the command's last is unrecognized where it appears.
  *
  * Returns `{values, positionals}`, or `{values, subcommand: {name, values,
- * positionals}}` once a subcommand took the rest. Every refusal exits 1 in the
- * exact text the native `main` prints (`exit_argh`).
+ * positionals}}` once a subcommand took the rest. Every refusal exits 2 (a usage
+ * error) in the exact text the native `main` prints (`exit_argh`).
  */
 function parse_argv(args, spec) {
 	const values = {};

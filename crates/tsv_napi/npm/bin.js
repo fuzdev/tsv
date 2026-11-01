@@ -2,8 +2,9 @@
 /**
  * The `tsv` bin of `@fuzdev/tsv` — a dispatcher, not a second CLI: it execs
  * the real `tsv_cli` binary shipped beside the addon in the platform package
- * (`@fuzdev/tsv-<triple>`), forwarding argv, stdio, exit codes, and signals
- * verbatim — so `npx tsv` here IS the native CLI (real `--jobs` parallelism,
+ * (`@fuzdev/tsv-<triple>`), forwarding argv (as Node decodes it: a non-UTF-8
+ * argument arrives U+FFFD-spelled), stdio, exit codes, and signals — so
+ * `npx tsv` here IS the native CLI (real `--jobs` parallelism,
  * native discovery and error paths), the esbuild/biome shape. When no binary
  * is reachable it defers to `./cli.js`, the shared JS mirror of the same
  * contract that `@fuzdev/tsv-wasm` ships as its bin — on an unsupported
