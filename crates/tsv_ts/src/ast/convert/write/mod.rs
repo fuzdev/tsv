@@ -1233,9 +1233,15 @@ mod tests {
     fn plain_identifier_under_a_comment_attach_emits_its_comments() {
         let source = "/* c */ name";
         let arena = bumpalo::Bump::new();
-        let (expression, comments) =
-            crate::__private::parse_expression_with_comments(source, 0, 0, &arena, |_| Ok(()))
-                .expect("parses");
+        let (expression, comments) = crate::__private::parse_expression_with_comments(
+            source,
+            0,
+            0,
+            &arena,
+            "end of input",
+            |_| Ok(()),
+        )
+        .expect("parses");
         let ast::ExpressionKind::Identifier(id) = &expression.kind else {
             panic!("an identifier expected");
         };

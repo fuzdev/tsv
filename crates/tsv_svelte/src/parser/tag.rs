@@ -58,7 +58,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .trim_start_matches(is_svelte_ws);
 
         let expr_offset = tag_content_start + subslice_offset(tag_content, expr_str);
-        let expression = self.parse_ts_expression_checked(expr_str, expr_offset, host_check)?;
+        let expression =
+            self.parse_ts_expression_checked(expr_str, expr_offset, "'}'", host_check)?;
 
         // Span runs from `{@` (start) to just after the closing `}` (after_close).
         let span = Span {
@@ -246,9 +247,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // The refusal runs inside the init's parse: under tsc's comparison
         // `f<T, U><V>(x)` is the sequence `f < T, U > <V>(x)`, which only the re-read as
         // acorn-typescript's call repairs (`parse_ts_expression_checked`).
-        let init = self.parse_ts_expression_checked(init_str, init_offset, |this, init| {
-            this.reject_multi_declarator(init, init_str, init_offset)
-        })?;
+        let init =
+            self.parse_ts_expression_checked(init_str, init_offset, "'}'", |this, init| {
+                this.reject_multi_declarator(init, init_str, init_offset)
+            })?;
         Ok((id, init))
     }
 
@@ -337,7 +339,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // `{@debug ,a}` / `{@debug a, , b}`) or a trailing token
             // (`{@debug a b}`) is a parse error, matching Svelte's
             // `eat('}', true)`. Comments are collected into `Root.comments`.
-            let expr = self.parse_ts_expression(expr_str, expr_offset)?;
+            let expr = self.parse_ts_expression(expr_str, expr_offset, "'}'")?;
 
             // Flatten a top-level comma sequence — `{@debug a, b}` and
             // `{@debug (a, b)}` both yield `[a, b]` (a comma inside `()` is not a

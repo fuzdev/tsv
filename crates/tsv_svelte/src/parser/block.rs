@@ -374,7 +374,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Parse the test expression (with comments)
         let expr_offset = tag_content_start + subslice_offset(expr_content, expr_str);
 
-        let test = self.parse_ts_expression(expr_str, expr_offset)?;
+        let test = self.parse_ts_expression(expr_str, expr_offset, "'}'")?;
 
         // Opening tag span is from start to content_start (includes the closing })
         let opening_tag_span = Span {
@@ -486,7 +486,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // The partial parse stopped at no top-level comma, so a bare sequence here is tsc's
         // comparison reading a list the partial parse read as acorn-typescript's
         // (`f<T, U><V>(x) as A[]`) — refused inside the parse, so it is re-read the same way.
-        self.parse_ts_expression_checked(iterable, expr_offset, |this, expression| {
+        self.parse_ts_expression_checked(iterable, expr_offset, "'}'", |this, expression| {
             match super::tag::bare_sequence_comma(expression, iterable) {
                 Some(comma) => Err(this.error_expected_at("'as'", expr_offset + comma)),
                 None => Ok(()),
@@ -841,7 +841,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let index = tail.index.map(|name| self.alloc_str_in(name));
         let key = match tail.key {
             Some(region) => Some(EachKey {
-                expression: self.parse_ts_expression(region.expr_str, region.expr_offset)?,
+                expression: self.parse_ts_expression(region.expr_str, region.expr_offset, "')'")?,
                 span: region.span,
             }),
             None => None,
@@ -1373,7 +1373,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .trim_start_matches(is_svelte_ws);
 
         let expr_offset = tag_content_start + subslice_offset(tag_content, expr_str);
-        let expression = self.parse_ts_expression(expr_str, expr_offset)?;
+        let expression = self.parse_ts_expression(expr_str, expr_offset, "'}'")?;
 
         // Opening tag span is from start to content_start (includes the closing })
         let opening_tag_span = Span {
@@ -1431,7 +1431,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             return Err(self.error_expected_at("snippet name", content_offset));
         };
         let name_len = name_str.len();
-        let expression = self.parse_ts_expression(name_str, content_offset)?;
+        // the slice is the name alone, so its end is the name's
+        let expression =
+            self.parse_ts_expression(name_str, content_offset, "end of snippet name")?;
         // The reserved-word filter above is what makes this an `Identifier` rather than
         // whatever `this` / `null` / `true` / `super` would have parsed to — a
         // `ThisExpression`, a `Literal`, a `Super`, none of which the wire's

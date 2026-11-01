@@ -637,12 +637,21 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// The extents of the whole family are pinned by
     /// `tests/fixtures/svelte/syntax/comments/head_final_line_comment_extent`.
+    ///
+    /// `end` names the delimiter the slice ends at — `'}'` for a tag or block head (the
+    /// `{#each}` iterable included, whose slice stops at the binding's `as`: a token left
+    /// there is reported as Svelte reports it, wanting the head's `}`), `')'` for an
+    /// `{#each}` key — which is what a token left after the expression is reported as wanting
+    /// (`{a b}` → `Expected '}'`): the island's own parser sees only its end of input there,
+    /// while the document goes on past it. A slice bounded by a construct rather than a
+    /// delimiter names the construct (`end of snippet name`).
     pub(crate) fn parse_ts_expression(
         &mut self,
         source: &str,
         base_offset: usize,
+        end: &str,
     ) -> Result<&'arena Expression<'arena>, Error> {
-        self.parse_ts_expression_checked(source, base_offset, |_, _| Ok(()))
+        self.parse_ts_expression_checked(source, base_offset, end, |_, _| Ok(()))
     }
 
     /// [`Self::parse_ts_expression`] for a head whose grammar refuses some expressions
@@ -659,6 +668,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
+        end: &str,
         host_check: impl Fn(&Self, &'arena Expression<'arena>) -> Result<(), Error>,
     ) -> Result<&'arena Expression<'arena>, Error> {
         let this = &*self;
@@ -667,6 +677,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             base_offset,
             self.island_nesting(),
             self.arena,
+            end,
             |expr| host_check(this, expr),
         )?;
         self.expression_comments.extend_from_slice(comments);

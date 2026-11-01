@@ -1425,9 +1425,16 @@ mod tests {
     /// Parse a bare array expression to its internal AST node (spans index into `src`),
     /// allocated in the caller-supplied `arena`.
     fn parse_array<'a>(arena: &'a Bump, src: &str) -> &'a ast::ArrayExpression<'a> {
-        match crate::__private::parse_expression_with_comments(src, 0, 0, arena, |_| Ok(()))
-            .expect("expression should parse")
-            .0
+        match crate::__private::parse_expression_with_comments(
+            src,
+            0,
+            0,
+            arena,
+            "end of input",
+            |_| Ok(()),
+        )
+        .expect("expression should parse")
+        .0
         {
             Expression {
                 kind: ExpressionKind::ArrayExpression(arr),

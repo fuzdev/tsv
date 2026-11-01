@@ -273,20 +273,23 @@ pub fn parse_embedded_preserve_parens<'arena>(
 /// a refusal of tsc's reading of a type-argument follower re-reads the text as
 /// acorn-typescript does — see `with_embedding_parser`. `|_| Ok(())` refuses nothing.
 ///
+/// The expression must fill `source`. `end` names where `source` ends, for the error a
+/// token left after the expression gets (`Expected {end}, found …`): the host's delimiter
+/// that bounds the slice — `'}'` for a tag, `')'` for an `{#each}` key — since the document
+/// goes on past it, or `end of input` for a source that really ends there.
+///
 /// # Errors
 ///
 /// As [`parse_embedded`]'s: positioned in the host document, with no point until the
 /// host fills its context. A refusal `host_check` returns fails the parse it judged like
 /// any other error, so it is reported only where no list was given up to tsc's comparison;
 /// otherwise the acorn re-read decides, as at [`parse_embedded`].
-// The method-path form clippy suggests fails the higher-ranked lifetime check on
-// `with_embedding_parser`'s `f` bound — same reason as [`parse_embedded`]'s closure.
-#[expect(clippy::redundant_closure_for_method_calls)]
 pub fn parse_expression_with_comments<'arena>(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
+    end: &str,
     host_check: impl Fn(&'arena Expression<'arena>) -> Result<()>,
 ) -> Result<(&'arena Expression<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(
@@ -294,7 +297,7 @@ pub fn parse_expression_with_comments<'arena>(
         base_offset,
         host_nesting,
         arena,
-        |parser| parser.parse_expression_with_comments(),
+        |parser| parser.parse_expression_with_comments(end),
         |&(expr, _)| host_check(expr),
     )
 }
@@ -346,8 +349,9 @@ pub fn parse_pattern_with_comments<'arena>(
             let expr = parser.parse_expression_unbounded()?;
             let pattern = parser.expression_to_svelte_pattern(expr)?;
             // The pattern must fill the whole slice the caller bounded. Without this a trailing
-            // token is silently dropped, losing content.
-            parser.expect_end_of_input()?;
+            // token is silently dropped, losing content. The slice is the pattern itself (a name
+            // or a matched bracket), so its end is the pattern's, not a delimiter's.
+            parser.expect_end_of_input("end of pattern")?;
             Ok((pattern, parser.take_comments()))
         },
         |_| Ok(()),

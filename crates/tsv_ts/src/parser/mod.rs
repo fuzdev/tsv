@@ -3895,22 +3895,30 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the slice exactly — Svelte's `eat('}', true)`. Without this check a trailing token
     /// is silently dropped (`{@html a b}` → `{@html a}`), which loses content rather than
     /// diverging visibly.
-    pub(crate) fn expect_end_of_input(&self) -> Result<(), Error> {
+    ///
+    /// `end` is what the message says was expected in the stray token's place: the slice's
+    /// end as the caller knows it. For an island that is the host's delimiter (`'}'`,
+    /// `')'`), since the document goes on past it and the delimiter is what is missing.
+    /// The island's parser knows nothing else of its host, and the name is handed to this
+    /// check alone rather than stored on the parser.
+    pub(crate) fn expect_end_of_input(&self, end: &str) -> Result<(), Error> {
         if self.current.kind == TokenKind::Eof {
             Ok(())
         } else {
-            Err(self.error_expected_found("end of input"))
+            Err(self.error_expected_found(end))
         }
     }
 
     /// Parse a single expression and return it with any collected comments.
     /// Used for expressions in Svelte templates where comments need to be preserved.
-    /// The expression must fill the whole slice (see `expect_end_of_input`).
+    /// The expression must fill the whole slice, whose end `end` names (see
+    /// `expect_end_of_input`).
     pub(crate) fn parse_expression_with_comments(
         &mut self,
+        end: &str,
     ) -> Result<(&'arena Expression<'arena>, &'arena [Comment]), Error> {
         let expr = self.parse_expression_ref()?;
-        self.expect_end_of_input()?;
+        self.expect_end_of_input(end)?;
         let comments = self.take_comments();
         Ok((expr, comments))
     }

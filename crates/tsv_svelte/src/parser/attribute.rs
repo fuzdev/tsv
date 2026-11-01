@@ -768,7 +768,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let expr_offset = content_start + super::subslice_offset(content, expr_str);
 
         // Parse the expression using the TypeScript parser
-        let expression = self.parse_ts_expression(expr_str, expr_offset)?;
+        let expression = self.parse_ts_expression(expr_str, expr_offset, "'}'")?;
 
         // Advance the lexer past the entire {@attach ...} construct
         // We need to update the lexer position to after the closing '}'
@@ -836,7 +836,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let expr_offset = content_start + leading_ws + "...".len();
 
         // Parse the expression using the TypeScript parser
-        let expression = self.parse_ts_expression(after_dots, expr_offset)?;
+        let expression = self.parse_ts_expression(after_dots, expr_offset, "'}'")?;
 
         // Advance the lexer past the entire {...} construct
         self.advance_to_position(end)?;
