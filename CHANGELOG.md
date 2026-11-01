@@ -17,9 +17,11 @@ Each `## Unreleased` section must be non-empty and carry a
 - **breaking** feat: the `IgnoreStack` binding methods change: `pop_tsv()` is renamed
   `pop_override()`, and `classify_dir` / `should_format_file` drop their `name` argument,
   reading it off the path
-- **breaking** fix: a malformed command line — an unknown flag, a missing value, an extra
-  positional, `--version` beside a subcommand — exits 2 on both CLIs, the usage-error code, not
-  1, which `format --check` and `strip` keep for "would change" and "refused"
+- **breaking** fix: a usage or read error exits 2 on both CLIs, not 1 — a malformed command
+  line (an unknown flag, a missing value, an extra positional, `--version` beside a
+  subcommand) in every command, and `parse`'s own (a missing `--parser`, a bad
+  `--source-type`, an unreadable file); `parse` keeps 1 for input that does not parse, as
+  `format --check` keeps it for "would change" and `strip` for "refused"
 
 - feat: the Rust crates publish to crates.io — `cargo install --locked tsv_cli`, or
   `cargo binstall tsv_cli` for the prebuilt binary; their API is reshaped for it
