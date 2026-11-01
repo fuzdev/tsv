@@ -176,12 +176,12 @@ let js = tsv_ts::strip("let x: number = 1;")?.code; // "let x         = 1;"
 let json = tsv_ts::parse_to_json("const x = 1;")?;
 ```
 
-Errors carry a `kind()` (`Syntax`, `Refusal`, `TooDeep`, `TooLarge`), a `span()` in the
-input's UTF-8 bytes, and the report the npm packages return (`to_report()`); `{}` prints one
-line and `{:#}` the CLI's frame. TypeScript takes an exact parse goal (`Goal::Script` /
-`Goal::Module`) through `format_with_goal`, `strip_with_goal` and `JsonOptions::goal`; with
-none named, format and strip try the module grammar, then the script one, and parsing reads a
-module.
+Errors carry a `kind()` (`Syntax`, `Refusal`, `TooDeep`, `TooLarge`), a one-line `message()`,
+a `span()` in the input's UTF-8 bytes, and the report the npm packages return (`to_report()`);
+`{}` prints one line and `{:#}` the CLI's frame. TypeScript takes an exact parse goal
+(`Goal::Script` / `Goal::Module`) through `format_with_goal`, `strip_with_goal` and
+`JsonOptions::goal`; with none named, format and strip try the module grammar, then the script
+one, and parsing reads a module.
 
 This release exposes no AST: parsing returns the wire JSON — the AST as JSON in the
 canonical parser's shape (acorn-typescript's, Svelte's, `parseCss`'s), its `start` / `end`
@@ -203,7 +203,7 @@ without `parse_to_json*`.
 | `parse_*(src, {locations: true})`, `reconstruct_locations` | `JsonOptions::new().locations(true)` (`locations` feature)                 |
 | `{ok: false, error}`                                   | `Err(Error)` (strip: `Err(StripError)`)                                    |
 | `error.kind` `'parse'` / `'refused'` / `'unsupported'` | `ErrorKind::Syntax` or `TooDeep` / `ErrorKind::Refusal` / `StripError::Unsupported` |
-| `error.message`, `error.frame`                         | `to_report()`'s `summary`, `frame` (`format!("{e:#}")` is both)            |
+| `error.message`, `error.frame`                         | `message()` / `to_report()`'s `message`, `frame` (`{e:#}` is both)         |
 | `error.start` / `end`, `error.loc`                     | `to_report()`'s `start` / `end` (`WirePoint`: offset, line, column)        |
 | a thrown error for a source over 4 GiB                 | `ErrorKind::TooLarge`                                                      |
 | `IgnoreStack` (discovery)                              | `tsv_ignore::IgnoreStack` (the discovery policy has no public Rust API)    |

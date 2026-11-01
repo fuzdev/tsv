@@ -43,10 +43,10 @@
 //! ## Errors
 //!
 //! Formatting and parsing return an [`Error`] that says what kind of failure it is
-//! ([`Error::kind`]), where it is in the input's UTF-8 bytes ([`Error::span`]), and how tsv's
-//! bindings (its npm packages) report it ([`Error::to_report`]: the summary and the frame
-//! apart, positions in UTF-16 offsets and 1-based lines). `{}` prints one line; `{:#}` adds
-//! the frame the `tsv` CLI prints.
+//! ([`Error::kind`]), what went wrong on one line ([`Error::message`]), where it is in the
+//! input's UTF-8 bytes ([`Error::span`]), and how tsv's bindings (its npm packages) report it
+//! ([`Error::to_report`]: the message and the frame apart, positions in UTF-16 offsets and
+//! 1-based lines). `{}` prints one line; `{:#}` adds the frame the `tsv` CLI prints.
 //!
 //! ```
 //! use tsv_ts::{ErrorKind, format};
@@ -54,6 +54,7 @@
 //! let err = format("const x=").unwrap_err();
 //! assert_eq!(err.kind(), ErrorKind::Syntax);
 //! assert_eq!(err.span(), Some(8..8));
+//! assert_eq!(err.message(), "Expected expression, found end of input");
 //! assert_eq!(err.to_string(), "Expected expression, found end of input (1:9)");
 //! assert_eq!(
 //!     format!("{err:#}"),

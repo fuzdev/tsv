@@ -90,6 +90,7 @@ use tsv_lang::{Error, ErrorKind, ErrorReport};
 /// assert_eq!(error.span(), Some(8..12));
 /// let report = error.to_report().unwrap();
 /// assert_eq!((report.start.line, report.start.column), (1, 8));
+/// assert_eq!(error.message(), "cannot strip an angle-bracket type assertion");
 /// assert_eq!(error.to_string(), "cannot strip an angle-bracket type assertion (1:9)");
 /// assert_eq!(
 ///     format!("{error:#}"),
@@ -315,6 +316,15 @@ impl StripError {
         self.error().kind()
     }
 
+    /// What went wrong, on one line and without where — [`Error::message`]: a parse error's
+    /// own, or the refusal's `cannot strip …` naming the construct. Every failure has one,
+    /// a source over the size cap included, and it equals [`StripError::to_report`]'s
+    /// `message` whenever that is `Some`. Composed on each call (an allocated `String`).
+    #[must_use]
+    pub fn message(&self) -> String {
+        self.error().message()
+    }
+
     /// The failure's byte range in the source that was stripped — UTF-8 byte offsets, not
     /// the UTF-16 wire coordinates [`StripError::to_report`] gives. A parse error's is
     /// [`Error::span`] (an empty `p..p` at a syntax error or a depth limit, `None` for a
@@ -389,8 +399,9 @@ mod tests {
             "cannot strip an enum\n2:1 enum E {}\n    ^ here"
         );
         assert_eq!(error.kind(), tsv_lang::ErrorKind::Refusal);
+        assert_eq!(error.message(), "cannot strip an enum");
         let report = error.to_report().expect("a refusal reports");
-        assert_eq!(report.summary, "cannot strip an enum");
+        assert_eq!(report.message, error.message());
         assert_eq!(report.frame, "2:1 enum E {}\n    ^ here");
         assert_eq!((report.start.line, report.start.column), (2, 0));
     }
@@ -441,6 +452,16 @@ mod tests {
         };
         assert_eq!(format!("{error:#}"), format!("{parse:#}"));
         assert_eq!(error.to_report(), parse.to_report());
+        // the parse error's own one line, the full text's first
+        assert_eq!(error.message(), parse.message());
+        assert_eq!(
+            format!("{error:#}").lines().next(),
+            Some(error.message().as_str())
+        );
+        assert_eq!(
+            error.to_report().expect("a syntax error reports").message,
+            error.message()
+        );
     }
 
     fn stripped(source: &str) -> String {

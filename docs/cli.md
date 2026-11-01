@@ -228,11 +228,11 @@ bundle — is cut to that window, each cut end marked with a `…`, so an error 
 is not a megabyte; the header still prints the true point.
 The caret is padded by the display width of what the excerpt prints ahead of it (a tab echoed
 as a tab), so it sits under the error's character even where the header's UTF-16 column and
-the screen column differ. The text is `tsv_lang`'s `Error` in its full (`{:#}`) form and is the same
-on both bins and in every package — where the `{kind: 'parse'}` error the facade returns
-carries it split in two, the summary as `message` and the header, excerpt and caret lines as
-`frame` (so `` `${message}\n${frame}` `` is the text), beside a `start` / `end` / `loc` span
-over the same point (`crates/tsv_wasm/npm/api.js`).
+the screen column differ. The text is `tsv_lang`'s `Error` in its full (`{:#}`) form and is
+the same on both bins and in every package — where the `{kind: 'parse'}` error the facade
+returns carries it split in two, the first line as `message` (`Error::message`) and the header,
+excerpt and caret lines as `frame` (so `` `${message}\n${frame}` `` is the text), beside a
+`start` / `end` / `loc` span over the same point (`crates/tsv_wasm/npm/api.js`).
 
 Two errors are not parse errors, and a single input prints them after `Error: ` rather than
 `Parse error: ` (a path-mode `format` names the file either way): a source over the 4 GiB

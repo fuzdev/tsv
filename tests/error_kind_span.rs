@@ -8,7 +8,7 @@
 //! point's error is mapped back through its `<CR>` fold, an embedded `<script>`'s is
 //! absolute in the host document, and a leading byte-order mark is counted in every
 //! language — unlike `to_report()`, whose points are UTF-16 and whose Svelte and CSS wires
-//! elide the mark. `Display` is one line (`summary (line:col)`); `{:#}` is the full frame
+//! elide the mark. `Display` is one line (`message (line:col)`); `{:#}` is the full text
 //! the CLI prints.
 
 use tsv_lang::{Error, ErrorKind};
@@ -111,7 +111,7 @@ fn a_lone_cr_refusal_spans_the_cr() {
         .find(|&at| source.as_bytes().get(at + 1) != Some(&b'\n'))
         .expect("a lone `<CR>`");
     assert_eq!(error.span(), Some(cr..cr + 1));
-    // the refusal's one line is its summary and the `<CR>`'s point
+    // the refusal's one line is its message and the `<CR>`'s point
     assert!(error.to_string().ends_with(" (2:10)"), "{error}");
 }
 
@@ -132,7 +132,7 @@ fn a_depth_refusal_spans_where_the_limit_tripped() {
 }
 
 #[test]
-fn display_is_one_line_and_the_alternate_is_the_frame() {
+fn display_is_one_line_and_the_alternate_is_the_full_text() {
     let source = "let a = 1;\nlet x = ;\n";
     let error = ts_parse_error(source);
     let one = error.to_string();
@@ -143,18 +143,19 @@ fn display_is_one_line_and_the_alternate_is_the_frame() {
         full,
         "Expected expression, found ';'\n2:9 let x = ;\n            ^ here"
     );
-    // the one line is the frame's summary line plus its header's point, exactly
+    // the one line is the full text's message line plus its header's point, exactly
     let mut lines = full.lines();
-    let summary = lines.next().expect("a summary");
+    let message = lines.next().expect("a message");
+    assert_eq!(message, error.message());
     let header = lines
         .next()
         .and_then(|line| line.split_once(' '))
         .map(|(at, _)| at)
         .expect("a header");
-    assert_eq!(one, format!("{summary} ({header})"));
+    assert_eq!(one, format!("{message} ({header})"));
     // and `to_report()` holds the same two parts apart
     let report = error.to_report().expect("a located error reports");
-    assert_eq!(full, format!("{}\n{}", report.summary, report.frame));
+    assert_eq!(full, format!("{}\n{}", report.message, report.frame));
 
     // the strip's parse error forwards both forms
     let strip = {

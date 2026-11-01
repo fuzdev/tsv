@@ -128,7 +128,7 @@ pub(crate) fn exit_with_error(code: i32, message: impl std::fmt::Display) -> ! {
 /// --content`/`--stdin`), prefixed by what the error is: `Parse error:` for a located
 /// error — a syntax error or a depth limit ([`tsv_lang::Error::kind`]) — and `Error:` for
 /// the kinds that are not one — the size cap and a format's refusal of a source that parses
-/// ([`tsv_lang::Error::refusal`]). The error prints in its full form (`{:#}`: the summary,
+/// ([`tsv_lang::Error::refusal`]). The error prints its full text (`{:#}`: the message,
 /// then the `line:col` header, excerpt and caret). The JS mirror makes the same split on
 /// the facade result's `error.kind` (`cli.js`'s `result_failure`). A path-mode `format`
 /// names the file instead, with no prefix (`error: <path>: …`).

@@ -346,7 +346,7 @@ napi-rs marshals the JS string into a Rust `String` and the returned `String` ba
   report }` for a pointed one: `kind` `'parse'` (a syntax error), `'refused'` (a format's
   refusal of a source that parses) or `'unsupported'` (a strip refusal, with its `construct`),
   over the `ErrorReport` `Error::to_report` gives — a strip refusal's own `Error` included — (the
-  summary, the frame, and the span as two `WirePoint`s).
+  message, the frame, and the span as two `WirePoint`s).
 - **The `#[napi]` wrapper**, which takes the `Env` napi-rs injects (`&Env`, not a JS argument,
   so the arity is unchanged) and returns `Either<String, Object>` (`Either<Undefined, Object>`
   for `parse_internal_*`): the product as before, or the `{ok: false, error}` object
@@ -355,7 +355,7 @@ napi-rs marshals the JS string into a Rust `String` and the returned `String` ba
   in the order `tsv_wasm`'s setters run, so the two engines' objects read alike. No `Error` is
   built and nothing is thrown, so napi-rs's `Either::A` string path is the success path
   unchanged. Were building that object to fail, the failure is thrown as a plain error carrying
-  its summary and frame instead (`Failure::into_napi`). A `Plain` is thrown as an `Error`
+  its message and frame instead (`Failure::into_napi`). A `Plain` is thrown as an `Error`
   built on `env` (`plain_error`), its own enumerable `code: 'GenericFailure'` deleted — a plain error passes through the facade as the
   same object, and a package swap must not change what a caller's `Object.keys` reads.
 

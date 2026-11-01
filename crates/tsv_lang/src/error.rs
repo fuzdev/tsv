@@ -115,9 +115,9 @@ impl ErrorContext {
         }
     }
 
-    /// The **frame** under a located error's summary: the `{line}:{col}` header and the
+    /// The **frame** under a located error's message: the `{line}:{col}` header and the
     /// excerpted line, then the caret line beneath — two lines, joined by one `\n`, no
-    /// terminator after. The message a located error renders is its summary, a `\n`, and
+    /// terminator after. The full text a located error renders is its message, a `\n`, and
     /// this ([`ErrorContext::format_with_caret`]); a binding reports the two apart
     /// ([`ErrorReport`]).
     fn frame(&self) -> String {
@@ -224,16 +224,16 @@ enum Repr {
 }
 
 impl Repr {
-    /// What went wrong, without where: the message's first part, ahead of the frame a
-    /// located error renders under it — always ONE line. Every summary every surface prints or
+    /// What went wrong, without where: the full text's first part, ahead of the frame a
+    /// located error renders under it — always ONE line. Every message every surface prints or
     /// returns is built here, and several quote source text (a token, a Svelte attribute's
     /// raw text), so a line terminator in it is spelled out ([`escape_line_terminators`]).
-    fn summary(&self) -> String {
-        escape_line_terminators(self.raw_summary())
+    fn message(&self) -> String {
+        escape_line_terminators(self.raw_message())
     }
 
-    /// [`Repr::summary`] before its line terminators are spelled out.
-    fn raw_summary(&self) -> String {
+    /// [`Repr::message`] before its line terminators are spelled out.
+    fn raw_message(&self) -> String {
         match self {
             Repr::UnexpectedToken {
                 expected, found, ..
@@ -262,23 +262,23 @@ impl Repr {
     }
 }
 
-/// One line by default, the whole frame under the alternate flag (`{:#}`) — see
+/// One line by default, the full text under the alternate flag (`{:#}`) — see
 /// [`Error`]'s `Display`.
 impl fmt::Display for Repr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let summary = self.summary();
+        let message = self.message();
         if f.alternate() {
-            // The summary, then — for a located error with its context filled, and for a
+            // The message, then — for a located error with its context filled, and for a
             // refusal — a `\n` and the frame; a located error no context has been filled for
             // falls back to `at position N`.
             if let Repr::Refused { frame, .. } = self {
-                return write!(f, "{summary}\n{frame}");
+                return write!(f, "{message}\n{frame}");
             }
             return match self.located() {
                 Some((position, context)) => {
-                    f.write_str(&format_error(&summary, *position, context.as_ref()))
+                    f.write_str(&format_error(&message, *position, context.as_ref()))
                 }
-                None => f.write_str(&summary),
+                None => f.write_str(&message),
             };
         }
         // The point the frame's header prints, as `line:col`; a byte offset where no context
@@ -287,25 +287,25 @@ impl fmt::Display for Repr {
             Repr::Refused { start, .. } => Some(*start),
             _ => match self.located() {
                 Some((_, Some(context))) => Some(context.point),
-                Some((position, None)) => return write!(f, "{summary} (at byte {position})"),
+                Some((position, None)) => return write!(f, "{message} (at byte {position})"),
                 None => None,
             },
         };
         match point {
             Some(point) => write!(
                 f,
-                "{summary} ({}:{})",
+                "{message} ({}:{})",
                 point.line,
                 u64::from(point.column) + 1
             ),
-            None => f.write_str(&summary),
+            None => f.write_str(&message),
         }
     }
 }
 
 impl ErrorReport {
     /// A refusal's report — what [`Error::refusal`] reports for the same arguments, and
-    /// the parts it renders from: `message` as the summary (its line terminators spelled
+    /// the parts it renders from: `message` as the report's message (its line terminators spelled
     /// out), the frame of `start` in `source` under `coordinates`, and the span
     /// `start..end`.
     fn refusal(
@@ -317,7 +317,7 @@ impl ErrorReport {
     ) -> Self {
         let context = ErrorContext::from_source(source, start, coordinates);
         ErrorReport {
-            summary: escape_line_terminators(message.to_owned()),
+            message: escape_line_terminators(message.to_owned()),
             frame: context.frame(),
             start: context.point,
             end: coordinates.point(source, end.max(start)),
@@ -326,18 +326,18 @@ impl ErrorReport {
     }
 }
 
-/// `summary` with every line terminator — LF, CR, U+2028, U+2029, the characters that end a
+/// `message` with every line terminator — LF, CR, U+2028, U+2029, the characters that end a
 /// line in a terminal or in ECMAScript — spelled `<U+XXXX>` (the `U+` notation the codepoint
-/// errors already use), so a summary quoting source text stays one line and no raw CR
+/// errors already use), so a message quoting source text stays one line and no raw CR
 /// overwrites a terminal line. The frame needs none of this: its excerpt is bounded by the
 /// same terminators ([`ErrorContext::from_source`]).
-fn escape_line_terminators(summary: String) -> String {
+fn escape_line_terminators(message: String) -> String {
     const TERMINATORS: [char; 4] = ['\n', '\r', '\u{2028}', '\u{2029}'];
-    if !summary.contains(TERMINATORS) {
-        return summary;
+    if !message.contains(TERMINATORS) {
+        return message;
     }
-    let mut escaped = String::with_capacity(summary.len() + 8);
-    for c in summary.chars() {
+    let mut escaped = String::with_capacity(message.len() + 8);
+    for c in message.chars() {
         if TERMINATORS.contains(&c) {
             // infallible: writing to a `String` never fails
             let _ = write!(escaped, "<U+{:04X}>", u32::from(c));
@@ -348,16 +348,17 @@ fn escape_line_terminators(summary: String) -> String {
     escaped
 }
 
-/// A pointed error as tsv's bindings (its npm packages) report it: the summary and the frame
+/// A pointed error as tsv's bindings (its npm packages) report it: the message and the frame
 /// apart, and the span in the document's wire coordinates ([`Error::to_report`]). The error's
-/// full message (its `{:#}` form) is exactly `summary`, a `\n`, then `frame`.
+/// full text (its `{:#}` form) is exactly `message`, a `\n`, then `frame`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct ErrorReport {
-    /// What went wrong — the message's first part.
-    pub summary: String,
+    /// What went wrong, on one line — the full text's first part, and the same text
+    /// [`Error::message`] returns.
+    pub message: String,
     /// The `{line}:{col}` header with the excerpted line, a `\n`, then the caret line —
-    /// what the message prints after the summary and a `\n`. The excerpt is display text,
+    /// what the full text prints after the message and a `\n`. The excerpt is display text,
     /// cut at any line terminator (a lone `\r`, U+2028 or U+2029 included), so under a
     /// language whose lines end at `\n` alone it can begin mid-line; positions are read from
     /// [`start`](Self::start) / [`end`](Self::end), never off the frame.
@@ -386,42 +387,43 @@ pub struct ErrorReport {
 // loops pack into less instruction cache.
 /// Why a parse or format produced no output — a syntax error, a depth limit, a refusal of
 /// a source that parses, or a source over the size cap ([`ErrorKind`]): what went wrong
-/// ([`Error::kind`]), where ([`Error::span`], UTF-8 byte offsets), and the pointed report
-/// tsv's bindings (its npm packages) render ([`Error::to_report`]). One pointer wide, so a
-/// `Result` carrying it costs a successful call almost nothing.
+/// ([`Error::kind`], [`Error::message`]), where ([`Error::span`], UTF-8 byte offsets), and
+/// the pointed report tsv's bindings (its npm packages) render ([`Error::to_report`]). One
+/// pointer wide, so a `Result` carrying it costs a successful call almost nothing.
 ///
 /// ```
 /// # use tsv_lang::{Error, ErrorKind, LeadingBom, LineRule, WireCoordinates};
 /// # let source = "let x = (";
 /// # let err = Error::unexpected_eof(source.len())
 /// #     .with_context(source, WireCoordinates::new(LineRule::Ecmascript, LeadingBom::Counted));
-/// // `err`: a syntax error summarized `Unexpected end of input`, located at the end (byte 9) of
-/// // the one-line source `let x = (`
+/// // `err`: a syntax error, `Unexpected end of input`, located at the end (byte 9) of the
+/// // one-line source `let x = (`
 /// assert_eq!(err.kind(), ErrorKind::Syntax);
+/// assert_eq!(err.message(), "Unexpected end of input");
 /// assert_eq!(err.span(), Some(9..9)); // UTF-8 bytes of the caller's text
 /// assert_eq!(err.to_string(), "Unexpected end of input (1:10)");
 /// assert_eq!(format!("{err:#}"), "Unexpected end of input\n1:10 let x = (\n              ^ here");
-/// // what a binding returns: the summary and the frame apart, the points in UTF-16 units
+/// // what a binding returns: the message and the frame apart, the points in UTF-16 units
 /// let report = err.to_report().expect("a located error reports");
-/// assert_eq!(report.summary, "Unexpected end of input");
+/// assert_eq!(report.message, "Unexpected end of input");
 /// assert_eq!((report.start.offset, report.start.line, report.start.column), (9, 1, 9));
 /// ```
 ///
 /// # Equality
 ///
 /// Two errors are equal when they are observably the same error: the same
-/// [`Error::kind`] and [`Error::span`], the same located point, and the same full message
-/// (the `{:#}` form, which carries the summary and the frame). Nothing else is compared —
+/// [`Error::kind`] and [`Error::span`], the same located point, and the same full text
+/// (the `{:#}` form, which carries the message and the frame). Nothing else is compared —
 /// no internal classification an error carries beside its message.
 ///
 /// # Display
 ///
-/// `{}` is **one line**: the summary, then the error's `line:col` (1-based line, 1-based
-/// UTF-16 column, the point its frame's header prints) in parentheses —
-/// `Unexpected end of input (3:7)`. A source over the size cap, which has no position, is
-/// the summary alone. The alternate form `{:#}` is the whole frame: the
-/// summary, a `\n`, the `line:col` header with the excerpted line, a `\n`, and the caret
-/// line — what the `tsv` CLI prints (and `summary + "\n" + frame` of [`Error::to_report`]).
+/// `{}` is **one line**: the message ([`Error::message`]), then the error's `line:col`
+/// (1-based line, 1-based UTF-16 column, the point its frame's header prints) in
+/// parentheses — `Unexpected end of input (3:7)`. A source over the size cap, which has no
+/// position, is the message alone. The alternate form `{:#}` is the full text: the message, a `\n`,
+/// the `line:col` header with the excerpted line, a `\n`, and the caret line — what the
+/// `tsv` CLI prints (and `message + "\n" + frame` of [`Error::to_report`]).
 /// `Debug` prints the private payload's variant.
 #[derive(Clone)]
 #[repr(transparent)]
@@ -429,7 +431,7 @@ pub struct Error(Box<Payload>);
 
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
-        // the cheap observable facts first; the message (summary + frame) last
+        // the cheap observable facts first; the full text (message + frame) last
         self.kind() == other.kind()
             && self.span() == other.span()
             && self.wire_point() == other.wire_point()
@@ -641,6 +643,21 @@ impl Error {
         }
     }
 
+    /// What went wrong, on one line and without where (`Unexpected end of input`) — the
+    /// text both `{}` and `{:#}` open with, ahead of the point or the frame. Every error
+    /// has one, a source over the size cap ([`ErrorKind::TooLarge`]) included, and it
+    /// equals [`Error::to_report`]'s `message` whenever that is `Some`. A line terminator it
+    /// quotes from the source (LF, CR, U+2028, U+2029) is spelled `<U+000A>` and so on, so
+    /// it never breaks the line.
+    ///
+    /// Composed on each call, an allocated `String`, rather than stored: the parsers build
+    /// and discard errors while they speculate, so the text costs nothing until someone asks
+    /// for it.
+    #[must_use]
+    pub fn message(&self) -> String {
+        self.0.kind.message()
+    }
+
     /// The error's byte range in the source the caller handed over — UTF-8 byte offsets,
     /// not the UTF-16 wire coordinates [`Error::to_report`] gives. A syntax error and a depth
     /// limit know a point, so their range is empty (`p..p`); a refusal's is the bytes it
@@ -682,7 +699,7 @@ impl Error {
     /// early), or a type strip that cannot erase a construct (`tsv_ts::StripError`). It
     /// covers the bytes `start..end`.
     ///
-    /// The message is rendered here, with the `line:col` header and excerpt of `start` in
+    /// The full text is rendered here, with the `line:col` header and excerpt of `start` in
     /// `source` under `coordinates` that a located error prints, so it reads like every other
     /// error, and the span is kept ([`Error::to_report`]). But it is **not a syntax error** —
     /// no [`Error::position`], no `Error::wire_point`, [`Error::kind`]
@@ -704,7 +721,7 @@ impl Error {
     ) -> Self {
         let report = ErrorReport::refusal(message, source, start, end, coordinates);
         Error::new(Repr::Refused {
-            message: report.summary.into(),
+            message: report.message.into(),
             frame: report.frame.into(),
             // the same ends the report's points are taken at: `end` never short of `start`
             span: start..end.max(start),
@@ -713,7 +730,7 @@ impl Error {
         })
     }
 
-    /// The error as tsv's bindings (its npm packages) report it — summary, frame and span —
+    /// The error as tsv's bindings (its npm packages) report it — message, frame and span —
     /// for every error with a point: a syntax error or a depth limit (its span the point
     /// alone: `end == start`) and a refusal (its own span, `kind` [`ErrorKind::Refusal`]).
     /// `None` for a source over the size cap ([`ErrorKind::TooLarge`]), which has no point.
@@ -737,7 +754,7 @@ impl Error {
         } = &self.0.kind
         {
             return Some(ErrorReport {
-                summary: self.0.kind.summary(),
+                message: self.0.kind.message(),
                 frame: frame.to_string(),
                 start: *start,
                 end: *end,
@@ -747,7 +764,7 @@ impl Error {
         let (_, context) = self.0.kind.located()?;
         let context = context.as_ref()?;
         Some(ErrorReport {
-            summary: self.0.kind.summary(),
+            message: self.0.kind.message(),
             frame: context.frame(),
             start: context.point,
             end: context.point,
@@ -1040,8 +1057,8 @@ mod tests {
         );
     }
 
-    /// `{}` is one line: the summary and the frame header's `line:col`, a byte offset for a
-    /// located error no context has been filled for, the summary alone without a position.
+    /// `{}` is one line: the message and the frame header's `line:col`, a byte offset for a
+    /// located error no context has been filled for, the message alone without a position.
     #[test]
     fn test_display_is_one_line() {
         let source = "let x =\ny";
@@ -1051,10 +1068,11 @@ mod tests {
         let e = Error::unexpected_token("';'".to_string(), "'y'".to_string(), 8)
             .with_context(source, ECMA);
         assert_eq!(e.to_string(), "Expected ';', found 'y' (2:1)");
-        // the header's numbers, and the summary's first line, exactly
+        // the header's numbers, and the full text's first line, exactly
         let alternate = format!("{e:#}");
-        let summary = alternate.lines().next().unwrap();
-        assert_eq!(e.to_string(), format!("{summary} ({})", header(&alternate)));
+        let message = alternate.lines().next().unwrap();
+        assert_eq!(message, e.message());
+        assert_eq!(e.to_string(), format!("{message} ({})", header(&alternate)));
         assert_eq!(
             Error::file_too_large(5, 4).to_string(),
             "File too large: 5 bytes (maximum: 4 bytes / 4 GiB)"
@@ -1322,7 +1340,7 @@ mod tests {
         assert_eq!(
             refusal.to_report(),
             Some(ErrorReport {
-                summary: "no".to_owned(),
+                message: "no".to_owned(),
                 frame: "2:2 c\n     ^ here".to_owned(),
                 start: point(4, 2, 1),
                 end: point(5, 2, 2),
@@ -1335,12 +1353,12 @@ mod tests {
         );
     }
 
-    /// A summary quoting source text never carries a raw line terminator: LF, CR, U+2028 and
-    /// U+2029 are spelled `<U+XXXX>`, in the message and the report alike, for a syntax
-    /// error and a refusal — so the summary stays one line and the message stays
-    /// `summary + "\n" + frame`.
+    /// A message quoting source text never carries a raw line terminator: LF, CR, U+2028 and
+    /// U+2029 are spelled `<U+XXXX>`, in the full text and the report alike, for a syntax
+    /// error and a refusal — so the message stays one line and the full text stays
+    /// `message + "\n" + frame`.
     #[test]
-    fn a_summary_spells_out_its_line_terminators() {
+    fn a_message_spells_out_its_line_terminators() {
         let source = "x\ny";
         for (raw, spelled) in [
             ("a\nb", "a<U+000A>b"),
@@ -1352,47 +1370,56 @@ mod tests {
         ] {
             let e = Error::invalid_syntax(format!("bad '{raw}'"), 2).with_context(source, ECMA);
             let report = e.to_report().expect("a filled syntax error reports");
-            assert_eq!(report.summary, format!("bad '{spelled}'"));
+            assert_eq!(report.message, format!("bad '{spelled}'"));
+            assert_eq!(e.message(), report.message);
             assert_eq!(
                 format!("{e:#}"),
-                format!("{}\n{}", report.summary, report.frame)
+                format!("{}\n{}", report.message, report.frame)
             );
             let e = Error::unexpected_token("';'".to_string(), format!("'{raw}'"), 2)
                 .with_context(source, ECMA);
-            assert_eq!(
-                e.to_report().expect("reports").summary,
-                format!("Expected ';', found '{spelled}'")
-            );
+            let report = e.to_report().expect("reports");
+            assert_eq!(report.message, format!("Expected ';', found '{spelled}'"));
+            assert_eq!(e.message(), report.message);
             let refusal = Error::refusal(raw, source, 2, 3, LF);
             let report = refusal.to_report().expect("a refusal reports");
-            assert_eq!(report.summary, spelled);
+            assert_eq!(report.message, spelled);
+            assert_eq!(refusal.message(), report.message);
             assert_eq!(
                 format!("{refusal:#}"),
-                format!("{}\n{}", report.summary, report.frame)
+                format!("{}\n{}", report.message, report.frame)
             );
         }
     }
 
-    /// A filled syntax error reports its summary and frame apart — the two its message
+    /// A filled syntax error reports its message and frame apart — the two its full text
     /// joins with one `\n` — over a one-point span; an unfilled one and the size cap report
     /// nothing.
     #[test]
-    fn a_syntax_error_reports_its_summary_frame_and_point() {
+    fn a_syntax_error_reports_its_message_frame_and_point() {
         let source = "let x =\ny";
         let e = Error::unexpected_token("';'".to_string(), "'y'".to_string(), 8);
         assert_eq!(e.to_report(), None);
         let e = e.with_context(source, ECMA);
         let report = e.to_report().expect("a filled syntax error reports");
-        assert_eq!(report.summary, "Expected ';', found 'y'");
+        assert_eq!(report.message, "Expected ';', found 'y'");
+        assert_eq!(e.message(), report.message);
         assert_eq!(report.frame, "2:1 y\n    ^ here");
         assert_eq!(report.start, point(8, 2, 0));
         assert_eq!(report.end, report.start);
         assert_eq!(report.kind, ErrorKind::Syntax);
         assert_eq!(
             format!("{e:#}"),
-            format!("{}\n{}", report.summary, report.frame)
+            format!("{}\n{}", report.message, report.frame)
         );
-        assert_eq!(Error::file_too_large(5, 4).to_report(), None);
+        // the size cap reports nothing, but still has its message
+        let too_large = Error::file_too_large(5, 4);
+        assert_eq!(too_large.to_report(), None);
+        assert_eq!(
+            too_large.message(),
+            "File too large: 5 bytes (maximum: 4 bytes / 4 GiB)"
+        );
+        assert_eq!(too_large.message(), format!("{too_large:#}"));
     }
 
     /// An error raised over the folded text, unfolded, is the error a parse of the original

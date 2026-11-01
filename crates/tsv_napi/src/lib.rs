@@ -102,7 +102,7 @@ enum Failure {
     /// A failure the source causes, RETURNED as `{ok: false, error}`: `kind` `'parse'` (a
     /// syntax error), `'refused'` (a format's refusal of a source that parses), or
     /// `'unsupported'` (a strip refusal, with its `construct`, the construct's wire name —
-    /// `tsv_ts::UnsupportedConstruct::as_str`), over the report's summary, frame and span.
+    /// `tsv_ts::UnsupportedConstruct::as_str`), over the report's message, frame and span.
     Returned {
         kind: &'static str,
         construct: Option<&'static str>,
@@ -130,20 +130,20 @@ impl Failure {
         }
     }
 
-    /// The message a caller reads: a plain error's own, a returned failure's summary and
+    /// The text a caller reads: a plain error's own, a returned failure's message and
     /// frame as the native CLI prints them.
     #[cfg(test)]
     fn message(&self) -> String {
         match self {
             Failure::Plain(message) => message.clone(),
-            Failure::Returned { report, .. } => format!("{}\n{}", report.summary, report.frame),
+            Failure::Returned { report, .. } => format!("{}\n{}", report.message, report.frame),
         }
     }
 
     /// The value the export hands back in its product's place: `{ok: false, error}` for a
     /// returned failure ([`failure_result`]), and a thrown `Error` for a plain one
     /// ([`plain_error`]). Were building the failure object to fail, the failure is thrown
-    /// instead, as a plain error carrying its summary and frame — the text a caller would
+    /// instead, as a plain error carrying its message and frame — the text a caller would
     /// have read off the object — rather than napi-rs's own error about the object.
     fn into_napi(self, env: &Env) -> napi::Result<Object<'_>> {
         match self {
@@ -153,13 +153,13 @@ impl Failure {
                 construct,
                 report,
             } => failure_result(env, kind, construct, &report)
-                .map_err(|_| plain_error(*env, &format!("{}\n{}", report.summary, report.frame))),
+                .map_err(|_| plain_error(*env, &format!("{}\n{}", report.message, report.frame))),
         }
     }
 }
 
 /// The `{ok: false, error}` result a failure is returned as, its `error` a plain object
-/// with own `kind`, `construct` (a strip refusal's alone), `message` (the summary), `frame`,
+/// with own `kind`, `construct` (a strip refusal's alone), `message` (the report's), `frame`,
 /// `start`, `end` and `loc: {start: {line, column}, end: {line, column}}` — the span in the
 /// document's wire coordinates, shaped as a wire node's. The npm facade (`npm/api.js`) hands
 /// it to the caller as it is, so this shape is its contract, shared with `tsv_wasm` (whose
@@ -175,7 +175,7 @@ fn failure_result<'env>(
     if let Some(construct) = construct {
         error.set("construct", construct)?;
     }
-    error.set("message", report.summary.as_str())?;
+    error.set("message", report.message.as_str())?;
     error.set("frame", report.frame.as_str())?;
     error.set("start", report.start.offset)?;
     error.set("end", report.end.offset)?;
@@ -940,7 +940,7 @@ mod tests {
     #[test]
     fn invalid_syntax_errors_per_language() {
         // Parse and format both fail a source that does not parse with a returned
-        // `Failure` (`{ok: false, error}` across the boundary), its summary and frame the
+        // `Failure` (`{ok: false, error}` across the boundary), its message and frame the
         // engine's, and the point the frame's header prints.
         type Engine = (&'static str, StringFn, StringFn, UnitFn);
         let cases: [(Engine, &str); 3] = [
@@ -990,7 +990,7 @@ mod tests {
                 )),
                 "{label} parse: the frame's header prints the point: {report:?}"
             );
-            assert!(!report.summary.contains('\n'), "{label}: {report:?}");
+            assert!(!report.message.contains('\n'), "{label}: {report:?}");
             assert_eq!(
                 report.end, report.start,
                 "{label}: a syntax error is a point"
@@ -1053,10 +1053,10 @@ mod tests {
             panic!("expected a refusal: {refused:?}");
         };
         assert!(
-            report.summary.starts_with("Lone carriage return"),
+            report.message.starts_with("Lone carriage return"),
             "{report:?}"
         );
-        assert!(!report.summary.contains('\n'), "{report:?}");
+        assert!(!report.message.contains('\n'), "{report:?}");
         assert!(report.frame.starts_with("2:10 <div // c\n"), "{report:?}");
         assert_eq!(
             (point(report.start), point(report.end)),
@@ -1094,7 +1094,7 @@ mod tests {
             (point(report.start), point(report.end)),
             ((15, 2, 0), (24, 2, 9))
         );
-        assert_eq!(report.summary, "cannot strip an enum");
+        assert_eq!(report.message, "cannot strip an enum");
         assert_eq!(report.frame, "2:1 enum E {}\n    ^ here");
     }
 

@@ -210,7 +210,7 @@ fn parse_failure(e: &Error) -> Failure {
 }
 
 /// The `{ok: false, error}` result a failure is returned as, its `error` a plain object
-/// with own `kind`, `construct` (a strip refusal's alone), `message` (the summary), `frame`,
+/// with own `kind`, `construct` (a strip refusal's alone), `message` (the report's), `frame`,
 /// `start`, `end` and `loc: {start: {line, column}, end: {line, column}}` — the span in the
 /// document's wire coordinates, shaped as a wire node's. The npm facade (`npm/api.js`)
 /// hands it to the caller as it is, so this shape is its contract, shared with `tsv_napi`.
@@ -224,7 +224,7 @@ fn failure_result(kind: &str, construct: Option<&str>, report: &tsv_ts::ErrorRep
     }
     #[cfg(not(feature = "strip"))]
     let _ = construct;
-    error.set_message(&report.summary);
+    error.set_message(&report.message);
     error.set_frame(&report.frame);
     error.set_start(report.start.offset);
     error.set_end(report.end.offset);

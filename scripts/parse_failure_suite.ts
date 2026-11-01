@@ -51,7 +51,7 @@ export interface ParseFailureRow {
 	format_at?: string;
 	/** The options bag every export is called with (TypeScript's `sourceType`). */
 	options?: { sourceType: 'script' | 'module' };
-	/** The exact `message`, where the row pins it (a line terminator the summary quotes). */
+	/** The exact `message`, where the row pins it (a line terminator the message quotes). */
 	message?: string;
 }
 
@@ -183,20 +183,20 @@ export const PARSE_FAILURE_ROWS: ReadonlyArray<ParseFailureRow> = [
 	},
 	{ name: 'the end of the source', language: 'svelte', source: '<p>𝒜</p>\n<div', at: '' },
 	{
-		// a summary quoting source text spells each line terminator out, so it stays one line
-		name: 'a summary quoting a LF spells it out',
+		// a message quoting source text spells each line terminator out, so it stays one line
+		name: 'a message quoting a LF spells it out',
 		language: 'svelte',
 		source: '<div {"a\nb"}></div>',
 		message: 'Invalid shorthand attribute: \'"a<U+000A>b"\''
 	},
 	{
-		name: 'a summary quoting a CR spells it out',
+		name: 'a message quoting a CR spells it out',
 		language: 'svelte',
 		source: '<div {a\rb}></div>',
 		message: "Invalid shorthand attribute: 'a<U+000D>b'"
 	},
 	{
-		name: 'a summary quoting U+2029 spells it out',
+		name: 'a message quoting U+2029 spells it out',
 		language: 'typescript',
 		source: "x = '\\x\u2029';",
 		message: "Expected hex digit, found '<U+2029>'"
@@ -241,7 +241,7 @@ export interface ReturnedParseError {
 export const ERROR_KEYS = ['kind', 'message', 'frame', 'start', 'end', 'loc'];
 
 /**
- * Assert `error`'s `message` / `frame` split: a one-line summary, and a frame of two lines —
+ * Assert `error`'s `message` / `frame` split: a one-line message, and a frame of two lines —
  * the `line:col` header naming `loc.start` before the excerpt (which echoes no leading BOM),
  * then the caret line.
  */
