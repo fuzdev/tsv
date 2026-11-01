@@ -495,7 +495,7 @@ pub(super) struct Checkpoint<'arena> {
 }
 
 #[expect(clippy::struct_excessive_bools)]
-pub struct Parser<'a, 'arena> {
+pub(crate) struct Parser<'a, 'arena> {
     /// Bump arena that owns every AST node this parser allocates. Supplied by
     /// the caller (caller-owns-`Bump`); the returned `Program<'arena>` borrows
     /// from it. `&'arena Bump` is `Copy`, so `self.alloc(owned)` and
@@ -3825,7 +3825,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Program<'arena>, Error> {
+    pub(crate) fn parse(&mut self) -> Result<Program<'arena>, Error> {
         self.parse_program()
             .map_err(|error| self.mark_await_operand_gate(error))
     }
@@ -3882,7 +3882,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the result to a Svelte pattern, then enforces end-of-input itself. (Expression tags
     /// use `parse_expression_with_comments`, which requires full consumption via
     /// `expect_end_of_input`.)
-    pub fn parse_expression_unbounded(&mut self) -> Result<Expression<'arena>, Error> {
+    pub(crate) fn parse_expression_unbounded(&mut self) -> Result<Expression<'arena>, Error> {
         self.parse_expression()
     }
 
@@ -3895,7 +3895,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the slice exactly — Svelte's `eat('}', true)`. Without this check a trailing token
     /// is silently dropped (`{@html a b}` → `{@html a}`), which loses content rather than
     /// diverging visibly.
-    pub fn expect_end_of_input(&self) -> Result<(), Error> {
+    pub(crate) fn expect_end_of_input(&self) -> Result<(), Error> {
         if self.current.kind == TokenKind::Eof {
             Ok(())
         } else {
@@ -3906,7 +3906,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a single expression and return it with any collected comments.
     /// Used for expressions in Svelte templates where comments need to be preserved.
     /// The expression must fill the whole slice (see `expect_end_of_input`).
-    pub fn parse_expression_with_comments(
+    pub(crate) fn parse_expression_with_comments(
         &mut self,
     ) -> Result<(&'arena Expression<'arena>, &'arena [Comment]), Error> {
         let expr = self.parse_expression_ref()?;
@@ -3917,7 +3917,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Hand the collected comments to the caller as an arena slice.
     /// Used when parsing expressions that need to return comments to the caller.
-    pub fn take_comments(&mut self) -> &'arena [Comment] {
+    pub(crate) fn take_comments(&mut self) -> &'arena [Comment] {
         std::mem::replace(&mut self.comments, BumpVec::new_in(self.arena)).into_bump_slice()
     }
 
@@ -3933,7 +3933,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Returns (expression, end_position) where end_position is where the next
     /// unparsed content begins (in absolute source coordinates with base_offset).
-    pub fn parse_assignment_expression_partial(
+    pub(crate) fn parse_assignment_expression_partial(
         &mut self,
         top_level_as: TopLevelAs,
     ) -> Result<(&'arena Expression<'arena>, usize), Error> {
@@ -3967,7 +3967,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// * `Ok(Expression)` - The converted pattern (ObjectPattern, ArrayPattern, etc.)
     /// * `Err(Error)` - If the expression cannot be converted to a valid pattern
-    pub fn expression_to_svelte_pattern(
+    pub(crate) fn expression_to_svelte_pattern(
         &mut self,
         expr: Expression<'arena>,
     ) -> Result<Expression<'arena>, Error> {
@@ -4005,7 +4005,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 }
 
 /// Parse TypeScript source code into an AST allocated in `arena`.
-pub fn parse_typescript<'arena>(
+pub(crate) fn parse_typescript<'arena>(
     source: &str,
     arena: &'arena Bump,
 ) -> Result<Program<'arena>, Error> {
@@ -4115,7 +4115,7 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
 // `Parser::parse` (clippy's method-path suggestion) fails the higher-ranked
 // lifetime check on `parse_retrying_acorn_followers`'s `f` bound; the closure infers it.
 #[expect(clippy::redundant_closure_for_method_calls)]
-pub fn parse_typescript_with_goal<'arena>(
+pub(crate) fn parse_typescript_with_goal<'arena>(
     source: &str,
     goal: Goal,
     arena: &'arena Bump,
@@ -4137,7 +4137,7 @@ pub fn parse_typescript_with_goal<'arena>(
 /// `crate::__private::parse_embedded_preserve_parens` — the binding audit
 /// (`tsv_debug binding_audit`) reparses formatted output this way so the paren
 /// structure a glued comment binds to is visible in the wire JSON.
-pub fn parse_typescript_preserve_parens<'arena>(
+pub(crate) fn parse_typescript_preserve_parens<'arena>(
     source: &str,
     arena: &'arena Bump,
 ) -> Result<Program<'arena>, Error> {

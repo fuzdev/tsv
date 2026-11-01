@@ -11,7 +11,7 @@ use tsv_debug::fixtures::{self, InputType};
 
 /// A document as its wire positions index it: its UTF-16 code units (behind the BOM when
 /// the wire elides one) and the unit offset each line starts at.
-pub struct Reference {
+pub(crate) struct Reference {
     units: Vec<u16>,
     line_starts: Vec<usize>,
 }
@@ -31,7 +31,7 @@ impl Reference {
 }
 
 /// Every violation of the definition in `value`, each named by its JSON path.
-pub fn violations(value: &Value, reference: &Reference) -> Vec<String> {
+pub(crate) fn violations(value: &Value, reference: &Reference) -> Vec<String> {
     let mut out = Vec::new();
     walk(value, reference, &mut String::from("$"), &mut out);
     out
@@ -250,7 +250,7 @@ fn check_name_loc(
 
 /// Both wires of `source` parsed as `input_type` — the loc wire as a tree, the span-only
 /// wire as its bytes — with the loc wire's reference.
-pub fn wires_and_reference(
+pub(crate) fn wires_and_reference(
     source: &str,
     input_type: InputType,
     goal: tsv_ts::Goal,
@@ -305,7 +305,7 @@ pub fn wires_and_reference(
 /// `arbitrary_precision` each number token, and the writer's string escaper is graded
 /// byte-for-byte against `serde_json`'s). Strips `loc_wire` in place; returns where the
 /// two first differ.
-pub fn span_wire_difference(loc_wire: &mut Value, span: &[u8]) -> Option<String> {
+pub(crate) fn span_wire_difference(loc_wire: &mut Value, span: &[u8]) -> Option<String> {
     fixtures::strip_locations(loc_wire);
     let stripped = serde_json::to_string(loc_wire).expect("a parsed wire re-serializes");
     let at = stripped
@@ -325,7 +325,7 @@ pub fn span_wire_difference(loc_wire: &mut Value, span: &[u8]) -> Option<String>
 }
 
 /// Grade one document, panicking with the first violations.
-pub fn assert_definition(source: &str, input_type: InputType) -> Value {
+pub(crate) fn assert_definition(source: &str, input_type: InputType) -> Value {
     let (wire, span, reference) = wires_and_reference(source, input_type, tsv_ts::Goal::Module);
     let mut found = violations(&wire, &reference);
     found.extend(span_wire_difference(&mut wire.clone(), &span));

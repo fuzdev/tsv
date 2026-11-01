@@ -3,15 +3,15 @@
 // Parses CSS values into structured AST (CssValue enum).
 // Handles identifiers, strings, numbers/dimensions, colors, functions, and lists.
 
-pub mod colors;
+pub(super) mod colors;
 pub(crate) mod cursor;
-pub mod dimensions;
-pub mod functions;
-pub mod lists;
+pub(super) mod dimensions;
+pub(super) mod functions;
+pub(super) mod lists;
 pub(crate) mod operators;
 pub(crate) mod parser;
 pub(crate) mod scan;
-pub mod strings;
+pub(super) mod strings;
 
 use crate::ast::CssValue;
 use crate::escapes::{ends_with_live_hex_escape, trim_end_preserving_escape, trim_start_css};
@@ -57,7 +57,7 @@ use strings::parse_string_literal;
 /// The host offset of the `(` whose function would enter past `room`, the parse
 /// abandoned there.
 #[expect(clippy::too_many_arguments)]
-pub fn parse_value_from_source<'arena>(
+pub(super) fn parse_value_from_source<'arena>(
     source: &str,
     source_relative_span: Span,
     base_offset: u32,

@@ -48,7 +48,7 @@ mod types;
 // `group_chain_nodes` and `build_chain_doc` are deliberately NOT re-exported: they are two
 // of the steps `build_linearized_chain_doc` performs, and handing them out separately is
 // what let a caller assemble some of them and drop the head claim.
-pub use analysis::{
+pub(super) use analysis::{
     LinearizeInput, build_linearized_chain_doc, chain_paren_leading_gap,
     linearize_chain_from_call_into, linearize_chain_from_member_into,
     linearize_chain_from_non_null_into,
@@ -57,9 +57,9 @@ pub(crate) use analysis::{
     call_callee_paren_leading_start, chain_mid_chain_paren_gaps, child_stops_optional_chain,
     tag_paren_leading_start, transparent_callee_sealed_chain, transparent_instantiation_callee,
 };
-pub use builder::call_prints_as_member_chain;
-pub use inline_lookups::build_lookup_after_operand_doc;
+pub(super) use builder::call_prints_as_member_chain;
+pub(super) use inline_lookups::build_lookup_after_operand_doc;
 pub(crate) use printing::find_bracket_position;
 #[cfg(feature = "_internal_buffer_stats")]
-pub use types::ChainGroupVec;
-pub use types::{ChainCall, ChainNode, ChainNodeVec};
+pub(super) use types::ChainGroupVec;
+pub(super) use types::{ChainCall, ChainNode, ChainNodeVec};

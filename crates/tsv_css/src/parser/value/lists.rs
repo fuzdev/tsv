@@ -14,7 +14,7 @@ use crate::parser::value::scan::{comment_end, is_comment_start};
 /// take priority over whitespace (a value with both is comma-separated), so the
 /// variants are ordered by that precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ValueSeparator {
+pub(crate) enum ValueSeparator {
     /// At least one top-level comma — parse as a comma-separated list.
     Comma,
     /// No top-level comma, but at least one top-level whitespace run — parse as
@@ -46,7 +46,7 @@ pub enum ValueSeparator {
 /// unbalanced paren or quote. `ValueParser::split_top_level`'s progress guard remains
 /// for the comment-free disagreement it was always about (a value opening with a
 /// delimiter, e.g. `,a b`).
-pub fn classify_separators(s: &str) -> ValueSeparator {
+pub(crate) fn classify_separators(s: &str) -> ValueSeparator {
     let mut in_parens: u32 = 0;
     let mut in_quote = false;
     let mut quote_char = 0u8;

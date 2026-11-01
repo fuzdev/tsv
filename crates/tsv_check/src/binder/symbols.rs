@@ -25,26 +25,26 @@ use tsv_lang::Span;
 
 /// A dense symbol identity into the binder's `symbols` vector.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct SymbolId(pub u32);
+pub(crate) struct SymbolId(pub u32);
 
 impl SymbolId {
     /// The 0-based index this id addresses.
     #[inline]
     #[must_use]
-    pub const fn index(self) -> usize {
+    pub(crate) const fn index(self) -> usize {
         self.0 as usize
     }
 }
 
 /// A dense symbol-table identity into the binder's `tables` vector.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct TableId(pub u32);
+pub(crate) struct TableId(pub u32);
 
 impl TableId {
     /// The 0-based index this id addresses.
     #[inline]
     #[must_use]
-    pub const fn index(self) -> usize {
+    pub(crate) const fn index(self) -> usize {
         self.0 as usize
     }
 }
@@ -188,7 +188,7 @@ impl SymbolFlags {
 /// squiggle sits on the identifier, matching tsgo's `getNameOfDeclaration`).
 #[derive(Clone, Copy, Debug)]
 #[expect(dead_code)] // `node` is the future checker's declaration identity; the family cascade keys on `error_span`.
-pub struct Decl {
+pub(crate) struct Decl {
     /// The declaration node's dense id (best-effort via the address map; not yet
     /// consumed by the cascade, which keys on `error_span`).
     pub node: NodeId,
@@ -209,7 +209,7 @@ pub struct Decl {
 // `parent` mirrors tsgo's `Symbol` shape and is set by the bind but read by nothing
 // yet (hence the allow); the cascade + merge resolution read
 // `flags`/`name`/`decls`/`members`/`exports`.
-pub struct Symbol {
+pub(crate) struct Symbol {
     /// The accumulated classification flags.
     pub flags: SymbolFlags,
     /// The table key (interned name).
@@ -228,7 +228,7 @@ pub struct Symbol {
 impl Symbol {
     /// A fresh symbol with the given flags and name and no declarations.
     #[must_use]
-    pub fn new(flags: SymbolFlags, name: Atom) -> Symbol {
+    pub(crate) fn new(flags: SymbolFlags, name: Atom) -> Symbol {
         Symbol {
             flags,
             name,

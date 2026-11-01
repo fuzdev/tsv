@@ -71,7 +71,7 @@ pub(super) fn find_separator_position(
 //
 
 /// Recursively unwrap TSParenthesizedType to get the inner type.
-pub fn unwrap_parenthesized<'a>(ts_type: &'a TSType<'a>) -> &'a TSType<'a> {
+pub(crate) fn unwrap_parenthesized<'a>(ts_type: &'a TSType<'a>) -> &'a TSType<'a> {
     match ts_type {
         TSType::Parenthesized(p) => unwrap_parenthesized(p.type_annotation),
         _ => ts_type,
@@ -91,7 +91,7 @@ pub fn unwrap_parenthesized<'a>(ts_type: &'a TSType<'a>) -> &'a TSType<'a> {
 /// [`is_simple_type_arg`], and the cast-seed shortness rule in
 /// [`is_hopefully_short_arg`](crate::printer::calls::arg_predicates) — so it lives here as
 /// one body rather than two spellings that could drift.
-pub fn is_simple_type(ty: &TSType<'_>) -> bool {
+pub(crate) fn is_simple_type(ty: &TSType<'_>) -> bool {
     match unwrap_parenthesized(ty) {
         TSType::Keyword(_) | TSType::ThisType(_) | TSType::Literal(_) => true,
         TSType::TypeReference(reference) => reference.type_arguments.is_none(),
@@ -109,7 +109,7 @@ pub fn is_simple_type(ty: &TSType<'_>) -> bool {
 /// caller relies on). They stay in the breakable group path — a residual divergence
 /// pending an atomic template-literal-type printer. That narrowing is this caller's alone;
 /// don't push it down into [`is_simple_type`].
-pub fn is_simple_type_arg(ty: &TSType<'_>) -> bool {
+pub(crate) fn is_simple_type_arg(ty: &TSType<'_>) -> bool {
     let unwrapped = unwrap_parenthesized(ty);
     is_simple_type(unwrapped)
         && !matches!(

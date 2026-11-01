@@ -898,7 +898,7 @@ pub(crate) struct ComputedBracket {
 impl ComputedBracket {
     /// The `[` itself. Derived from [`Self::inside`], which the scan set from the real
     /// bracket — never from [`Self::open`], which is the `?` on a contiguous `?.[`.
-    pub const fn bracket_pos(self) -> u32 {
+    pub(crate) const fn bracket_pos(self) -> u32 {
         self.inside - 1
     }
 }

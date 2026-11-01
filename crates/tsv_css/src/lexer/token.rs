@@ -1,7 +1,7 @@
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TokenKind {
+pub(crate) enum TokenKind {
     // Identifiers and keywords
     Identifier, // div, color, red, etc.
 
@@ -106,7 +106,7 @@ impl fmt::Display for TokenKind {
 /// common no-escape identifier costs no allocation and the hot token does not carry a
 /// `String`. `Clone` (not `Copy`) mirrors `tsv_ts::Token`.
 #[derive(Debug, Clone)]
-pub struct Token {
+pub(crate) struct Token {
     pub kind: TokenKind,
     pub start: u32,
     pub end: u32,

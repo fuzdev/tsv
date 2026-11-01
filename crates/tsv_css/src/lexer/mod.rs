@@ -40,7 +40,7 @@ mod comments;
 mod identifiers;
 mod numbers;
 mod strings;
-pub mod token;
+pub(crate) mod token;
 
 use comments::read_comment;
 use identifiers::{
@@ -53,10 +53,10 @@ pub(crate) use identifiers::{
 use numbers::read_number_into;
 use strings::read_string;
 pub(crate) use strings::string_end;
-pub use token::{Token, TokenKind};
+pub(crate) use token::{Token, TokenKind};
 use tsv_lang::Error;
 
-pub struct Lexer<'a> {
+pub(crate) struct Lexer<'a> {
     source: &'a str,
     /// `source.as_bytes()`, cached so the hot `next_token_into_local` front reads a byte
     /// without re-slicing + UTF-8-decoding a char per call. Char decoding is done only at
@@ -100,7 +100,7 @@ impl<'a> Lexer<'a> {
     /// (`source[from..]` for the declaration-value scan): a lexer reporting its own
     /// coordinates there puts the caret near the top of the file for an error in the
     /// middle of a stylesheet.
-    pub fn at_offset(source: &'a str, base_offset: usize) -> Self {
+    pub(crate) fn at_offset(source: &'a str, base_offset: usize) -> Self {
         // Skip UTF-8 BOM (U+FEFF) at start of file if present.
         // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
         // Position starts after BOM so token spans reflect actual file bytes; the WIRE
@@ -135,7 +135,7 @@ impl<'a> Lexer<'a> {
     /// immediately after each lex (`CssParser::decoded_to_arena`) rather than holding
     /// the borrow.
     #[inline]
-    pub fn decoded_str(&self) -> Option<&str> {
+    pub(crate) fn decoded_str(&self) -> Option<&str> {
         if self.has_decoded {
             Some(&self.decode_scratch)
         } else {
@@ -314,7 +314,7 @@ impl<'a> Lexer<'a> {
     /// The lexer's one fallible scan, so the error path is lifted into host coordinates here
     /// ([`Lexer::host_err`]); the scan itself reports in the lexer's own.
     #[inline]
-    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), Error> {
+    pub(crate) fn next_token_into(&mut self, dst: &mut Token) -> Result<(), Error> {
         self.next_token_into_local(dst)
             .map_err(|err| self.host_err(err))
     }
@@ -326,7 +326,7 @@ impl<'a> Lexer<'a> {
     /// `peek_past_*` scans, `decl_scan`, the selector scans), the printer's own token
     /// scans, and `debug_token_stream`. The hot path — `advance` and `peek_kind` — writes
     /// the current token and the lookahead slot in place through [`Lexer::next_token_into`].
-    pub fn next_token(&mut self) -> Result<Token, Error> {
+    pub(crate) fn next_token(&mut self) -> Result<Token, Error> {
         let mut token = Token {
             kind: TokenKind::Eof,
             start: 0,

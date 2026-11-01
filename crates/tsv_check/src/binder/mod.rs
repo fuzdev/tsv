@@ -55,10 +55,10 @@
 //       a recorded deviation with identical results)
 
 mod atoms;
-pub mod flow;
+pub(crate) mod flow;
 mod lower;
 mod sym;
-pub mod symbols;
+pub(crate) mod symbols;
 
 use crate::diag::Diagnostic;
 use crate::ids::{FileId, NodeId};

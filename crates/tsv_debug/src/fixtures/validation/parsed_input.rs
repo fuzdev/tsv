@@ -57,7 +57,7 @@ pub(crate) struct InputAstPaths {
 
 impl InputAstPaths {
     /// The wire as a key-order-insensitive `Value`, through the unbounded reader.
-    pub fn wire_value(&self) -> serde_json::Value {
+    pub(crate) fn wire_value(&self) -> serde_json::Value {
         wire_value(&self.wire)
     }
 }

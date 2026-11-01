@@ -129,7 +129,7 @@ enum ActorCommand {
 
 /// Handle to communicate with the Deno actor
 #[derive(Debug)]
-pub struct DenoActor {
+pub(super) struct DenoActor {
     tx: mpsc::Sender<ActorCommand>,
     #[cfg(test)]
     launch_paths: [PathBuf; 3],
@@ -139,7 +139,7 @@ impl DenoActor {
     /// Spawn a new Deno sidecar actor
     ///
     /// This starts the Deno process and background task for handling requests.
-    pub fn spawn() -> Result<Self, DenoError> {
+    pub(super) fn spawn() -> Result<Self, DenoError> {
         // Write embedded script to tempfile
         let mut script_file = NamedTempFile::new().map_err(DenoError::TempfileCreate)?;
         script_file

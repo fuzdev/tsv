@@ -109,6 +109,7 @@ trivial_numeric_casts = "warn"
 unused_lifetimes = "warn"
 elided_lifetimes_in_paths = "warn"
 unused_qualifications = "warn"
+unreachable_pub = "warn"
 
 [workspace.lints.rustdoc]
 # A doc link is the only machine-checkable claim a doc comment makes, so an unresolvable

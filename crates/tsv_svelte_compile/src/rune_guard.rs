@@ -84,7 +84,7 @@ pub(crate) struct WalkCtx<'a> {
 }
 
 impl<'a> WalkCtx<'a> {
-    pub fn new(
+    pub(crate) fn new(
         source: &'a str,
         updated: &'a mut HashSet<String>,
         nested_declared: &'a mut HashSet<String>,

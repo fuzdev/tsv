@@ -69,11 +69,11 @@ mod imp {
     }
 
     #[inline]
-    pub fn add(index: usize, n: u64) {
+    pub(super) fn add(index: usize, n: u64) {
         C[index].fetch_add(n, Relaxed);
     }
 
-    pub fn site(loc: &'static core::panic::Location<'static>, count: usize) {
+    pub(super) fn site(loc: &'static core::panic::Location<'static>, count: usize) {
         let bucket = match count {
             0..=3 => count,
             4..=8 => 4,
@@ -115,7 +115,7 @@ mod imp {
         });
     }
 
-    pub fn report() {
+    pub(super) fn report() {
         report_sites();
         let mut named = [false; super::N];
         for (index, name) in super::LABELS {
@@ -134,9 +134,9 @@ mod imp {
 #[cfg(not(feature = "_internal_census"))]
 mod imp {
     #[inline]
-    pub fn add(_index: usize, _n: u64) {}
+    pub(super) fn add(_index: usize, _n: u64) {}
 
-    pub fn report() {}
+    pub(super) fn report() {}
 }
 
 /// Add `n` to counter `index`. A no-op without the `_internal_census` feature.

@@ -64,7 +64,7 @@ pub(crate) struct Builder<'arena> {
 }
 
 impl<'arena> Builder<'arena> {
-    pub fn new(arena: &'arena Bump, host_source: &str) -> Self {
+    pub(crate) fn new(arena: &'arena Bump, host_source: &str) -> Self {
         Self {
             arena,
             buffer: host_source.to_string(),
@@ -72,7 +72,7 @@ impl<'arena> Builder<'arena> {
     }
 
     /// Append minted text to the appendix, returning its span.
-    pub fn mint(&mut self, text: &str) -> Span {
+    pub(crate) fn mint(&mut self, text: &str) -> Span {
         let start = self.buffer.len() as u32;
         self.buffer.push_str(text);
         Span::new(start, self.buffer.len() as u32)
@@ -80,7 +80,7 @@ impl<'arena> Builder<'arena> {
 
     /// A synthetic identifier: arena-allocated name (source-free resolution) with
     /// its text minted into the appendix so the span is backed.
-    pub fn ident(&mut self, name: &str) -> Identifier<'arena> {
+    pub(crate) fn ident(&mut self, name: &str) -> Identifier<'arena> {
         let span = self.mint(name);
         let ident_name = IdentName {
             escaped: Some(self.arena.alloc_str(name)),
@@ -91,7 +91,7 @@ impl<'arena> Builder<'arena> {
     }
 
     /// A synthetic identifier as an arena-allocated expression.
-    pub fn ident_expr(&mut self, name: &str) -> &'arena Expression<'arena> {
+    pub(crate) fn ident_expr(&mut self, name: &str) -> &'arena Expression<'arena> {
         let ident = self.ident(name);
         self.arena.alloc(Expression::from_identifier(ident))
     }
@@ -102,7 +102,7 @@ impl<'arena> Builder<'arena> {
     /// a synthetic header node's windows empty/inverted, and a *stolen* host span
     /// (the node it replaces, e.g. `$$props` over the original `$props()` call)
     /// keeps the surrounding gaps exactly the authored ones.
-    pub fn ident_at(&self, name: &str, span: Span) -> Identifier<'arena> {
+    pub(crate) fn ident_at(&self, name: &str, span: Span) -> Identifier<'arena> {
         let ident_name = IdentName {
             escaped: Some(self.arena.alloc_str(name)),
             raw_len: 0,
@@ -114,14 +114,14 @@ impl<'arena> Builder<'arena> {
     /// [`Self::ident_at`] as an arena-allocated expression (no minting — the
     /// arena-allocated name channel supplies the text, so the span steers comment
     /// windows only).
-    pub fn ident_expr_at(&self, name: &str, span: Span) -> &'arena Expression<'arena> {
+    pub(crate) fn ident_expr_at(&self, name: &str, span: Span) -> &'arena Expression<'arena> {
         self.arena
             .alloc(Expression::from_identifier(self.ident_at(name, span)))
     }
 
     /// A single-quoted string literal minted into the appendix. `content` must
     /// not itself require escaping (module specifiers do not).
-    pub fn string_literal(&mut self, content: &str) -> Literal<'arena> {
+    pub(crate) fn string_literal(&mut self, content: &str) -> Literal<'arena> {
         // Escape quote/backslash/newlines so any content is safe in release
         // builds too (module specifiers never need it, but safety must not be a
         // debug-only guarantee). When escaping fires, the minted raw text differs
@@ -151,7 +151,7 @@ impl<'arena> Builder<'arena> {
     }
 
     /// `import * as <local> from '<specifier>';`
-    pub fn import_namespace(&mut self, local: &str, specifier: &str) -> Statement<'arena> {
+    pub(crate) fn import_namespace(&mut self, local: &str, specifier: &str) -> Statement<'arena> {
         let start = self.mint("import * as ").start;
         let local = self.ident(local);
         let local_span = local.span;
@@ -186,7 +186,7 @@ impl<'arena> Builder<'arena> {
 
     /// `<object>.<property>(<arguments>)` — a call on a synthetic member chain.
     /// The arguments slice may hold borrowed expressions (host spans).
-    pub fn member_call(
+    pub(crate) fn member_call(
         &mut self,
         object: &str,
         property: &str,
@@ -224,7 +224,7 @@ impl<'arena> Builder<'arena> {
     /// borrowed user subtrees. The `${`/`}` delimiters are minted as
     /// placeholders so the appendix stays a readable mirror of the output — the
     /// printer emits them statically and never reads those bytes.
-    pub fn template_literal(
+    pub(crate) fn template_literal(
         &mut self,
         texts: &[String],
         expressions: &'arena [&'arena Expression<'arena>],
@@ -266,7 +266,7 @@ impl<'arena> Builder<'arena> {
     /// it, an appendix-end span would sweep every host comment after the callee
     /// into the minted parens (`full_path(/* c */)`), double-printing a carried
     /// script comment when this lowers a script-position `$derived` read.
-    pub fn call_expr(
+    pub(crate) fn call_expr(
         &mut self,
         callee: &'arena Expression<'arena>,
         arguments: &'arena [Expression<'arena>],
@@ -287,7 +287,7 @@ impl<'arena> Builder<'arena> {
     /// or, when `optional`, `foo?.($$renderer, x)`): the callee keeps its host
     /// span, the `(…)` is minted. `arguments` may mix synthetic and borrowed
     /// expressions.
-    pub fn call_of(
+    pub(crate) fn call_of(
         &mut self,
         callee: &'arena Expression<'arena>,
         arguments: &'arena [Expression<'arena>],
@@ -316,7 +316,7 @@ impl<'arena> Builder<'arena> {
     /// exactly once, and a comment inside `body` prints with `body`. A thunk anchored on
     /// the replaced init instead let that scan reach the host `$derived(`…`)` parens and
     /// print the argument's comments a second time inside `()`.
-    pub fn thunk_on_body(&self, body: &'arena Expression<'arena>) -> Expression<'arena> {
+    pub(crate) fn thunk_on_body(&self, body: &'arena Expression<'arena>) -> Expression<'arena> {
         let span = body.span();
         Expression {
             span,
@@ -344,7 +344,7 @@ impl<'arena> Builder<'arena> {
     /// appendix-spanned form when the script carries no comments. With a zero-width
     /// `anchor` and zero-width synthetic arguments the whole call sits at one host
     /// position (the prepended `$props.id()` / `$$slots` declarations).
-    pub fn member_call_at(
+    pub(crate) fn member_call_at(
         &self,
         object: &str,
         property: &str,
@@ -382,7 +382,7 @@ impl<'arena> Builder<'arena> {
     /// through the synthetic-identifier name channel instead, which prints the name
     /// and reads no source, so the node can sit at `at` — the end of the replaced
     /// call, leaving a comment inside the empty call to the window before it.
-    pub fn void_zero_at(&self, at: u32) -> Expression<'arena> {
+    pub(crate) fn void_zero_at(&self, at: u32) -> Expression<'arena> {
         Expression::from_identifier(self.ident_at("void 0", Span::new(at, at)))
     }
 
@@ -392,7 +392,7 @@ impl<'arena> Builder<'arena> {
     /// (`$$renderer`) or borrowed user patterns (a `{:then value}` binding).
     /// `block_span` is the span the block's comment windows anchor on (the
     /// caller decides — host-anchored when the body holds borrowed statements).
-    pub fn arrow_block(
+    pub(crate) fn arrow_block(
         &mut self,
         params: &'arena [Expression<'arena>],
         body: &'arena [Statement<'arena>],
@@ -425,14 +425,14 @@ impl<'arena> Builder<'arena> {
     /// node (`if`/`for`/block statement) that needs a span but no backing text —
     /// its keywords print statically and, with block output, no comments are
     /// carried, so the span only has to stay in-bounds.
-    pub fn here(&self) -> Span {
+    pub(crate) fn here(&self) -> Span {
         let pos = self.buffer.len() as u32;
         Span::new(pos, pos)
     }
 
     /// `<object>.<name>` — a non-computed member on a synthetic property name
     /// (`each_array.length`).
-    pub fn member_prop(
+    pub(crate) fn member_prop(
         &mut self,
         object: &'arena Expression<'arena>,
         name: &str,
@@ -452,7 +452,7 @@ impl<'arena> Builder<'arena> {
     }
 
     /// `<object>[<index>]` — a computed member (`each_array[$$index]`).
-    pub fn member_computed(
+    pub(crate) fn member_computed(
         &mut self,
         object: &'arena Expression<'arena>,
         index: &'arena Expression<'arena>,
@@ -473,7 +473,7 @@ impl<'arena> Builder<'arena> {
 
     /// `<left> <op> <right>` — a binary expression (`$$index < $$length`,
     /// `each_array.length !== 0`).
-    pub fn binary(
+    pub(crate) fn binary(
         &mut self,
         left: &'arena Expression<'arena>,
         op: BinaryOperator,
@@ -496,7 +496,7 @@ impl<'arena> Builder<'arena> {
     }
 
     /// `<argument>++` / `<argument>--` (postfix) — an update expression.
-    pub fn update(
+    pub(crate) fn update(
         &mut self,
         argument: &'arena Expression<'arena>,
         op: UpdateOperator,
@@ -522,7 +522,7 @@ impl<'arena> Builder<'arena> {
     /// the elements (already built, their text elsewhere in the appendix) print
     /// structurally with the printer's own commas. Used for
     /// `$.exclude_from_object(o, ['a', 'b'])`.
-    pub fn array_of(
+    pub(crate) fn array_of(
         &mut self,
         elements: &'arena [Option<&'arena Expression<'arena>>],
     ) -> Expression<'arena> {
@@ -538,7 +538,7 @@ impl<'arena> Builder<'arena> {
     }
 
     /// A numeric literal expression (`0`).
-    pub fn number(&mut self, value: f64) -> Expression<'arena> {
+    pub(crate) fn number(&mut self, value: f64) -> Expression<'arena> {
         let span = self.mint(&format!("{value}"));
         Expression::from_literal(Literal {
             value: LiteralValue::Number(value),
@@ -559,7 +559,7 @@ impl<'arena> Builder<'arena> {
     /// expression wouldn't. A statement wrapping a *fictional* span is
     /// deliberately steering those windows and builds its own node instead
     /// (`transform_server`'s `$$renderer.component` wrapper).
-    pub fn expression_statement(&self, expression: Expression<'arena>) -> Statement<'arena> {
+    pub(crate) fn expression_statement(&self, expression: Expression<'arena>) -> Statement<'arena> {
         let span = expression.span();
         Statement {
             span,
@@ -574,7 +574,7 @@ impl<'arena> Builder<'arena> {
     /// argument (single-quoted after canonicalization), distinct from the
     /// template-literal pushes the `BodyBuilder` flushes. `text` is a hydration
     /// anchor comment (`<!--[0-->`, `<!--[-->`, …) — never needs escaping.
-    pub fn push_string_stmt(&mut self, text: &str) -> Statement<'arena> {
+    pub(crate) fn push_string_stmt(&mut self, text: &str) -> Statement<'arena> {
         let arg = self.string_literal_expr(text);
         let arg_alloc = self.arena.alloc(arg);
         let call = self.member_call("$$renderer", "push", std::slice::from_ref(arg_alloc));
@@ -582,7 +582,7 @@ impl<'arena> Builder<'arena> {
     }
 
     /// `void 0` — the oracle's spelling of an absent rune argument.
-    pub fn void_zero(&mut self) -> Expression<'arena> {
+    pub(crate) fn void_zero(&mut self) -> Expression<'arena> {
         let span = self.mint("void 0");
         let zero = self.arena.alloc(Expression::from_literal(Literal {
             value: LiteralValue::Number(0.0),
@@ -596,7 +596,7 @@ impl<'arena> Builder<'arena> {
     }
 
     /// A `true` literal (the `$.attr(name, value, true)` boolean-attribute arg).
-    pub fn true_literal(&mut self) -> Expression<'arena> {
+    pub(crate) fn true_literal(&mut self) -> Expression<'arena> {
         let span = self.mint("true");
         Expression::from_literal(Literal {
             value: LiteralValue::Boolean(true),
@@ -605,7 +605,7 @@ impl<'arena> Builder<'arena> {
     }
 
     /// A single-quoted string literal expression.
-    pub fn string_literal_expr(&mut self, content: &str) -> Expression<'arena> {
+    pub(crate) fn string_literal_expr(&mut self, content: &str) -> Expression<'arena> {
         Expression::from_literal(self.string_literal(content))
     }
 
@@ -624,7 +624,12 @@ impl<'arena> Builder<'arena> {
     /// `'$<base>'` key is spelled through the identifier name channel, as
     /// [`Self::void_zero_at`] spells `void 0`: a string literal prints its own source
     /// slice, so it cannot move off the appendix.
-    pub fn store_get(&self, base: &str, base_is_derived: bool, read: Span) -> Expression<'arena> {
+    pub(crate) fn store_get(
+        &self,
+        base: &str,
+        base_is_derived: bool,
+        read: Span,
+    ) -> Expression<'arena> {
         let at = Span::new(read.start, read.start);
         let mut args: bumpalo::collections::Vec<'arena, Expression<'arena>> =
             bumpalo::collections::Vec::new_in(self.arena);
@@ -687,7 +692,7 @@ impl<'arena> Builder<'arena> {
     /// `value` the authored tail, each claimed once. (Between two arguments the call
     /// printer looks for their comma in the source; with none there, a `<base>` at the
     /// target's end left the `=` gap to no window, dropping its comment.)
-    pub fn store_set(
+    pub(crate) fn store_set(
         &self,
         base: &str,
         value: Expression<'arena>,
@@ -712,7 +717,7 @@ impl<'arena> Builder<'arena> {
     /// Fictional-span like [`Self::store_get`]: the call takes `update`, the replaced
     /// update expression's host span, with every leaf zero-width at its start (`-1`
     /// spelled through the identifier name channel for the same reason as the key).
-    pub fn update_store(
+    pub(crate) fn update_store(
         &self,
         base: &str,
         prefix: bool,
@@ -742,7 +747,7 @@ impl<'arena> Builder<'arena> {
     /// component-body statement when any store read compiled. Zero-width at `at`, the
     /// body block's start, for the reason `transform_server.rs::build_props_id_decl`
     /// gives.
-    pub fn store_subs_var_at(&self, at: u32) -> Statement<'arena> {
+    pub(crate) fn store_subs_var_at(&self, at: u32) -> Statement<'arena> {
         let span = Span::new(at, at);
         let id = Expression::from_identifier(self.ident_at("$$store_subs", span));
         let declarator = VariableDeclarator {
@@ -763,7 +768,7 @@ impl<'arena> Builder<'arena> {
     /// `if ($$store_subs) $.unsubscribe_stores($$store_subs);` — the store
     /// cleanup, injected as the component body's last statement (before any
     /// `$.bind_props`).
-    pub fn unsubscribe_stores_stmt(&mut self) -> Statement<'arena> {
+    pub(crate) fn unsubscribe_stores_stmt(&mut self) -> Statement<'arena> {
         let test = Expression::from_identifier(self.ident("$$store_subs"));
         let test_start = test.span().start;
         let subs_arg = self.ident_expr("$$store_subs");
@@ -791,7 +796,7 @@ impl<'arena> Builder<'arena> {
     /// The clause is type-level only — the oracle emits `function s($$renderer, x)`
     /// either way — so *not reading it* IS the erasure. Threading a caller's type
     /// parameters through here would silently print them into the compiled JS.
-    pub fn function_declaration(
+    pub(crate) fn function_declaration(
         &mut self,
         name: &str,
         params: &'arena [Expression<'arena>],

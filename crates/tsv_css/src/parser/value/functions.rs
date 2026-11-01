@@ -15,7 +15,7 @@ use tsv_lang::Span;
 ///
 /// # Returns
 /// Arena-allocated slice of parsed argument values
-pub fn parse_function_arguments<'arena>(
+pub(crate) fn parse_function_arguments<'arena>(
     args_str: &str,
     parent_span: Span,
     arena: &'arena Bump,

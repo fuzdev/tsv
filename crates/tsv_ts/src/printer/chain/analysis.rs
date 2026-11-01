@@ -36,7 +36,7 @@ use tsv_lang::{Comment, Span, TAB_WIDTH, has_line_spanning_comments_to_emit_in_r
 /// printer and none is ever passed alone — the same reason `ParenLeadingValue` travels as
 /// one. Two words: it is copied down every step of the walk.
 #[derive(Clone, Copy)]
-pub struct LinearizeInput<'i> {
+pub(crate) struct LinearizeInput<'i> {
     pub(crate) printer: &'i Printer<'i>,
     /// The heads that keep the author's shell behind a `typeof` or a unary `-` in a
     /// comma-list region (`Printer::region_kept_shell_targets`), `None` in the document
@@ -103,7 +103,7 @@ fn linearize_chain<'a>(expr: &'a Expression<'_>, input: LinearizeInput<'_>) -> C
 /// Linearize starting from a CallExpression (avoids cloning to wrap in Expression)
 ///
 /// Returns whether the chain holds a long-curried pair ([`finalize_chain_nodes`]).
-pub fn linearize_chain_from_call_into<'a>(
+pub(crate) fn linearize_chain_from_call_into<'a>(
     call: &'a ast::CallExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
@@ -122,7 +122,7 @@ pub fn linearize_chain_from_call_into<'a>(
 /// Linearize starting from a MemberExpression (avoids cloning to wrap in Expression)
 ///
 /// Returns whether the chain holds a long-curried pair ([`finalize_chain_nodes`]).
-pub fn linearize_chain_from_member_into<'a>(
+pub(crate) fn linearize_chain_from_member_into<'a>(
     member: &'a ast::MemberExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
@@ -147,7 +147,7 @@ pub fn linearize_chain_from_member_into<'a>(
 /// reached (a `//` there makes `needs_parens` true, a block comment takes its
 /// trailing-comment branch), so only the comment-free case arrives here. Nested
 /// non-nulls go through the walk's own step ([`non_null_step`]), which does gate.
-pub fn linearize_chain_from_non_null_into<'a>(
+pub(crate) fn linearize_chain_from_non_null_into<'a>(
     non_null: &'a ast::TSNonNullExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
@@ -524,7 +524,10 @@ pub(crate) fn child_stops_optional_chain(
 /// reads the same one. A pair whose doc emits a trailing gap the window does not skip
 /// double-prints; the reverse DROPS. It answered differently with and without a `!`
 /// for as long as the trailing half was keyed on the operand's KIND instead.
-pub fn chain_paren_leading_gap(expr: &Expression<'_>, comments: &[Comment]) -> Option<(u32, u32)> {
+pub(crate) fn chain_paren_leading_gap(
+    expr: &Expression<'_>,
+    comments: &[Comment],
+) -> Option<(u32, u32)> {
     match &expr.kind {
         ExpressionKind::MemberExpression(member) => {
             member_object_paren_leading_start(member, expr.span)
@@ -1216,7 +1219,7 @@ fn linearize_member_node<'a>(
 /// The grouping is a PARTITION into consecutive runs — `i` only ever advances and
 /// every node joins the run it is scanned into — so each group is recorded as the
 /// index where it opens and emitted as `&nodes[open..close]`. Nothing is copied.
-pub fn group_chain_nodes<'a>(
+pub(super) fn group_chain_nodes<'a>(
     nodes: &'a [ChainNode<'a>],
     printer: &Printer<'_>,
 ) -> ChainGroupVec<'a> {
@@ -1484,7 +1487,7 @@ fn is_factory_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) 
 /// the printed node's own span, which the chain doc needs for its source lookups.
 /// `long_curried` is what the linearizer returned: whether the chain holds a long-curried
 /// pair at all, without which the marks have nothing to decide.
-pub fn build_linearized_chain_doc(
+pub(crate) fn build_linearized_chain_doc(
     nodes: &mut [ChainNode<'_>],
     long_curried: bool,
     head_expr: &Expression<'_>,

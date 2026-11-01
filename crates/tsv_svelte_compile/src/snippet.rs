@@ -65,7 +65,7 @@ impl SnippetAnalysis {
     /// `SnippetBlock::span.start`, so a body-local snippet and a nested snippet
     /// (neither of which is ever inserted) both return `false` — a nested snippet
     /// sharing a top-level snippet's name is never mistaken for it.
-    pub fn is_hoisted(&self, snippet: &SnippetBlock<'_>) -> bool {
+    pub(crate) fn is_hoisted(&self, snippet: &SnippetBlock<'_>) -> bool {
         self.hoistable.contains(&snippet.span.start)
     }
 
@@ -73,7 +73,7 @@ impl SnippetAnalysis {
     /// export-scope query (`validate_module_exports`), which asks whether module
     /// scope holds a binding of a given export name. Name-based and unambiguous:
     /// a top-level snippet name is unique.
-    pub fn has_hoisted_snippet_named(&self, name: &str) -> bool {
+    pub(crate) fn has_hoisted_snippet_named(&self, name: &str) -> bool {
         self.hoisted_names.contains(name)
     }
 }

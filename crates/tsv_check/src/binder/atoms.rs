@@ -34,10 +34,10 @@ use tsv_lang::FxHashMap;
 /// distinct-name lookups are integer compares. Atoms from different files never
 /// compare (each `bind_file` has its own interner).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Atom(u32);
+pub(crate) struct Atom(u32);
 
 /// The binder's per-file name interner (its own hand-rolled table).
-pub struct Atoms {
+pub(super) struct Atoms {
     /// `Atom` index → owned name (the resolve channel). Owned rather than
     /// source-borrowed so bind products stay relocatable across programs/folds.
     names: Vec<Box<str>>,
@@ -53,7 +53,7 @@ pub struct Atoms {
 impl Atoms {
     /// Build the interner and pre-intern the hot reserved names.
     #[must_use]
-    pub fn new() -> Atoms {
+    pub(super) fn new() -> Atoms {
         let mut atoms = Atoms {
             names: Vec::new(),
             lookup: FxHashMap::default(),
@@ -66,7 +66,7 @@ impl Atoms {
     }
 
     /// Intern a name to its [`Atom`] — one string hash, then integer identity.
-    pub fn intern(&mut self, name: &str) -> Atom {
+    pub(super) fn intern(&mut self, name: &str) -> Atom {
         if let Some(&atom) = self.lookup.get(name) {
             return atom;
         }
@@ -79,20 +79,20 @@ impl Atoms {
 
     /// Resolve an [`Atom`] back to its name (for diagnostic display).
     #[must_use]
-    pub fn resolve(&self, atom: Atom) -> &str {
+    pub(super) fn resolve(&self, atom: Atom) -> &str {
         // Sound: every `Atom` was minted by this interner's `intern`.
         self.names.get(atom.0 as usize).map_or("", |name| &**name)
     }
 
     /// The forced-default-export name atom (`"default"`).
     #[must_use]
-    pub fn default_export(&self) -> Atom {
+    pub(super) fn default_export(&self) -> Atom {
         self.default
     }
 
     /// The `export =` self-merge name atom (`"export="`).
     #[must_use]
-    pub fn export_equals(&self) -> Atom {
+    pub(super) fn export_equals(&self) -> Atom {
         self.export_equals
     }
 }

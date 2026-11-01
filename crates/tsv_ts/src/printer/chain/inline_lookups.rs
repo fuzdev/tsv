@@ -47,7 +47,7 @@ use tsv_lang::doc::arena::DocId;
 /// `call_tail` at the peel. They only ever agree by coincidence, and folding them would
 /// make a site read the clause it does not implement.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct InlineLookups {
+pub(super) struct InlineLookups {
     /// EVERY `.prop` lookup in this chain carries no break point.
     pub every: bool,
     /// A lone `.prop` tail off a call WITH ARGUMENTS carries no break point.
@@ -57,7 +57,7 @@ pub struct InlineLookups {
 impl InlineLookups {
     /// The answer for a chain no parent marked — and for every peeled SUB-chain, which is
     /// not the span either mark named.
-    pub const NONE: Self = Self {
+    pub(super) const NONE: Self = Self {
         every: false,
         call_tail: false,
     };
@@ -82,7 +82,7 @@ impl InlineLookups {
 /// `call_tail` does NOT decline: its `firstNonChainElementWrapperParent` walk skips
 /// `ChainExpression` by construction, so prettier's answer there is unchanged by the `?.`.
 /// The two walks reading the same wrapper oppositely is prettier's, not a tsv choice.
-pub fn resolve_inline_lookups(
+pub(super) fn resolve_inline_lookups(
     chain_span: Span,
     groups: &[ChainGroup<'_>],
     printer: &Printer<'_>,
@@ -124,7 +124,7 @@ pub fn resolve_inline_lookups(
 ///
 /// The caller declines for any comment in `member`'s span, so the node's gap emitters have
 /// nothing to print and no `lineSuffixBoundary` is owed between the two halves.
-pub fn build_lookup_after_operand_doc(
+pub(crate) fn build_lookup_after_operand_doc(
     member: &MemberExpression<'_>,
     span: Span,
     object_doc: DocId,

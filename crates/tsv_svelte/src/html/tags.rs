@@ -19,7 +19,7 @@
 /// including the non-alphanumeric members `·`/ZWNJ/ZWJ/astral) and by the name
 /// validator (the hyphen-tail run) — a single source of truth for the ranges.
 #[must_use]
-pub fn is_custom_element_name_char(c: char) -> bool {
+pub(crate) fn is_custom_element_name_char(c: char) -> bool {
     c.is_ascii_alphanumeric()
         || matches!(c, '-' | '.' | '_' | '\u{00B7}')
         || matches!(c,
@@ -51,7 +51,7 @@ macro_rules! optional_end_tags {
         /// Exact and case-sensitive: tag names arrive as authored.
         #[inline]
         #[must_use]
-        pub fn optional_end_tag(tag_name: &str) -> Option<OptionalEndTag> {
+        pub(crate) fn optional_end_tag(tag_name: &str) -> Option<OptionalEndTag> {
             Some(OptionalEndTag(match tag_name {
                 $($key => OptionalEndTagKey::$variant,)+
                 _ => return None,
@@ -63,7 +63,7 @@ macro_rules! optional_end_tags {
             /// element — one of the key's listed triggers.
             #[inline]
             #[must_use]
-            pub fn is_closed_by(self, next: &str) -> bool {
+            pub(crate) fn is_closed_by(self, next: &str) -> bool {
                 match self.0 {
                     $(OptionalEndTagKey::$variant => matches!(next, $($trigger)|+),)+
                 }
@@ -93,7 +93,7 @@ macro_rules! optional_end_tags {
 /// one of its listed triggers ([`is_closed_by`](Self::is_closed_by)). Split in two so a parser
 /// can ask the first half once per element and the second once per child.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct OptionalEndTag(OptionalEndTagKey);
+pub(crate) struct OptionalEndTag(OptionalEndTagKey);
 
 // Svelte's `autoclosing_children` (the Svelte repository's
 // `packages/svelte/src/html-tree-validation.js`),

@@ -99,7 +99,7 @@ impl Tail {
 }
 
 impl<'s, 'b> Walk<'s, 'b> {
-    pub fn new(source: &'s str, arena: &'b Bump) -> Self {
+    pub(super) fn new(source: &'s str, arena: &'b Bump) -> Self {
         Self {
             src: Source::new(source),
             edits: BumpVec::new_in(arena),
@@ -113,14 +113,14 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     /// The collected edits, or the refusal.
-    pub fn finish(self) -> Result<BumpVec<'b, Edit>, StripError> {
+    pub(super) fn finish(self) -> Result<BumpVec<'b, Edit>, StripError> {
         match self.refusal {
             Some((kind, span)) => Err(StripError::unsupported(kind, self.src.text, span.range())),
             None => Ok(self.edits),
         }
     }
 
-    pub fn program(&mut self, program: &Program<'_>) {
+    pub(super) fn program(&mut self, program: &Program<'_>) {
         self.statement_list(program.body, false);
     }
 

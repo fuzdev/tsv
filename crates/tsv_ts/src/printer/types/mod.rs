@@ -32,7 +32,7 @@ mod union_intersection;
 use union_intersection::union_member_parens;
 
 // Re-export public items from helpers
-pub use helpers::unwrap_parenthesized;
+pub(super) use helpers::unwrap_parenthesized;
 
 // The array-suffix layout verdict, shared with the type-alias `=` gate
 // (`statements/type_declarations.rs`) so the emitter and the gate cannot disagree.

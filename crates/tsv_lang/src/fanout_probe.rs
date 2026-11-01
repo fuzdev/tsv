@@ -133,7 +133,7 @@ mod imp {
     }
 
     #[inline]
-    pub fn build<K>(dispatch: Build, kind: &K, span: impl FnOnce() -> (u32, u32)) {
+    pub(super) fn build<K>(dispatch: Build, kind: &K, span: impl FnOnce() -> (u32, u32)) {
         if any_armed() {
             let (start, end) = span();
             build_armed(dispatch, discriminant_hash(kind), start, end);
@@ -167,7 +167,7 @@ mod imp {
     }
 
     #[inline]
-    pub fn walk() {
+    pub(super) fn walk() {
         if any_armed() {
             armed(|state| {
                 state.walks += 1;
@@ -177,7 +177,7 @@ mod imp {
     }
 
     #[inline]
-    pub fn scan(n: u64) {
+    pub(super) fn scan(n: u64) {
         if any_armed() {
             armed(|state| {
                 state.scans += n;
@@ -187,7 +187,7 @@ mod imp {
     }
 
     #[inline]
-    pub fn predicate() {
+    pub(super) fn predicate() {
         if any_armed() {
             armed(|state| {
                 state.predicates += 1;
@@ -197,7 +197,7 @@ mod imp {
     }
 
     #[inline]
-    pub fn node() {
+    pub(super) fn node() {
         if any_armed() {
             node_armed();
         }
@@ -215,7 +215,7 @@ mod imp {
         });
     }
 
-    pub fn arm(budget: Budget) {
+    pub(super) fn arm(budget: Budget) {
         STATE.with(|state| {
             *state.borrow_mut() = Some(State {
                 budget,
@@ -230,7 +230,7 @@ mod imp {
         ANY_ARMED.store(true, Relaxed);
     }
 
-    pub fn disarm() -> Tally {
+    pub(super) fn disarm() -> Tally {
         STATE.with(|state| {
             state
                 .borrow_mut()
@@ -248,7 +248,7 @@ mod imp {
         })
     }
 
-    pub const ENABLED: bool = true;
+    pub(super) const ENABLED: bool = true;
 }
 
 #[cfg(not(feature = "_internal_fanout_check"))]
@@ -256,29 +256,29 @@ mod imp {
     use super::{Budget, Build, Tally};
 
     #[inline]
-    pub fn build<K>(_dispatch: Build, _kind: &K, _span: impl FnOnce() -> (u32, u32)) {}
+    pub(super) fn build<K>(_dispatch: Build, _kind: &K, _span: impl FnOnce() -> (u32, u32)) {}
 
     #[inline]
-    pub fn walk() {}
+    pub(super) fn walk() {}
 
     #[inline]
-    pub fn scan(_n: u64) {}
+    pub(super) fn scan(_n: u64) {}
 
     #[inline]
-    pub fn predicate() {}
+    pub(super) fn predicate() {}
 
     #[inline]
-    pub fn node() {}
+    pub(super) fn node() {}
 
     #[inline]
-    pub fn arm(_budget: Budget) {}
+    pub(super) fn arm(_budget: Budget) {}
 
     #[inline]
-    pub fn disarm() -> Tally {
+    pub(super) fn disarm() -> Tally {
         Tally::default()
     }
 
-    pub const ENABLED: bool = false;
+    pub(super) const ENABLED: bool = false;
 }
 
 /// Whether the counters are compiled in (the `_internal_fanout_check` feature). Without them every

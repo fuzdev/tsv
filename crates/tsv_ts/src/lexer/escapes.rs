@@ -57,7 +57,7 @@ use tsv_lang::swar::next_byte_of;
 /// decode_string_escapes_into("\\u{1F4A9}", &mut out)?;
 /// assert_eq!(out, "💩");
 /// ```
-pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Error> {
+pub(crate) fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Error> {
     out.clear();
     out.reserve(s.len());
     let result = out;
@@ -189,7 +189,7 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Error
 /// decodes off the lexer's path: the re-run that surfaces an escape error the lexer
 /// swallowed, and the decode of a template's line-terminator-normalized raw text.
 /// The hot lexer path calls `_into` directly against a parked scratch buffer.
-pub fn decode_string_escapes(s: &str) -> Result<String, Error> {
+pub(crate) fn decode_string_escapes(s: &str) -> Result<String, Error> {
     let mut out = String::new();
     decode_string_escapes_into(s, &mut out)?;
     Ok(out)

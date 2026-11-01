@@ -95,7 +95,7 @@ fn call_has_breaking_single_arg(call: &CallExpression<'_>, printer: &Printer<'_>
 /// - Short chains (≤cutoff groups): simple group with softlines
 /// - Longer chains: conditionalGroup([oneLine, expanded])
 /// - 3+ calls with complex args: force expanded (no width-based decision)
-pub fn build_chain_doc<'a>(
+pub(super) fn build_chain_doc<'a>(
     groups: &[ChainGroup<'a>],
     chain_span: Span,
     printer: &Printer<'_>,
@@ -709,7 +709,7 @@ fn groups_exceed_cutoff(
 /// The comment half of the label — `nodeHasComment`, which sends a short chain down the
 /// long path — is not asked here; the poorly-breakable walk's own member-gap comment gate
 /// answers it, scoped the way that walk needs (a same-line gap comment only).
-pub fn call_prints_as_member_chain(
+pub(crate) fn call_prints_as_member_chain(
     call: &CallExpression<'_>,
     span: Span,
     printer: &Printer<'_>,
@@ -749,7 +749,7 @@ pub fn call_prints_as_member_chain(
 /// Returns whether any call followed by another call of this chain prints its list bare —
 /// the only shape the group printer closes a group for. The chain's last link, which the
 /// call printing the chain as its callee marks itself, is followed by none.
-pub fn mark_long_curried_calls(nodes: &mut [ChainNode<'_>], printer: &Printer<'_>) -> bool {
+pub(super) fn mark_long_curried_calls(nodes: &mut [ChainNode<'_>], printer: &Printer<'_>) -> bool {
     let mut any = false;
     for i in 1..nodes.len() {
         let ungroup = match (&nodes[i - 1], &nodes[i]) {

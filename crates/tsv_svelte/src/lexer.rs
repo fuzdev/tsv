@@ -5,7 +5,7 @@ use crate::parser::scan_to_matching_brace;
 use crate::whitespace::{brace_interior_start, char_at, is_svelte_ws, skip_svelte_ws};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TokenKind {
+pub(crate) enum TokenKind {
     LeftAngle,     // <
     RightAngle,    // >
     Slash,         // /
@@ -80,7 +80,7 @@ impl fmt::Display for TokenKind {
 /// There is **no out-of-band decoded value**: markup tokens are pure spans (the
 /// embedded TS/CSS/expression content is lexed by the other crates).
 #[derive(Debug, Clone)]
-pub struct Token {
+pub(crate) struct Token {
     pub kind: TokenKind,
     pub start: u32,
     pub end: u32,
@@ -292,7 +292,7 @@ fn quoted_value_end_from_brace(source: &str, brace: usize, quote: u8) -> Option<
     }
 }
 
-pub struct Lexer<'a> {
+pub(crate) struct Lexer<'a> {
     source: &'a str,
     /// The cursor, as a byte offset into `source` — always on a character boundary. `source`
     /// is the whole document, so the cursor and every token span are document offsets.
@@ -402,7 +402,7 @@ impl BlockOrTagMarker {
 impl<'a> Lexer<'a> {
     /// A lexer over the whole document `source`, its cursor past a leading byte-order mark
     /// ([`tsv_lang::leading_bom_len`]).
-    pub fn new(source: &'a str) -> Self {
+    pub(crate) fn new(source: &'a str) -> Self {
         // Skip UTF-8 BOM (U+FEFF) at start of file if present.
         // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
         // Position starts after BOM so token spans reflect actual file bytes; the WIRE
@@ -423,7 +423,7 @@ impl<'a> Lexer<'a> {
     /// No byte-order-mark skip at `pos`: the only BOM is at byte 0 ([`Lexer::new`]). A
     /// U+FEFF at a resume point is skipped by the next token's scan either way — it is
     /// Svelte whitespace ([`is_svelte_ws`]) in tag mode, and not `<` or `{` in template mode.
-    pub fn seek(&mut self, pos: usize) {
+    pub(crate) fn seek(&mut self, pos: usize) {
         assert!(
             self.source.is_char_boundary(pos),
             "seek to {pos}, not a character boundary of the document"
@@ -577,7 +577,7 @@ impl<'a> Lexer<'a> {
     /// The match yields only the token's KIND — every token spans `start` to the cursor — so
     /// the one store at the end is the only write of `*dst`.
     #[inline(never)]
-    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), Error> {
+    pub(crate) fn next_token_into(&mut self, dst: &mut Token) -> Result<(), Error> {
         let bytes = self.source.as_bytes();
         let mut i = self.position;
         if self.inside_tag {

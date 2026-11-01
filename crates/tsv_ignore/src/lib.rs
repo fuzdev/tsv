@@ -227,7 +227,7 @@ impl Rule {
 
 impl IgnoreRules {
     /// Parses the text of one ignore file into a rule set.
-    pub fn parse(content: &str) -> Self {
+    pub(crate) fn parse(content: &str) -> Self {
         // A leading UTF-8 BOM is not part of the first pattern: git skips it
         // (`add_patterns_from_buffer`), and an editor that writes one would otherwise
         // silently disable the file's first rule — in the unsafe direction, since
@@ -253,7 +253,7 @@ impl IgnoreRules {
     /// matches nothing, and its presence alone can still set the regime
     /// ([`IgnoreStack::has_gitignore_layers`]).
     #[cfg(test)]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.rules.is_empty()
     }
 
@@ -271,7 +271,7 @@ impl IgnoreRules {
     /// The stack never asks this — it layers `last_match` per prefix itself — so the
     /// single-file form survives only for the unit tests that grade one file's rules.
     #[cfg(test)]
-    pub fn is_ignored(&self, path: &str, is_dir: bool) -> bool {
+    pub(crate) fn is_ignored(&self, path: &str, is_dir: bool) -> bool {
         first_excluded_prefix(path, is_dir, |prefix, dir| {
             self.last_match(prefix, dir).map(|ignored| (ignored, ()))
         })

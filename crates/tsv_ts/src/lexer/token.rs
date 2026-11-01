@@ -326,7 +326,7 @@ impl fmt::Display for KeywordKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TokenKind {
+pub(crate) enum TokenKind {
     Number,
     String,
     Identifier,
@@ -426,7 +426,7 @@ impl TokenKind {
     /// sites that care) and the non-word binding starters (`[`, `{`, `...`,
     /// `this`).
     #[inline]
-    pub fn is_binding_name_word(&self) -> bool {
+    pub(crate) fn is_binding_name_word(&self) -> bool {
         match self {
             TokenKind::Identifier => true,
             TokenKind::Keyword(kw) => kw.can_be_binding_name(),
@@ -541,7 +541,7 @@ impl fmt::Display for TokenKind {
 // `trivially_copy_pass_by_ref` cascade on the many `&TokenKind` params; moving an
 // 8-byte `TokenKind` field is just as cheap.
 #[derive(Debug, Clone)]
-pub struct Token {
+pub(crate) struct Token {
     pub kind: TokenKind,
     /// Byte offsets into the lexer's source. `u32` (not `usize`) keeps `Token`
     /// 16 bytes; source length is capped < 4 GiB upstream (`Error::FileTooLarge`).
@@ -1012,7 +1012,7 @@ fn read_keyword_word(bytes: &[u8], start: usize, len: usize) -> u64 {
 /// it is in bounds (a non-ASCII identifier simply matches no ASCII keyword constant
 /// and falls through to `None`).
 #[inline]
-pub fn keyword_at(bytes: &[u8], start: usize, len: usize) -> Option<KeywordKind> {
+pub(crate) fn keyword_at(bytes: &[u8], start: usize, len: usize) -> Option<KeywordKind> {
     if !matches!(len, KEYWORD_MIN_LEN..=KEYWORD_MAX_LEN)
         || !keyword_prefilter_admits(bytes[start], len)
     {
@@ -1029,7 +1029,7 @@ pub fn keyword_at(bytes: &[u8], start: usize, len: usize) -> Option<KeywordKind>
 /// [`keyword_at_in_word`]'s answer: the lookup settled from one word, or deferred to
 /// [`keyword_at`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum WordLookup {
+pub(super) enum WordLookup {
     /// The name's keyword kind, `None` for a plain identifier.
     Settled(Option<KeywordKind>),
     /// The front must hand the name to the general reader: from [`keyword_at_in_word`], a
@@ -1056,7 +1056,7 @@ pub enum WordLookup {
 /// with the caller's keeps that register live across the whole identifier run — one
 /// more than the front has to spare without saving a callee-saved one.
 #[inline]
-pub fn keyword_at_in_word(bytes: &[u8], start: usize, len: usize) -> WordLookup {
+pub(super) fn keyword_at_in_word(bytes: &[u8], start: usize, len: usize) -> WordLookup {
     if !matches!(len, KEYWORD_MIN_LEN..=KEYWORD_MAX_LEN) {
         return WordLookup::Settled(None);
     }
@@ -1086,7 +1086,7 @@ pub fn keyword_at_in_word(bytes: &[u8], start: usize, len: usize) -> WordLookup 
 /// ⭐ The general form: a "this path is cold" comment names a RATE, and the rate it
 /// names is usually the success rate while the cost follows the call rate.
 #[inline]
-pub fn long_keyword(name: &[u8]) -> Option<KeywordKind> {
+pub(super) fn long_keyword(name: &[u8]) -> Option<KeywordKind> {
     let (head, rest) = name.split_first_chunk::<8>()?;
     let tail = match *rest {
         [ninth] => u16::from(ninth),

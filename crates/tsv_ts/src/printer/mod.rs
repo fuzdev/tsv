@@ -29,7 +29,7 @@
 
 mod analysis;
 #[cfg(feature = "_internal_buffer_stats")]
-pub mod buffer_stats;
+pub(crate) mod buffer_stats;
 mod calls;
 mod chain;
 mod class_common;
@@ -292,7 +292,7 @@ pub(crate) enum ArrowChainContext {
 }
 
 /// Printer state for building output
-pub struct Printer<'a> {
+pub(crate) struct Printer<'a> {
     /// Output buffer
     buffer: OutputBuffer,
     /// Current indentation level

@@ -108,7 +108,8 @@ mod tests;
 
 pub use build::build_flow;
 pub use flags::FlowFlags;
-pub use graph::{FlowGraph, FlowReduceLabel, FlowSwitchClause};
+pub use graph::FlowGraph;
+pub(crate) use graph::{FlowReduceLabel, FlowSwitchClause};
 pub use product::{FlowProduct, FlowStats, render_flow_dot};
 
 use crate::ids::{FlowNodeId, NodeId};

@@ -5,4 +5,4 @@
 // Organization:
 // - element.rs: Element type checks (block, void)
 
-pub mod element;
+pub(super) mod element;

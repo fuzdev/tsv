@@ -13,7 +13,7 @@ use std::path::Path;
 /// Fail, naming the enclosing git tree, when an ancestor of `dir` (inclusive) holds a
 /// `.git` entry. Reads `dir` resolved, as the walk does — a symlinked temp dir has two
 /// ancestor chains, and the regime follows the real one.
-pub fn assert_outside_git_tree(dir: &Path) {
+pub(crate) fn assert_outside_git_tree(dir: &Path) {
     let resolved = fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
     let enclosing = resolved
         .ancestors()

@@ -60,7 +60,7 @@ impl<'a> ValueCursor<'a> {
     ///
     /// let cursor = ValueCursor::new("rgba(255, 0, 0, 1.0)");
     /// ```
-    pub fn new(source: &'a str) -> Self {
+    pub(crate) fn new(source: &'a str) -> Self {
         Self {
             source,
             pos: 0,
@@ -73,12 +73,12 @@ impl<'a> ValueCursor<'a> {
     /// Peek at next character without advancing
     ///
     /// Returns `None` if at end of input.
-    pub fn peek(&self) -> Option<char> {
+    pub(crate) fn peek(&self) -> Option<char> {
         self.source[self.pos..].chars().next()
     }
 
     /// Check if at end of input
-    pub fn is_eof(&self) -> bool {
+    pub(crate) fn is_eof(&self) -> bool {
         self.pos >= self.source.len()
     }
 
@@ -86,7 +86,7 @@ impl<'a> ValueCursor<'a> {
     ///
     /// Advances cursor past all whitespace characters and returns the
     /// new position (first non-whitespace character or EOF).
-    pub fn skip_whitespace(&mut self) -> usize {
+    pub(crate) fn skip_whitespace(&mut self) -> usize {
         let bytes = self.source.as_bytes();
         // CSS whitespace is ASCII-only (`is_css_whitespace` is `is_ascii_whitespace`;
         // NBSP and other Unicode whitespace are value content), so a non-ASCII byte
@@ -132,7 +132,7 @@ impl<'a> ValueCursor<'a> {
     /// let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
     /// // Parses "rgba(1, 2, 3)" correctly - commas inside parens don't stop parsing
     /// ```
-    pub fn consume_until<F>(
+    pub(crate) fn consume_until<F>(
         &mut self,
         is_delimiter: F,
         skip: &[bool; 256],
@@ -248,7 +248,7 @@ impl<'a> ValueCursor<'a> {
     ///
     /// # Arguments
     /// * `ch` - Character to advance past (used for UTF-8 length calculation)
-    pub fn advance(&mut self, ch: char) {
+    pub(crate) fn advance(&mut self, ch: char) {
         self.pos += ch.len_utf8();
     }
 
@@ -256,7 +256,7 @@ impl<'a> ValueCursor<'a> {
     ///
     /// # Safety
     /// Caller must ensure position is at a UTF-8 character boundary.
-    pub fn set_position(&mut self, pos: usize) {
+    pub(crate) fn set_position(&mut self, pos: usize) {
         self.pos = pos;
     }
 }

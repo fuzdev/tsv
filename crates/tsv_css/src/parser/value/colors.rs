@@ -7,7 +7,7 @@ use crate::keyword_set::ascii_keyword_set;
 ///
 /// `Hex`/`Named` carry no text — their source is recovered from the value's span at
 /// print time — so this only classifies and needs no arena.
-pub fn parse_color(s: &str) -> Option<Color> {
+pub(crate) fn parse_color(s: &str) -> Option<Color> {
     // Hex color: #RGB, #RGBA, #RRGGBB, or #RRGGBBAA. `is_hex_color_body` (shared with
     // the printer's value-text normalizer) also requires the body be all hex digits,
     // so a same-length non-hex hash (`#ZZZ`, `#12G`) stays a plain hash token — else
@@ -31,7 +31,7 @@ pub fn parse_color(s: &str) -> Option<Color> {
 /// CSS function names are ASCII case-insensitive, and this runs on *every* function value
 /// the parser builds (`var`, `calc`, `clamp`, …), the overwhelming majority of which are
 /// not color functions at all, so it must not cost an allocation to say "no".
-pub fn parse_color_function(name: &str, args_str: &str) -> Option<Color> {
+pub(crate) fn parse_color_function(name: &str, args_str: &str) -> Option<Color> {
     if name.eq_ignore_ascii_case("rgb") || name.eq_ignore_ascii_case("rgba") {
         parse_rgb(args_str)
     } else if name.eq_ignore_ascii_case("hsl") || name.eq_ignore_ascii_case("hsla") {

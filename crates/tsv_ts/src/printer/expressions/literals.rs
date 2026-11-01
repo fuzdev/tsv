@@ -108,7 +108,7 @@ pub(crate) fn format_directive(raw: &str) -> String {
 ///
 /// BigInt literals are only lowercased (Prettier's `printBigInt`); the BigInt
 /// grammar has no exponent or fraction, so the rest of the pipeline is inert.
-pub fn normalize_number_literal(raw: &str) -> Cow<'_, str> {
+pub(crate) fn normalize_number_literal(raw: &str) -> Cow<'_, str> {
     // Prettier short-circuits single-character literals (`0`, `1`) — a numeric
     // literal's only single-char form is one ASCII digit, already canonical, so
     // borrow (`len == 1` is the ASCII-fast equivalent of `chars().count() == 1`).
@@ -281,7 +281,7 @@ fn strip_trailing_dot(s: Cow<'_, str>) -> Cow<'_, str> {
 ///
 /// Prettier normalizes regex flags to alphabetical order (dgimsvy).
 /// Example: `/pattern/vg` → `/pattern/gv`
-pub fn sort_regex_flags(flags: &str) -> String {
+pub(crate) fn sort_regex_flags(flags: &str) -> String {
     let mut chars: SmallVec<[char; 8]> = flags.chars().collect();
     chars.sort_unstable();
     chars.into_iter().collect()

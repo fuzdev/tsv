@@ -17,7 +17,7 @@ pub(super) struct Source<'s> {
 }
 
 impl<'s> Source<'s> {
-    pub fn new(text: &'s str) -> Self {
+    pub(super) fn new(text: &'s str) -> Self {
         Self {
             text,
             bytes: text.as_bytes(),
@@ -25,19 +25,19 @@ impl<'s> Source<'s> {
     }
 
     /// The byte before offset `end` — a node's last byte — is a `;`.
-    pub fn ends_with_semicolon(self, end: u32) -> bool {
+    pub(super) fn ends_with_semicolon(self, end: u32) -> bool {
         end > 0 && self.bytes.get(end as usize - 1) == Some(&b';')
     }
 
     /// Whether an ECMAScript line terminator (LF, CR, U+2028, U+2029) lies in
     /// `[start, end)`, comments included.
-    pub fn line_break_between(self, start: u32, end: u32) -> bool {
+    pub(super) fn line_break_between(self, start: u32, end: u32) -> bool {
         has_newline_between(self.text, start, end)
     }
 
     /// The offset of the first significant byte at or after `from`: past whitespace, line
     /// terminators and comments. `self.text.len()` at the end of the source.
-    pub fn next_significant(self, from: u32) -> u32 {
+    pub(super) fn next_significant(self, from: u32) -> u32 {
         skip_trivia_run(
             self.text,
             from as usize,
@@ -52,7 +52,7 @@ impl<'s> Source<'s> {
     /// anything else). A statement opening with `<` is a generic arrow (`<T>(x: T) => x`),
     /// whose type parameters blank to leave its `(` the line's first token, so it continues
     /// as a call's `(` does.
-    pub fn continuation(self, from: u32) -> Option<Continuation> {
+    pub(super) fn continuation(self, from: u32) -> Option<Continuation> {
         let at = self.next_significant(from) as usize;
         match self.bytes.get(at)? {
             b'(' | b'[' | b'`' | b'<' => Some(Continuation::Postfix),
@@ -68,19 +68,19 @@ impl<'s> Source<'s> {
     }
 
     /// The first `target` in `[start, end)` outside a comment.
-    pub fn find_char(self, start: u32, end: u32, target: u8) -> Option<u32> {
+    pub(super) fn find_char(self, start: u32, end: u32, target: u8) -> Option<u32> {
         find_char_skipping_comments(self.bytes, start as usize, end as usize, target)
             .map(|at| at as u32)
     }
 
     /// The last `target` in `[start, end)` outside a comment.
-    pub fn rfind_char(self, start: u32, end: u32, target: u8) -> Option<u32> {
+    pub(super) fn rfind_char(self, start: u32, end: u32, target: u8) -> Option<u32> {
         rfind_char_skipping_comments(self.bytes, start as usize, end as usize, target)
             .map(|at| at as u32)
     }
 
     /// The first whole-word `keyword` in `[start, end)` outside a comment or string.
-    pub fn find_keyword(self, start: u32, end: u32, keyword: &[u8]) -> Option<u32> {
+    pub(super) fn find_keyword(self, start: u32, end: u32, keyword: &[u8]) -> Option<u32> {
         find_keyword(
             self.bytes,
             start as usize,
@@ -92,7 +92,7 @@ impl<'s> Source<'s> {
     }
 
     /// The last whole-word `keyword` in `[start, end)` outside a comment or string.
-    pub fn rfind_keyword(self, start: u32, end: u32, keyword: &[u8]) -> Option<u32> {
+    pub(super) fn rfind_keyword(self, start: u32, end: u32, keyword: &[u8]) -> Option<u32> {
         rfind_keyword(
             self.bytes,
             start as usize,
@@ -105,7 +105,7 @@ impl<'s> Source<'s> {
 
     /// The end of a `,` that directly follows offset `end` (past trivia), else `end` — the
     /// extent of a blanked list element that takes its trailing comma with it.
-    pub fn end_with_trailing_comma(self, end: u32) -> u32 {
+    pub(super) fn end_with_trailing_comma(self, end: u32) -> u32 {
         let next = self.next_significant(end);
         if self.bytes.get(next as usize) == Some(&b',') {
             next + 1
@@ -119,7 +119,7 @@ impl<'s> Source<'s> {
     /// binary operator starts there (an assignment operator, `=>`, a `?` / `?.`, `++` / `--`,
     /// a punctuator, or anything else). The lexing is longest-match, so `>>` is the shift
     /// operator and `>=` the comparison.
-    pub fn binary_operator_precedence(self, from: u32) -> Option<u8> {
+    pub(super) fn binary_operator_precedence(self, from: u32) -> Option<u8> {
         let at = self.next_significant(from) as usize;
         let byte = |offset: usize| self.bytes.get(at + offset).copied();
         match byte(0)? {

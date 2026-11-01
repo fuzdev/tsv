@@ -32,10 +32,11 @@ mod entities;
 mod tags;
 mod whitespace;
 
-pub use elements::{
+pub(crate) use elements::{
     collapses_child_whitespace, is_block_element, is_foreign_element, is_line_break_element,
-    is_mathml_element, is_svg_element, is_void_element,
+    is_void_element,
 };
-pub use entities::{ReferenceContext, decode_character_references};
-pub use tags::{is_custom_element_name_char, optional_end_tag};
+pub use elements::{is_mathml_element, is_svg_element};
+pub(crate) use entities::{ReferenceContext, decode_character_references};
+pub(crate) use tags::{is_custom_element_name_char, optional_end_tag};
 pub use whitespace::preserves_whitespace;

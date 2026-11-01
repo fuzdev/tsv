@@ -75,7 +75,7 @@ use tsv_svelte::ast::{
 
 /// A script's splice slot: where a statement can be inserted, and whether the
 /// script is TypeScript (the erasure axis wants to know).
-pub struct ScriptSlot {
+pub(super) struct ScriptSlot {
     /// Byte offset just inside the script's content — a valid statement position.
     pub insert_at: u32,
     /// `lang="ts"` — the type-erasure operators only apply here.
@@ -85,7 +85,7 @@ pub struct ScriptSlot {
 }
 
 /// A template-block binding: the name it introduces, and a gap inside its body.
-pub struct BlockBinding {
+pub(super) struct BlockBinding {
     /// The bound name as written (`{#each xs as name}` → `name`).
     pub name: String,
     /// A splice offset inside the block's body.
@@ -94,7 +94,7 @@ pub struct BlockBinding {
 
 /// The structural anchors of one seed component.
 #[derive(Default)]
-pub struct Anchors {
+pub(super) struct Anchors {
     /// Offsets a fragment node may be spliced at (before each template sibling).
     pub template_gaps: Vec<u32>,
     /// The subset of [`Self::template_gaps`] inside a region the **server** target
@@ -142,7 +142,7 @@ pub struct Anchors {
 impl Anchors {
     /// Parse `source` and collect its anchors, or `None` when tsv's parser rejects
     /// it (an unparseable seed is simply not usable as one).
-    pub fn collect(source: &str) -> Option<Self> {
+    pub(super) fn collect(source: &str) -> Option<Self> {
         let arena = bumpalo::Bump::new();
         let root = tsv_svelte::__private::parse(source, &arena).ok()?;
         let mut anchors = Self::default();

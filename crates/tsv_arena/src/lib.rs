@@ -540,15 +540,15 @@ mod tests {
     // DISPATCH is pinned without this crate depending on any of them.
 
     mod fake_lang {
-        pub mod __private {
-            pub fn parse(source: &str, arena: &str) -> String {
+        pub(super) mod __private {
+            pub(crate) fn parse(source: &str, arena: &str) -> String {
                 format!("parse({source}, {arena})")
             }
-            pub fn parse_with_goal(source: &str, goal: &str, arena: &str) -> String {
+            pub(crate) fn parse_with_goal(source: &str, goal: &str, arena: &str) -> String {
                 format!("parse_with_goal({source}, {goal}, {arena})")
             }
             /// The goal-axis language's format-path parse (`tsv_ts::__private::parse_folded`).
-            pub fn parse_folded(folded: &str, goal: Option<&str>, arena: &str) -> String {
+            pub(crate) fn parse_folded(folded: &str, goal: Option<&str>, arena: &str) -> String {
                 match goal {
                     Some(goal) => format!("exact({folded}, {goal}, {arena})"),
                     None => format!("fallback({folded}, {arena})"),
@@ -559,8 +559,8 @@ mod tests {
 
     /// A goalless language (Svelte, CSS): its format-path parse takes no goal at all.
     mod fake_goalless_lang {
-        pub mod __private {
-            pub fn parse_folded(folded: &str, arena: &str) -> String {
+        pub(super) mod __private {
+            pub(crate) fn parse_folded(folded: &str, arena: &str) -> String {
                 format!("parse_folded({folded}, {arena})")
             }
         }
@@ -602,11 +602,11 @@ mod tests {
     /// A language whose parse can fail, for the export-body macros: its goal type is `&str`,
     /// whose `Default` (`""`) stands in for `Goal::Module`.
     mod fake_fallible_lang {
-        pub mod __private {
-            pub fn parse(source: &str, arena: &bumpalo::Bump) -> Result<String, String> {
+        pub(super) mod __private {
+            pub(crate) fn parse(source: &str, arena: &bumpalo::Bump) -> Result<String, String> {
                 parse_with_goal(source, "goalless", arena)
             }
-            pub fn parse_with_goal(
+            pub(crate) fn parse_with_goal(
                 source: &str,
                 goal: &str,
                 _arena: &bumpalo::Bump,
@@ -617,7 +617,7 @@ mod tests {
                     Ok(format!("ast({source}, {goal:?})"))
                 }
             }
-            pub fn convert(ast: &String, source: &str) -> String {
+            pub(crate) fn convert(ast: &String, source: &str) -> String {
                 format!("convert({ast}, {source})")
             }
         }

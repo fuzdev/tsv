@@ -33,7 +33,7 @@ use tsv_lang::Span;
 /// This enum captures WHERE an expression appears in the AST, which determines
 /// whether it needs parentheses.
 #[derive(Debug, Clone, Copy)]
-pub enum ParenContext {
+pub(crate) enum ParenContext {
     /// Variable declarator init: `const x = <expr>`
     VariableInit,
 
@@ -285,7 +285,7 @@ fn ends_open_optional_chain(head: &Expression<'_>) -> bool {
 /// every `in` lexically under the init, regardless of context). It's threaded as
 /// a parameter rather than read from a context because parenthesization is a pure
 /// function of the node and its surroundings.
-pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool) -> bool {
+pub(super) fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool) -> bool {
     // Ambient for-init rule: an `in` binary always needs parens here. ORed ahead
     // of the context match so it applies uniformly (call args, object values,
     // binary operands, etc.) and never double-wraps a node a context already

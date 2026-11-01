@@ -106,7 +106,7 @@ struct CandidateRun {
 /// at bind time and consumed by [`UnreachableCandidates::emit`] per variant.
 /// C15-relocatable by construction (spans are `Copy`; nothing borrows the AST).
 #[derive(Clone, Debug, Default)]
-pub struct UnreachableCandidates {
+pub(crate) struct UnreachableCandidates {
     /// Maximal unreachable-statement runs (TS7027 candidates).
     runs: Vec<CandidateRun>,
     /// Unreferenced-label identifier spans (TS7028 candidates), pre-order.
@@ -126,7 +126,7 @@ impl UnreachableCandidates {
     /// suggestion.
     // `&CheckOptions` mirrors the `check_bound` threading (uniform + future-proof).
     #[expect(clippy::trivially_copy_pass_by_ref)]
-    pub fn emit(
+    pub(crate) fn emit(
         &self,
         file: FileId,
         options: &CheckOptions,
@@ -246,7 +246,7 @@ fn is_instantiated_module(state: ModuleInstanceState, preserve: bool) -> bool {
 /// Build the per-unit candidate table from a parsed file's AST + the flow product
 /// (the `Unreachable`-bit source). Called once per parsed unit in `bind_program`.
 #[must_use]
-pub fn build_candidates(
+pub(crate) fn build_candidates(
     program: &Program<'_>,
     source: &str,
     bound: &BoundFile,

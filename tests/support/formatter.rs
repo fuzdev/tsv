@@ -10,7 +10,10 @@ use tsv_cli::cli::input::ParserType;
     clippy::panic,
     reason = "a helper's assertion, not reached by clippy's in-test allowance"
 )]
-pub fn format_via_formatter(source: &str, parser: ParserType) -> Result<String, tsv_lang::Error> {
+pub(crate) fn format_via_formatter(
+    source: &str,
+    parser: ParserType,
+) -> Result<String, tsv_lang::Error> {
     let twice = |format: &mut dyn FnMut(&str) -> Result<String, tsv_lang::Error>| {
         let cold = format(source);
         let warm = format(source);

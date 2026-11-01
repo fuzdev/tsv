@@ -71,47 +71,47 @@ pub(crate) struct Bindings<'arena> {
 }
 
 impl<'arena> Bindings<'arena> {
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
             map: HashMap::new(),
         }
     }
 
-    pub fn get(&self, name: &str) -> Option<&Binding<'arena>> {
+    pub(crate) fn get(&self, name: &str) -> Option<&Binding<'arena>> {
         self.map.get(name)
     }
 
     /// Whether a top-level binding by this name exists (block-name collision
     /// guard).
-    pub fn contains(&self, name: &str) -> bool {
+    pub(crate) fn contains(&self, name: &str) -> bool {
         self.map.contains_key(name)
     }
 
     /// The top-level binding names (snippet-hoist instance-binding set).
-    pub fn names(&self) -> impl Iterator<Item = &str> {
+    pub(crate) fn names(&self) -> impl Iterator<Item = &str> {
         self.map.keys().map(String::as_str)
     }
 
     /// Whether this binding is a `$props()` destructure (render-callee dynamic
     /// classification: a prop callee is dynamic, so its render tag is not
     /// standalone).
-    pub fn is_prop(&self, name: &str) -> bool {
+    pub(crate) fn is_prop(&self, name: &str) -> bool {
         self.map
             .get(name)
             .is_some_and(|b| b.kind == BindingKind::Prop)
     }
 
-    pub fn insert(&mut self, name: String, binding: Binding<'arena>) {
+    pub(crate) fn insert(&mut self, name: String, binding: Binding<'arena>) {
         self.map.insert(name, binding);
     }
 
-    pub fn mark_updated(&mut self, name: &str) {
+    pub(crate) fn mark_updated(&mut self, name: &str) {
         if let Some(binding) = self.map.get_mut(name) {
             binding.updated = true;
         }
     }
 
-    pub fn mark_opaque(&mut self, name: &str) {
+    pub(crate) fn mark_opaque(&mut self, name: &str) {
         if let Some(binding) = self.map.get_mut(name) {
             binding.kind = BindingKind::Opaque;
         }
@@ -209,7 +209,7 @@ impl Evaluation {
     }
 
     /// `is_known`: exactly one possible value and it is concrete.
-    pub fn known_value(&self) -> Option<&Value> {
+    pub(crate) fn known_value(&self) -> Option<&Value> {
         match self.values.as_slice() {
             [Entry::Value(v)] => Some(v),
             _ => None,
@@ -219,7 +219,7 @@ impl Evaluation {
     /// The oracle's `is_string && is_defined` (drives `$.stringify` omission in
     /// attribute templates): every possible value is a string (or the STRING
     /// sentinel) and none is nullish/UNKNOWN.
-    pub fn is_defined_string(&self) -> bool {
+    pub(crate) fn is_defined_string(&self) -> bool {
         self.values
             .iter()
             .all(|e| matches!(e, Entry::Value(Value::Str(_)) | Entry::StringSentinel))
@@ -1125,7 +1125,7 @@ pub(crate) enum Resolved<'a, 'arena> {
 }
 
 impl<'a, 'arena> Scope<'a, 'arena> {
-    pub fn resolve(&self, name: &str) -> Resolved<'a, 'arena> {
+    pub(crate) fn resolve(&self, name: &str) -> Resolved<'a, 'arena> {
         for overlay in self.overlays.iter().rev() {
             match overlay.get(name) {
                 Some(ScopeEntry::Masked) => return Resolved::Masked,
@@ -1141,7 +1141,7 @@ impl<'a, 'arena> Scope<'a, 'arena> {
 
     /// Whether `name` resolves to anything local (overlay or table) — the
     /// global-keypath test (a rune/global root must be unresolved).
-    pub fn is_local(&self, name: &str) -> bool {
+    pub(crate) fn is_local(&self, name: &str) -> bool {
         !matches!(self.resolve(name), Resolved::None)
     }
 }

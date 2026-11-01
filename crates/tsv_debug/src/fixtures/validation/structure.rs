@@ -11,7 +11,7 @@ use crate::fixtures::{
 
 /// The number of S-rules [`validate_fixture_structure`] checks (S1–S24), reported on
 /// success.
-pub const STRUCTURE_RULE_COUNT: usize = 24;
+pub(super) const STRUCTURE_RULE_COUNT: usize = 24;
 
 /// Validate fixture structure and conventions
 ///
@@ -67,7 +67,10 @@ pub const STRUCTURE_RULE_COUNT: usize = 24;
 /// D1 — README.md required for divergences — is deliberately **not** here: it is the
 /// one rule that says nothing about the file set, so it must not short-circuit the
 /// claim phases. See [`validate_divergence_readme`].
-pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Result<(), String> {
+pub(super) fn validate_fixture_structure(
+    fixture: &Fixture,
+    files: &FixtureFiles,
+) -> Result<(), String> {
     let fixture_dir = &fixture.path;
 
     // Get input type (validates that it's a known type)
@@ -774,7 +777,10 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
 /// Both spellings of the rule live here, so the tsv_rejects branch cannot drift: that
 /// fixture's whole claim is two live checks ([`super::phases::validate_tsv_rejects`] and
 /// its canonical sibling), which the same early return was hiding.
-pub fn validate_divergence_readme(fixture: &Fixture, files: &FixtureFiles) -> Option<String> {
+pub(super) fn validate_divergence_readme(
+    fixture: &Fixture,
+    files: &FixtureFiles,
+) -> Option<String> {
     if fixture.path.join("README.md").exists() {
         return None;
     }

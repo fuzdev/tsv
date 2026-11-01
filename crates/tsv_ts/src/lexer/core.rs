@@ -198,7 +198,7 @@ enum TemplateStop {
 /// [`Lexer::checkpoint`] and restored by [`Lexer::rewind`]. Opaque: only the lexer
 /// reads it, and only to put itself back.
 #[derive(Clone, Copy)]
-pub struct LexerCheckpoint {
+pub(crate) struct LexerCheckpoint {
     position: usize,
     template_depth: u32,
     had_line_terminator: bool,
@@ -209,7 +209,7 @@ pub struct LexerCheckpoint {
     nonplain_ident_starts: [u32; 2],
 }
 
-pub struct Lexer<'a> {
+pub(crate) struct Lexer<'a> {
     source: &'a str,
     /// The source as raw bytes (`source.as_bytes()`), cached so the hot dispatch
     /// peeks a byte without re-deriving the slice. Char decoding (non-ASCII branches)
@@ -397,7 +397,7 @@ impl<'a> Lexer<'a> {
     /// silent zero is the failure mode: a slice lexer that reports its own coordinates
     /// hands the renderer a position it reads as the document's, pointing the caret at an
     /// unrelated line.
-    pub fn at_offset(source: &'a str, base_offset: usize) -> Self {
+    pub(crate) fn at_offset(source: &'a str, base_offset: usize) -> Self {
         let bytes = source.as_bytes();
         // Skip UTF-8 BOM (U+FEFF) at start of file if present.
         // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
@@ -477,7 +477,7 @@ impl<'a> Lexer<'a> {
     /// it), so the parser copies it into its AST arena immediately after each lex
     /// (`Parser::decoded_to_arena`) rather than holding the borrow.
     #[inline]
-    pub fn decoded_str(&self) -> Option<&str> {
+    pub(crate) fn decoded_str(&self) -> Option<&str> {
         if self.has_decoded {
             Some(&self.decode_scratch)
         } else {
@@ -490,7 +490,7 @@ impl<'a> Lexer<'a> {
     /// parser's current token and for its one lookahead token — see
     /// `nonplain_ident_starts` for why two slots suffice and what would break it.
     #[inline]
-    pub fn ident_is_plain_ascii(&self, start: u32) -> bool {
+    pub(crate) fn ident_is_plain_ascii(&self, start: u32) -> bool {
         let [k0, k1] = self.nonplain_ident_starts;
         start != k0 && start != k1
     }
@@ -511,7 +511,7 @@ impl<'a> Lexer<'a> {
 
     /// Returns true if a line terminator was encountered while skipping to the current token.
     /// Used for ASI (Automatic Semicolon Insertion).
-    pub fn had_line_terminator(&self) -> bool {
+    pub(crate) fn had_line_terminator(&self) -> bool {
         self.had_line_terminator
     }
 
@@ -520,7 +520,7 @@ impl<'a> Lexer<'a> {
     /// takes it before the tokens it may have to un-read. Everything a token advances
     /// except the decode scratch, which the rewind marks stale instead (see `rewind`).
     #[must_use]
-    pub fn checkpoint(&self) -> LexerCheckpoint {
+    pub(crate) fn checkpoint(&self) -> LexerCheckpoint {
         LexerCheckpoint {
             position: self.position,
             template_depth: self.template_depth,
@@ -534,7 +534,7 @@ impl<'a> Lexer<'a> {
     /// absent: the parser drains a decoded value into its arena at the lex that
     /// produced it, so nothing reads the scratch for a token it did not just lex,
     /// and the next token-producing call resets the flag either way.
-    pub fn rewind(&mut self, checkpoint: LexerCheckpoint) {
+    pub(crate) fn rewind(&mut self, checkpoint: LexerCheckpoint) {
         let LexerCheckpoint {
             position,
             template_depth,
@@ -550,7 +550,7 @@ impl<'a> Lexer<'a> {
 
     /// Seek to a specific position and re-lex from there.
     /// Used when splitting compound tokens like `>=` into `>` + `=`.
-    pub fn seek_and_next_token(&mut self, position: usize) -> Result<Token, Error> {
+    pub(crate) fn seek_and_next_token(&mut self, position: usize) -> Result<Token, Error> {
         self.set_position(position);
         self.next_token()
     }
@@ -1262,7 +1262,7 @@ impl<'a> Lexer<'a> {
     /// The error path is lifted into host coordinates here, at the producer
     /// ([`Lexer::host_err`]); the scan itself works in — and reports in — the lexer's own.
     #[inline]
-    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), Error> {
+    pub(crate) fn next_token_into(&mut self, dst: &mut Token) -> Result<(), Error> {
         self.has_decoded = false;
         self.had_line_terminator = false;
         self.next_token_into_local(dst)
@@ -1751,7 +1751,7 @@ impl<'a> Lexer<'a> {
     /// [`Lexer::seek_and_next_token`]'s compound-token split), and `debug_token_stream`.
     /// The advance path and `Parser::prime` use [`Lexer::next_token_into`] to write the
     /// parser's current token in place.
-    pub fn next_token(&mut self) -> Result<Token, Error> {
+    pub(crate) fn next_token(&mut self) -> Result<Token, Error> {
         let mut tok = Token {
             kind: TokenKind::Eof,
             start: 0,
@@ -1883,7 +1883,10 @@ impl<'a> Lexer<'a> {
     ///
     /// A producer, so it lifts its error into host coordinates ([`Lexer::host_err`]).
     #[inline]
-    pub fn read_regex_literal(&mut self, slash_start: usize) -> Result<(Token, usize), Error> {
+    pub(crate) fn read_regex_literal(
+        &mut self,
+        slash_start: usize,
+    ) -> Result<(Token, usize), Error> {
         self.read_regex_literal_local(slash_start)
             .map_err(|err| self.host_err(err))
     }
@@ -2022,7 +2025,10 @@ impl<'a> Lexer<'a> {
     ///
     /// A producer, so it lifts its error into host coordinates ([`Lexer::host_err`]).
     #[inline]
-    pub fn continue_template_from_brace(&mut self, brace_end: usize) -> Result<Token, Error> {
+    pub(crate) fn continue_template_from_brace(
+        &mut self,
+        brace_end: usize,
+    ) -> Result<Token, Error> {
         self.continue_template_from_brace_local(brace_end)
             .map_err(|err| self.host_err(err))
     }

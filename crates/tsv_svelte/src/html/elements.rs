@@ -190,7 +190,7 @@ element_set! {
 /// `<xmp>` render as blocks but format inline, as in the plugin. Everything outside the set
 /// formats as inline, table cells included (prettier's `isInlineElement = !isBlockElement`).
 #[inline]
-pub fn is_block_element(tag_name: &str) -> bool {
+pub(crate) fn is_block_element(tag_name: &str) -> bool {
     shape_admits(&BLOCK_SHAPE, tag_name) && block_set_contains(tag_name)
 }
 
@@ -201,7 +201,7 @@ pub fn is_block_element(tag_name: &str) -> bool {
 /// Elements only: a `<!doctype>` declaration is not one, though Svelte's own `is_void` answers
 /// `true` for it.
 #[inline]
-pub fn is_void_element(tag_name: &str) -> bool {
+pub(crate) fn is_void_element(tag_name: &str) -> bool {
     shape_admits(&VOID_SHAPE, tag_name) && void_set_contains(tag_name)
 }
 
@@ -222,7 +222,7 @@ pub fn is_void_element(tag_name: &str) -> bool {
 /// [br]: https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-br-element
 /// [wbr]: https://html.spec.whatwg.org/multipage/text-level-semantics.html#the-wbr-element
 #[inline]
-pub fn is_line_break_element(tag_name: &str) -> bool {
+pub(crate) fn is_line_break_element(tag_name: &str) -> bool {
     tag_name == "br"
 }
 
@@ -238,7 +238,7 @@ pub fn is_line_break_element(tag_name: &str) -> bool {
 /// element — is a namespace-level rule the caller applies, not a tag-name question, so it is not
 /// covered here.
 #[inline]
-pub fn collapses_child_whitespace(tag_name: &str) -> bool {
+pub(crate) fn collapses_child_whitespace(tag_name: &str) -> bool {
     matches!(
         tag_name,
         "select" | "table" | "tbody" | "thead" | "tfoot" | "tr" | "colgroup" | "datalist"
@@ -267,7 +267,7 @@ pub fn is_mathml_element(tag_name: &str) -> bool {
 /// ([`is_mathml_element`]) element — by name alone, so `title` answers `true` and `a`,
 /// `script` and `style` answer `false`, as those two do.
 #[inline]
-pub fn is_foreign_element(tag_name: &str) -> bool {
+pub(crate) fn is_foreign_element(tag_name: &str) -> bool {
     is_svg_element(tag_name) || is_mathml_element(tag_name)
 }
 

@@ -132,7 +132,7 @@ impl<'a> ValueParser<'a> {
     /// ```ignore
     /// let parser = ValueParser::new("red, blue", Span { start: 50, end: 59 });
     /// ```
-    pub fn new(source: &'a str, base_span: Span) -> Self {
+    pub(crate) fn new(source: &'a str, base_span: Span) -> Self {
         Self::new_within(source, base_span, false)
     }
 
@@ -141,7 +141,7 @@ impl<'a> ValueParser<'a> {
     /// being a node to postcss. It is the source of both per-range flags and is not kept:
     /// a group's interior is where a `:` stands as an operator, and is where a head `+`
     /// does NOT weld.
-    pub fn new_within(source: &'a str, base_span: Span, in_group: bool) -> Self {
+    pub(crate) fn new_within(source: &'a str, base_span: Span, in_group: bool) -> Self {
         Self {
             source,
             start: 0,
@@ -155,7 +155,7 @@ impl<'a> ValueParser<'a> {
     /// [`Self::new`] for a **custom property's** whole value, the other range where a `:`
     /// is a value operator (see [`Self::colon_is_operator`]). Its head welds and its `(`
     /// is no node, so it is a top-level value in every other respect.
-    pub fn new_custom_property(source: &'a str, base_span: Span) -> Self {
+    pub(crate) fn new_custom_property(source: &'a str, base_span: Span) -> Self {
         Self {
             colon_is_operator: true,
             ..Self::new(source, base_span)
@@ -278,7 +278,7 @@ impl<'a> ValueParser<'a> {
     /// ASCII-whitespace boundary comes off (identical to what the fast path would
     /// produce) while a non-ASCII space (NBSP, em space) is kept as leaf content,
     /// never dropped.
-    pub fn parse<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
+    pub(crate) fn parse<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         self.parse_classified(arena, None)
     }
 

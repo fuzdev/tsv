@@ -14,7 +14,7 @@ use tsv_lang::Span;
 /// this is the single buffer every [`ChainGroup`] is a sub-slice of — as is the
 /// peeled trailing member tail, which is named as a pair of runs over it rather
 /// than collected into a second buffer (`builder::TailRuns`).
-pub type ChainNodeVec<'a> = SmallVec<[ChainNode<'a>; 8]>;
+pub(crate) type ChainNodeVec<'a> = SmallVec<[ChainNode<'a>; 8]>;
 
 /// Stack-friendly buffer for the grouped chain — `group_chain_nodes` builds this
 /// once per chain. A [`ChainGroup`] is two words (a borrowed sub-slice), so the
@@ -22,13 +22,13 @@ pub type ChainNodeVec<'a> = SmallVec<[ChainNode<'a>; 8]>;
 /// (`a.b().c()` and friends) is common in real code — a two-call chain is already
 /// 3 groups — so `4` keeps the common shapes on the stack while the genuinely long
 /// chains, which break anyway, spill to the heap.
-pub type ChainGroupVec<'a> = SmallVec<[ChainGroup<'a>; 4]>;
+pub(crate) type ChainGroupVec<'a> = SmallVec<[ChainGroup<'a>; 4]>;
 
 /// Stack-friendly buffer of chain-node references — for the member-only and
 /// base-call flatten passes that collect `&ChainNode` before printing. `8` covers
 /// the common short chain inline; longer chains spill. `'n` is the (short) borrow
 /// of the `ChainGroup` slice; `'a` is the AST lifetime the nodes point into.
-pub type ChainNodeRefVec<'n, 'a> = SmallVec<[&'n ChainNode<'a>; 8]>;
+pub(super) type ChainNodeRefVec<'n, 'a> = SmallVec<[&'n ChainNode<'a>; 8]>;
 
 /// The facts about one call LINK that only the chain can supply — the link's own printer
 /// has no parent pointer and cannot see any of them.
@@ -45,7 +45,7 @@ pub type ChainNodeRefVec<'n, 'a> = SmallVec<[&'n ChainNode<'a>; 8]>;
 /// The link's `?.` is deliberately NOT here: it is `call.optional`, readable from the node's
 /// own `call`, and a second copy is a flag with two producers that can only ever disagree.
 #[derive(Debug, Clone, Copy)]
-pub struct ChainCall {
+pub(crate) struct ChainCall {
     /// This call keeps `printCallExpression`'s own layout rules — it is not a link the
     /// member-chain redirect swallowed. Set by `mark_own_call_layout` after linearization;
     /// `new` seeds it `true`, the value for a chain nothing entered.
@@ -62,7 +62,7 @@ pub struct ChainCall {
 
 impl ChainCall {
     /// A link's facts before the chain-wide passes decide them.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             own_call_layout: true,
             ungroup_args: false,
@@ -75,7 +75,7 @@ impl ChainCall {
 /// Each variant contains exactly the data it needs - no optional fields.
 /// This makes invalid states unrepresentable.
 #[derive(Debug, Clone, Copy)]
-pub enum ChainNode<'a> {
+pub(crate) enum ChainNode<'a> {
     /// Base expression: identifier, literal, complex expr in parens
     ///
     /// `paren_comment_end`, when `Some`, marks the end of the region (just past the
@@ -160,7 +160,7 @@ pub enum ChainNode<'a> {
 /// The two arms are a partition of one region, so exactly one emitter prints its
 /// comments — deliberately not a "someone else claimed this" flag.
 #[derive(Debug, Clone, Copy)]
-pub enum NonNullGap {
+pub(crate) enum NonNullGap {
     /// The region belongs to the `!`, which prints its comments just before
     /// itself: `aaa /* c */!.bbb`. `operand_end` is where the operand expression
     /// ends; `bang_end` is just past the `!`.
@@ -188,13 +188,13 @@ pub enum NonNullGap {
 /// (`computed_lookup_doc`), and `printMemberChain` (member-chain.js) lets a numeric lookup
 /// ride along in the current group where a non-numeric one opens a new one
 /// (`is_numeric_accessor`, used by `group_chain_nodes`).
-pub fn is_numeric_index(expr: &ast::Expression<'_>) -> bool {
+pub(super) fn is_numeric_index(expr: &ast::Expression<'_>) -> bool {
     matches!(&expr.kind, ast::ExpressionKind::Literal(lit) if matches!(lit.value, LiteralValue::Number(_)))
 }
 
 impl<'a> ChainNode<'a> {
     /// Create a new base node
-    pub fn base(expr: &'a ast::Expression<'a>, needs_parens: bool) -> Self {
+    pub(crate) fn base(expr: &'a ast::Expression<'a>, needs_parens: bool) -> Self {
         Self::Base {
             expr,
             needs_parens,
@@ -208,7 +208,7 @@ impl<'a> ChainNode<'a> {
     /// optional chain reached without a `!` (`( // c⏎a?.b).ddd`,
     /// `( // c⏎a?.b)()`). `paren_leading_start` is the `(`, i.e. the enclosing
     /// member/call node's own start.
-    pub fn sealed_base(expr: &'a ast::Expression<'a>, paren_leading_start: u32) -> Self {
+    pub(crate) fn sealed_base(expr: &'a ast::Expression<'a>, paren_leading_start: u32) -> Self {
         Self::Base {
             expr,
             needs_parens: true,
@@ -225,7 +225,7 @@ impl<'a> ChainNode<'a> {
     /// bounds the region to scan for a trailing comment from the parens, emitted
     /// inside them before `)` — the scan may find nothing (a comment-free sealed
     /// chain), in which case the printer renders bare parens.
-    pub fn paren_base_before_non_null(
+    pub(crate) fn paren_base_before_non_null(
         expr: &'a ast::Expression<'a>,
         paren_leading_start: u32,
         paren_comment_end: u32,
@@ -240,7 +240,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Create a new call node
-    pub fn call(call: &'a ast::CallExpression<'a>, span: Span) -> Self {
+    pub(crate) fn call(call: &'a ast::CallExpression<'a>, span: Span) -> Self {
         Self::Call {
             call,
             span,
@@ -249,7 +249,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Create a new member node
-    pub fn member(
+    pub(crate) fn member(
         property: IdentName<'a>,
         optional: bool,
         object_end: u32,
@@ -265,7 +265,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Create a new private member node: .#prop
-    pub fn private_member(
+    pub(crate) fn private_member(
         property: IdentName<'a>,
         optional: bool,
         object_end: u32,
@@ -283,7 +283,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Create a new computed member node
-    pub fn computed_member(
+    pub(crate) fn computed_member(
         expr: &'a ast::Expression<'a>,
         optional: bool,
         object_end: u32,
@@ -302,7 +302,7 @@ impl<'a> ChainNode<'a> {
     ///
     /// The bounds are derived here rather than at the call sites, so the two
     /// linearization entry points cannot hand the node different ones.
-    pub fn non_null(non_null: &ast::TSNonNullExpression<'_>, span: Span) -> Self {
+    pub(crate) fn non_null(non_null: &ast::TSNonNullExpression<'_>, span: Span) -> Self {
         Self::NonNull {
             gap: NonNullGap::Bang {
                 operand_end: non_null.expression.span().end,
@@ -312,25 +312,25 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Create a new non-null node whose region a parenthesized operand keeps
-    pub fn non_null_after_paren_operand() -> Self {
+    pub(crate) fn non_null_after_paren_operand() -> Self {
         Self::NonNull {
             gap: NonNullGap::InsideOperandParens,
         }
     }
 
     /// Check if this is a call node
-    pub const fn is_call(&self) -> bool {
+    pub(crate) const fn is_call(&self) -> bool {
         matches!(self, Self::Call { .. })
     }
 
     /// Whether this is a call whose argument list prints without its own group
     /// ([`ChainCall::ungroup_args`]).
-    pub const fn ungroups_args(&self) -> bool {
+    pub(crate) const fn ungroups_args(&self) -> bool {
         matches!(self, Self::Call { facts, .. } if facts.ungroup_args)
     }
 
     /// Check if this is a member node (including computed)
-    pub const fn is_member(&self) -> bool {
+    pub(crate) const fn is_member(&self) -> bool {
         matches!(
             self,
             Self::Member { .. } | Self::PrivateMember { .. } | Self::ComputedMember { .. }
@@ -341,7 +341,7 @@ impl<'a> ChainNode<'a> {
     /// own (prettier's `printMemberExpression` gives each a `group(indent([softline,
     /// lookup]))`), as opposed to a computed `[i]`, which its `shouldInline` glues
     /// (`node.computed`) and which sheds width inside its own brackets.
-    pub const fn is_dot_lookup(&self) -> bool {
+    pub(crate) const fn is_dot_lookup(&self) -> bool {
         matches!(self, Self::Member { .. } | Self::PrivateMember { .. })
     }
 
@@ -353,7 +353,7 @@ impl<'a> ChainNode<'a> {
     /// of its own but is never one of them: the `!` binds under `[no LineTerminator
     /// here]`, so a break before it is a syntax error and the node prints that region
     /// itself (see [`NonNullGap`]).
-    pub fn comment_range(&self) -> Option<(u32, u32)> {
+    pub(crate) fn comment_range(&self) -> Option<(u32, u32)> {
         match self {
             Self::Member {
                 object_end,
@@ -387,7 +387,7 @@ impl<'a> ChainNode<'a> {
     ///
     /// Deliberately not applied to the *layout* predicates, which keep asking the whole
     /// widened range: a comment anywhere in it still occupies the page here.
-    pub const fn paren_gap_skip(&self) -> Option<Span> {
+    pub(crate) const fn paren_gap_skip(&self) -> Option<Span> {
         match self {
             Self::Member { paren_gap_skip, .. }
             | Self::PrivateMember { paren_gap_skip, .. }
@@ -397,7 +397,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Check if this is a non-null node
-    pub const fn is_non_null(&self) -> bool {
+    pub(crate) const fn is_non_null(&self) -> bool {
         matches!(self, Self::NonNull { .. })
     }
 
@@ -409,7 +409,7 @@ impl<'a> ChainNode<'a> {
     /// optional — exactly the nesting the public AST wraps. Read by
     /// [`super::inline_lookups::resolve_inline_lookups`], where that wrapper stops two
     /// of prettier's `shouldInline` ancestor walks.
-    pub const fn is_optional_link(&self) -> bool {
+    pub(crate) const fn is_optional_link(&self) -> bool {
         match self {
             Self::Member { optional, .. }
             | Self::PrivateMember { optional, .. }
@@ -420,17 +420,17 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Check if this is a numeric computed accessor like `[0]`, `[1]`
-    pub fn is_numeric_accessor(&self) -> bool {
+    pub(crate) fn is_numeric_accessor(&self) -> bool {
         matches!(self, Self::ComputedMember { expr, .. } if is_numeric_index(expr))
     }
 
     /// Check if this is a computed member access
-    pub const fn is_computed(&self) -> bool {
+    pub(crate) const fn is_computed(&self) -> bool {
         matches!(self, Self::ComputedMember { .. })
     }
 
     /// Get the property name channel (+ its span start) for Member nodes
-    pub const fn property(&self) -> Option<(IdentName<'a>, u32)> {
+    pub(crate) const fn property(&self) -> Option<(IdentName<'a>, u32)> {
         match self {
             Self::Member {
                 property,
@@ -442,7 +442,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Get the CallExpression if this is a Call node
-    pub fn as_call_expression(&self) -> Option<&'a ast::CallExpression<'a>> {
+    pub(crate) fn as_call_expression(&self) -> Option<&'a ast::CallExpression<'a>> {
         if let Self::Call { call, .. } = self {
             Some(call)
         } else {
@@ -465,13 +465,13 @@ impl<'a> ChainNode<'a> {
 /// lifetime it points into shortens to it at the call site and one parameter
 /// covers both.
 #[derive(Debug, Clone, Copy)]
-pub struct ChainGroup<'a> {
+pub(crate) struct ChainGroup<'a> {
     pub nodes: &'a [ChainNode<'a>],
 }
 
 impl<'a> ChainGroup<'a> {
     /// The view of `nodes` this group covers.
-    pub fn new(nodes: &'a [ChainNode<'a>]) -> Self {
+    pub(crate) fn new(nodes: &'a [ChainNode<'a>]) -> Self {
         Self { nodes }
     }
 }

@@ -51,7 +51,7 @@ const WINDOWS_1252: [u32; 32] = [
 /// Where a run of text whose character references are decoded sits — the one fact about
 /// it [`decode_character_references`] reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ReferenceContext {
+pub(crate) enum ReferenceContext {
     /// Text content: every valid reference is decoded.
     Text,
     /// An attribute value: a named reference without its `;` is decoded only when not
@@ -77,7 +77,7 @@ pub enum ReferenceContext {
 /// attribute-value boundary above is ASCII alphanumeric (not the word class of JS's `\b`,
 /// which adds `_`), every other code point is emitted as itself (Svelte drops some planes
 /// to NUL), and a name that stands for two code points emits both.
-pub fn decode_character_references(html: &str, context: ReferenceContext) -> Cow<'_, str> {
+pub(crate) fn decode_character_references(html: &str, context: ReferenceContext) -> Cow<'_, str> {
     // No `&`, no reference: the text is its own decode, borrowed.
     let Some(first) = html.find('&') else {
         return Cow::Borrowed(html);

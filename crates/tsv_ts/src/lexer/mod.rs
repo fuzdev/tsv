@@ -5,8 +5,8 @@
 
 mod comments;
 mod core;
-pub mod escapes;
-pub mod ident;
+pub(crate) mod escapes;
+pub(crate) mod ident;
 mod token;
 
 // Re-export public API
@@ -14,6 +14,6 @@ pub(crate) use core::{
     ES_LINE_TERMINATOR_LEADS, is_es_line_terminator, is_es_line_terminator_at, is_es_whitespace,
     unicode_escape_len_at,
 };
-pub use core::{Lexer, LexerCheckpoint};
+pub(crate) use core::{Lexer, LexerCheckpoint};
 pub(crate) use token::keyword_at;
-pub use token::{KeywordKind, Token, TokenKind};
+pub(crate) use token::{KeywordKind, Token, TokenKind};

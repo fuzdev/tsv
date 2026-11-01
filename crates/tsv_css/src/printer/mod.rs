@@ -28,7 +28,7 @@ pub(crate) use boundary_ws::source_holds_boundary_ws;
 mod declarations;
 mod rules;
 mod selectors;
-pub mod value_normalization;
+pub(crate) mod value_normalization;
 mod values;
 
 use crate::ast::{Comment, CssBlockChild, CssDeclaration, CssNode, CssStyleSheet};

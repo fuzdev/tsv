@@ -38,7 +38,7 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 /// Prettier tuned it empirically until output "looked right".
 ///
 /// Reference: prettier/src/language-js/print/assignment.js
-pub const MIN_OVERLAP_FOR_BREAK: usize = 3;
+pub(crate) const MIN_OVERLAP_FOR_BREAK: usize = 3;
 
 /// Assignment layout strategies (matches prettier's chooseLayout return values)
 ///
@@ -46,7 +46,7 @@ pub const MIN_OVERLAP_FOR_BREAK: usize = 3;
 /// via context passing, not through this unified layout system. Chain formatting requires
 /// parent context tracking which doesn't fit the "key: value" model used here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AssignmentLayout {
+pub(crate) enum AssignmentLayout {
     /// Break after operator, then RHS is indented
     /// Structure: group([left, op, indent([line, right])])
     BreakAfterOperator,
@@ -75,7 +75,7 @@ pub enum AssignmentLayout {
 /// The two facts are mutually exclusive — a property key is never a destructuring
 /// pattern — so they are one parameter rather than two bools that could both be set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AssignmentLeft {
+pub(crate) enum AssignmentLeft {
     /// Nothing the layout keys on.
     Plain,
 
@@ -96,7 +96,7 @@ impl AssignmentLeft {
     /// The object-literal property's spelling: `ShortKey` when its key is short enough
     /// for prettier's `isObjectPropertyWithShortKey`, `Plain` otherwise. A property key
     /// is never a destructuring pattern, so this is the whole of that caller's answer.
-    pub fn short_key(is_short_key: bool) -> Self {
+    pub(crate) fn short_key(is_short_key: bool) -> Self {
         if is_short_key {
             Self::ShortKey
         } else {
@@ -170,7 +170,7 @@ impl<'a> Printer<'a> {
 /// reached (a short key, or a simple value) — see [`Printer::build_assignment_layout`].
 /// Prettier computes `canBreakLeftDoc` eagerly; on a real corpus two thirds of those
 /// answers went unread, a doc walk apiece.
-pub fn choose_layout(
+pub(crate) fn choose_layout(
     right_expr: &Expression<'_>,
     left: AssignmentLeft,
     can_break_left: bool,
@@ -298,7 +298,7 @@ pub fn should_inline_logical_expression(binary: &ast::BinaryExpression<'_>) -> b
 /// Examples that stay inline:
 ///   const f = (x: T) => (y) => expr       // an annotated identifier is still simple
 ///   const f = (): H => (y) => expr        // a return type with no parameters
-pub fn is_curried_arrow_chain_that_breaks(expr: &Expression<'_>) -> bool {
+pub(crate) fn is_curried_arrow_chain_that_breaks(expr: &Expression<'_>) -> bool {
     is_curried_arrow_chain(expr)
         && matches!(&expr.kind, ExpressionKind::ArrowFunctionExpression(arrow) if arrow_chain_should_break(arrow))
 }
@@ -308,7 +308,7 @@ pub fn is_curried_arrow_chain_that_breaks(expr: &Expression<'_>) -> bool {
 /// ([`is_curried_arrow_chain_that_breaks`], which the seam breaks for instead). Such a chain
 /// takes the fluid layout and prints the operator→value gap's run behind its own softline
 /// ([`Printer::build_led_curried_chain_doc`]).
-pub fn is_curried_arrow_chain_owning_break(expr: &Expression<'_>) -> bool {
+pub(crate) fn is_curried_arrow_chain_owning_break(expr: &Expression<'_>) -> bool {
     is_curried_arrow_chain(expr) && !is_curried_arrow_chain_that_breaks(expr)
 }
 
@@ -316,7 +316,7 @@ pub fn is_curried_arrow_chain_owning_break(expr: &Expression<'_>) -> bool {
 /// arrow). The terminal body may be an expression or a block. Used to route the
 /// assignment RHS through the arrow-chain layout regardless of whether any head
 /// triggers the chain break.
-pub fn is_curried_arrow_chain(expr: &Expression<'_>) -> bool {
+pub(crate) fn is_curried_arrow_chain(expr: &Expression<'_>) -> bool {
     if let ExpressionKind::ArrowFunctionExpression(arrow) = &expr.kind {
         matches!(
             &arrow.body,
@@ -343,7 +343,7 @@ pub fn is_curried_arrow_chain(expr: &Expression<'_>) -> bool {
 /// declines on it is the assignment RHS, where `choose_layout` answers the same question
 /// with `AssignmentLayout::BreakAfterOperator` and so renders the break itself — see
 /// `should_use_arrow_chain_layout`.
-pub fn arrow_chain_should_break(arrow: &ast::ArrowFunctionExpression<'_>) -> bool {
+pub(crate) fn arrow_chain_should_break(arrow: &ast::ArrowFunctionExpression<'_>) -> bool {
     // Check this arrow for breaking conditions:
     // 1. return_type AND has params
     // 2. type_params (generics)
@@ -388,7 +388,7 @@ pub fn arrow_chain_should_break(arrow: &ast::ArrowFunctionExpression<'_>) -> boo
 /// Note: prettier does NOT include RegexLiteral here. Regex falls through to Fluid layout,
 /// which produces the same output since regex can't break internally — the declarator twin
 /// names it outright to reach the same place.
-pub fn should_break_after_operator(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
+pub(crate) fn should_break_after_operator(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
     // Unwrap wrapper expressions to get to the core
     let core_expr = unwrap_expression(expr);
 
@@ -623,7 +623,7 @@ impl Printer<'_> {
 /// comments via `call_arg_has_comments`, complex type args).
 ///
 /// We have `DocArena::will_break()` infrastructure if a real gap ever surfaces.
-pub fn is_poorly_breakable_chain(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
+pub(crate) fn is_poorly_breakable_chain(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
     let walk = PoorlyBreakableWalk {
         printer,
         // A member-gap comment only withholds the operator break on a chain prettier
@@ -925,7 +925,7 @@ fn call_arg_has_comments(
 /// Used for break-after-operator layout decisions: when a type assertion call has long args,
 /// we break after `=` instead of inside the call. If the call has short/trivial args, the
 /// type annotation can break instead.
-pub fn is_type_assertion_call(expr: &Expression<'_>, source: &str) -> bool {
+pub(crate) fn is_type_assertion_call(expr: &Expression<'_>, source: &str) -> bool {
     let call = match &expr.kind {
         ExpressionKind::TSAsExpression(as_expr) => match &as_expr.expression.kind {
             ExpressionKind::CallExpression(call) => call,
@@ -967,7 +967,7 @@ fn is_member_only_chain(mut expr: &Expression<'_>) -> bool {
 /// UNDECORATED class is on the list because a decorated one never reaches it: prettier's
 /// `shouldBreakAfterOperator` answers it first, as both of tsv's layout twins do
 /// (`class_expr_has_decorators`).
-pub fn is_simple_value(expr: &Expression<'_>) -> bool {
+pub(crate) fn is_simple_value(expr: &Expression<'_>) -> bool {
     matches!(
         &expr.kind,
         ExpressionKind::Literal(lit) if matches!(
@@ -987,7 +987,7 @@ pub fn is_simple_value(expr: &Expression<'_>) -> bool {
 /// Bundles the inputs describing comments, the value-head freeze and grouping-paren
 /// boundaries around the RHS, so the layout entry point takes one value instead of
 /// four loose args.
-pub struct RhsCommentInfo {
+pub(crate) struct RhsCommentInfo {
     /// Inline comments between the operator and the RHS (e.g. `x = /** @type {T} */ (e)`);
     /// `None` when the caller handles comments separately.
     pub comments: Option<DocId>,
@@ -1030,7 +1030,7 @@ impl RhsCommentInfo {
     /// range it was taken over are one fact, and a second copy is a second answer waiting to
     /// drift. `false` where there is no gap, which is exactly right — a gap with no comments
     /// has no comment leading the RHS.
-    pub fn indentable_leads_value(&self) -> bool {
+    pub(crate) fn indentable_leads_value(&self) -> bool {
         self.gap.is_some_and(|gap| gap.indentable_leads_value)
     }
 
@@ -1039,7 +1039,7 @@ impl RhsCommentInfo {
     ///
     /// ⚠️ Only for a caller whose gap is provably comment-free **on page** — see the
     /// [`RhsCommentInfo::gap`] field, whose `None` this produces.
-    pub fn frozen_only(frozen: Option<Span>) -> Self {
+    pub(crate) fn frozen_only(frozen: Option<Span>) -> Self {
         Self {
             comments: None,
             has_line_comment: false,
@@ -1080,7 +1080,7 @@ impl<'a> Printer<'a> {
     /// `operator` is the operator's doc (`:`, ` =`, ` +=`, …), built by the caller where
     /// its spelling is a literal — a constant there, where a `&'static str` threaded down
     /// to this one `text()` site would be a runtime match at every layout.
-    pub fn build_assignment_layout(
+    pub(crate) fn build_assignment_layout(
         &self,
         left_doc: DocId,
         operator: DocId,

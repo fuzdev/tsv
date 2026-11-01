@@ -7,7 +7,7 @@ use serde_json::Value;
 
 /// Request sent to the Deno sidecar (JSON-lines over stdin)
 #[derive(Debug, Serialize)]
-pub struct WireRequest {
+pub(super) struct WireRequest {
     pub id: u64,
     pub tool: String,
     pub content: String,
@@ -17,7 +17,7 @@ pub struct WireRequest {
 
 /// Response from the Deno sidecar (JSON-lines over stdout)
 #[derive(Debug, Deserialize)]
-pub struct WireResponse {
+pub(super) struct WireResponse {
     /// Request ID. -1 indicates a malformed request error (couldn't parse request JSON)
     pub id: i64,
     pub ok: bool,

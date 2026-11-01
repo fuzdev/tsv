@@ -30,7 +30,7 @@ pub(crate) use expression_tag::scan_to_matching_brace;
 /// `arena` owns the entire parsed graph (the template AST plus the embedded TS
 /// `<script>`/`{expr}` ASTs, which share this one `Bump`); the returned
 /// `Root<'arena>` borrows from it.
-pub fn parse_svelte<'arena>(
+pub(crate) fn parse_svelte<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
 ) -> Result<Root<'arena>, Error> {

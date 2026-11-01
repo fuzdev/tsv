@@ -20,7 +20,7 @@ use tsv_lang::Span;
 /// - Conversion: Re-applies Svelte quirks when generating public JSON AST
 ///
 /// This matches TypeScript's architecture and keeps the internal AST clean.
-pub fn parse_string_literal<'arena>(
+pub(crate) fn parse_string_literal<'arena>(
     s: &str,
     span: Span,
     arena: &'arena Bump,

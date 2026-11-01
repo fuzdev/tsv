@@ -1072,7 +1072,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 ///
 /// `host_nesting` is the nesting the host document has spent around the stylesheet (`0`
 /// standalone), the start of this parse's depth count.
-pub fn parse_css<'arena>(
+pub(crate) fn parse_css<'arena>(
     source: &str,
     base_offset: usize,
     host_nesting: u32,

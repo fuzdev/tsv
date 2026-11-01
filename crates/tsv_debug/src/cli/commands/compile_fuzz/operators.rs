@@ -111,7 +111,7 @@ use super::super::fuzz::Rng;
 use super::anchors::Anchors;
 
 /// A donor seed: the material [`Operator::SpliceDonor`] grafts across components.
-pub struct Donor {
+pub(super) struct Donor {
     /// The donor's template text (everything outside its `<script>` / `<style>`).
     pub template: String,
     /// The donor's instance-script body.
@@ -128,7 +128,7 @@ impl Donor {
     ///
     /// Returns `None` when tsv's parser rejects the component — the same gate the
     /// seed list uses, so a donor is always a real, parseable component.
-    pub fn from_source(source: &str) -> Option<Self> {
+    pub(super) fn from_source(source: &str) -> Option<Self> {
         let arena = bumpalo::Bump::new();
         let root = tsv_svelte::__private::parse(source, &arena).ok()?;
         // The three top-level regions to cut out of the template. `<svelte:options>`
@@ -180,7 +180,7 @@ impl Donor {
 /// report prints the per-operator counts that actually landed — the honest read of
 /// what got exercised.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Operator {
+pub(super) enum Operator {
     ShadowRead,
     ShadowDeclared,
     CollideGeneratedName,
@@ -195,7 +195,7 @@ pub enum Operator {
 }
 
 impl Operator {
-    pub const ALL: &'static [Self] = &[
+    pub(super) const ALL: &'static [Self] = &[
         Self::ShadowRead,
         Self::ShadowDeclared,
         Self::CollideGeneratedName,
@@ -209,7 +209,7 @@ impl Operator {
         Self::ExoticWhitespace,
     ];
 
-    pub fn label(self) -> &'static str {
+    pub(super) fn label(self) -> &'static str {
         match self {
             Self::ShadowRead => "shadow_read",
             Self::ShadowDeclared => "shadow_declared",
@@ -354,7 +354,7 @@ enum CommentKind {
 
 /// Apply `op` to `source`, returning the mutated text — or `None` when the seed
 /// carries no anchor the operator needs (the caller simply draws again).
-pub fn apply(
+pub(super) fn apply(
     op: Operator,
     source: &str,
     anchors: &Anchors,

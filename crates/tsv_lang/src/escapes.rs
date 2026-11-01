@@ -52,7 +52,12 @@
 /// swap_quote_escaping_into(input, '\'', '"', &mut result);
 /// assert_eq!(result, r#"has \"double\" quotes"#);  // " → \" (escaped for new quotes)
 /// ```
-pub fn swap_quote_escaping_into(content: &str, old_quote: char, new_quote: char, out: &mut String) {
+pub(crate) fn swap_quote_escaping_into(
+    content: &str,
+    old_quote: char,
+    new_quote: char,
+    out: &mut String,
+) {
     if old_quote == new_quote {
         out.push_str(content);
         return;
