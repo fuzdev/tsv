@@ -51,10 +51,9 @@ pub(super) const FLAT_SWEEP: [usize; 3] = [1_000, 2_000, 4_000];
 pub(super) const MAX_FLAT_EXPONENT: f64 = 1.3;
 
 /// How far over its limit a measured exponent may sit. A quadratic's lower-order terms put
-/// its exponent over one doubling a little above 2 — the nested templates' walks and the
-/// mixed-precedence chains' scans measure 2.02–2.11 over 16→32 and converge on 2 further
-/// out (4.02–4.07× per doubling at 64→128) — where a cubic measures 3 and a rebuild per
-/// layout candidate far more.
+/// its exponent over one doubling a little above 2 — the mixed-precedence chains' scans
+/// measure up to 2.03 and converge on 2 further out — where a cubic measures 3 and a rebuild
+/// per layout candidate far more.
 const EXPONENT_TOLERANCE: f64 = 0.25;
 
 /// A counter below this at the sweep's top point is too small to fail on its exponent: a
@@ -91,6 +90,11 @@ pub(super) enum Growth {
     /// [`CHAIN_SWEEP`], graded on the flat exponent, since a link is a sibling of the one
     /// before it on the printer's side and its work must stay linear.
     Chain,
+    /// A nest whose work must stay linear in its depth, since no level's printing reaches
+    /// into a deeper level's subtree (a template literal's interpolation takes its inner
+    /// levels' flattened docs as they stand): swept over [`CHAIN_SWEEP`] and graded on the
+    /// flat exponent, as a chain is.
+    LinearNesting,
     Flat,
     Fixed,
 }
@@ -662,6 +666,40 @@ const K289_ASSIGN_OR_NONNULL: &str = concat!(
     "|| c)!) || c)!) || c) || c) || c) || c)!) || c) || c)!)!) || c",
 );
 
+/// Nests whose work must stay linear in their depth ([`Growth::LinearNesting`]): template
+/// literals nested in each other's interpolations, each level flattening its interpolation
+/// onto one line over the inner levels' already-flattened docs.
+pub(super) fn linear_nesting_inputs() -> Vec<Input> {
+    use Growth::LinearNesting;
+    use Lang::{Svelte, Ts};
+    vec![
+        hand(
+            "linear_ts_template",
+            Ts,
+            LinearNesting,
+            ["x = ", "`${", "a", "}`", ";\n"],
+        ),
+        hand(
+            "linear_ts_tagged_template",
+            Ts,
+            LinearNesting,
+            ["x = ", "t`a ${", "a", "} b`", ";\n"],
+        ),
+        hand(
+            "linear_ts_template_call",
+            Ts,
+            LinearNesting,
+            ["x = ", "`${f(a, ", "a", ")}`", ";\n"],
+        ),
+        hand(
+            "linear_svelte_template",
+            Svelte,
+            LinearNesting,
+            ["{", "`${", "a", "}`", "}\n"],
+        ),
+    ]
+}
+
 /// Flat sibling runs no bug is known in: the work leg's linear baseline, one per kind of
 /// list a printer walks.
 pub(super) fn flat_inputs() -> Vec<Input> {
@@ -780,7 +818,7 @@ pub(super) fn grade_input(input: &Input, findings: &mut Vec<Finding>) -> InputRe
     let parser = parser_of(shape.lang);
     let (graded_size, sweep, limit): (usize, &[usize], f64) = match input.growth {
         Growth::Nesting => (GRADED_DEPTH, &NESTING_SWEEP, MAX_NESTING_EXPONENT),
-        Growth::Chain => (GRADED_DEPTH, &CHAIN_SWEEP, MAX_FLAT_EXPONENT),
+        Growth::Chain | Growth::LinearNesting => (GRADED_DEPTH, &CHAIN_SWEEP, MAX_FLAT_EXPONENT),
         Growth::Flat => (FLAT_SWEEP[0], &FLAT_SWEEP, MAX_FLAT_EXPONENT),
         Growth::Fixed => (0, &[], 0.0),
     };
@@ -885,6 +923,7 @@ pub(super) fn growth_token(growth: Growth) -> &'static str {
     match growth {
         Growth::Nesting => "nesting",
         Growth::Chain => "chain",
+        Growth::LinearNesting => "linear",
         Growth::Flat => "flat",
         Growth::Fixed => "fixed",
     }

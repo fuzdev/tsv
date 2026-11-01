@@ -1180,6 +1180,7 @@ impl BuildFanoutAuditCommand {
         // sizes (a nest to 32, a chain to 128 links) — the whole sweep is seconds.
         let inputs: Vec<legs::Input> = legs::depth_inputs(crate::depth_shapes::Scope::Full)
             .chain(legs::bug_inputs())
+            .chain(legs::linear_nesting_inputs())
             .chain(legs::flat_inputs())
             .filter(|input| {
                 self.filter
@@ -1325,8 +1326,8 @@ fn print_legs_human(inputs: &[InputResult], findings: &[Finding]) {
     println!(
         "\nbuild-fanout work legs — {graded} inputs graded ({skipped} the parser rejects, \
          skipped): build multiplicity and doc nodes per byte at n={} (flat: n={}), work \
-         counter growth over n={:?} (flat: {:?}; chain links: {:?}, graded on the flat \
-         exponent)\n",
+         counter growth over n={:?} (flat: {:?}; chain links and linear nests: {:?}, graded \
+         on the flat exponent)\n",
         legs::GRADED_DEPTH,
         legs::FLAT_SWEEP[0],
         legs::NESTING_SWEEP,
@@ -1355,6 +1356,7 @@ fn print_legs_human(inputs: &[InputResult], findings: &[Finding]) {
     for growth in [
         legs::Growth::Nesting,
         legs::Growth::Chain,
+        legs::Growth::LinearNesting,
         legs::Growth::Flat,
     ] {
         if let Some((e, counter, name)) = inputs

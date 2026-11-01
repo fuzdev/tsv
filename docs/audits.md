@@ -779,7 +779,7 @@ The legs, and the inputs they run over:
 | --- | --- | --- |
 | **multiplicity** | one AST node is built more than 32 times, or the builds exceed 4× the distinct nodes built | the corpus's worst file builds one node 9 times, and 1.73 builds per node (p99 1.51) |
 | **density** | the doc has more than 8 × bytes + 2,000 nodes | the corpus's densest file (≥ 2 KB) builds 0.69 nodes per byte (p99 0.49) |
-| **work** | a counter (doc nodes, builds, walks, scans, predicates) grows faster than n^2 across a nesting sweep's last doubling (n = 8, 16, 32), or than n^1.3 across a flat run's (1,000, 2,000, 4,000) or a chain's links (n = 8, 16, 32, 64, 128) — 0.25 over either exponent tolerated, and a counter under 4,096 at the top point never failing | a walk or scan over each level's subtree from each level is quadratic in nesting; a sibling run's work must stay linear. A quadratic's lower-order terms read 2.02–2.11 over 16→32 (nested templates' walks) and settle at 4.0× per doubling further out; a cubic reads 3. The chain sweep runs to 128 links so a quadratic of under 4 units per link squared clears the floor, and its last doubling sits near the asymptote: the real chains no bug is known in read at most n^1.01 over 64→128 (a chain the parser refuses past 32 or 64 links ends its sweep there, with the floor's coarser reach) |
+| **work** | a counter (doc nodes, builds, walks, scans, predicates) grows faster than n^2 across a nesting sweep's last doubling (n = 8, 16, 32), or than n^1.3 across a flat run's (1,000, 2,000, 4,000), a chain's links or a linear nest's depth (n = 8, 16, 32, 64, 128) — 0.25 over either exponent tolerated, and a counter under 4,096 at the top point never failing | a walk or scan over each level's subtree from each level is quadratic in nesting; a sibling run's work must stay linear, and so must a nest whose levels never reach into a deeper level's subtree. A quadratic's lower-order terms read a little above 2 across a doubling (the mixed-precedence chains' scans, up to 2.03) and settle at 4.0× per doubling further out; a cubic reads 3. The chain sweep runs to 128 links so a quadratic of under 4 units per link squared clears the floor, and its last doubling sits near the asymptote: the real chains no bug is known in read at most n^1.01 over 64→128 (a chain the parser refuses past 32 or 64 links ends its sweep there, with the floor's coarser reach) |
 
 - the depth-limit gate's **whole** generated catalog (`tsv_debug::depth_shapes`, its full
   sweep: the named shapes, the grammar POSITIONS, every link pair and the seeded triples behind
@@ -794,6 +794,11 @@ The legs, and the inputs they run over:
   turn green — a hand-written shape that stops parsing fails the run;
 - **flat runs** no bug is known in (statements, array elements, object members, call arguments,
   a binary chain, union members, template parts, class members, Svelte elements, blocks,
+- **linear nests** (`linear_*`): template literals nested in each other's interpolations — plain,
+  tagged, behind a call, and in a Svelte template expression. Each level flattens its
+  interpolation onto one line over the inner levels' already-flattened docs (`DocArena::atomize`
+  takes an atomized subtree as it stands), so its work is graded on the flat exponent over the
+  chain sweep's depths, as a chain's links are;
   attributes and text, CSS rules, declarations and selectors) — the work leg's linear baseline;
 - each doc-node-growth construct at its deepest depth (multiplicity and density only).
 

@@ -2491,6 +2491,20 @@ pub struct DocArena {
     /// second walk is a cache read; the caches merge because they now have
     /// identical populations by construction.
     layout_cache: RefCell<Vec<u32>>,
+    /// One bit per `DocId`, set on every doc an [`Self::atomize`] call returned. Such a doc
+    /// is a fixed point of `atomize` — it holds no line of any kind, no multi-line text, no
+    /// `if_break` and no conditional state, and every node kind it can still hold atomizes to
+    /// an equivalent copy of itself — so a later `atomize` over a doc holding it
+    /// takes it as it stands rather than copying it again: atomizing each level of a nest
+    /// whose inner levels were atomized first (`${`${`${…}`}`}`, one `atomize` per
+    /// interpolation) walks and copies each node once, not once per enclosing level.
+    ///
+    /// Only the returned root is marked, which is where a walk enters the subtree; a walk
+    /// reaching one of its interior nodes some other way copies it, which prints the same.
+    /// Only `atomize` reads it. A [`Self::remove_lines`] copy keeps its hard lines, so it is
+    /// no fixed point of `atomize` and is never marked. Empty until the first `atomize`;
+    /// cleared by `reset()`.
+    atomized: RefCell<Vec<u64>>,
     /// Direct-mapped cache for [`Self::text`] statics, carrying two halves per
     /// slot with different lifetimes:
     ///
@@ -2740,6 +2754,7 @@ impl DocArena {
             docbuf_pool: RefCell::new(Vec::new()),
             chain_share_store: RefCell::new(ChainShareStore::default()),
             layout_cache: RefCell::new(Vec::new()),
+            atomized: RefCell::new(Vec::new()),
             static_cache: empty_static_cache(),
             format_gen: Cell::new(1),
             flow_probe: RefCell::new(FlowProbeState::default()),
@@ -2797,6 +2812,7 @@ impl DocArena {
             // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
             // to absorb those reallocs. Only capacity changes — never values.
             layout_cache: RefCell::new(Vec::with_capacity(estimated_nodes)),
+            atomized: RefCell::new(Vec::new()),
             static_cache: empty_static_cache(),
             format_gen: Cell::new(1),
             flow_probe: RefCell::new(FlowProbeState::default()),
@@ -2859,6 +2875,7 @@ impl DocArena {
         self.children.get_mut().clear();
         self.text_pool.get_mut().clear();
         self.layout_cache.get_mut().clear();
+        self.atomized.get_mut().clear();
         #[cfg(feature = "_internal_swallow_check")]
         self.line_comment_ids.get_mut().clear();
         #[cfg(feature = "_internal_comment_check")]
@@ -5342,13 +5359,34 @@ impl DocArena {
     ///
     /// Folding the two into one function under prettier's name is how a multi-line comment
     /// in a flattened arrow signature gets its newline deleted. Two questions, two names.
+    ///
+    /// The result is marked atomized (`DocArena.atomized`), and a later call takes a marked
+    /// subtree as it stands, so atomizing a doc that holds earlier results costs only its
+    /// own new nodes.
     pub fn atomize(&self, id: DocId) -> DocId {
-        self.flatten_lines_impl(
+        let flat = self.flatten_lines_impl(
             id,
             FlattenMode::Atomize,
             &mut WalkMemo::new(),
             FLATTEN_FRAMES,
-        )
+        );
+        let i = flat.index();
+        let mut marks = self.atomized.borrow_mut();
+        if marks.len() <= i / 64 {
+            marks.resize(i / 64 + 1, 0);
+        }
+        marks[i / 64] |= 1 << (i % 64);
+        flat
+    }
+
+    /// Whether `id` is a doc an [`Self::atomize`] call returned, so atomizes to itself.
+    #[inline]
+    fn is_atomized(&self, id: DocId) -> bool {
+        let i = id.index();
+        self.atomized
+            .borrow()
+            .get(i / 64)
+            .is_some_and(|word| word & (1 << (i % 64)) != 0)
     }
 
     /// [`Self::remove_lines`] and [`Self::atomize`]'s walk, memoized per node within one
@@ -5370,6 +5408,9 @@ impl DocArena {
             return self.flatten_lines_loop(id, mode, memo);
         }
         crate::fanout_probe::walk();
+        if mode == FlattenMode::Atomize && self.is_atomized(id) {
+            return id;
+        }
         if let Some(known) = memo.visit(id) {
             return known;
         }
@@ -5410,6 +5451,10 @@ impl DocArena {
             match step {
                 Step::Enter(id) => {
                     crate::fanout_probe::walk();
+                    if mode == FlattenMode::Atomize && self.is_atomized(id) {
+                        copies.push(id);
+                        continue;
+                    }
                     if let Some(known) = memo.visit(id) {
                         copies.push(known);
                         continue;
@@ -7403,6 +7448,36 @@ mod walk_memo_tests {
                 "atomize, {case}"
             );
         });
+    }
+
+    /// An atomized doc atomizes to itself, so a later `atomize` takes it as it stands, and
+    /// a doc atomized over an earlier result prints as atomizing the original at once.
+    #[test]
+    fn atomizing_an_atomized_subtree_takes_it_as_it_stands() {
+        for_each_pair(5, |a, dag, tree, case| {
+            let inner = a.atomize(tree);
+            assert_eq!(a.atomize(inner), inner, "{case}: the result is marked");
+            // the copy the mark skips prints as the doc it would copy
+            let marks = a.atomized.take();
+            let copy = a.atomize(inner);
+            *a.atomized.borrow_mut() = marks;
+            assert_eq!(render(a, copy), render(a, inner), "{case}");
+            let level = |doc| a.concat(&[a.text("${"), doc, a.text("}")]);
+            assert_eq!(
+                render(a, a.atomize(level(inner))),
+                render(a, a.atomize(level(dag))),
+                "{case}"
+            );
+        });
+    }
+
+    #[test]
+    fn reset_clears_the_atomized_marks() {
+        let mut a = DocArena::new();
+        let flat = a.atomize(a.group(a.concat(&[a.text("a"), a.line(), a.text("b")])));
+        assert!(a.is_atomized(flat));
+        a.reset();
+        assert!(!a.is_atomized(flat));
     }
 
     #[test]
