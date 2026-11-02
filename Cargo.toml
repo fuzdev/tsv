@@ -64,9 +64,13 @@ argh = "0.1.19"
 # Node-runtime sibling of `tsv_ffi` (Deno's C-FFI path). napi/napi-derive ride
 # the 3.x line together; napi-build (build dep) is its own 2.x line. A tsv-scoped
 # carve-out from the ecosystem's N-API deferral.
-napi = "3.9.4"
+# napi-derive is held at 3.5.x: 3.7+ needs syn 3 while argh_derive needs syn 2
+# (denied clippy::multiple_crate_versions). napi's runtime accepts its older
+# class glue only while `napi8` stays off — under napi8, `MaybeTypeTag` requires
+# the `impl TypeTag` that only napi-derive 3.7+ generates.
+napi = "3.16.1"
 napi-derive = "3.5.7"
-napi-build = "2.3.2"
+napi-build = "2.6.0"
 # Bump arena for the internal AST: per-parse `Bump`, nodes/collections/decoded
 # strings allocated as `&'arena ...` (no per-node heap alloc/free, better
 # traversal locality). Already present transitively (via wasm-bindgen); this
@@ -89,15 +93,15 @@ serde = { version = "1", features = ["derive"] }
 # deps:audit`), so these features unify only into dev and tooling builds — never
 # into a consumer's `serde_json`, whose deserialization they would change.
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip", "arbitrary_precision"] }
-smallvec = "1.15.2"
+smallvec = "1.16.4"
 thiserror = "2"
-unicode-ident = "1.0.24"
+unicode-ident = "1.0.27"
 unicode-segmentation = "1.13.3"
-unicode-width = { version = "0.2.2", default-features = false }
+unicode-width = { version = "0.2.3", default-features = false }
 # Shortest round-trip `f64` formatting for the wire writer's non-integral numbers
 # (`tsv_lang`'s `JsonWriter::f64`): the formatter `serde_json` itself calls, called
 # directly so no shipped crate depends on `serde_json`. Featureless and dependency-free.
-zmij = "1.0.21"
+zmij = "1.0.23"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

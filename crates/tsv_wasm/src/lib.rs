@@ -59,7 +59,8 @@ use tsv_ts::Error;
 // format path is allocation-heavy (doc IR, output string, memo vecs) and
 // dlmalloc's grow/memcpy behavior is the measured allocation wall there; talc
 // is a pure-Rust no_std allocator tuned for WebAssembly. The `WasmGrowAndExtend`
-// source (vs the default `WasmGrowAndClaim`) extends one contiguous heap on
+// source (talc's default since 5.1, named here so a default flip can't move it;
+// vs `WasmGrowAndClaim`) extends one contiguous heap on
 // `memory.grow` instead of claiming fragmented new ones — it holds the
 // long-lived reset()-reuse instance's linear-memory high-water at dlmalloc
 // parity, where the claim-source fragments it. Single-threaded WASM only

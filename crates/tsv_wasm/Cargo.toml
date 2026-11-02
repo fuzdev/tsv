@@ -81,7 +81,7 @@ js-sys = { version = "0.3", optional = true }
 # pure-Rust no_std crates. Native builds are untouched — the target cfg-gate
 # keeps all of it out of every non-wasm dependency graph.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-talc = "5.0.4"
+talc = "5.1.1"
 
 [lints]
 workspace = true
