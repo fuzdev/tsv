@@ -123,6 +123,7 @@ const DISPLAY_ORDER = [
 	'malva-wasm',
 	'markup-fmt-wasm',
 	'oxc-parser',
+	'oxc-parser-raw',
 	'oxc-parser-wasm',
 	'oxfmt',
 	'postcss',
@@ -226,6 +227,8 @@ const PARSE_PAYLOAD_TIERS: Readonly<Record<string, RowPayloadTier>> = {
 	'tsv+locations': LOCATIONS_TIERS,
 	'tsv-wasm+locations': LOCATIONS_TIERS,
 	'oxc-parser': 'span_only',
+	// The same tree as `oxc-parser` — byte parity graded per file in pre-flight.
+	'oxc-parser-raw': 'span_only',
 	'oxc-parser-wasm': 'span_only',
 	'yuku-parser': 'span_only',
 	'yuku-parser-wasm': 'span_only',
@@ -416,6 +419,7 @@ export function generate_summary_report(
 					] as const);
 		for (const [ours, opponent, note] of [
 			['tsv', 'oxc-parser', 'span-only, theirs larger'],
+			['tsv', 'oxc-parser-raw', 'span-only, theirs larger, no JSON'],
 			['tsv', 'yuku-parser', 'span-only, theirs larger'],
 			['tsv-wasm', 'oxc-parser-wasm', 'span-only, theirs larger'],
 			['tsv-wasm', 'yuku-parser-wasm', 'span-only, theirs larger'],
@@ -799,6 +803,17 @@ const OXFMT_NOTE: FairnessNote = {
 		'oxfmt formats JS/TS and CSS natively; only its svelte row routes through its bundled prettier (+ svelte plugin, with the embedded `<script>` formatted natively), so `tsv` vs `oxfmt` is native-vs-native on typescript and css, and the svelte ratio is a prettier-pipeline number in oxfmt packaging'
 };
 
+const OXC_RAW_NOTE: FairnessNote = {
+	terminal: [
+		'  (oxc-parser-raw is the same native parse and the same tree as oxc-parser, crossing as a',
+		'   shared buffer a generated JS deserializer builds the objects from — no JSON string. Every',
+		'   node is materialized before the call returns, so it is the full-tree tier tsv’s default',
+		'   rows are, by a cheaper transfer tsv does not ship; native only, and absent under Bun)'
+	],
+	markdown:
+		'oxc-parser-raw is the same native parse as oxc-parser and hands JS the identical tree (byte parity graded per file), but crosses the boundary as a shared buffer that a generated JS deserializer builds the objects from instead of a JSON string — oxc’s undocumented `experimentalRawTransfer`. Deserialization is eager and complete before `parseSync` returns, so the row materializes the full tree like tsv’s default rows, by a transfer mechanism tsv does not ship. Native only, and absent under Bun, where oxc does not support raw transfer'
+};
+
 const OXC_NOTE: FairnessNote = {
 	terminal: [
 		'  (oxc-parser — native and wasm — serializes the AST to JSON in Rust and deserializes',
@@ -928,6 +943,7 @@ const COMPARISON_SECTIONS: readonly ComparisonSectionSpec[] = [
 			parse: [
 				{ row: CANONICAL_PARSER_ROWS, note: CANONICAL_PARSE_NOTE },
 				{ row: 'oxc-parser', note: OXC_NOTE },
+				{ row: 'oxc-parser-raw', note: OXC_RAW_NOTE },
 				{ row: 'yuku-parser', note: YUKU_NOTE },
 				{ row: 'swc', note: SWC_NOTE },
 				{ row: 'rsvelte-parse', note: RSVELTE_PARSE_NOTE },

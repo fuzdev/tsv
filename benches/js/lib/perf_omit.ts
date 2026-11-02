@@ -122,7 +122,7 @@ export const PERF_OMITS: PerfOmit[] = [
 		path: 'kit/packages/kit/src/runtime/app/env',
 		category: 'harness_path_threading',
 		reason:
-			'oxc (native + wasm) rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
+			'oxc (native, raw transfer + wasm) rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
 	},
 	{
 		task: 'format/typescript/oxfmt',

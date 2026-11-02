@@ -812,6 +812,8 @@ const is_native_tsv_row = (name: string): boolean =>
  */
 const same_engine_sibling_name = (name: string): string | null => {
 	if (name === 'oxc-parser') return 'oxc-parser-wasm';
+	// One addon, two transfer modes: the raw row's base is the default row.
+	if (name === 'oxc-parser-raw') return 'oxc-parser';
 	if (name === 'yuku-parser') return 'yuku-parser-wasm';
 	if (name === 'rsvelte-parse') return 'rsvelte-parse-skip-expr-loc';
 	if (is_native_tsv_row(name)) return name.replace(/^tsv/, 'tsv-wasm');
@@ -852,6 +854,12 @@ const same_engine_pair_versions = (
  * - **rsvelte's option pair** is excluded on the strongest possible ground: its
  *   `skipExpressionLoc` variant removes payload BY DESIGN, so byte equality there
  *   would be the bug.
+ * - **oxc's raw↔default pair** is graded like tsv's, on a different ground: one
+ *   addon, one package version and one parse, so the two transfer modes must hand JS
+ *   the same tree — and the raw row SHARES `oxc-parser`'s payload tier and comparison
+ *   notes on exactly that claim. A byte difference would mean it times a different
+ *   product under the same label, which is the fairness question rather than a
+ *   binding nicety (`lib/oxc_raw.ts`).
  * - **oxc's and yuku's native↔wasm pairs** should agree, but a divergence is a
  *   third-party binding's defect rather than something tsv's bench should hard-fail
  *   on — and oxc's WASI binding has a known one (lib/oxc_wasm.ts). They keep the
@@ -873,7 +881,8 @@ const same_engine_pair_versions = (
  * second hand-written predicate — see `run_preflight`.
  */
 const sibling_outputs_must_match = (name: string): boolean =>
-	is_native_tsv_row(name) && !name.endsWith('-internal') && name !== 'tsv-forced-async';
+	name === 'oxc-parser-raw' ||
+	(is_native_tsv_row(name) && !name.endsWith('-internal') && name !== 'tsv-forced-async');
 
 /**
  * Digest one pre-flight result for byte-parity comparison, or `null` when the
@@ -908,13 +917,19 @@ const sibling_outputs_must_match = (name: string): boolean =>
 function output_digest(result: unknown): string | null {
 	if (result === undefined || result === null) return null;
 	try {
-		const text = typeof result === 'string' ? result : JSON.stringify(result);
+		// `BigInt` has no JSON form (a bare stringify throws), and oxc's trees carry one
+		// per bigint literal — spelled out rather than leaving those files ungraded.
+		const text =
+			typeof result === 'string' ? result : JSON.stringify(result, bigint_to_digest_text);
 		if (text === undefined) return null;
 		return createHash('sha1').update(text).digest('hex');
 	} catch {
 		return null;
 	}
 }
+
+const bigint_to_digest_text = (_key: string, value: unknown): unknown =>
+	typeof value === 'bigint' ? `${value}n` : value;
 
 /** Populated by `check_variant_parity()` after pre-flight; lands in the report as `variant_parity`. */
 const variant_parity_findings: VariantParityFinding[] = [];
@@ -1099,18 +1114,25 @@ function check_variant_parity(): void {
 			}
 			if (output_mismatch > 0) {
 				fatal = true;
+				const is_oxc_raw = name === 'oxc-parser-raw';
 				console.error(
 					`✗ variant parity (${group_name}): ${name} and ${sibling_name} produced DIFFERENT ` +
-						`OUTPUT on ${output_mismatch} file(s) both accepted. One engine, two bindings — this ` +
-						`is a marshalling or build-profile bug, not an engine difference. First:\n` +
+						`OUTPUT on ${output_mismatch} file(s) both accepted. ` +
+						(is_oxc_raw
+							? `One parse, two transfer modes — the raw row no longer times the product ` +
+								`\`oxc-parser\` does, so its payload tier and comparisons are wrong. First:\n`
+							: `One engine, two bindings — this is a marshalling or build-profile bug, not ` +
+								`an engine difference. First:\n`) +
 						output_mismatch_examples.map((path) => `    ${path}`).join('\n') +
 						// Every other failure in this harness names the next action; this is the
 						// most serious one, and the outputs themselves are gone by now (the check
 						// keeps digests, not bytes), so the remedy is how to get them BACK.
 						`\n  Isolate: BENCH_FILTER=${output_mismatch_examples[0]} deno task bench:${RUNTIME}:run` +
-						`\n  Both sides are reachable per file from ${
-							RUNTIME === 'deno' ? 'lib/ffi.ts' : 'lib/napi.ts'
-						} and lib/wasm.ts; \`deno task smoke\` exercises the same two bindings.`
+						(is_oxc_raw
+							? `\n  Both sides are one \`parseSync\` call apart in lib/oxc_raw.ts and lib/oxc.ts.`
+							: `\n  Both sides are reachable per file from ${
+									RUNTIME === 'deno' ? 'lib/ffi.ts' : 'lib/napi.ts'
+								} and lib/wasm.ts; \`deno task smoke\` exercises the same two bindings.`)
 				);
 			}
 		}

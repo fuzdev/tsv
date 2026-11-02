@@ -508,15 +508,27 @@ Things the published numbers measure that aren't quite what they look like.
     `tsv-wasm-internal` (parse-only, no JS materialization) have **no fair oxc
     counterpart** — oxc's JS API always serializes to cross into JS — and that
     asymmetry is left honest rather than papered over with a misleading row.
-  - **oxc's eager raw transfer is untimed, and it is faster than the JSON path the
-    `oxc-parser` row times.** `experimentalRawTransfer` (native-only like lazy, and
-    undocumented: absent from oxc-parser's README and `.d.ts`, present only in its JS
-    source) deserializes the AST transfer buffer straight into JS objects, skipping
-    JSON. A probe over fuz_util's `src/lib` `.ts` files at oxc-parser 0.150.0 measured
-    it ~2.8x faster with `.program` materialized (10.8 vs 30.7 ms per sweep; 16.1 vs
-    36.8 ms with a full AST walk) — enough to likely reverse the published native
-    `parse/typescript` ratio against `tsv`. The `oxc-parser` row
-    times oxc's default path only; an `oxc-parser-raw` row would price the other.
+  - **`oxc-parser-raw` times oxc's eager raw transfer, the faster of its two full-tree
+    transfers.** `experimentalRawTransfer` (native-only, and undocumented: absent from
+    oxc-parser's README and from `ParserOptions` in its `.d.ts`, present only in its JS
+    source) has the Rust side write the AST into a shared buffer that a generated JS
+    deserializer builds the objects from, skipping the JSON string. It is a different
+    TRANSFER, not a different product: deserialization is eager and complete before
+    `parseSync` returns (the buffer is reused by the next parse, so nothing can stay
+    lazy), the tree is byte-identical to the default path's (`BigInt` / `RegExp`
+    literal values included), and the pre-flight grades that byte parity per file on
+    every run — a FATAL check, like tsv's own binding pairs, since the row shares
+    `oxc-parser`'s payload tier and comparison notes on exactly that claim
+    (`sibling_outputs_must_match`). Init also proves the option landed (the result's
+    `program` getter must not be the default path's `jsonParseAst`, with a vacuity
+    guard on the default side), so a renamed key cannot time JSON under the raw name.
+    A probe at oxc-parser 0.150.0 measured it ~2.8x faster than the JSON path with
+    `.program` materialized (fuz_util's `src/lib` `.ts`: 10.8 vs 30.7 ms per sweep) —
+    enough to likely reverse the native `parse/typescript` ratio against `tsv`, which
+    is why the row is published rather than footnoted: tsv ships no such transfer, so
+    `tsv` vs `oxc-parser-raw` is the same tree delivered by a mechanism tsv lacks.
+    Absent under Bun, where `rawTransferSupported()` is false (its own impl slot, so
+    the absence is recorded in `unavailable` rather than read as a missing row).
 - **The `+locations` rows price `{locations: true}`, and they are not opponents of
   tsv's own rows.** `tsv+locations` and its wasm sibling call the published
   `parse_<lang>(source, {locations: true})`: the default row's parse (`JSON.parse`
@@ -668,6 +680,10 @@ prettier. Load-bearing on two axes:
   proves a real syntax error still lands as fatal. Every call passes a `sourceType`
   (`module` when the file declares none): left unset, oxc infers the goal and reads an
   import-free `file.ts` as a script.
+- **oxc-parser raw transfer (`oxc-parser-raw`, NAPI)** — the same native parse over
+  `experimentalRawTransfer`, the same tree, eagerly deserialized from a shared buffer
+  instead of a JSON string (see §Fairness caveats); native only, absent under Bun
+  (`lib/oxc_raw.ts`).
 - **oxfmt (NAPI)** — fast formatter; TypeScript, JS, CSS, Svelte (experimental).
   The native Rust formatter handles **JS/TS *and* CSS**; only **Svelte**
   routes through a JS-side fallback into oxfmt's **bundled prettier**
@@ -931,7 +947,8 @@ before anything is timed.
 
 ### OXC package details
 
-**oxc-parser** ships three package types:
+**oxc-parser** ships three package types (the native one drives two rows: `oxc-parser`
+over the default JSON transfer and `oxc-parser-raw` over raw transfer):
 
 - **Main** (`oxc-parser`): JS wrapper with platform detection; contains
   `src-js/wasm.js` for direct WASM usage. `NAPI_RS_FORCE_WASI` forces WASM.

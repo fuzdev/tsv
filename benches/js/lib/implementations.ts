@@ -27,6 +27,7 @@ import { NapiImplementation } from './napi.ts';
 import { WasmImplementation } from './wasm.ts';
 import { current_runtime } from './runtime.ts';
 import { OxcImplementation } from './oxc.ts';
+import { OxcRawImplementation } from './oxc_raw.ts';
 import { OxcWasmImplementation } from './oxc_wasm.ts';
 import { TscImplementation } from './tsc.ts';
 import { YukuImplementation } from './yuku.ts';
@@ -115,6 +116,8 @@ export interface ImplementationSet {
 	oxc: OxcImplementation | undefined;
 	/** OXC WASM implementation (oxc-parser via wasm32-wasi) - undefined if not available */
 	oxc_wasm: OxcWasmImplementation | undefined;
+	/** oxc-parser in raw-transfer mode (native, where `rawTransferSupported()`) - undefined if not available */
+	oxc_raw: OxcRawImplementation | undefined;
 	/** tsc (the TypeScript compiler's own parser) - parse only; undefined if not available */
 	tsc: TscImplementation | undefined;
 	/** yuku-parser (N-API) - parse only; undefined if not available */
@@ -366,6 +369,7 @@ export async function init_implementations(
 	const {
 		oxc,
 		oxc_wasm,
+		oxc_raw,
 		tsc,
 		yuku,
 		yuku_wasm,
@@ -381,6 +385,12 @@ export async function init_implementations(
 
 	const oxc_impl = await optional(oxc, 'oxc', 'OXC (oxc-parser + oxfmt)', 'OXC');
 	const oxc_wasm_impl = await optional(oxc_wasm, 'oxc_wasm', 'OXC WASM (oxc-parser)', 'OXC WASM');
+	const oxc_raw_impl = await optional(
+		oxc_raw,
+		'oxc_raw',
+		'OXC raw transfer (oxc-parser)',
+		'OXC raw transfer'
+	);
 	const tsc_impl = await optional(tsc, 'tsc', `tsc ${versions.tsc.typescript} (parse-only)`, 'tsc');
 	const yuku_impl = await optional(yuku, 'yuku', 'yuku-parser (N-API)', 'yuku-parser');
 	const yuku_wasm_impl = await optional(
@@ -437,6 +447,7 @@ export async function init_implementations(
 		wasm,
 		oxc: oxc_impl,
 		oxc_wasm: oxc_wasm_impl,
+		oxc_raw: oxc_raw_impl,
 		tsc: tsc_impl,
 		yuku: yuku_impl,
 		yuku_wasm: yuku_wasm_impl,
@@ -471,6 +482,8 @@ function construct_implementations(versions: AllVersions): ConstructedImplementa
 		wasm: new WasmImplementation(),
 		oxc: new OxcImplementation(versions.oxc),
 		oxc_wasm: new OxcWasmImplementation(versions.oxc_wasm),
+		// The same addon and package version as `oxc`, in raw-transfer mode — see lib/oxc_raw.ts.
+		oxc_raw: new OxcRawImplementation(versions.oxc),
 		tsc: new TscImplementation(),
 		// One class, two cores — see lib/yuku.ts.
 		yuku: new YukuImplementation('yuku-parser', versions.yuku),
@@ -780,7 +793,8 @@ export function get_benchmark_tasks(
 
 		// OXC parser (TypeScript/JS only) — default mode: serializes to JSON in Rust
 		// then JSON.parses in JS, eagerly materializing the full AST (the like-for-like
-		// opponent to tsv's default parse rows). There is intentionally no `oxc-parser-lazy`
+		// opponent to tsv's default parse rows; `oxc-parser-raw` below is the same parse
+		// over oxc's faster raw transfer). There is intentionally no `oxc-parser-lazy`
 		// row: oxc's `experimentalLazy` raw transfer is setup-dominated in every runtime
 		// (measures buffer copy, not parse speed) — see `lib/oxc.ts` and
 		// docs/benchmarks.md §Fairness caveats.
@@ -797,6 +811,17 @@ export function get_benchmark_tasks(
 			'oxc-parser-wasm',
 			'oxc-wasm',
 			(source, _language, goal) => impls.oxc_wasm!.parse(source, language, goal)
+		);
+		// The same native parse in raw-transfer mode: the AST crosses as a shared buffer
+		// that a generated JS deserializer turns into objects, eagerly and in full, so it
+		// materializes the identical tree `oxc-parser` does (byte parity graded per file —
+		// `sibling_outputs_must_match`) without the JSON round trip. See lib/oxc_raw.ts.
+		add(
+			'oxc_raw',
+			impls.oxc_raw?.supports_parse_language(language),
+			'oxc-parser-raw',
+			'oxc-raw',
+			(source, _language, goal) => impls.oxc_raw!.parse(source, language, goal)
 		);
 
 		// tsc (TypeScript/JS only) — the language's own parser, so this row is the

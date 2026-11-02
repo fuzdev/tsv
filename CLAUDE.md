@@ -501,7 +501,7 @@ BENCH_FILTER=zzz BENCH_LIMIT=10 deno task bench:deno:run
 
 **Compares** canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node+Bun), WASM, and alternatives:
 
-- oxc-parser (an N-API row + a separate wasm32-wasi row), oxfmt, biome-wasm, dprint-wasm (the engine `deno fmt` runs; TS/JS only), malva-wasm (dprint's CSS plugin over the same formatter host; CSS only, enforced by the plugin)
+- oxc-parser (an N-API row, the same N-API parse over its raw transfer — `oxc-parser-raw`, absent under Bun — and a separate wasm32-wasi row), oxfmt, biome-wasm, dprint-wasm (the engine `deno fmt` runs; TS/JS only), malva-wasm (dprint's CSS plugin over the same formatter host; CSS only, enforced by the plugin)
 - `tsc` — parse-only, conformance surface only; the language's definition, not a peer (its parser is error-recovering, so an accept means zero `parseDiagnostics`)
 - yuku-parser — a Zig TS/JS parser, N-API + WASM bindings, parse-only, payload-matched to oxc; its lazy `parse()` and error-tolerant parser are corrected for in `benches/js/lib/yuku.ts`
 - swc — parse-only TS/JS on both surfaces (its own AST dialect, so oxc-class payload disclosure; `decorators` must be enabled explicitly; goal axis `isModule`)

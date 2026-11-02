@@ -1643,6 +1643,7 @@ benches/js/
     │                      # the dprint + malva plugins in one host context; COVERAGE-ONLY, never timed)
     ├── napi.ts            # process.dlopen bindings (NapiImplementation — Node/Bun native)
     ├── oxc.ts             # OXC native wrappers (oxc-parser + oxfmt)
+    ├── oxc_raw.ts         # oxc-parser over raw transfer (`oxc-parser-raw`; native only, eager, byte-graded vs `oxc-parser`)
     ├── oxc_wasm.ts        # OXC WASM wrapper (oxc-parser via wasm32-wasi; per-runtime entry)
     ├── parse_diff.ts      # The parse-comparison diff engine (`diff_asts`): raw deep diff, then
     │                      # classification at the reporting layer (shared by corpus_compare_parse
@@ -1829,15 +1830,16 @@ state) shows in the coverage report and skip counts without `--verbose`.
   (`lib/oxc_wasm.ts` does; `lib/oxc.ts` mirrors the form defensively). Two guards
   exist: the single-read pattern at the wrappers, and `bench_preflight.ts`'s
   `check_variant_parity` — after pre-flight, same-engine pairs
-  (tsv↔tsv-wasm variants, oxc-parser↔oxc-parser-wasm, yuku-parser↔yuku-parser-wasm,
+  (tsv↔tsv-wasm variants, oxc-parser↔oxc-parser-wasm, oxc-parser-raw↔oxc-parser, yuku-parser↔yuku-parser-wasm,
   rsvelte-parse↔rsvelte-parse-skip-expr-loc) are compared file-for-file and
   any accept-set divergence prints a `⚠ variant parity` warning (same engine ⇒ a
   divergence is a binding-boundary bug, not an engine difference).
   ⚠️ **The tsv pair is graded on a second, STRONGER axis, and that one is FATAL**: an
   accept set only records whether a file threw, so it is blind to two bindings of one
   engine returning different CONTENT. For the rows `sibling_outputs_must_match` names
-  (tsv's own — the third-party pairs keep the warning, and rsvelte's option pair is
-  excluded because its variant drops payload by design), pre-flight digests each
+  (tsv's own, plus `oxc-parser-raw` ↔ `oxc-parser` — one parse over two transfers, whose
+  shared payload tier rests on equal bytes; the other third-party pairs keep the warning,
+  and rsvelte's option pair is excluded because its variant drops payload by design), pre-flight digests each
   output and a byte divergence over the files both accepted exits non-zero. Under Node
   and Bun the native row IS the N-API addon on the `napi` profile, which makes this
   the standing correctness check on the artifact the native npm packages ship.
