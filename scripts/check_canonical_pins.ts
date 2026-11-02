@@ -155,7 +155,7 @@ const drifted: string[] = [];
  * Versions the sidecar lockfile resolves for `name`.
  *
  * Lock keys are `name@version`, optionally suffixed with the peer resolution
- * that disambiguates a duplicate (`prettier-plugin-svelte@4.1.1_prettier@3.9.9_svelte@5.57.2`),
+ * that disambiguates a duplicate (`prettier-plugin-svelte@4.1.1_prettier@3.9.10_svelte@5.57.3`),
  * and a scoped name carries its own leading `@`. Returns every match so the
  * caller can distinguish absent (0) from a genuinely duplicated package (>1) —
  * two copies of the oracle's printer in one tree would make "the pinned version"

@@ -28,9 +28,9 @@
 // NOTE: Requires deno.json with "acorn": "npm:acorn@8.19.0" import map
 // to ensure @sveltejs/acorn-typescript uses the same acorn instance.
 const VERSIONS = {
-	prettier: '3.9.9',
+	prettier: '3.9.10',
 	'prettier-plugin-svelte': '4.1.1',
-	svelte: '5.57.2',
+	svelte: '5.57.3',
 	acorn: '8.19.0',
 	'@sveltejs/acorn-typescript': '1.0.13'
 } as const;
@@ -38,7 +38,7 @@ const VERSIONS = {
 // TODO verify there's not a better solution to use deno.json here, see the above NOTE too
 // Imports are like this because these don't have the deno.json when used by the release binary.
 // deno-lint-ignore no-import-prefix
-import * as prettier from 'npm:prettier@3.9.9';
+import * as prettier from 'npm:prettier@3.9.10';
 // deno-lint-ignore no-import-prefix
 import prettierPluginSvelte from 'npm:prettier-plugin-svelte@4.1.1';
 // deno-lint-ignore no-import-prefix
@@ -46,7 +46,7 @@ import {
 	compile as svelteCompile,
 	parse as svelteParse,
 	parseCss
-} from 'npm:svelte@5.57.2/compiler';
+} from 'npm:svelte@5.57.3/compiler';
 // deno-lint-ignore no-import-prefix
 import * as acorn from 'npm:acorn@8.19.0';
 // deno-lint-ignore no-import-prefix
