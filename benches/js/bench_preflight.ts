@@ -1059,10 +1059,17 @@ function check_variant_parity(): void {
 			// vacuity arm above cannot see, since it tests that the maps EXIST. Saying
 			// `graded N of M` is what keeps `output_mismatch: 0` from quietly widening
 			// from "agreed" to "never asked".
-			for (const [row_name, key] of [
-				[name, tracking_key],
-				[sibling_name, sibling_key]
-			] as const) {
+			//
+			// Only for a pair this pass actually byte-grades: a row can carry digests for
+			// one pair (oxc-parser, as `oxc-parser-raw`'s base) while sitting in another
+			// that is accept-set only (oxc-parser ↔ oxc-parser-wasm), and reporting its
+			// hole there reads as "graded 0" for a comparison never meant to run.
+			for (const [row_name, key] of impl_digests && sibling_digests
+				? ([
+						[name, tracking_key],
+						[sibling_name, sibling_key]
+					] as const)
+				: []) {
 				const ungraded = ungraded_digests.get(key);
 				if (ungraded === undefined) continue;
 				console.error(
