@@ -62,13 +62,13 @@ export class OxcWasmImplementation extends BaseImplementation {
 				: '@oxc-parser/binding-wasm32-wasi/parser.wasi-browser.js';
 		const mod = await import(entry);
 		this._parser = mod as OxcParserWasmModule;
-		// The native package's own deserializer (dependency-free ESM; the package has
-		// no `exports` map, so the deep import resolves). Importing rather than
-		// copying keeps the two rows' materialization identical by construction; a
-		// moved upstream path fails init loudly. ⚠ It comes from `oxc-parser` at ITS
-		// pin, while this binding is pinned apart (`package.json` `//oxc-wasi`): the two
-		// agree only while `wrap.js` is unchanged across that version gap, so re-diff
-		// it whenever either pin moves.
+		// The native package's own deserializer (dependency-free ESM; the package's
+		// `exports` map carries a `./*` passthrough, so the deep import resolves).
+		// Importing rather than copying keeps the two rows' materialization identical
+		// by construction; a moved upstream path fails init loudly. ⚠ It comes from
+		// `oxc-parser` at ITS pin, while this binding is pinned apart (`package.json`
+		// `//oxc-wasi`): the two agree only while `wrap.js` is unchanged across that
+		// version gap, so re-diff it whenever either pin moves.
 		const wrap = await import('oxc-parser/src-js/wrap.js');
 		this._json_parse_ast = (wrap as { jsonParseAst: JsonParseAst }).jsonParseAst;
 

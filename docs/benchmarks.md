@@ -963,7 +963,7 @@ invalidate. It never sits beside these numbers.
 
 **A row exists only for an artifact on disk**, so this is the one report section
 whose *composition* varies by machine — and the ratios read the same either way
-(`biome is 18.4x tsv`), so an omission is easy to miss. The top-level
+(`biome is Nx tsv`), so an omission is easy to miss. The top-level
 `binary_sizes_absent` is the disclosure: every label the collector reached for and
 did not find. Two different facts share that list, told apart by the label. A **tsv**
 variant (`tsv format (ffi)`, `tsv-parse-wasm`, …) is absent whenever its optional

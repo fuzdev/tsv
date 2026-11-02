@@ -112,8 +112,9 @@ async function gzip_size(path: string): Promise<number | null> {
 	try {
 		// `encoding: 'buffer'` so `stdout` is the raw gzip bytes (a string would
 		// corrupt the binary and miscount). `maxBuffer` lifted well above the
-		// default 1 MB — biome's wasm gzips to ~9 MB. Works under both runtimes
-		// (Deno's node:child_process needs the bench's `--allow-env`/`--allow-run`).
+		// default 1 MB, which biome's gzipped wasm alone exceeds many times over.
+		// Works under both runtimes (Deno's node:child_process needs the bench's
+		// `--allow-env`/`--allow-run`).
 		const { stdout } = await exec_file('gzip', ['-c', path], {
 			encoding: 'buffer',
 			maxBuffer: 256 * 1024 * 1024
@@ -156,7 +157,7 @@ type StagedEntry = { entry: Omit<BinarySize, 'gzip_bytes'>; path: string };
  * COMPOSITION varies by machine — a row is emitted only if its file is on disk, so
  * without it an unbuilt artifact leaves no trace at all, and a committed report's row
  * set silently describes the producer's build state rather than the release. The
- * ratios read the same either way (`biome is 18.4x tsv`), which is what makes the
+ * ratios read the same either way (`biome is Nx tsv`), which is what makes the
  * omission easy to miss.
  */
 interface SizeStaging {
@@ -237,7 +238,7 @@ function napi_binding_dirs(
  * and node_modules paths for npm packages. Computes gzipped size
  * alongside raw size; gzip is shelled out and parallelized across all
  * collected entries, so adding it costs roughly the slowest single
- * compression (biome's 35 MB dominates).
+ * compression (biome's wasm, by far the largest, dominates).
  *
  * Takes the initialized REGISTRY rather than a parallel list of `has_*` booleans.
  * That list was a second place to remember an impl, and the caller silently fell

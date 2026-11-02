@@ -37,7 +37,8 @@
  * Non-braced escapes (`\uXXXX`) and literal non-ASCII identifiers are unaffected at
  * any length, as is the wasm core at these lengths (the overrun stays inside linear
  * memory, and it parses the same inputs cleanly; several times longer it throws a
- * catchable `RuntimeError` and stays usable — no corpus file is that long). test262's
+ * catchable `RuntimeError`, and further out still the trap poisons the instance, so every
+ * later call traps too — no corpus file is that long). test262's
  * `language/identifiers/part-unicode-*-{,class-}escaped.js` fixtures are exactly
  * this shape, and they live only in the conformance corpus — real code has no such
  * identifiers, so both rows stay on the perf corpus.

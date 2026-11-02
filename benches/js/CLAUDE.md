@@ -1801,9 +1801,10 @@ state) shows in the coverage report and skip counts without `--verbose`.
   is the wasm core at these lengths (the overrun stays inside linear memory; it parses
   the same inputs cleanly — itself a variant-parity divergence, except the process dies
   before `check_variant_parity` can report it). Several times longer and the wasm
-  overrun leaves linear memory too: the call throws a `RuntimeError` — an ordinary
-  catchable reject, and the core parses correctly afterwards — which no file in either
-  corpus reaches. test262's
+  overrun leaves linear memory too: the call throws a `RuntimeError` — catchable, and
+  just past that edge the core parses correctly afterwards, but further out the trap
+  poisons the instance and every later call traps too — which no file in either corpus
+  reaches. test262's
   `language/identifiers/part-unicode-*-{,class-}escaped.js` are exactly this shape,
   so the conformance corpus kills the whole run mid-preflight; the perf corpus has no
   such identifiers. A skip list is not a workaround: **which** files of that family
