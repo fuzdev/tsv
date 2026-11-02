@@ -2,8 +2,8 @@
 	"version": 22,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-10-18T07:36:58.821Z",
-	"git_commit": "7103b4aa",
+	"timestamp": "2026-11-02T07:41:52.090Z",
+	"git_commit": "83aa5582",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -11,7 +11,7 @@
 		"runtime_version": "24.14.1"
 	},
 	"corpus": {
-		"svelte": 4644,
+		"svelte": 4686,
 		"typescript": 53323,
 		"css": 22450
 	},
@@ -93,16 +93,16 @@
 		},
 		{
 			"path": "../svelte/packages/svelte/tests",
-			"files": 4568,
+			"files": 4610,
 			"by_language": {
-				"svelte": 4244,
+				"svelte": 4286,
 				"typescript": 140,
 				"css": 184
 			},
 			"repo": {
 				"url": "https://github.com/sveltejs/svelte",
 				"slug": "sveltejs/svelte",
-				"commit": "707c28146b0f0a6d5404a1bd4769874c3c24851a",
+				"commit": "23bb146306ff02cc5041bca0c5de9f8bd086e4a3",
 				"subpath": "packages/svelte/tests"
 			}
 		},
@@ -220,32 +220,32 @@
 			},
 			"../svelte/packages/svelte/tests": {
 				"svelte/compiler": {
-					"processed": 4244,
-					"total": 4244
+					"processed": 4286,
+					"total": 4286
 				},
 				"tsv": {
-					"processed": 4244,
-					"total": 4244
+					"processed": 4286,
+					"total": 4286
 				},
 				"tsv-wasm": {
-					"processed": 4244,
-					"total": 4244
+					"processed": 4286,
+					"total": 4286
 				},
 				"tsv-internal": {
-					"processed": 4244,
-					"total": 4244
+					"processed": 4286,
+					"total": 4286
 				},
 				"tsv-wasm-internal": {
-					"processed": 4244,
-					"total": 4244
+					"processed": 4286,
+					"total": 4286
 				},
 				"rsvelte-parse": {
-					"processed": 4244,
-					"total": 4244
+					"processed": 4286,
+					"total": 4286
 				},
 				"rsvelte-parse-skip-expr-loc": {
-					"processed": 4244,
-					"total": 4244
+					"processed": 4286,
+					"total": 4286
 				}
 			}
 		},
@@ -283,18 +283,23 @@
 					"processed": 570,
 					"total": 591
 				},
+				"oxc-parser-raw": {
+					"processed": 569,
+					"total": 591
+				},
 				"tsc": {
 					"processed": 590,
 					"total": 591
 				},
 				"yuku-parser-wasm": {
-					"processed": 582,
+					"processed": 581,
 					"total": 591,
-					"script_only": 2
+					"script_only": 1
 				},
 				"swc": {
-					"processed": 561,
-					"total": 591
+					"processed": 562,
+					"total": 591,
+					"script_only": 1
 				}
 			},
 			"../prettier/tests/format/js": {
@@ -324,12 +329,19 @@
 					"script_only": 11
 				},
 				"oxc-parser": {
-					"processed": 748,
-					"total": 756
+					"processed": 750,
+					"total": 756,
+					"script_only": 1
 				},
 				"oxc-parser-wasm": {
-					"processed": 748,
-					"total": 756
+					"processed": 750,
+					"total": 756,
+					"script_only": 1
+				},
+				"oxc-parser-raw": {
+					"processed": 750,
+					"total": 756,
+					"script_only": 1
 				},
 				"tsc": {
 					"processed": 743,
@@ -375,6 +387,10 @@
 					"processed": 140,
 					"total": 140
 				},
+				"oxc-parser-raw": {
+					"processed": 140,
+					"total": 140
+				},
 				"tsc": {
 					"processed": 140,
 					"total": 140
@@ -417,16 +433,20 @@
 					"processed": 43725,
 					"total": 43739
 				},
+				"oxc-parser-raw": {
+					"processed": 43725,
+					"total": 43739
+				},
 				"tsc": {
 					"processed": 43677,
 					"total": 43739
 				},
 				"yuku-parser-wasm": {
-					"processed": 43698,
+					"processed": 43705,
 					"total": 43739
 				},
 				"swc": {
-					"processed": 43423,
+					"processed": 43425,
 					"total": 43739
 				}
 			},
@@ -452,11 +472,15 @@
 					"total": 8097
 				},
 				"oxc-parser": {
-					"processed": 7999,
+					"processed": 7983,
 					"total": 8097
 				},
 				"oxc-parser-wasm": {
-					"processed": 8000,
+					"processed": 7984,
+					"total": 8097
+				},
+				"oxc-parser-raw": {
+					"processed": 7982,
 					"total": 8097
 				},
 				"tsc": {
@@ -464,11 +488,11 @@
 					"total": 8097
 				},
 				"yuku-parser-wasm": {
-					"processed": 7991,
+					"processed": 7992,
 					"total": 8097
 				},
 				"swc": {
-					"processed": 7936,
+					"processed": 7934,
 					"total": 8097
 				}
 			}
@@ -555,94 +579,94 @@
 		}
 	},
 	"versions": {
-		"tsv": "0.7.0",
-		"svelte": "5.57.2",
+		"tsv": "0.8.0",
+		"svelte": "5.57.3",
 		"acorn": "8.19.0",
 		"acorn_ts": "1.0.13",
-		"prettier": "3.9.9",
+		"prettier": "3.9.10",
 		"prettier_svelte": "4.1.1",
-		"oxc_parser": "0.153.0",
+		"oxc_parser": "0.156.0",
 		"oxc_parser_wasm": "0.142.0",
-		"oxfmt": "0.72.0",
-		"yuku_parser": "0.17.0",
-		"yuku_parser_wasm": "0.17.0",
-		"biome": "2.5.15",
+		"oxfmt": "0.75.0",
+		"yuku_parser": "0.19.0",
+		"yuku_parser_wasm": "0.19.0",
+		"biome": "2.6.4",
 		"dprint": "0.96.1",
 		"malva": "0.16.0",
-		"markup": "0.27.5",
-		"postcss": "8.5.29",
+		"markup": "0.27.6",
+		"postcss": "8.5.32",
 		"rsvelte_fmt": "0.7.25",
 		"rsvelte_parse": "0.3.17",
 		"rsvelte_parse_svelte_target": "5.57.1",
-		"swc": "1.16.13",
+		"swc": "1.16.21",
 		"tsc": "6.0.3"
 	},
 	"binary_sizes": [
 		{
 			"label": "tsv (ffi)",
-			"bytes": 3616016,
+			"bytes": 3872880,
 			"kind": "native",
-			"gzip_bytes": 1688408
+			"gzip_bytes": 1830947
 		},
 		{
 			"label": "tsv format (ffi)",
-			"bytes": 3325360,
+			"bytes": 3576096,
 			"kind": "native",
-			"gzip_bytes": 1555218
+			"gzip_bytes": 1696251
 		},
 		{
 			"label": "tsv parse (ffi)",
-			"bytes": 1587888,
+			"bytes": 1638800,
 			"kind": "native",
-			"gzip_bytes": 711327
+			"gzip_bytes": 739021
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 4062256,
+			"bytes": 4327488,
 			"kind": "native",
-			"gzip_bytes": 1879007
+			"gzip_bytes": 2037799
 		},
 		{
 			"label": "tsv-format-wasm",
-			"bytes": 2466136,
+			"bytes": 2720580,
 			"kind": "wasm",
-			"gzip_bytes": 961684
+			"gzip_bytes": 1052786
 		},
 		{
 			"label": "tsv-parse-wasm",
-			"bytes": 1023317,
+			"bytes": 1073743,
 			"kind": "wasm",
-			"gzip_bytes": 404849
+			"gzip_bytes": 424905
 		},
 		{
 			"label": "tsv-wasm",
-			"bytes": 2768445,
+			"bytes": 3038156,
 			"kind": "wasm",
-			"gzip_bytes": 1070924
+			"gzip_bytes": 1166241
 		},
 		{
 			"label": "svelte + acorn-typescript parsers (js bundle)",
 			"bytes": 500459,
 			"kind": "js",
-			"gzip_bytes": 124924
+			"gzip_bytes": 124925
 		},
 		{
 			"label": "prettier + svelte plugin (js bundle)",
-			"bytes": 2215561,
+			"bytes": 2215562,
 			"kind": "js",
-			"gzip_bytes": 567362
+			"gzip_bytes": 567363
 		},
 		{
 			"label": "prettier + parsers (js bundle)",
-			"bytes": 2216001,
+			"bytes": 2216002,
 			"kind": "js",
-			"gzip_bytes": 567467
+			"gzip_bytes": 567463
 		},
 		{
 			"label": "biome (wasm)",
-			"bytes": 46900198,
+			"bytes": 64052560,
 			"kind": "wasm",
-			"gzip_bytes": 11916869
+			"gzip_bytes": 16655943
 		},
 		{
 			"label": "dprint (wasm)",
@@ -652,15 +676,15 @@
 		},
 		{
 			"label": "oxc-parser (napi)",
-			"bytes": 2104992,
+			"bytes": 2162336,
 			"kind": "native",
-			"gzip_bytes": 880782
+			"gzip_bytes": 905954
 		},
 		{
 			"label": "oxfmt (napi)",
-			"bytes": 8842816,
+			"bytes": 9141768,
 			"kind": "native",
-			"gzip_bytes": 3653212
+			"gzip_bytes": 3769229
 		},
 		{
 			"label": "oxc-parser (wasm)",
@@ -670,15 +694,15 @@
 		},
 		{
 			"label": "yuku-parser (napi)",
-			"bytes": 681096,
+			"bytes": 692232,
 			"kind": "native",
-			"gzip_bytes": 285954
+			"gzip_bytes": 287683
 		},
 		{
 			"label": "yuku-parser (wasm)",
-			"bytes": 698941,
+			"bytes": 718650,
 			"kind": "wasm",
-			"gzip_bytes": 202782
+			"gzip_bytes": 209398
 		},
 		{
 			"label": "rsvelte-fmt (binary)",
@@ -694,9 +718,9 @@
 		},
 		{
 			"label": "markup_fmt (wasm)",
-			"bytes": 1999061,
+			"bytes": 2009404,
 			"kind": "wasm",
-			"gzip_bytes": 557307
+			"gzip_bytes": 558659
 		},
 		{
 			"label": "rsvelte compiler (napi)",
@@ -706,9 +730,9 @@
 		},
 		{
 			"label": "swc (napi)",
-			"bytes": 10544504,
+			"bytes": 10663360,
 			"kind": "native",
-			"gzip_bytes": 10151891
+			"gzip_bytes": 10265702
 		}
 	],
 	"binary_sizes_absent": [],
@@ -738,8 +762,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4644,
-			"files_total": 4644,
+			"files_processed": 4686,
+			"files_total": 4686,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -770,8 +794,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4644,
-			"files_total": 4644,
+			"files_processed": 4686,
+			"files_total": 4686,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "span_only",
@@ -802,8 +826,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4644,
-			"files_total": 4644,
+			"files_processed": 4686,
+			"files_total": 4686,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "span_only",
@@ -834,8 +858,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4644,
-			"files_total": 4644,
+			"files_processed": 4686,
+			"files_total": 4686,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "none",
@@ -866,8 +890,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4644,
-			"files_total": 4644,
+			"files_processed": 4686,
+			"files_total": 4686,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "none",
@@ -898,8 +922,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4644,
-			"files_total": 4644,
+			"files_processed": 4686,
+			"files_total": 4686,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -930,8 +954,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4644,
-			"files_total": 4644,
+			"files_processed": 4686,
+			"files_total": 4686,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "own_shape",
@@ -1122,7 +1146,7 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53181,
+			"files_processed": 53167,
 			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
@@ -1154,7 +1178,39 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53183,
+			"files_processed": 53169,
+			"files_total": 53323,
+			"files_iterated": null,
+			"files_iterated_digest": null,
+			"payload": "span_only",
+			"runtime": "node"
+		},
+		{
+			"name": "oxc-parser-raw",
+			"group": "parse/typescript",
+			"mean_ns": null,
+			"p50_ns": null,
+			"p75_ns": null,
+			"p90_ns": null,
+			"p95_ns": null,
+			"p99_ns": null,
+			"min_ns": null,
+			"max_ns": null,
+			"std_dev_ns": null,
+			"cv": null,
+			"ops_per_second": null,
+			"sample_size": null,
+			"cv_raw": null,
+			"drift": null,
+			"raw_sample_size": null,
+			"outlier_ratio": null,
+			"warmup_iterations": null,
+			"min_iterations": null,
+			"passes": null,
+			"pass_mean_ns": null,
+			"pass_spread": null,
+			"settled_heap_bytes": null,
+			"files_processed": 53166,
 			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
@@ -1218,7 +1274,7 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53162,
+			"files_processed": 53169,
 			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
@@ -1250,7 +1306,7 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 52796,
+			"files_processed": 52797,
 			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
@@ -1453,7 +1509,8 @@
 	"suppressed_noise": {},
 	"output_digest_ungraded": {
 		"parse/typescript/tsv": 1,
-		"parse/typescript/tsv-wasm": 1
+		"parse/typescript/tsv-wasm": 1,
+		"parse/typescript/oxc-parser": 1
 	},
 	"variant_parity": [
 		{
@@ -1462,6 +1519,15 @@
 			"sibling": "oxc-parser-wasm",
 			"impl_only": 0,
 			"sibling_only": 2,
+			"output_mismatch": 0,
+			"output_mismatch_examples": []
+		},
+		{
+			"group": "parse/typescript",
+			"impl": "oxc-parser-raw",
+			"sibling": "oxc-parser",
+			"impl_only": 0,
+			"sibling_only": 1,
 			"output_mismatch": 0,
 			"output_mismatch_examples": []
 		}
