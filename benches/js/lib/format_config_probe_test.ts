@@ -1,5 +1,6 @@
 /**
- * Tests for the pinned-layout-config grader (`assert_format_config_landed`).
+ * Tests for the pinned-layout-config grader (`assert_format_config_landed`) and the
+ * embedded-region grader (`assert_embedded_regions_landed`).
  *
  * Pins the two directions that matter, since a wrong verdict either publishes a
  * number produced at some other tool's defaults or removes a healthy row:
@@ -19,7 +20,10 @@
  */
 
 import { throws, doesNotThrow } from 'node:assert';
-import { assert_format_config_landed } from './format_config_probe.ts';
+import {
+	assert_embedded_regions_landed,
+	assert_format_config_landed
+} from './format_config_probe.ts';
 import type { Language } from './types.ts';
 
 /** What each language's probe looks like once the pins LANDED — the passing case. */
@@ -33,11 +37,19 @@ const pinned: Record<Language, string> = {
 		"\t'bbbbbbbbbb',",
 		"\t'hhhhhhhhhh'",
 		'];',
+		'const probe_wide = {',
+		"\talpha: 'aaaaaaaaa',",
+		"\teps: 'eeee'",
+		'};',
 		''
 	].join('\n'),
 	css: [
 		'.probe {',
 		"\tfont-family: 'Alpha Sans', 'Beta Serif', 'Gamma Mono', 'Delta Text', 'Epsilon UI', sans-serif;",
+		'}',
+		'.wide {',
+		'\tfont-family:',
+		"\t\t'Alpha Sans', 'Beta Serif', 'Gamma Mono', 'Delta Text', 'Epsilon UI', 'Zeta Sans', serif;",
 		'}',
 		''
 	].join('\n'),
@@ -47,6 +59,9 @@ const pinned: Record<Language, string> = {
 		'\t<p>aaaaaaaaaa</p>',
 		'\t<p>dddddddddd</p>',
 		'</section>',
+		'<div class="wide">',
+		'\t<span>alpha</span><span>beta</span><span>gamma</span><span>delta</span><b>eps</b>',
+		'</div>',
 		''
 	].join('\n')
 };
@@ -103,14 +118,10 @@ const dropped: Array<{ label: string; language: Language; output: string; option
 	{
 		label: 'css width fell back below 100',
 		language: 'css',
-		output: [
-			'.probe {',
-			'\tfont-family:',
-			"\t\t'Alpha Sans', 'Beta Serif', 'Gamma Mono', 'Delta Text', 'Epsilon UI',",
-			'\t\tsans-serif;',
-			'}',
-			''
-		].join('\n'),
+		output: pinned.css.replace(
+			"\tfont-family: 'Alpha Sans', 'Beta Serif', 'Gamma Mono', 'Delta Text', 'Epsilon UI', sans-serif;",
+			"\tfont-family:\n\t\t'Alpha Sans', 'Beta Serif', 'Gamma Mono', 'Delta Text', 'Epsilon UI',\n\t\tsans-serif;"
+		),
 		option: 'printWidth'
 	},
 	{
@@ -128,8 +139,10 @@ const dropped: Array<{ label: string; language: Language; output: string; option
 	{
 		label: 'css rule stayed inline (vacuous indent arm)',
 		language: 'css',
-		output:
-			".probe { font-family: 'Alpha Sans', 'Beta Serif', 'Gamma Mono', 'Delta Text', 'Epsilon UI', sans-serif; }\n",
+		output: pinned.css.replace(
+			".probe {\n\tfont-family: 'Alpha Sans', 'Beta Serif', 'Gamma Mono', 'Delta Text', 'Epsilon UI', sans-serif;\n}",
+			".probe { font-family: 'Alpha Sans', 'Beta Serif', 'Gamma Mono', 'Delta Text', 'Epsilon UI', sans-serif; }"
+		),
 		option: 'indentStyle'
 	},
 	{
@@ -157,6 +170,35 @@ const dropped: Array<{ label: string; language: Language; output: string; option
 		option: 'indentStyle'
 	},
 	{
+		// The fallback the one-sided check missed: dprint's 120 for a misspelled global
+		// `lineWidth` — every line under 100 still fits, so only an over-100 line shows it.
+		label: 'ts width rose above 100',
+		language: 'typescript',
+		output: pinned.typescript.replace(
+			"const probe_wide = {\n\talpha: 'aaaaaaaaa',\n\teps: 'eeee'\n};",
+			"const probe_wide = { alpha: 'aaaaaaaaa', eps: 'eeee' };"
+		),
+		option: 'printWidth'
+	},
+	{
+		label: 'css width rose above 100',
+		language: 'css',
+		output: pinned.css.replace(
+			"\tfont-family:\n\t\t'Alpha Sans', 'Beta Serif', 'Gamma Mono', 'Delta Text', 'Epsilon UI', 'Zeta Sans', serif;",
+			"\tfont-family: 'Alpha Sans', 'Beta Serif', 'Gamma Mono', 'Delta Text', 'Epsilon UI', 'Zeta Sans', serif;"
+		),
+		option: 'printWidth'
+	},
+	{
+		label: 'svelte width rose above 100',
+		language: 'svelte',
+		output: pinned.svelte.replace(
+			'<div class="wide">\n\t<span>alpha</span><span>beta</span><span>gamma</span><span>delta</span><b>eps</b>\n</div>',
+			'<div class="wide"><span>alpha</span><span>beta</span><span>gamma</span><span>delta</span><b>eps</b></div>'
+		),
+		option: 'printWidth'
+	},
+	{
 		// The shape biome produces for `.svelte` when `experimentalFullSupportEnabled`
 		// is lost: an EMPTY string, which every other check reads as a clean format.
 		label: 'svelte formatter declined the language (empty output)',
@@ -172,6 +214,65 @@ for (const { label, language, output, option } of dropped) {
 			() => assert_format_config_landed('probe-tool', language, output),
 			(e: unknown) => e instanceof Error && e.message.includes(option),
 			`expected the throw to name '${option}'`
+		);
+	});
+}
+
+const embedded_pinned = [
+	'<script>',
+	"\tconst probe = 'embedded';",
+	'</script>',
+	'',
+	'<p>{a + b}</p>',
+	'',
+	'<style>',
+	'\t.probe {',
+	'\t\tcolor: red;',
+	'\t}',
+	'</style>',
+	''
+].join('\n');
+
+Deno.test('embedded regions landed: pinned output passes', () => {
+	doesNotThrow(() => assert_embedded_regions_landed('probe-tool', embedded_pinned));
+});
+
+/** Each dropped hop, as the output a tool produces without it — `hop` is what the throw must name. */
+const dropped_embeds: Array<{ label: string; output: string; hop: string }> = [
+	{
+		// biome before `indentScriptAndStyle`: both bodies flush
+		label: 'bodies left flush',
+		output: embedded_pinned
+			.replace("\tconst probe = 'embedded';", "const probe = 'embedded';")
+			.replace('\t.probe {\n\t\tcolor: red;\n\t}', '.probe {\n\tcolor: red;\n}'),
+		hop: '<script>'
+	},
+	{
+		label: '<style> body left flush',
+		output: embedded_pinned.replace(
+			'\t.probe {\n\t\tcolor: red;\n\t}',
+			'.probe {\n\tcolor: red;\n}'
+		),
+		hop: '<style>'
+	},
+	{
+		label: '<script> handed back unformatted',
+		output: embedded_pinned.replace("\tconst probe = 'embedded';", '\tconst probe = "embedded"'),
+		hop: '<script>'
+	},
+	{
+		label: 'template expression handed back unformatted',
+		output: embedded_pinned.replace('{a + b}', '{a+b}'),
+		hop: 'template expression'
+	}
+];
+
+for (const { label, output, hop } of dropped_embeds) {
+	Deno.test(`embedded regions did NOT land: ${label}`, () => {
+		throws(
+			() => assert_embedded_regions_landed('probe-tool', output),
+			(e: unknown) => e instanceof Error && e.message.includes(hop),
+			`expected the throw to name '${hop}'`
 		);
 	});
 }

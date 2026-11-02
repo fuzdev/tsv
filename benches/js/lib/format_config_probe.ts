@@ -8,7 +8,8 @@
  * docs/benchmarks.md §Fairness caveats). Two of the four timed format opponents
  * have a channel that says so when a key stops being recognized, and two do not:
  * `lib/dprint.ts` and `lib/malva.ts` fail init on a non-empty
- * `getConfigDiagnostics()` (as does the coverage-only `lib/markup.ts`), while
+ * `getConfigDiagnostics()` (as does the coverage-only `lib/markup.ts`) — for their
+ * plugin keys only: the shared global config's keys report nothing — while
  * biome's `applyConfiguration` and oxfmt's per-call options bag each accept an unknown key SILENTLY and fall back to their
  * own defaults — measured: biome drops to width 80 + double quotes + trailing
  * commas, oxfmt to spaces + double quotes + trailing commas. A renamed key there
@@ -64,8 +65,10 @@ import type { Language } from './types.ts';
  *
  * TypeScript carries all four:
  *
- * - the object fits in 100 columns and not in 80, so `printWidth`/`lineWidth`
- *   shows up as whether it stays on one line;
+ * - the object fits in 100 columns and not in 80, and `probe_wide` formats to 106,
+ *   so `printWidth`/`lineWidth` shows up as whether each stays on one line — the
+ *   pair bounds the width from BOTH sides (a fallback to dprint's 120 broke nothing
+ *   with only the first, so it read as a pass);
  * - its values are double-quoted in the input, so `singleQuote`/`quoteStyle`
  *   shows up as the quote character;
  * - the function body is indented, so `useTabs`/`indentStyle` shows up as the
@@ -75,22 +78,26 @@ import type { Language } from './types.ts';
  *
  * CSS carries the three it has (there is no trailing comma in a declaration): the
  * `font-family` list formats to 96 columns, so it stays on one line at 100 and
- * breaks at 80; its family names are double-quoted; and the declaration sits inside
+ * breaks at 80, while the `.wide` one formats to 104 and breaks at 100; its family names are double-quoted; and the declaration sits inside
  * a rule, so it is indented.
  *
  * Svelte carries the two the markup pipeline governs (attribute quotes are not the
  * JS quote style): the `<div>` formats to 95 columns, so it stays whole at 100 and
- * breaks at 80, and the `<section>` breaks at any width, so its children are always
+ * breaks at 80, while the `wide` one formats to 105 and breaks at 100; and the `<section>` breaks at any width, so its children are always
  * indented.
  */
 export const FORMAT_CONFIG_PROBES: Readonly<Record<Language, string>> = {
 	typescript:
 		'function probe() { return { alpha: "aaaa", beta: "bbbb", gamma: "cccc", delta: "dddd", epsilon: "eeee" } }\n' +
-		'const probe_list = ["aaaaaaaaaa", "bbbbbbbbbb", "cccccccccc", "dddddddddd", "eeeeeeeeee", "ffffffffff", "gggggggggg", "hhhhhhhhhh"]\n',
-	css: '.probe { font-family: "Alpha Sans", "Beta Serif", "Gamma Mono", "Delta Text", "Epsilon UI", sans-serif; }\n',
+		'const probe_list = ["aaaaaaaaaa", "bbbbbbbbbb", "cccccccccc", "dddddddddd", "eeeeeeeeee", "ffffffffff", "gggggggggg", "hhhhhhhhhh"]\n' +
+		'const probe_wide = { alpha: "aaaaaaaaa", beta: "bbbbbbbbb", gamma: "ccccccccc", delta: "d", eps: "eeee" }\n',
+	css:
+		'.probe { font-family: "Alpha Sans", "Beta Serif", "Gamma Mono", "Delta Text", "Epsilon UI", sans-serif; }\n' +
+		'.wide { font-family: "Alpha Sans", "Beta Serif", "Gamma Mono", "Delta Text", "Epsilon UI", "Zeta Sans", serif; }\n',
 	svelte:
 		'<div class="probe"><span>alpha</span><span>beta</span><span>gamma</span><span>delta</span></div>\n' +
-		'<section><p>aaaaaaaaaa</p><p>bbbbbbbbbb</p><p>cccccccccc</p><p>dddddddddd</p></section>\n'
+		'<section><p>aaaaaaaaaa</p><p>bbbbbbbbbb</p><p>cccccccccc</p><p>dddddddddd</p></section>\n' +
+		'<div class="wide"><span>alpha</span><span>beta</span><span>gamma</span><span>delta</span><b>eps</b></div>\n'
 };
 
 /**
@@ -142,6 +149,19 @@ export function assert_format_config_landed(
 				throw fail(
 					'printWidth/lineWidth',
 					'the probe object broke across lines, so the width fell back below 100'
+				);
+			}
+			const wide_line = lines.find((line) => line.includes('probe_wide'));
+			if (wide_line === undefined) {
+				throw fail(
+					'printWidth',
+					'the probe produced no `probe_wide` line at all — it no longer applies'
+				);
+			}
+			if (wide_line.includes('eps:')) {
+				throw fail(
+					'printWidth/lineWidth',
+					'the 106-column probe object stayed on one line, so the width is above 100'
 				);
 			}
 
@@ -206,6 +226,19 @@ export function assert_format_config_landed(
 					'the probe declaration broke across lines, so the width fell back below 100'
 				);
 			}
+			const wide_line = lines.find((line) => line.includes('Zeta Sans'));
+			if (wide_line === undefined) {
+				throw fail(
+					'lineWidth',
+					'the probe produced no `Zeta Sans` line at all — it no longer applies'
+				);
+			}
+			if (wide_line.includes('font-family:')) {
+				throw fail(
+					'printWidth/lineWidth',
+					'the 104-column probe declaration stayed on one line, so the width is above 100'
+				);
+			}
 			if (!output.includes("'Alpha Sans'")) {
 				throw fail(
 					'singleQuote/quoteStyle',
@@ -230,6 +263,19 @@ export function assert_format_config_landed(
 				throw fail(
 					'printWidth/lineWidth',
 					'the probe element broke across lines, so the width fell back below 100'
+				);
+			}
+			const wide_line = lines.find((line) => line.includes('<div class="wide"'));
+			if (wide_line === undefined) {
+				throw fail(
+					'lineWidth',
+					'the probe produced no `<div class="wide">` line at all — it no longer applies'
+				);
+			}
+			if (wide_line.includes('</div>')) {
+				throw fail(
+					'printWidth/lineWidth',
+					'the 105-column probe element stayed on one line, so the width is above 100'
 				);
 			}
 
@@ -263,4 +309,52 @@ export function assert_format_config_landed(
 	// until the arm exists.
 	const unhandled: never = language;
 	throw new Error(`format config probe: no grading arm for language '${String(unhandled)}'`);
+}
+
+/**
+ * A Svelte source with one region per EMBED hop — the regions a Svelte formatter hands
+ * to another language's printer — each graded by a line only that hop produces:
+ *
+ * - `<script>` → TypeScript, indented one level: the double-quoted string comes back
+ *   single-quoted, terminated, on a line indented by a tab;
+ * - template expression → TypeScript: spaces appear around the operator;
+ * - `<style>` → CSS, indented one level: the rule expands and its declaration comes
+ *   back terminated on a line indented by two tabs.
+ *
+ * `FORMAT_CONFIG_PROBES.svelte` holds no `<script>` or `<style>`, so it grades the
+ * markup layer alone, and the `typescript` / `css` probes reach those printers
+ * standalone — neither sees a hop, nor the `<script>` / `<style>` body indent
+ * (prettier-plugin-svelte's `svelteIndentScriptAndStyle`, default on), which a
+ * formatter that leaves the bodies flush gives every embedded line two more columns
+ * to fit in: different layout work under the same row name.
+ */
+export const EMBED_PROBE_SOURCE =
+	'<script>\nconst probe = "embedded"\n</script>\n\n<p>{a+b}</p>\n\n<style>\n.probe{color:red}\n</style>\n';
+
+/** The line each `EMBED_PROBE_SOURCE` hop must produce, keyed by the hop. */
+const EMBED_PROBE_LINES: ReadonlyArray<readonly [hop: string, line: string]> = [
+	['<script> → TypeScript, body indented', "\tconst probe = 'embedded';"],
+	['template expression → TypeScript', '<p>{a + b}</p>'],
+	['<style> → CSS, body indented', '\t\tcolor: red;']
+];
+
+/**
+ * Grade `tool`'s formatting of `EMBED_PROBE_SOURCE`, THROWING when an embedded region
+ * came back unformatted or unindented — a hop that no longer reaches its printer, or
+ * an indent option that did not land.
+ *
+ * @param tool - the tool's row-facing name, so the throw names who failed
+ * @param output - what the tool made of `EMBED_PROBE_SOURCE`
+ */
+export function assert_embedded_regions_landed(tool: string, output: string): void {
+	const lines = output.split('\n');
+	const missed = EMBED_PROBE_LINES.filter(([, line]) => !lines.includes(line));
+	if (missed.length > 0) {
+		throw new Error(
+			`${tool} (svelte): an embedded region came back unformatted or unindented ` +
+				`(${missed.map(([hop, line]) => `${hop}: no line ${JSON.stringify(line)}`).join('; ')}) ` +
+				`— got ${JSON.stringify(output)}. See \`assert_embedded_regions_landed\` in ` +
+				'lib/format_config_probe.ts.'
+		);
+	}
 }

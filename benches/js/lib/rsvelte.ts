@@ -25,6 +25,12 @@
  *   the only language where it is a distinct engine.
  */
 
+import {
+	assert_embedded_regions_landed,
+	assert_format_config_landed,
+	EMBED_PROBE_SOURCE,
+	FORMAT_CONFIG_PROBES
+} from './format_config_probe.ts';
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -132,6 +138,18 @@ export class RsvelteImplementation extends BaseImplementation {
 		if (probe.status !== 0) {
 			throw new Error(`rsvelte-fmt --version exited ${probe.status}`);
 		}
+
+		// And that a VALID file formats, under the pinned layout: the reject probe below
+		// passes whatever makes the call fail, so a renamed flag (an `unexpected
+		// argument` exit 2 on every file) would publish 0% coverage as the engine's own
+		// limit, and an unknown `.oxfmtrc` key falls back to oxfmt's default silently.
+		// The embed probe reaches the quote key, which only a `<script>` can show.
+		assert_format_config_landed(
+			'rsvelte-fmt',
+			'svelte',
+			this.format(FORMAT_CONFIG_PROBES.svelte, 'svelte')
+		);
+		assert_embedded_regions_landed('rsvelte-fmt', this.format(EMBED_PROBE_SOURCE, 'svelte'));
 
 		// The row is an accept rate and nothing else, decided by the exit status — so
 		// prove a syntax error still exits non-zero (`lib/reject_probe.ts`).

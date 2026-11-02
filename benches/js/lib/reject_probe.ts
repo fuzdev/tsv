@@ -201,6 +201,46 @@ export function assert_parser_rejects_invalid(
 	}
 }
 
+/**
+ * Assert a TypeScript parse row's goal axis SWINGS, in both directions, at every goal
+ * `probe_goals` hands it — and that an UNSET goal reads as `module`, the goal tsv,
+ * acorn, yuku and swc parse an untagged file at (`SourceFile.goal`).
+ *
+ * For a tool that infers the goal itself when none is passed, or ignores an unknown
+ * `sourceType` value silently, an inert goal is invisible to every other probe: oxc
+ * guesses from the file name and reads an import-free `file.ts` as a SCRIPT, so with
+ * the goal left unset `var await = 1;` parsed, crediting the row with script-only
+ * syntax on every untagged file of the conformance surface. `var await` is legal at
+ * Script alone, so it pins the axis. (`import` is no probe: oxc and yuku accept an
+ * import declaration at Script, a parser difference rather than a dropped option.)
+ *
+ * @param tool - the row-facing name
+ * @param parse - the row's own call, throwing on a rejection
+ */
+export function assert_parse_goal_swings(
+	tool: string,
+	parse: (source: string, goal?: ParseGoal) => unknown
+): void {
+	const accepts = (source: string, goal?: ParseGoal): boolean => {
+		try {
+			parse(source, goal);
+			return true;
+		} catch {
+			return false;
+		}
+	};
+	for (const goal of probe_goals('typescript')) {
+		const script = goal === 'script';
+		if (accepts('var await = 1;', goal) !== script) {
+			throw new Error(
+				`${tool}: the parse goal did not land at ${goal ?? 'unset'} — \`var await\` must parse at ` +
+					'Script alone, and an unset goal must read as Module. ' +
+					'See `assert_parse_goal_swings` in lib/reject_probe.ts.'
+			);
+		}
+	}
+}
+
 /** `assert_tool_rejects_invalid` for a wrapper whose call is async-only. */
 export async function assert_tool_rejects_invalid_async(
 	tool: string,

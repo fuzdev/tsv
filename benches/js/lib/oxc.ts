@@ -16,6 +16,7 @@ import {
 import type { OxcVersions } from './versions.ts';
 import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
 import {
+	assert_parse_goal_swings,
 	assert_parser_rejects_invalid,
 	assert_tool_rejects_invalid_async,
 	INVALID_SOURCES,
@@ -73,6 +74,17 @@ interface OxfmtModule {
  * probe below only has to catch the conservative one.
  */
 const OXC_NON_FATAL_SEVERITIES: ReadonlySet<string> = new Set(['Warning', 'Advice']);
+
+/**
+ * The `parseSync` options per goal, shared by both bindings and built once (the
+ * parse rows take one per call). Every call passes one: with no `sourceType`, oxc
+ * infers the goal from the file name and content, reading an import-free `file.ts`
+ * as a script — every other row parses an untagged file as a module.
+ */
+export const OXC_GOAL_OPTIONS: Readonly<Record<ParseGoal, { sourceType: ParseGoal }>> = {
+	module: { sourceType: 'module' },
+	script: { sourceType: 'script' }
+};
 
 /**
  * The entries of an oxc `errors` array that mean the tool REJECTED its input.
@@ -222,6 +234,8 @@ export class OxcImplementation extends BaseImplementation {
 			assert_parser_rejects_invalid('oxc-parser', this.parse_languages, (s, l, goal) =>
 				this.parse(s, l, goal)
 			);
+			// oxc ignores an unknown `sourceType` silently, and infers a goal when none lands.
+			assert_parse_goal_swings('oxc-parser', (s, goal) => this.parse(s, 'typescript', goal));
 		}
 		if (!formats) return;
 		// Per LANGUAGE, and through `format_async` rather than the raw module call:
@@ -257,9 +271,10 @@ export class OxcImplementation extends BaseImplementation {
 			throw new Error(`OXC parser does not support ${language}`);
 		}
 
-		// A test262 goal pins oxc's `sourceType` so it's scored at the declared
-		// goal like tsv/acorn, instead of oxc's filename-based inference.
-		const options = goal ? { sourceType: goal } : undefined;
+		// ALWAYS pass a goal: left unset, oxc infers it from the file name and reads an
+		// import-free `file.ts` as a SCRIPT, where every other row parses an untagged
+		// file as a module (`assert_parse_goal_swings`).
+		const options = OXC_GOAL_OPTIONS[goal ?? 'module'];
 		const result = this._parser.parseSync(`file${LANGUAGE_EXTENSIONS[language]}`, source, options);
 
 		// Read `errors` once into a local: the WASI sibling's getter is consume-once

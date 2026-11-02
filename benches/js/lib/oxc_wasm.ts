@@ -10,8 +10,13 @@
 
 import { BaseImplementation, type Language, LANGUAGE_EXTENSIONS, type ParseGoal } from './types.ts';
 import type { OxcWasmVersions } from './versions.ts';
-import { assert_oxc_rejects_invalid, type OxcDiagnostic, oxc_fatal_errors } from './oxc.ts';
-import { assert_parser_rejects_invalid } from './reject_probe.ts';
+import {
+	assert_oxc_rejects_invalid,
+	type OxcDiagnostic,
+	oxc_fatal_errors,
+	OXC_GOAL_OPTIONS
+} from './oxc.ts';
+import { assert_parse_goal_swings, assert_parser_rejects_invalid } from './reject_probe.ts';
 import { current_runtime } from './runtime.ts';
 
 /** oxc-parser WASM module types (same API as native) */
@@ -83,6 +88,8 @@ export class OxcWasmImplementation extends BaseImplementation {
 		assert_parser_rejects_invalid('oxc-parser-wasm', this.parse_languages, (s, l, goal) =>
 			this.parse(s, l, goal)
 		);
+		// oxc ignores an unknown `sourceType` silently, and infers a goal when none lands.
+		assert_parse_goal_swings('oxc-parser-wasm', (s, goal) => this.parse(s, 'typescript', goal));
 	}
 
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
@@ -91,7 +98,8 @@ export class OxcWasmImplementation extends BaseImplementation {
 			throw new Error(`OXC WASM parser does not support ${language}`);
 		}
 
-		const options = goal ? { sourceType: goal } : undefined;
+		// Always a goal — see `OXC_GOAL_OPTIONS`.
+		const options = OXC_GOAL_OPTIONS[goal ?? 'module'];
 		const result = this._parser.parseSync(`file${LANGUAGE_EXTENSIONS[language]}`, source, options);
 
 		// Read `errors` exactly ONCE: on the WASI binding it's a CONSUME-ONCE getter —

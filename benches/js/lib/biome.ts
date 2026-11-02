@@ -18,7 +18,12 @@ import type { BiomeVersions } from './versions.ts';
 // the package at this module's import. The value imports are deferred to `init()`
 // (see there) so a load-time crash can't escape the registry's skip.
 import type { Biome, Configuration } from '@biomejs/js-api';
-import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
+import {
+	assert_embedded_regions_landed,
+	assert_format_config_landed,
+	EMBED_PROBE_SOURCE,
+	FORMAT_CONFIG_PROBES
+} from './format_config_probe.ts';
 import { assert_tool_rejects_invalid } from './reject_probe.ts';
 
 /**
@@ -93,6 +98,12 @@ const BIOME_CONFIGURATION: Configuration = {
 		lineWidth: 100
 	},
 	javascript: {
+		// A GRAMMAR input like `css.parser` below: TypeScript's parameter decorators
+		// (`m(@Inject() a)`) are refused unless enabled, and a project using them would
+		// enable it in its own config — prettier and tsv parse them unconfigured.
+		parser: {
+			unsafeParameterDecoratorsEnabled: true
+		},
 		formatter: {
 			indentStyle: 'tab',
 			lineWidth: 100,
@@ -118,11 +129,39 @@ const BIOME_CONFIGURATION: Configuration = {
 	html: {
 		experimentalFullSupportEnabled: true,
 		formatter: {
+			// prettier-plugin-svelte indents `<script>` / `<style>` bodies by default and
+			// biome does not (`EMBED_PROBE_SOURCE`); flush bodies are different layout work.
+			indentScriptAndStyle: true,
 			indentStyle: 'tab',
 			lineWidth: 100
 		}
 	}
 };
+
+/**
+ * One source per grammar option in `BIOME_CONFIGURATION` and per row it reaches, each
+ * refused by biome's parser with the option off — `[option, language, source]`.
+ */
+const BIOME_GRAMMAR_PROBES: ReadonlyArray<
+	readonly [option: string, language: Language, source: string]
+> = [
+	['css.parser.tailwindDirectives', 'css', 'a {\n\t@apply hidden;\n}\n'],
+	[
+		'css.parser.tailwindDirectives',
+		'svelte',
+		'<style>\n\ta {\n\t\t@apply hidden;\n\t}\n</style>\n'
+	],
+	[
+		'javascript.parser.unsafeParameterDecoratorsEnabled',
+		'typescript',
+		'class C {\n\tm(@inject() a) {}\n}\n'
+	],
+	[
+		'javascript.parser.unsafeParameterDecoratorsEnabled',
+		'svelte',
+		'<script lang="ts">\n\tclass C {\n\t\tm(@inject() a) {}\n\t}\n</script>\n'
+	]
+];
 
 /**
  * A biome diagnostic as `formatContent` returns it. Only the fields the harness
@@ -285,15 +324,23 @@ export class BiomeImplementation extends BaseImplementation {
 					'diagnostics — see `biome_fatal_diagnostics` in lib/biome.ts.'
 			);
 		}
-		// The parser option above is as silently droppable as a formatter key, and the
-		// format probes cannot see it: assert biome now takes a Tailwind directive.
-		if (scope === undefined || scope.language === 'css') {
+		// The embed hops and the `<script>` / `<style>` body indent, which the svelte
+		// probe above cannot see (`EMBED_PROBE_SOURCE`).
+		if (scope === undefined || scope.language === 'svelte') {
+			assert_embedded_regions_landed('biome', this.format(EMBED_PROBE_SOURCE, 'svelte'));
+		}
+		// The parser options are as silently droppable as a formatter key, and the
+		// format probes cannot see them: each source below fails to parse with its
+		// option off (verified on 2.6.4 — `@tailwind base;` parses either way, so the
+		// CSS probe is an `@apply`).
+		for (const [option, language, source] of BIOME_GRAMMAR_PROBES) {
+			if (scope !== undefined && scope.language !== language) continue;
 			try {
-				this.format('@tailwind base;\n', 'css');
+				this.format(source, language);
 			} catch (e) {
 				throw new Error(
-					'biome: `css.parser.tailwindDirectives` did not land — a Tailwind directive still ' +
-						`fails to parse (${e instanceof Error ? e.message : String(e)})`
+					`biome (${language}): \`${option}\` did not land — its probe still fails to parse ` +
+						`(${e instanceof Error ? e.message : String(e)})`
 				);
 			}
 		}
@@ -336,7 +383,11 @@ export class BiomeImplementation extends BaseImplementation {
 		const biome = new this._biome_class({ ...this._glue } as unknown as ConstructorParameters<
 			typeof Biome
 		>[0]);
-		const { projectKey } = biome.openProject('/tmp');
+		// No path: the js-api applies settings at `workspaceDirectory: "./"`, and
+		// from biome 2.6 a project opened at a ROOTED path no longer resolves its
+		// `file.css` against them for the PARSER options — `tailwindDirectives` is
+		// dropped while the formatter keys still land (measured on 2.6.4).
+		const { projectKey } = biome.openProject();
 		biome.applyConfiguration(projectKey, BIOME_CONFIGURATION);
 		this._instance = instance;
 		this._biome = biome;

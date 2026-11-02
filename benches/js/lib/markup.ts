@@ -29,7 +29,12 @@
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { BaseImplementation, type Language } from './types.ts';
-import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
+import {
+	assert_embedded_regions_landed,
+	assert_format_config_landed,
+	EMBED_PROBE_SOURCE,
+	FORMAT_CONFIG_PROBES
+} from './format_config_probe.ts';
 import { assert_tool_rejects_invalid } from './reject_probe.ts';
 import type { MarkupVersions } from './versions.ts';
 import { DPRINT_GLOBAL_CONFIG, DPRINT_TYPESCRIPT_CONFIG } from './dprint.ts';
@@ -47,33 +52,6 @@ import type { FormatterContext } from '@dprint/formatter';
  * `singleQuote` governs JS strings, never HTML attributes.
  */
 const MARKUP_CONFIG = { scriptIndent: true, styleIndent: true } as const;
-
-/**
- * Proves the context routes each embedded region to its configured plugin. With a
- * plugin missing, markup_fmt hands the region back as written, so a broken region
- * would format "successfully" and the row would count a file it never formatted
- * (measured: with no CSS plugin, an unclosed `<style>` rule is accepted). One
- * region per hop, each graded by a line only its plugin produces:
- * - `<script>` → TypeScript under `scriptIndent`: the double-quoted string comes
- *   back single-quoted on a line indented by a tab;
- * - template expression → TypeScript (a separate hop, as `.tsx`): spaces appear
- *   around the operator;
- * - `<style>` → malva under `styleIndent`: the rule expands and its declaration
- *   comes back terminated on a line indented by two tabs.
- *
- * `FORMAT_CONFIG_PROBES.svelte` grades only the markup layer, and the
- * `typescript` / `css` probes reach those plugins standalone — neither sees these
- * hops.
- */
-const EMBED_PROBE_SOURCE =
-	'<script>\nconst probe = "embedded"\n</script>\n\n<p>{a+b}</p>\n\n<style>\n.probe{color:red}\n</style>\n';
-
-/** The line each `EMBED_PROBE_SOURCE` hop must produce, keyed by the hop. */
-const EMBED_PROBE_LINES: ReadonlyArray<readonly [hop: string, line: string]> = [
-	['<script> → TypeScript (scriptIndent)', "\tconst probe = 'embedded';"],
-	['template expression → TypeScript', '<p>{a + b}</p>'],
-	['<style> → malva (styleIndent)', '\t\tcolor: red;']
-];
 
 /**
  * markup_fmt Svelte formatter, composed with dprint's TypeScript and CSS plugins.
@@ -124,7 +102,7 @@ export class MarkupImplementation extends BaseImplementation {
 			throw new Error(`markup_fmt rejected the benchmark config (${detail})`);
 		}
 		// Recognized is not landed — the behavioral proof every formatter row runs, on
-		// the markup layer, then the embed hop (see `EMBED_PROBE_SOURCE`).
+		// the markup layer, then the embed hops (`assert_embedded_regions_landed`).
 		for (const language of this.format_languages) {
 			assert_format_config_landed(
 				'markup-fmt',
@@ -138,17 +116,10 @@ export class MarkupImplementation extends BaseImplementation {
 				this.format(source, language)
 			);
 		}
-		const embedded = this.format(EMBED_PROBE_SOURCE, 'svelte');
-		const embedded_lines = embedded.split('\n');
-		const missed = EMBED_PROBE_LINES.filter(([, line]) => !embedded_lines.includes(line));
-		if (missed.length > 0) {
-			throw new Error(
-				`markup-fmt (svelte): an embedded region came back unformatted, so the context no ` +
-					`longer routes it to its configured plugin or an indent option did not land ` +
-					`(${missed.map(([hop, line]) => `${hop}: no line ${JSON.stringify(line)}`).join('; ')}) ` +
-					`— got ${JSON.stringify(embedded)}. See lib/markup.ts.`
-			);
-		}
+		// With a plugin missing, markup_fmt hands a region back as written (measured: with
+		// no CSS plugin, an unclosed `<style>` rule is accepted), so the embed hops get their
+		// own proof — and `scriptIndent` / `styleIndent` theirs.
+		assert_embedded_regions_landed('markup-fmt', this.format(EMBED_PROBE_SOURCE, 'svelte'));
 	}
 
 	parse(_source: string, _language: Language): unknown {

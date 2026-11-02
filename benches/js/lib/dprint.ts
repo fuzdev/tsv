@@ -91,9 +91,11 @@ export class DprintImplementation extends BaseImplementation {
 		// the pinned layout targets — see `DPRINT_GLOBAL_CONFIG` / `DPRINT_TYPESCRIPT_CONFIG`
 		this._formatter.setConfig(DPRINT_GLOBAL_CONFIG, DPRINT_TYPESCRIPT_CONFIG);
 
-		// Assert the config actually LANDED. dprint reports an unrecognized key as
-		// a diagnostic rather than throwing (verified: a bogus key yields
-		// `Unknown property in configuration`), so without this check a renamed key
+		// Assert the config actually LANDED. dprint reports an unrecognized PLUGIN key
+		// as a diagnostic rather than throwing (verified: a bogus key yields
+		// `Unknown property in configuration`) — but NOT an unrecognized GLOBAL key
+		// (`DPRINT_GLOBAL_CONFIG`: a misspelled `lineWidth` reported nothing and fell
+		// back to 120), so without this check and the probe below a renamed key
 		// in a future plugin version would silently leave that option at its default
 		// and skew the row against every other formatter — exactly the config-vs-engine
 		// conflation the fairness discipline exists to prevent.
@@ -102,7 +104,7 @@ export class DprintImplementation extends BaseImplementation {
 			const detail = diagnostics.map((d) => `${d.propertyName}: ${d.message}`).join('; ');
 			throw new Error(`dprint rejected the benchmark config (${detail})`);
 		}
-		// A clean diagnostic list proves every key was RECOGNIZED, not that its value
+		// A clean diagnostic list proves every PLUGIN key was RECOGNIZED, not that its value
 		// had the pinned effect (`trailingCommas: 'never'` fans out to twelve keys, any
 		// of which a plugin bump could re-default). The behavioral proof is the shared
 		// probe every other formatter row already runs.

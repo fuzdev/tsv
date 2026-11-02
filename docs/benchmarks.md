@@ -67,13 +67,23 @@ Things the published numbers measure that aren't quite what they look like.
   silently. The svelte probe doubles as the only guard on biome's
   `html.experimentalFullSupportEnabled` — without it biome returns only the formatted
   `<script>` for `.svelte` (an EMPTY string for a script-less file), which the timed
-  row would otherwise score as a successful format. One non-layout key is pinned too, a
-  grammar input: biome's `css.parser.tailwindDirectives`, since biome alone refuses
-  Tailwind's `@tailwind`/`@apply` unless it is on, and the corpus's Tailwind projects
-  would turn it on in their own config (prettier and tsv read them as ordinary at-rules);
-  it reaches the svelte row as well, whose `<style>` blocks biome parses with the CSS
-  options, and changes no output on CSS that has no Tailwind directive. The layout probes
-  can't see a parser key, so init also asserts a Tailwind directive formats.
+  row would otherwise score as a successful format. The width is graded from BOTH sides
+  — a line that must stay whole at 100 and one just over 100 that must break — because
+  a fallback to a WIDER default (dprint's 120, for a misspelled global `lineWidth`,
+  which dprint's config diagnostics do not report) breaks nothing the first can see.
+  The `<script>` / `<style>` body indent prettier-plugin-svelte applies by default is
+  pinned where a tool defaults it off (biome's `html.formatter.indentScriptAndStyle`,
+  markup_fmt's `scriptIndent` / `styleIndent`) and graded by a shared embed probe
+  (`EMBED_PROBE_SOURCE`), since a flush body gives every embedded line two more columns.
+  Two non-layout keys are pinned too, grammar inputs biome alone refuses unconfigured
+  and a project using the syntax would turn on in its own config (prettier and tsv parse
+  it unconfigured): `css.parser.tailwindDirectives` (Tailwind's `@apply` / `@theme` /
+  `@custom-variant`) and `javascript.parser.unsafeParameterDecoratorsEnabled`
+  (TypeScript's parameter decorators). Each reaches the svelte row too, through its
+  `<style>` / `<script>`, and changes no output on code without the syntax. The layout
+  probes can't see a parser key, so init formats one probe per key and row that fails
+  to parse with it off. biome's project is opened with NO path: from 2.6, a project
+  opened at a rooted path drops the parser keys while the formatter keys still land.
 
   A tool whose pins stop landing goes ABSENT, the option and language named in the
   report's `unavailable`, rather than publishing a number produced at some other
@@ -187,7 +197,9 @@ Things the published numbers measure that aren't quite what they look like.
   via the file's own `"use strict"` prologue): tsv routes through its bindings' goal
   axis (FFI a `u32` code, N-API a trailing source-type
   string, WASM the same trailing string), acorn takes `sourceType: goal`, oxc an
-  explicit `sourceType` — so a script-goal `await`-identifier test is scored valid
+  explicit `sourceType` (passed on EVERY call, `module` when the file declares none:
+  left unset, oxc infers the goal and reads an import-free `file.ts` as a script, where
+  every other row parses an untagged file as a module) — so a script-goal `await`-identifier test is scored valid
   against every tool rather than counted as a module-goal failure. Only the
   conformance-coverage preflight is goal-aware — the perf surface has no test262. The tsc corpus deliberately
   carries NO goal: tsc's module-vs-script reading is a semantic classification,
@@ -653,7 +665,9 @@ prettier. Load-bearing on two axes:
   because the accept definition should be correct rather than accidentally correct. The classification is written as a NON-fatal denylist rather than an
   `Error` allowlist, so an upstream rename of that value degrades to the
   conservative reading instead of fabricating a 100% row, and `init` additionally
-  proves a real syntax error still lands as fatal.
+  proves a real syntax error still lands as fatal. Every call passes a `sourceType`
+  (`module` when the file declares none): left unset, oxc infers the goal and reads an
+  import-free `file.ts` as a script.
 - **oxfmt (NAPI)** — fast formatter; TypeScript, JS, CSS, Svelte (experimental).
   The native Rust formatter handles **JS/TS *and* CSS**; only **Svelte**
   routes through a JS-side fallback into oxfmt's **bundled prettier**
