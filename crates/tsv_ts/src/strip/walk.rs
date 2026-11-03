@@ -174,6 +174,11 @@ impl<'s, 'b> Walk<'s, 'b> {
 
     /// The collected edits, or the refusal.
     pub(super) fn finish(self) -> Result<BumpVec<'b, Edit>, StripError> {
+        debug_assert!(
+            self.mode != Mode::Strip
+                || (self.records.is_empty() && !self.module_syntax && self.function_depth == 0),
+            "a strip walk collects nothing"
+        );
         match self.refusal {
             Some((kind, span)) => Err(StripError::unsupported(kind, self.src.text, span.range())),
             None => Ok(self.edits),
@@ -188,6 +193,13 @@ impl<'s, 'b> Walk<'s, 'b> {
             Mode::Strip => false,
             Mode::Imports | Mode::StripWithImports => true,
         }
+    }
+
+    /// Whether a static import, a re-export or an import-equals met here is a record: in a
+    /// collecting walk, outside every namespace body ([`Self::in_namespace`]).
+    #[inline]
+    fn collects_static(&self) -> bool {
+        self.collects() && !self.in_namespace
     }
 
     /// Whether the subtrees the strip refuses are walked: a [`Mode::Imports`] walk alone.
@@ -263,6 +275,10 @@ impl<'s, 'b> Walk<'s, 'b> {
     //
     // Import records
     //
+    // TODO: no record comes from a type, which every site blanks whole without walking it
+    // (module docs), so a type-position import (`let x: import('./a').T`, `typeof
+    // import('./a')`) is no record — the known gap `crate::imports` documents. A dependency
+    // graph over types would need a walk of the type's own, in a collecting mode alone
 
     /// Room for more records: [`RECORDS_FIRST_CAPACITY`] at the first, then doubling —
     /// most files' records in one allocation, with no count taken ahead of the walk.
@@ -298,7 +314,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// A static import's record, its `type_only` read by [`Self::import`] off the walk over
     /// its specifiers. None inside a namespace body.
     fn record_import(&mut self, import: &ImportDeclaration<'_>, span: Span, type_only: TypeOnly) {
-        if !self.collects() || self.in_namespace {
+        if !self.collects_static() {
             return;
         }
         let attributes = self.attributes_clause(import.source.span.end, import.attributes);
@@ -324,7 +340,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         let Some(source) = &export.source else {
             return;
         };
-        if !self.collects() || self.in_namespace {
+        if !self.collects_static() {
             return;
         }
         let attributes = self.attributes_clause(source.span.end, export.attributes);
@@ -339,7 +355,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     fn record_export_all(&mut self, export: &ExportAllDeclaration<'_>, span: Span) {
-        if !self.collects() || self.in_namespace {
+        if !self.collects_static() {
             return;
         }
         let type_only = if export.export_kind == ExportKind::Type {
@@ -362,7 +378,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         let TSModuleReference::ExternalModuleReference(reference) = &import.module_reference else {
             return;
         };
-        if !self.collects() || self.in_namespace {
+        if !self.collects_static() {
             return;
         }
         let type_only = if import.import_kind == ImportKind::Type {
@@ -468,9 +484,6 @@ impl<'s, 'b> Walk<'s, 'b> {
         self.blank_marked(start, end, Mark::Plain);
     }
 
-    // TODO: a type blanks here unwalked, so a type-position import (`let x:
-    // import('./a').T`, `typeof import('./a')`) is no record — the known gap
-    // `crate::imports` documents; a dependency graph over types would walk the type for it
     fn blank_span(&mut self, span: Span) {
         self.blank(span.start, span.end);
     }
@@ -1079,23 +1092,29 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// its operand and its mark run innermost first — the order the recursion does each in
     /// ([`Self::expr_inner`]), so the edits, the refusal and the `;` state do not depend on
     /// which one walked a link.
+    ///
+    /// A refused assertion's work past its operand is skipped, as [`Self::assertion`]
+    /// skips it. The strip walks nothing under one either: the chain ends at the first, so
+    /// it is the innermost link, and the base is not walked. An imports walk walks on
+    /// through every refused link to the base ([`Self::walks_refused`]).
     #[inline(never)]
     fn chain(&mut self, e: &Expression<'_>) {
-        let mut links: SmallVec<[&Expression<'_>; 16]> = SmallVec::new();
+        // each link with whether its grouping check refused it
+        let mut links: SmallVec<[(&Expression<'_>, bool); 16]> = SmallVec::new();
         let mut node = e;
-        let mut refused = false;
+        let mut walks_base = true;
         loop {
-            let operand = match &node.kind {
-                ExpressionKind::CallExpression(call) => call.callee,
-                ExpressionKind::NewExpression(new) => new.callee,
-                ExpressionKind::MemberExpression(member) => member.object,
-                ExpressionKind::TaggedTemplateExpression(tagged) => tagged.tag,
+            let (operand, refused) = match &node.kind {
+                ExpressionKind::CallExpression(call) => (call.callee, false),
+                ExpressionKind::NewExpression(new) => (new.callee, false),
+                ExpressionKind::MemberExpression(member) => (member.object, false),
+                ExpressionKind::TaggedTemplateExpression(tagged) => (tagged.tag, false),
                 ExpressionKind::TSInstantiationExpression(instantiation) => {
-                    instantiation.expression
+                    (instantiation.expression, false)
                 }
-                ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+                ExpressionKind::TSNonNullExpression(non_null) => (non_null.expression, false),
                 ExpressionKind::TSAsExpression(assertion) => {
-                    refused = self
+                    let refused = self
                         .assertion_head(
                             node.span,
                             assertion.expression,
@@ -1103,10 +1122,10 @@ impl<'s, 'b> Walk<'s, 'b> {
                             b"as",
                         )
                         .is_none();
-                    assertion.expression
+                    (assertion.expression, refused)
                 }
                 ExpressionKind::TSSatisfiesExpression(assertion) => {
-                    refused = self
+                    let refused = self
                         .assertion_head(
                             node.span,
                             assertion.expression,
@@ -1114,27 +1133,23 @@ impl<'s, 'b> Walk<'s, 'b> {
                             b"satisfies",
                         )
                         .is_none();
-                    assertion.expression
+                    (assertion.expression, refused)
                 }
                 _ => break,
             };
-            links.push(node);
-            // a refused assertion's operand is not walked by the strip: the chain ends at
-            // it. An imports walk walks on: what it edits is never read
-            if refused {
-                if !self.walks_refused() {
-                    break;
-                }
-                refused = false;
+            links.push((node, refused));
+            // a refused assertion's operand is not walked by the strip: the chain ends at it
+            if refused && !self.walks_refused() {
+                walks_base = false;
+                break;
             }
             node = operand;
         }
-        if !refused {
+        if walks_base {
             self.expr(node);
         }
-        for (i, link) in links.iter().rev().enumerate() {
-            // a refused assertion is the innermost link: nothing of it is left to walk
-            if !(refused && i == 0) {
+        for &(link, refused) in links.iter().rev() {
+            if !refused {
                 self.link_tail(link);
             }
             self.mark(link.span.end);
@@ -1791,13 +1806,13 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// [`Self::namespace_body`]: the strip never takes it.
     #[inline(never)]
     fn enum_initializers(&mut self, decl: &TSEnumDeclaration<'_>) {
-        self.function_depth += 1;
+        self.enter_function();
         for member in decl.members {
             if let Some(initializer) = &member.initializer {
                 self.expr(initializer);
             }
         }
-        self.function_depth -= 1;
+        self.leave_function();
     }
 
     /// A value namespace's body, walked in [`Mode::Imports`] alone (the strip refuses the
@@ -1808,7 +1823,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     #[inline(never)]
     fn namespace_body(&mut self, decl: &TSModuleDeclaration<'_>) {
         let outer_in_namespace = std::mem::replace(&mut self.in_namespace, true);
-        self.function_depth += 1;
+        self.enter_function();
         let mut decl = decl;
         loop {
             match &decl.body {
@@ -1820,7 +1835,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 }
             }
         }
-        self.function_depth -= 1;
+        self.leave_function();
         self.in_namespace = outer_in_namespace;
     }
 
