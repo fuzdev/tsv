@@ -273,7 +273,8 @@ fn stripped(source: &str, edits: &mut [blank::Edit]) -> Stripped {
     Stripped { code }
 }
 
-/// A successful [`strip`].
+/// A successful [`strip`]: the JS alone. [`strip_with_imports`] hands the import records
+/// out beside it, so `strip` collects none.
 ///
 /// ```
 /// # fn main() -> Result<(), tsv_ts::StripError> {
@@ -288,8 +289,6 @@ pub struct Stripped {
     /// The JS: the source with every type-only range blanked, the source itself when
     /// nothing is type-only.
     pub code: String,
-    // no import records: `strip` pays for none, and `strip_with_imports` hands them out
-    // beside this rather than in it, so a field here never sits empty
 }
 
 // A new variant compiles silently at every in-workspace match, which `#[non_exhaustive]`

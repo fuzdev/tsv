@@ -1218,15 +1218,15 @@ Share parser and AST across tools; let each tool add its own layers:
 
 The type strip ([strip.md](strip.md)) and the import records ([imports.md](imports.md)) are
 one walk over the internal AST (`tsv_ts/src/strip/walk.rs`), run in a **mode** chosen at the
-call: `Strip` collects the strip's edits, `Imports` collects the records and nothing else, and
-`StripWithImports` (`tsv_ts::strip_with_imports`) both, from one parse. The walk already visits
-every node a record comes from — each import and export declaration, every `import(…)`, the
-import-equals it refuses — and already knows which subtrees are types and which code is ambient,
-so a record is a push at an arm it has; a second walker would restate those decisions and could
-drift from them. Where the two products differ the mode decides: collecting, the walk descends
+call: `Strip` collects the strip's edits and no record, `Imports` the records (its edits are
+never read), and `StripWithImports` (`tsv_ts::strip_with_imports`) both, from one parse. The
+walk already visits every node a record comes from — each import and export declaration, every
+`import(…)`, the import-equals it refuses — and already knows which subtrees are types and
+which code is ambient, so a record is a push at an arm it has; a second walker would restate
+those decisions and could drift from them. Where the two products differ the mode decides: an `Imports` walk descends
 into the four value subtrees the strip refuses without walking (an enum's initializers, a value
 namespace's body, an `export =` operand, a regrouping assertion's operand), since their imports
-run all the same.
+run all the same (a `StripWithImports` walk need not: a refusal returns no records).
 
 The mode is a runtime value, not a type parameter, so the walk is compiled once: a build
 carrying both the strip and the records (`@fuzdev/tsv-wasm`, `@fuzdev/tsv`) carries one copy of

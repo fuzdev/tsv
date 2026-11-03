@@ -95,6 +95,10 @@
 import { extname, relative, resolve } from 'node:path';
 import process from 'node:process';
 
+import type {
+	ImportRecordKind,
+	ImportsSuccess
+} from '../../crates/tsv_wasm/npm/facade_imports.d.ts';
 import { check_artifact_freshness } from './lib/check_artifact_freshness.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { CORPORA_COLLECTIONS, is_collection_path } from './lib/corpora.ts';
@@ -248,9 +252,13 @@ const OXC_REJECTS = 'oxc-parser rejects it';
 const SCRIPT = /\.[cm]?[jt]s$/;
 const SVELTE = /\.svelte$/;
 
-/** The projection both sides are compared on (module doc §The projection). */
+/**
+ * The projection both sides are compared on (module doc §The projection): tsv's record with
+ * its attributes clause reduced to its presence, and a specifier value oxc may lack (a
+ * template's cooked value).
+ */
 interface Projected {
-	kind: 'static' | 're_export' | 'dynamic' | 'import_equals';
+	kind: ImportRecordKind;
 	start: number;
 	end: number;
 	specifier: { value: string | null; start: number; end: number } | null;
@@ -264,22 +272,8 @@ interface FileProjection {
 	imports: Projected[];
 }
 
-/** One tsv record, as a binding returns it. */
-interface TsvRecord {
-	kind: Projected['kind'];
-	start: number;
-	end: number;
-	specifier: { value: string | null; start: number; end: number } | null;
-	typeOnly: Projected['typeOnly'];
-	phase: string | null;
-	attributes: { start: number; end: number } | null;
-}
-
-/** One reply line of `tsv_debug imports --stdin`. */
-type ImportsReply =
-	| { imports: { hasModuleSyntax: boolean; imports: TsvRecord[] } }
-	| { error: string }
-	| { panic: string };
+/** One reply line of `tsv_debug imports --stdin`: the records as a binding returns them. */
+type ImportsReply = { imports: Omit<ImportsSuccess, 'ok'> } | { error: string } | { panic: string };
 
 // deno-lint-ignore no-explicit-any
 type Node = any;
@@ -343,7 +337,9 @@ let svelte_files = 0;
 
 /**
  * One file's verdict: `null` when the two sides agree, else the check that fired and why.
- * Tallies tsv's records into the run's counts when `tally` is set.
+ * When `tally` is set, a file both sides parse is counted into the run's tallies — its
+ * records, their kinds, its module syntax, and whether it is a component — so every tally
+ * counts the same files.
  */
 async function grade(
 	file_path: string,
@@ -362,7 +358,6 @@ async function grade(
 		return { check: null, message: `tsv's parser rejects it: ${reply.error.split('\n')[0]}` };
 	}
 	const is_svelte = SVELTE.test(file_path);
-	if (is_svelte && tally) svelte_files++;
 	const theirs = is_svelte ? oxc_svelte(source) : oxc_script(file_path, source, 0, null);
 	if (typeof theirs === 'string') {
 		// only oxc's own rejection can be accepted; a tree the harness cannot join is its bug
@@ -370,6 +365,7 @@ async function grade(
 	}
 	const ours = reply.imports;
 	if (tally) {
+		if (is_svelte) svelte_files++;
 		records += ours.imports.length;
 		if (ours.hasModuleSyntax) module_syntax++;
 		for (const r of ours.imports) kinds.set(r.kind, (kinds.get(r.kind) ?? 0) + 1);

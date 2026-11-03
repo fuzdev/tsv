@@ -6,7 +6,10 @@
 //! if that fails), and `parse_imports_with_goal` names one exactly. The import fixtures
 //! read every input at the unset goal, so they cannot pin a named one.
 
+use std::ops::Range;
+
 use bumpalo::Bump;
+use tsv_lang::{Error, ErrorKind};
 use tsv_ts::__private::parse_imports_in;
 use tsv_ts::{Goal, ImportRecordKind, Imports, parse_imports, parse_imports_with_goal};
 
@@ -64,17 +67,34 @@ fn a_script_await_is_a_name() {
     assert_eq!(script.records.len(), 1);
 }
 
-/// The warm-arena primitive is the one-shot functions' body.
+/// What an error says: its kind, its span, whether a goal gate marked it, and its full
+/// text.
+type ErrorFacts = (ErrorKind, Option<Range<usize>>, bool, String);
+
+/// What a parse-imports call returns, its error projected onto [`ErrorFacts`].
+type Outcome = Result<Imports, ErrorFacts>;
+
+fn outcome(result: Result<Imports, Error>) -> Outcome {
+    result.map_err(|e| (e.kind(), e.span(), e.is_goal_gated(), format!("{e:#}")))
+}
+
+/// The warm-arena primitive is the one-shot functions' body, records and errors alike.
 #[test]
 fn the_arena_primitive_matches() {
-    let source = "import a from './a.js';\nwith (o) {}\n";
-    let arena = Bump::new();
-    for goal in [None, Some(Goal::Module), Some(Goal::Script)] {
-        let warm = parse_imports_in(source, goal, &arena).ok();
-        let one_shot = match goal {
-            Some(goal) => parse_imports_with_goal(source, goal).ok(),
-            None => parse_imports(source).ok(),
-        };
-        assert_eq!(warm, one_shot, "{goal:?}");
+    let mut arena = Bump::new();
+    for source in [
+        "import a from './a.js';\nwith (o) {}\n",
+        "import a from './a.js';\nimport('./b.js');\n",
+        "with (o) { import('./w.js'); }\n",
+    ] {
+        for goal in [None, Some(Goal::Module), Some(Goal::Script)] {
+            arena.reset();
+            let warm = outcome(parse_imports_in(source, goal, &arena));
+            let one_shot = outcome(match goal {
+                Some(goal) => parse_imports_with_goal(source, goal),
+                None => parse_imports(source),
+            });
+            assert_eq!(warm, one_shot, "{source:?} at {goal:?}");
+        }
     }
 }
