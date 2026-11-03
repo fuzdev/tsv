@@ -1696,7 +1696,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
         // A `` tag<T>`x` `` tagged template lifts the tag's `<T>`
         // into the tag's `typeArguments` (see `flatten_instantiation`).
-        let (tag, type_arguments) = self.flatten_instantiation(left);
+        let (tag, type_arguments) = self.flatten_instantiation(left, start);
         Ok(self.build_tagged_template(tag, start, type_arguments, template))
     }
 
@@ -1776,7 +1776,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // Call expression: foo()
                     let units = self.call_link_units(left);
                     self.spine_link(units)?;
-                    self.function_head_pair(left, start, ParenContext::Callee)?;
+                    self.function_head_pair(
+                        left,
+                        start,
+                        ParenContext::Callee {
+                            list_joins_call: true,
+                        },
+                    )?;
                     self.advance()?; // consume '('
                     let (arguments, paren_end) = self.parse_call_arguments()?;
                     let arguments = arguments.into_bump_slice();
@@ -1784,7 +1790,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let span = Span::new(start, paren_end as u32);
                     // A `foo<T>(...)` generic call lifts the callee's `<T>` into
                     // the call's `typeArguments` (see `flatten_instantiation`).
-                    let (callee, type_arguments) = self.flatten_instantiation(left);
+                    let (callee, type_arguments) = self.flatten_instantiation(left, start);
                     left = alloc_expr(
                         self.arena,
                         Expression {
@@ -2912,12 +2918,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `parse_instantiation_expression`. When a `(` (generic call) or template
     /// tag (tagged template) follows the instantiation, the `<T>` belongs to
     /// that call/tag as its `typeArguments` rather than staying a standalone
-    /// instantiation (acorn parity). A non-instantiation operand passes through
-    /// unchanged with no type arguments. Shared by the subscript loop's call and
-    /// tagged-template arms.
+    /// instantiation (acorn parity). Only an instantiation this chain built
+    /// itself flattens — one starting at the chain's `start`
+    /// ([`Parser::is_bare_instantiation`]); a parenthesized one (`(f<T>)()`,
+    /// `` (f<T>)`x` ``) is the call's callee or the tag, as acorn-typescript reads
+    /// it, while an instantiation over a parenthesized base (`(f)<T>()`) is the
+    /// chain's own and flattens. Any other operand passes through unchanged with no
+    /// type arguments. Shared by the subscript loop's call and tagged-template arms.
     fn flatten_instantiation(
         &self,
         expr: &'arena Expression<'arena>,
+        start: u32,
     ) -> (
         &'arena Expression<'arena>,
         Option<TSTypeParameterInstantiation<'arena>>,
@@ -2926,7 +2937,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Expression {
                 kind: ExpressionKind::TSInstantiationExpression(inst),
                 ..
-            } => (inst.expression, Some(inst.type_arguments.clone())),
+            } if Self::is_bare_instantiation(expr, start) => {
+                (inst.expression, Some(inst.type_arguments.clone()))
+            }
             other => (other, None),
         }
     }

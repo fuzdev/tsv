@@ -18,8 +18,8 @@
 // - `printPathNoParens`'s caller (`print/index.js`, the application layer)
 
 use crate::ast::{
-    ArrowFunctionBody, AssignmentOperator, BinaryExpression, BinaryOperator, Expression,
-    ExpressionKind, LiteralValue, UnaryOperator, UpdateOperator,
+    ArrowFunctionBody, AssignmentOperator, BinaryExpression, BinaryOperator, CallExpression,
+    Expression, ExpressionKind, LiteralValue, UnaryOperator, UpdateOperator,
 };
 use crate::printer::chain::child_stops_optional_chain;
 use crate::printer::class_expr_has_decorators;
@@ -67,8 +67,12 @@ pub(crate) enum ParenContext {
     /// Binary right operand: `x + <expr>`
     BinaryRight { parent_op: BinaryOperator },
 
-    /// Callee position: `<expr>()` or tagged template tag: `<expr>`template``
-    Callee,
+    /// Callee position: `<expr>()`. `list_joins_call` is whether a bare instantiation
+    /// callee's list would become the call's own type arguments — a plain call with no list
+    /// of its own ([`ParenContext::callee_of`]). An optional call reads the instantiation as
+    /// its callee bare (`f<T>?.()`), and a call with a list of its own leaves the pair to the
+    /// second-list rule ([`instantiation_keeps_pair_before_type_args`]).
+    Callee { list_joins_call: bool },
 
     /// New expression callee: `new <expr>()`
     NewCallee,
@@ -276,6 +280,15 @@ fn ends_open_optional_chain(head: &Expression<'_>) -> bool {
     level.has_optional_in_chain()
 }
 
+impl ParenContext {
+    /// The [`ParenContext::Callee`] context of `call`'s callee.
+    pub(crate) fn callee_of(call: &CallExpression<'_>) -> Self {
+        Self::Callee {
+            list_joins_call: !call.optional && call.type_arguments.is_none(),
+        }
+    }
+}
+
 /// Determines if an expression needs parentheses in a given context.
 ///
 /// This is the central entry point for all parenthesization decisions.
@@ -339,7 +352,7 @@ pub(super) fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init
         // and NewCallee add the optional-chain rule below.
         // Note: SequenceExpression already adds its own parens in build_sequence_doc
         // Note: ClassExpression needs parens only in NewCallee: `class {}()` is valid but `new class {}()` is not
-        ParenContext::Callee | ParenContext::NewCallee | ParenContext::TaggedTemplateTag => {
+        ParenContext::Callee { .. } | ParenContext::NewCallee | ParenContext::TaggedTemplateTag => {
             if matches!(ctx, ParenContext::NewCallee) {
                 // ClassExpression only needs parens in `new` context
                 if matches!(expr.kind, ExpressionKind::ClassExpression(_)) {
@@ -365,6 +378,23 @@ pub(super) fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init
                 ctx,
                 ParenContext::NewCallee | ParenContext::TaggedTemplateTag
             ) && ends_open_optional_chain(expr)
+            {
+                return true;
+            }
+            // An instantiation called or tagged keeps its pair (`(f<T>)()`, `` (f<T>)`x` ``):
+            // bare, its list is the call's or the tag's own type arguments, a different
+            // tree to tsc and acorn-typescript alike (`f<T>()` is a generic call), and over
+            // an open optional chain the pair is where the chain ends. An optional call
+            // reads the instantiation as its callee bare (`f<T>?.()`), so that pair strips,
+            // and a call with a list of its own (`(f<T>)<U>()`) is the second-list rule's;
+            // a `new` callee's list folds onto the `new` (the parser's `NewExpression`
+            // reading), so `NewCallee` is not asked here.
+            if matches!(expr.kind, ExpressionKind::TSInstantiationExpression(_))
+                && match ctx {
+                    ParenContext::Callee { list_joins_call } => list_joins_call,
+                    ParenContext::TaggedTemplateTag => true,
+                    _ => false,
+                }
             {
                 return true;
             }
@@ -1148,7 +1178,7 @@ fn export_default_leftmost<'a>(
                 m.object
             }
             ExpressionKind::CallExpression(call)
-                if !needs_parens(call.callee, ParenContext::Callee, false) =>
+                if !needs_parens(call.callee, ParenContext::callee_of(call), false) =>
             {
                 call.callee
             }

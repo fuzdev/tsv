@@ -151,7 +151,7 @@ fn left_side_child_is_parenthesized(
     use ast::ExpressionKind;
     let ctx = match &expr.kind {
         ExpressionKind::MemberExpression(_) => ParenContext::ChainBase,
-        ExpressionKind::CallExpression(_) => ParenContext::Callee,
+        ExpressionKind::CallExpression(call) => ParenContext::callee_of(call),
         ExpressionKind::TaggedTemplateExpression(_) => ParenContext::TaggedTemplateTag,
         ExpressionKind::TSNonNullExpression(_) => ParenContext::NonNull,
         ExpressionKind::AssignmentExpression(assign) => ParenContext::AssignmentTarget {

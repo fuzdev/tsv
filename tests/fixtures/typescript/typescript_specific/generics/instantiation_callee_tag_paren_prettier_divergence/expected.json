@@ -1,0 +1,813 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 520,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 495,
+				"end": 497,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 497,
+				"end": 507,
+				"expression": {
+					"type": "CallExpression",
+					"start": 498,
+					"end": 506,
+					"callee": {
+						"type": "TSInstantiationExpression",
+						"start": 499,
+						"end": 503,
+						"expression": {
+							"type": "Identifier",
+							"start": 499,
+							"end": 500,
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 500,
+							"end": 503,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 501,
+									"end": 502,
+									"typeName": {
+										"type": "Identifier",
+										"start": 501,
+										"end": 502,
+										"name": "T"
+									}
+								}
+							]
+						}
+					},
+					"arguments": [],
+					"optional": false
+				}
+			},
+			{
+				"type": "Text",
+				"start": 507,
+				"end": 508,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 508,
+				"end": 519,
+				"expression": {
+					"type": "TaggedTemplateExpression",
+					"start": 509,
+					"end": 518,
+					"tag": {
+						"type": "TSInstantiationExpression",
+						"start": 510,
+						"end": 514,
+						"expression": {
+							"type": "Identifier",
+							"start": 510,
+							"end": 511,
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 511,
+							"end": 514,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 512,
+									"end": 513,
+									"typeName": {
+										"type": "Identifier",
+										"start": 512,
+										"end": 513,
+										"name": "T"
+									}
+								}
+							]
+						}
+					},
+					"quasi": {
+						"type": "TemplateLiteral",
+						"start": 515,
+						"end": 518,
+						"expressions": [],
+						"quasis": [
+							{
+								"type": "TemplateElement",
+								"start": 516,
+								"end": 517,
+								"value": {
+									"raw": "x",
+									"cooked": "x"
+								},
+								"tail": true
+							}
+						]
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an instantiation as a call's callee or a template's tag keeps its pair",
+			"start": 20,
+			"end": 93
+		},
+		{
+			"type": "Line",
+			"value": " a member chain over the call breaks with the pair kept on its base",
+			"start": 200,
+			"end": 269
+		},
+		{
+			"type": "Line",
+			"value": " an optional call reads the instantiation as its callee bare, so the pair strips",
+			"start": 392,
+			"end": 474
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 495,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 486,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 95,
+					"end": 104,
+					"expression": {
+						"type": "CallExpression",
+						"start": 95,
+						"end": 103,
+						"callee": {
+							"type": "TSInstantiationExpression",
+							"start": 96,
+							"end": 100,
+							"expression": {
+								"type": "Identifier",
+								"start": 96,
+								"end": 97,
+								"name": "f"
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 97,
+								"end": 100,
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 98,
+										"end": 99,
+										"typeName": {
+											"type": "Identifier",
+											"start": 98,
+											"end": 99,
+											"name": "T"
+										}
+									}
+								]
+							}
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an instantiation as a call's callee or a template's tag keeps its pair",
+							"start": 20,
+							"end": 93
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 106,
+					"end": 118,
+					"expression": {
+						"type": "CallExpression",
+						"start": 106,
+						"end": 117,
+						"callee": {
+							"type": "TSInstantiationExpression",
+							"start": 107,
+							"end": 113,
+							"expression": {
+								"type": "MemberExpression",
+								"start": 107,
+								"end": 110,
+								"object": {
+									"type": "Identifier",
+									"start": 107,
+									"end": 108,
+									"name": "a"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 109,
+									"end": 110,
+									"name": "b"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 110,
+								"end": 113,
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 111,
+										"end": 112,
+										"typeName": {
+											"type": "Identifier",
+											"start": 111,
+											"end": 112,
+											"name": "T"
+										}
+									}
+								]
+							}
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 115,
+								"end": 116,
+								"name": "c"
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 120,
+					"end": 130,
+					"expression": {
+						"type": "TaggedTemplateExpression",
+						"start": 120,
+						"end": 129,
+						"tag": {
+							"type": "TSInstantiationExpression",
+							"start": 121,
+							"end": 125,
+							"expression": {
+								"type": "Identifier",
+								"start": 121,
+								"end": 122,
+								"name": "f"
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 122,
+								"end": 125,
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 123,
+										"end": 124,
+										"typeName": {
+											"type": "Identifier",
+											"start": 123,
+											"end": 124,
+											"name": "T"
+										}
+									}
+								]
+							}
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 126,
+							"end": 129,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 127,
+									"end": 128,
+									"value": {
+										"raw": "x",
+										"cooked": "x"
+									},
+									"tail": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 132,
+					"end": 144,
+					"expression": {
+						"type": "TaggedTemplateExpression",
+						"start": 132,
+						"end": 143,
+						"tag": {
+							"type": "TSInstantiationExpression",
+							"start": 133,
+							"end": 139,
+							"expression": {
+								"type": "MemberExpression",
+								"start": 133,
+								"end": 136,
+								"object": {
+									"type": "Identifier",
+									"start": 133,
+									"end": 134,
+									"name": "a"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 135,
+									"end": 136,
+									"name": "b"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 136,
+								"end": 139,
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 137,
+										"end": 138,
+										"typeName": {
+											"type": "Identifier",
+											"start": 137,
+											"end": 138,
+											"name": "T"
+										}
+									}
+								]
+							}
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 140,
+							"end": 143,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 141,
+									"end": 142,
+									"value": {
+										"raw": "x",
+										"cooked": "x"
+									},
+									"tail": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 146,
+					"end": 162,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 146,
+						"end": 161,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 146,
+							"end": 147,
+							"name": "x"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 150,
+							"end": 161,
+							"object": {
+								"type": "CallExpression",
+								"start": 150,
+								"end": 159,
+								"callee": {
+									"type": "TSInstantiationExpression",
+									"start": 151,
+									"end": 155,
+									"expression": {
+										"type": "Identifier",
+										"start": 151,
+										"end": 152,
+										"name": "f"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 152,
+										"end": 155,
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 153,
+												"end": 154,
+												"typeName": {
+													"type": "Identifier",
+													"start": 153,
+													"end": 154,
+													"name": "T"
+												}
+											}
+										]
+									}
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 157,
+										"end": 158,
+										"name": "c"
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 160,
+								"end": 161,
+								"name": "d"
+							},
+							"computed": false,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 164,
+					"end": 180,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 164,
+						"end": 179,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 164,
+							"end": 165,
+							"name": "x"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 168,
+							"end": 179,
+							"object": {
+								"type": "TaggedTemplateExpression",
+								"start": 168,
+								"end": 177,
+								"tag": {
+									"type": "TSInstantiationExpression",
+									"start": 169,
+									"end": 173,
+									"expression": {
+										"type": "Identifier",
+										"start": 169,
+										"end": 170,
+										"name": "f"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 170,
+										"end": 173,
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 171,
+												"end": 172,
+												"typeName": {
+													"type": "Identifier",
+													"start": 171,
+													"end": 172,
+													"name": "T"
+												}
+											}
+										]
+									}
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 174,
+									"end": 177,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 175,
+											"end": 176,
+											"value": {
+												"raw": "x",
+												"cooked": "x"
+											},
+											"tail": true
+										}
+									]
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 178,
+								"end": 179,
+								"name": "y"
+							},
+							"computed": false,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 182,
+					"end": 198,
+					"expression": {
+						"type": "NewExpression",
+						"start": 182,
+						"end": 197,
+						"callee": {
+							"type": "TaggedTemplateExpression",
+							"start": 186,
+							"end": 195,
+							"tag": {
+								"type": "TSInstantiationExpression",
+								"start": 187,
+								"end": 191,
+								"expression": {
+									"type": "Identifier",
+									"start": 187,
+									"end": 188,
+									"name": "f"
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 188,
+									"end": 191,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 189,
+											"end": 190,
+											"typeName": {
+												"type": "Identifier",
+												"start": 189,
+												"end": 190,
+												"name": "T"
+											}
+										}
+									]
+								}
+							},
+							"quasi": {
+								"type": "TemplateLiteral",
+								"start": 192,
+								"end": 195,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 193,
+										"end": 194,
+										"value": {
+											"raw": "x",
+											"cooked": "x"
+										},
+										"tail": true
+									}
+								]
+							}
+						},
+						"arguments": []
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 271,
+					"end": 390,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 271,
+						"end": 389,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 271,
+							"end": 272,
+							"name": "x"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 275,
+							"end": 389,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 275,
+								"end": 387,
+								"object": {
+									"type": "CallExpression",
+									"start": 275,
+									"end": 369,
+									"callee": {
+										"type": "MemberExpression",
+										"start": 275,
+										"end": 367,
+										"object": {
+											"type": "CallExpression",
+											"start": 275,
+											"end": 344,
+											"callee": {
+												"type": "MemberExpression",
+												"start": 275,
+												"end": 342,
+												"object": {
+													"type": "CallExpression",
+													"start": 275,
+													"end": 319,
+													"callee": {
+														"type": "TSInstantiationExpression",
+														"start": 276,
+														"end": 298,
+														"expression": {
+															"type": "Identifier",
+															"start": 276,
+															"end": 295,
+															"name": "aaaaaaaaaaaaaaaaaaa"
+														},
+														"typeArguments": {
+															"type": "TSTypeParameterInstantiation",
+															"start": 295,
+															"end": 298,
+															"params": [
+																{
+																	"type": "TSTypeReference",
+																	"start": 296,
+																	"end": 297,
+																	"typeName": {
+																		"type": "Identifier",
+																		"start": 296,
+																		"end": 297,
+																		"name": "T"
+																	}
+																}
+															]
+														}
+													},
+													"arguments": [
+														{
+															"type": "Identifier",
+															"start": 300,
+															"end": 318,
+															"name": "bbbbbbbbbbbbbbbbbb"
+														}
+													],
+													"optional": false
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 323,
+													"end": 342,
+													"name": "ccccccccccccccccccc"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 348,
+											"end": 367,
+											"name": "ddddddddddddddddddd"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 373,
+									"end": 387,
+									"name": "eeeeeeeeeeeeee"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a member chain over the call breaks with the pair kept on its base",
+							"start": 200,
+							"end": 269
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 476,
+					"end": 485,
+					"expression": {
+						"type": "ChainExpression",
+						"start": 476,
+						"end": 484,
+						"expression": {
+							"type": "CallExpression",
+							"start": 476,
+							"end": 484,
+							"callee": {
+								"type": "TSInstantiationExpression",
+								"start": 476,
+								"end": 480,
+								"expression": {
+									"type": "Identifier",
+									"start": 476,
+									"end": 477,
+									"name": "f"
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 477,
+									"end": 480,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 478,
+											"end": 479,
+											"typeName": {
+												"type": "Identifier",
+												"start": 478,
+												"end": 479,
+												"name": "T"
+											}
+										}
+									]
+								}
+							},
+							"arguments": [],
+							"optional": true
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an optional call reads the instantiation as its callee bare, so the pair strips",
+							"start": 392,
+							"end": 474
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

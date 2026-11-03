@@ -139,7 +139,7 @@ fn build_call_head(printer: &Printer<'_>, call: &ast::CallExpression<'_>, span: 
     let callee_parens = super::CalleeParens::of(
         printer,
         call.callee,
-        ParenContext::Callee,
+        ParenContext::callee_of(call),
         call.type_arguments
             .as_ref()
             .map(|_| SecondTypeArgs::Expression),
@@ -193,7 +193,7 @@ fn build_call_head(printer: &Printer<'_>, call: &ast::CallExpression<'_>, span: 
             callee_freezes,
             span.start,
             call.callee,
-            FrozenOperandPair::position(ParenContext::Callee),
+            FrozenOperandPair::position(ParenContext::callee_of(call)),
             || {
                 test_call_flat
                     .then(|| build_test_callee_flat_doc(call.callee, printer))

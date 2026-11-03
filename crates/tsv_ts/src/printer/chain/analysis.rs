@@ -467,7 +467,7 @@ fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>], input: LinearizeInput<'_>
         // bare-callee path keeps ([`instantiation_keeps_pair_before_type_args`]).
         let second_list = call.type_arguments.is_some()
             && instantiation_keeps_pair_before_type_args(source, expr, SecondTypeArgs::Expression);
-        let callee_pair = needs_parens(expr, ParenContext::Callee, false)
+        let callee_pair = needs_parens(expr, ParenContext::callee_of(call), false)
             && !(is_called_function(expr)
                 && input
                     .printer
@@ -961,11 +961,12 @@ fn member_object_step<'a>(
 /// call's node prints the instantiation's type arguments and the walk continues into
 /// `inst.expression`, so the instantiation itself emits nothing.
 ///
-/// `expr<T>(args)` parses to a call whose callee is the instantiation, while the canonical
-/// tree puts `<T>` on the call. This is the one position where an instantiation is
-/// transparent — reached as a member object or a `!` operand it is a parenthesized base.
-/// A call with a list of its OWN (`f<T><U>(x).y`) has two, and the Call node prints only
-/// its own, so there the instantiation stays the base and prints the first.
+/// `expr<T>?.(args)` parses to an optional call whose callee is the instantiation, and an
+/// optional call reads it bare, so this is the one position where an instantiation is
+/// transparent — reached as a member object or a `!` operand it is a parenthesized base,
+/// and so is a plain call's (`(f<T>)(x).y`, whose bare spelling would make the list the
+/// call's own). A call with a list of its OWN (`f<T><U>(x).y`) has two, and the Call node
+/// prints only its own, so there the instantiation stays the base and prints the first.
 ///
 /// ⚠️ One predicate for every reader — the linearizer, the call's head doc (which prints
 /// the list, and ahead of an optional call's `?.` when it comes from here) and
@@ -975,7 +976,9 @@ pub(crate) fn transparent_instantiation_callee<'a>(
     call: &'a ast::CallExpression<'a>,
 ) -> Option<&'a ast::TSInstantiationExpression<'a>> {
     match &call.callee.kind {
-        ExpressionKind::TSInstantiationExpression(inst) if call.type_arguments.is_none() => {
+        ExpressionKind::TSInstantiationExpression(inst)
+            if call.optional && call.type_arguments.is_none() =>
+        {
             Some(inst)
         }
         _ => None,

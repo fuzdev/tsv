@@ -1,0 +1,315 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 199,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 174,
+				"end": 176,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 176,
+				"end": 186,
+				"expression": {
+					"type": "CallExpression",
+					"start": 177,
+					"end": 185,
+					"callee": {
+						"type": "Identifier",
+						"start": 178,
+						"end": 179,
+						"name": "f"
+					},
+					"arguments": [],
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 180,
+						"end": 183,
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 181,
+								"end": 182,
+								"typeName": {
+									"type": "Identifier",
+									"start": 181,
+									"end": 182,
+									"name": "T"
+								}
+							}
+						]
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 186,
+				"end": 187,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 187,
+				"end": 198,
+				"expression": {
+					"type": "TaggedTemplateExpression",
+					"start": 188,
+					"end": 197,
+					"tag": {
+						"type": "Identifier",
+						"start": 189,
+						"end": 190,
+						"name": "f"
+					},
+					"quasi": {
+						"type": "TemplateLiteral",
+						"start": 194,
+						"end": 197,
+						"expressions": [],
+						"quasis": [
+							{
+								"type": "TemplateElement",
+								"start": 195,
+								"end": 196,
+								"value": {
+									"raw": "x",
+									"cooked": "x"
+								},
+								"tail": true
+							}
+						]
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 191,
+						"end": 194,
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 192,
+								"end": 193,
+								"typeName": {
+									"type": "Identifier",
+									"start": 192,
+									"end": 193,
+									"name": "T"
+								}
+							}
+						]
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an instantiation over a parenthesized base is the chain's own, so its list",
+			"start": 20,
+			"end": 97
+		},
+		{
+			"type": "Line",
+			"value": " joins the call or the tag",
+			"start": 99,
+			"end": 127
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 174,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 165,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 129,
+					"end": 138,
+					"expression": {
+						"type": "CallExpression",
+						"start": 129,
+						"end": 137,
+						"callee": {
+							"type": "Identifier",
+							"start": 130,
+							"end": 131,
+							"name": "f"
+						},
+						"arguments": [],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 132,
+							"end": 135,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 133,
+									"end": 134,
+									"typeName": {
+										"type": "Identifier",
+										"start": 133,
+										"end": 134,
+										"name": "T"
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an instantiation over a parenthesized base is the chain's own, so its list",
+							"start": 20,
+							"end": 97
+						},
+						{
+							"type": "Line",
+							"value": " joins the call or the tag",
+							"start": 99,
+							"end": 127
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 140,
+					"end": 150,
+					"expression": {
+						"type": "TaggedTemplateExpression",
+						"start": 140,
+						"end": 149,
+						"tag": {
+							"type": "Identifier",
+							"start": 141,
+							"end": 142,
+							"name": "f"
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 146,
+							"end": 149,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 147,
+									"end": 148,
+									"value": {
+										"raw": "x",
+										"cooked": "x"
+									},
+									"tail": true
+								}
+							]
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 143,
+							"end": 146,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 144,
+									"end": 145,
+									"typeName": {
+										"type": "Identifier",
+										"start": 144,
+										"end": 145,
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 152,
+					"end": 164,
+					"expression": {
+						"type": "CallExpression",
+						"start": 152,
+						"end": 163,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 153,
+							"end": 156,
+							"object": {
+								"type": "Identifier",
+								"start": 153,
+								"end": 154,
+								"name": "a"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 155,
+								"end": 156,
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 161,
+								"end": 162,
+								"name": "c"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 157,
+							"end": 160,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 158,
+									"end": 159,
+									"typeName": {
+										"type": "Identifier",
+										"start": 158,
+										"end": 159,
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

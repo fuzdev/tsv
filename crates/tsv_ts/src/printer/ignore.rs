@@ -800,7 +800,7 @@ impl<'a> Printer<'a> {
         }
         match ctx {
             ParenContext::ChainBase
-            | ParenContext::Callee
+            | ParenContext::Callee { .. }
             | ParenContext::TaggedTemplateTag
             | ParenContext::NonNull => true,
             // The slice's last token is the `>` closing its TYPE ARGUMENTS exactly when it

@@ -97,7 +97,8 @@ fn a_pair_the_callee_prints_takes_no_second() {
 #[test]
 fn a_sealed_chain_keeps_its_pair_under_an_instantiation() {
     for (source, printed) in [
-        ("new ((a?.b())<T>)`t`();", "new (a?.b())<T>`t`();\n"),
+        // a tag keeps the instantiation's own pair as well (`instantiation_callee_tag_parens.rs`)
+        ("new ((a?.b())<T>)`t`();", "new ((a?.b())<T>)`t`();\n"),
         ("new ((a?.b())<T>)();", "new (a?.b())<T>();\n"),
         ("new ((a?.b())!<T>)();", "new (a?.b())!<T>();\n"),
         ("new ((a?.b)<T>)();", "new (a?.b)<T>();\n"),

@@ -1305,7 +1305,7 @@ impl<'a> Printer<'a> {
             || (matches!(
                 ctx,
                 ParenContext::AssignmentTarget { .. }
-                    | ParenContext::Callee
+                    | ParenContext::Callee { .. }
                     | ParenContext::TaggedTemplateTag
                     | ParenContext::NonNull
             ) && self.region_keeps_shell(expr))
@@ -1347,7 +1347,9 @@ impl<'a> Printer<'a> {
                 expr.kind,
                 ast::ExpressionKind::AwaitExpression(_) | ast::ExpressionKind::BinaryExpression(_)
             ),
-            ParenContext::Callee | ParenContext::TaggedTemplateTag => is_called_function(expr),
+            ParenContext::Callee { .. } | ParenContext::TaggedTemplateTag => {
+                is_called_function(expr)
+            }
             _ => false,
         };
         takes_a_clarity_pair && self.withheld_clarity_pair_targets.is_marked(expr.span())
