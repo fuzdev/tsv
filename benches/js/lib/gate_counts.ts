@@ -97,7 +97,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	// `collections/` tree (see above); what each collection vendors is its manifest.
 	[CORPORA_ROOT]: {
 		tree: CORPORA_TREE,
-		hash: 'e5847b3dd',
+		hash: '98dc2cc10',
 		pins: [
 			'corpus_format_pins.txt',
 			'corpus_parse_pins.txt',
@@ -314,7 +314,7 @@ export const TS_REPO_PINS = {
  * id), a collection joining the bench, or a broken extraction, and the harvest fails
  * BEFORE writing so a wrong cache never replaces a good one. Stamped on the snapshot's
  * `collections/` tree id and the perf view's entry list (`lib/harvest_stamp.ts`).
- * Measured 2026-10-17: ../corpora `collections/` at e5847b3dd.
+ * Measured at ../corpora `collections/` 98dc2cc10.
  *
  * 401 → 619: the third-party collections join the bench, so the perf view gains their
  * `.svelte` blocks with the snapshot's tree id unmoved (layercake, layerchart,
@@ -322,8 +322,12 @@ export const TS_REPO_PINS = {
  * none), the `lang="postcss"` blocks skipped.
  *
  * 619 → 615: fuz_mastodon leaves the bench, taking its 4 blocks.
+ *
+ * 615 → 647: a whole-snapshot refresh to upstream HEADs; mostly new components'
+ * blocks in layercake (+17) and zzz (+10), the rest a few blocks either way across
+ * fuz_css, svelte-docinfo, layerchart, svelte-maplibre, svelte.dev, fuz_ui, tsv.fuz.dev.
  */
-export const SVELTE_STYLES_BLOCKS_PIN = 615;
+export const SVELTE_STYLES_BLOCKS_PIN = 647;
 
 /**
  * strip:corpus — exact counts over the strippable TypeScript of the `gates` view's snapshot
@@ -334,8 +338,13 @@ export const SVELTE_STYLES_BLOCKS_PIN = 615;
  * see. Measured over ../corpora `collections/`, ts-blank-space 0.9.0.
  *
  * files 4852 → 4844: fuz_mastodon leaves the corpus, taking its 8 strippable files.
+ *
+ * files 4844 → 5719, refusals 175 → 182: a whole-snapshot refresh to upstream HEADs.
+ * The growth is mostly storybook (+324), fuz_app (+221), zzz (+106) and layerchart
+ * (+89). The new refusals are new files, both sides agreeing: storybook +6
+ * (`ParameterProperty`) and layerchart +1 (`TypeAssertion`).
  */
-export const STRIP_CORPUS_PINS = { files: 4844, refusals: 175 };
+export const STRIP_CORPUS_PINS = { files: 5719, refusals: 182 };
 
 /**
  * bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured
