@@ -52,8 +52,8 @@ impl<'a> Printer<'a> {
     /// The per-family facts of a type-literal member body, for the shared member-body
     /// walk ([`Printer::build_member_list_docs_into`]): a type member's `;` is the
     /// WALK's, so its trailing run partitions around that separator
-    /// ([`MemberSeam::AroundSeparator`]) and a format-ignore freeze stops at the
-    /// member's content end rather than carrying a second terminator out with it.
+    /// ([`MemberSeam::AroundSeparator`]), except after a member a format-ignore directive
+    /// freezes, whose slice carries its separator as authored ([`MemberFreeze::Span`]).
     ///
     /// `delimiter_pull_pos` is the opening `{`'s own position where the caller pulled a
     /// delimiter-line comment onto it, so this walk drops the same comment from the first
@@ -1263,9 +1263,9 @@ impl<'a> Printer<'a> {
             }
 
             // Multi-line format (same for both modes) — the shared member-body walk. A
-            // preceding format-ignore directive keeps the member's source verbatim, up to
-            // the member's CONTENT end (no trailing `;`), because the walk's own seam
-            // re-adds the separator ([`MemberFreeze::Content`]).
+            // preceding format-ignore directive keeps the member's whole span verbatim, its
+            // separator included as authored, as an interface member's
+            // ([`MemberFreeze::Span`]).
             let mut member_parts = d.pooled_docbuf();
             self.build_member_list_docs_into(
                 &mut member_parts,
@@ -1274,7 +1274,7 @@ impl<'a> Printer<'a> {
                     t,
                     comments_present,
                     delimiter_pull_pos,
-                    MemberFreeze::Content,
+                    MemberFreeze::Span,
                 ),
                 TSTypeElement::span,
                 |m| m.content_end(self.source),

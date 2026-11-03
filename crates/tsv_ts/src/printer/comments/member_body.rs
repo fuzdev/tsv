@@ -45,10 +45,11 @@ pub(crate) enum MemberBlankScan {
 
 /// What an honored `prettier-ignore` in a member's leading gap emits verbatim.
 ///
-/// The extent is a per-family fact because it must stop where the family's own emission
-/// resumes: a class or interface member's doc carries its own terminator, while the
-/// type-literal walk re-adds the `;` from its seam and so must not let the frozen slice
-/// carry one too.
+/// Every family that honors the directive freezes the member's whole span, its
+/// separator included and as authored (`a:  1,`, `a:  1⏎;`, or none at all), so the
+/// walk emits no separator of its own after a frozen member: a type-literal member
+/// leaves its [`MemberSeam::AroundSeparator`] seam for the interface's
+/// [`MemberSeam::Whole`] one there.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum MemberFreeze {
     /// No freeze arm at all — the alignment walk (a union-member / parenthesized-
@@ -57,15 +58,12 @@ pub(crate) enum MemberFreeze {
     /// TODO: this one is a KNOWN BUG rather than a family fact — it is the
     /// `UNHONORED TSTypeLiteral.members` line in
     /// `crates/tsv_debug/src/cli/commands/ignore_audit_known.txt`, and the plain type
-    /// literal next door honors the same directive through [`Self::Content`]. Named here so
-    /// the walk's shape does not hide it; switching this arm to `Content` is the fix, and it
+    /// literal next door honors the same directive through [`Self::Span`]. Named here so
+    /// the walk's shape does not hide it; switching this arm to `Span` is the fix, and it
     /// needs its own fixture plus a `deno task ignore:audit:update` re-pin.
     Never,
     /// The member's whole span, its terminator included.
     Span,
-    /// The member's content only, stopping at the seam anchor, because the walk's own
-    /// seam re-emits the separator ([`Printer::raw_source_range`]).
-    Content,
 }
 
 /// Where the leads-next test ([`Printer::trailing_claim_end`]) opens in the gap after a
@@ -223,16 +221,24 @@ impl<'a> Printer<'a> {
             let frozen = body.has_comments
                 && !matches!(body.freeze, MemberFreeze::Never)
                 && self.member_gap_frozen(prev_end, member_start);
-            parts.push(match (frozen, body.freeze) {
-                (true, MemberFreeze::Span) => self.raw_source_doc(member_span),
-                (true, MemberFreeze::Content) => self.raw_source_range(member_start, anchor),
-                _ => build_member(member, &mut deferred),
+            parts.push(if frozen {
+                self.raw_source_doc(member_span)
+            } else {
+                build_member(member, &mut deferred)
             });
 
             // The trailing seam, and with it the deferred flag the next member's leading
-            // run and the end-of-body emitter read as their `claims_trailing`.
+            // run and the end-of-body emitter read as their `claims_trailing`. A frozen
+            // member's slice carries its separator as authored, so a type member takes the
+            // interface's seam there: the run after its span, and no separator re-added.
             let next_start = members.get(i + 1).map(|next| get_span(next).start);
-            (prev_end, prev_deferred_line_comment) = match body.seam {
+            let seam = match body.seam {
+                MemberSeam::AroundSeparator if frozen => MemberSeam::Whole {
+                    floor: MemberFloor::MemberEnd,
+                },
+                seam => seam,
+            };
+            (prev_end, prev_deferred_line_comment) = match seam {
                 MemberSeam::Whole { floor } => {
                     debug_assert!(
                         deferred.is_empty(),
