@@ -1,0 +1,1 @@
+An `as` whose blanking would regroup the expression around it (`(b + import(…)) as T / d` would read `b + import(…) / d`): the type strip refuses it without walking its operand, and the operand's dynamic import is a record all the same.

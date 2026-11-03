@@ -1,0 +1,21 @@
+{
+	"hasModuleSyntax": true,
+	"imports": [
+		{
+			"kind": "re_export",
+			"start": 0,
+			"end": 45,
+			"specifier": {
+				"value": "./a.json",
+				"start": 15,
+				"end": 23
+			},
+			"typeOnly": null,
+			"phase": null,
+			"attributes": {
+				"start": 25,
+				"end": 44
+			}
+		}
+	]
+}

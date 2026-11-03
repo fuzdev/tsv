@@ -1,0 +1,1 @@
+await using a = b;

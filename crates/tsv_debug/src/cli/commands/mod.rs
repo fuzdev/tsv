@@ -40,6 +40,9 @@ pub mod gap_audit;
 // ledger.
 #[cfg(feature = "_internal_comment_check")]
 pub mod ignore_audit;
+pub mod imports;
+pub mod imports_fixtures_update;
+pub mod imports_fixtures_validate;
 pub mod json_profile;
 pub mod lex_diff;
 pub mod line_width;

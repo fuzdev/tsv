@@ -1,0 +1,1 @@
+A `<script module>` counts.

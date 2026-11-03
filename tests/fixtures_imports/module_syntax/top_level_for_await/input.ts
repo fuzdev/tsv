@@ -1,0 +1,2 @@
+for await (const a of b) {
+}

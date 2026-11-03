@@ -21,7 +21,9 @@
 //! the hazard substitutions and the refusals, locating the bytes the AST holds no position
 //! for (a modifier keyword, a `?` / `!` mark, a paren the parser stripped) with
 //! `tsv_lang::source_scan`; then one copy of the source (`blank`) writes the blanks. The
-//! strip shares nothing with the printer.
+//! strip shares nothing with the printer. The same walk, in its imports mode, is what
+//! `crate::parse_imports` collects import records with; the strip's walk collects none,
+//! and [`strip_with_imports`]'s collects them as it strips, from the one parse.
 //!
 //! **The hazards.** Each substitution is one character inside a blanked range:
 //!
@@ -58,12 +60,14 @@
 
 mod blank;
 mod scan;
-mod walk;
+pub(crate) mod walk;
 
 use std::fmt;
 use std::ops::Range;
 
 use tsv_lang::{Error, ErrorKind, ErrorReport};
+
+use crate::imports::Imports;
 
 /// Strip the types from TypeScript `source`, keeping every surviving character at its line
 /// and UTF-16 column.
@@ -136,6 +140,84 @@ fn strip_one_shot(source: &str, goal: Option<crate::Goal>) -> Result<Stripped, S
     strip_in(source, goal, &arena)
 }
 
+/// [`strip`] and [`parse_imports`](crate::parse_imports()) in one parse and one walk: the
+/// JS, and the import records of the source it was stripped from.
+///
+/// The pair is exactly what the two calls return apart — the code [`strip`]'s, the records
+/// and `has_module_syntax` [`parse_imports`](crate::parse_imports())' — for every source
+/// the strip accepts; a source it refuses is the same [`StripError`], with no records. The
+/// walk collects as it strips, so a loader wanting both pays for the walk once; plain
+/// [`strip`] collects nothing, and pays for no record. The goal is read as [`strip`] reads
+/// it: a module, retried as a script only if that fails (see [Goals](crate#goals));
+/// [`strip_with_imports_with_goal`] names one exactly.
+///
+/// ```
+/// use tsv_ts::{ImportRecordKind, TypeOnly, strip_with_imports};
+///
+/// # fn main() -> Result<(), tsv_ts::StripError> {
+/// let source = "import type {T} from './t';\nconst b: T = await import('./b');";
+/// let (stripped, imports) = strip_with_imports(source)?;
+/// assert_eq!(
+///     stripped.code,
+///     "                           \nconst b    = await import('./b');"
+/// );
+/// assert!(imports.has_module_syntax);
+/// let [t, b] = &imports.records[..] else {
+///     panic!("two records");
+/// };
+/// // the type-only import is a record, though the strip blanks it
+/// assert_eq!((t.kind, t.type_only), (ImportRecordKind::Static, TypeOnly::Statement));
+/// assert_eq!(b.kind, ImportRecordKind::Dynamic);
+/// // every span is a byte range of the source, not of the code
+/// assert_eq!(b.specifier.map(|s| s.text(source)), Some("./b"));
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Errors
+///
+/// As [`strip`].
+pub fn strip_with_imports(source: &str) -> Result<(Stripped, Imports), StripError> {
+    strip_with_imports_one_shot(source, None)
+}
+
+/// [`strip_with_imports`] at exactly `goal`, with no Module-to-Script fallback: the pair
+/// [`strip_with_goal`] and [`parse_imports_with_goal`](crate::parse_imports_with_goal())
+/// return apart.
+///
+/// ```
+/// use tsv_ts::{Goal, StripError, strip_with_imports_with_goal};
+///
+/// let source = "import a from 'a'; let x: T;";
+/// assert!(matches!(
+///     strip_with_imports_with_goal(source, Goal::Script),
+///     Err(StripError::Parse(_))
+/// ));
+/// let (stripped, imports) = strip_with_imports_with_goal(source, Goal::Module).unwrap();
+/// assert_eq!(stripped.code, "import a from 'a'; let x   ;");
+/// assert_eq!(imports.records.len(), 1);
+/// ```
+///
+/// # Errors
+///
+/// As [`strip_with_goal`].
+pub fn strip_with_imports_with_goal(
+    source: &str,
+    goal: crate::Goal,
+) -> Result<(Stripped, Imports), StripError> {
+    strip_with_imports_one_shot(source, Some(goal))
+}
+
+/// [`strip_with_imports`]' arena: a fresh one sized to the source, dropped on return — the
+/// output is owned.
+fn strip_with_imports_one_shot(
+    source: &str,
+    goal: Option<crate::Goal>,
+) -> Result<(Stripped, Imports), StripError> {
+    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+    strip_with_imports_in(source, goal, &arena)
+}
+
 /// The strip over a caller-owned `arena` — the hidden primitive beneath [`strip`] and
 /// [`strip_with_goal`], for a hot loop that keeps one arena warm across sources (the
 /// bindings' per-thread arena), reset by the caller between calls.
@@ -153,16 +235,42 @@ pub fn strip_in(
 ) -> Result<Stripped, StripError> {
     let program = crate::__private::parse_with_goal_or_fallback(source, goal, arena)
         .map_err(StripError::Parse)?;
-    let mut walk = walk::Walk::new(source, arena);
+    let mut walk = walk::Walk::new(source, arena, walk::Mode::Strip);
     walk.program(&program);
     let mut edits = walk.finish()?;
+    Ok(stripped(source, &mut edits))
+}
+
+/// [`strip_with_imports`] over a caller-owned `arena` — the hidden primitive beneath
+/// [`strip_with_imports`] and [`strip_with_imports_with_goal`], as [`strip_in`] is the
+/// strip's. The parse is [`strip_in`]'s.
+///
+/// # Errors
+///
+/// As [`strip`].
+pub fn strip_with_imports_in(
+    source: &str,
+    goal: Option<crate::Goal>,
+    arena: &bumpalo::Bump,
+) -> Result<(Stripped, Imports), StripError> {
+    let program = crate::__private::parse_with_goal_or_fallback(source, goal, arena)
+        .map_err(StripError::Parse)?;
+    let mut walk = walk::Walk::new(source, arena, walk::Mode::StripWithImports);
+    walk.program(&program);
+    let (mut edits, imports) = walk.finish_with_imports()?;
+    Ok((stripped(source, &mut edits), imports))
+}
+
+/// The JS a walk's `edits` make of `source`.
+#[inline]
+fn stripped(source: &str, edits: &mut [blank::Edit]) -> Stripped {
     // nothing type-only: the source is the JS, copied once with no walk over the edits
     let code = if edits.is_empty() {
         source.to_owned()
     } else {
-        blank::apply(source, &mut edits)
+        blank::apply(source, edits)
     };
-    Ok(Stripped { code })
+    Stripped { code }
 }
 
 /// A successful [`strip`].
@@ -180,8 +288,8 @@ pub struct Stripped {
     /// The JS: the source with every type-only range blanked, the source itself when
     /// nothing is type-only.
     pub code: String,
-    // TODO: `imports` — the static import and re-export specifiers the walk visits, for a
-    // parallel module loader. Reserved as shape; it lands with a consumer.
+    // no import records: `strip` pays for none, and `strip_with_imports` hands them out
+    // beside this rather than in it, so a field here never sits empty
 }
 
 // A new variant compiles silently at every in-workspace match, which `#[non_exhaustive]`
@@ -372,6 +480,73 @@ impl std::error::Error for StripError {
 #[cfg(test)]
 mod tests {
     use super::{StripError, UnsupportedConstruct, strip};
+
+    /// A collecting walk blanks what the strip's walk blanks: the mode adds records, never
+    /// an edit, over a source the strip does not refuse.
+    #[test]
+    fn the_imports_mode_edits_as_the_strip_does() {
+        for source in [
+            "import a, {type B} from './a';\nexport * as c from './c' with {type: 'json'};",
+            "import type {T} from './t';\nimport {type U} from './u';\nexport type {V} from './v';",
+            "class C { [import('./k')] = import('./v'); static { x as T; } }",
+            "for await (const a of import('./a')) {}\nawait using b = c;",
+            "const f = <T,>(a: T) => import.meta.url as string;",
+            "let a: { [import('./t')]: number } = {};\nexport default a!;",
+        ] {
+            let arena = bumpalo::Bump::new();
+            let program = crate::__private::parse_with_goal_or_fallback(source, None, &arena)
+                .expect("the source parses");
+            let code = |mode| {
+                let mut walk = super::walk::Walk::new(source, &arena, mode);
+                walk.program(&program);
+                let mut edits = walk.finish().expect("the source strips");
+                super::blank::apply(source, &mut edits)
+            };
+            assert_eq!(
+                code(super::walk::Mode::Imports),
+                code(super::walk::Mode::Strip),
+                "{source:?}"
+            );
+            assert_eq!(
+                code(super::walk::Mode::StripWithImports),
+                code(super::walk::Mode::Strip),
+                "{source:?}"
+            );
+            let (stripped, imports) = super::strip_with_imports(source).expect("the source strips");
+            assert_eq!(
+                stripped,
+                strip(source).expect("the source strips"),
+                "{source:?}"
+            );
+            assert_eq!(
+                imports,
+                crate::parse_imports(source).expect("the source parses"),
+                "{source:?}"
+            );
+        }
+    }
+
+    /// Where the strip refuses, the combined entry refuses with the same error — though an
+    /// imports walk would collect records there, the combined walk hands back none.
+    #[test]
+    fn the_combined_entry_refuses_as_the_strip_does() {
+        for source in [
+            "enum E { A = (import('a'), 1) }",
+            "namespace N { export const a = import('a'); }",
+            "export = import('a');",
+            "let a = b + import('a') as T / d;",
+            "import a = require('a');",
+            "let x = <T>import('a');",
+            "let x =",
+        ] {
+            assert_eq!(
+                super::strip_with_imports(source).map(|(stripped, _)| stripped),
+                strip(source),
+                "{source:?}"
+            );
+            assert!(strip(source).is_err(), "{source:?} is not refused");
+        }
+    }
 
     fn strip_error(source: &str) -> StripError {
         match strip(source) {

@@ -9,8 +9,11 @@ use crate::ast::{
 };
 use tsv_lang::Span;
 
+pub use crate::imports::{collect_imports, parse_imports_in};
+#[cfg(feature = "json")]
+pub use crate::imports::{write_imports_json, write_imports_json_string};
 pub use crate::parser::TopLevelAs;
-pub use crate::strip::strip_in;
+pub use crate::strip::{strip_in, strip_with_imports_in};
 
 /// The per-document environment shared by every formatting entry point: the
 /// source the AST's spans index into, the comment buffer, the precomputed

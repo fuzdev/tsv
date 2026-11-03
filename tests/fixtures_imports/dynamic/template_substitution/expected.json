@@ -1,0 +1,14 @@
+{
+	"hasModuleSyntax": false,
+	"imports": [
+		{
+			"kind": "dynamic",
+			"start": 18,
+			"end": 40,
+			"specifier": null,
+			"typeOnly": null,
+			"phase": null,
+			"attributes": null
+		}
+	]
+}

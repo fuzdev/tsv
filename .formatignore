@@ -9,3 +9,4 @@
 tests/fixtures/
 tests/fixtures_compile/
 tests/fixtures_strip/
+tests/fixtures_imports/

@@ -1,0 +1,18 @@
+{
+	"hasModuleSyntax": true,
+	"imports": [
+		{
+			"kind": "static",
+			"start": 0,
+			"end": 23,
+			"specifier": {
+				"value": "./polyfill.js",
+				"start": 8,
+				"end": 21
+			},
+			"typeOnly": null,
+			"phase": null,
+			"attributes": null
+		}
+	]
+}

@@ -1,0 +1,44 @@
+{
+	"hasModuleSyntax": false,
+	"imports": [
+		{
+			"kind": "dynamic",
+			"start": 19,
+			"end": 35,
+			"specifier": {
+				"value": "./a.js",
+				"start": 27,
+				"end": 33
+			},
+			"typeOnly": null,
+			"phase": null,
+			"attributes": null
+		},
+		{
+			"kind": "dynamic",
+			"start": 58,
+			"end": 74,
+			"specifier": {
+				"value": "./b.js",
+				"start": 66,
+				"end": 72
+			},
+			"typeOnly": null,
+			"phase": null,
+			"attributes": null
+		},
+		{
+			"kind": "dynamic",
+			"start": 91,
+			"end": 107,
+			"specifier": {
+				"value": "./c.js",
+				"start": 99,
+				"end": 105
+			},
+			"typeOnly": null,
+			"phase": null,
+			"attributes": null
+		}
+	]
+}

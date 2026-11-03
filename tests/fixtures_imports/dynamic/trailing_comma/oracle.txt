@@ -1,0 +1,2 @@
+tsv-wire
+acorn-typescript rejects a trailing comma in `import(…)`, which ECMAScript allows (`ImportCall : import ( AssignmentExpression ,opt )`), so the records come from tsv's own parse wire.

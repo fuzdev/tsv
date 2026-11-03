@@ -1,0 +1,31 @@
+{
+	"hasModuleSyntax": true,
+	"imports": [
+		{
+			"kind": "static",
+			"start": 17,
+			"end": 40,
+			"specifier": {
+				"value": "./a.js",
+				"start": 32,
+				"end": 38
+			},
+			"typeOnly": null,
+			"phase": null,
+			"attributes": null
+		},
+		{
+			"kind": "static",
+			"start": 62,
+			"end": 85,
+			"specifier": {
+				"value": "./b.js",
+				"start": 77,
+				"end": 83
+			},
+			"typeOnly": null,
+			"phase": null,
+			"attributes": null
+		}
+	]
+}

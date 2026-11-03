@@ -122,6 +122,7 @@ use ast::Root;
 pub use formatter::Formatter;
 pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, STACK_SIZE, WirePoint, run_with_stack};
 use tsv_lang::{LeadingBom, LineRule, WireCoordinates};
+pub use tsv_ts::{ByteSpan, ImportPhase, ImportRecord, ImportRecordKind, Imports, TypeOnly};
 
 // `tests/public_reexports.rs` (outside this crate) names every item above through this
 // crate's path: cargo-semver-checks cannot see a dropped or demoted re-export.
@@ -337,6 +338,44 @@ pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> 
     #[cfg(not(feature = "locations"))]
     let _ = options;
     Ok(__private::convert_ast_json_string(&ast, source))
+}
+
+/// Collect the import records of a Svelte component: its instance `<script>` and its
+/// module `<script>` (`<script module>` / `<script context="module">`), in source order —
+/// the module script may come second. Every position is a UTF-8 byte offset into the
+/// whole document.
+///
+/// Only the two top-level scripts hold records. A `<script>` nested in markup is markup,
+/// not the component's code, and an `import(…)` in a template expression
+/// (`{#await import('./a.svelte')}`) is not a record either. `has_module_syntax` answers
+/// for both scripts together.
+///
+/// The records are `tsv_ts`'s ([`tsv_ts::parse_imports`] states what each holds).
+///
+/// ```
+/// use tsv_svelte::ImportRecordKind;
+///
+/// # fn main() -> tsv_svelte::Result<()> {
+/// let source = "<script>import a from './a';</script>\n<script module>import('./m');</script>";
+/// let imports = tsv_svelte::parse_imports(source)?;
+/// assert!(imports.has_module_syntax);
+/// let [a, m] = &imports.records[..] else {
+///     panic!("two records");
+/// };
+/// assert_eq!(a.kind, ImportRecordKind::Static);
+/// assert_eq!(a.span.text(source), "import a from './a';");
+/// assert_eq!(m.kind, ImportRecordKind::Dynamic);
+/// assert_eq!(m.specifier.map(|s| s.text(source)), Some("./m"));
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Errors
+///
+/// A parse error.
+pub fn parse_imports(source: &str) -> Result<Imports> {
+    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+    __private::parse_imports_in(source, &arena)
 }
 
 /// The wire's bytes as the `String` they are: the writer emits source slices and ASCII

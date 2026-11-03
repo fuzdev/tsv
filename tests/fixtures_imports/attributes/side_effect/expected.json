@@ -1,0 +1,21 @@
+{
+	"hasModuleSyntax": true,
+	"imports": [
+		{
+			"kind": "static",
+			"start": 0,
+			"end": 36,
+			"specifier": {
+				"value": "./a.css",
+				"start": 8,
+				"end": 15
+			},
+			"typeOnly": null,
+			"phase": null,
+			"attributes": {
+				"start": 17,
+				"end": 35
+			}
+		}
+	]
+}

@@ -127,6 +127,25 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Root<
     parser::parse_svelte(source, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
+/// [`crate::parse_imports`] over a caller-owned `arena` — the hidden primitive beneath it,
+/// for a hot loop that keeps one arena warm across sources, reset by the caller between
+/// calls.
+///
+/// # Errors
+///
+/// As [`crate::parse_imports`].
+pub fn parse_imports_in(source: &str, arena: &bumpalo::Bump) -> Result<Imports> {
+    let root = parse(source, arena)?;
+    let mut scripts = [root.instance, root.module];
+    scripts.sort_by_key(|script| script.map(|script| script.span.start));
+    let programs: smallvec::SmallVec<[&tsv_ts::ast::Program<'_>; 2]> = scripts
+        .into_iter()
+        .flatten()
+        .map(|script| &script.content)
+        .collect();
+    Ok(tsv_ts::__private::collect_imports(&programs, source, arena))
+}
+
 /// Convert internal AST to compact JSON wire bytes with character-based positions
 ///
 /// The span-only wire every binding ships, and `tsv parse`'s default: the Svelte parser's

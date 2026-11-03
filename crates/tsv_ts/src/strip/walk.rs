@@ -12,6 +12,22 @@
 //! last byte of every JS node the walk completes (`Walk::mark`), cleared on entering a
 //! function body and restored on leaving it, and left alone by a blanked node. A class's
 //! name is the one JS node not marked, as ts-blank-space never visits it.
+//!
+//! **The import records.** The walk is also the one producer of [`crate::Imports`], in a
+//! collecting mode ([`Mode::Imports`], [`Mode::StripWithImports`]): a record is pushed where
+//! its node is visited, before any type-only early return, so the records come out in
+//! source order (the walk is pre-order, and a chain walks its base before its links), and
+//! `has_module_syntax` is set where its evidence is met. A [`Mode::Imports`] walk also
+//! descends into the four value subtrees the strip refuses without walking — an enum's
+//! member initializers, a value namespace's body, an `export =` operand and a regrouping
+//! assertion's operand — and is otherwise the same walk; its edits and refusal are never
+//! read. A [`Mode::Strip`] walk collects nothing: it pushes no
+//! record and tracks no module syntax, each site asking the mode with a branch, so the
+//! edits and the refusal are the same in every mode and the strip pays for no record. A
+//! [`Mode::StripWithImports`] walk is the strip's walk collecting as it goes: the strip's
+//! edits and refusal, and, over a source the strip accepts, the records an imports walk
+//! collects (the two walks part only inside a subtree the strip refuses). The mode is a
+//! runtime value rather than a type parameter, so the bindings link one walk.
 
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
@@ -28,6 +44,11 @@ use crate::ast::{
     TSModuleDeclarationKind, TSModuleName, TSParameterProperty, TSType, TSTypeAnnotation,
     TSTypeParameterDeclaration, TSTypeParameterInstantiation, VariableDeclaration,
 };
+use crate::ast::{
+    ExportAllDeclaration, ImportAttribute, ImportExpression, LiteralValue, TSEnumDeclaration,
+    TSImportEqualsDeclaration, TSModuleReference, VariableDeclarationKind,
+};
+use crate::imports::{ByteSpan, ImportRecord, ImportRecordKind, Imports, TypeOnly};
 
 use super::blank::{Edit, Mark};
 use super::scan::{Continuation, EXPONENT_PRECEDENCE, Source};
@@ -42,11 +63,45 @@ enum Position {
     Nested,
 }
 
-/// The walk's state: the edits it has collected, the first refusal, and the state the
-/// hazard substitutions read.
-pub(super) struct Walk<'s, 'b> {
+/// What a walk is for: the strip's edits, the import records alone, or both (module docs).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Mode {
+    /// The strip: no record is collected, and the subtrees it refuses are not walked, since
+    /// a refused strip has no output.
+    Strip,
+    /// `parse_imports`: the records are collected, and the subtrees the strip refuses are
+    /// walked for theirs.
+    Imports,
+    /// `strip_with_imports`: the strip's walk, collecting the records as it goes. The
+    /// subtrees the strip refuses are not walked: a refusal returns no records either, so
+    /// over every source the strip accepts the records are an imports walk's.
+    StripWithImports,
+}
+
+/// The walk's state: the edits it has collected, the first refusal, the import records,
+/// and the state the hazard substitutions read.
+pub(crate) struct Walk<'s, 'b> {
     src: Source<'s>,
+    /// What the walk collects ([`Self::collects`]) and whether the subtrees the strip
+    /// refuses are walked ([`Self::walks_refused`]).
+    mode: Mode,
     edits: BumpVec<'b, Edit>,
+    /// The import records, in source order — empty in [`Mode::Strip`].
+    records: Vec<ImportRecord>,
+    /// Whether module syntax was met: a top-level import or export declaration, an
+    /// `import.meta`, a top-level `await` / `for await` / `await using`. Tracked by a
+    /// collecting walk alone.
+    module_syntax: bool,
+    /// How many functions, class static blocks, field initializers, namespace bodies and
+    /// enum member initializers enclose the walk: an `await` is a top-level one at zero (tsc
+    /// reads the last two as function-like: TS1308). A count rather than a saved flag, so a
+    /// function — the walk's most frequent boundary — pays an increment and a decrement.
+    /// Kept by a collecting walk alone ([`Self::enter_function`]).
+    function_depth: u32,
+    /// Inside a namespace body (walked in [`Mode::Imports`] alone), where a static import,
+    /// a re-export and an `import x = require('y')` are no records: tsc rejects them there
+    /// (TS1147, TS1194). A dynamic import is a record.
+    in_namespace: bool,
     /// The refusal with the earliest start — the one ts-blank-space reports first.
     refusal: Option<(UnsupportedConstruct, Span)>,
     /// The end of the last JS node marked (`Walk::mark`), `None` where nothing is marked yet (the
@@ -99,10 +154,15 @@ impl Tail {
 }
 
 impl<'s, 'b> Walk<'s, 'b> {
-    pub(super) fn new(source: &'s str, arena: &'b Bump) -> Self {
+    pub(crate) fn new(source: &'s str, arena: &'b Bump, mode: Mode) -> Self {
         Self {
             src: Source::new(source),
+            mode,
             edits: BumpVec::new_in(arena),
+            records: Vec::new(),
+            module_syntax: false,
+            function_depth: 0,
+            in_namespace: false,
             refusal: None,
             marked_end: None,
             statement_end: None,
@@ -120,8 +180,284 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
     }
 
-    pub(super) fn program(&mut self, program: &Program<'_>) {
-        self.statement_list(program.body, false);
+    /// Whether the walk collects import records and module syntax: every walk but a
+    /// [`Mode::Strip`] one.
+    #[inline]
+    fn collects(&self) -> bool {
+        match self.mode {
+            Mode::Strip => false,
+            Mode::Imports | Mode::StripWithImports => true,
+        }
+    }
+
+    /// Whether the subtrees the strip refuses are walked: a [`Mode::Imports`] walk alone.
+    #[inline]
+    fn walks_refused(&self) -> bool {
+        self.mode == Mode::Imports
+    }
+
+    /// Enter a function-like scope for `has_module_syntax`'s top-level `await`; paired with
+    /// [`Self::leave_function`].
+    #[inline]
+    fn enter_function(&mut self) {
+        if self.collects() {
+            self.function_depth += 1;
+        }
+    }
+
+    #[inline]
+    fn leave_function(&mut self) {
+        if self.collects() {
+            self.function_depth -= 1;
+        }
+    }
+
+    /// Whether an `await` met here is a top-level one, in a collecting walk.
+    #[inline]
+    fn top_level_await(&self) -> bool {
+        self.collects() && self.function_depth == 0
+    }
+
+    /// The collected edits and import records, or the refusal — the
+    /// [`Mode::StripWithImports`] product. A refusal discards the records.
+    pub(super) fn finish_with_imports(self) -> Result<(BumpVec<'b, Edit>, Imports), StripError> {
+        match self.refusal {
+            Some((kind, span)) => Err(StripError::unsupported(kind, self.src.text, span.range())),
+            None => Ok((
+                self.edits,
+                Imports {
+                    records: self.records,
+                    has_module_syntax: self.module_syntax,
+                },
+            )),
+        }
+    }
+
+    /// The import records, whatever the walk refused — the [`Mode::Imports`] product.
+    pub(crate) fn into_imports(self) -> Imports {
+        Imports {
+            records: self.records,
+            has_module_syntax: self.module_syntax,
+        }
+    }
+
+    pub(crate) fn program(&mut self, program: &Program<'_>) {
+        // `statement_list`'s loop, plus the module-declaration half of `has_module_syntax`
+        // asked of each top-level statement as it is walked (measured cheaper than a pass
+        // of its own, and than asking at the import and export arms). The strip runs this
+        // loop too, its mode asked per statement: measured cheaper for it than a call to
+        // `statement_list`
+        let outer_end = self.statement_end;
+        let outer_open = std::mem::replace(&mut self.open, Tail::Closed);
+        for statement in program.body {
+            if self.collects() {
+                self.module_syntax |= is_module_declaration(statement);
+            }
+            self.statement_end = Some(statement.span.end);
+            self.statement(statement, statement.span, Position::List);
+        }
+        self.statement_end = outer_end;
+        self.open = outer_open;
+    }
+
+    //
+    // Import records
+    //
+
+    /// Room for more records: [`RECORDS_FIRST_CAPACITY`] at the first, then doubling —
+    /// most files' records in one allocation, with no count taken ahead of the walk.
+    #[cold]
+    #[inline(never)]
+    fn grow_records(&mut self) {
+        self.records
+            .reserve(self.records.capacity().max(RECORDS_FIRST_CAPACITY));
+    }
+
+    fn record(
+        &mut self,
+        kind: ImportRecordKind,
+        span: Span,
+        specifier: Option<ByteSpan>,
+        type_only: TypeOnly,
+        phase: crate::ImportPhase,
+        attributes: Option<ByteSpan>,
+    ) {
+        if self.records.len() == self.records.capacity() {
+            self.grow_records();
+        }
+        self.records.push(ImportRecord {
+            kind,
+            span: byte_span(span),
+            specifier,
+            type_only,
+            phase,
+            attributes,
+        });
+    }
+
+    /// A static import's record, its `type_only` read by [`Self::import`] off the walk over
+    /// its specifiers. None inside a namespace body.
+    fn record_import(&mut self, import: &ImportDeclaration<'_>, span: Span, type_only: TypeOnly) {
+        if !self.collects() || self.in_namespace {
+            return;
+        }
+        let attributes = self.attributes_clause(import.source.span.end, import.attributes);
+        self.record(
+            ImportRecordKind::Static,
+            span,
+            Some(string_contents(import.source.span)),
+            type_only,
+            import.phase,
+            attributes,
+        );
+    }
+
+    /// A re-export's record — none for an export with no `from`, nor inside a namespace
+    /// body — its `type_only` read by [`Self::export_named`] off the walk over its
+    /// specifiers.
+    fn record_re_export(
+        &mut self,
+        export: &ExportNamedDeclaration<'_>,
+        span: Span,
+        type_only: TypeOnly,
+    ) {
+        let Some(source) = &export.source else {
+            return;
+        };
+        if !self.collects() || self.in_namespace {
+            return;
+        }
+        let attributes = self.attributes_clause(source.span.end, export.attributes);
+        self.record(
+            ImportRecordKind::ReExport,
+            span,
+            Some(string_contents(source.span)),
+            type_only,
+            crate::ImportPhase::None,
+            attributes,
+        );
+    }
+
+    fn record_export_all(&mut self, export: &ExportAllDeclaration<'_>, span: Span) {
+        if !self.collects() || self.in_namespace {
+            return;
+        }
+        let type_only = if export.export_kind == ExportKind::Type {
+            TypeOnly::Statement
+        } else {
+            TypeOnly::No
+        };
+        let attributes = self.attributes_clause(export.source.span.end, export.attributes);
+        self.record(
+            ImportRecordKind::ReExport,
+            span,
+            Some(string_contents(export.source.span)),
+            type_only,
+            crate::ImportPhase::None,
+            attributes,
+        );
+    }
+
+    fn record_import_equals(&mut self, import: &TSImportEqualsDeclaration<'_>, span: Span) {
+        let TSModuleReference::ExternalModuleReference(reference) = &import.module_reference else {
+            return;
+        };
+        if !self.collects() || self.in_namespace {
+            return;
+        }
+        let type_only = if import.import_kind == ImportKind::Type {
+            TypeOnly::Statement
+        } else {
+            TypeOnly::No
+        };
+        self.record(
+            ImportRecordKind::ImportEquals,
+            span,
+            Some(string_contents(reference.expression.span)),
+            type_only,
+            crate::ImportPhase::None,
+            None,
+        );
+    }
+
+    /// A dynamic import: its record, then its operands. Out of line: the record's
+    /// arguments, inlined into [`Self::expr_inner`], cost every expression's walk a register
+    /// for a kind few expressions are.
+    #[inline(never)]
+    fn import_expression(&mut self, import: &ImportExpression<'_>, span: Span) {
+        if self.collects() {
+            self.record_dynamic(import, span);
+        }
+        self.expr(import.source);
+        if let Some(options) = import.options {
+            self.expr(options);
+        }
+    }
+
+    fn record_dynamic(&mut self, import: &ImportExpression<'_>, span: Span) {
+        let specifier = match &import.source.kind {
+            ExpressionKind::Literal(literal)
+                if matches!(literal.value, LiteralValue::String(_)) =>
+            {
+                Some(string_contents(literal.span))
+            }
+            ExpressionKind::TemplateLiteral(template) if template.expressions.is_empty() => {
+                template
+                    .quasis
+                    .first()
+                    .map(|quasi| byte_span(quasi.raw_span))
+            }
+            _ => None,
+        };
+        self.record(
+            ImportRecordKind::Dynamic,
+            span,
+            specifier,
+            TypeOnly::No,
+            import.phase,
+            import.options.map(|options| byte_span(options.span)),
+        );
+    }
+
+    /// A static import's or a re-export's attributes clause, from its `with` keyword —
+    /// the first token past the source literal ending at `source_end` — through its `}`.
+    /// The AST holds the attributes alone, so the clause's two ends are read off the
+    /// source, past whitespace and comments.
+    fn attributes_clause(
+        &self,
+        source_end: u32,
+        attributes: Option<&[ImportAttribute<'_>]>,
+    ) -> Option<ByteSpan> {
+        let attributes = attributes?;
+        let with = self.src.next_significant(source_end);
+        let close = match attributes.last() {
+            Some(last) => {
+                let at = self.src.next_significant(last.span.end);
+                if self.src.bytes.get(at as usize) == Some(&b',') {
+                    self.src.next_significant(at + 1)
+                } else {
+                    at
+                }
+            }
+            None => {
+                let open = self.src.next_significant(with + b"with".len() as u32);
+                debug_assert_eq!(self.src.bytes.get(open as usize), Some(&b'{'));
+                self.src.next_significant(open + 1)
+            }
+        };
+        debug_assert!(self.src.bytes[with as usize..].starts_with(b"with"));
+        debug_assert_eq!(self.src.bytes.get(close as usize), Some(&b'}'));
+        Some(ByteSpan {
+            start: with,
+            end: close + 1,
+        })
+    }
+
+    /// A meta property: `import.meta` is module syntax, `new.target` is not.
+    fn meta_property(&mut self, span: Span) {
+        if self.collects() && self.src.bytes[span.start as usize] == b'i' {
+            self.module_syntax = true;
+        }
     }
 
     //
@@ -132,6 +468,9 @@ impl<'s, 'b> Walk<'s, 'b> {
         self.blank_marked(start, end, Mark::Plain);
     }
 
+    // TODO: a type blanks here unwalked, so a type-position import (`let x:
+    // import('./a').T`, `typeof import('./a')`) is no record — the known gap
+    // `crate::imports` documents; a dependency graph over types would walk the type for it
     fn blank_span(&mut self, span: Span) {
         self.blank(span.start, span.end);
     }
@@ -277,6 +616,9 @@ impl<'s, 'b> Walk<'s, 'b> {
                     return false;
                 }
                 self.refuse(UnsupportedConstruct::Enum, outer);
+                if self.walks_refused() {
+                    self.enum_initializers(decl);
+                }
                 true
             }
             StatementKind::TSModuleDeclaration(decl) => {
@@ -285,6 +627,9 @@ impl<'s, 'b> Walk<'s, 'b> {
                     return false;
                 }
                 self.refuse(UnsupportedConstruct::ValueNamespace, outer);
+                if self.walks_refused() && !decl.declare {
+                    self.namespace_body(decl);
+                }
                 true
             }
             StatementKind::ReturnStatement(s) => {
@@ -316,21 +661,26 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.export_default(export, outer, position)
             }
             StatementKind::ExportAllDeclaration(export) => {
+                self.record_export_all(export, outer);
                 if export.export_kind == ExportKind::Type {
                     self.blank_statement(outer, position);
                     return false;
                 }
                 true
             }
-            StatementKind::TSExportAssignment(_) => {
+            StatementKind::TSExportAssignment(assignment) => {
                 self.refuse(UnsupportedConstruct::ExportEquals, outer);
+                if self.walks_refused() {
+                    self.expr(&assignment.expression);
+                }
                 true
             }
             // `export as namespace N;` is kept verbatim, as both oracles keep it: it declares
             // a UMD global, which only a declaration file may (tsc's TS1315)
             StatementKind::TSNamespaceExportDeclaration(_) => true,
             StatementKind::ImportDeclaration(import) => self.import(import, outer, position),
-            StatementKind::TSImportEqualsDeclaration(_) => {
+            StatementKind::TSImportEqualsDeclaration(import) => {
+                self.record_import_equals(import, outer);
                 self.refuse(UnsupportedConstruct::ImportEquals, outer);
                 true
             }
@@ -365,6 +715,9 @@ impl<'s, 'b> Walk<'s, 'b> {
                 true
             }
             StatementKind::ForOfStatement(s) => {
+                if s.r#await && self.top_level_await() {
+                    self.module_syntax = true;
+                }
                 self.for_left(s.left);
                 self.expr(s.right);
                 self.nested_statement(s.body);
@@ -509,6 +862,11 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     fn variable_declaration(&mut self, decl: &VariableDeclaration<'_>) {
+        // a top-level `await using` (in a `for` head too) is module syntax, as a top-level
+        // `await` is
+        if decl.kind == VariableDeclarationKind::AwaitUsing && self.top_level_await() {
+            self.module_syntax = true;
+        }
         for declarator in decl.declarations {
             self.expr(declarator.id);
             if declarator.definite {
@@ -543,18 +901,28 @@ impl<'s, 'b> Walk<'s, 'b> {
         position: Position,
     ) -> bool {
         if export.export_kind == ExportKind::Type {
+            self.record_re_export(export, outer, TypeOnly::Statement);
             self.blank_statement(outer, position);
             return false;
         }
         if let Some(declaration) = export.declaration {
             return self.statement_kind(declaration, outer, position);
         }
+        let mut every_type = !export.specifiers.is_empty();
         for specifier in export.specifiers {
             if specifier.export_kind == ExportKind::Type {
                 let end = self.src.end_with_trailing_comma(specifier.span.end);
                 self.blank(specifier.span.start, end);
+            } else {
+                every_type = false;
             }
         }
+        let type_only = if every_type {
+            TypeOnly::Specifiers
+        } else {
+            TypeOnly::No
+        };
+        self.record_re_export(export, outer, type_only);
         true
     }
 
@@ -601,20 +969,28 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// still loads the module, as `verbatimModuleSyntax` and both oracles have it.
     fn import(&mut self, import: &ImportDeclaration<'_>, outer: Span, position: Position) -> bool {
         if import.import_kind == ImportKind::Type {
+            self.record_import(import, outer, TypeOnly::Statement);
             self.blank_statement(outer, position);
             return false;
         }
+        let mut every_type = !import.specifiers.is_empty();
         for specifier in import.specifiers {
             match specifier {
-                ImportSpecifier::Named(named) => {
-                    if named.import_kind == ImportKind::Type {
-                        let end = self.src.end_with_trailing_comma(named.span.end);
-                        self.blank(named.span.start, end);
-                    }
+                ImportSpecifier::Named(named) if named.import_kind == ImportKind::Type => {
+                    let end = self.src.end_with_trailing_comma(named.span.end);
+                    self.blank(named.span.start, end);
                 }
-                ImportSpecifier::Default(_) | ImportSpecifier::Namespace(_) => {}
+                ImportSpecifier::Named(_)
+                | ImportSpecifier::Default(_)
+                | ImportSpecifier::Namespace(_) => every_type = false,
             }
         }
+        let type_only = if every_type {
+            TypeOnly::Specifiers
+        } else {
+            TypeOnly::No
+        };
+        self.record_import(import, outer, type_only);
         true
     }
 
@@ -623,10 +999,12 @@ impl<'s, 'b> Walk<'s, 'b> {
     //
 
     /// Walk expression `e`. A leaf holding no TypeScript — a literal, `this`, `super`, a private
-    /// name, a meta property, or an identifier with no binding state (no `extra`, not
-    /// `optional`: `Walk::identifier` would blank nothing) — only marks the `;` state, which is
-    /// all the full walk ([`Self::expr_inner`]) does for it; it is answered here, inlined at
-    /// each call site, without entering that walk's frame.
+    /// name, or an identifier with no binding state (no `extra`, not `optional`:
+    /// `Walk::identifier` would blank nothing) — only marks the `;` state, which is all the
+    /// full walk ([`Self::expr_inner`]) does for it; it is answered here, inlined at each call
+    /// site, without entering that walk's frame. A meta property is a leaf too, but takes the
+    /// full walk, which reads an `import.meta` as module syntax: a rare kind, kept out of the
+    /// inlined set every call site tests.
     #[inline]
     fn expr(&mut self, e: &Expression<'_>) {
         match &e.kind {
@@ -634,8 +1012,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             | ExpressionKind::RegexLiteral(_)
             | ExpressionKind::ThisExpression(_)
             | ExpressionKind::Super(_)
-            | ExpressionKind::PrivateIdentifier(_)
-            | ExpressionKind::MetaProperty(_) => self.mark(e.span.end),
+            | ExpressionKind::PrivateIdentifier(_) => self.mark(e.span.end),
             ExpressionKind::Identifier(id) if id.extra.is_none() && !id.optional => {
                 self.mark(e.span.end);
             }
@@ -675,8 +1052,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             | ExpressionKind::RegexLiteral(_)
             | ExpressionKind::ThisExpression(_)
             | ExpressionKind::Super(_)
-            | ExpressionKind::PrivateIdentifier(_)
-            | ExpressionKind::MetaProperty(_) => self.mark(operand.span.end),
+            | ExpressionKind::PrivateIdentifier(_) => self.mark(operand.span.end),
             ExpressionKind::Identifier(id) if id.extra.is_none() && !id.optional => {
                 self.mark(operand.span.end);
             }
@@ -743,9 +1119,13 @@ impl<'s, 'b> Walk<'s, 'b> {
                 _ => break,
             };
             links.push(node);
-            // a refused assertion's operand is not walked: the chain ends at it
+            // a refused assertion's operand is not walked by the strip: the chain ends at
+            // it. An imports walk walks on: what it edits is never read
             if refused {
-                break;
+                if !self.walks_refused() {
+                    break;
+                }
+                refused = false;
             }
             node = operand;
         }
@@ -821,8 +1201,8 @@ impl<'s, 'b> Walk<'s, 'b> {
             | ExpressionKind::RegexLiteral(_)
             | ExpressionKind::ThisExpression(_)
             | ExpressionKind::Super(_)
-            | ExpressionKind::PrivateIdentifier(_)
-            | ExpressionKind::MetaProperty(_) => {}
+            | ExpressionKind::PrivateIdentifier(_) => {}
+            ExpressionKind::MetaProperty(_) => self.meta_property(e.span),
             ExpressionKind::Identifier(id) => self.identifier(id),
             ExpressionKind::ObjectExpression(object) => {
                 for property in object.properties {
@@ -885,7 +1265,10 @@ impl<'s, 'b> Walk<'s, 'b> {
                     self.expr(expression);
                 }
             }
-            ExpressionKind::AwaitExpression(e) => self.expr(e.argument),
+            ExpressionKind::AwaitExpression(e) => {
+                self.module_syntax |= self.top_level_await();
+                self.expr(e.argument);
+            }
             ExpressionKind::YieldExpression(e) => {
                 if let Some(argument) = e.argument {
                     self.expr(argument);
@@ -956,12 +1339,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.parameter_property(e.span, property);
                 self.expr(property.parameter);
             }
-            ExpressionKind::ImportExpression(import) => {
-                self.expr(import.source);
-                if let Some(options) = import.options {
-                    self.expr(options);
-                }
-            }
+            ExpressionKind::ImportExpression(import) => self.import_expression(import, e.span),
             ExpressionKind::CommentBoundPair(cast) => self.expr(cast.inner),
             ExpressionKind::ParenthesizedExpression(parens) => {
                 self.expr(parens.unreachable_contents());
@@ -1043,6 +1421,8 @@ impl<'s, 'b> Walk<'s, 'b> {
         if let Some(blank_from) = self.assertion_head(span, operand, ty, keyword) {
             self.link_operand(operand);
             self.assertion_tail(span, blank_from);
+        } else if self.walks_refused() {
+            self.link_operand(operand);
         }
     }
 
@@ -1166,6 +1546,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     //
 
     fn function(&mut self, func: FunctionView<'_, '_>) {
+        self.enter_function();
         if let Some(type_parameters) = func.type_parameters {
             let span = type_parameters.span;
             // a line break between the `<` and the parameters' `(` would let ASI end a
@@ -1211,6 +1592,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             FunctionBody::Block(block) => self.statement_list(block.body, true),
             FunctionBody::Expression(body) => self.expr(body),
         }
+        self.leave_function();
     }
 
     fn is_this_parameter(&self, param: &Expression<'_>) -> bool {
@@ -1286,7 +1668,9 @@ impl<'s, 'b> Walk<'s, 'b> {
                 // a decorated block's decorators stay, as any member's do (their type
                 // arguments blank)
                 self.decorators(block.decorators);
+                self.enter_function();
                 self.statement_list(block.body, false);
+                self.leave_function();
                 true
             }
             ClassMember::IndexSignature(signature) => {
@@ -1346,7 +1730,9 @@ impl<'s, 'b> Walk<'s, 'b> {
             self.blank_span(annotation.span);
         }
         if let Some(value) = &property.value {
+            self.enter_function();
             self.expr(value);
+            self.leave_function();
         }
         true
     }
@@ -1398,6 +1784,44 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
         self.function(FunctionView::expression(func));
         true
+    }
+
+    /// An enum's member initializers, walked in [`Mode::Imports`] alone (the strip refuses
+    /// the enum). An `await` in one is not a top-level one (TS1308). Out of line, as
+    /// [`Self::namespace_body`]: the strip never takes it.
+    #[inline(never)]
+    fn enum_initializers(&mut self, decl: &TSEnumDeclaration<'_>) {
+        self.function_depth += 1;
+        for member in decl.members {
+            if let Some(initializer) = &member.initializer {
+                self.expr(initializer);
+            }
+        }
+        self.function_depth -= 1;
+    }
+
+    /// A value namespace's body, walked in [`Mode::Imports`] alone (the strip refuses the
+    /// namespace): a nested `namespace A.B` down to its block. Its static imports,
+    /// re-exports and import-equals are no records, and an `await` in it is not a
+    /// top-level one (TS1308): tsc reads the body as function-like. Out of line: the strip
+    /// never takes it, and `statement_kind` is every statement's frame.
+    #[inline(never)]
+    fn namespace_body(&mut self, decl: &TSModuleDeclaration<'_>) {
+        let outer_in_namespace = std::mem::replace(&mut self.in_namespace, true);
+        self.function_depth += 1;
+        let mut decl = decl;
+        loop {
+            match &decl.body {
+                None => break,
+                Some(TSModuleDeclarationBody::TSModuleDeclaration(inner)) => decl = inner,
+                Some(TSModuleDeclarationBody::TSModuleBlock(block)) => {
+                    self.statement_list(block.body, false);
+                    break;
+                }
+            }
+        }
+        self.function_depth -= 1;
+        self.in_namespace = outer_in_namespace;
     }
 
     /// Whether a member key is an identifier spelled like a binary operator (`in`,
@@ -1461,6 +1885,39 @@ struct MemberModifiers {
     removed: [Option<&'static [u8]>; 3],
     /// The keywords that stay, those present.
     kept: [Option<&'static [u8]>; 2],
+}
+
+/// Whether a top-level statement is an ECMAScript module declaration: an import, or an
+/// export other than TypeScript's `export =`, `export as namespace` and `export import`.
+const fn is_module_declaration(statement: &Statement<'_>) -> bool {
+    matches!(
+        statement.kind,
+        StatementKind::ImportDeclaration(_)
+            | StatementKind::ExportNamedDeclaration(_)
+            | StatementKind::ExportDefaultDeclaration(_)
+            | StatementKind::ExportAllDeclaration(_)
+    )
+}
+
+/// The records' first allocation: a file's requests usually fit (most files make a few),
+/// and a smaller one grows, copying, in the files that make more — measured costlier than
+/// the slack.
+const RECORDS_FIRST_CAPACITY: usize = 16;
+
+/// A node span as a record's.
+const fn byte_span(span: Span) -> ByteSpan {
+    ByteSpan {
+        start: span.start,
+        end: span.end,
+    }
+}
+
+/// A string literal's contents: its span less the two quotes.
+const fn string_contents(literal: Span) -> ByteSpan {
+    ByteSpan {
+        start: literal.start + 1,
+        end: literal.end - 1,
+    }
 }
 
 /// Whether `e` is a chain link: a member access, a call, a `new`, a tagged template, a `!`,

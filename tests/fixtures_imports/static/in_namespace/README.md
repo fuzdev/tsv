@@ -1,0 +1,1 @@
+A static import inside a namespace body is no record: tsc rejects it (TS1147), though both parsers accept it — the rule an `import x = require()` there follows (`import_equals/in_namespace`). Nor is it module syntax, which reads the top level alone.

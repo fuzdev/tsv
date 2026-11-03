@@ -10,9 +10,9 @@
 //!   the path each repetition and the count does not see — fails here, whether or not its
 //!   walks happen to fit the stack ([`check_wire`]);
 //! - the deepest accepted input runs **parse, both wire writers (span-only and `loc`),
-//!   format and — TypeScript — the type strip** on a thread nine tenths of the contract's
-//!   size ([`GATE_STACK`]), which it must survive: a stack overflow aborts this test
-//!   binary, which fails the gate;
+//!   format, the imports walk (TypeScript and Svelte) and the type strip (TypeScript)** on
+//!   a thread nine tenths of the contract's size ([`GATE_STACK`]), which it must survive: a
+//!   stack overflow aborts this test binary, which fails the gate;
 //! - its format's output **parses again and is its own format** (F1): the pairs the printer
 //!   adds are levels of the output's nesting, which the parse charges as it reads the input
 //!   (`tsv_lang::SpineCount::try_pair`), so an accepted input's output is never refused;
@@ -498,8 +498,9 @@ fn run_every_phase(shape: &'static Shape, n: usize) {
     run_walks(shape.name.clone(), shape.lang, shape.make(n));
 }
 
-/// Parse, both wire writers, format and — TypeScript — the type strip over `source`, on a
-/// thread of the contract's stack named `contract <name>`.
+/// Parse, both wire writers, format, the imports walk (TypeScript and Svelte), the type
+/// strip and the combined strip-and-imports walk (TypeScript) over `source`, on a thread of
+/// the contract's stack named `contract <name>`.
 fn run_walks(name: String, lang: Lang, source: String) {
     on_thread(format!("contract {name}"), gate_stack(), move || {
         let arena = bumpalo::Bump::new();
@@ -524,6 +525,30 @@ fn run_walks(name: String, lang: Lang, source: String) {
                     ),
                     "{name}: the strip failed: {stripped:?}",
                 );
+                // the imports walk descends into what the strip refuses, so it walks
+                // deeper than the strip on a refused shape
+                let imports_arena = bumpalo::Bump::new();
+                let imports = tsv_ts::__private::parse_imports_in(&source, None, &imports_arena);
+                assert!(
+                    imports.is_ok(),
+                    "{name}: the imports walk failed: {imports:?}"
+                );
+                // the combined walk is the strip's, collecting: the strip's verdict, and
+                // where the strip accepts, the imports walk's records
+                let combined_arena = bumpalo::Bump::new();
+                let combined =
+                    tsv_ts::__private::strip_with_imports_in(&source, None, &combined_arena);
+                if let (Ok((_, combined_imports)), Ok(imports)) = (&combined, &imports) {
+                    assert_eq!(
+                        combined_imports, imports,
+                        "{name}: the combined walk's records part from the imports walk"
+                    );
+                }
+                assert_eq!(
+                    combined.map(|(stripped, _)| stripped),
+                    stripped,
+                    "{name}: the combined walk parts from the strip"
+                );
             }
             Lang::Css => {
                 let sheet = tsv_css::__private::parse(&source, &arena).expect("parses");
@@ -544,6 +569,12 @@ fn run_walks(name: String, lang: Lang, source: String) {
                 );
                 let formatted = tsv_svelte::format(&source).expect("formats");
                 assert_output_reparses(&name, Lang::Svelte, &formatted);
+                let imports_arena = bumpalo::Bump::new();
+                let imports = tsv_svelte::__private::parse_imports_in(&source, &imports_arena);
+                assert!(
+                    imports.is_ok(),
+                    "{name}: the imports walk failed: {imports:?}"
+                );
             }
         }
     });

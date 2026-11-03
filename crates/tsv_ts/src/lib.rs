@@ -36,6 +36,11 @@
 //! # }
 //! ```
 //!
+//! [`parse_imports`] collects a source's import records — every module it requests, with
+//! its specifier, span, kind and whether it is for types alone — and
+//! [`strip_with_imports`] returns the stripped JS and those records from one parse and one
+//! walk. Plain [`strip()`] collects no records.
+//!
 //! The wire JSON is the AST as JSON in the canonical parser's shape — acorn-typescript's
 //! here. Its `start` / `end` are UTF-16 offsets, and the default wire is span-only: no `loc`
 //! (the `locations` feature adds it). [`Error::span`], unlike the wire, is a UTF-8 byte range.
@@ -77,14 +82,16 @@
 //! A TypeScript source parses against a [`Goal`] — ECMAScript's `Module` or `Script` grammar —
 //! and each entry point reads it in one of two tiers:
 //!
-//! - **The bare name** names no goal. [`format()`] and [`strip()`] parse at `Module` and
-//!   retry at `Script` only if that fails, so a legacy sloppy script (a `with` statement, a
-//!   leading-zero literal, `await` as a name) formats and strips while a module-valid source
-//!   is never reinterpreted — neither output depends on which grammar read it.
+//! - **The bare name** names no goal. [`format()`], [`strip()`], [`strip_with_imports`] and
+//!   [`parse_imports`] parse at `Module` and retry at `Script` only if that fails, so a
+//!   legacy sloppy script (a `with` statement, a leading-zero literal, `await` as a name)
+//!   formats and strips while a module-valid source is never reinterpreted — no output
+//!   depends on which grammar read it.
 //!   `parse_to_json` parses at `Module` alone, with no retry: the wire's
 //!   `Program.sourceType` is a claim about which grammar produced it, which a retry would
 //!   make depend on the input.
-//! - **A named goal** — [`format_with_goal`], [`strip_with_goal`], and
+//! - **A named goal** — [`format_with_goal`], [`strip_with_goal`],
+//!   [`strip_with_imports_with_goal`], [`parse_imports_with_goal`], and
 //!   `JsonOptions::goal` for `parse_to_json_with` — parses at exactly that goal, with
 //!   no retry: a source the goal's grammar rejects is an error even when the other goal
 //!   would accept it.
@@ -153,6 +160,7 @@ pub mod __private;
 pub mod ast;
 mod formatter;
 mod goal;
+mod imports;
 mod lexer;
 mod parser;
 mod printer;
@@ -177,7 +185,14 @@ struct ReadmeDoctests;
 
 pub use formatter::Formatter;
 pub use goal::{Goal, ParseGoalError};
-pub use strip::{StripError, Stripped, UnsupportedConstruct, strip, strip_with_goal};
+pub use imports::{
+    ByteSpan, ImportPhase, ImportRecord, ImportRecordKind, Imports, TypeOnly, parse_imports,
+    parse_imports_with_goal,
+};
+pub use strip::{
+    StripError, Stripped, UnsupportedConstruct, strip, strip_with_goal, strip_with_imports,
+    strip_with_imports_with_goal,
+};
 
 /// The coordinates a TypeScript document's positions are reported in — acorn's: a
 /// leading BOM **counted** (acorn reads U+FEFF as whitespace, so it is one UTF-16 unit at

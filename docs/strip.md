@@ -20,7 +20,12 @@ and Node's `module.stripTypeScriptTypes` share. The implementation is `tsv_ts::s
   of `ErrorKind::Refusal`, its span the refused bytes. Either way `StripError::error` is a
   `tsv_lang::Error`, so `{:#}` renders it as the CLI prints it, `message()` gives its one
   line, `span()` its byte span, and `to_report()` splits it — message, frame, span — as the
-  packages return it.
+  packages return it. `tsv_ts::strip_with_imports(source) -> Result<(Stripped, Imports),
+  StripError>` (and `strip_with_imports_with_goal`; hidden warm-arena twin
+  `__private::strip_with_imports_in`) is the strip and `parse_imports` from one parse and
+  one walk: over a source the strip accepts, exactly what the two return apart; over one
+  it refuses, the strip's error and no records. Plain `strip` collects no records. Rust
+  only — no binding or CLI flag exposes it.
 - **npm**: `strip_typescript(source, options?)` in `@fuzdev/tsv-wasm` and the native
   `@fuzdev/tsv` — the `strip` cargo feature of `tsv_wasm` and `tsv_napi`, in each crate's
   default set, which the format-only and parse-only wasm packages build without. It

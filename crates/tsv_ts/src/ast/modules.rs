@@ -142,30 +142,14 @@ pub enum ImportKind {
 }
 
 /// Import phase for the import-phase proposals (source-phase imports and
-/// import defer). `None` is an ordinary import; `Source`/`Defer` tag the static
+/// import defer) — the public `crate::ImportPhase` an import record carries, one type for
+/// both. `None` is an ordinary import; `Source`/`Defer` tag the static
 /// `import source …` / `import defer …` declaration or the dynamic
 /// `import.source(…)` / `import.defer(…)` call. Neither proposal is in acorn yet,
 /// so parsing them is a deliberate divergence from the Svelte/acorn oracle — see
-/// `docs/conformance_svelte.md`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ImportPhase {
-    #[default]
-    None,
-    Source,
-    Defer,
-}
-
-impl ImportPhase {
-    /// The public-AST `phase` string (`"source"`/`"defer"`), or `None` for an
-    /// ordinary import (the field is omitted from the JSON in that case).
-    pub fn as_str(self) -> Option<&'static str> {
-        match self {
-            ImportPhase::None => None,
-            ImportPhase::Source => Some("source"),
-            ImportPhase::Defer => Some("defer"),
-        }
-    }
-}
+/// `docs/conformance_svelte.md`. `as_str` is the public-AST `phase` string, `None` for an
+/// ordinary import (the field is omitted from the JSON in that case).
+pub use crate::imports::ImportPhase;
 
 /// Import declaration: `import x from "y"`, `import { a, b } from "y"`, etc.
 #[derive(Debug, Clone)]

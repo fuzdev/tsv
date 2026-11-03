@@ -1,0 +1,1 @@
+An `import x = require('y')` inside a namespace body is no record: tsc rejects it (TS1147, an import in a namespace cannot reference a module), though both parsers accept it. The namespace holds a value, so the walk reaches the declaration.

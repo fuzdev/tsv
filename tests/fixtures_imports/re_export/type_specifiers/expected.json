@@ -1,0 +1,18 @@
+{
+	"hasModuleSyntax": true,
+	"imports": [
+		{
+			"kind": "re_export",
+			"start": 0,
+			"end": 38,
+			"specifier": {
+				"value": "./a.js",
+				"start": 30,
+				"end": 36
+			},
+			"typeOnly": "specifiers",
+			"phase": null,
+			"attributes": null
+		}
+	]
+}

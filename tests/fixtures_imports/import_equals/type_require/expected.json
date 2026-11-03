@@ -1,0 +1,18 @@
+{
+	"hasModuleSyntax": false,
+	"imports": [
+		{
+			"kind": "import_equals",
+			"start": 0,
+			"end": 34,
+			"specifier": {
+				"value": "./a.js",
+				"start": 25,
+				"end": 31
+			},
+			"typeOnly": "statement",
+			"phase": null,
+			"attributes": null
+		}
+	]
+}

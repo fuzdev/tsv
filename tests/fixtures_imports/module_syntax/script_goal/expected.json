@@ -1,0 +1,18 @@
+{
+	"hasModuleSyntax": false,
+	"imports": [
+		{
+			"kind": "dynamic",
+			"start": 12,
+			"end": 28,
+			"specifier": {
+				"value": "./w.js",
+				"start": 20,
+				"end": 26
+			},
+			"typeOnly": null,
+			"phase": null,
+			"attributes": null
+		}
+	]
+}

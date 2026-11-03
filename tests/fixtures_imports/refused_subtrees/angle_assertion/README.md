@@ -1,0 +1,1 @@
+An angle-bracket assertion's operand — an ordinary walked position (the strip refuses the assertion but still walks its operand): its dynamic import is a record. The refused-and-unwalked assertions are `as_regroup` and `satisfies_regroup`.

@@ -1,0 +1,18 @@
+{
+	"hasModuleSyntax": true,
+	"imports": [
+		{
+			"kind": "static",
+			"start": 0,
+			"end": 32,
+			"specifier": {
+				"value": "A😀",
+				"start": 15,
+				"end": 30
+			},
+			"typeOnly": null,
+			"phase": null,
+			"attributes": null
+		}
+	]
+}

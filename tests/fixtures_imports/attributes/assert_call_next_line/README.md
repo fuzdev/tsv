@@ -1,0 +1,1 @@
+An `assert` on the line after a side-effect import is a call, not an attributes clause (`assert` is no import-attribute syntax for tsv): ASI ends the import at the line break, so the record has no `attributes` and its span ends at the source literal.

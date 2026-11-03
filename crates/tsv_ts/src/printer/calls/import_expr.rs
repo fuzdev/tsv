@@ -15,16 +15,6 @@ use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
-/// The phase keyword of a phased dynamic import (`source` / `defer`), or `None` for a
-/// plain `import(`.
-fn import_phase_word(phase: ast::ImportPhase) -> Option<&'static str> {
-    match phase {
-        ast::ImportPhase::None => None,
-        ast::ImportPhase::Source => Some("source"),
-        ast::ImportPhase::Defer => Some("defer"),
-    }
-}
-
 /// The HEAD of a (possibly phased) dynamic import — `import` plus the phase (`.source` /
 /// `.defer`) when there is one, everything before the `(` — plus the offset where the
 /// caller's leading-comment scan must begin.
@@ -57,7 +47,7 @@ fn build_import_head_doc(
     let source_start = import_expr.source.span().start;
 
     // The head (`import`, plus `.source` / `.defer`) and where it ends in source.
-    let (head, head_end) = match import_phase_word(import_expr.phase) {
+    let (head, head_end) = match import_expr.phase.as_str() {
         None => (d.text("import"), import_end),
         Some(word) => match printer.find_keyword_in_range(import_end, source_start, word) {
             Some(word_start) => (

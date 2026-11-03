@@ -1,0 +1,21 @@
+{
+	"hasModuleSyntax": false,
+	"imports": [
+		{
+			"kind": "dynamic",
+			"start": 10,
+			"end": 52,
+			"specifier": {
+				"value": "./a.json",
+				"start": 18,
+				"end": 26
+			},
+			"typeOnly": null,
+			"phase": null,
+			"attributes": {
+				"start": 29,
+				"end": 51
+			}
+		}
+	]
+}

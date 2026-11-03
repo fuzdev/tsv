@@ -1,0 +1,21 @@
+{
+	"hasModuleSyntax": true,
+	"imports": [
+		{
+			"kind": "static",
+			"start": 0,
+			"end": 62,
+			"specifier": {
+				"value": "./a.json",
+				"start": 18,
+				"end": 26
+			},
+			"typeOnly": null,
+			"phase": null,
+			"attributes": {
+				"start": 42,
+				"end": 61
+			}
+		}
+	]
+}

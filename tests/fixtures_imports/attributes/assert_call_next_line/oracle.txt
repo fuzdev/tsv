@@ -1,0 +1,2 @@
+tsv-wire
+acorn-typescript reads the `assert` as a legacy import-assertion clause and rejects the `(` after it, so the records come from tsv's own parse wire.

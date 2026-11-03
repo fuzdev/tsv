@@ -1,0 +1,2 @@
+tsv-wire
+acorn-typescript has no import phases (it rejects `import source`, `import defer`, `import.source()` and `import.defer()`), so the records come from tsv's own parse wire.

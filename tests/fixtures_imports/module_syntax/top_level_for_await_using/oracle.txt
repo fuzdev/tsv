@@ -1,0 +1,2 @@
+tsv-wire
+acorn-typescript rejects `await using` (explicit resource management), so the records come from tsv's own parse wire.

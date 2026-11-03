@@ -29,5 +29,5 @@
 		"checkJs": true
 	},
 	"include": ["tests/**/*.js", "tests/**/*.ts", "tests/**/*.svelte"],
-	"exclude": ["tests/fixtures/**", "tests/fixtures_strip/**"]
+	"exclude": ["tests/fixtures/**", "tests/fixtures_strip/**", "tests/fixtures_imports/**"]
 }

@@ -9,6 +9,7 @@ pub mod depth_shapes;
 pub mod diff;
 pub mod fixtures;
 pub mod format_source;
+pub mod imports_fixtures;
 pub mod json;
 pub mod render_browser;
 pub mod render_normalize;
