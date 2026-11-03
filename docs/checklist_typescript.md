@@ -909,7 +909,7 @@ Early errors that still parse (not yet enforced):
 - `let` as a lexically bound name (`let let = 1`, `const let = 1`) — a rule of its own and *not* the strict-mode bullet above: §sec-let-and-const-declarations makes it a Syntax Error for a `LexicalDeclaration`'s `BoundNames` to contain `let`, unconditionally, so acorn rejects it at either goal — at `sourceType: 'script'` naming this rule (`let is disallowed as a lexically bound name`), at `'module'` the strict-mode bullet firing first — while `var let = 1` is only the strict-mode error
 - A lexical, class or function declaration as the single-statement body of an `if` arm, a loop or a `with` (`if (a) const x = 1;`, `for (;;) const x = 1;`, `while (a) class C {}`) — those positions take a `Statement`, which no declaration is; acorn rejects, tsv parses. A **labelled** item is the one such position tsv does enforce, since its check reads the finished node rather than the token that opens it (`label: let x = 1`, `lbl: function f() {}` reject)
 - A reserved word or string as an export specifier's LOCAL name with no `from` clause
-  (`export { class };`, `export { 'str' };`) — the `ReferencedBindings` early error. With a
+  (`export { class };`, `export { type class };`, `export { 'str' };`) — the `ReferencedBindings` early error. With a
   `from` clause the same specifier is *valid* (`export { class } from 'm'` re-exports another
   module's binding), which is why the production accepts any `ModuleExportName` and the
   bar is an early error rather than a grammar rule

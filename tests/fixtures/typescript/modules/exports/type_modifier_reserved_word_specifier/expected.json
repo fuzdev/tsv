@@ -1,0 +1,438 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 498,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a reserved word after the `type` modifier names another module's export",
+			"start": 20,
+			"end": 94
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 497,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 488,
+			"body": [
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 96,
+					"end": 131,
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 105,
+							"end": 117,
+							"local": {
+								"type": "Identifier",
+								"start": 110,
+								"end": 117,
+								"name": "default"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 110,
+								"end": 117,
+								"name": "default"
+							},
+							"exportKind": "type"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 125,
+						"end": 130,
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a reserved word after the `type` modifier names another module's export",
+							"start": 20,
+							"end": 94
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 133,
+					"end": 173,
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 142,
+							"end": 159,
+							"local": {
+								"type": "Identifier",
+								"start": 147,
+								"end": 154,
+								"name": "default"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 158,
+								"end": 159,
+								"name": "b"
+							},
+							"exportKind": "type"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 167,
+						"end": 172,
+						"value": "./b",
+						"raw": "'./b'"
+					}
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 175,
+					"end": 217,
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 184,
+							"end": 203,
+							"local": {
+								"type": "Identifier",
+								"start": 189,
+								"end": 196,
+								"name": "default"
+							},
+							"exported": {
+								"type": "Literal",
+								"start": 200,
+								"end": 203,
+								"value": "c",
+								"raw": "'c'"
+							},
+							"exportKind": "type"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 211,
+						"end": 216,
+						"value": "./c",
+						"raw": "'./c'"
+					}
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 219,
+					"end": 249,
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 228,
+							"end": 235,
+							"local": {
+								"type": "Identifier",
+								"start": 233,
+								"end": 235,
+								"name": "if"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 233,
+								"end": 235,
+								"name": "if"
+							},
+							"exportKind": "type"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 243,
+						"end": 248,
+						"value": "./d",
+						"raw": "'./d'"
+					}
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 251,
+					"end": 289,
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 260,
+							"end": 275,
+							"local": {
+								"type": "Identifier",
+								"start": 265,
+								"end": 270,
+								"name": "class"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 274,
+								"end": 275,
+								"name": "E"
+							},
+							"exportKind": "type"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 283,
+						"end": 288,
+						"value": "./e",
+						"raw": "'./e'"
+					}
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 291,
+					"end": 336,
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 300,
+							"end": 322,
+							"local": {
+								"type": "Identifier",
+								"start": 305,
+								"end": 311,
+								"name": "typeof"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 315,
+								"end": 322,
+								"name": "default"
+							},
+							"exportKind": "type"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 330,
+						"end": 335,
+						"value": "./f",
+						"raw": "'./f'"
+					}
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 338,
+					"end": 392,
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 347,
+							"end": 348,
+							"local": {
+								"type": "Identifier",
+								"start": 347,
+								"end": 348,
+								"name": "g"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 347,
+								"end": 348,
+								"name": "g"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 350,
+							"end": 367,
+							"local": {
+								"type": "Identifier",
+								"start": 355,
+								"end": 362,
+								"name": "default"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 366,
+								"end": 367,
+								"name": "h"
+							},
+							"exportKind": "type"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 369,
+							"end": 378,
+							"local": {
+								"type": "Identifier",
+								"start": 374,
+								"end": 378,
+								"name": "with"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 374,
+								"end": 378,
+								"name": "with"
+							},
+							"exportKind": "type"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 386,
+						"end": 391,
+						"value": "./g",
+						"raw": "'./g'"
+					}
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 394,
+					"end": 430,
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 403,
+							"end": 416,
+							"local": {
+								"type": "Identifier",
+								"start": 408,
+								"end": 410,
+								"name": "if"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 414,
+								"end": 416,
+								"name": "as"
+							},
+							"exportKind": "type"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 424,
+						"end": 429,
+						"value": "./h",
+						"raw": "'./h'"
+					}
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 432,
+					"end": 487,
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 441,
+							"end": 450,
+							"local": {
+								"type": "Identifier",
+								"start": 446,
+								"end": 450,
+								"name": "enum"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 446,
+								"end": 450,
+								"name": "enum"
+							},
+							"exportKind": "type"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 452,
+							"end": 461,
+							"local": {
+								"type": "Identifier",
+								"start": 457,
+								"end": 461,
+								"name": "null"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 457,
+								"end": 461,
+								"name": "null"
+							},
+							"exportKind": "type"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 463,
+							"end": 473,
+							"local": {
+								"type": "Identifier",
+								"start": 468,
+								"end": 473,
+								"name": "await"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 468,
+								"end": 473,
+								"name": "await"
+							},
+							"exportKind": "type"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 481,
+						"end": 486,
+						"value": "./i",
+						"raw": "'./i'"
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

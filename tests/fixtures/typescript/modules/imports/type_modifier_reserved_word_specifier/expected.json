@@ -1,0 +1,125 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 200,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " behind a rename, a reserved word after the `type` modifier names the imported export",
+			"start": 20,
+			"end": 107
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 199,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 190,
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 109,
+					"end": 149,
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 118,
+							"end": 135,
+							"imported": {
+								"type": "Identifier",
+								"start": 123,
+								"end": 130,
+								"name": "default"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 134,
+								"end": 135,
+								"name": "d"
+							},
+							"importKind": "type"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 143,
+						"end": 148,
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " behind a rename, a reserved word after the `type` modifier names the imported export",
+							"start": 20,
+							"end": 107
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 151,
+					"end": 189,
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 160,
+							"end": 175,
+							"imported": {
+								"type": "Identifier",
+								"start": 165,
+								"end": 170,
+								"name": "class"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 174,
+								"end": 175,
+								"name": "C"
+							},
+							"importKind": "type"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 183,
+						"end": 188,
+						"value": "./b",
+						"raw": "'./b'"
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

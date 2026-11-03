@@ -623,14 +623,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse the name in the `{ type <name> … }` case (`leftOfAs` when `type` is
     /// the type-only modifier). Import mirrors acorn's `parseIdent(true)` +
     /// `checkUnreserved` unless a rename follows (so `import { type class }`
-    /// rejects but `import { type class as C }` accepts); export uses the same
-    /// identifier-or-contextual-keyword name its plain specifiers accept.
+    /// rejects but `import { type class as C }` accepts). Export reads a
+    /// `ModuleExportName`, as its plain specifiers do, so any `IdentifierName`
+    /// is accepted (`export { type default } from 'a'`); a reserved word naming a
+    /// local binding is the `ReferencedBindings` early error, deferred.
     fn parse_type_modifier_name(
         &mut self,
         is_import: bool,
     ) -> Result<(Identifier<'arena>, usize), Error> {
         let (start, end) = self.current_pos();
-        let name = if is_import && self.peek_at_as_keyword() {
+        let name = if !is_import || self.peek_at_as_keyword() {
             self.try_identifier_name()
         } else {
             self.try_ident_or_contextual_name()
