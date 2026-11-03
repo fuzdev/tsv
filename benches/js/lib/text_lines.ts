@@ -1,6 +1,6 @@
 /**
- * Line splitting over a byte stream — the NDJSON reader the `tsv_debug loc_wires` clients
- * share (`loc_wire_client.ts`, `scripts/check_loc.ts`). Node-modules-free.
+ * Line splitting over a byte stream — the NDJSON reader the `tsv_debug` clients share
+ * (`tsv_debug_server.ts`, `scripts/check_loc.ts`). Node-modules-free.
  *
  * @module
  */

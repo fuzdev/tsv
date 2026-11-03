@@ -130,7 +130,7 @@ deno task typecheck:packages # the STAGED npm packages' .d.ts as a consumer comp
 deno task typecheck:scripts # deno check over scripts/ alone — node-modules-free, so in `check` (nothing else typechecks
 #                          the release scripts); excludes `scripts/doctor.ts`, whose corpus probe reaches node_modules
 deno task typecheck:bench-core # the node-modules-free bench modules scripts/'s import graph misses
-#                          (`lib/{wasm,harvest_stamp,fixture_documents,error_text}.ts` + `compose_reports.ts`); the rest
+#                          (`lib/{wasm,harvest_stamp,loc_wire_client,fixture_documents,error_text}.ts` + `compose_reports.ts`); the rest
 #                          of that core rides `typecheck:scripts` or `test:deno`. Scope rationale: deno.json's `//` note; in `check`
 deno task test           # cargo test
 deno task test:deno      # deno tests over the node-modules-free bench core (divergence detectors, format-config probe,

@@ -39,13 +39,11 @@
 import { relative, resolve } from 'node:path';
 import process from 'node:process';
 
-import { check_artifact_freshness } from './lib/check_artifact_freshness.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { CORPORA_COLLECTIONS, is_collection_path } from './lib/corpora.ts';
 import { CorpusLoader } from './lib/corpus.ts';
 import { STRIP_CORPUS_PINS } from './lib/gate_counts.ts';
-import { TSV_DEBUG_CORPUS } from './lib/loc_wire_client.ts';
-import { lines_of } from './lib/text_lines.ts';
+import { TsvDebugServer } from './lib/tsv_debug_server.ts';
 
 /** A check an `ACCEPTED` entry can excuse. */
 type AcceptedCheck = 'output' | 'refusal' | 'js';
@@ -82,14 +80,7 @@ if (!('Deno' in globalThis)) {
 }
 
 await check_node_modules();
-await check_artifact_freshness([
-	{
-		label: 'tsv_debug (corpus)',
-		path: TSV_DEBUG_CORPUS,
-		binding_crates: ['tsv_debug', 'tsv_cli'],
-		rebuild: 'deno task build:check'
-	}
-]);
+const server = await TsvDebugServer.start<{ source: string }, StripReply>('strip');
 // dynamic, so a missing node_modules reports through the preflight above
 const { derive, js_parse_failure, ORACLE_VERSIONS } = await import('./lib/strip_oracle.ts');
 
@@ -105,16 +96,6 @@ console.log(
 		`${ORACLE_VERSIONS.oxc_parser}; ${files.length} file(s) from ${CORPORA_COLLECTIONS}`
 );
 
-const child = new Deno.Command(TSV_DEBUG_CORPUS, {
-	args: ['strip', '--stdin'],
-	stdin: 'piped',
-	stdout: 'piped',
-	stderr: 'inherit'
-}).spawn();
-const writer = child.stdin.getWriter();
-const replies = lines_of(child.stdout);
-const encoder = new TextEncoder();
-
 const failures: Array<string> = [];
 const accepted_fired = new Set<string>();
 const refusal_kinds = new Map<string, number>();
@@ -126,13 +107,13 @@ for (const file of files) {
 	const path = relative(collections_root, file.path);
 	// a lone surrogate has no UTF-8 spelling, so both sides read the replaced string
 	const source = file.content.toWellFormed();
-	await writer.write(encoder.encode(JSON.stringify({ source }) + '\n'));
-	const line = (await replies.next()).value;
-	if (line === undefined) {
-		console.error(`✗ ${TSV_DEBUG_CORPUS} strip --stdin exited without answering ${path}`);
+	let reply: StripReply;
+	try {
+		reply = await server.ask({ source });
+	} catch (e) {
+		console.error(`✗ ${e instanceof Error ? e.message : e}, on ${path}`);
 		process.exit(1);
 	}
-	const reply = JSON.parse(line) as StripReply;
 	const fail = (check: AcceptedCheck | null, message: string): void => {
 		const key = `${check}\t${path}`;
 		if (check !== null && ACCEPTED.some((a) => a.check === check && a.path === path)) {
@@ -185,9 +166,11 @@ for (const file of files) {
 	}
 }
 
-await writer.close();
-const status = await child.status;
-if (!status.success) failures.push(`${TSV_DEBUG_CORPUS} strip --stdin exited ${status.code}`);
+try {
+	await server.close();
+} catch (e) {
+	failures.push(e instanceof Error ? e.message : String(e));
+}
 
 if (files.length === 0) failures.push('the corpus is empty — nothing was graded');
 for (const a of ACCEPTED) {

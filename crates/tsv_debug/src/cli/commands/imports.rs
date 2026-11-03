@@ -26,7 +26,6 @@
 
 use crate::cli::CliError;
 use argh::FromArgs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// Print tsv's import records for a file, tab-indented, or answer import requests over
@@ -108,57 +107,17 @@ struct ImportsRequest {
 
 /// Answer import requests until stdin closes (module doc §`--stdin`).
 fn serve_requests() -> Result<(), CliError> {
-    let stdin = std::io::stdin();
-    let mut input = stdin.lock();
-    let stdout = std::io::stdout();
-    let mut out = std::io::BufWriter::new(stdout.lock());
-    let mut line = String::new();
-    let mut arena = bumpalo::Bump::new();
-    loop {
-        line.clear();
-        let read = std::io::BufRead::read_line(&mut input, &mut line).map_err(|e| {
-            eprintln!("Error: reading stdin: {e}");
-            CliError::Failed
-        })?;
-        if read == 0 {
-            return Ok(());
-        }
-        if line.trim().is_empty() {
-            continue;
-        }
-        let request: ImportsRequest = serde_json::from_str(&line).map_err(|e| {
-            eprintln!("Error: malformed imports request: {e}");
-            CliError::Failed
-        })?;
-        let reply = answer(&request.path, &request.source, &mut arena);
-        let written = serde_json::to_writer(&mut out, &reply)
-            .map_err(std::io::Error::from)
-            .and_then(|()| out.write_all(b"\n"))
-            .and_then(|()| out.flush());
-        if let Err(e) = written {
-            eprintln!("Error: writing stdout: {e}");
-            return Err(CliError::Failed);
-        }
-    }
+    super::serve_ndjson("imports", |request: &ImportsRequest, arena| {
+        serde_json::to_vec(&answer(&request.path, &request.source, arena))
+            .map_err(|e| e.to_string())
+    })
 }
 
 /// The reply for one source (module doc §`--stdin`).
 fn answer(path: &Path, source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
-    arena.reset();
-    let result = {
-        let arena: &bumpalo::Bump = arena;
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            imports_at_path(path, source, arena)
-        }))
-    };
-    match result {
+    match super::catch_in_arena(arena, |arena| imports_at_path(path, source, arena)) {
         Ok(Ok(bytes)) => serde_json::json!({ "imports": crate::json::wire_value(&bytes) }),
         Ok(Err(e)) => serde_json::json!({ "error": format!("{e:#}") }),
-        Err(payload) => {
-            // a panicked parse may leave the arena mid-allocation; start the next one fresh
-            *arena = bumpalo::Bump::new();
-            let message = crate::audit::panic_hook::panic_message(payload.as_ref());
-            serde_json::json!({ "panic": message })
-        }
+        Err(message) => serde_json::json!({ "panic": message }),
     }
 }

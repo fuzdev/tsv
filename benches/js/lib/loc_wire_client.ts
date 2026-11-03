@@ -17,50 +17,30 @@
  * on this wire still fails `gate_on_panics` rather than counting as one more rejection. The
  * `corpus` profile is what makes a panic catchable here, as it is for the FFI library.
  *
- * Deno-only, like every corpus tool. The binary is the shared `--profile corpus` build world
- * (`deno task build:check`), guarded for freshness like the FFI library.
+ * The process is the shared `tsv_debug` client's (`tsv_debug_server.ts`): one long-lived
+ * `--profile corpus` server, guarded for freshness, Deno-only like every corpus tool.
  */
 
-import { check_artifact_freshness } from './check_artifact_freshness.ts';
-import { lines_of } from './text_lines.ts';
 import { goal_for, type Language, type ParseGoal } from './types.ts';
+import { TsvDebugServer } from './tsv_debug_server.ts';
 
-/** The `--profile corpus` `tsv_debug` binary `deno task build:check` builds. */
-export const TSV_DEBUG_CORPUS = 'target/corpus/tsv_debug';
+/** One request line (the command's module doc). */
+type WireRequest = { language: Language; goal?: ParseGoal; source: string };
 
 /** One reply line (the command's module doc). */
 type WireReply = { loc: unknown } | { error: string } | { panic: string };
 
 /** A running `tsv_debug loc_wires --stdin`, asked one document at a time. */
 export class LocWireClient {
-	private readonly child: Deno.ChildProcess;
-	private readonly writer: WritableStreamDefaultWriter<Uint8Array>;
-	private readonly replies: AsyncGenerator<string>;
-	private readonly encoder = new TextEncoder();
+	private readonly server: TsvDebugServer<WireRequest, WireReply>;
 
-	private constructor(child: Deno.ChildProcess) {
-		this.child = child;
-		this.writer = child.stdin.getWriter();
-		this.replies = lines_of(child.stdout);
+	private constructor(server: TsvDebugServer<WireRequest, WireReply>) {
+		this.server = server;
 	}
 
 	/** Spawn the server, refusing a missing or stale binary (`BENCH_STALE_OK=1` overrides staleness). */
 	static async start(): Promise<LocWireClient> {
-		await check_artifact_freshness([
-			{
-				label: 'tsv_debug (corpus)',
-				path: TSV_DEBUG_CORPUS,
-				binding_crates: ['tsv_debug', 'tsv_cli'],
-				rebuild: 'deno task build:check'
-			}
-		]);
-		const child = new Deno.Command(TSV_DEBUG_CORPUS, {
-			args: ['loc_wires', '--stdin'],
-			stdin: 'piped',
-			stdout: 'piped',
-			stderr: 'inherit'
-		}).spawn();
-		return new LocWireClient(child);
+		return new LocWireClient(await TsvDebugServer.start<WireRequest, WireReply>('loc_wires'));
 	}
 
 	/**
@@ -76,19 +56,11 @@ export class LocWireClient {
 	 */
 	async parse(source: string, language: Language, goal?: ParseGoal): Promise<unknown> {
 		const request_goal = goal_for(language, goal);
-		const request = JSON.stringify({
+		const reply = await this.server.ask({
 			language,
 			...(request_goal === undefined ? {} : { goal: request_goal }),
 			source: source.toWellFormed()
 		});
-		await this.writer.write(this.encoder.encode(request + '\n'));
-		const { value: line, done } = await this.replies.next();
-		if (done || line === undefined) {
-			throw new Error(
-				`${TSV_DEBUG_CORPUS} loc_wires --stdin exited without answering — see its stderr above`
-			);
-		}
-		const reply = JSON.parse(line) as WireReply;
 		if ('loc' in reply) return reply.loc;
 		if ('panic' in reply) throw new Error(`panic: ${reply.panic}`);
 		throw new Error(reply.error);
@@ -99,10 +71,6 @@ export class LocWireClient {
 	 * arrived is still a failure, never a quiet end of run.
 	 */
 	async close(): Promise<void> {
-		await this.writer.close();
-		const status = await this.child.status;
-		if (!status.success) {
-			throw new Error(`${TSV_DEBUG_CORPUS} loc_wires --stdin exited ${status.code} on close`);
-		}
+		await this.server.close();
 	}
 }

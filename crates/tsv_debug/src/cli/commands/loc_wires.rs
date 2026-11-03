@@ -267,41 +267,7 @@ impl WireLanguage {
 
 /// Answer loc-wire requests until stdin closes (module doc §`--stdin`).
 fn serve_requests() -> Result<(), CliError> {
-    let stdin = std::io::stdin();
-    let mut input = stdin.lock();
-    let stdout = std::io::stdout();
-    let mut out = std::io::BufWriter::new(stdout.lock());
-    let mut line = String::new();
-    let mut arena = bumpalo::Bump::new();
-    loop {
-        line.clear();
-        let read = std::io::BufRead::read_line(&mut input, &mut line).map_err(|e| {
-            eprintln!("Error: reading stdin: {e}");
-            CliError::Failed
-        })?;
-        if read == 0 {
-            return Ok(());
-        }
-        if line.trim().is_empty() {
-            continue;
-        }
-        let request: WireRequest = serde_json::from_str(&line).map_err(|e| {
-            eprintln!("Error: malformed loc_wires request: {e}");
-            CliError::Failed
-        })?;
-        let reply = answer(&request, &mut arena).map_err(|e| {
-            eprintln!("Error: {e}");
-            CliError::Failed
-        })?;
-        let written = out
-            .write_all(&reply)
-            .and_then(|()| out.write_all(b"\n"))
-            .and_then(|()| out.flush());
-        if let Err(e) = written {
-            eprintln!("Error: writing stdout: {e}");
-            return Err(CliError::Failed);
-        }
-    }
+    super::serve_ndjson("loc_wires", answer)
 }
 
 /// The reply line for one request — `Err` only for a request no binding would accept
@@ -320,32 +286,25 @@ fn answer(request: &WireRequest, arena: &mut bumpalo::Bump) -> Result<Vec<u8>, S
             ));
         }
     };
-    arena.reset();
     let source = request.source.as_str();
-    let parsed = {
-        let arena: &bumpalo::Bump = arena;
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(
-            || -> Result<Vec<u8>, String> {
-                Ok(match language {
-                    WireLanguage::Svelte => {
-                        let ast = tsv_svelte::__private::parse(source, arena)
-                            .map_err(|e| format!("{e:#}"))?;
-                        tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, source)
-                    }
-                    WireLanguage::Typescript => {
-                        let ast = tsv_ts::__private::parse_with_goal(source, goal, arena)
-                            .map_err(|e| format!("{e:#}"))?;
-                        tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, source)
-                    }
-                    WireLanguage::Css => {
-                        let ast = tsv_css::__private::parse(source, arena)
-                            .map_err(|e| format!("{e:#}"))?;
-                        tsv_css::__private::convert_ast_json_bytes_with_locations(&ast, source)
-                    }
-                })
-            },
-        ))
-    };
+    let parsed = super::catch_in_arena(arena, |arena| -> Result<Vec<u8>, String> {
+        Ok(match language {
+            WireLanguage::Svelte => {
+                let ast =
+                    tsv_svelte::__private::parse(source, arena).map_err(|e| format!("{e:#}"))?;
+                tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, source)
+            }
+            WireLanguage::Typescript => {
+                let ast = tsv_ts::__private::parse_with_goal(source, goal, arena)
+                    .map_err(|e| format!("{e:#}"))?;
+                tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, source)
+            }
+            WireLanguage::Css => {
+                let ast = tsv_css::__private::parse(source, arena).map_err(|e| format!("{e:#}"))?;
+                tsv_css::__private::convert_ast_json_bytes_with_locations(&ast, source)
+            }
+        })
+    });
     Ok(match parsed {
         Ok(Ok(wire)) => {
             let mut reply = Vec::with_capacity(wire.len() + 8);
@@ -355,11 +314,6 @@ fn answer(request: &WireRequest, arena: &mut bumpalo::Bump) -> Result<Vec<u8>, S
             reply
         }
         Ok(Err(message)) => format!("{{\"error\":{}}}", json_string(&message)).into_bytes(),
-        Err(payload) => {
-            // a panicked parse may leave the arena mid-allocation; start the next one fresh
-            *arena = bumpalo::Bump::new();
-            let message = crate::audit::panic_hook::panic_message(payload.as_ref());
-            format!("{{\"panic\":{}}}", json_string(message)).into_bytes()
-        }
+        Err(message) => format!("{{\"panic\":{}}}", json_string(&message)).into_bytes(),
     })
 }

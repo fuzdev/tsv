@@ -99,14 +99,12 @@ import type {
 	ImportRecordKind,
 	ImportsSuccess
 } from '../../crates/tsv_wasm/npm/facade_imports.d.ts';
-import { check_artifact_freshness } from './lib/check_artifact_freshness.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { CORPORA_COLLECTIONS, is_collection_path } from './lib/corpora.ts';
 import { CorpusLoader } from './lib/corpus.ts';
 import { IMPORTS_CORPUS_PINS } from './lib/gate_counts.ts';
-import { TSV_DEBUG_CORPUS } from './lib/loc_wire_client.ts';
 import { oxc_fatal_errors } from './lib/oxc.ts';
-import { lines_of } from './lib/text_lines.ts';
+import { TsvDebugServer } from './lib/tsv_debug_server.ts';
 
 /** A check an `ACCEPTED` entry can excuse. */
 type AcceptedCheck = 'oxc_rejects' | 'records';
@@ -284,14 +282,9 @@ if (!('Deno' in globalThis)) {
 }
 
 await check_node_modules();
-await check_artifact_freshness([
-	{
-		label: 'tsv_debug (corpus)',
-		path: TSV_DEBUG_CORPUS,
-		binding_crates: ['tsv_debug', 'tsv_cli'],
-		rebuild: 'deno task build:check'
-	}
-]);
+const server = await TsvDebugServer.start<{ path: string; source: string }, ImportsReply>(
+	'imports'
+);
 // dynamic, so a missing node_modules reports through the preflight above
 const { parseSync } = await import('oxc-parser');
 const { parse: svelte_parse } = await import('svelte/compiler');
@@ -313,16 +306,6 @@ console.log(
 		`(svelte ${versions.svelte} finds the scripts); ${files.length} file(s) from ` +
 		CORPORA_COLLECTIONS
 );
-
-const child = new Deno.Command(TSV_DEBUG_CORPUS, {
-	args: ['imports', '--stdin'],
-	stdin: 'piped',
-	stdout: 'piped',
-	stderr: 'inherit'
-}).spawn();
-const writer = child.stdin.getWriter();
-const replies = lines_of(child.stdout);
-const encoder = new TextEncoder();
 
 const failures: Array<string> = [];
 const accepted_fired = new Set<string>();
@@ -346,13 +329,13 @@ async function grade(
 	source: string,
 	tally: boolean
 ): Promise<{ check: AcceptedCheck | null; message: string } | null> {
-	await writer.write(encoder.encode(JSON.stringify({ path: file_path, source }) + '\n'));
-	const line = (await replies.next()).value;
-	if (line === undefined) {
-		console.error(`✗ ${TSV_DEBUG_CORPUS} imports --stdin exited without answering ${file_path}`);
+	let reply: ImportsReply;
+	try {
+		reply = await server.ask({ path: file_path, source });
+	} catch (e) {
+		console.error(`✗ ${e instanceof Error ? e.message : e}, on ${file_path}`);
 		process.exit(1);
 	}
-	const reply = JSON.parse(line) as ImportsReply;
 	if ('panic' in reply) return { check: null, message: `tsv panicked: ${reply.panic}` };
 	if ('error' in reply) {
 		return { check: null, message: `tsv's parser rejects it: ${reply.error.split('\n')[0]}` };
@@ -411,9 +394,11 @@ for (const file of files) {
 	}
 }
 
-await writer.close();
-const status = await child.status;
-if (!status.success) failures.push(`${TSV_DEBUG_CORPUS} imports --stdin exited ${status.code}`);
+try {
+	await server.close();
+} catch (e) {
+	failures.push(e instanceof Error ? e.message : String(e));
+}
 
 if (files.length === 0) failures.push('the corpus is empty — nothing was graded');
 for (const a of ACCEPTED) {

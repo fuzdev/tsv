@@ -661,10 +661,10 @@ deno task typecheck:js
   The node-modules-free part of the harness IS gated, mostly for free: `deno check` walks
   transitive imports, so `typecheck:scripts` already covers the loader/guard core through
   scripts/'s own graph (check_artifact_freshness, ffi, napi, tsv_artifacts, runtime, types,
-  reject_probe, locations_probe, and — through check_loc.ts — loc_wire_client), and `test:deno`
+  reject_probe, locations_probe, and — through check_loc.ts — tsv_debug_server), and `test:deno`
   covers gate_counts. `typecheck:bench-core` names the orphans nothing else reaches —
-  `lib/wasm.ts`, `lib/harvest_stamp.ts`, `lib/fixture_documents.ts`, `lib/error_text.ts` and
-  `compose_reports.ts`. It is deliberately NOT the maximal checkable set: the impl wrappers also
+  `lib/wasm.ts`, `lib/harvest_stamp.ts`, `lib/loc_wire_client.ts`, `lib/fixture_documents.ts`,
+  `lib/error_text.ts` and `compose_reports.ts`. It is deliberately NOT the maximal checkable set: the impl wrappers also
   check on a bare checkout, but only because their npm imports are dynamic, and gating them would
   impose that import style on modules whose job is loading npm (deno.json
   `//typecheck:bench-core`).
@@ -1637,8 +1637,8 @@ benches/js/
     │                      # the definition, recognized by structure (any other fails the run) —
     │                      # and its pinned superset kinds; mutation-tested by loc_tolerance_test.ts
     ├── loc_wire_client.ts # The loc arm's loc-bearing wire, asked of one `tsv_debug loc_wires
-    │                      # --stdin` process (NDJSON, per-request panic catching) — the wire no
-    │                      # binding ships
+    │                      # --stdin` process (`tsv_debug_server.ts`; per-request panic catching)
+    │                      # — the wire no binding ships
     ├── locations_probe.ts # Behavioral "is the parse wire still SPAN-ONLY" check, asked at each
     │                      # tsv binding's init: no `loc` / `name_loc`, numeric root offsets, so
     │                      # a binding still emitting `loc` can't be timed as the span-only
@@ -1689,7 +1689,7 @@ benches/js/
     │                      # and wasm_target (the pkg/<variant>/<target>/ segment)
     ├── swc.ts             # swc wrapper (parse-only, TS/JS; both surfaces — goal axis is `isModule`)
     ├── text_lines.ts      # `lines_of`: a byte stream's lines, linear in its length — the NDJSON
-    │                      # reader `loc_wire_client.ts` and `scripts/check_loc.ts` share
+    │                      # reader `tsv_debug_server.ts` and `scripts/check_loc.ts` share
     ├── ts_repo.ts         # Shared `../typescript`-corpus vocabulary: discovery, the `@filename`
     │                      # unit split (tsc's own harness rule), and the baseline key/grammar-code
     │                      # rules (the ts-repo GATE and the harvest both read it, so they can't
@@ -1697,6 +1697,9 @@ benches/js/
     │                      # themselves along two DECLARED axes — root + DeclarationPolicy)
     ├── tsc.ts             # tsc wrapper (parse-only, conformance surface only) + the shared
     │                      # `typescript` loader and parse call the harvest reuses
+    ├── tsv_debug_server.ts # One long-lived `tsv_debug <command> --stdin` process asked one NDJSON
+    │                      # request at a time — the client `loc_wire_client.ts`, `strip_corpus.ts`
+    │                      # and `imports_corpus.ts` share, and the `--profile corpus` binary's path
     ├── tsv_api.ts         # The packages' published API over one tsv engine: the shipped facade
     │                      # (`crates/tsv_wasm/npm/api.js` + `api_parse.js`) built over a binding's flat
     │                      # exports, and `TsvBinding`, the base the three wrappers (ffi/napi/wasm) share

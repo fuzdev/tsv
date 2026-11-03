@@ -33,7 +33,7 @@
  */
 
 import { loc_definition_violation } from '../benches/js/lib/loc_cross_grade.ts';
-import { TSV_DEBUG_CORPUS as TSV_DEBUG } from '../benches/js/lib/loc_wire_client.ts';
+import { TSV_DEBUG_CORPUS as TSV_DEBUG } from '../benches/js/lib/tsv_debug_server.ts';
 import type { Language } from '../benches/js/lib/types.ts';
 import { lines_of } from '../benches/js/lib/text_lines.ts';
 

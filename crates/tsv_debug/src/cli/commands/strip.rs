@@ -27,7 +27,6 @@
 use crate::cli::CliError;
 use crate::strip_fixtures::{contract_violations, idempotence_failure, refusal_line};
 use argh::FromArgs;
-use std::io::Write;
 use std::path::PathBuf;
 
 /// Strip the types from a TypeScript file to stdout, or answer strip requests over stdin
@@ -112,57 +111,24 @@ struct StripRequest {
 
 /// Answer strip requests until stdin closes (module doc §`--stdin`).
 fn serve_requests() -> Result<(), CliError> {
-    let stdin = std::io::stdin();
-    let mut input = stdin.lock();
-    let stdout = std::io::stdout();
-    let mut out = std::io::BufWriter::new(stdout.lock());
-    let mut line = String::new();
-    let mut arena = bumpalo::Bump::new();
-    loop {
-        line.clear();
-        let read = std::io::BufRead::read_line(&mut input, &mut line).map_err(|e| {
-            eprintln!("Error: reading stdin: {e}");
-            CliError::Failed
-        })?;
-        if read == 0 {
-            return Ok(());
-        }
-        if line.trim().is_empty() {
-            continue;
-        }
-        let request: StripRequest = serde_json::from_str(&line).map_err(|e| {
-            eprintln!("Error: malformed strip request: {e}");
-            CliError::Failed
-        })?;
-        let reply = answer(&request.source, &mut arena);
-        let written = serde_json::to_writer(&mut out, &reply)
-            .map_err(std::io::Error::from)
-            .and_then(|()| out.write_all(b"\n"))
-            .and_then(|()| out.flush());
-        if let Err(e) = written {
-            eprintln!("Error: writing stdout: {e}");
-            return Err(CliError::Failed);
-        }
-    }
+    super::serve_ndjson("strip", |request: &StripRequest, arena| {
+        serde_json::to_vec(&answer(&request.source, arena)).map_err(|e| e.to_string())
+    })
 }
 
 /// The reply for one source (module doc §`--stdin`).
 fn answer(source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
-    arena.reset();
-    let result = {
-        let arena: &bumpalo::Bump = arena;
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            tsv_ts::__private::strip_in(source, None, arena).map(|stripped| {
-                let code = stripped.code;
-                let mut findings: Vec<String> = contract_violations(source, &code)
-                    .into_iter()
-                    .map(|(_, detail)| detail)
-                    .collect();
-                findings.extend(idempotence_failure(source, &code).map(|f| f.to_string()));
-                (code, findings)
-            })
-        }))
-    };
+    let result = super::catch_in_arena(arena, |arena| {
+        tsv_ts::__private::strip_in(source, None, arena).map(|stripped| {
+            let code = stripped.code;
+            let mut findings: Vec<String> = contract_violations(source, &code)
+                .into_iter()
+                .map(|(_, detail)| detail)
+                .collect();
+            findings.extend(idempotence_failure(source, &code).map(|f| f.to_string()));
+            (code, findings)
+        })
+    });
     match result {
         Ok(Ok((code, findings))) => serde_json::json!({ "code": code, "findings": findings }),
         Ok(Err(tsv_ts::StripError::Unsupported {
@@ -173,12 +139,7 @@ fn answer(source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
         }
         Ok(Err(tsv_ts::StripError::Parse(e))) => serde_json::json!({ "error": format!("{e:#}") }),
         Ok(Err(other)) => serde_json::json!({ "error": format!("{other:#}") }),
-        Err(payload) => {
-            // a panicked strip may leave the arena mid-allocation; start the next one fresh
-            *arena = bumpalo::Bump::new();
-            let message = crate::audit::panic_hook::panic_message(payload.as_ref());
-            serde_json::json!({ "panic": message })
-        }
+        Err(message) => serde_json::json!({ "panic": message }),
     }
 }
 

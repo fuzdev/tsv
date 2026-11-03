@@ -184,6 +184,83 @@ pub(crate) fn print_json_tabs<T: serde::Serialize>(
     }
 }
 
+/// Answer NDJSON requests read from stdin until it closes — the `--stdin` server the corpus
+/// tools drive a long-lived process through (`imports`, `strip`, `loc_wires`; each
+/// command's module doc states its request and reply). One request per line, a blank line
+/// skipped, each answered by exactly one line on stdout, flushed before the next request is
+/// read, so a client awaits one reply per request.
+///
+/// `answer` takes the request and the server's one arena (reset per request by
+/// [`catch_in_arena`]) and returns the reply line, its newline left to the server. A request
+/// that does not deserialize, or one `answer` refuses (`Err`, a request no tsv verdict
+/// answers), is a harness bug, not a verdict: it ends the process with an error, the
+/// malformed one named by `command`.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] on a malformed or refused request, or when stdin / stdout
+/// fails.
+pub(crate) fn serve_ndjson<R: serde::de::DeserializeOwned>(
+    command: &str,
+    mut answer: impl FnMut(&R, &mut bumpalo::Bump) -> Result<Vec<u8>, String>,
+) -> Result<(), CliError> {
+    use std::io::{BufRead, Write};
+    let stdin = std::io::stdin();
+    let mut input = stdin.lock();
+    let stdout = std::io::stdout();
+    let mut out = std::io::BufWriter::new(stdout.lock());
+    let mut line = String::new();
+    let mut arena = bumpalo::Bump::new();
+    loop {
+        line.clear();
+        let read = input.read_line(&mut line).map_err(|e| {
+            eprintln!("Error: reading stdin: {e}");
+            CliError::Failed
+        })?;
+        if read == 0 {
+            return Ok(());
+        }
+        if line.trim().is_empty() {
+            continue;
+        }
+        let request: R = serde_json::from_str(&line).map_err(|e| {
+            eprintln!("Error: malformed {command} request: {e}");
+            CliError::Failed
+        })?;
+        let reply = answer(&request, &mut arena).map_err(|e| {
+            eprintln!("Error: {e}");
+            CliError::Failed
+        })?;
+        let written = out
+            .write_all(&reply)
+            .and_then(|()| out.write_all(b"\n"))
+            .and_then(|()| out.flush());
+        if let Err(e) = written {
+            eprintln!("Error: writing stdout: {e}");
+            return Err(CliError::Failed);
+        }
+    }
+}
+
+/// Run `f` over `arena`, reset first, under `catch_unwind` — one [`serve_ndjson`] request's
+/// tsv work, so a panic answers as a panic rather than ending the server (the `corpus`
+/// profile unwinds). `Err` is the panic's message; the arena is then replaced, since a
+/// panicked parse may leave it mid-allocation.
+pub(crate) fn catch_in_arena<T>(
+    arena: &mut bumpalo::Bump,
+    f: impl FnOnce(&bumpalo::Bump) -> T,
+) -> Result<T, String> {
+    arena.reset();
+    let result = {
+        let arena: &bumpalo::Bump = arena;
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(arena)))
+    };
+    result.map_err(|payload| {
+        *arena = bumpalo::Bump::new();
+        crate::audit::panic_hook::panic_message(payload.as_ref()).to_owned()
+    })
+}
+
 /// Print `value` as `serde_json`'s two-space pretty JSON on stdout. Takes a built `Value`
 /// rather than any `Serialize`, because a `Value`'s alternate `Display` is that same pretty
 /// form and cannot fail — so there is no serialization error to swallow.
@@ -395,6 +472,30 @@ pub fn task_result<T>(joined: Result<T, JoinError>, what: &str) -> Result<T, Cli
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A request's value comes back as it is, and a panic as its message, the arena
+    /// replaced and usable for the next request.
+    #[test]
+    fn catch_in_arena_answers_a_panic_as_its_message() {
+        let mut arena = bumpalo::Bump::new();
+        assert_eq!(
+            catch_in_arena(&mut arena, |arena| *arena.alloc(3_u8)),
+            Ok(3)
+        );
+        let caught = {
+            let _lock = crate::audit::panic_hook::hook_test_lock();
+            let _quiet = crate::audit::panic_hook::SuppressedPanicHook::install();
+            catch_in_arena(&mut arena, |arena| -> u8 {
+                arena.alloc(1_u8);
+                std::panic::panic_any("a probe panic")
+            })
+        };
+        assert_eq!(caught, Err("a probe panic".to_owned()));
+        assert_eq!(
+            catch_in_arena(&mut arena, |arena| *arena.alloc(7_u8)),
+            Ok(7)
+        );
+    }
 
     fn fixture(relative_path: &str) -> Fixture {
         Fixture {
