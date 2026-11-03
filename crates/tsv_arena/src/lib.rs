@@ -6,8 +6,8 @@
 //! keep three copies of honest (see the crate's CLAUDE.md §Why this crate
 //! exists). The arenas are the bulk of it and are described below; the goal
 //! macros ([`parse_ast!`], [`parse_ast_for_format!`], [`goal_allowed!`]), the export
-//! bodies built on them ([`parse_convert!`], [`parse_internal!`], and the format path's
-//! `parse_format!`), the export [`Family`] and the string-axis decoder
+//! bodies built on them ([`parse_convert!`], [`parse_internal!`], [`parse_imports_json!`],
+//! and the format path's `parse_format!`), the export [`Family`] and the string-axis decoder
 //! ([`decode_source_type`]) sit at the bottom of this file.
 //!
 //! # The arenas
@@ -379,6 +379,52 @@ macro_rules! parse_format {
                 $lang::__private::format_folded_in(&ast, &folded, doc_arena)
             }))
         })
+    }};
+}
+
+/// A binding's whole **imports** export body: collect the import records of `$source` in the
+/// per-thread AST arena through the language's `__private::parse_imports_in`, and write them
+/// as the JSON every binding returns — `tsv_ts::__private::write_imports_json_string`, the
+/// one writer every language's records go through, in the language's own
+/// `WIRE_COORDINATES` — a parse error mapped through `$map_err`, the binding's own error
+/// type.
+///
+/// `$goal` is the binding's decoded `Option` goal, read as the strip reads it: `goal`
+/// (TypeScript) hands it on, so an unset one is the module-then-script fallback; `nogoal`
+/// (Svelte, whose scripts are modules) ignores it — a set goal is already refused by the
+/// binding's own decoder ([`goal_allowed!`]). The source is the caller's own bytes, with no
+/// line-terminator fold, as a parse export's: the records' offsets index them.
+///
+/// Expands to `Result<String, _>`, the error `$map_err`'s; `$lang` and `tsv_ts` resolve in
+/// the caller's scope, as in [`parse_ast!`].
+///
+/// ```ignore
+/// parse_imports_json!(goal, tsv_ts, source, goal, |e| Failure::parse(&e))
+/// ```
+#[macro_export]
+macro_rules! parse_imports_json {
+    ($goalness:ident, $lang:ident, $source:expr, $goal:expr, $map_err:expr) => {{
+        let source = $source;
+        let goal = $goal;
+        $crate::with_ast_arena(|arena| {
+            $crate::parse_imports_json!(@collect $goalness, $lang, source, goal, arena)
+                .map(|imports| {
+                    tsv_ts::__private::write_imports_json_string(
+                        &imports,
+                        source,
+                        $lang::WIRE_COORDINATES,
+                    )
+                })
+                .map_err($map_err)
+        })
+    }};
+    (@collect goal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {
+        $lang::__private::parse_imports_in($source, $goal, $arena)
+    };
+    (@collect nogoal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {{
+        // Consume the (always-unset) goal so the binding stays used in every expansion.
+        let _ = $goal;
+        $lang::__private::parse_imports_in($source, $arena)
     }};
 }
 

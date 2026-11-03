@@ -45,15 +45,19 @@ serde_json.workspace = true
 default = ["format", "parse", "strip", "imports"]
 # Pulls the reusable doc arena (`tsv_arena::with_doc_arena`, which pulls
 # tsv_lang), plus the `IgnoreStack` discovery matcher and its verdict methods.
-format = ["tsv_arena/format", "dep:tsv_ignore", "dep:tsv_discover"]
-parse = ["tsv_ts/json", "tsv_css/json", "tsv_svelte/json"]
+format = ["_internal_exports", "tsv_arena/format", "dep:tsv_ignore", "dep:tsv_discover"]
+parse = ["_internal_exports", "tsv_ts/json", "tsv_css/json", "tsv_svelte/json"]
 # The `strip_typescript` export — the type strip, `tsv_ts::strip` (the same export
 # `tsv_wasm`'s `strip` feature adds to `@fuzdev/tsv-wasm`).
-strip = []
+strip = ["_internal_exports"]
 # The `parse_imports_typescript` / `parse_imports_svelte` exports — `tsv_ts::parse_imports`
 # and `tsv_svelte::parse_imports`, their records written as JSON by the TypeScript crate's
 # `json` layer (the same exports `tsv_wasm`'s `imports` feature adds to `@fuzdev/tsv-wasm`).
-imports = ["tsv_ts/json"]
+imports = ["_internal_exports", "tsv_ts/json"]
+# What every export family shares — the source-type decoder and the failure an export ends
+# on — named once for the `cfg`s, rather than spelled at each as an `any` over the
+# families. On with any family; no build names it.
+_internal_exports = []
 # Test-only: compiles the `__panic_probe` export that `deno task test:napi`
 # drives to prove the panic contract end to end (panic → thrown JS error →
 # addon still usable). Never enabled by a published build; `test_napi.ts` skips

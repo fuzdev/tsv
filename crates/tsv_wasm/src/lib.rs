@@ -37,20 +37,17 @@ use wasm_bindgen::prelude::*;
 // thread-local while it is in use, so a trap here leaves a callable instance
 // (see `tsv_arena`'s §Abort safety — this is the target that made it necessary).
 // The goal-axis macros and every export body (`parse_convert!`, `parse_internal!`,
-// `parse_format!`) come from the same crate, so the three bindings share ONE definition
+// `parse_format!`, `parse_imports_json!`) come from the same crate, so the three bindings share ONE definition
 // of which languages have a goal and of what each export does, rather than three
 // hand-synced copies.
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 use tsv_arena::Family;
 #[cfg(any(feature = "parse", feature = "format"))]
 use tsv_arena::goal_allowed;
 #[cfg(feature = "format")]
 use tsv_arena::parse_format;
+#[cfg(feature = "imports")]
+use tsv_arena::parse_imports_json;
 #[cfg(feature = "parse")]
 use tsv_arena::{parse_convert, parse_internal};
 
@@ -59,12 +56,7 @@ use tsv_arena::{parse_convert, parse_internal};
 // `WirePoint`s), so the shared error helpers below take a Svelte or CSS failure as readily as
 // a TypeScript one. Named through `tsv_ts`, as the language surface spells it; this crate's
 // own `tsv_lang` edge serves the wasm32 layout pins alone (`layout`).
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 use tsv_ts::Error;
 
 // WASM global allocator: talc replaces std's default dlmalloc on wasm32. The
@@ -125,12 +117,7 @@ fn err(message: impl ToString) -> JsValue {
 // constructor and a few setters are all this needs (the `console_error` binding above is
 // the same trade). Each setter writes a plain data property, so the key order is the order
 // the setters run in.
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_name = Object)]
@@ -187,12 +174,7 @@ extern "C" {
 /// How an export ends that did not produce its product: a failure it RETURNS (the source's
 /// own — a parse failure, a refusal), or an error it THROWS (an argument the raw export
 /// refuses, a source over the size cap).
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 enum Failure {
     /// The `{ok: false, error}` result ([`failure_result`]).
     Returned(JsValue),
@@ -200,12 +182,7 @@ enum Failure {
     Thrown(JsValue),
 }
 
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 impl Failure {
     /// The export's return value: a returned failure is the `Ok` value beside the product,
     /// a thrown one the `Err` wasm-bindgen throws.
@@ -221,12 +198,7 @@ impl Failure {
 /// `{ok: false, error}` — `kind` `'parse'` for a syntax error, `'refused'` for a format's
 /// refusal of a source that parses (`Error::to_report`'s `kind`, `ErrorKind::Refusal`) — and a
 /// positionless one (a source over the size cap) thrown as a plain `Error`.
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 fn parse_failure(e: &Error) -> Failure {
     match e.to_report() {
         Some(report) => Failure::Returned(failure_result(
@@ -247,12 +219,7 @@ fn parse_failure(e: &Error) -> Failure {
 /// `start`, `end` and `loc: {start: {line, column}, end: {line, column}}` — the span in the
 /// document's wire coordinates, shaped as a wire node's. The npm facade (`npm/api.js`)
 /// hands it to the caller as it is, so this shape is its contract, shared with `tsv_napi`.
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 fn failure_result(kind: &str, construct: Option<&str>, report: &tsv_ts::ErrorReport) -> JsValue {
     let error = PlainObject::new();
     error.set_kind(kind);
@@ -277,12 +244,7 @@ fn failure_result(kind: &str, construct: Option<&str>, report: &tsv_ts::ErrorRep
 }
 
 /// A point's `{line, column}`, the wire's `Position`.
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 fn position(point: tsv_ts::WirePoint) -> PlainObject {
     let position = PlainObject::new();
     position.set_line(point.line);
@@ -338,18 +300,10 @@ pub fn strip_typescript(source: &str, source_type: JsValue) -> Result<JsValue, J
 pub fn parse_imports_typescript(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
     let goal =
         wasm_source_type(SourceTypeArg::read(&source_type), true, Family::Imports).map_err(err)?;
-    tsv_arena::with_ast_arena(|arena| {
-        match tsv_ts::__private::parse_imports_in(source, goal, arena) {
-            Ok(imports) => Ok(JsValue::from_str(
-                &tsv_ts::__private::write_imports_json_string(
-                    &imports,
-                    source,
-                    tsv_ts::WIRE_COORDINATES,
-                ),
-            )),
-            Err(e) => parse_failure(&e).into_return(),
-        }
-    })
+    match parse_imports_json!(goal, tsv_ts, source, goal, |e| parse_failure(&e)) {
+        Ok(json) => Ok(JsValue::from_str(&json)),
+        Err(failure) => failure.into_return(),
+    }
 }
 
 /// The import records of a Svelte component (`tsv_svelte::parse_imports`) — both scripts,
@@ -359,19 +313,12 @@ pub fn parse_imports_typescript(source: &str, source_type: JsValue) -> Result<Js
 #[cfg(feature = "imports")]
 #[wasm_bindgen]
 pub fn parse_imports_svelte(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
-    wasm_source_type(SourceTypeArg::read(&source_type), false, Family::Imports).map_err(err)?;
-    tsv_arena::with_ast_arena(|arena| {
-        match tsv_svelte::__private::parse_imports_in(source, arena) {
-            Ok(imports) => Ok(JsValue::from_str(
-                &tsv_ts::__private::write_imports_json_string(
-                    &imports,
-                    source,
-                    tsv_svelte::WIRE_COORDINATES,
-                ),
-            )),
-            Err(e) => parse_failure(&e).into_return(),
-        }
-    })
+    let goal =
+        wasm_source_type(SourceTypeArg::read(&source_type), false, Family::Imports).map_err(err)?;
+    match parse_imports_json!(nogoal, tsv_svelte, source, goal, |e| parse_failure(&e)) {
+        Ok(json) => Ok(JsValue::from_str(&json)),
+        Err(failure) => failure.into_return(),
+    }
 }
 
 /// The hierarchical, git-faithful matcher for tsv's discovery ignore files, wrapping
@@ -623,12 +570,7 @@ impl IgnoreStack {
 /// release glue does not refuse a wrong-typed one: it coerces a number, a boolean or an
 /// object to `""`, which then reads as `invalid sourceType ''` (and an array throws from
 /// inside the glue, `arg.charCodeAt is not a function`). Read here, the type is named.
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 #[derive(Debug, PartialEq, Eq)]
 enum SourceTypeArg {
     /// Omitted, `undefined` or `null`.
@@ -639,12 +581,7 @@ enum SourceTypeArg {
     Other(String),
 }
 
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 impl SourceTypeArg {
     fn read(value: &JsValue) -> Self {
         if value.is_null_or_undefined() {
@@ -677,12 +614,7 @@ impl SourceTypeArg {
 /// `Program.sourceType` is a claim one settled grammar has to produce), a format or the
 /// strip as "none named" — the module grammar retried as a script
 /// (`tsv_ts::__private::parse_with_goal_or_fallback`).
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 fn wasm_source_type(
     source_type: SourceTypeArg,
     allowed: bool,

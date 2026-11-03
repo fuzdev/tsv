@@ -38,21 +38,18 @@ use napi_derive::napi;
 // Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
 // native bindings — see its module docs for the reuse rationale + soundness).
 // The goal-axis macros and every export body (`parse_convert!`, `parse_internal!`,
-// `parse_format!`) come from the same crate, so the three bindings share ONE definition
+// `parse_format!`, `parse_imports_json!`) come from the same crate, so the three bindings share ONE definition
 // of which languages have a goal and of what each export does, rather than three
 // hand-synced copies.
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 use tsv_arena::Family;
 #[cfg(any(feature = "parse", feature = "format"))]
 use tsv_arena::goal_allowed;
 #[cfg(feature = "format")]
 use tsv_arena::parse_format;
-#[cfg(any(feature = "panic_probe", feature = "strip", feature = "imports"))]
+#[cfg(feature = "imports")]
+use tsv_arena::parse_imports_json;
+#[cfg(any(feature = "panic_probe", feature = "strip"))]
 use tsv_arena::with_ast_arena;
 #[cfg(feature = "parse")]
 use tsv_arena::{parse_convert, parse_internal};
@@ -62,12 +59,7 @@ use tsv_arena::{parse_convert, parse_internal};
 // `WirePoint`s), so the shared error helpers below take a Svelte or CSS failure as readily as
 // a TypeScript one. Named through `tsv_ts` only because this crate takes no `tsv_lang` edge of
 // its own.
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 use tsv_ts::Error;
 use tsv_ts::{ErrorReport, WirePoint};
 
@@ -85,12 +77,7 @@ use tsv_ts::{ErrorReport, WirePoint};
 /// produce), the format exports, the strip and the imports parse as "none named", which
 /// `tsv_ts::__private::parse_with_goal_or_fallback` answers with the module grammar retried as
 /// a script.
-#[cfg(any(
-    feature = "parse",
-    feature = "format",
-    feature = "strip",
-    feature = "imports"
-))]
+#[cfg(feature = "_internal_exports")]
 fn napi_source_type(
     source_type: Option<String>,
     allowed: bool,
@@ -129,12 +116,7 @@ impl Failure {
     /// A parse error: a pointed one returned with its report (`'refused'` for a format
     /// refusal, `'parse'` otherwise), and the positionless one (a source over the size cap)
     /// thrown.
-    #[cfg(any(
-        feature = "parse",
-        feature = "format",
-        feature = "strip",
-        feature = "imports"
-    ))]
+    #[cfg(feature = "_internal_exports")]
     fn parse(e: &Error) -> Self {
         match e.to_report() {
             Some(report) => Failure::Returned {
@@ -457,16 +439,7 @@ fn parse_imports_typescript_engine(
     source_type: Option<String>,
 ) -> Result<String, Failure> {
     let goal = napi_source_type(source_type, true, Family::Imports)?;
-    with_ast_arena(
-        |arena| match tsv_ts::__private::parse_imports_in(source, goal, arena) {
-            Ok(imports) => Ok(tsv_ts::__private::write_imports_json_string(
-                &imports,
-                source,
-                tsv_ts::WIRE_COORDINATES,
-            )),
-            Err(e) => Err(Failure::parse(&e)),
-        },
-    )
+    parse_imports_json!(goal, tsv_ts, source, goal, |e| Failure::parse(&e))
 }
 
 /// The engine half of `parse_imports_svelte`: a component's import records, both scripts in
@@ -477,17 +450,8 @@ fn parse_imports_svelte_engine(
     source: &str,
     source_type: Option<String>,
 ) -> Result<String, Failure> {
-    napi_source_type(source_type, false, Family::Imports)?;
-    with_ast_arena(
-        |arena| match tsv_svelte::__private::parse_imports_in(source, arena) {
-            Ok(imports) => Ok(tsv_ts::__private::write_imports_json_string(
-                &imports,
-                source,
-                tsv_svelte::WIRE_COORDINATES,
-            )),
-            Err(e) => Err(Failure::parse(&e)),
-        },
-    )
+    let goal = napi_source_type(source_type, false, Family::Imports)?;
+    parse_imports_json!(nogoal, tsv_svelte, source, goal, |e| Failure::parse(&e))
 }
 
 /// The import records of TypeScript `source` (`tsv_ts::parse_imports`), as a JSON string
