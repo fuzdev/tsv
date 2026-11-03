@@ -1096,7 +1096,10 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// A refused assertion's work past its operand is skipped, as [`Self::assertion`]
     /// skips it. The strip walks nothing under one either: the chain ends at the first, so
     /// it is the innermost link, and the base is not walked. An imports walk walks on
-    /// through every refused link to the base ([`Self::walks_refused`]).
+    /// through every refused link to the base ([`Self::walks_refused`]). None is refused
+    /// today: a chain past `CHAIN_FRAMES` is entered at a link's operand, so no assertion
+    /// in it is followed by a binary operator. The flag keeps the loop's verdict the
+    /// recursion's should that change.
     #[inline(never)]
     fn chain(&mut self, e: &Expression<'_>) {
         // each link with whether its grouping check refused it

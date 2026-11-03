@@ -450,6 +450,8 @@ pub fn write_imports_json(
         w.raw("\",");
         start_end(&mut w, record.span);
         w.raw(",\"specifier\":");
+        // `specifier_value` is `None` only when there is no specifier (it panics on a
+        // foreign source), so this pairs every specifier with its value
         match record.specifier.zip(record.specifier_value(source)) {
             Some((specifier, value)) => {
                 w.raw("{\"value\":");

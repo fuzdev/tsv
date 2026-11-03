@@ -38,9 +38,9 @@ use napi_derive::napi;
 // Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
 // native bindings — see its module docs for the reuse rationale + soundness).
 // The goal-axis macros and every export body (`parse_convert!`, `parse_internal!`,
-// `parse_format!`, `parse_imports_json!`) come from the same crate, so the three bindings share ONE definition
-// of which languages have a goal and of what each export does, rather than three
-// hand-synced copies.
+// `parse_format!`, `parse_imports_json!`) come from the same crate, so the bindings
+// share ONE definition of which languages have a goal and of what each export does,
+// rather than hand-synced copies.
 #[cfg(feature = "_internal_exports")]
 use tsv_arena::Family;
 #[cfg(any(feature = "parse", feature = "format"))]
