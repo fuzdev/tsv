@@ -102,9 +102,11 @@ pub struct Imports {
     /// anywhere outside types, or a top-level `await`, `for await` or `await using`
     /// (outside every function, class static block, field initializer, namespace body and
     /// enum member initializer — the last two function-like for `await` in tsc, TS1308).
-    /// A dynamic `import(…)`, an `import x = require('y')`, an `export =` and an
-    /// `export as namespace` are not module syntax. This is the set Node's ESM syntax
-    /// detection reads. tsc's module indicator is a different set: it adds an
+    /// A dynamic `import(…)`, an `import x = require('y')`, an `export import x = …`, an
+    /// `export =` and an `export as namespace` are not module syntax. This is the
+    /// module-syntax core of what Node's ESM syntax detection reads (Node also weighs
+    /// signals that are not module syntax, such as a top-level redeclaration of a CommonJS
+    /// wrapper name). tsc's module indicator is a different set: it adds an
     /// `import x = require('y')`, an `export =` and any `export`-modified declaration
     /// (`export import X = require('y')` included), and omits a top-level `await` or
     /// `await using`.

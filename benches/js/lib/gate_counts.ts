@@ -102,7 +102,8 @@ export const GATE_CHECKOUT_IDS: Record<
 			'corpus_format_pins.txt',
 			'corpus_parse_pins.txt',
 			'SVELTE_STYLES_BLOCKS_PIN',
-			'STRIP_CORPUS_PINS'
+			'STRIP_CORPUS_PINS',
+			'IMPORTS_CORPUS_PINS'
 		]
 	},
 	// `../svelte` feeds the conformance view alone (its `tests` tree); its
@@ -345,6 +346,17 @@ export const SVELTE_STYLES_BLOCKS_PIN = 647;
  * (`ParameterProperty`) and layerchart +1 (`TypeAssertion`).
  */
 export const STRIP_CORPUS_PINS = { files: 5719, refusals: 182 };
+
+/**
+ * imports:corpus — exact counts over the JS/TS-family files and Svelte components of the
+ * `gates` view's snapshot tiers (`benches/js/imports_corpus.ts`): `files` graded and
+ * `records`, the import records tsv collects over them. A move in `files` is a snapshot
+ * refresh, a collection joining a tier, or a broken filter; `records` moves with the
+ * snapshot, or with a record rule changing on both sides at once (an oxc-parser bump), the one
+ * move the per-file agreement cannot see. Measured over ../corpora `collections/`,
+ * oxc-parser 0.156.0.
+ */
+export const IMPORTS_CORPUS_PINS = { files: 8657, records: 42592 };
 
 /**
  * bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured

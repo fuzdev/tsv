@@ -280,9 +280,11 @@ parse-capable builds (`@fuzdev/tsv-parse-wasm` and the full `@fuzdev/tsv-wasm`) 
 in via `tsv_wasm/parse`, which forwards to each language crate's `json`.
 Conversely the parse-only build omits `tsv_wasm/format`, so the `format_*` exports
 and the printers behind them drop at link time. `tsv_wasm` and `tsv_napi` add a
-default-on `strip` feature (the `strip_typescript` export over `tsv_ts::strip`), which
-the subset wasm packages build without. `tsv_ffi` carries the same
-`format`/`parse` pair (default both) and no strip, so the native C FFI binding tree-shakes
+default-on `strip` feature (the `strip_typescript` export over `tsv_ts::strip`) and a
+default-on `imports` feature (`parse_imports_typescript` / `parse_imports_svelte` over
+`tsv_ts::parse_imports` / `tsv_svelte::parse_imports`), which the subset wasm packages build
+without. `tsv_ffi` carries the same
+`format`/`parse` pair (default both) and neither, so the native C FFI binding tree-shakes
 identically — the benchmark builds
 format-only and parse-only `libtsv_ffi` variants to size them
 scope-matched against `oxfmt` and `oxc-parser`. Third-party
@@ -1211,6 +1213,26 @@ Share parser and AST across tools; let each tool add its own layers:
 ```
 
 **Rationale:** Formatter is stable; compiler needs transforms/codegen that formatter doesn't; LSP needs incremental parsing that CLI tools don't. Each tool optimizes for its needs.
+
+### One Walk, Two Products: the Strip and the Import Records
+
+The type strip ([strip.md](strip.md)) and the import records ([imports.md](imports.md)) are
+one walk over the internal AST (`tsv_ts/src/strip/walk.rs`), run in a **mode** chosen at the
+call: `Strip` collects the strip's edits, `Imports` collects the records and nothing else, and
+`StripWithImports` (`tsv_ts::strip_with_imports`) both, from one parse. The walk already visits
+every node a record comes from — each import and export declaration, every `import(…)`, the
+import-equals it refuses — and already knows which subtrees are types and which code is ambient,
+so a record is a push at an arm it has; a second walker would restate those decisions and could
+drift from them. Where the two products differ the mode decides: collecting, the walk descends
+into the four value subtrees the strip refuses without walking (an enum's initializers, a value
+namespace's body, an `export =` operand, a regrouping assertion's operand), since their imports
+run all the same.
+
+The mode is a runtime value, not a type parameter, so the walk is compiled once: a build
+carrying both the strip and the records (`@fuzdev/tsv-wasm`, `@fuzdev/tsv`) carries one copy of
+the walk, not two monomorphized ones, and a strip-only call collects no record, nor tracks module
+syntax. The records are a full parse's, not a scan's; a byte scanner, if one ever ships, would be
+a faster producer of the same record type, with this walk as its oracle.
 
 ### Positioning vs. oxc and Biome
 

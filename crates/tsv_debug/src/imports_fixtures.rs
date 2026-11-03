@@ -309,9 +309,28 @@ fn walk_recursive(
 ///
 /// tsv's parse error, displayed.
 pub fn ours_json(language: ImportsLanguage, source: &str) -> Result<Value, String> {
+    ours_json_at(language, source, None)
+}
+
+/// [`ours_json`] at a named goal: `Some(goal)` parses a TypeScript input at that goal
+/// exactly (`tsv_ts::parse_imports_with_goal`), `None` takes the unset goal. A Svelte
+/// component's scripts are modules whatever `goal` says.
+///
+/// # Errors
+///
+/// tsv's parse error, displayed.
+pub fn ours_json_at(
+    language: ImportsLanguage,
+    source: &str,
+    goal: Option<tsv_ts::Goal>,
+) -> Result<Value, String> {
     let bytes = match language {
         ImportsLanguage::TypeScript => {
-            let imports = tsv_ts::parse_imports(source).map_err(|e| format!("{e:#}"))?;
+            let imports = match goal {
+                Some(goal) => tsv_ts::parse_imports_with_goal(source, goal),
+                None => tsv_ts::parse_imports(source),
+            }
+            .map_err(|e| format!("{e:#}"))?;
             tsv_ts::__private::write_imports_json(&imports, source, tsv_ts::WIRE_COORDINATES)
         }
         ImportsLanguage::Svelte => {

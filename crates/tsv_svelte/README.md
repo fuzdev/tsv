@@ -7,6 +7,8 @@ CSS in `<style>`) — part of [tsv](https://github.com/fuzdev/tsv)
 - `format` formats one source; a `Formatter` formats many on one thread, keeping its arenas
   warm between calls.
 - `parse_to_json` parses to the wire JSON AST (the default `json` feature).
+- `parse_imports` lists the modules the component's two `<script>` blocks request, in source
+  order.
 - `run_with_stack` runs a call on a thread reserving `STACK_SIZE`, for a thread whose stack
   may be too small for the deepest input tsv accepts.
 

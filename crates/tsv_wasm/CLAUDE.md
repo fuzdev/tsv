@@ -129,7 +129,8 @@ source type read as a format reads one (`tsv_arena::Family::Strip`) — returnin
 imports nothing but `api.js`'s readers, and the patcher stages it into the `all` variant alone.
 
 **The imports family** (`npm/api_imports.js` + `npm/facade_imports.d.ts`, in `@fuzdev/tsv-wasm`
-and the native `@fuzdev/tsv` alone). `parse_imports_typescript(source, options?)` and
+and the native `@fuzdev/tsv` alone — [docs/imports.md](../../docs/imports.md)).
+`parse_imports_typescript(source, options?)` and
 `parse_imports_svelte(source, options?)` return `{ok: true, hasModuleSyntax, imports}` — the
 records `tests/fixtures_imports/*/expected.json` pins, offsets in UTF-16 units — or `{ok: false,
 error}`, `error.kind` `'parse'`. `read_options`' `'imports'` kind takes `sourceType` on

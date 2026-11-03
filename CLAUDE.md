@@ -209,6 +209,11 @@ deno task imports:fixtures:validate  # import records vs tests/fixtures_imports:
 #                                      imports_fixtures_tests` grades tsv against the committed files. See tests/fixtures_imports/README.md
 deno task imports:fixtures:update    # regenerate every expected.json from the canonical parsers' trees (an `oracle.txt` fixture
 #                                      walks tsv's own parse wire instead). Sidecar; NOT in check
+deno task imports:corpus             # parse_imports vs oxc-parser's module record over the ../corpora snapshot's JS/TS and
+#                                      Svelte: no panic, no parse error, record + hasModuleSyntax agreement after named
+#                                      normalizations, outside a reviewed ACCEPTED list, exact IMPORTS_CORPUS_PINS. A
+#                                      `conformance` leg; ./docs/audits.md. Its sidecar-free sibling, in check: `cargo test
+#                                      --test imports_self_check_tests` (the oracle walk over tests/fixtures' expected.json)
 ```
 
 **Standing audit gates** — full reference ./docs/audits.md (what each proves, blind spots, flags, where it gates; its overview table maps every task). Read the relevant section before running or modifying an audit. RATCHET audits grade against a committed known-bug snapshot (`*_known.txt`); each has an `:update` task that re-pins after a fix and refuses a narrowed run. Everything below gates in `deno task check` unless noted.
@@ -442,7 +447,8 @@ deno task conformance                  # pre-release aggregate, in order:
 #   2. fixtures:validate + compile:fixtures:validate — ORACLE-FRESHNESS: `check` runs only each tree's sidecar-free slice,
 #      which grades tsv against the committed file and can't see the oracle moving; only a prettier re-format can (~17 s)
 #   3. bench:harvest:svelte-styles — re-extracts the CSS the `gates` view grades; then strip:corpus:run — the type strip
-#      vs ts-blank-space over the snapshot's TypeScript (its own process, seconds)
+#      vs ts-blank-space over the snapshot's TypeScript — and imports:corpus:run — the import records vs oxc-parser's
+#      module record over its JS/TS and Svelte (each its own process, seconds)
 #   4. in ONE process (benches/js/conformance.ts; oracles load once, fail-fast, FFI built once): the three gates above +
 #      corpus:compare:parse --all + corpus:compare:parse tests/fixtures --fixtures (each fixture's parse-pinned documents,
 #      grading the `loc` tolerance rows real code rarely reaches) + corpus:compare:format --all
@@ -741,6 +747,10 @@ cargo run --release -p tsv_debug -- erase_comment_census ../corpora/collections/
 # requests `{source}` — the tsv side of `deno task strip:corpus` (benches/js/strip_corpus.ts)
 cargo run -p tsv_debug strip file.ts
 
+# imports - parse_imports on one file, as a binding returns the records; --stdin answers NDJSON requests
+# `{path, source}` — the tsv side of `deno task imports:corpus` (benches/js/imports_corpus.ts)
+cargo run -p tsv_debug imports file.ts
+
 # format_prettier - format using prettier (line widths by default; --no-line-widths to hide)
 cargo run -p tsv_debug format_prettier file.svelte
 
@@ -961,6 +971,7 @@ The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh
 
 - ./docs/cli.md - CLI architecture, command patterns, multi-file formatting rules
 - ./docs/strip.md - the type strip: surfaces, the position invariant, verdicts and refusals, oracles
+- ./docs/imports.md - import records: surfaces, the record model, what is and isn't a record, coordinates, oracles
 - ./docs/audits.md - the standing audit gates: what each proves, blind spots, flags, gating
 - ./docs/benchmarks.md - benchmark fairness caveats, the implementation catalog, binary sizes, the canonical-oracle-pin ritual
 - ./docs/gate_counts.md - the pinned counts every graded gate and harvest enforces

@@ -59,6 +59,8 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | parity legs in `deno task check` (`cargo test`); freshness in `deno task conformance` |
 | [Strip fixtures](#strip-fixture-validation-stripfixturesvalidate) | `strip:fixtures:validate` · `strip:fixtures:oracle` | `tsv_ts::strip` departing from a fixture's output or refusal, moving a character's line or UTF-16 column or a line terminator, or not idempotent (a ratchet over known failures) · a committed expectation the oracles no longer derive, or an undeclared oracle disagreement | parity in `deno task check` (`cargo test --test strip_fixtures_tests`); the oracle check on demand (Node + `bench:install`) |
 | [Strip corpus](#strip-corpus-differential-stripcorpus) | `strip:corpus` | `tsv_ts::strip` on real TypeScript panicking, breaking the position contract or idempotence, emitting no JS module, or departing from ts-blank-space's bytes or refusals outside a reviewed list | `deno task conformance` (release) |
+| [Import self-check](#import-fixture-self-check-imports_self_check_tests) | `cargo test --test imports_self_check_tests` | `parse_imports` departing from the records an independent ESTree walk reads off the canonical trees the main fixture tree pins | `deno task check` (`cargo test`) |
+| [Import corpus](#import-corpus-differential-importscorpus) | `imports:corpus` | `parse_imports` on real TypeScript, JavaScript or Svelte panicking, rejecting the parse, or departing from oxc-parser's module record outside its named normalizations and a reviewed list | `deno task conformance` (release) |
 | [Depth limits](./cli.md#the-stack-contract) | `test:depth` · `test:depth:napi` · `test:depth:wasm` | a construct the parse leaves uncounted (an accepted input with a wire path past either limit, whatever its stack); an accepted input whose walks overflow the stack contract's thread, or trap or throw a `RangeError` in the WASM engine on a Node main thread (cold or tiered up, under V8's default tiering); an accepted input whose format's output does not parse again or is not its own format (a printer-added pair the parse did not charge); a depth past a limit that is not refused by the depth error. Blind to a grammar position no catalog or sweep shape builds: the gate grades constructed shapes, not the grammar | `test:depth`: `deno task check` (`corpus` world, `check`'s scope of the sweep); `test:depth:napi`, the shipped optimization over the full sweep: publish Step 3, CI `artifacts`; `test:depth:wasm`: publish Step 6, CI `artifacts` |
 | [Fixture validation](./fixture_overview.md) | `fixtures:validate` | a fixture claim no longer holding — parser/formatter parity vs the committed files · the ORACLE itself having moved (freshness, sidecar) | parity in `deno task check` (`cargo test --test fixtures_tests`); freshness in `deno task conformance` (with `bench:pins:suites`, its pin-freshness preflight) |
 
@@ -2701,3 +2703,80 @@ over the fixtures. The fixtures' departures from ts-blank-space (the hazards it 
 occur in this corpus, so it grades agreement with ts-blank-space, not those fixes. The position
 contract has the fixtures' limit (a blank or a `;` / `(` / `)` is allowed at any offset); the
 byte comparison is what catches a misplaced one.
+
+## Import Fixture Self-Check (`imports_self_check_tests`)
+
+```bash
+cargo test --test imports_self_check_tests -- --nocapture   # prints the counts it graded
+target/corpus/tsv_debug imports <file>                      # one file's records, for triage
+```
+
+**What it proves.** Every TypeScript and Svelte fixture under `tests/fixtures/` whose
+`expected.json` is the canonical parser's tree of its input is free oracle input for the import
+records: the import fixtures' ESTree walk (`tsv_debug`'s `imports_fixtures::oracle_json`, the
+rules stated once as `RULES`, reading that tree and never tsv's AST) computes the records from
+it, and `parse_imports` on the input — at the fixture's `goal` for TypeScript — must return the
+same records and `hasModuleSyntax`. An `expected_<stem>.json` variant pin is graded the same way
+against its variant. Pure Rust and sidecar-free, so it runs in every `cargo test`; the curated
+import fixtures themselves are [tests/fixtures_imports/](../tests/fixtures_imports/README.md)'s.
+
+**Scope.** Skipped, and counted: CSS; a fixture with `expected_ours.json` (a parser divergence,
+whose canonical tree is not of tsv's parse — its variant pins too); a `tsv_rejects.txt` fixture.
+A record-free tree still grades `hasModuleSyntax`, so it counts as compared.
+
+**Gating.** Every difference fails, and so does a tree the walk cannot read (a `TS*` node reached
+through a key it does not know holds a type, an `assert` clause, a missing field) — never a
+skip. Two floors keep it from passing over nothing: trees compared and records compared
+(`COMPARED_MIN`, `RECORDS_MIN`).
+
+**Blind spots.** The fixture tree is written for the parser and the formatter, so its records are
+whatever its inputs happen to import: most are a few static imports, and the shapes that decide
+the rules (namespace bodies, refused subtrees, ambient code, phases) are the import fixtures'.
+A rule the walk and the collector get wrong the same way passes both; the corpus differential
+against oxc is the independent second reading.
+
+## Import Corpus Differential (`imports:corpus`)
+
+```bash
+deno task imports:corpus                   # builds the corpus tsv_debug; :run skips the build
+target/corpus/tsv_debug imports <file>     # one file's records, for triage
+```
+
+**What it proves.** Over every JS/TS-family file (declaration files and `.svelte.ts` included)
+and every `.svelte` component of the `gates` view's snapshot tiers, `parse_imports` does not
+panic or reject the parse, and its records agree with oxc-parser's module record on the
+projection a dependency graph reads: per record, in source order, the kind, the span, the
+decoded specifier and its span, the type-only verdict, the phase and whether an attributes
+clause is present (a dynamic import's options span exactly); per file, `hasModuleSyntax`.
+tsv's side is one `tsv_debug imports --stdin` process, answering with the JSON a binding
+returns; oxc's side is `benches/js/imports_corpus.ts`, which finds a component's scripts with
+Svelte's own `parse`.
+
+**The normalizations.** The two models differ by construction, and each difference is named,
+reviewed and counted in the run's report (the script's module doc states each): oxc's specifier
+span includes the quotes; its dynamic record carries no value (read off oxc's own
+`ImportExpression`) and lists an `import()` inside a parenthesized assignment twice; its
+type-only, phase and attribute facts live on its tree, not its record (a static clause's presence
+is read off the source, since its tree holds an empty `with {}` as no clause); a local
+`export {a}` of an imported `a` is an indirect export in its record, carrying the import's span —
+dropped only where an import node starts there, so any other export entry with a module request
+that joins no `export … from` node fails the file; it omits `export {} from 'x'` and
+`import x = require('y')`; its `hasModuleSyntax` omits a top-level `await` and counts `export =`,
+`export as namespace` and `export import`; and tsv reads the JS family as TypeScript, so oxc does
+too. Each normalization also runs over a probe source ahead of the corpus, which must apply it
+and reconcile the two sides, so a rule the snapshot never reaches still runs; the type-only,
+phase and attribute normalizations count only the applications that decide a case, so their
+probes prove the decisive one.
+
+**Gating.** Exact counts, `IMPORTS_CORPUS_PINS` (files graded, records). A difference left after
+the normalizations, or oxc's parser rejecting a file tsv accepts, fails unless the script's
+`ACCEPTED` list names the file and check with the reason tsv's answer stands; an entry that no
+longer fires fails too, as do a panic, a tsv parse error, Svelte's parser rejecting a component,
+and an empty corpus. No argument narrows the run: the corpus runs in seconds, so every run is a
+full one. A `deno task conformance` leg, beside `strip:corpus`.
+
+**Blind spots.** oxc leaves out what tsv leaves out — a type-position `import()`, ambient code —
+so the gap is shared, not graded. Attribute clause spans are not compared for a static import
+(oxc's tree gives the attributes, not the clause). The records of a namespace body are graded
+only where oxc has some: its record is top-level by construction, the rule tsv states for static
+imports, re-exports and import-equals, and dynamic imports it lists anywhere.

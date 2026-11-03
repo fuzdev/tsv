@@ -1,23 +1,29 @@
 # tsv_ts
 
-TypeScript and JavaScript formatting, type stripping, and parsing to acorn-typescript's wire JSON —
-part of [tsv](https://github.com/fuzdev/tsv) ([tsv.fuz.dev](https://tsv.fuz.dev/)).
+TypeScript and JavaScript formatting, type stripping, import records, and parsing to
+acorn-typescript's wire JSON — part of [tsv](https://github.com/fuzdev/tsv)
+([tsv.fuz.dev](https://tsv.fuz.dev/)).
 
 - `format` formats one source; a `Formatter` formats many on one thread, keeping its arenas
   warm between calls.
 - `strip` erases the types, keeping every surviving character at its line and column.
+- `parse_imports` lists the modules a source requests — static, re-export, dynamic,
+  `import x = require()` — with their spans, decoded specifiers and type-only verdicts.
 - `parse_to_json` parses to the wire JSON AST (the default `json` feature).
 - `run_with_stack` runs a call on a thread reserving `STACK_SIZE`, for a thread whose stack
   may be too small for the deepest input tsv accepts.
 
 ```rust
-use tsv_ts::{Formatter, format, strip};
+use tsv_ts::{Formatter, format, parse_imports, strip};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(format("const x:number=42")?, "const x: number = 42;\n");
     let mut formatter = Formatter::new(); // warm arenas, for many sources on one thread
     assert_eq!(formatter.format("let y=1")?, "let y = 1;\n");
     assert_eq!(strip("let x: number = 1;")?.code, "let x         = 1;");
+    let source = "import type {T} from './t';";
+    let imports = parse_imports(source)?;
+    assert_eq!(imports.records[0].specifier_value(source).as_deref(), Some("./t"));
     Ok(())
 }
 ```

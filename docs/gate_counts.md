@@ -23,6 +23,8 @@ real move in a number is a deliberate, visible edit.
     the other two.
   - **`strip:corpus`**: EXACT `files` graded + `refusals` (`STRIP_CORPUS_PINS`), over the
     strippable TypeScript of the `gates` view's snapshot tiers.
+  - **`imports:corpus`**: EXACT `files` graded + `records` (`IMPORTS_CORPUS_PINS`), over the
+    JS/TS-family files and Svelte components of the `gates` view's snapshot tiers.
   - **the six harvests**, all exact: wpt block count, test262 positive count, the
     ts-repo corpus + rejects counts, svelte-rejects count, prettier-jsx count,
     svelte-styles block count (the last over the `../corpora` snapshot's perf view). The
@@ -116,10 +118,10 @@ real move in a number is a deliberate, visible edit.
 ## Semantics — three pin categories, chosen per surface
 
 - **Exact pins** (mismatch in either direction fails): the fixtures gates, ts-repo,
-  test262, `strip:corpus`, and the harvests. Their inputs are pinned checkouts (version-gated by
-  `pins:audit`) or deliberately-updated ones, so the counts are deterministic — a
-  drop is a regression or gutted input, a rise is a suite refresh or behavior
-  change; both must be re-pinned deliberately. No slack: slack lets small
+  test262, `strip:corpus`, `imports:corpus`, and the harvests. Their inputs are pinned
+  checkouts (version-gated by `pins:audit`) or deliberately-updated ones, so the counts are
+  deterministic — a drop is a regression or gutted input, a rise is a suite refresh or
+  behavior change; both must be re-pinned deliberately. No slack: slack lets small
   regressions creep and silently widens after every refresh.
 - **Minimums** (shrink fails, growth passes): the committed-fixtures audits
   (`fixtures_validate`, `swallow_audit`) — genuine growth minimums, since fixture counts

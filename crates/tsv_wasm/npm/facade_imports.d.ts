@@ -90,8 +90,9 @@ export interface ImportsSuccess {
 	/**
 	 * Whether the source uses syntax only a module parses: a top-level `import` or `export`
 	 * declaration (type-only ones included), an `import.meta`, or a top-level `await` /
-	 * `for await` / `await using` — the set Node's ESM syntax detection reads. A dynamic
-	 * `import(…)`, an `import x = require('y')` and an `export =` are not module syntax.
+	 * `for await` / `await using` — the module-syntax core of what Node's ESM syntax
+	 * detection reads. A dynamic `import(…)`, an `import x = require('y')`, an
+	 * `export import x = …` and an `export =` are not module syntax.
 	 */
 	hasModuleSyntax: boolean;
 	/**

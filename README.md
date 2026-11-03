@@ -73,7 +73,7 @@ tsv features:
       (with intentional divergences and no supported style config)
 - [x] [VS Code formatter extension](https://github.com/fuzdev/vscode-extension-tsv-format) - [`fuzdev.tsv-format`](https://marketplace.visualstudio.com/items?itemName=fuzdev.tsv-format) on the Marketplace and [Open VSX](https://open-vsx.org/extension/fuzdev/tsv-format) (WASM-only, works in desktop VS Code and the browser host)
 - [x] type stripping: TypeScript to JS by blanking types to whitespace, preserving every position — `tsv strip`, `strip_typescript` in `@fuzdev/tsv-wasm` and `@fuzdev/tsv` ([docs/strip.md](docs/strip.md))
-- [ ] module lexer
+- [x] import records: every module request a TypeScript, JS or Svelte source makes — static, re-export, dynamic, `import x = require()` — with its span, decoded specifier and type-only verdict — `parse_imports_typescript` / `parse_imports_svelte` in `@fuzdev/tsv-wasm` and `@fuzdev/tsv` ([docs/imports.md](docs/imports.md))
 
 Future features (unknown order):
 
@@ -100,7 +100,7 @@ Future features (unknown order):
 tsv ships to npm as a native package for Node and Bun, plus three WASM
 packages for browsers, Deno, and platforms without a prebuilt binary:
 
-- [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) - the full tool (formatter + parser + type stripper) as a prebuilt native N-API addon, shipping tsv's real native CLI binary as the `tsv` command
+- [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) - the full tool (formatter + parser + type stripper + import records) as a prebuilt native N-API addon, shipping tsv's real native CLI binary as the `tsv` command
 - [`@fuzdev/tsv-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-wasm) - the full tool with the same `tsv` CLI, as WASM
 - [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm) - formatter only (smaller)
 - [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) - parser + JSON AST only (smallest)
@@ -172,6 +172,9 @@ let code = tsv_ts::Formatter::new().format("let y=1")?; // "let y = 1;\n"
 // TypeScript to JS by blanking the types, every surviving character at its line and column
 let js = tsv_ts::strip("let x: number = 1;")?.code; // "let x         = 1;"
 
+// the modules a source requests: one record each, in source order
+let imports = tsv_ts::parse_imports("import type {T} from './t';")?; // 1 record, type-only
+
 // parse to the wire JSON AST, the same JSON the npm packages return
 let json = tsv_ts::parse_to_json("const x = 1;")?;
 ```
@@ -180,8 +183,8 @@ Errors carry a `kind()` (`Syntax`, `Refusal`, `TooDeep`, `TooLarge`), a one-line
 a `span()` in the input's UTF-8 bytes, and the report the npm packages return (`to_report()`);
 `{}` prints one line and `{:#}` the CLI's frame. TypeScript takes an exact parse goal
 (`Goal::Script` / `Goal::Module`) through `format_with_goal`, `strip_with_goal` and
-`JsonOptions::goal`; with none named, format and strip try the module grammar, then the script
-one, and parsing reads a module.
+`JsonOptions::goal`; with none named, format, strip and `parse_imports` try the module grammar,
+then the script one, and parsing reads a module (`parse_imports_with_goal` names one).
 
 This release exposes no AST: parsing returns the wire JSON — the AST as JSON in the
 canonical parser's shape (acorn-typescript's, Svelte's, `parseCss`'s), its `start` / `end`
@@ -198,6 +201,9 @@ without `parse_to_json*`.
 | `format_css` / `format_svelte`                         | `tsv_css::format` / `tsv_svelte::format`                                   |
 | -                                                      | `Formatter::new()` then `.format(src)`, for many sources on one thread     |
 | `strip_typescript(src, {sourceType})`                  | `tsv_ts::strip` / `strip_with_goal`                                        |
+| `parse_imports_typescript(src, {sourceType})`          | `tsv_ts::parse_imports` / `parse_imports_with_goal`                        |
+| `parse_imports_svelte(src)`                            | `tsv_svelte::parse_imports`                                                |
+| -                                                      | `tsv_ts::strip_with_imports`: the strip and the records from one parse     |
 | `parse_typescript_json(src, {sourceType})`             | `tsv_ts::parse_to_json` / `parse_to_json_with` with `JsonOptions::goal`    |
 | `parse_typescript(src)` (an object)                    | - (`parse_to_json` and a JSON reader)                                      |
 | `parse_*(src, {locations: true})`, `reconstruct_locations` | `JsonOptions::new().locations(true)` (`locations` feature)                 |
@@ -289,6 +295,7 @@ see [docs/architecture.md](docs/architecture.md).
 - [docs/directives.md](docs/directives.md) - `format-ignore` / `prettier-ignore` formatting directives
 - [docs/cli.md](docs/cli.md) - commands and design
 - [docs/strip.md](docs/strip.md) - the type strip: TypeScript to JS by blanking, every position kept
+- [docs/imports.md](docs/imports.md) - import records: the modules a source requests, where, and whether type-only
 - [docs/audits.md](docs/audits.md) - the standing audit gates: what each proves, its blind spots, and where it gates
 - [docs/benchmarks.md](docs/benchmarks.md) - benchmark fairness caveats, the implementation catalog, and binary size reporting
 - [docs/conformance_prettier.md](docs/conformance_prettier.md) - where formatting diverges from Prettier (and why); its §Catalogs table indexes the per-language catalogs
