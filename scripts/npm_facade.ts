@@ -6,16 +6,15 @@
  * staging scripts state the facade's export-map entry and its re-exported type names
  * from one place.
  *
- * The shared part — the options reader with the format family (`api.js`) and the
- * parse-failure type every family's results carry — rides every package; the format
- * declarations ride the format-capable ones; the parse half — the parse family, the
- * `locations.js` helper it runs and the AST types its declarations name — rides the
- * parse-capable ones (the format-only package loads none of it); and the strip half — the
- * type strip and its declarations — rides the two packages that carry the strip
- * (`@fuzdev/tsv-wasm`, `@fuzdev/tsv`). The declarations are named
- * apart from the `.js` files they sit beside (`facade_format.d.ts`, not `api.d.ts`): they
- * type the entries' re-exports, not those modules, and a same-basename `.d.ts` would be
- * read as the module's own types.
+ * The shared part — the options reader with the format family (`api.js`) and the parse-failure type
+ * every family's results carry — rides every package; the format declarations ride the
+ * format-capable ones; the parse half — the parse family, the `locations.js` helper it runs and the
+ * AST types its declarations name — rides the parse-capable ones (the format-only package loads
+ * none of it); and the strip half — the type strip and its declarations — and the imports half —
+ * the import records and theirs — ride the two packages that carry them (`@fuzdev/tsv-wasm`,
+ * `@fuzdev/tsv`). The declarations are named apart from the `.js` files they sit beside
+ * (`facade_format.d.ts`, not `api.d.ts`): they type the entries' re-exports, not those modules, and
+ * a same-basename `.d.ts` would be read as the module's own types.
  *
  * Plain `node:` imports only: the package suites run this module under Node as well as
  * Deno.
@@ -68,15 +67,28 @@ const FACADE_STRIP_FILES: ReadonlyArray<FacadeFile> = [
 	from_source_dir('facade_strip.d.ts')
 ];
 
+/** The facade's imports half: the import records and their declarations, which import only
+ * the shared error type. */
+const FACADE_IMPORTS_FILES: ReadonlyArray<FacadeFile> = [
+	from_source_dir('api_imports.js'),
+	from_source_dir('facade_imports.d.ts')
+];
+
 /** Which families a package carries. */
 export interface FacadeFamilies {
 	format: boolean;
 	parse: boolean;
 	strip: boolean;
+	imports: boolean;
 }
 
 /** Every family — `@fuzdev/tsv` and `@fuzdev/tsv-wasm`. */
-export const ALL_FAMILIES: FacadeFamilies = { format: true, parse: true, strip: true };
+export const ALL_FAMILIES: FacadeFamilies = {
+	format: true,
+	parse: true,
+	strip: true,
+	imports: true
+};
 
 /** The facade files a package carrying `families` ships. */
 export function facade_files(families: FacadeFamilies): Array<FacadeFile> {
@@ -84,7 +96,8 @@ export function facade_files(families: FacadeFamilies): Array<FacadeFile> {
 		...FACADE_SHARED_FILES,
 		...(families.format ? FACADE_FORMAT_FILES : []),
 		...(families.parse ? FACADE_PARSE_FILES : []),
-		...(families.strip ? FACADE_STRIP_FILES : [])
+		...(families.strip ? FACADE_STRIP_FILES : []),
+		...(families.imports ? FACADE_IMPORTS_FILES : [])
 	];
 }
 
@@ -105,7 +118,11 @@ export const LOCATIONS_EXPORT = {
 
 /** The facade declaration files whose types a package's entry re-exports by name. */
 export type FacadeDeclarations =
-	'facade_format.d.ts' | 'facade_parse.d.ts' | 'facade_strip.d.ts' | 'facade_error.d.ts';
+	| 'facade_format.d.ts'
+	| 'facade_parse.d.ts'
+	| 'facade_strip.d.ts'
+	| 'facade_imports.d.ts'
+	| 'facade_error.d.ts';
 
 /**
  * The types (interfaces and type aliases) a facade declaration file exports, in source

@@ -8,18 +8,19 @@
  *   under computed keys, which name them (an assignment to a computed member leaves it
  *   `''`, which is how the facade's functions once all shipped);
  * - a source holding a lone surrogate is refused by every `format_*` / `parse_*` /
- *   `strip_*` export, never converted lossily — both engines read the source as UTF-8,
- *   which would replace it with U+FFFD, so the facade refuses one before either engine sees
- *   it (and before the lazy entries' init guard, so the row holds on an uninitialized one
- *   too).
+ *   `strip_*` / `parse_imports_*` export, never converted lossily — both engines read the
+ *   source as UTF-8, which would replace it with U+FFFD, so the facade refuses one before
+ *   either engine sees it (and before the lazy entries' init guard, so the row holds on an
+ *   uninitialized one too).
  */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 export interface FacadeSurfaceOptions {
-	/** The exact count of `format_*` / `parse_*` / `strip_*` exports the entry publishes,
-	 * where the suite knows it; otherwise at least one per language is required. */
+	/** The exact count of `format_*` / `parse_*` / `strip_*` exports (`parse_imports_*` among
+	 * the `parse_*`) the entry publishes, where the suite knows it; otherwise at least one per
+	 * language is required. */
 	facade_exports?: number;
 }
 
@@ -60,7 +61,8 @@ export function register_facade_surface_suite(
 				assert.equal(exports.length, options.facade_exports);
 			}
 			for (const name of exports) {
-				const noun = name.split('_')[0];
+				// the imports family's noun is its own, not the `parse_` prefix it shares
+				const noun = name.startsWith('parse_imports_') ? 'imports' : name.split('_')[0];
 				assert.throws(() => api[name]('"\uD800";'), {
 					name: 'TypeError',
 					message: `${noun} source must be well-formed UTF-16 (a lone surrogate at offset 1)`

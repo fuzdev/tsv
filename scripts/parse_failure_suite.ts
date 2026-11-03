@@ -5,10 +5,10 @@
  * `scripts/test_bun.ts` over the staged packages, so the two engines are held to one
  * table.
  *
- * Every `parse_*`, `parse_*_json` and `format_*` call on a source that does not parse
- * returns `{ok: false, error}` (those two keys, in that order), whose `error` is a plain
- * object with exactly `kind` (`'parse'`), `message`, `frame`, `start`, `end` and `loc` — a
- * one-line `message`; a point, so `end === start`; and `loc` deep-equal to
+ * Every `parse_*`, `parse_*_json`, `format_*` and `parse_imports_*` call on a source that
+ * does not parse returns `{ok: false, error}` (those two keys, in that order), whose `error`
+ * is a plain object with exactly `kind` (`'parse'`), `message`, `frame`, `start`, `end` and
+ * `loc` — a one-line `message`; a point, so `end === start`; and `loc` deep-equal to
  * `create_locator(source, {language}).loc_of(error)` — and whose frame's `line:col` header
  * is `loc.start.line:loc.start.column + 1`, with no leading BOM echoed in the excerpt after
  * it.
@@ -47,7 +47,8 @@ export interface ParseFailureRow {
 	 */
 	at?: string;
 	last?: boolean;
-	/** Where the FORMAT's error sits, when its fallback parse reports another than the parse's. */
+	/** Where the FORMAT's error sits — and the imports parse's, which reads an unset goal as a
+	 * format does — when its fallback parse reports another than the parse's. */
 	format_at?: string;
 	/** The options bag every export is called with (TypeScript's `sourceType`). */
 	options?: { sourceType: 'script' | 'module' };
@@ -307,7 +308,8 @@ const calls = (api: Record<string, any>, row: ParseFailureRow) =>
 		[
 			[`parse_${row.language}`, row.at],
 			[`parse_${row.language}_json`, row.at],
-			[`format_${row.language}`, row.format_at ?? row.at]
+			[`format_${row.language}`, row.format_at ?? row.at],
+			[`parse_imports_${row.language}`, row.format_at ?? row.at]
 		] as const
 	).filter(([name]) => typeof api[name] === 'function');
 

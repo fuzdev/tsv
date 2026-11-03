@@ -54,6 +54,7 @@ import { assert_staged_fresh, wasm_package_checks } from './check_staged_freshne
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 import { register_dts_specifier_test } from './dts_specifiers.ts';
 import { register_facade_surface_suite } from './facade_surface_suite.ts';
+import { register_imports_api_suite } from './imports_suite.ts';
 import { register_strip_api_suite, register_strip_cli_suite } from './strip_suite.ts';
 import {
 	LONE_CR_REFUSAL,
@@ -276,7 +277,8 @@ describe(`package metadata: ${pkg_dir}`, () => {
 		for (const { published, source } of facade_files({
 			format: has_format,
 			parse: has_parse,
-			strip: variant === 'all'
+			strip: variant === 'all',
+			imports: variant === 'all'
 		})) {
 			assert.ok(pkg.files.includes(published), published);
 			assert.equal(
@@ -303,6 +305,19 @@ describe(`package metadata: ${pkg_dir}`, () => {
 		}
 	});
 
+	it('only the umbrella ships the imports facade', () => {
+		const has_imports_facade = variant === 'all';
+		for (const file of ['api_imports.js', 'facade_imports.d.ts']) {
+			assert.equal(pkg.files.includes(file), has_imports_facade, file);
+		}
+		if (!has_imports_facade) {
+			for (const f of ['index.js', 'browser.js', 'index.d.ts', 'browser.d.ts']) {
+				const text = readFileSync(new URL(`../${pkg_dir}/${f}`, import.meta.url), 'utf8');
+				assert.doesNotMatch(text, /api_imports|facade_imports|parse_imports_/, f);
+			}
+		}
+	});
+
 	it('only the umbrella ships the strip facade', () => {
 		const has_strip_facade = variant === 'all';
 		for (const file of ['api_strip.js', 'facade_strip.d.ts']) {
@@ -321,7 +336,7 @@ describe(`package metadata: ${pkg_dir}`, () => {
 	// `exports` (`node10`), `api.d.ts` beside `api.js` would type a deep import of `api.js`
 	// as the published functions, which it does not export.
 	it('no facade declaration is named for a facade module', () => {
-		for (const file of ['api.d.ts', 'api_parse.d.ts', 'api_strip.d.ts']) {
+		for (const file of ['api.d.ts', 'api_parse.d.ts', 'api_strip.d.ts', 'api_imports.d.ts']) {
 			assert.equal(pkg.files.includes(file), false, file);
 		}
 	});
@@ -722,6 +737,19 @@ describe(`strip scope: ${pkg_dir}`, () => {
 	});
 });
 
+// The import records (`scripts/imports_suite.ts`) are the umbrella's alone too: the subsets
+// build without the `imports` cargo feature.
+const has_imports = variant === 'all';
+if (has_imports) register_imports_api_suite(`index.js: ${pkg_dir}`, node_entry);
+
+describe(`imports scope: ${pkg_dir}`, () => {
+	it(`parse_imports_* is ${has_imports ? 'exported' : 'absent'}`, () => {
+		for (const name of ['parse_imports_typescript', 'parse_imports_svelte']) {
+			assert.equal(typeof node_entry[name], has_imports ? 'function' : 'undefined', name);
+		}
+	});
+});
+
 // What the facade hands back: the raw engine RETURNS a parse failure in its product's place,
 // as the plain `{ok: false, error}` the facade passes through unchanged — no `Error` built,
 // nothing thrown. Read off the glue module the entry initialized, past the facade.
@@ -1078,8 +1106,10 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 	// the parse-failure table over the lazy entry, now initialized — the same facade over
 	// the same guarded engine functions, reached through the other entry's wiring
 	register_parse_failure_suite(`browser.js (lazy entry): ${pkg_dir}`, () => browser);
-	if (variant === 'all')
+	if (variant === 'all') {
 		register_strip_api_suite(`browser.js (lazy entry): ${pkg_dir}`, () => browser);
+		register_imports_api_suite(`browser.js (lazy entry): ${pkg_dir}`, () => browser);
+	}
 
 	it('format functions work after init', { skip: !has_format }, () => {
 		assert.equal(ok_code(browser.format_typescript('const   x=1')), 'const x = 1;\n');

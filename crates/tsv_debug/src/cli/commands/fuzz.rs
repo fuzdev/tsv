@@ -44,9 +44,16 @@
 //!   (`strip_fixtures::idempotence_failure`; a panic of its second strip is a
 //!   `strip_panic`, like one of the first). A refusal or a parse error is a verdict, not
 //!   a finding.
+//! - **The import records.** Every TypeScript-family and Svelte input goes through
+//!   `parse_imports` (TypeScript at the unset-goal fallback, as the strip) and the
+//!   bindings' JSON writer in the language's wire coordinates: no panic, and on a parse,
+//!   the records' own contract — sorted by start, each pair disjoint or nested (a dynamic
+//!   import inside another's argument), every span in bounds and on character boundaries,
+//!   a specifier or attributes span inside its record's, and a value for every specifier.
 //!
-//! Each leg's graded count is floored: a run whose locations leg graded nothing, or
-//! whose strip leg stripped nothing although it had TypeScript seeds, fails rather than
+//! Each leg's graded count is floored: a run whose locations leg graded nothing, whose
+//! strip leg stripped nothing although it had TypeScript seeds, or whose imports leg
+//! collected nothing although it had TypeScript or Svelte seeds, fails rather than
 //! reporting a clean run it never made.
 //!
 //! **`--embedded css|ts`** reseeds the run from the `<style>` / `<script>` bodies of the
@@ -443,11 +450,13 @@ fn mutate(rng: &mut Rng, seed: &[u8], max_ops: usize) -> Vec<u8> {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Outcome {
     /// A leg panicked (the DoS-safety violation): the parse + format leg, the
-    /// `locations` wire, or the type strip.
+    /// `locations` wire, the type strip, or the import records.
     Panic(Leg),
     /// The type strip produced output that breaks its own contract or its idempotence
     /// (the finding's detail names which).
     StripContract,
+    /// The import records break their own contract (the finding's detail names which).
+    ImportsContract,
     /// The shared F1 checks ([`f1_check`]) ran to a verdict.
     Checked(F1Outcome),
 }
@@ -461,6 +470,8 @@ enum Leg {
     Locations,
     /// `tsv_ts::strip` on a TypeScript-family input.
     Strip,
+    /// `parse_imports` and its JSON writer on a TypeScript-family or Svelte input.
+    Imports,
 }
 
 impl Outcome {
@@ -470,7 +481,7 @@ impl Outcome {
     /// canonical-confirmation-needing bucket (see [`FuzzCommand::strict`]).
     fn is_hard(self) -> bool {
         match self {
-            Self::Panic(_) | Self::StripContract => true,
+            Self::Panic(_) | Self::StripContract | Self::ImportsContract => true,
             Self::Checked(outcome) => outcome.is_hard(),
         }
     }
@@ -481,14 +492,16 @@ impl Outcome {
             Self::Panic(Leg::Locations) => "locations_panic",
             Self::Panic(Leg::Strip) => "strip_panic",
             Self::StripContract => "strip_contract",
+            Self::Panic(Leg::Imports) => "imports_panic",
+            Self::ImportsContract => "imports_contract",
             Self::Checked(outcome) => outcome.label(),
         }
     }
 }
 
-/// What one guarded attempt produced: its [`Outcome`], the finding's detail (a strip
-/// contract break), and which of the extra legs graded the input — the counts their
-/// vacuity floors read.
+/// What one guarded attempt produced: its [`Outcome`], the finding's detail (a strip or
+/// imports contract break), and which of the extra legs graded the input — the counts
+/// their vacuity floors read.
 struct Attempt {
     outcome: Outcome,
     detail: Option<String>,
@@ -496,21 +509,26 @@ struct Attempt {
     locations: bool,
     /// The type strip produced output (not a refusal or a parse error).
     stripped: bool,
+    /// The import records were collected (the input parsed).
+    imports: bool,
 }
 
 /// One guarded attempt: write the last-input repro, clear the panic slot, run every leg
 /// under one `catch_unwind` — the shared [`f1_check`], then the `locations` wire of an
-/// accepted input, then the type strip of a TypeScript-family input — and map a panic
-/// to [`Outcome::Panic`] of the leg that was running.
+/// accepted input, then the type strip of a TypeScript-family input, then the import
+/// records of a TypeScript-family or Svelte input — and map a panic to
+/// [`Outcome::Panic`] of the leg that was running.
 ///
 /// A hard format verdict ends the attempt (it is the finding); a soft or clean one
-/// lets the other legs grade the same input, and a strip contract break outranks it.
+/// lets the other legs grade the same input, and a strip or imports contract break
+/// outranks it.
 fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) -> Attempt {
     last.write(parser, src);
     let _ = take_last_panic();
     let mut leg = Leg::Format;
     let mut locations = false;
     let mut stripped = false;
+    let mut imports = false;
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let f1 = f1_check(src, parser, render);
         if f1.is_hard() {
@@ -528,6 +546,14 @@ fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) ->
                 return (outcome, Some(detail));
             }
         }
+        if parser != ParserType::Css {
+            leg = Leg::Imports;
+            let (collected, broken) = imports_check(src, parser);
+            imports = collected;
+            if let Some(detail) = broken {
+                return (Outcome::ImportsContract, Some(detail));
+            }
+        }
         (Outcome::Checked(f1), None)
     }));
     let (outcome, detail) = result.unwrap_or((Outcome::Panic(leg), None));
@@ -536,6 +562,7 @@ fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) ->
         detail,
         locations,
         stripped,
+        imports,
     }
 }
 
@@ -590,6 +617,94 @@ fn strip_check(src: &str) -> (bool, Option<(Outcome, String)>) {
         true,
         (!broken.is_empty()).then(|| (outcome, broken.join("; "))),
     )
+}
+
+/// Collect the import records of `src` (`parse_imports`; TypeScript at the unset-goal
+/// fallback, what a bare `parse_imports_typescript(source)` runs), write them as the
+/// bindings do (`write_imports_json`, in the language's wire coordinates), and check
+/// their contract. Returns whether they were collected, and the joined breaks.
+fn imports_check(src: &str, parser: ParserType) -> (bool, Option<String>) {
+    let arena = bumpalo::Bump::new();
+    let (imports, coordinates) = match parser {
+        ParserType::TypeScript => (
+            tsv_ts::__private::parse_imports_in(src, None, &arena).ok(),
+            tsv_ts::WIRE_COORDINATES,
+        ),
+        ParserType::Svelte => (
+            tsv_svelte::__private::parse_imports_in(src, &arena).ok(),
+            tsv_svelte::WIRE_COORDINATES,
+        ),
+        ParserType::Css => return (false, None),
+    };
+    let Some(imports) = imports else {
+        return (false, None);
+    };
+    let broken = import_record_violations(src, &imports.records);
+    if !broken.is_empty() {
+        // a violation the writer would panic on (a specifier with no value) reports here,
+        // with its detail, rather than as a bare panic out of the writer
+        return (true, Some(broken.join("; ")));
+    }
+    // the bindings' writer must not panic on any collected records; their bytes are graded
+    // by `tests/imports_fixtures_tests.rs`, not here
+    let _ = tsv_ts::__private::write_imports_json(&imports, src, coordinates);
+    (true, None)
+}
+
+/// Every way `records`, collected from `src`, break the records' contract: sorted by
+/// start, each pair disjoint or one nested in the other (a dynamic import in another's
+/// argument), every span in bounds and on character boundaries, a specifier or
+/// attributes span inside its record's, and a value for every specifier.
+fn import_record_violations(src: &str, records: &[tsv_ts::ImportRecord]) -> Vec<String> {
+    let in_bounds = |span: tsv_ts::ByteSpan| {
+        span.start <= span.end
+            && src.is_char_boundary(span.start as usize)
+            && src.is_char_boundary(span.end as usize)
+    };
+    let inside = |inner: tsv_ts::ByteSpan, outer: tsv_ts::ByteSpan| {
+        outer.start <= inner.start && inner.end <= outer.end
+    };
+    let mut broken = Vec::new();
+    // the ends of the records still open at the current start, innermost last
+    let mut open: Vec<u32> = Vec::new();
+    let mut prev_start = None;
+    for (i, record) in records.iter().enumerate() {
+        let span = record.span;
+        if !in_bounds(span) {
+            broken.push(format!("record {i}: span {span:?} out of bounds"));
+            continue;
+        }
+        if prev_start.is_some_and(|prev| span.start < prev) {
+            broken.push(format!("record {i}: starts before the record ahead of it"));
+        }
+        prev_start = Some(span.start);
+        while open.last().is_some_and(|&end| end <= span.start) {
+            open.pop();
+        }
+        if open.last().is_some_and(|&end| span.end > end) {
+            broken.push(format!(
+                "record {i}: span {span:?} overlaps a record it is not nested in"
+            ));
+        }
+        open.push(span.end);
+        if let Some(specifier) = record.specifier {
+            if !in_bounds(specifier) || !inside(specifier, span) {
+                broken.push(format!(
+                    "record {i}: specifier {specifier:?} outside its record {span:?}"
+                ));
+            } else if record.specifier_value(src).is_none() {
+                broken.push(format!("record {i}: specifier {specifier:?} has no value"));
+            }
+        }
+        if let Some(attributes) = record.attributes
+            && (!in_bounds(attributes) || !inside(attributes, span))
+        {
+            broken.push(format!(
+                "record {i}: attributes {attributes:?} outside its record {span:?}"
+            ));
+        }
+    }
+    broken
 }
 
 /// Best-effort pre-attempt repro file: written **before** every parse/format
@@ -821,6 +936,8 @@ struct LegCounts {
     locations: usize,
     /// Inputs the type strip stripped (a refusal or a parse error grades no output).
     stripped: usize,
+    /// Inputs whose import records were collected (a parse error grades none).
+    imports: usize,
 }
 
 impl LegCounts {
@@ -828,6 +945,7 @@ impl LegCounts {
     fn count(&mut self, attempt: Attempt) -> Attempt {
         self.locations += usize::from(attempt.locations);
         self.stripped += usize::from(attempt.stripped);
+        self.imports += usize::from(attempt.imports);
         attempt
     }
 }
@@ -888,6 +1006,7 @@ impl FuzzCommand {
         // `--embedded`, held no body in the language).
         check_graded_nonzero(seeds.len(), "readable non-empty seed files")?;
         let has_ts_seeds = seeds.iter().any(|s| s.parser == ParserType::TypeScript);
+        let has_imports_seeds = seeds.iter().any(|s| s.parser != ParserType::Css);
 
         if let Some(dir) = &self.dump_dir
             && let Err(e) = std::fs::create_dir_all(dir)
@@ -1055,7 +1174,8 @@ impl FuzzCommand {
         // The extra legs' floors, after the report so its counts are on screen: a leg
         // that graded nothing must not read as a clean run. Locations grades every
         // accepted input, so zero means nothing parsed; the strip owes output only when
-        // the run had TypeScript seeds to strip.
+        // the run had TypeScript seeds to strip, and the imports leg records only when it
+        // had TypeScript or Svelte seeds.
         check_graded_nonzero(
             stats.legs.locations,
             "inputs written through the locations wire",
@@ -1064,6 +1184,12 @@ impl FuzzCommand {
             check_graded_nonzero(
                 stats.legs.stripped,
                 "TypeScript inputs the type strip stripped",
+            )?;
+        }
+        if has_imports_seeds {
+            check_graded_nonzero(
+                stats.legs.imports,
+                "TypeScript and Svelte inputs whose import records were collected",
             )?;
         }
         Ok(())
@@ -1127,6 +1253,7 @@ impl FuzzCommand {
                 "ok": stats.ok,
                 "locations_graded": stats.legs.locations,
                 "strip_graded": stats.legs.stripped,
+                "imports_graded": stats.legs.imports,
                 "evolved": stats.evolved,
                 "hard_findings": stats.hard_count,
                 "soft_findings": stats.soft_count,
@@ -1163,6 +1290,10 @@ impl FuzzCommand {
             "  {:>7}  stripped by the type strip (no panic, contract + idempotence held)",
             stats.legs.stripped
         );
+        println!(
+            "  {:>7}  import records collected (no panic, the records' contract held)",
+            stats.legs.imports
+        );
         if self.evolve {
             println!(
                 "  {:>7}  accepted mutants evolved into the seed pool",
@@ -1174,7 +1305,7 @@ impl FuzzCommand {
             stats.reflow_paths.count()
         );
         println!(
-            "  {:>7}  HARD findings (panic / locations_panic / strip_panic / strip_contract /\n           format_error / unreparseable / node_loss / leaf_value_corruption /\n           non_idempotent)",
+            "  {:>7}  HARD findings (panic / locations_panic / strip_panic / strip_contract /\n           imports_panic / imports_contract / format_error / unreparseable / node_loss /\n           leaf_value_corruption / non_idempotent)",
             stats.hard_count
         );
         println!(

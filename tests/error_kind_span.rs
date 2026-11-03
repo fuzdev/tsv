@@ -179,3 +179,28 @@ fn display_is_one_line_and_the_alternate_is_the_full_text() {
         "{refusal:#}"
     );
 }
+
+#[test]
+fn a_parse_imports_error_is_the_parse_error() {
+    // TypeScript: the kind, the span and both `Display` forms are the parse's
+    for source in ["let a = 1;\nlet x = ;\n", "\u{FEFF}let x = ;"] {
+        let error = tsv_ts::parse_imports(source).expect_err("the source must not parse");
+        let parsed = ts_parse_error(source);
+        assert_eq!(error.kind(), ErrorKind::Syntax);
+        assert_eq!(error.span(), parsed.span());
+        assert_eq!(error.to_string(), parsed.to_string());
+        assert_eq!(format!("{error:#}"), format!("{parsed:#}"));
+    }
+
+    // Svelte: an embedded script's error spans host-absolute bytes, a leading BOM counted
+    for source in [
+        "<p>before</p>\n<script lang=\"ts\">\n\tlet x = ;\n</script>\n",
+        "\u{FEFF}<script>let x = ;</script>",
+    ] {
+        let error = tsv_svelte::parse_imports(source).expect_err("the source must not parse");
+        assert_eq!(error.kind(), ErrorKind::Syntax);
+        let semicolon = source.find(';').expect("a `;`");
+        assert_eq!(error.span(), Some(semicolon..semicolon));
+        assert_eq!(error.span(), svelte_parse_error(source).span());
+    }
+}

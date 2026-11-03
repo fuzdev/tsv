@@ -6,7 +6,8 @@
  * caller reads is the object the engine built through JavaScriptCore's own object and
  * N-API paths: its keys, their order, its span and `loc` are graded here and nowhere else
  * under Bun. The type strip's API table (`scripts/strip_suite.ts`) rides along over the two
- * packages that carry the strip, since its refusal is built the same way.
+ * packages that carry the strip, since its refusal is built the same way, and so does the
+ * import-records table (`scripts/imports_suite.ts`), whose failures are the same object.
  *
  * Narrow by design. The package suites themselves run under `bun test` nearly whole, but
  * their CLI and resolution rows assert Node's own behavior; this registers the shared
@@ -44,6 +45,7 @@ import {
 	wasm_package_checks,
 	wasm_package_dir
 } from './check_staged_freshness.ts';
+import { register_imports_api_suite } from './imports_suite.ts';
 import { register_strip_api_suite } from './strip_suite.ts';
 import { register_parse_failure_suite } from './parse_failure_suite.ts';
 
@@ -52,6 +54,9 @@ type Package = (typeof PACKAGES)[number];
 
 /** The packages that carry the type strip: the umbrella and the native loader. */
 const STRIP_PACKAGES: ReadonlySet<Package> = new Set(['all', 'napi']);
+
+/** The packages that carry the import records: the same two. */
+const IMPORTS_PACKAGES: ReadonlySet<Package> = new Set(['all', 'napi']);
 
 /** The launcher flag that turns a missing `bun` from a warn-skip into a failure. */
 const REQUIRE_FLAG = '--require-bun';
@@ -158,5 +163,6 @@ async function register(packages: Array<string>): Promise<void> {
 		register_parse_failure_suite(`${name} under Bun`, api);
 		// the strip's refusal is an engine-built object too, returned through the same path
 		if (STRIP_PACKAGES.has(p)) register_strip_api_suite(`${name} under Bun`, api);
+		if (IMPORTS_PACKAGES.has(p)) register_imports_api_suite(`${name} under Bun`, api);
 	}
 }

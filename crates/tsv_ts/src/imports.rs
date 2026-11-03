@@ -400,9 +400,14 @@ pub fn collect_imports(programs: &[&Program<'_>], source: &str, arena: &bumpalo:
 /// Every offset is a UTF-16 code unit offset in `coordinates` — the language's own
 /// (`crate::WIRE_COORDINATES` for TypeScript, which counts a leading BOM; the Svelte
 /// crate's elides it), so the records index the same text the language's parse wire
-/// does. `value` is [`ImportRecord::specifier_value`], or `null` when that has none.
-/// `source` must be the text the records were collected from.
+/// does. `value` is [`ImportRecord::specifier_value`], always a string: a record with a
+/// specifier always has a value.
+///
+/// # Panics
+///
+/// When `source` is not the text the records were collected from.
 #[cfg(feature = "json")]
+#[expect(clippy::expect_used)]
 pub fn write_imports_json(
     imports: &Imports,
     source: &str,
@@ -435,11 +440,12 @@ pub fn write_imports_json(
         w.raw(",\"specifier\":");
         match record.specifier {
             Some(specifier) => {
+                let value = record.specifier_value(source).expect(
+                    "a record with a specifier always decodes against its own source \
+                     (`ImportRecord::specifier_value`)",
+                );
                 w.raw("{\"value\":");
-                match record.specifier_value(source) {
-                    Some(value) => w.string(&value),
-                    None => w.raw("null"),
-                }
+                w.string(&value);
                 w.raw(",");
                 start_end(&mut w, specifier);
                 w.raw("}");
@@ -466,6 +472,11 @@ pub fn write_imports_json(
 }
 
 /// [`write_imports_json`] as a `String`: the same bytes, for a `&str` boundary.
+///
+/// # Panics
+///
+/// When `source` is not the text the records were collected from, as
+/// [`write_imports_json`] does.
 #[cfg(feature = "json")]
 #[expect(clippy::expect_used)]
 pub fn write_imports_json_string(

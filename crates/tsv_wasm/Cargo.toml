@@ -28,7 +28,7 @@ wasm-opt = [
 [features]
 # Default build: everything (@fuzdev/tsv-wasm). Subset packages build with
 # `--no-default-features --features format|parse`.
-default = ["format", "parse", "strip"]
+default = ["format", "parse", "strip", "imports"]
 # `format_*` exports + the `IgnoreStack` discovery matcher and its
 # `tsv_discover` verdict methods (@fuzdev/tsv-format-wasm when alone).
 # `tsv_arena/format` adds the reusable doc arena (`with_doc_arena`).
@@ -49,6 +49,10 @@ parse = [
 # The `strip_typescript` export — the type strip, `tsv_ts::strip` (@fuzdev/tsv-wasm
 # only: neither subset package carries it). Needs nothing beyond the parser.
 strip = []
+# The `parse_imports_typescript` / `parse_imports_svelte` exports — the import records,
+# `tsv_ts::parse_imports` / `tsv_svelte::parse_imports` (@fuzdev/tsv-wasm only, like
+# `strip`). The records cross as JSON, written by the TypeScript crate's `json` layer.
+imports = ["tsv_ts/json"]
 
 [dependencies]
 tsv_svelte.workspace = true

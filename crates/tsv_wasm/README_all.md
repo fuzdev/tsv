@@ -2,11 +2,11 @@
 
 > precise language tools for TypeScript/JS, CSS, and Svelte in Rust
 
-Rust-based formatter + parser + type stripper compiled to WASM — the full tool in one package, with a `tsv` CLI. A near-Prettier formatter that tracks **Prettier** + **prettier-plugin-svelte** closely (with documented divergences), plus a parser whose AST is compatible with **Svelte's parser** + **acorn** + **acorn-typescript**.
+Rust-based formatter + parser + type stripper + import lister compiled to WASM — the full tool in one package, with a `tsv` CLI. A near-Prettier formatter that tracks **Prettier** + **prettier-plugin-svelte** closely (with documented divergences), plus a parser whose AST is compatible with **Svelte's parser** + **acorn** + **acorn-typescript**.
 
 tsv is non-configurable: formatter settings are fixed at Prettier's defaults except `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and `trailingComma: 'none'` — no options, like `gofmt` and Black.
 
-Only need one half? The subset packages ship smaller WASM blobs: [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm) (format only) and [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) (parse only); neither carries the type strip. On Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) is the native build of the same API and CLI.
+Only need one half? The subset packages ship smaller WASM blobs: [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm) (format only) and [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) (parse only); neither carries the type strip or the import records. On Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) is the native build of the same API and CLI.
 
 Docs and benchmarks: [tsv.fuz.dev](https://tsv.fuz.dev/). Source and conformance notes: [github.com/fuzdev/tsv](https://github.com/fuzdev/tsv).
 
@@ -176,6 +176,28 @@ if (result.ok) {
 ```
 
 The first six refusals are exactly what TypeScript's `erasableSyntaxOnly` rejects, so a codebase that type-checks under it meets only the last, a rare spelling a pair of parentheses keeps (`a + (b as T) / c`). The one option is `sourceType`, read as `format_typescript` reads it: omitted, the source is a module retried as a script if that fails, so a legacy sloppy script strips as the sloppy script it is; `'script'` or `'module'` is exact. Argument errors are `TypeError`s, as for every export.
+
+### Listing imports
+
+`parse_imports_typescript(source)` and `parse_imports_svelte(source)` list a source's module requests — every static `import`, re-export (`export … from`), dynamic `import(…)` and `import x = require(…)`, in source order — without building an AST for you: the parser runs, and only the records cross into JS. They return `{ok: true, hasModuleSyntax, imports}`, or `{ok: false, error}` for a source that does not parse (the error `parse_typescript` / `parse_svelte` returns for it).
+
+Each record is `{kind, start, end, specifier, typeOnly, phase, attributes}`: `kind` is `'static'`, `'re_export'`, `'dynamic'` or `'import_equals'`; `start`/`end` span the whole request; `specifier` is `{value, start, end}` — the decoded string and the span of its contents, quotes excluded — or `null` for a computed `import(x)`; `typeOnly` is `'statement'` (`import type`), `'specifiers'` (every specifier an inline `type`) or `null`; `phase` is `'source'`, `'defer'` or `null`; `attributes` spans a `with {…}` clause or a dynamic import's options, else `null`. Offsets are UTF-16 code units, in the AST's coordinates. Ambient code (`declare`, overloads) and type positions hold no records. `hasModuleSyntax` says whether the source uses syntax only a module parses (a top-level `import`/`export`, `import.meta`, a top-level `await`) — the set Node's ESM detection reads. A Svelte component's records come from both `<script>` blocks, in document order.
+
+```typescript
+import {parse_imports_typescript} from '@fuzdev/tsv-wasm';
+
+const result = parse_imports_typescript(
+	"import type {User} from './user.js';\nconst page = await import(`./pages/${name}.js`);\n"
+);
+if (result.ok) {
+	for (const record of result.imports) {
+		// 'static' './user.js' 'statement', then 'dynamic' null null
+		console.log(record.kind, record.specifier?.value ?? null, record.typeOnly);
+	}
+}
+```
+
+The one option is `sourceType`, TypeScript's alone and read as `strip_typescript` reads it: omitted, the source is a module retried as a script if that fails; `'script'` or `'module'` is exact. Argument errors are `TypeError`s, as for every export.
 
 ### File scoping (`IgnoreStack`)
 

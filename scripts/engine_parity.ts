@@ -37,13 +37,17 @@
  * the CLI refuses: the API reads any source as TypeScript. Absent, the snapshot is a
  * warn-skip there too.
  *
- * Blind spots. It compares the two CLI **drivers** as well as the two engines,
- * so a driver-only difference reads as a failure here (that is a real finding,
- * just a differently-located one; `scripts/test_napi_npm.ts` is where the
- * driver contract is pinned flag by flag). It sees only inputs the corpus
- * holds, and only the format and strip paths — `parse` wire equality is not graded here.
- * And it cannot see a divergence both engines share with each other but not
- * with prettier, which is the conformance gates' job.
+ * **The import records** ride the same in-process half, over `tests/fixtures_imports` and
+ * the snapshot: `parse_imports_typescript` for the strip's engine extensions and
+ * `parse_imports_svelte` for `.svelte`, deep-equal on both engines — the records, or the
+ * parse error.
+ *
+ * Blind spots. It compares the two CLI **drivers** as well as the two engines, so a driver-only
+ * difference reads as a failure here (that is a real finding, just a differently-located one;
+ * `scripts/test_napi_npm.ts` is where the driver contract is pinned flag by flag). It sees only
+ * inputs the corpus holds, and only the format, strip and imports paths — `parse` wire equality is
+ * not graded here. And it cannot see a divergence both engines share with each other but not with
+ * prettier, which is the conformance gates' job.
  *
  * NOT in `deno task check`: it needs two built packages, and `check` builds
  * none. It runs in CI's `artifacts` job, after the step that builds both, and
@@ -369,51 +373,60 @@ async function grade_strip_cli(root: string): Promise<RootReport> {
 	return { root: `${root} (tsv strip)`, files: files.length, findings };
 }
 
-/** The in-process half: one Node child holding both engines, `strip_typescript` compared
- * per file (results as JSON, deep-equal by their serialization — every field is a string,
- * a number, a boolean or a plain object of them, in one key order on both engines). */
-const STRIP_PARITY_SCRIPT = `
+/** The in-process half: one Node child holding both engines, one export compared per file
+ * (results as JSON, deep-equal by their serialization — every field is a string, a number,
+ * a boolean, `null` or a plain object or array of them, in one key order on both engines).
+ * The list pairs each file with the export that reads it. */
+const ENGINE_PARITY_SCRIPT = `
 import { readFileSync } from 'node:fs';
 import * as native from '@fuzdev/tsv';
 const wasm = await import(process.argv[2]);
 const files = JSON.parse(readFileSync(process.argv[3], 'utf8'));
 const differing = [];
-for (const file of files) {
+for (const [file, name] of files) {
 	const source = readFileSync(file, 'utf8');
-	const a = JSON.stringify(native.strip_typescript(source));
-	const b = JSON.stringify(wasm.strip_typescript(source));
+	const a = JSON.stringify(native[name](source));
+	const b = JSON.stringify(wasm[name](source));
 	if (a !== b) differing.push(file);
 }
 process.stdout.write(JSON.stringify({ files: files.length, differing }));
 `;
 
-/** The strip leg over the engines alone, in process (see the module doc). */
-async function grade_strip_engines(root: string): Promise<RootReport> {
+/**
+ * An export graded over the engines alone, in process (see the module doc): `label` names
+ * the leg, `extensions` the files it takes, and `export_for` the export reading each one.
+ */
+async function grade_engines(
+	root: string,
+	label: string,
+	extensions: string[],
+	export_for: (file: string) => string
+): Promise<RootReport> {
 	const absolute = resolve(ROOT, root);
 	if (!existsSync(absolute)) {
-		return { root: `${root} (strip_typescript)`, files: 0, skipped: 'not present', findings: [] };
+		return { root: `${root} (${label})`, files: 0, skipped: 'not present', findings: [] };
 	}
-	const files = collect_strippable(absolute, STRIP_ENGINE_EXTENSIONS);
+	const files = collect_strippable(absolute, extensions);
 	if (files.length === 0) {
 		return {
-			root: `${root} (strip_typescript)`,
+			root: `${root} (${label})`,
 			files: 0,
-			skipped: 'no files in the strip’s extensions',
+			skipped: `no files in ${label}’s extensions`,
 			findings: []
 		};
 	}
-	const consumer = await mkdtemp(join(tmpdir(), 'tsv_engines_strip_'));
+	const consumer = await mkdtemp(join(tmpdir(), 'tsv_engines_api_'));
 	try {
 		stage_napi_consumer(consumer, napi_triple);
-		const script = join(consumer, 'strip_parity.mjs');
+		const script = join(consumer, 'engine_parity.mjs');
 		const list = join(consumer, 'files.json');
-		Deno.writeTextFileSync(script, STRIP_PARITY_SCRIPT);
-		Deno.writeTextFileSync(list, JSON.stringify(files));
+		Deno.writeTextFileSync(script, ENGINE_PARITY_SCRIPT);
+		Deno.writeTextFileSync(list, JSON.stringify(files.map((file) => [file, export_for(file)])));
 		const wasm_index = pathToFileURL(join(wasm_bundle_dir('all', 'npm'), 'index.js')).href;
 		const result = await run(['node', script], consumer, [wasm_index, list]);
 		if (result.status !== 0) {
 			return {
-				root: `${root} (strip_typescript)`,
+				root: `${root} (${label})`,
 				files: files.length,
 				findings: [`the comparison child failed (exit ${result.status}): ${result.stderr.trim()}`]
 			};
@@ -422,16 +435,27 @@ async function grade_strip_engines(root: string): Promise<RootReport> {
 			files: number;
 			differing: string[];
 		};
-		const findings = differing.slice(0, 10).map((file) => `strip_typescript differs: ${file}`);
+		const findings = differing.slice(0, 10).map((file) => `${label} differs: ${file}`);
 		if (differing.length > 10) findings.push(`… and ${differing.length - 10} more file(s)`);
 		if (compared !== files.length) {
 			findings.push(`compared ${compared} of ${files.length} files`);
 		}
-		return { root: `${root} (strip_typescript)`, files: files.length, findings };
+		return { root: `${root} (${label})`, files: files.length, findings };
 	} finally {
 		rmSync(consumer, { recursive: true, force: true });
 	}
 }
+
+/** The strip leg over the engines alone. */
+const grade_strip_engines = (root: string): Promise<RootReport> =>
+	grade_engines(root, 'strip_typescript', STRIP_ENGINE_EXTENSIONS, () => 'strip_typescript');
+
+/** The import-records leg over the engines alone: TypeScript's export for the strip's engine
+ * extensions, Svelte's for a component. */
+const grade_imports_engines = (root: string): Promise<RootReport> =>
+	grade_engines(root, 'parse_imports_*', [...STRIP_ENGINE_EXTENSIONS, '.svelte'], (file) =>
+		extname(file).toLowerCase() === '.svelte' ? 'parse_imports_svelte' : 'parse_imports_typescript'
+	);
 
 const roots = args.length
 	? args
@@ -444,6 +468,11 @@ const strip_cli_roots = args.length ? args : ['tests/fixtures_strip', 'tests/fix
 const strip_engine_roots = args.length ? args : ['../corpora/collections'];
 for (const root of strip_cli_roots) reports.push(await grade_strip_cli(root));
 for (const root of strip_engine_roots) reports.push(await grade_strip_engines(root));
+// the import records: the fixture tree and the snapshot, in process
+const imports_engine_roots = args.length
+	? args
+	: ['tests/fixtures_imports', '../corpora/collections'];
+for (const root of imports_engine_roots) reports.push(await grade_imports_engines(root));
 
 if (json) {
 	console.log(JSON.stringify({ native: native.label, reports }, null, 2));

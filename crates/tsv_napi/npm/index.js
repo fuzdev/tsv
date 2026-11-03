@@ -1,22 +1,19 @@
 /**
  * `@fuzdev/tsv` — native N-API bindings for tsv (Node.js / Bun).
  *
- * A thin loader over the per-platform prebuilt addons
- * (`@fuzdev/tsv-<triple>`, installed as optionalDependencies — the
- * package manager selects by their `os`/`cpu`/`libc` fields; this file only
- * resolves the matching name). The formatter, parser and type-strip API is
- * `@fuzdev/tsv-wasm`'s — the same hand-written facade (`api.js` / `api_parse.js` /
- * `api_strip.js`, staged in from the wasm crate), so the same names, `(source, options?)` bags, and
- * error strings — and the two are drop-in swaps: this one is the fast native path,
- * that one the universal fallback (browsers + unsupported platforms). What is
- * absent here is only what a WASM engine needs and this one doesn't: `init()`
- * and `init_sync()` (nothing to initialize), `wasm_module` (no compiled
- * module to hand a worker), `reinstantiate()` (no instance to poison — a
- * native stack overflow is a process-fatal SIGSEGV, not a recoverable trap),
- * and, one level down, `IgnoreStack`'s `free()` and its `[Symbol.dispose]`
- * alias, which a GC-managed native object has no handle to need. That list is
- * the whole delta — `scripts/test_napi_npm.ts` compares the two export sets
- * rather than trusting this sentence.
+ * A thin loader over the per-platform prebuilt addons (`@fuzdev/tsv-<triple>`, installed as
+ * optionalDependencies — the package manager selects by their `os`/`cpu`/`libc` fields; this file
+ * only resolves the matching name). The formatter, parser, type-strip and import-records API is
+ * `@fuzdev/tsv-wasm`'s — the same hand-written facade (`api.js` / `api_parse.js` / `api_strip.js` /
+ * `api_imports.js`, staged in from the wasm crate), so the same names, `(source, options?)` bags,
+ * and error strings — and the two are drop-in swaps: this one is the fast native path, that one the
+ * universal fallback (browsers + unsupported platforms). What is absent here is only what a WASM
+ * engine needs and this one doesn't: `init()` and `init_sync()` (nothing to initialize),
+ * `wasm_module` (no compiled module to hand a worker), `reinstantiate()` (no instance to poison — a
+ * native stack overflow is a process-fatal SIGSEGV, not a recoverable trap), and, one level down,
+ * `IgnoreStack`'s `free()` and its `[Symbol.dispose]` alias, which a GC-managed native object has
+ * no handle to need. That list is the whole delta — `scripts/test_napi_npm.ts` compares the two
+ * export sets rather than trusting this sentence.
  *
  * `npm/cli.js` reads that absence three ways: as the signal to load this
  * loader in its workers rather than the wasm `./worker` entry, as the signal
@@ -38,8 +35,9 @@
 import { createRequire } from 'node:module';
 
 // The shared facade — staged beside this file by `scripts/build_napi_packages.ts` from
-// `crates/tsv_wasm/npm/`, so these three resolve in the package, not in the source tree.
+// `crates/tsv_wasm/npm/`, so these four resolve in the package, not in the source tree.
 import { create_format_api } from './api.js';
+import { create_imports_api } from './api_imports.js';
 import { create_parse_api } from './api_parse.js';
 import { create_strip_api } from './api_strip.js';
 import { platform_triple } from './platform.js';
@@ -82,9 +80,9 @@ try {
 	);
 }
 
-// The published surface: the shared facade (`api.js` + `api_parse.js` + `api_strip.js`, staged from
-// `crates/tsv_wasm/npm/` — one options reader, one set of error texts, the
-// `{locations: true}` sugar) over the addon's flat exports. The addon emits the
+// The published surface: the shared facade (`api.js` + `api_parse.js` + `api_strip.js` +
+// `api_imports.js`, staged from `crates/tsv_wasm/npm/` — one options reader, one set of error
+// texts, the `{locations: true}` sugar) over the addon's flat exports. The addon emits the
 // span-only wire as a JSON string; the facade `JSON.parse`s it.
 const engine_languages = ['svelte', 'typescript', 'css'];
 const from_addon = (name) =>
@@ -107,6 +105,12 @@ export const { format_svelte, format_typescript, format_css } = create_format_ap
 
 // The type strip: TypeScript's alone, so its one engine function is named directly.
 export const { strip_typescript } = create_strip_api({ typescript: addon.strip_typescript });
+
+// The import records: TypeScript's and Svelte's, the two languages that hold a module request.
+export const { parse_imports_typescript, parse_imports_svelte } = create_imports_api({
+	typescript: addon.parse_imports_typescript,
+	svelte: addon.parse_imports_svelte
+});
 
 // The discovery matcher, re-exported straight off the addon — it takes no
 // options bag, so there is nothing to wrap. Same class name and method surface

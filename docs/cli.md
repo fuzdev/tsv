@@ -610,8 +610,8 @@ contract holds there:
 Every row was measured with every shape `tests/depth_limit.rs` generates, at its deepest
 accepted depth, through the packages' API (parse with and without `locations`, the `_json`
 string, format, strip); the WASM main-thread row on Node is the standing gate,
-`deno task test:depth:wasm`, which runs V8's stack at nine tenths of its default, the
-native gate's margin. A WASM build keeps its spilled frames on a 1 MiB shadow stack in
+`deno task test:depth:wasm`. That gate adds the import records to the calls above and cuts
+V8's stack to nine tenths of its default, the native gate's margin. A WASM build keeps its spilled frames on a 1 MiB shadow stack in
 linear memory (wasm-ld's default) and its call frames on the engine's native stack, about
 1 MiB on a V8 main thread — and **an engine's tier decides those frames**: V8's optimizing
 compiler lays a recursive walk's frames out larger than its baseline compiler does, so a

@@ -136,9 +136,11 @@ for (const variant of VARIANTS) {
 }
 await assert_staged_fresh(freshness_checks);
 
-// Centers (deno target; npm == deno, identical `.wasm`): format 2,584,809 B, parse
-// 1,066,881 B and all 2,895,446 B measured 2026-10-25; all carries the type strip (the
-// `strip` feature, which the umbrella alone builds). Bounds are ±8% of each.
+// Centers (deno target; npm == deno, identical `.wasm`): format 2,720,874 B, parse
+// 1,073,871 B and all 3,048,129 B, measured on one tree 2026-11-03; all carries the type
+// strip and the import records (the `strip` and `imports` features, which the umbrella alone
+// builds). Bounds are ±8% of each. The import records are about 10 KB of `all`, and no
+// part of format or parse.
 //
 // Recenter (and re-measure the deltas below) whenever a measure has drifted to
 // within a few percent of a band edge through accumulated work — otherwise the
@@ -148,9 +150,9 @@ await assert_staged_fresh(freshness_checks);
 // named in the commit. The retired centers and what moved them are recorded
 // elsewhere, not here.
 const BOUNDS = {
-	format: { min: 2_378_000, max: 2_792_000 },
-	parse: { min: 982_000, max: 1_152_000 },
-	all: { min: 2_664_000, max: 3_127_000 }
+	format: { min: 2_503_000, max: 2_938_000 },
+	parse: { min: 988_000, max: 1_160_000 },
+	all: { min: 2_804_000, max: 3_292_000 }
 };
 
 // all = format + parse. `all − format` is what the parse feature adds (parser
@@ -161,13 +163,15 @@ const BOUNDS = {
 // parse feature alone — the format exports read no options bag — so it counts in
 // `all − format`). A change that lands in code both variants link (a parser cut) moves the
 // bundles and leaves the deltas where they were; a delta that moves with the
-// bundles means a feature boundary shifted, not that code got smaller. The `strip`
-// feature rides `all` alone, so the type strip counts in both deltas.
+// bundles means a feature boundary shifted, not that code got smaller. The `strip` and
+// `imports` features ride `all` alone, so the type strip and the import records count in
+// both deltas: `all − format` is the parse wire, the type strip and the import records
+// together, the import records its smallest part.
 //
-// At the current center: `all − format` 310,637 B; `all − parse` 1,828,565 B.
+// At the current center: `all − format` 327,255 B; `all − parse` 1,974,258 B.
 const DELTAS = {
-	format: { min: 286_000, max: 335_000 }, // all − format
-	parse: { min: 1_682_000, max: 1_975_000 } // all − parse
+	format: { min: 301_000, max: 353_000 }, // all − format
+	parse: { min: 1_816_000, max: 2_132_000 } // all − parse
 };
 
 console.log('=== WASM binary sizes ===');
@@ -238,6 +242,8 @@ interface SmokeTarget {
 	has_parse: boolean;
 	/** The type strip rides the `all` build alone (the `strip` feature). */
 	has_strip: boolean;
+	/** The import records ride the `all` build alone too (the `imports` feature). */
+	has_imports: boolean;
 	/** The published npm package (patched by `patch_npm_package.ts`) vs the raw
 	 * wasm-pack deno bundle. The facade and the pure-JS `locations.js` helper are
 	 * patched into the npm packages only, so they're checked on npm entries alone. */
@@ -252,6 +258,7 @@ const smoke_entries = (variant: WasmVariant): SmokeTarget[] => [
 		has_format: variant !== 'parse',
 		has_parse: variant !== 'format',
 		has_strip: variant === 'all',
+		has_imports: variant === 'all',
 		is_npm: true
 	},
 	// deno-target bundle (auto-init at import)
@@ -261,6 +268,7 @@ const smoke_entries = (variant: WasmVariant): SmokeTarget[] => [
 		has_format: variant !== 'parse',
 		has_parse: variant !== 'format',
 		has_strip: variant === 'all',
+		has_imports: variant === 'all',
 		is_npm: false
 	}
 ];
@@ -269,7 +277,15 @@ const smoke_targets: SmokeTarget[] = VARIANTS.flatMap(smoke_entries);
 
 console.log('\n=== Deno runtime smoke ===');
 
-for (const { label, entry, has_format, has_parse, has_strip, is_npm } of smoke_targets) {
+for (const {
+	label,
+	entry,
+	has_format,
+	has_parse,
+	has_strip,
+	has_imports,
+	is_npm
+} of smoke_targets) {
 	const entry_url = pathToFileURL(entry);
 	if (file_size(entry_url) === null) {
 		skip(`${label} — not built`);
@@ -417,6 +433,40 @@ for (const { label, entry, has_format, has_parse, has_strip, is_npm } of smoke_t
 		});
 	} else {
 		check(label, 'strip_* absent (subset build)', () => mod.strip_typescript === undefined);
+	}
+	// The import records: the facade's result object on the npm entry, the raw JSON string
+	// on the deno bundle — both engines' one boundary — and a parse failure as the result.
+	const IMPORTS_JSON =
+		'{"hasModuleSyntax":true,"imports":[{"kind":"static","start":0,"end":11,' +
+		'"specifier":{"value":"a","start":8,"end":9},"typeOnly":null,"phase":null,"attributes":null}]}';
+	if (has_imports && is_npm) {
+		check(label, 'parse_imports_typescript + parse_imports_svelte', () => {
+			const imports = mod as unknown as Record<
+				string,
+				(source: string) => { ok: boolean; error?: { kind: string } }
+			>;
+			const ok = imports.parse_imports_typescript("import 'a';");
+			const svelte = imports.parse_imports_svelte("<script>import 'a';</script>");
+			const failed = imports.parse_imports_typescript('let = ;');
+			return (
+				JSON.stringify(ok) === `{"ok":true,${IMPORTS_JSON.slice(1)}` &&
+				svelte.ok &&
+				!failed.ok &&
+				failed.error?.kind === 'parse'
+			);
+		});
+	} else if (has_imports) {
+		check(label, 'parse_imports_typescript (raw)', () => {
+			if (mod.parse_imports_typescript("import 'a';") !== IMPORTS_JSON) return false;
+			const failed = mod.parse_imports_typescript('let = ;') as { ok?: boolean };
+			return failed.ok === false && typeof mod.parse_imports_svelte === 'function';
+		});
+	} else {
+		check(
+			label,
+			'parse_imports_* absent (subset build)',
+			() => mod.parse_imports_typescript === undefined && mod.parse_imports_svelte === undefined
+		);
 	}
 	// The facade and the pure-JS reconstruction helper are patched into the npm
 	// packages only (the raw wasm-pack deno bundle carries neither), so scope this to

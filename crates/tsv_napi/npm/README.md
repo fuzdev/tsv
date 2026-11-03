@@ -1,8 +1,8 @@
 # @fuzdev/tsv
 
-> native formatter and parser for Svelte, TypeScript, and CSS, and a TypeScript type stripper (N-API)
+> native formatter and parser for Svelte, TypeScript, and CSS, a TypeScript type stripper, and an import-records parser (N-API)
 
-Rust-based formatter + parser + type stripper as a prebuilt native addon for Node.js and Bun. A near-Prettier formatter that tracks **Prettier** + **prettier-plugin-svelte** closely (documented divergences), and a parser whose AST is compatible with Svelte's parser + acorn + acorn-typescript (and `parseCss`).
+Rust-based formatter + parser + type stripper + import lister as a prebuilt native addon for Node.js and Bun. A near-Prettier formatter that tracks **Prettier** + **prettier-plugin-svelte** closely (documented divergences), and a parser whose AST is compatible with Svelte's parser + acorn + acorn-typescript (and `parseCss`).
 
 The API mirrors [`@fuzdev/tsv-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-wasm) export for export — same names, same options, same errors — minus only what a WASM engine needs and this one doesn't (`init`, `init_sync`, `wasm_module`, `reinstantiate`, the `./worker` subpath, and the WASM `IgnoreStack`'s `free()` / `[Symbol.dispose]()`, which a GC-managed native class doesn't need), so the two are drop-in swaps: this package is the fast native path; the WASM one runs everywhere (browsers included) and is the fallback for platforms without a prebuilt binding.
 
@@ -96,6 +96,22 @@ if (!result.ok && result.error.kind === 'unsupported') {
 ```
 
 The one option is `sourceType`, read as `format_typescript` reads it: omitted, the source is a module retried as a script if that fails, so a legacy sloppy script strips as the sloppy script it is; `'script'` or `'module'` is exact.
+
+### Listing imports
+
+`parse_imports_typescript(source)` and `parse_imports_svelte(source)` list a source's module requests — every static `import`, re-export, dynamic `import(…)` and `import x = require(…)`, in source order — without handing you an AST: `{ok: true, hasModuleSyntax, imports}`, or `{ok: false, error}` for a source that does not parse. Each record is `{kind, start, end, specifier, typeOnly, phase, attributes}` — `kind` `'static'` / `'re_export'` / `'dynamic'` / `'import_equals'`, `specifier` `{value, start, end}` (the decoded string, its span quotes excluded) or `null` for a computed `import(x)`, `typeOnly` `'statement'` / `'specifiers'` / `null`, `phase` `'source'` / `'defer'` / `null`, `attributes` a `{start, end}` span or `null` — in UTF-16 offsets, the same records `@fuzdev/tsv-wasm` returns.
+
+```javascript
+import {parse_imports_svelte} from '@fuzdev/tsv';
+
+const result = parse_imports_svelte('<script>\n\timport Button from "./Button.svelte";\n</script>\n');
+if (result.ok) {
+	result.imports[0]?.specifier?.value; // './Button.svelte'
+	result.hasModuleSyntax; // true
+}
+```
+
+`parse_imports_typescript` takes `sourceType`, read as `strip_typescript` reads it; `parse_imports_svelte` takes none.
 
 ### Options
 

@@ -2,9 +2,10 @@
  * Stage the publishable N-API npm packages into `crates/tsv_napi/pkg/`:
  *
  * - `pkg/napi/` — the `@fuzdev/tsv` loader, ESM like the wasm packages (index.js + index.d.ts +
- *   platform.js (triple detection) + the shared facade with its parse half — `api.js` /
- *   `api_parse.js`, the `locations.js` helper, the declarations (`facade_format.d.ts`,
- *   `facade_parse.d.ts`, `facade_strip.d.ts`, `facade_error.d.ts`, `locations.d.ts`,
+ *   platform.js (triple detection) + the shared facade with its parse, strip and imports
+ *   halves — `api.js` / `api_parse.js` / `api_strip.js` / `api_imports.js`, the `locations.js`
+ *   helper, the declarations (`facade_format.d.ts`, `facade_parse.d.ts`,
+ *   `facade_strip.d.ts`, `facade_imports.d.ts`, `facade_error.d.ts`, `locations.d.ts`,
  *   `tsv_ast.d.ts`), the table
  *   `scripts/npm_facade.ts` names — + the shared `cli.js` + the `bin.js` dispatcher wired
  *   as the `tsv` bin + README + LICENSE + the third-party NOTICE + generated package.json
@@ -131,7 +132,8 @@ write_pkg(loader_dir, {
 	name: '@fuzdev/tsv',
 	version,
 	description:
-		'native formatter and parser for Svelte, TypeScript, and CSS, and a TypeScript type stripper (N-API)',
+		'native formatter and parser for Svelte, TypeScript, and CSS, a TypeScript type stripper, ' +
+		'and an import-records parser (N-API)',
 	// ESM, matching the wasm packages — one module system across tsv's npm
 	// surface, so shared sources load unchanged in either. The platform `.node`
 	// is still `require`d, via `createRequire` (see npm/index.js).
@@ -169,6 +171,7 @@ write_pkg(loader_dir, {
 		'css',
 		'formatter',
 		'strip',
+		'imports',
 		'prettier',
 		'parser',
 		'ast',

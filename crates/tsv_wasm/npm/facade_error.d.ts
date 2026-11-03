@@ -1,10 +1,9 @@
 /**
- * The errors every parse, format and strip export of a tsv npm package returns: their
- * shared shape `TsvError`, and the parse failure every export returns for a source that does
- * not parse. Types only — the error itself is built by the
- * facade (`api.js`) — and its own file so every package ships it, the format-only and
- * parse-only ones alike, beside whichever family's declarations they carry (each imports it
- * from here).
+ * The errors every parse, format, strip and imports export of a tsv npm package returns:
+ * their shared shape `TsvError`, and the parse failure every export returns for a source
+ * that does not parse. Types only — the error itself is built by the facade (`api.js`) —
+ * and its own file so every package ships it, the format-only and parse-only ones alike,
+ * beside whichever family's declarations they carry (each imports it from here).
  */
 
 /**
@@ -38,8 +37,8 @@ export interface TsvError {
 	 * that is narrower than the document line the header counts in: the excerpt can start
 	 * after a lone CR or U+2028 that the header's line count does not break on, so the
 	 * header's column counts from the start of the document line, not from the start of the
-	 * excerpt. A line longer than 120 characters either side of the error's character (minified code) is
-	 * cut to that window, each cut end marked with a `…`.
+	 * excerpt. A line longer than 120 characters either side of the error's character (minified
+	 * code) is cut to that window, each cut end marked with a `…`.
 	 */
 	frame: string;
 	/**
@@ -63,12 +62,12 @@ export interface TsvError {
 }
 
 /**
- * The source does not parse — returned by every parse, format and strip export. A format
- * reports the error at the same `start` and `loc` a parse of the same source does — though
- * its `message` can differ where it quotes source text, which a format reads with line
- * endings folded to LF — with one exception: with no `sourceType` named, `format_typescript`
- * and `strip_typescript` retry a failed module parse as a script and can report that
- * attempt's error where a module parse reports its own.
+ * The source does not parse — returned by every parse, format, strip and imports export. A
+ * format reports the error at the same `start` and `loc` a parse of the same source does —
+ * though its `message` can differ where it quotes source text, which a format reads with line
+ * endings folded to LF — with one exception: with no `sourceType` named, `format_typescript`,
+ * `strip_typescript` and `parse_imports_typescript` retry a failed module parse as a script
+ * and can report that attempt's error where a module parse reports its own.
  */
 export interface TsvParseError extends TsvError {
 	kind: 'parse';

@@ -84,6 +84,11 @@ import {
 	type StripRowOptions
 } from './strip_suite.ts';
 import {
+	IMPORTS_PARSE_ERROR_ROWS,
+	imports_fixtures,
+	register_imports_api_suite
+} from './imports_suite.ts';
+import {
 	LONE_CR_REFUSAL,
 	LONE_CR_TAG_COMMENT,
 	ok_ast,
@@ -481,7 +486,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	});
 
 	// export names and the lone-surrogate refusal, shared with the wasm entries' suite
-	register_facade_surface_suite('@fuzdev/tsv loader', api, { facade_exports: 10 });
+	register_facade_surface_suite('@fuzdev/tsv loader', api, { facade_exports: 12 });
 
 	it('the loader ships the shared facade verbatim', () => {
 		for (const { published, source } of facade_files(ALL_FAMILIES)) {
@@ -516,6 +521,10 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.deepEqual(
 			reexported('./facade_strip.js'),
 			facade_type_names('facade_strip.d.ts').sort()
+		);
+		assert.deepEqual(
+			reexported('./facade_imports.js'),
+			facade_type_names('facade_imports.d.ts').sort()
 		);
 		assert.deepEqual(
 			reexported('./facade_error.js'),
@@ -768,6 +777,39 @@ describe('strip engine parity: @fuzdev/tsv vs @fuzdev/tsv-wasm', () => {
 						api.strip_typescript(source, bag),
 						wasm.strip_typescript(source, bag),
 						`${JSON.stringify(source)} ${JSON.stringify(bag)}`
+					);
+				}
+			}
+		}
+	);
+});
+
+// The import-records table (`scripts/imports_suite.ts`), shared with the wasm umbrella's suite.
+register_imports_api_suite('@fuzdev/tsv loader', api);
+
+// Engine parity over the import records, as over the strip table: every fixture and every
+// parse-failure row, at the unset goal and at each named one, deep-equal on both engines.
+describe('imports engine parity: @fuzdev/tsv vs @fuzdev/tsv-wasm', () => {
+	it(
+		'every imports row returns the same result on both engines',
+		{ skip: wasm_parity_skip },
+		async () => {
+			const wasm = await import(pathToFileURL(wasm_package_index).href);
+			const rows = [
+				...imports_fixtures().map(({ language, source }) => ({ language, source })),
+				...IMPORTS_PARSE_ERROR_ROWS
+			];
+			for (const { language, source } of rows) {
+				const name = `parse_imports_${language}`;
+				const bags: Array<unknown> =
+					language === 'typescript'
+						? [undefined, { sourceType: 'module' }, { sourceType: 'script' }]
+						: [undefined];
+				for (const bag of bags) {
+					assert.deepStrictEqual(
+						api[name](source, bag),
+						wasm[name](source, bag),
+						`${name} ${JSON.stringify(source)} ${JSON.stringify(bag)}`
 					);
 				}
 			}

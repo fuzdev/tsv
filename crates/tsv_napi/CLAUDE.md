@@ -23,6 +23,7 @@ Mirrors `tsv_ffi` / `tsv_wasm`:
 - `format` (default) — `format_<lang>` exports
 - `parse` (default) — `parse_<lang>_json` + `parse_internal_<lang>` exports, and the `json` layer on each language crate
 - `strip` (default) — the `strip_typescript` export (the type strip, `tsv_ts::strip`), as `tsv_wasm`'s `strip` feature adds it to `@fuzdev/tsv-wasm`
+- `imports` (default) — the `parse_imports_typescript` / `parse_imports_svelte` exports (the import records, `tsv_ts::parse_imports` / `tsv_svelte::parse_imports`), as `tsv_wasm`'s `imports` feature adds them; enables `tsv_ts/json` for the records' writer
 - `panic_probe` (test-only, never default) — the `__panic_probe` export driving the panic-contract test; see §Marshalling & errors
 
 Unlike `tsv_ffi`'s and `tsv_wasm`'s, **no build task produces a single-feature `tsv_napi`** — the addon always ships every feature, and the split exists so the crate mirrors its siblings. `deno task typecheck:features` (in `check`) `cargo check`s each feature on its own, so the declared sets can't rot unbuilt; neither `cargo check --workspace` (features unified, defaults ON) nor clippy's `--all-features` union sees a subset.
@@ -57,6 +58,8 @@ JS export names are kept **snake_case** via `#[napi(js_name = "…")]` (napi-rs 
 
 Outside the macro, the `strip` feature exports **`strip_typescript(source, sourceType?)`** — the trailing optional source type every export takes, read as the format exports read it (`Family::Strip`: unset is none named, the module grammar retried as a script) — returning the JS, a parse failure as the parse exports return one, and a refusal as `{ok: false, error}` with `kind: 'unsupported'`, its `construct` and its span (`Failure::Returned` over the refusal's `Error::to_report`, the object `tsv_wasm` builds), which the loader's facade (`api_strip.js`) checks and hands back ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §The npm Facade).
 
+Outside the macro, the `imports` feature exports **`parse_imports_typescript(source, sourceType?)`** and **`parse_imports_svelte(source, sourceType?)`** — the TypeScript source type read as the strip reads it (`Family::Imports`), Svelte refusing a set one — returning the records as the JSON string `tsv_ts::__private::write_imports_json_string` writes in the language's `WIRE_COORDINATES` (the loader's facade, `api_imports.js`, `JSON.parse`s it), or a parse failure as the parse exports return one. Their engine halves (`parse_imports_typescript_engine` / `parse_imports_svelte_engine`) run on `with_ast_arena`.
+
 Outside the macro, the `format` feature also exports **`IgnoreStack`** — a `#[napi]` class over `tsv_ignore::IgnoreStack` plus the `tsv_discover` verdicts, method for method with `tsv_wasm`'s `#[wasm_bindgen]` twin (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Discovery Matcher + Policy). ⚠️ Its maybe-a-warning methods return **`Either<String, Undefined>`, not `Option<String>`**: napi-rs maps `None` to JS `null` where wasm-bindgen maps it to `undefined`, and a package that exists to be swapped for the other must not change which one a caller sees. `Undefined` is napi-rs's `()`, so the none arm allocates nothing. Two tests pin it — the in-crate one on the `Either::B` variant, `scripts/test_napi_npm.ts` on the JS value, since only the latter can observe it.
 
 ## The npm packages: `@fuzdev/tsv` + platform packages
@@ -67,8 +70,9 @@ into `crates/tsv_napi/pkg/` (gitignored):
 - **`pkg/napi/` — `@fuzdev/tsv`**, the loader: `npm/index.js` +
   `npm/index.d.ts` + `npm/platform.js` (triple detection, shared by `index.js`
   and `bin.js`) + `npm/bin.js` (the `tsv` bin — a dispatcher, see below) +
-  `npm/README.md` + the facade with its parse and strip halves (`api.js` / `api_parse.js` / `api_strip.js`,
-  `locations.js`, the declarations — `facade_format.d.ts` / `facade_parse.d.ts` / `facade_strip.d.ts`,
+  `npm/README.md` + the facade with its parse, strip and imports halves (`api.js` / `api_parse.js` /
+  `api_strip.js` / `api_imports.js`, `locations.js`, the declarations — `facade_format.d.ts` /
+  `facade_parse.d.ts` / `facade_strip.d.ts` / `facade_imports.d.ts`,
   named apart from the modules they sit beside, `facade_error.d.ts`, `locations.d.ts`
   — and `tsv_wasm`'s `tsv_ast.d.ts` — the file table
   `scripts/npm_facade.ts` shares with the wasm staging), and
@@ -116,7 +120,8 @@ fallback.
 **`@fuzdev/tsv` is the full native distribution; `@fuzdev/tsv-wasm` is the
 fallback** — so parity runs the whole way, not just the engine calls. Same
 export names, same `(source, options?)` bags, same error strings: the loader
-publishes through the wasm packages' own facade (`api.js` / `api_parse.js` / `api_strip.js`, staged
+publishes through the wasm packages' own facade (`api.js` / `api_parse.js` / `api_strip.js` /
+`api_imports.js`, staged
 in from `crates/tsv_wasm/npm/`), so there is one options reader for both, and
 `scripts/test_napi_npm.ts` asserts the strings. `parse_<lang>` returns `{ok: true, ast}`, the
 JSON-parsed span-only object (`{locations: true}` adds `loc`, reconstructed in JS), and
@@ -378,8 +383,8 @@ Three properties a Node/Bun host inherits from this crate, none of them visible 
 
 ## Files
 
-- `src/lib.rs` — All bindings: the `lang_bindings!` macro (its engine halves the shared `tsv_arena` macros — `parse_convert!` / `parse_internal!` for the parse exports, `parse_format!` carrying the format path's unset source type — with `napi_source_type` decoding the optional `sourceType` string per `tsv_arena::Family`), the three `lang_bindings!` invocations, the `strip`-gated `strip_typescript` export (its engine half `strip_typescript_engine`), the `format`-gated `IgnoreStack` class, the `panic_probe` export, and a `#[cfg(test)]` module. `with_ast_arena` is imported only for the strip and the panic probe; every other export reaches the arenas through the macros
-- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` — hand-written: the loader plus the wasm packages' own facade over the addon, so the surface is theirs minus the WASM lifecycle (§The npm packages states the exact delta, and the suite diffs it as a set), and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Line/Column Reconstruction Helper), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared facade (`api.js` / `api_parse.js` / `api_strip.js` and the `facade_*.d.ts` declarations), the `locations.js` helper and the `cli.js` fallback (see §The npm packages)
+- `src/lib.rs` — All bindings: the `lang_bindings!` macro (its engine halves the shared `tsv_arena` macros — `parse_convert!` / `parse_internal!` for the parse exports, `parse_format!` carrying the format path's unset source type — with `napi_source_type` decoding the optional `sourceType` string per `tsv_arena::Family`), the three `lang_bindings!` invocations, the `strip`-gated `strip_typescript` export (its engine half `strip_typescript_engine`), the `imports`-gated `parse_imports_typescript` / `parse_imports_svelte` exports (their engine halves beside them), the `format`-gated `IgnoreStack` class, the `panic_probe` export, and a `#[cfg(test)]` module. `with_ast_arena` is imported only for the strip, the import records and the panic probe; every other export reaches the arenas through the macros
+- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` — hand-written: the loader plus the wasm packages' own facade over the addon, so the surface is theirs minus the WASM lifecycle (§The npm packages states the exact delta, and the suite diffs it as a set), and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Line/Column Reconstruction Helper), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared facade (`api.js` / `api_parse.js` / `api_strip.js` / `api_imports.js` and the `facade_*.d.ts` declarations), the `locations.js` helper and the `cli.js` fallback (see §The npm packages)
 - `build.rs` — `napi_build::setup()` (linker config for the addon)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "deny"`, not `allow` — `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` (an inner `allow` overrides `deny`), so the macro output compiles while any hand-written `unsafe` stays a compile error; deps `napi` + `napi-derive` (3.x) + `tsv_arena`, plus the `format`-optional `tsv_ignore` + `tsv_discover` behind `IgnoreStack`, build-dep `napi-build` (2.x). `format` → `tsv_arena/format` + those two (no direct `tsv_lang` edge: `parse_format!`'s line-terminator fold reaches it through `tsv_arena`)
 

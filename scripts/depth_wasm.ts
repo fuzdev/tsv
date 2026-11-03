@@ -7,8 +7,9 @@
  * memory, and its call frames on the engine's own, about 1 MiB on a V8 main thread. The
  * native gate (`deno task test:depth:napi`) grades neither, so this one runs the package
  * itself: for every shape, at its accepted `n`, the parse (the object form, with and
- * without `{locations: true}`, and the `_json` string), the format and — TypeScript — the
- * type strip must each return `{ok: true, …}` (a strip's refusal is a verdict too), never
+ * without `{locations: true}`, and the `_json` string), the format, the import records —
+ * TypeScript and Svelte, whose walk descends into what the strip refuses — and — TypeScript —
+ * the type strip must each return `{ok: true, …}` (a strip's refusal is a verdict too), never
  * throw a trap or a `RangeError`; and at `n + 1` the parse must return the depth refusal.
  * The engine's own stack is cut to nine tenths of V8's default for the run
  * (`GATE_STACK_KIB`), the margin the native gate keeps; the shadow stack is the shipped
@@ -135,6 +136,9 @@ async function run_child(args: Map<string, string>): Promise<void> {
 			['parse+locations', () => tsv[`parse_${lang}`](source, { locations: true })],
 			['parse_json', () => tsv[`parse_${lang}_json`](source)],
 			['format', () => tsv[`format_${lang}`](source)],
+			...(lang === 'css'
+				? []
+				: [['imports', () => tsv[`parse_imports_${lang}`](source)] as [string, () => unknown]]),
 			...(lang === 'typescript'
 				? [['strip', () => tsv.strip_typescript(source)] as [string, () => unknown]]
 				: [])

@@ -230,7 +230,8 @@ export function wasm_package_checks(
 				...facade_sources({
 					format: variant !== 'parse',
 					parse: variant !== 'format',
-					strip: variant === 'all'
+					strip: variant === 'all',
+					imports: variant === 'all'
 				}),
 				'scripts/npm_facade.ts'
 			],

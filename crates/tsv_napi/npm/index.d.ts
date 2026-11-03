@@ -1,16 +1,14 @@
 /**
- * Hand-written types for `@fuzdev/tsv` — `@fuzdev/tsv-wasm`'s surface (the same
- * facade declarations, re-exported from the staged `facade_format.d.ts` /
- * `facade_parse.d.ts` / `facade_strip.d.ts` / `facade_error.d.ts`, and the same `tsv_ast`
- * re-export), so the two packages type-check
- * interchangeably except for what a WASM engine needs and this one doesn't: `init()` and
- * `init_sync()` (nothing here needs initializing), `wasm_module` (no compiled module
- * to hand a worker), `reinstantiate()` (no instance to poison), and `IgnoreStack`'s `free()` /
- * `[Symbol.dispose]` (a GC-managed native object has no handle to release).
- * That list is the whole delta — `scripts/test_napi_npm.ts` diffs the two
- * packages' export names rather than trusting it. The `locations.js` helper's
- * functions and types are re-exported whole, from the copy
- * `scripts/build_napi_packages.ts` stages beside this file.
+ * Hand-written types for `@fuzdev/tsv` — `@fuzdev/tsv-wasm`'s surface (the same facade
+ * declarations, re-exported from the staged `facade_format.d.ts` / `facade_parse.d.ts` /
+ * `facade_strip.d.ts` / `facade_imports.d.ts` / `facade_error.d.ts`, and the same `tsv_ast`
+ * re-export), so the two packages type-check interchangeably except for what a WASM engine needs
+ * and this one doesn't: `init()` and `init_sync()` (nothing here needs initializing), `wasm_module`
+ * (no compiled module to hand a worker), `reinstantiate()` (no instance to poison), and
+ * `IgnoreStack`'s `free()` / `[Symbol.dispose]` (a GC-managed native object has no handle to
+ * release). That list is the whole delta — `scripts/test_napi_npm.ts` diffs the two packages'
+ * export names rather than trusting it. The `locations.js` helper's functions and types are
+ * re-exported whole, from the copy `scripts/build_napi_packages.ts` stages beside this file.
  *
  * Relative specifiers carry the **`.js`** extension, here and in every
  * `import(...)` below: under `moduleResolution: node16`/`nodenext` a relative
@@ -57,6 +55,17 @@ export type {
 	StripUnsupportedKind,
 	StripUnsupportedError
 } from './facade_strip.js';
+export type {
+	TypeScriptImportsOptions,
+	ImportsOptions,
+	ImportRecordKind,
+	ImportRecordSpan,
+	ImportRecordSpecifier,
+	ImportRecord,
+	ImportsSuccess,
+	ImportsFailure,
+	ImportsResult
+} from './facade_imports.js';
 export type { TsvError, TsvParseError } from './facade_error.js';
 export {
 	parse_svelte,
@@ -68,6 +77,7 @@ export {
 } from './facade_parse.js';
 export { format_svelte, format_typescript, format_css } from './facade_format.js';
 export { strip_typescript } from './facade_strip.js';
+export { parse_imports_typescript, parse_imports_svelte } from './facade_imports.js';
 
 /**
  * The gitignore-aware matcher stack — the same layering and prune decisions

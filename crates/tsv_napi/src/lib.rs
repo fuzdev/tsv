@@ -41,13 +41,18 @@ use napi_derive::napi;
 // `parse_format!`) come from the same crate, so the three bindings share ONE definition
 // of which languages have a goal and of what each export does, rather than three
 // hand-synced copies.
-#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
+#[cfg(any(
+    feature = "parse",
+    feature = "format",
+    feature = "strip",
+    feature = "imports"
+))]
 use tsv_arena::Family;
 #[cfg(any(feature = "parse", feature = "format"))]
 use tsv_arena::goal_allowed;
 #[cfg(feature = "format")]
 use tsv_arena::parse_format;
-#[cfg(any(feature = "panic_probe", feature = "strip"))]
+#[cfg(any(feature = "panic_probe", feature = "strip", feature = "imports"))]
 use tsv_arena::with_ast_arena;
 #[cfg(feature = "parse")]
 use tsv_arena::{parse_convert, parse_internal};
@@ -57,7 +62,12 @@ use tsv_arena::{parse_convert, parse_internal};
 // `WirePoint`s), so the shared error helpers below take a Svelte or CSS failure as readily as
 // a TypeScript one. Named through `tsv_ts` only because this crate takes no `tsv_lang` edge of
 // its own.
-#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
+#[cfg(any(
+    feature = "parse",
+    feature = "format",
+    feature = "strip",
+    feature = "imports"
+))]
 use tsv_ts::Error;
 use tsv_ts::{ErrorReport, WirePoint};
 
@@ -72,10 +82,15 @@ use tsv_ts::{ErrorReport, WirePoint};
 ///
 /// What an unset one means is the caller's: the parse exports read it as `Module`
 /// (their wire's `Program.sourceType` is a claim one settled grammar has to
-/// produce), the format exports and the strip as "none named", which
+/// produce), the format exports, the strip and the imports parse as "none named", which
 /// `tsv_ts::__private::parse_with_goal_or_fallback` answers with the module grammar retried as
 /// a script.
-#[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
+#[cfg(any(
+    feature = "parse",
+    feature = "format",
+    feature = "strip",
+    feature = "imports"
+))]
 fn napi_source_type(
     source_type: Option<String>,
     allowed: bool,
@@ -114,7 +129,12 @@ impl Failure {
     /// A parse error: a pointed one returned with its report (`'refused'` for a format
     /// refusal, `'parse'` otherwise), and the positionless one (a source over the size cap)
     /// thrown.
-    #[cfg(any(feature = "parse", feature = "format", feature = "strip"))]
+    #[cfg(any(
+        feature = "parse",
+        feature = "format",
+        feature = "strip",
+        feature = "imports"
+    ))]
     fn parse(e: &Error) -> Self {
         match e.to_report() {
             Some(report) => Failure::Returned {
@@ -424,6 +444,82 @@ pub fn strip_typescript(
 ) -> napi::Result<Either<String, Object<'_>>> {
     match strip_typescript_engine(&source, source_type) {
         Ok(code) => Ok(Either::A(code)),
+        Err(failure) => failure.into_napi(env).map(Either::B),
+    }
+}
+
+/// The engine half of `parse_imports_typescript` (see `lang_bindings!` for the split): the
+/// import records as the JSON `tsv_ts::__private::write_imports_json_string` writes, in
+/// TypeScript's wire coordinates, or a parse failure as every parse export reports one.
+#[cfg(feature = "imports")]
+fn parse_imports_typescript_engine(
+    source: &str,
+    source_type: Option<String>,
+) -> Result<String, Failure> {
+    let goal = napi_source_type(source_type, true, Family::Imports)?;
+    with_ast_arena(
+        |arena| match tsv_ts::__private::parse_imports_in(source, goal, arena) {
+            Ok(imports) => Ok(tsv_ts::__private::write_imports_json_string(
+                &imports,
+                source,
+                tsv_ts::WIRE_COORDINATES,
+            )),
+            Err(e) => Err(Failure::parse(&e)),
+        },
+    )
+}
+
+/// The engine half of `parse_imports_svelte`: a component's import records, both scripts in
+/// source order, as JSON in Svelte's wire coordinates (a leading BOM elided). Svelte has no
+/// goal axis, so a source type is refused.
+#[cfg(feature = "imports")]
+fn parse_imports_svelte_engine(
+    source: &str,
+    source_type: Option<String>,
+) -> Result<String, Failure> {
+    napi_source_type(source_type, false, Family::Imports)?;
+    with_ast_arena(
+        |arena| match tsv_svelte::__private::parse_imports_in(source, arena) {
+            Ok(imports) => Ok(tsv_ts::__private::write_imports_json_string(
+                &imports,
+                source,
+                tsv_svelte::WIRE_COORDINATES,
+            )),
+            Err(e) => Err(Failure::parse(&e)),
+        },
+    )
+}
+
+/// The import records of TypeScript `source` (`tsv_ts::parse_imports`), as a JSON string
+/// for the host to `JSON.parse`: `{hasModuleSyntax, imports}`, every offset a UTF-16 code
+/// unit. The source type is read as `strip_typescript` reads it: omitted, the module grammar
+/// retried as a script; set, exact. A parse failure is returned as the parse exports return
+/// one ([`failure_result`]).
+#[cfg(feature = "imports")]
+#[napi(js_name = "parse_imports_typescript", catch_unwind)]
+pub fn parse_imports_typescript(
+    env: &Env,
+    source: String,
+    source_type: Option<String>,
+) -> napi::Result<Either<String, Object<'_>>> {
+    match parse_imports_typescript_engine(&source, source_type) {
+        Ok(json) => Ok(Either::A(json)),
+        Err(failure) => failure.into_napi(env).map(Either::B),
+    }
+}
+
+/// The import records of a Svelte component (`tsv_svelte::parse_imports`), as
+/// `parse_imports_typescript` returns them. A source type is refused (Svelte hard-wires
+/// `Module`); a parse failure is returned as the parse exports return one.
+#[cfg(feature = "imports")]
+#[napi(js_name = "parse_imports_svelte", catch_unwind)]
+pub fn parse_imports_svelte(
+    env: &Env,
+    source: String,
+    source_type: Option<String>,
+) -> napi::Result<Either<String, Object<'_>>> {
+    match parse_imports_svelte_engine(&source, source_type) {
+        Ok(json) => Ok(Either::A(json)),
         Err(failure) => failure.into_napi(env).map(Either::B),
     }
 }
@@ -1096,6 +1192,83 @@ mod tests {
         );
         assert_eq!(report.message, "cannot strip an enum");
         assert_eq!(report.frame, "2:1 enum E {}\n    ^ here");
+    }
+
+    #[test]
+    fn parse_imports_engines_outcomes() {
+        assert_eq!(
+            parse_imports_typescript_engine("import a from 'a';\n", None),
+            Ok(concat!(
+                r#"{"hasModuleSyntax":true,"imports":[{"kind":"static","start":0,"end":18,"#,
+                r#""specifier":{"value":"a","start":15,"end":16},"typeOnly":null,"#,
+                r#""phase":null,"attributes":null}]}"#
+            )
+            .to_string())
+        );
+        // unset: the module grammar, retried as a script
+        assert_eq!(
+            parse_imports_typescript_engine("with (o) {}\n", None),
+            Ok(r#"{"hasModuleSyntax":false,"imports":[]}"#.to_string())
+        );
+        // a named goal is exact
+        let src = "import a from 'a';\n";
+        assert_eq!(
+            parse_imports_typescript_engine(src, Some("script".into())).unwrap_err(),
+            typescript_engine::parse_json(src, Some("script".into())).unwrap_err()
+        );
+        // a parse failure is the one the parse export reports for the same source
+        let src = "let = ;\n";
+        assert_eq!(
+            parse_imports_typescript_engine(src, None).unwrap_err(),
+            at_default(typescript_engine::parse_json, src).unwrap_err()
+        );
+        // Svelte: document offsets, UTF-16 units (the astral character is two)
+        assert_eq!(
+            parse_imports_svelte_engine("<p>\u{1D49C}</p><script>import 'b';</script>", None),
+            Ok(concat!(
+                r#"{"hasModuleSyntax":true,"imports":[{"kind":"static","start":17,"end":28,"#,
+                r#""specifier":{"value":"b","start":25,"end":26},"typeOnly":null,"#,
+                r#""phase":null,"attributes":null}]}"#
+            )
+            .to_string())
+        );
+        // a leading BOM: TypeScript counts it, as acorn does; Svelte elides it, as its parse does
+        assert_eq!(
+            parse_imports_typescript_engine("\u{FEFF}import a from 'x';\n", None),
+            Ok(concat!(
+                r#"{"hasModuleSyntax":true,"imports":[{"kind":"static","start":1,"end":19,"#,
+                r#""specifier":{"value":"x","start":16,"end":17},"typeOnly":null,"#,
+                r#""phase":null,"attributes":null}]}"#
+            )
+            .to_string())
+        );
+        assert_eq!(
+            parse_imports_svelte_engine("\u{FEFF}<script>import 'x';</script>", None),
+            Ok(concat!(
+                r#"{"hasModuleSyntax":true,"imports":[{"kind":"static","start":8,"end":19,"#,
+                r#""specifier":{"value":"x","start":16,"end":17},"typeOnly":null,"#,
+                r#""phase":null,"attributes":null}]}"#
+            )
+            .to_string())
+        );
+        let src = "<div";
+        assert_eq!(
+            parse_imports_svelte_engine(src, None).unwrap_err(),
+            at_default(svelte_engine::parse_json, src).unwrap_err()
+        );
+        // Svelte has no goal axis
+        assert_eq!(
+            parse_imports_svelte_engine("", Some("module".into())),
+            Err(Failure::Plain(
+                "imports option 'sourceType' is only supported for TypeScript".to_string()
+            ))
+        );
+        assert_eq!(
+            parse_imports_typescript_engine("", Some("sloppy".into())),
+            Err(Failure::Plain(
+                "invalid sourceType 'sloppy' (expected 'script' or 'module')".to_string()
+            ))
+        );
     }
 
     #[test]

@@ -140,9 +140,10 @@ deno task test:deno      # deno tests over the node-modules-free bench core (div
 #                          `release/plan_test.ts` — the version grammar and the fresh/resume plan; `release/crates_test.ts` —
 #                          publish:crates' order, liveness, semver baseline + release type + feature flags and rate-limit read over a
 #                          fake crates.io, plus its packaging cleanup on the real filesystem (own invocation, `--allow-write`);
-#                          `release/binstall_test.ts` — the binstall-table grader; `npm_api_test.ts` + `npm_api_strip_test.ts` — the
-#                          npm options facade and its strip half over a fake engine; `typecheck_packages_test.ts` — the README fence +
-#                          marker grammar; `perf_ab_verdict_test.ts` — perf:ab's verdict rule; `perf_ab_test.ts` —
+#                          `release/binstall_test.ts` — the binstall-table grader; `npm_api_test.ts` + `npm_api_strip_test.ts` +
+#                          `npm_api_imports_test.ts` — the npm options facade and its strip and imports halves over a fake
+#                          engine; `typecheck_packages_test.ts` — the README fence + marker grammar; `perf_ab_verdict_test.ts` —
+#                          perf:ab's verdict rule; `perf_ab_test.ts` —
 #                          perf:ab's `git ls-tree -z` listing and strip entry-point probe over a scratch repo, its
 #                          own `deno test` invocation with `--allow-write --allow-run=git` + `--allow-env` for the three
 #                          `GIT_*` variables it clears); in `check`
@@ -151,14 +152,15 @@ deno task test:depth     # tests/depth_limit.rs optimized (`--profile corpus`): 
 #                          behind the heads `a` and `a()`, a few hundred seeded triples, every commented link, the bare prefix
 #                          pairs plus a sample of the prefix alphabet, and a sample of the decorators — at its limit: no path
 #                          through its wire passes a limit (the count charges at least what the walks recurse through), it
-#                          survives parse + both wires + format + strip on nine tenths of a 2 MiB thread, its format's output
+#                          survives parse + both wires + format + the imports walk + strip + the combined strip-and-imports walk
+#                          on nine tenths of a 2 MiB thread, its format's output
 #                          reparses and is its own format (F1), and one deeper is refused (a plain `cargo test` grades the
 #                          16 MiB debug contract over the named shapes and a stride of the sweep); in `check`
 deno task test:depth:napi # the same in the SHIPPED optimization (`--profile napi`, fat LTO) over the FULL sweep (every head,
 #                          `TSV_DEPTH_SWEEP=full`); NOT in `check` — publish Step 3 and CI's `artifacts` job (deno.json `//test:depth:napi`)
 deno task test:depth:wasm # the full sweep's shapes at the same depths through the staged `all` WASM package on a Node MAIN thread,
-#                          cold and tiered up (scripts/depth_wasm.ts); NOT in `check` — publish Step 6 and CI's `artifacts`
-#                          job (deno.json `//test:depth:wasm`)
+#                          cold and tiered up — parse, format, the import records and the strip (scripts/depth_wasm.ts); NOT
+#                          in `check` — publish Step 6 and CI's `artifacts` job (deno.json `//test:depth:wasm`)
 deno task test:audits    # cargo test -p tsv_lang --features _internal_audits — the `_internal_swallow_check` + `_internal_comment_check` seams' own tests; in `check`
 deno task lint           # cargo clippy
 deno task entities:update # regenerate tsv_html's committed entity table from its entities.json (the generator is
@@ -172,7 +174,7 @@ cargo test --workspace --test cli_tests                # CLI integration tests
 cargo test --workspace --test strip_fixtures_tests     # type-strip fixtures (tests/fixtures_strip)
 ```
 
-`cargo fmt` (Rust) and `tsv format` (TS/JS) are the repo's ONLY autoformatters and partition it; markdown and JSON are hand-maintained. **Never run `deno fmt` or `prettier` on the repo** — tsv ships no config for them, so they'd churn every file (the prettier oracles pass options inline). `tsv format` on a directory is safe: the root `.formatignore` prunes tests/fixtures/, tests/fixtures_compile/ and tests/fixtures_strip/ (deliberately not format fixed points), and a file named under them is skipped too.
+`cargo fmt` (Rust) and `tsv format` (TS/JS) are the repo's ONLY autoformatters and partition it; markdown and JSON are hand-maintained. **Never run `deno fmt` or `prettier` on the repo** — tsv ships no config for them, so they'd churn every file (the prettier oracles pass options inline). `tsv format` on a directory is safe: the root `.formatignore` prunes tests/fixtures/, tests/fixtures_compile/, tests/fixtures_strip/ and tests/fixtures_imports/ (deliberately not format fixed points), and a file named under them is skipped too.
 
 ### Fixtures (Rust + Deno-based)
 
@@ -201,6 +203,12 @@ deno task strip:fixtures:update      # regenerate expected.* / refusal.txt from 
 deno task strip:corpus               # tsv_ts::strip vs ts-blank-space over the ../corpora snapshot's TypeScript: no panic, the
 #                                      position contract + idempotence, JS-valid output, byte and refusal agreement outside a
 #                                      reviewed ACCEPTED list, exact STRIP_CORPUS_PINS. A `conformance` leg; ./docs/audits.md
+deno task imports:fixtures:validate  # import records vs tests/fixtures_imports: the tree's shape, oracle freshness (the canonical
+#                                      parser's tree walked by tsv_debug's oracle, regenerated in memory, must equal the committed
+#                                      expected.json) and tsv's records. Sidecar, so NOT in check — `cargo test --test
+#                                      imports_fixtures_tests` grades tsv against the committed files. See tests/fixtures_imports/README.md
+deno task imports:fixtures:update    # regenerate every expected.json from the canonical parsers' trees (an `oracle.txt` fixture
+#                                      walks tsv's own parse wire instead). Sidecar; NOT in check
 ```
 
 **Standing audit gates** — full reference ./docs/audits.md (what each proves, blind spots, flags, where it gates; its overview table maps every task). Read the relevant section before running or modifying an audit. RATCHET audits grade against a committed known-bug snapshot (`*_known.txt`); each has an `:update` task that re-pins after a fix and refuses a narrowed run. Everything below gates in `deno task check` unless noted.
@@ -265,9 +273,11 @@ deno task paren:audit                # authoring-independence over redundant PAR
 deno task fuzz:audit                 # seeded mutational fuzzer: no-panic + idempotency + structural reparse (node loss HARD,
 #                                      skeleton divergence soft); its dictionary carries `// prettier-ignore`, the only standing
 #                                      instrument composing a freeze with a comment or a paren shell. Every accepted attempt
-#                                      also writes the `locations` wire (no panic) and type-strips TypeScript (no panic + the
-#                                      strip's contract + idempotence); runs tests/fixtures as found, then `:css` / `:ts`
-#                                      (`--embedded`: every `<style>` / `<script>` body as a seed)
+#                                      also writes the `locations` wire (no panic), type-strips TypeScript (no panic + the
+#                                      strip's contract + idempotence) and collects the import records of TypeScript and Svelte
+#                                      (no panic + the records' contract); runs tests/fixtures as found, then `:css` / `:ts`
+#                                      (`--embedded`: every `<style>` / `<script>` body as a seed; `:ts` adds tests/fixtures_strip
+#                                      and tests/fixtures_imports)
 deno task fuzz:audit:debug           # the same three runs under `--profile corpus-debug` (debug-assertions + overflow-checks,
 #                                      what a consumer's dev build compiles in): a fired `debug_assert!` is a caught panic finding
 deno task swallow:audit              # `//` line comment swallowing following output-line content (also over real code via audit:corpus)
@@ -291,8 +301,9 @@ deno task razor:audit                # print-width RAZOR SWEEP: pads a text word
 deno task engines:audit              # ENGINE PARITY: wasm32 (under Node, the host `cli.js` ships for) and native builds must
 #                                      produce the SAME BYTES — exit code, changed paths, diagnostics, every file — over both
 #                                      fixture trees + ../corpora when present, plus a strip leg (`tsv strip` per file on both
-#                                      bins; `strip_typescript` on both engines over ../corpora). Needs both packages built: NOT
-#                                      in check; gates in CI's `artifacts` job
+#                                      bins; `strip_typescript` on both engines over ../corpora) and an imports leg
+#                                      (`parse_imports_*` on both engines over tests/fixtures_imports + ../corpora). Needs both
+#                                      packages built: NOT in check; gates in CI's `artifacts` job
 deno task render:audit <paths>       # render-equivalence over REAL Svelte (sidecar; NOT in check; release-gated via `deno task conformance`)
 deno task idempotency:sweep          # F1 sweep over the real-code corpus (minutes; NOT in check; conformance cadence)
 deno task audit:corpus               # the content-loss/robustness bundle over REAL code (publish Step 3c; NOT in check)
@@ -327,7 +338,7 @@ Three binding crates:
 - `tsv_wasm` (wasm-bindgen) — browser, Deno, Node; format / parse / all variants via cargo features
 - `tsv_napi` (napi-rs) — Node.js / Bun native addon (`libtsv_napi.*`, loaded via `process.dlopen`), built with the `napi` profile (`release` + `panic = "unwind"` → `target/napi/`; every export is `catch_unwind`, so a panic throws a JS error instead of aborting the host). Its npm surface (`@fuzdev/tsv`, wasm-API-parity by contract) is in [Publishing](#publishing); tested per OS by `test:napi:npm`; expected to eventually subsume the WASM native path. See ./crates/tsv_napi/CLAUDE.md.
 
-`tsv_wasm` produces three npm packages from one crate via the `format` + `parse` + `strip` cargo features (default = all three): `@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`, and `@fuzdev/tsv-wasm` (everything — the type strip's `strip_typescript` included — + the `tsv` CLI), each with its own output directory. `tsv_napi` carries the same `strip` feature in its default set; `tsv_ffi` has none.
+`tsv_wasm` produces three npm packages from one crate via the `format` + `parse` + `strip` + `imports` cargo features (default = all four): `@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`, and `@fuzdev/tsv-wasm` (everything — the type strip's `strip_typescript` and the import records' `parse_imports_typescript` / `parse_imports_svelte` included — + the `tsv` CLI), each with its own output directory. `tsv_napi` carries the same `strip` and `imports` features in its default set; `tsv_ffi` has neither.
 
 ```bash
 deno task build:ffi                  # C FFI, full → target/release/libtsv_ffi.so
@@ -352,7 +363,7 @@ npm is the JS package surface (each tag's GitHub Release carries only notes + th
 
 - `@fuzdev/tsv-format-wasm` — format only (`--no-default-features --features format`)
 - `@fuzdev/tsv-parse-wasm` — parse only; bundles the hand-maintained `tsv_ast.d.ts` (`crates/tsv_wasm/types/`) + the pure-JS line/column helper behind `{locations: true}` (`crates/tsv_wasm/npm/locations.js` + `.d.ts`; also exported alone, engine-free, as the `./locations` subpath)
-- `@fuzdev/tsv-wasm` — the default features: both of the above plus `strip` (`strip_typescript`, through the facade's `api_strip.js` + `facade_strip.d.ts` — ./docs/strip.md; neither subset carries it); bundles the above and ships the `tsv` bin (`crates/tsv_wasm/npm/cli.js` — `format` + `parse` + `strip` mirroring `tsv_cli`'s flags/exit codes; argv parsed by a zero-dep transcription of argh's grammar). Path mode fans onto `node:worker_threads` (workers get the main thread's compiled module via the `./worker` entry); `--jobs N` keeps the native ceiling, while the default pool is sized **per engine**, below the native CLI's — ./docs/cli.md §Binary Structure
+- `@fuzdev/tsv-wasm` — the default features: both of the above plus `strip` (`strip_typescript`, through the facade's `api_strip.js` + `facade_strip.d.ts` — ./docs/strip.md) and `imports` (`parse_imports_typescript` / `parse_imports_svelte`, through `api_imports.js` + `facade_imports.d.ts`), neither of which a subset carries; bundles the above and ships the `tsv` bin (`crates/tsv_wasm/npm/cli.js` — `format` + `parse` + `strip` mirroring `tsv_cli`'s flags/exit codes; argv parsed by a zero-dep transcription of argh's grammar). Path mode fans onto `node:worker_threads` (workers get the main thread's compiled module via the `./worker` entry); `--jobs N` keeps the native ceiling, while the default pool is sized **per engine**, below the native CLI's — ./docs/cli.md §Binary Structure
 
 **Naming.** Every npm name tsv publishes is kebab-case (`@fuzdev/tsv`, `@fuzdev/tsv-wasm`, `@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`, `@fuzdev/tsv-<triple>`) — one spelling with the `tsv-<triple>` release assets and the `fuzdev.tsv-format` VS Code extension (vsce forbids `_`), and the `-wasm` convention of tsv's Rust-tooling peers; the rule for every `@fuzdev` WASM or native-delivery package (`@fuzdev/blake3-wasm` too). Rust crates (`tsv_wasm`, `tsv_napi`) and the rest of the `@fuzdev` libraries stay snake_case; crate-derived file names inside a package (`tsv_wasm.js`, `tsv_wasm_bg.wasm`, `tsv_napi.node`) are internal and follow the crate.
 
@@ -575,9 +586,9 @@ tsv/
 │   ├── tsv_html/    # HTML spec data: named character references
 │   ├── tsv_ignore/  # gitignore-aware matcher: hierarchical .gitignore + .formatignore/.prettierignore
 │   ├── tsv_discover/# file-discovery policy (build-output heuristic + safety nets) over tsv_ignore
-│   ├── tsv_ts/      # TypeScript: parse_to_json(), format(), strip()
+│   ├── tsv_ts/      # TypeScript: parse_to_json(), format(), strip(), parse_imports(), strip_with_imports()
 │   ├── tsv_css/     # CSS: parse_to_json(), format()
-│   ├── tsv_svelte/  # Svelte: parse_to_json(), format()
+│   ├── tsv_svelte/  # Svelte: parse_to_json(), format(), parse_imports()
 │   ├── tsv_svelte_compile/ # Svelte→JS compiler (Svelte's compile() oracle) + JS canonicalizer; consumed by tsv_debug — no shipped artifact links it
 │   ├── tsv_check/   # EXPERIMENTAL TypeScript binder + checker — may never ship (consumed only by tsv_debug)
 │   ├── tsv_cli/     # Production CLI (binary: tsv) - pure Rust
@@ -590,7 +601,8 @@ tsv/
 ├── tests/           # Integration tests (parser, formatter, CLI)
 │   ├── fixtures/    # Test fixtures organized by language/feature
 │   ├── fixtures_compile/ # Compiler fixtures (input.svelte + canonicalized oracle expected_server.js + expected.css) — separate tree so parser/formatter fixture counts stay unperturbed
-│   └── fixtures_strip/ # Type-strip fixtures for `tsv_ts::strip` (input.ts + oracle-generated expected.js or refusal.txt) — tests/fixtures_strip/README.md
+│   ├── fixtures_strip/ # Type-strip fixtures for `tsv_ts::strip` (input.ts + oracle-generated expected.js or refusal.txt) — tests/fixtures_strip/README.md
+│   └── fixtures_imports/ # Import-record fixtures for `parse_imports` (input.ts / input.svelte + oracle-generated expected.json) — tests/fixtures_imports/README.md
 └── docs/            # Documentation (fixtures, cli, architecture, etc.)
 ```
 

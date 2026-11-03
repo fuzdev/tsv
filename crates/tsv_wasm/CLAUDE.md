@@ -1,14 +1,15 @@
 # tsv_wasm
 
 WebAssembly bindings for `tsv`. Three npm packages from one Rust crate via the `format`,
-`parse` and `strip` cargo features (default = all three):
+`parse`, `strip` and `imports` cargo features (default = all four):
 
 - `@fuzdev/tsv-format-wasm` — `--no-default-features --features format`, format only
 - `@fuzdev/tsv-parse-wasm` — `--no-default-features --features parse`, parse only (the printers
   drop out at link time; bundles `tsv_ast.d.ts` for typed returns)
 - `@fuzdev/tsv-wasm` — the default build: everything — the type strip (`strip_typescript`,
-  the `strip` feature, which neither subset enables) included — plus the `tsv` CLI from
-  `npm/cli.js`
+  the `strip` feature) and the import records (`parse_imports_typescript` /
+  `parse_imports_svelte`, the `imports` feature), neither of which a subset enables, included —
+  plus the `tsv` CLI from `npm/cli.js`
 
 Package shape, version-of-truth rule, and the `deno task publish` / `build:npm:*` commands:
 [../../CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
@@ -127,11 +128,30 @@ source type read as a format reads one (`tsv_arena::Family::Strip`) — returnin
 (`UnsupportedConstruct::as_str`), which `api_strip.js` checks against the set it knows. `api_strip.js`
 imports nothing but `api.js`'s readers, and the patcher stages it into the `all` variant alone.
 
+**The imports family** (`npm/api_imports.js` + `npm/facade_imports.d.ts`, in `@fuzdev/tsv-wasm`
+and the native `@fuzdev/tsv` alone). `parse_imports_typescript(source, options?)` and
+`parse_imports_svelte(source, options?)` return `{ok: true, hasModuleSyntax, imports}` — the
+records `tests/fixtures_imports/*/expected.json` pins, offsets in UTF-16 units — or `{ok: false,
+error}`, `error.kind` `'parse'`. `read_options`' `'imports'` kind takes `sourceType` on
+TypeScript alone, as a strip's; Svelte refuses a set one. The raw exports
+`parse_imports_<lang>(source, source_type?)` read an unset source type as a strip does
+(`tsv_arena::Family::Imports`) and return the records as ONE JSON string
+(`tsv_ts::__private::write_imports_json_string`, in the language's `WIRE_COORDINATES`) or the
+`{ok: false, error}` they built; the facade `JSON.parse`s the string into the result, and a
+string that is not JSON is thrown as `Error('internal error: import records serialized to
+invalid JSON', {cause})` — an engine bug, never a result. A string, not engine-built objects:
+the records would cost a property set per field across the boundary, and a prototype that built
+them engine-side measured slower than the string plus the facade's `JSON.parse`. Kept out of
+the parse family on purpose — `patch_npm_package.ts` reads the `parse_imports_` prefix ahead
+of `parse_`, and `facade_surface_suite.ts` names its noun `imports`. `strip_with_imports`
+stays Rust-only.
+
 **Why the reader is JS.** Both package sets need it, and the native one has no WASM to host a
 Rust reader — a Rust reader would need a hand restatement in the napi loader plus a parity test.
 One shared JS reader is strictly less to drift: it is unit-tested over a fake engine by
 `scripts/npm_api_test.ts` (a `deno task test:deno` leg, so it gates in `check` with no package
-built) — its strip half by `scripts/npm_api_strip_test.ts`, the same way — and exercised through
+built) — its strip and imports halves by `scripts/npm_api_strip_test.ts` /
+`scripts/npm_api_imports_test.ts`, the same way — and exercised through
 the real engines by `scripts/test_npm.ts` / `scripts/test_napi_npm.ts`, whose exact-string
 tests pin the texts.
 
@@ -174,8 +194,8 @@ whichever family's declarations it carries, each of which imports it); `FormatRe
 `end` covers. `TsvError` and `TsvParseError` are re-exported by name from every entry and
 from the napi `index.d.ts`. The published declarations are the facade's hand-written
 `npm/facade_format.d.ts` (format and its `FormatResult` / `FormatRefusedError`; in the
-format-capable packages), `npm/facade_parse.d.ts` (parse, `ParseResult<T>` / `ParseJsonResult`)
-and `npm/facade_strip.d.ts`, re-exported **by name** from
+format-capable packages), `npm/facade_parse.d.ts` (parse, `ParseResult<T>` / `ParseJsonResult`),
+`npm/facade_strip.d.ts` and `npm/facade_imports.d.ts`, re-exported **by name** from
 each entry's `index.d.ts` / `browser.d.ts` (the napi `index.d.ts` the same way):
 `parse_svelte(...): ParseResult<Root>`, `parse_typescript(...): ParseResult<Program>`,
 `parse_css(...): ParseResult<StyleSheetFile>`, `format_<lang>(...): FormatResult`. Each result
@@ -470,8 +490,8 @@ under `nodenext`, and both package suites also assert it over every declared `.d
 regex, not a typechecker, but it runs wherever the suites do, with no TypeScript install
 (`scripts/dts_specifiers.ts`, one test both suites register). The facade's functions and
 its option and error types are re-exported **by name** from `facade_format.d.ts` /
-`facade_parse.d.ts` / `facade_strip.d.ts` / `facade_error.d.ts`, an explicit form star-export ambiguation can't
-drop. The type names are read off those files (`scripts/npm_facade.ts`'s `facade_type_names`), so a type
+`facade_parse.d.ts` / `facade_strip.d.ts` / `facade_imports.d.ts` / `facade_error.d.ts`, an
+explicit form star-export ambiguation can't drop. The type names are read off those files (`scripts/npm_facade.ts`'s `facade_type_names`), so a type
 the facade declares reaches every wasm entry with no list to keep; the napi loader's
 hand-written `index.d.ts` is held to the same derived set by `scripts/test_napi_npm.ts`.
 
@@ -729,6 +749,7 @@ require dual updates.
   - **Path quoting.** Every path it names itself — the `--list` and changed-path lines, `error:` lines, its traversal and argument errors, `parse`'s read failure — goes through its hand restatement of `tsv_discover::quote_path` (a name holding a control character or a double quote is C-quoted as `git ls-files` prints it; the binding's warnings arrive quoted), pinned beside the native rule by `scripts/test_npm.ts` (see [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting))
 - `npm/api.js` + `npm/facade_format.d.ts`, `npm/api_parse.js` + `npm/facade_parse.d.ts`, `npm/facade_error.d.ts` (the `TsvError` base shape and the `TsvParseError` every family's result carries) — The hand-written facade every package publishes through: the options reader, the failure readers and the format family, and the parse family with the `{locations: true}` sugar (see [The npm Facade](#the-npm-facade-options--typed-returns), which also says why the declarations are named apart from their modules). Staged verbatim by `patch_npm_package.ts` (`api_parse.js` + `facade_parse.d.ts` into the parse-capable packages only, `facade_format.d.ts` into the format-capable ones) and by `scripts/build_napi_packages.ts` into the native `@fuzdev/tsv` — one source for both package sets. `scripts/npm_facade.ts` owns what both staging scripts share: the facade file table (with `locations.*` and `types/tsv_ast.d.ts` in the parse half), the `./locations` exports entry, and the re-exported type names
 - `npm/api_strip.js` + `npm/facade_strip.d.ts` — The facade's strip half (`create_strip_api`, the result object; [The npm Facade](#the-npm-facade-options--typed-returns)), staged into `@fuzdev/tsv-wasm` and the native `@fuzdev/tsv` alone, as `scripts/npm_facade.ts`'s strip family
+- `npm/api_imports.js` + `npm/facade_imports.d.ts` — The facade's imports half (`create_imports_api`), staged into the same two packages, as `scripts/npm_facade.ts`'s imports family
 - `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only wire; ships in the parse-capable packages, run by `api_parse.js` for `{locations: true}`, re-exported from index.js/browser.js by `patch_npm_package.ts`, and exported alone as the `./locations` subpath. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv-format-wasm` (copied by `patch_npm_package.ts`)
 - `README_parse.md` — Shipped as `README.md` in `@fuzdev/tsv-parse-wasm` (copied by `patch_npm_package.ts`)
@@ -739,7 +760,7 @@ require dual updates.
 
 Variant-first output dirs (`pkg/<variant>/<target>/`) so builds never clobber
 each other. Subsets build `--no-default-features --features format|parse`;
-the `all` builds use the default features (all three).
+the `all` builds use the default features (all four).
 
 | Target | format output dir  | parse output dir  | all output dir  | Command (format / parse / all)                                      |
 | ------ | ------------------ | ----------------- | --------------- | ------------------------------------------------------------------- |

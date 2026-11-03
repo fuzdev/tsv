@@ -11,8 +11,8 @@
  * - every exported subpath — the root, `./worker` (wasm), `./locations` (parse-capable) —
  *   through lean consumer modules that call the surface with typed returns, forwarded
  *   option bags, the format / parse result narrowing (`TsvParseError`, the format's
- *   `FormatRefusedError`), the `IgnoreStack` verdict union and the type strip's
- *   result narrowing (in the two packages that carry it), plus
+ *   `FormatRefusedError`), the `IgnoreStack` verdict union and the type strip's and the
+ *   import records' result narrowing (in the two packages that carry them), plus
  *   `// @ts-expect-error` negatives for what must NOT compile (an unused one is itself an
  *   error, so the negatives are pinned too);
  * - every ```ts / ```typescript block of the README the package ships, each as its own
@@ -96,6 +96,8 @@ interface PackageSpec {
 	parse: boolean;
 	/** Whether it carries the type strip — the umbrella and the native loader alone. */
 	strip: boolean;
+	/** Whether it carries the import records — the same two. */
+	imports: boolean;
 	/** The command that restages it. */
 	rebuild: string;
 	/** The freshness checks that date the staging, its README included. */
@@ -122,6 +124,7 @@ const wasm_package = (variant: 'format' | 'parse' | 'all', name: string): Packag
 		format: variant !== 'parse',
 		parse: variant !== 'format',
 		strip: variant === 'all',
+		imports: variant === 'all',
 		rebuild,
 		checks: [
 			...wasm_package_checks(variant),
@@ -144,6 +147,7 @@ const PACKAGES: Record<PackageKey, PackageSpec> = {
 		format: true,
 		parse: true,
 		strip: true,
+		imports: true,
 		rebuild: NAPI_REBUILD,
 		checks: [
 			...napi_loader_checks(),
@@ -389,6 +393,63 @@ const kinds: Exact<
 void [returns, construct, kinds];
 `;
 
+/** The import records, over the package root: the result narrows on `ok`, a record's
+ * nullable fields on their own checks, and only TypeScript's bag names a goal. */
+const imports_module = (pkg: PackageSpec): string => `
+import {parse_imports_svelte, parse_imports_typescript} from '${pkg.name}';
+import type {
+	ImportRecord,
+	ImportRecordKind,
+	ImportRecordSpecifier,
+	ImportsOptions,
+	ImportsResult,
+	TsvParseError,
+	TypeScriptImportsOptions
+} from '${pkg.name}';
+
+${EXACT}
+
+const returns: Exact<ReturnType<typeof parse_imports_typescript>, ImportsResult> = true;
+const svelte_returns: Exact<ReturnType<typeof parse_imports_svelte>, ImportsResult> = true;
+const options: TypeScriptImportsOptions = {sourceType: 'module'};
+const result = parse_imports_typescript("import a from './a';", options);
+// one bag forwarded from a caller holding no source type, on either language
+const forwarded: ImportsOptions = {sourceType: undefined};
+parse_imports_svelte('<script>import a from "./a";</script>', forwarded);
+parse_imports_typescript('import(a)', {sourceType: undefined});
+// @ts-expect-error a goal is 'script' or 'module'
+parse_imports_typescript('x', {sourceType: 'sloppy'});
+// @ts-expect-error Svelte names no goal
+parse_imports_svelte('<p>x</p>', {sourceType: 'module'});
+// @ts-expect-error an unknown option key
+parse_imports_typescript('x', {locations: true});
+// @ts-expect-error the records are there only once \`ok\` says so
+void result.imports;
+let specifiers: Array<string> = [];
+if (result.ok) {
+	const has_module_syntax: boolean = result.hasModuleSyntax;
+	const records: Array<ImportRecord> = result.imports;
+	for (const record of records) {
+		// @ts-expect-error a computed dynamic import has no specifier: check it first
+		void record.specifier.value;
+		const specifier: ImportRecordSpecifier | null = record.specifier;
+		if (specifier !== null) specifiers = [...specifiers, specifier.value];
+		const span: [number, number] = [record.start, record.end];
+		const attributes: [number, number] | null =
+			record.attributes && [record.attributes.start, record.attributes.end];
+		void [span, attributes, record.typeOnly === 'specifiers', record.phase === 'defer'];
+	}
+	void has_module_syntax;
+} else {
+	const error: TsvParseError = result.error;
+	void [error.start, error.frame, error.loc.start.line];
+}
+const kinds: Exact<ImportRecordKind, 'static' | 're_export' | 'dynamic' | 'import_equals'> = true;
+const type_only: Exact<ImportRecord['typeOnly'], 'statement' | 'specifiers' | null> = true;
+const phase: Exact<ImportRecord['phase'], 'source' | 'defer' | null> = true;
+void [returns, svelte_returns, specifiers, kinds, type_only, phase];
+`;
+
 /** `./locations` alone: the helper with no engine, graded without the DOM lib. */
 const locations_module = (pkg: PackageSpec): string => `
 import {create_locator, reconstruct_locations} from '${pkg.name}/locations';
@@ -475,6 +536,15 @@ const absent_module = (pkg: PackageSpec): string => {
 			'// @ts-expect-error nor its types',
 			`import type {StripResult} from '${pkg.name}';`,
 			'void strip_typescript;'
+		);
+	}
+	if (!pkg.imports) {
+		lines.push(
+			'// @ts-expect-error only the umbrella and the native loader carry the import records',
+			`import {parse_imports_typescript} from '${pkg.name}';`,
+			'// @ts-expect-error nor their types',
+			`import type {ImportsResult} from '${pkg.name}';`,
+			'void parse_imports_typescript;'
 		);
 	}
 	if (pkg.engine === 'napi') {
@@ -581,6 +651,7 @@ function consumer_files(pkg: PackageSpec, readme: string): Array<ConsumerFile> {
 		add('locations', locations_module(pkg), { dom: false });
 	}
 	if (pkg.strip) add('strip', strip_module(pkg));
+	if (pkg.imports) add('imports', imports_module(pkg));
 	if (pkg.engine === 'wasm') {
 		add('worker', worker_module(pkg));
 		add('entry_node', entry_module(pkg, 'nodenext'), { resolutions: ['nodenext'] });

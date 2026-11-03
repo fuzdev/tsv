@@ -153,8 +153,9 @@ pub fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -
 // CLAUDE.md §Why this crate exists).
 
 /// Which export family a binding call belongs to — the one fact that decides what an
-/// **unset** source type means (a parse reads it as `Module`, a format or a strip as "none
-/// named", the module-then-script fallback), and the noun every source-type refusal names.
+/// **unset** source type means (a parse reads it as `Module`, a format, a strip or an
+/// imports parse as "none named", the module-then-script fallback), and the noun every
+/// source-type refusal names.
 ///
 /// One type for all three bindings' decoders: `tsv_ffi`'s `ffi_source_type` reads it to
 /// decide whether its unspecified code is accepted (format only), and the two string-axis
@@ -169,15 +170,19 @@ pub enum Family {
     /// `strip_typescript` — whose source type, like a format's, shapes only the parse the
     /// strip runs.
     Strip,
+    /// `parse_imports_*` — whose source type, like a strip's, shapes only the parse the
+    /// collection runs: its records carry no `sourceType`, so unset is the fallback.
+    Imports,
 }
 
 impl Family {
-    /// The family's name as the refusals spell it: `parse` / `format` / `strip`.
+    /// The family's name as the refusals spell it: `parse` / `format` / `strip` / `imports`.
     pub const fn noun(self) -> &'static str {
         match self {
             Family::Parse => "parse",
             Family::Format => "format",
             Family::Strip => "strip",
+            Family::Imports => "imports",
         }
     }
 }
@@ -185,7 +190,7 @@ impl Family {
 /// Decode a string-spelled source type — `tsv_wasm` and `tsv_napi`'s trailing optional
 /// argument — into the language's goal; `None` (omitted, `undefined`, `null`) stays
 /// **unset**, and what that means is the `family`'s (a parse reads it as `Module`, a
-/// format or a strip as "none named").
+/// format, a strip or an imports parse as "none named").
 ///
 /// `allowed` is the language's goal axis ([`goal_allowed!`]): a source type named on a
 /// language with none (Svelte hard-wires `Module`; CSS has no goal) is refused rather
@@ -702,6 +707,7 @@ mod tests {
             (Family::Parse, "parse"),
             (Family::Format, "format"),
             (Family::Strip, "strip"),
+            (Family::Imports, "imports"),
         ] {
             assert_eq!(family.noun(), noun);
             for value in ["script", "module", "sloppy"] {
