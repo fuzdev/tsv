@@ -1,0 +1,434 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 434,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A template has no legacy escapes: `\\0` before a digit, `\\1`–`\\7` and `\\8` / `\\9`",
+			"start": 20,
+			"end": 103
+		},
+		{
+			"type": "Line",
+			"value": " are a NotEscapeSequence, so a tagged template's cooked value is null.",
+			"start": 105,
+			"end": 177
+		},
+		{
+			"type": "Line",
+			"value": " A bare `\\0` is the NUL escape and still cooks.",
+			"start": 352,
+			"end": 401
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 433,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 424,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 179,
+					"end": 204,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 185,
+							"end": 203,
+							"id": {
+								"type": "Identifier",
+								"start": 185,
+								"end": 190,
+								"name": "octal"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 193,
+								"end": 203,
+								"tag": {
+									"type": "Identifier",
+									"start": 193,
+									"end": 196,
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 196,
+									"end": 203,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 197,
+											"end": 202,
+											"value": {
+												"raw": "\\75 a",
+												"cooked": null
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A template has no legacy escapes: `\\0` before a digit, `\\1`–`\\7` and `\\8` / `\\9`",
+							"start": 20,
+							"end": 103
+						},
+						{
+							"type": "Line",
+							"value": " are a NotEscapeSequence, so a tagged template's cooked value is null.",
+							"start": 105,
+							"end": 177
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 206,
+					"end": 233,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 212,
+							"end": 232,
+							"id": {
+								"type": "Identifier",
+								"start": 212,
+								"end": 220,
+								"name": "octalRun"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 223,
+								"end": 232,
+								"tag": {
+									"type": "Identifier",
+									"start": 223,
+									"end": 226,
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 226,
+									"end": 232,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 227,
+											"end": 231,
+											"value": {
+												"raw": "\\101",
+												"cooked": null
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 235,
+					"end": 262,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 241,
+							"end": 261,
+							"id": {
+								"type": "Identifier",
+								"start": 241,
+								"end": 250,
+								"name": "zeroDigit"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 253,
+								"end": 261,
+								"tag": {
+									"type": "Identifier",
+									"start": 253,
+									"end": 256,
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 256,
+									"end": 261,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 257,
+											"end": 260,
+											"value": {
+												"raw": "\\01",
+												"cooked": null
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 264,
+					"end": 289,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 270,
+							"end": 288,
+							"id": {
+								"type": "Identifier",
+								"start": 270,
+								"end": 278,
+								"name": "nonOctal"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 281,
+								"end": 288,
+								"tag": {
+									"type": "Identifier",
+									"start": 281,
+									"end": 284,
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 284,
+									"end": 288,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 285,
+											"end": 287,
+											"value": {
+												"raw": "\\8",
+												"cooked": null
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 291,
+					"end": 317,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 297,
+							"end": 316,
+							"id": {
+								"type": "Identifier",
+								"start": 297,
+								"end": 306,
+								"name": "nonOctal9"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 309,
+								"end": 316,
+								"tag": {
+									"type": "Identifier",
+									"start": 309,
+									"end": 312,
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 312,
+									"end": 316,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 313,
+											"end": 315,
+											"value": {
+												"raw": "\\9",
+												"cooked": null
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 319,
+					"end": 349,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 325,
+							"end": 348,
+							"id": {
+								"type": "Identifier",
+								"start": 325,
+								"end": 331,
+								"name": "member"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 334,
+								"end": 348,
+								"tag": {
+									"type": "MemberExpression",
+									"start": 334,
+									"end": 344,
+									"object": {
+										"type": "Identifier",
+										"start": 334,
+										"end": 340,
+										"name": "String"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 341,
+										"end": 344,
+										"name": "raw"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 344,
+									"end": 348,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 345,
+											"end": 347,
+											"value": {
+												"raw": "\\7",
+												"cooked": null
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 403,
+					"end": 423,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 409,
+							"end": 422,
+							"id": {
+								"type": "Identifier",
+								"start": 409,
+								"end": 412,
+								"name": "nul"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 415,
+								"end": 422,
+								"tag": {
+									"type": "Identifier",
+									"start": 415,
+									"end": 418,
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 418,
+									"end": 422,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 419,
+											"end": 421,
+											"value": {
+												"raw": "\\0",
+												"cooked": "\u0000"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A bare `\\0` is the NUL escape and still cooks.",
+							"start": 352,
+							"end": 401
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

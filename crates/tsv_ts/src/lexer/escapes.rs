@@ -34,9 +34,10 @@ use tsv_lang::swar::next_byte_of;
 /// - Octal escapes: `\0` (null), legacy octals (`\101` → 'A'; a three-digit run only
 ///   for a leading `0`–`3`, so `\400` is `\40` + `0`). The decode is mode-free; the
 ///   legacy forms are disallowed in strict code, which the parser gates over the raw
-///   slice (`find_legacy_escape`). The same decoder cooks template literals, so the
-///   digit-run rule reaches a template's `cooked` value too (where the untagged form is
-///   a deferred `NotEscapeSequence` early error)
+///   slice (`find_legacy_escape`). The same decoder cooks template literals, where each
+///   legacy form is a `NotEscapeSequence`: the parser asks the same finder and cooks a
+///   tagged template's segment to `null`, while an untagged one keeps this decode (its
+///   `NotEscapeSequence` is a deferred early error)
 /// - Line continuations: `\<newline>` → empty string
 /// - Invalid escapes: `\z` → 'z' (backslash ignored per spec) — including `\8` / `\9`,
 ///   the `NonOctalDecimalEscapeSequence`, which stands for the digit itself
@@ -218,10 +219,11 @@ pub(crate) enum LegacyEscape {
 /// production is `\0 [lookahead ∉ DecimalDigit]`, the NUL escape, legal in every mode.
 ///
 /// Scanning the raw slice rather than recording the fact during the decode keeps one
-/// spelling of the question for the parser's two askers: the string-literal seam, which
-/// asks as it turns the token into a node, and the retroactive prologue re-check, which
-/// asks about literals whose tokens are long gone. The walk is byte-wise and steps over a
-/// whole escape at a time, so an escaped backslash (`\\7`) opens no escape and a
+/// spelling of the question for the parser's askers: the string-literal seam, which
+/// asks as it turns the token into a node, the retroactive prologue re-check, which
+/// asks about literals whose tokens are long gone, and a tagged template's cooked value,
+/// where every one of these forms is a `NotEscapeSequence` (`Parser::template_cooked`).
+/// The walk is byte-wise and steps over a whole escape at a time, so an escaped backslash (`\\7`) opens no escape and a
 /// multi-byte escaped character cannot be mistaken for one (a UTF-8 continuation byte is
 /// never `\`).
 pub(crate) fn find_legacy_escape(raw: &str) -> Option<(usize, LegacyEscape)> {

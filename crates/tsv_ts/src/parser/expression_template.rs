@@ -4,6 +4,7 @@
 
 use crate::ast::{TemplateCooked, TemplateElement, TemplateLiteral};
 use crate::lexer::TokenKind;
+use crate::lexer::escapes::find_legacy_escape;
 use tsv_lang::{Error, Span};
 
 use super::Parser;
@@ -83,6 +84,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (cooked value `null` → `TemplateCooked::Invalid`), but is a syntax error in
     /// an untagged template or a template-literal type.
     ///
+    /// The decoder is the string decoder, which reads the legacy escapes (`\7`,
+    /// `\01`, `\8`) as a sloppy-mode string does; a template has no such escape —
+    /// each is a `NotEscapeSequence` — so where the decode succeeded a tagged
+    /// template asks the raw `content` for one ([`find_legacy_escape`]) and cooks
+    /// to `Invalid` on a hit. An untagged template keeps the decoded value: its
+    /// `NotEscapeSequence` is the deferred early error, not a parse failure.
+    ///
     /// `content_start` is `content`'s position in the document, where the decoder's
     /// content-relative error position is lifted to.
     pub(super) fn template_cooked(
@@ -92,6 +100,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         tagged: bool,
     ) -> Result<TemplateCooked<'arena>, Error> {
         match self.current_decoded {
+            Some(_) if tagged && find_legacy_escape(content).is_some() => {
+                Ok(TemplateCooked::Invalid)
+            }
             Some(decoded) => Ok(TemplateCooked::Decoded(decoded)),
             None if content.contains('\\') => {
                 if tagged {
