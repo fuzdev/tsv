@@ -147,16 +147,12 @@ impl ImportRecord {
     /// The specifier's value, decoded: a string literal's escapes, or a template
     /// literal's cooked value (a `\r` or `\r\n` read as `\n`) — the value tsv's parse
     /// wire carries. Borrowed from `source` when there is nothing to decode. `None` when
-    /// the record has no specifier.
+    /// the record has no specifier, and only then.
     ///
     /// The decoding is the parse wire's in its two lenient corners: an untagged template's
     /// escape with no cooked value, which tsv's parser defers rather than rejects, decodes
     /// as the wire decodes it (`` `\1` `` is U+0001), and a lone surrogate escape
-    /// (`'\uD800'`), which a Rust string cannot hold, decodes to U+FFFD. A record from
-    /// `source` always has a value when it has a specifier: a source whose escapes do not
-    /// decode does not parse.
-    ///
-    /// `source` must be the text the record was collected from.
+    /// (`'\uD800'`), which a Rust string cannot hold, decodes to U+FFFD.
     ///
     /// ```
     /// # fn main() -> tsv_ts::Result<()> {
@@ -168,27 +164,42 @@ impl ImportRecord {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// When `source` is not the text the record was collected from: the specifier's span
+    /// is out of bounds of it or not on a character boundary, as [`ByteSpan::text`]
+    /// panics, or its text holds an escape that does not decode — a source whose escapes
+    /// do not decode does not parse, so no record of its own holds one.
     #[must_use]
+    #[expect(
+        clippy::panic,
+        reason = "a record read against a source other than its own is a caller bug, \
+                  as `ByteSpan::text` treats it"
+    )]
     pub fn specifier_value<'s>(&self, source: &'s str) -> Option<Cow<'s, str>> {
         let span = self.specifier?;
-        let raw = source.get(span.range())?;
+        let raw = span.text(source);
         let is_template = span
             .start
             .checked_sub(1)
             .and_then(|delimiter| source.as_bytes().get(delimiter as usize))
             == Some(&b'`');
-        if is_template && raw.contains('\r') {
+        let decoded = if is_template && raw.contains('\r') {
             let normalized = raw.replace("\r\n", "\n").replace('\r', "\n");
-            return crate::lexer::escapes::decode_string_escapes(&normalized)
-                .ok()
-                .map(Cow::Owned);
-        }
-        if !raw.contains('\\') {
+            crate::lexer::escapes::decode_string_escapes(&normalized)
+        } else if raw.contains('\\') {
+            crate::lexer::escapes::decode_string_escapes(raw)
+        } else {
             return Some(Cow::Borrowed(raw));
+        };
+        match decoded {
+            Ok(value) => Some(Cow::Owned(value)),
+            Err(error) => panic!(
+                "a specifier that does not decode ({error}): the record was not collected \
+                 from this source"
+            ),
         }
-        crate::lexer::escapes::decode_string_escapes(raw)
-            .ok()
-            .map(Cow::Owned)
     }
 
     /// A dynamic import over `span` with `specifier`, every other field its default.
@@ -409,7 +420,6 @@ pub fn collect_imports(programs: &[&Program<'_>], source: &str, arena: &bumpalo:
 ///
 /// When `source` is not the text the records were collected from.
 #[cfg(feature = "json")]
-#[expect(clippy::expect_used)]
 pub fn write_imports_json(
     imports: &Imports,
     source: &str,
@@ -440,12 +450,8 @@ pub fn write_imports_json(
         w.raw("\",");
         start_end(&mut w, record.span);
         w.raw(",\"specifier\":");
-        match record.specifier {
-            Some(specifier) => {
-                let value = record.specifier_value(source).expect(
-                    "a record with a specifier always decodes against its own source \
-                     (`ImportRecord::specifier_value`)",
-                );
+        match record.specifier.zip(record.specifier_value(source)) {
+            Some((specifier, value)) => {
                 w.raw("{\"value\":");
                 w.string(&value);
                 w.raw(",");
@@ -556,6 +562,20 @@ mod tests {
     fn a_computed_dynamic_import_has_no_value() {
         let record = ImportRecord::dynamic(ByteSpan { start: 0, end: 9 }, None);
         assert_eq!(record.specifier_value("import(a)"), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "byte index")]
+    fn a_span_past_the_source_panics() {
+        let source = "import('./a.js');";
+        let _ = record_at(source, "./a.js").specifier_value("import(");
+    }
+
+    #[test]
+    #[should_panic(expected = "not collected from this source")]
+    fn a_specifier_that_does_not_decode_panics() {
+        let source = "import('\\x4');";
+        let _ = record_at(source, "\\x4").specifier_value(source);
     }
 
     #[test]

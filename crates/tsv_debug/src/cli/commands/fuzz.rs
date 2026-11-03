@@ -49,7 +49,8 @@
 //!   bindings' JSON writer in the language's wire coordinates: no panic, and on a parse,
 //!   the records' own contract — sorted by start, each pair disjoint or nested (a dynamic
 //!   import inside another's argument), every span in bounds and on character boundaries,
-//!   a specifier or attributes span inside its record's, and a value for every specifier.
+//!   a specifier or attributes span inside its record's, and every specifier decoding (the
+//!   writer's `specifier_value`, which panics on one that does not).
 //!
 //! Each leg's graded count is floored: a run whose locations leg graded nothing, whose
 //! strip leg stripped nothing although it had TypeScript seeds, or whose imports leg
@@ -641,12 +642,13 @@ fn imports_check(src: &str, parser: ParserType) -> (bool, Option<String>) {
     };
     let broken = import_record_violations(src, &imports.records);
     if !broken.is_empty() {
-        // a violation the writer would panic on (a specifier with no value) reports here,
-        // with its detail, rather than as a bare panic out of the writer
+        // a violation the writer would panic on (a span out of bounds) reports here, with
+        // its detail, rather than as a bare panic out of the writer
         return (true, Some(broken.join("; ")));
     }
-    // the bindings' writer must not panic on any collected records; their bytes are graded
-    // by `tests/imports_fixtures_tests.rs`, not here
+    // the bindings' writer must not panic on any collected records — it decodes every
+    // specifier (`specifier_value`, which panics on one that does not decode); their bytes
+    // are graded by `tests/imports_fixtures_tests.rs`, not here
     let _ = tsv_ts::__private::write_imports_json(&imports, src, coordinates);
     (true, None)
 }
@@ -654,7 +656,8 @@ fn imports_check(src: &str, parser: ParserType) -> (bool, Option<String>) {
 /// Every way `records`, collected from `src`, break the records' contract: sorted by
 /// start, each pair disjoint or one nested in the other (a dynamic import in another's
 /// argument), every span in bounds and on character boundaries, a specifier or
-/// attributes span inside its record's, and a value for every specifier.
+/// attributes span inside its record's. A specifier that does not decode is the writer's
+/// panic (`specifier_value`), not a violation here.
 fn import_record_violations(src: &str, records: &[tsv_ts::ImportRecord]) -> Vec<String> {
     let in_bounds = |span: tsv_ts::ByteSpan| {
         span.start <= span.end
@@ -687,14 +690,12 @@ fn import_record_violations(src: &str, records: &[tsv_ts::ImportRecord]) -> Vec<
             ));
         }
         open.push(span.end);
-        if let Some(specifier) = record.specifier {
-            if !in_bounds(specifier) || !inside(specifier, span) {
-                broken.push(format!(
-                    "record {i}: specifier {specifier:?} outside its record {span:?}"
-                ));
-            } else if record.specifier_value(src).is_none() {
-                broken.push(format!("record {i}: specifier {specifier:?} has no value"));
-            }
+        if let Some(specifier) = record.specifier
+            && (!in_bounds(specifier) || !inside(specifier, span))
+        {
+            broken.push(format!(
+                "record {i}: specifier {specifier:?} outside its record {span:?}"
+            ));
         }
         if let Some(attributes) = record.attributes
             && (!in_bounds(attributes) || !inside(attributes, span))

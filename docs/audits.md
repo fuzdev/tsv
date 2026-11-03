@@ -2268,8 +2268,9 @@ Three more legs ride every attempt, over entry points the format leg never reach
   the language's wire coordinates. Properties: no panic, and on a parse the records' own
   contract — sorted by start, each pair disjoint or one nested in the other (a dynamic import in
   another's argument), every span in bounds and on character boundaries, a specifier or
-  attributes span inside its record's, and a value for every specifier. A parse error is a
-  verdict, not a finding.
+  attributes span inside its record's, and every specifier decoding (the writer's
+  `specifier_value`, which panics on one that does not). A parse error is a verdict, not a
+  finding.
 
 All three ride the pristine pass too, so the `fuzz --iterations 0` of `idempotency:sweep` and
 `audit:corpus` grades them over real code. Each leg's graded count is floored after the

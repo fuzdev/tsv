@@ -19,7 +19,9 @@ the fixtures that define them are [tests/fixtures_imports/](../tests/fixtures_im
   `records: Vec<ImportRecord>`, in source order, and `has_module_syntax`. An `ImportRecord` is
   `Copy`: spans into the source (`ByteSpan`, UTF-8 byte offsets, `span.text(source)` the slice),
   never a copy of its text; `specifier_value(source)` decodes the specifier when asked,
-  borrowing from the source when there is nothing to decode. The error is the parse's
+  borrowing from the source when there is nothing to decode — `None` only for a record with no
+  specifier, and a panic, as `span.text(source)` panics, when `source` is not the text the
+  record came from. The error is the parse's
   `tsv_lang::Error`, as `parse_to_json` returns it. `tsv_ts::strip_with_imports(source)` (and
   `strip_with_imports_with_goal`) is the type strip and `parse_imports` from one parse and one
   walk — Rust only, no binding exposes it ([strip.md §Surfaces](./strip.md#surfaces)).
@@ -157,7 +159,7 @@ read off a slice.
   ([audits.md §Import corpus](./audits.md#import-corpus-differential-importscorpus)).
 - **The engines, the fuzzer and the depth gate** — `deno task engines:audit` holds the WASM and
   native engines to the same records; the fuzzer collects the records of every accepted mutant
-  and checks their contract (sorted, disjoint or nested, in bounds, a value for every specifier);
+  and checks their contract (sorted, disjoint or nested, in bounds, every specifier decoded);
   the depth gate walks every shape it builds at the parsers' limits
   ([audits.md](./audits.md)).
 
