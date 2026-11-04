@@ -20,7 +20,8 @@ Each `## Unreleased` section must be non-empty and carry a
   Rust, `tsv_ts::parse_imports`, `tsv_svelte::parse_imports`, and
   `tsv_ts::strip_with_imports` for stripped output and records from one parse
 - fix: the parser accepts more valid TypeScript and matches acorn's tree in more places; the
-  formatter keeps more meaning-carrying parens, and `prettier-ignore`d type members verbatim
+  formatter keeps more meaning-carrying parens, `prettier-ignore`d type members verbatim, and
+  more comments where and in the order the author wrote them
 
 ## 0.8.0
 
