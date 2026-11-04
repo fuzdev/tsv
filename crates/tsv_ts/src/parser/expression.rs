@@ -3491,6 +3491,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::Function) => self.parse_function_expression(),
             // Class expression: `new class {}`
             TokenKind::Keyword(KeywordKind::Class) => self.parse_class_expression(),
+            // Decorated class expression: `new @dec class {}` — a `PrimaryExpression` under
+            // the decorators proposal, so a `MemberExpression` callee, as tsc's parser and
+            // acorn-typescript read it
+            TokenKind::At => self.parse_decorated_class_expression(),
             TokenKind::Keyword(KeywordKind::Import) => {
                 // `new import.meta()` — `import.meta` is a MetaProperty (a
                 // MemberExpression), a valid `new` callee. `new import(...)`
