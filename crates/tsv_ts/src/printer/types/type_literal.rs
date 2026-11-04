@@ -520,7 +520,7 @@ impl<'a> Printer<'a> {
     /// too, with the shell's own two gaps emitted by the paren builder (see the body).
     /// `ty` is the element / object as authored (parens included): it is unwrapped to
     /// reach the union, and its own span (parens and all) is the comment window. Shared
-    /// by the array-element (`build_array_type_doc`) and indexed-access-object arms; the
+    /// by the array-element (`array_type_head`) and indexed-access-object arms; the
     /// indexed-access *index* uses bracket delimiters, not parens, so it expands
     /// inline rather than through here. See `type_param_fits_rhs_long`.
     pub(super) fn build_expanded_parenthesized_union_opt(&self, ty: &TSType<'_>) -> Option<DocId> {

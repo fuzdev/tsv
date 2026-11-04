@@ -10,12 +10,12 @@
 
 use super::helpers::{
     array_run_negative_literal, outermost_paren, paren_shell_gaps,
-    type_needs_parens_for_array_element, type_needs_parens_for_conditional_check,
-    type_needs_parens_for_conditional_extends, unwrap_parenthesized,
+    type_needs_parens_for_conditional_check, type_needs_parens_for_conditional_extends,
+    unwrap_parenthesized,
 };
 use super::{
-    BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, TrailingBlock,
-    UnionValueDoc,
+    ArrayTypeHead, BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer,
+    TrailingBlock, UnionValueDoc,
 };
 use crate::ast::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
@@ -2332,8 +2332,10 @@ impl<'a> Printer<'a> {
     // Array Types
     //
 
-    /// Build a Doc for an array type (e.g., `number[]`)
-    pub(super) fn build_array_type_doc(&self, arr: &TSArrayType<'_>) -> DocId {
+    /// An array type's own arms (e.g., `number[]`): the whole doc where a terminal arm
+    /// builds it, else the `[]` suffix its element is followed by
+    /// ([`Self::build_postfix_type_doc`]).
+    pub(super) fn array_type_head(&self, arr: &TSArrayType<'_>) -> ArrayTypeHead {
         let d = self.d();
         // A comment-free parenthesized union element EXPANDS its parens when it breaks
         // (`(⏎\t| A⏎\t| B⏎)[]`) instead of gluing the leading `|` to the `(`. Any other
@@ -2341,7 +2343,7 @@ impl<'a> Printer<'a> {
         // parens and breaks internally (`(T extends X⏎\t? Y⏎\t: Z)[]`). See the shared
         // `build_expanded_parenthesized_union_opt`.
         if let Some(union_doc) = self.build_expanded_parenthesized_union_opt(arr.element_type) {
-            return d.concat(&[union_doc, self.build_array_suffix_doc(arr)]);
+            return ArrayTypeHead::Whole(d.concat(&[union_doc, self.build_array_suffix_doc(arr)]));
         }
         // An alone-on-line format-ignore directive INSIDE a paren-shell element
         // (`(⏎⇥// prettier-ignore⏎⇥(a: T) => void⏎)[]`) freezes the fully-unwrapped
@@ -2365,7 +2367,7 @@ impl<'a> Printer<'a> {
             parts.push(d.hardline());
             parts.push(d.text(")"));
             parts.push(self.build_array_suffix_doc(arr));
-            return d.concat(&parts);
+            return ArrayTypeHead::Whole(d.concat(&parts));
         }
         // A bare negative literal leading the element's run of indexed accesses takes a
         // pair of its own (`-1[K][]` → `(-1)[K][]`): recorded here, ahead of the element's
@@ -2373,21 +2375,21 @@ impl<'a> Printer<'a> {
         if let Some(literal) = array_run_negative_literal(arr.element_type) {
             self.negative_literal_pair_targets.mark(literal.span());
         }
-        let suffix_doc = self.build_array_suffix_doc(arr);
         // The `[]` suffix rides OUTSIDE the required-pair decision — the shell may already
-        // print the pair, but the suffix is the array type's own and always emits.
-        let element_doc = self.build_required_paren_pair_operand_doc(
-            arr.element_type,
-            type_needs_parens_for_array_element,
-        );
-        d.concat(&[element_doc, suffix_doc])
+        // print the pair, but the suffix is the array type's own and always emits. Built
+        // ahead of the element, which the caller builds in its required pair
+        // (`build_required_paren_pair_doc`) or, bare, by descending the chain
+        // ([`Self::build_postfix_type_doc`]).
+        ArrayTypeHead::Element {
+            suffix: self.build_array_suffix_doc(arr),
+        }
     }
 
     /// Everything after an array type's element: the element→`[` gap and the `[]`
     /// pair.
     ///
     /// The single suffix emitter for every route through
-    /// [`Self::build_array_type_doc`] — the expanded parenthesized union, the
+    /// [`Self::array_type_head`] — the expanded parenthesized union, the
     /// paren-interior freeze, and the fall-through that prints the element bare or in
     /// its required pair. Each route closes its own element; what follows is this one
     /// question, so a commented suffix can't survive on one route and be dropped on
@@ -2426,7 +2428,7 @@ impl<'a> Printer<'a> {
     /// How an array type renders its `[]` suffix.
     ///
     /// One question, one predicate, for two callers that must agree: whether
-    /// [`Self::build_array_type_doc`] splits its fused suffix, and whether the
+    /// [`Self::array_type_head`] splits its fused suffix, and whether the
     /// type-alias `=` gate counts the suffix as an internal break point
     /// (`type_has_internal_breaking`). Answering them apart is the disagreement
     /// that gate's `Parenthesized` arm already records — the same `(…)[]` hugging

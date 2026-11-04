@@ -54,7 +54,9 @@ pub(super) use super::StandaloneGlue;
 pub(super) use super::comments::BlankRule;
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
-use crate::ast::{TSImportType, TSIntersectionType, TSParenthesizedType, TSType};
+use crate::ast::{
+    TSImportType, TSIndexedAccessType, TSIntersectionType, TSParenthesizedType, TSType,
+};
 use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
 use crate::printer::ignore::{RoutedScope, is_freeze_target};
 use crate::printer::{CommentVec, ShellLeadingRun, ShellPair};
@@ -67,7 +69,7 @@ use helpers::type_needs_parens_for_indexed_access_object;
 use helpers::type_needs_parens_for_optional_element;
 use helpers::type_needs_parens_in_union_or_intersection;
 use helpers::type_operator_operand_rule;
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::after_operator::hang_after_operator;
@@ -219,6 +221,38 @@ struct HeadRegion {
     region_end: u32,
 }
 
+/// One level of the leading-edge descent ([`Printer::head_stripped_paren_shell_step`]):
+/// the answer, or the head whose own answer is this level's.
+enum HeadStep<'t> {
+    Answer(Option<HeadRegion>),
+    Descend(&'t TSType<'t>),
+}
+
+/// One level of [`Printer::build_postfix_type_doc`]'s chain, waiting for its element /
+/// object: an array type's `[]` suffix, built ahead of its element, or an indexed access,
+/// whose suffix is built after its object.
+#[derive(Clone, Copy)]
+enum PostfixLevel<'a, 't> {
+    Array(DocId),
+    IndexedAccess(&'a TSIndexedAccessType<'t>),
+}
+
+/// What an array type's own arms make of it ([`Printer::array_type_head`]).
+pub(super) enum ArrayTypeHead {
+    /// One of the terminal arms built the whole type.
+    Whole(DocId),
+    /// The element is built through its required-pair seam, then `suffix` follows it.
+    Element { suffix: DocId },
+}
+
+/// [`Printer::build_type_doc`]'s fanout probe.
+fn probe_type_build(ts_type: &TSType<'_>) {
+    tsv_lang::fanout_probe::build(tsv_lang::fanout_probe::Build::Type, ts_type, || {
+        let span = ts_type.span();
+        (span.start, span.end)
+    });
+}
+
 impl HeadRegion {
     /// The region's two ends, for comparing answers under test.
     #[cfg(test)]
@@ -319,21 +353,298 @@ impl<'a> Printer<'a> {
     // Main Type Doc Builders
     //
 
+    /// An array or indexed access type and the array and indexed access types down its
+    /// element / object side (`A[][]`, `A['k']['k']`, mixed), built without recursing down
+    /// that side: the chain's length is bounded only by `SPINE_LIMIT`, so a recursion per
+    /// link would spend a frame per suffix — and its doc is ONE flat concat, the innermost
+    /// head's doc and then each level's suffix, so no later walk of the doc recurses per
+    /// link either.
+    ///
+    /// Each level is what the recursion through [`Self::build_type_doc`] built, in the same
+    /// order: an array level settles its terminal arms ([`Self::array_type_head`]) and
+    /// builds its `[]` suffix BEFORE its element, an indexed access level builds its suffix
+    /// AFTER its object; a level whose element / object takes a pair, or is no postfix type,
+    /// is the head, built whole. Its caller has taken `ts_type`'s fanout probe; every head
+    /// down the chain takes its own here.
+    ///
+    /// Out of line, so its buffers stay off the frame of [`Self::build_type_doc_probed`],
+    /// which every type's build recurses through.
+    #[inline(never)]
+    fn build_postfix_type_doc(&self, ts_type: &TSType<'_>) -> DocId {
+        let mut levels: SmallVec<[PostfixLevel<'_, '_>; 4]> = SmallVec::new();
+        let mut node = ts_type;
+        let head_doc = loop {
+            let (child, needs_parens): (&TSType<'_>, TypeParenRule) = match node {
+                TSType::Array(arr) => match self.array_type_head(arr) {
+                    ArrayTypeHead::Whole(doc) => break doc,
+                    ArrayTypeHead::Element { suffix } => {
+                        levels.push(PostfixLevel::Array(suffix));
+                        (arr.element_type, type_needs_parens_for_array_element)
+                    }
+                },
+                TSType::IndexedAccess(i) => {
+                    levels.push(PostfixLevel::IndexedAccess(i));
+                    // A comment-free parenthesized union OBJECT expands its parens when it
+                    // breaks (`(⏎\t| A⏎\t| B⏎)[K]`); any other object keeps the existing
+                    // layout. See the shared `build_expanded_parenthesized_union_opt`.
+                    if let Some(doc) = self.build_expanded_parenthesized_union_opt(i.object_type) {
+                        break doc;
+                    }
+                    (i.object_type, type_needs_parens_for_indexed_access_object)
+                }
+                _ => break self.build_type_doc_probed(node),
+            };
+            // a required pair builds the child whole (`build_required_paren_pair_doc`); a
+            // bare child descends the chain
+            if needs_parens(self, child) {
+                break self.build_required_paren_pair_doc(child);
+            }
+            probe_type_build(child);
+            node = child;
+        };
+        let mut parts: DocBuf = smallvec![head_doc];
+        for level in levels.iter().rev() {
+            match *level {
+                PostfixLevel::Array(suffix) => parts.push(suffix),
+                PostfixLevel::IndexedAccess(i) => self.push_indexed_access_suffix(&mut parts, i),
+            }
+        }
+        self.d().concat(&parts)
+    }
+
+    /// Everything an indexed access type prints after its object's doc — the
+    /// object→`[` gap, the bracketed index and the index→`]` gap — pushed onto `parts`,
+    /// which already ends with that doc ([`Self::build_postfix_type_doc`]).
+    fn push_indexed_access_suffix(&self, parts: &mut DocBuf, i: &TSIndexedAccessType<'_>) {
+        let d = self.d();
+        // A transparent one-member composite index is its member here, the `|`
+        // dropped and its head gap folded into the `[`→index gap
+        // ([`Self::transparent_value`]).
+        let index_type = self.transparent_value(i.index_type);
+        let index_type_start = index_type.span().start;
+        let bracket_area_start = i.object_type.span().end;
+        // The access `[`, located outside comments so a `[` glyph inside a
+        // comment before it (`A /* [ */[K]`) isn't mistaken for the bracket.
+        let bracket_open =
+            self.find_char_outside_comments(bracket_area_start, index_type_start, b'[');
+        // Comments in the object→`[` gap (`A /* c */[K]`) trail the object
+        // in place; comments in the `[`→index gap (`A[/* c */ K]`) lead the
+        // index — both preserved where the user placed them.
+        //
+        // The object→`[` gap can hold only a single-line block: a type's index
+        // suffix may not follow a line break, so a `//` (or a multiline block)
+        // there means the source never parsed as an indexed access at all
+        // (`type X = A // c⏎[K];` is `type X = A;` plus an `ArrayExpression`
+        // statement). Hence the plain inline run — no break to keep a comment
+        // from swallowing the `[`. The `[`→index gap below, which *can* hold a
+        // line comment, takes the hanging emitter instead.
+        let object_comments = bracket_open.and_then(|bp| {
+            debug_assert!(
+                !self.has_line_comments_between(bracket_area_start, bp),
+                "a line comment before `[` means this never parsed as an indexed access"
+            );
+            self.build_inline_comments_between_doc_opt(bracket_area_start, bp)
+        });
+        // An alone-on-line format-ignore directive in the `[`→index gap stays
+        // OWN-LINE inside the brackets — the trailing-hang emitter below would
+        // glue it to the `[` (`[// prettier-ignore`), an inert placement that
+        // loses the freeze on the second pass — and freezes a non-composite
+        // index verbatim (`single_child_frozen`; a composite index declines and
+        // freezes via its own leading-run walk). The brackets expand around the
+        // run: `A[⏎⇥// prettier-ignore⏎⇥K⏎]`.
+        if let Some(bp) = bracket_open
+            && self.member_gap_frozen(bp + 1, index_type_start)
+        {
+            let index_doc = self.build_routed_child_doc(index_type);
+            if let Some(c) = object_comments {
+                parts.push(c);
+            }
+            parts.push(d.text("["));
+            self.append_keyword_value_line_comments(parts, bp + 1, index_type_start, index_doc);
+            // Comments in the index→`]` gap trail the index line (a line
+            // comment rides `line_suffix`, flushing before the `]`'s
+            // hardline) — this route claims the whole bracket interior, so
+            // nothing here may go unemitted.
+            //
+            // `indent`, because this route already expanded the brackets and put
+            // the index one level in: a second comment in the run takes its own
+            // line and belongs in that same interior column, not out at the `[`'s.
+            // Inert for the run's first comment, which trails the index's line.
+            let mut gap: DocBuf = DocBuf::new();
+            self.push_trailing_comments_in_range(&mut gap, index_type.span().end, i.span.end);
+            if !gap.is_empty() {
+                parts.push(d.indent(d.concat(&gap)));
+            }
+            parts.push(d.hardline());
+            parts.push(d.text("]"));
+            return;
+        }
+        // A line comment (or multiline block) in the `[`→index gap breaks the
+        // index onto its own line so a `//` can't swallow it
+        // (indexed_access_line_comment). A single-line block comment (own-line,
+        // trailing, or glued) collapses the index inline (`A[/* c */ K]`);
+        // prettier relocates the comment out before `[` (`A /* c */[K]`) — see
+        // indexed_access_own_line_block_comment.
+        // Built lazily: the expanding-union arm below carries the gap inside the
+        // union's hang and never emits it here.
+        //
+        // The window is the shared keyword→value one
+        // ([`Self::keyword_value_stripped_paren_hang`]), not the index's own span
+        // start: a redundant paren SHELL around the index puts its `(` there, so a
+        // window ending at it is EMPTY and the gate saw nothing at all. The shell
+        // then laid its own run out — at its own indent, which the reparse, finding
+        // the comment in this gap with the shell gone, re-lays. Reading the hang's
+        // `value_start` gives the gate the run either authoring wrote, and the value
+        // is built from the substituted inner under the shell's claim + lift
+        // ([`Self::with_stripped_shell_value`]) so the run is emitted once and the
+        // shell's trailing gap travels out past the index. Both are no-ops where
+        // nothing stripped, which is every bare authoring.
+        //
+        // The gate itself is the keyword→value pair: a comment that forces its own
+        // line, OR a block run the author BROKE AFTER holding a multi-line block
+        // ([`Self::broke_after_run_holds_multiline_block`]) — the half
+        // `comments_force_own_line_between`, reading each comment against its own
+        // neighbour, answers no for (`[/* a⏎b */ /* c */⏎K]`). A **routed** head (an
+        // alone-on-line directive inside the shell) keeps the existing paths: the
+        // freeze is `member_gap_frozen`'s above, and this seam owes it nothing.
+        let hang = self.keyword_value_stripped_paren_hang(index_type);
+        let index_hangs = !hang.routed
+            && bracket_open.is_some_and(|bp| {
+                self.comments_force_own_line_between(bp + 1, hang.value_start)
+                    || self.broke_after_run_holds_multiline_block(bp + 1, hang.value_start)
+            });
+        let index_comments = || {
+            bracket_open.map(|bp| {
+                if index_hangs {
+                    self.build_trailing_comments_hang_next(bp + 1, hang.value_start)
+                } else {
+                    self.build_comments_between(bp + 1, index_type_start, CommentSpacing::Trailing)
+                }
+            })
+        };
+        // A comment-free union INDEX expands the bracket when it breaks:
+        // `Foo[⏎\t| A⏎\t| B]` — the `]` hugs the last member (prettier's
+        // `printUnionType` indent branch, `group(indent([softline, printed]))`,
+        // with no trailing softline). The brackets are the delimiter, so a
+        // parenthesized index union is unwrapped first — its (redundant) parens
+        // strip and the bare union expands, matching prettier (the object arm
+        // unwraps the same way). A comment anywhere in the `[`…`]` region keeps
+        // the existing hang layout so comment placement is untouched. See
+        // `type_param_fits_rhs_long`.
+        //
+        // The `[`→index gap is this seam's: a union index routes through
+        // `build_union_value_doc` on it, so a block run glued to its first member
+        // is handed in — declining the hug and landing after the pipe once the
+        // index breaks (`T[⏎| /* c */ {…}⏎| null]`,
+        // `union_hug_gap_block_comment_container`) — and any other run leads the
+        // union inside the expanded bracket. The seam's glue answer decides the
+        // expansion, so a run in the gap never welds `/* c */ | {` onto the `[`.
+        // The union→`]` gap keeps the hang layout below when it holds a comment —
+        // measured from the UNION's end, since a paren shell the arm strips holds
+        // its trailing gap inside `index_type`'s span, where a `]`-gap window
+        // cannot see it (the shell's leading gap rides `prepend_rhs_comments`).
+        let index_inner = unwrap_parenthesized(index_type);
+        let (index_doc, index_comments) = match (index_inner, bracket_open) {
+            (TSType::Union(u), Some(bp))
+                if !self.union_seam_hugs(bp + 1, u)
+                    && !self.has_comments_to_emit_between(u.span.end, i.span.end) =>
+            {
+                let UnionValueDoc {
+                    doc, run_handed, ..
+                } = self.build_union_value_doc(bp + 1, u);
+                let hung = if run_handed {
+                    doc
+                } else {
+                    self.prepend_rhs_comments(doc, bp + 1, u.span.start)
+                };
+                (d.group(d.indent(d.concat(&[d.softline(), hung]))), None)
+            }
+            _ => {
+                // Under the hang, the claim + lift pair the stripped shell owes
+                // (a no-op on every bare authoring — `value_type` is then the index
+                // itself and `claimed_shell` is `None`). Type position, so a
+                // trailing block lifted out of the shell trails the index inline
+                // inside the brackets.
+                let doc = if index_hangs {
+                    self.with_stripped_shell_value(
+                        hang.claimed_shell,
+                        index_type,
+                        hang.value_type,
+                        TrailingBlock::Inline,
+                        || self.build_type_doc(hang.value_type),
+                    )
+                } else {
+                    self.build_type_doc(index_type)
+                };
+                (doc, index_comments())
+            }
+        };
+        if let Some(c) = object_comments {
+            parts.push(c);
+        }
+        parts.push(d.text("["));
+        // Comments in the index→`]` gap trail the index and STAY INSIDE the
+        // brackets — the treatment every other bracketed type region already
+        // gives its own trailing gap (a type literal's `}`, a type-argument
+        // list's `>`, a tuple's `]`, a function type's `)`, and the retained
+        // paren shell), so the construct answers the question one way. A
+        // **line** comment there runs to end of line, so the `]` cannot follow
+        // it: the brackets open, the index sits one level in, and the run
+        // takes that same interior column. Letting the comment ride out to
+        // end-of-line instead would re-bind it from the index to the whole
+        // statement and land it on a line that may already hold one, where
+        // the two weld irreversibly — see
+        // [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
+        // §Comment relocation. The expanding-union index layout is
+        // comment-gated, so it never carries one of these.
+        let gap_start = index_type.span().end;
+        if self.has_line_comments_between(gap_start, i.span.end) {
+            let mut inner: DocBuf = DocBuf::new();
+            if let Some(c) = index_comments {
+                inner.push(c);
+            }
+            inner.push(index_doc);
+            // The author BLANK above an own-line comment in that run survives, as
+            // it does in the retained paren shell's gap
+            // ([`Self::build_open_paren_shell_doc`]): the run stays inside the
+            // brackets it was written in, and [`TrailingBlank`] is a question about
+            // the run's destination. The two shapes are one claim — the
+            // `type_suffix_trailing_comment_run` divergence pairs them.
+            self.push_trailing_comments_in_range_blank(
+                &mut inner,
+                gap_start,
+                i.span.end,
+                TrailingBlank::Keep,
+            );
+            parts.push(d.indent_hardline(d.concat(&inner)));
+            parts.push(d.hardline());
+        } else {
+            if let Some(c) = index_comments {
+                parts.push(c);
+            }
+            parts.push(index_doc);
+            self.push_trailing_comments_in_range(parts, gap_start, i.span.end);
+        }
+        parts.push(d.text("]"));
+    }
+
     /// Build a Doc for a TypeScript type expression.
     ///
     /// A `TypeReference`'s own type arguments always break internally when too wide
     /// (`Promise<LongType | null>` breaks inside the `<>`) — `build_type_arguments_doc` is the
     /// single builder for every type-argument position, so no caller has to opt into that.
     pub(in crate::printer) fn build_type_doc(&self, ts_type: &TSType<'_>) -> DocId {
-        tsv_lang::fanout_probe::build(tsv_lang::fanout_probe::Build::Type, ts_type, || {
-            let span = ts_type.span();
-            (span.start, span.end)
-        });
+        probe_type_build(ts_type);
+        self.build_type_doc_probed(ts_type)
+    }
+
+    /// [`Self::build_type_doc`] past its fanout probe, which the caller has taken.
+    fn build_type_doc_probed(&self, ts_type: &TSType<'_>) -> DocId {
         let d = self.d();
         match ts_type {
             TSType::Keyword(kw) => d.text(kw.kind.as_str()),
             TSType::Literal(lit) => self.build_literal_type_doc(lit),
-            TSType::Array(arr) => self.build_array_type_doc(arr),
+            TSType::Array(_) | TSType::IndexedAccess(_) => self.build_postfix_type_doc(ts_type),
             TSType::Union(u) => self.build_union_type_doc(u),
             // Default trailing-prefix context; own-line element callers (tuple) invoke
             // `build_intersection_type_doc` directly with `own_line = true`.
@@ -751,244 +1062,6 @@ impl<'a> Printer<'a> {
                     }
                     parts.push(self.build_type_arguments_doc(type_args, ShiftRescan::Never));
                 }
-                d.concat(&parts)
-            }
-            TSType::IndexedAccess(i) => {
-                // A transparent one-member composite index is its member here, the `|`
-                // dropped and its head gap folded into the `[`→index gap
-                // ([`Self::transparent_value`]).
-                let index_type = self.transparent_value(i.index_type);
-                let index_type_start = index_type.span().start;
-                let bracket_area_start = i.object_type.span().end;
-                // The access `[`, located outside comments so a `[` glyph inside a
-                // comment before it (`A /* [ */[K]`) isn't mistaken for the bracket.
-                let bracket_open =
-                    self.find_char_outside_comments(bracket_area_start, index_type_start, b'[');
-                // A comment-free parenthesized union OBJECT expands its parens when it
-                // breaks (`(⏎\t| A⏎\t| B⏎)[K]`); any other object keeps the existing
-                // layout. See the shared `build_expanded_parenthesized_union_opt`.
-                let object_doc = self
-                    .build_expanded_parenthesized_union_opt(i.object_type)
-                    .unwrap_or_else(|| {
-                        self.build_required_paren_pair_operand_doc(
-                            i.object_type,
-                            type_needs_parens_for_indexed_access_object,
-                        )
-                    });
-                // Comments in the object→`[` gap (`A /* c */[K]`) trail the object
-                // in place; comments in the `[`→index gap (`A[/* c */ K]`) lead the
-                // index — both preserved where the user placed them.
-                //
-                // The object→`[` gap can hold only a single-line block: a type's index
-                // suffix may not follow a line break, so a `//` (or a multiline block)
-                // there means the source never parsed as an indexed access at all
-                // (`type X = A // c⏎[K];` is `type X = A;` plus an `ArrayExpression`
-                // statement). Hence the plain inline run — no break to keep a comment
-                // from swallowing the `[`. The `[`→index gap below, which *can* hold a
-                // line comment, takes the hanging emitter instead.
-                let object_comments = bracket_open.and_then(|bp| {
-                    debug_assert!(
-                        !self.has_line_comments_between(bracket_area_start, bp),
-                        "a line comment before `[` means this never parsed as an indexed access"
-                    );
-                    self.build_inline_comments_between_doc_opt(bracket_area_start, bp)
-                });
-                // An alone-on-line format-ignore directive in the `[`→index gap stays
-                // OWN-LINE inside the brackets — the trailing-hang emitter below would
-                // glue it to the `[` (`[// prettier-ignore`), an inert placement that
-                // loses the freeze on the second pass — and freezes a non-composite
-                // index verbatim (`single_child_frozen`; a composite index declines and
-                // freezes via its own leading-run walk). The brackets expand around the
-                // run: `A[⏎⇥// prettier-ignore⏎⇥K⏎]`.
-                if let Some(bp) = bracket_open
-                    && self.member_gap_frozen(bp + 1, index_type_start)
-                {
-                    let index_doc = self.build_routed_child_doc(index_type);
-                    let mut parts: DocBuf = smallvec![object_doc];
-                    if let Some(c) = object_comments {
-                        parts.push(c);
-                    }
-                    parts.push(d.text("["));
-                    self.append_keyword_value_line_comments(
-                        &mut parts,
-                        bp + 1,
-                        index_type_start,
-                        index_doc,
-                    );
-                    // Comments in the index→`]` gap trail the index line (a line
-                    // comment rides `line_suffix`, flushing before the `]`'s
-                    // hardline) — this route claims the whole bracket interior, so
-                    // nothing here may go unemitted.
-                    //
-                    // `indent`, because this route already expanded the brackets and put
-                    // the index one level in: a second comment in the run takes its own
-                    // line and belongs in that same interior column, not out at the `[`'s.
-                    // Inert for the run's first comment, which trails the index's line.
-                    let mut gap: DocBuf = DocBuf::new();
-                    self.push_trailing_comments_in_range(
-                        &mut gap,
-                        index_type.span().end,
-                        i.span.end,
-                    );
-                    if !gap.is_empty() {
-                        parts.push(d.indent(d.concat(&gap)));
-                    }
-                    parts.push(d.hardline());
-                    parts.push(d.text("]"));
-                    return d.concat(&parts);
-                }
-                // A line comment (or multiline block) in the `[`→index gap breaks the
-                // index onto its own line so a `//` can't swallow it
-                // (indexed_access_line_comment). A single-line block comment (own-line,
-                // trailing, or glued) collapses the index inline (`A[/* c */ K]`);
-                // prettier relocates the comment out before `[` (`A /* c */[K]`) — see
-                // indexed_access_own_line_block_comment.
-                // Built lazily: the expanding-union arm below carries the gap inside the
-                // union's hang and never emits it here.
-                //
-                // The window is the shared keyword→value one
-                // ([`Self::keyword_value_stripped_paren_hang`]), not the index's own span
-                // start: a redundant paren SHELL around the index puts its `(` there, so a
-                // window ending at it is EMPTY and the gate saw nothing at all. The shell
-                // then laid its own run out — at its own indent, which the reparse, finding
-                // the comment in this gap with the shell gone, re-lays. Reading the hang's
-                // `value_start` gives the gate the run either authoring wrote, and the value
-                // is built from the substituted inner under the shell's claim + lift
-                // ([`Self::with_stripped_shell_value`]) so the run is emitted once and the
-                // shell's trailing gap travels out past the index. Both are no-ops where
-                // nothing stripped, which is every bare authoring.
-                //
-                // The gate itself is the keyword→value pair: a comment that forces its own
-                // line, OR a block run the author BROKE AFTER holding a multi-line block
-                // ([`Self::broke_after_run_holds_multiline_block`]) — the half
-                // `comments_force_own_line_between`, reading each comment against its own
-                // neighbour, answers no for (`[/* a⏎b */ /* c */⏎K]`). A **routed** head (an
-                // alone-on-line directive inside the shell) keeps the existing paths: the
-                // freeze is `member_gap_frozen`'s above, and this seam owes it nothing.
-                let hang = self.keyword_value_stripped_paren_hang(index_type);
-                let index_hangs = !hang.routed
-                    && bracket_open.is_some_and(|bp| {
-                        self.comments_force_own_line_between(bp + 1, hang.value_start)
-                            || self.broke_after_run_holds_multiline_block(bp + 1, hang.value_start)
-                    });
-                let index_comments = || {
-                    bracket_open.map(|bp| {
-                        if index_hangs {
-                            self.build_trailing_comments_hang_next(bp + 1, hang.value_start)
-                        } else {
-                            self.build_comments_between(
-                                bp + 1,
-                                index_type_start,
-                                CommentSpacing::Trailing,
-                            )
-                        }
-                    })
-                };
-                // A comment-free union INDEX expands the bracket when it breaks:
-                // `Foo[⏎\t| A⏎\t| B]` — the `]` hugs the last member (prettier's
-                // `printUnionType` indent branch, `group(indent([softline, printed]))`,
-                // with no trailing softline). The brackets are the delimiter, so a
-                // parenthesized index union is unwrapped first — its (redundant) parens
-                // strip and the bare union expands, matching prettier (the object arm
-                // unwraps the same way). A comment anywhere in the `[`…`]` region keeps
-                // the existing hang layout so comment placement is untouched. See
-                // `type_param_fits_rhs_long`.
-                //
-                // The `[`→index gap is this seam's: a union index routes through
-                // `build_union_value_doc` on it, so a block run glued to its first member
-                // is handed in — declining the hug and landing after the pipe once the
-                // index breaks (`T[⏎| /* c */ {…}⏎| null]`,
-                // `union_hug_gap_block_comment_container`) — and any other run leads the
-                // union inside the expanded bracket. The seam's glue answer decides the
-                // expansion, so a run in the gap never welds `/* c */ | {` onto the `[`.
-                // The union→`]` gap keeps the hang layout below when it holds a comment —
-                // measured from the UNION's end, since a paren shell the arm strips holds
-                // its trailing gap inside `index_type`'s span, where a `]`-gap window
-                // cannot see it (the shell's leading gap rides `prepend_rhs_comments`).
-                let index_inner = unwrap_parenthesized(index_type);
-                let (index_doc, index_comments) = match (index_inner, bracket_open) {
-                    (TSType::Union(u), Some(bp))
-                        if !self.union_seam_hugs(bp + 1, u)
-                            && !self.has_comments_to_emit_between(u.span.end, i.span.end) =>
-                    {
-                        let UnionValueDoc {
-                            doc, run_handed, ..
-                        } = self.build_union_value_doc(bp + 1, u);
-                        let hung = if run_handed {
-                            doc
-                        } else {
-                            self.prepend_rhs_comments(doc, bp + 1, u.span.start)
-                        };
-                        (d.group(d.indent(d.concat(&[d.softline(), hung]))), None)
-                    }
-                    _ => {
-                        // Under the hang, the claim + lift pair the stripped shell owes
-                        // (a no-op on every bare authoring — `value_type` is then the index
-                        // itself and `claimed_shell` is `None`). Type position, so a
-                        // trailing block lifted out of the shell trails the index inline
-                        // inside the brackets.
-                        let doc = if index_hangs {
-                            self.with_stripped_shell_value(
-                                hang.claimed_shell,
-                                index_type,
-                                hang.value_type,
-                                TrailingBlock::Inline,
-                                || self.build_type_doc(hang.value_type),
-                            )
-                        } else {
-                            self.build_type_doc(index_type)
-                        };
-                        (doc, index_comments())
-                    }
-                };
-                let mut parts: DocBuf = smallvec![object_doc];
-                if let Some(c) = object_comments {
-                    parts.push(c);
-                }
-                parts.push(d.text("["));
-                // Comments in the index→`]` gap trail the index and STAY INSIDE the
-                // brackets — the treatment every other bracketed type region already
-                // gives its own trailing gap (a type literal's `}`, a type-argument
-                // list's `>`, a tuple's `]`, a function type's `)`, and the retained
-                // paren shell), so the construct answers the question one way. A
-                // **line** comment there runs to end of line, so the `]` cannot follow
-                // it: the brackets open, the index sits one level in, and the run
-                // takes that same interior column. Letting the comment ride out to
-                // end-of-line instead would re-bind it from the index to the whole
-                // statement and land it on a line that may already hold one, where
-                // the two weld irreversibly — see
-                // [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
-                // §Comment relocation. The expanding-union index layout is
-                // comment-gated, so it never carries one of these.
-                let gap_start = index_type.span().end;
-                if self.has_line_comments_between(gap_start, i.span.end) {
-                    let mut inner: DocBuf = DocBuf::new();
-                    if let Some(c) = index_comments {
-                        inner.push(c);
-                    }
-                    inner.push(index_doc);
-                    // The author BLANK above an own-line comment in that run survives, as
-                    // it does in the retained paren shell's gap
-                    // ([`Self::build_open_paren_shell_doc`]): the run stays inside the
-                    // brackets it was written in, and [`TrailingBlank`] is a question about
-                    // the run's destination. The two shapes are one claim — the
-                    // `type_suffix_trailing_comment_run` divergence pairs them.
-                    self.push_trailing_comments_in_range_blank(
-                        &mut inner,
-                        gap_start,
-                        i.span.end,
-                        TrailingBlank::Keep,
-                    );
-                    parts.push(d.indent_hardline(d.concat(&inner)));
-                    parts.push(d.hardline());
-                } else {
-                    if let Some(c) = index_comments {
-                        parts.push(c);
-                    }
-                    parts.push(index_doc);
-                    self.push_trailing_comments_in_range(&mut parts, gap_start, i.span.end);
-                }
-                parts.push(d.text("]"));
                 d.concat(&parts)
             }
             TSType::Rest(r) => {
@@ -1631,6 +1704,20 @@ impl<'a> Printer<'a> {
             .filter(|claim| self.has_line_comments_between(claim.start, claim.end))
     }
 
+    /// The descent [`Self::head_stripped_paren_shell_step`] takes one level of, unmemoized
+    /// at this level: the twin every memo hit is graded against under test (`head_memo`).
+    #[cfg(test)]
+    fn head_stripped_paren_shell_uncached<'t>(
+        &self,
+        ty: &'t TSType<'t>,
+        run: EdgeRun,
+    ) -> Option<HeadRegion> {
+        match self.head_stripped_paren_shell_step(ty, run) {
+            HeadStep::Answer(found) => found,
+            HeadStep::Descend(head) => self.head_stripped_paren_shell(head, run),
+        }
+    }
+
     /// The redundant paren shell at a value's leading printed **edge**, where the shell is
     /// not the value itself — the shape [`Self::keyword_value_stripped_paren_hang`] widens
     /// over so the enclosing gap owns the run.
@@ -1679,7 +1766,7 @@ impl<'a> Printer<'a> {
     /// emitter at that gap's continuation indent, and the shell's emitter freezes the
     /// stripped inner under the claim ([`Self::build_parenthesized_type_unwrap_doc`]). The
     /// one link that declines it is the ARRAY element, whose own routed arm
-    /// ([`Self::build_array_type_doc`]) emits that run itself inside a re-synthesized pair.
+    /// ([`Self::array_type_head`]) emits that run itself inside a re-synthesized pair.
     /// Declined at every link instead — the seam's first reading — the shell was left to
     /// print the run with a bare `hardline` at its own indent, the F1 break the ⚠️ above
     /// describes, and the directive landed glued to the enclosing head, where tsv's own
@@ -1687,38 +1774,48 @@ impl<'a> Printer<'a> {
     ///
     /// Memoized per outermost call ([`head_memo`]): a required-pair link asks its head
     /// twice, so the uncached descent doubles at every level a link nests in its own head.
-    fn head_stripped_paren_shell_uncached<'t>(
-        &self,
-        ty: &'t TSType<'t>,
-        run: EdgeRun,
-    ) -> Option<HeadRegion> {
+    ///
+    /// One LEVEL of the descent: its answer, or — at the four links whose answer IS their
+    /// head's (an array type's element, an indexed access's object, a conditional's check
+    /// type, an optional element's type) — the head to descend into, so the memoized entry
+    /// point ([`Self::head_stripped_paren_shell`]) iterates a chain of them (`A[][]…`,
+    /// `A['k']['k']…`) rather than spending a frame per link.
+    fn head_stripped_paren_shell_step<'t>(&self, ty: &'t TSType<'t>, run: EdgeRun) -> HeadStep<'t> {
         tsv_lang::fanout_probe::predicate();
-        match ty {
+        let found = match ty {
             // The ONE link whose own arm owns a routed shell's run (see the ⚠️ above):
-            // `build_array_type_doc` keeps the pair and emits the interior run inside it.
-            TSType::Array(a) => self.leading_edge_shell(
-                a.element_type,
-                self.required_paren_pair_opens_for_leading_run(
+            // `array_type_head` keeps the pair and emits the interior run inside it.
+            TSType::Array(a) => {
+                return self.leading_edge_shell_step(
                     a.element_type,
-                    type_needs_parens_for_array_element,
-                ) || self.paren_interior_routed_inner(a.element_type).is_some(),
-                run,
-            ),
-            TSType::IndexedAccess(i) => self.required_pair_head_shell(
-                i.object_type,
-                type_needs_parens_for_indexed_access_object,
-                run,
-            ),
-            TSType::Conditional(c) => self.required_pair_head_shell(
-                c.check_type,
-                type_needs_parens_for_conditional_check,
-                run,
-            ),
-            TSType::Optional(o) => self.required_pair_head_shell(
-                o.type_annotation,
-                type_needs_parens_for_optional_element,
-                run,
-            ),
+                    self.required_paren_pair_opens_for_leading_run(
+                        a.element_type,
+                        type_needs_parens_for_array_element,
+                    ) || self.paren_interior_routed_inner(a.element_type).is_some(),
+                    run,
+                );
+            }
+            TSType::IndexedAccess(i) => {
+                return self.required_pair_head_shell_step(
+                    i.object_type,
+                    type_needs_parens_for_indexed_access_object,
+                    run,
+                );
+            }
+            TSType::Conditional(c) => {
+                return self.required_pair_head_shell_step(
+                    c.check_type,
+                    type_needs_parens_for_conditional_check,
+                    run,
+                );
+            }
+            TSType::Optional(o) => {
+                return self.required_pair_head_shell_step(
+                    o.type_annotation,
+                    type_needs_parens_for_optional_element,
+                    run,
+                );
+            }
             TSType::Intersection(i) => {
                 // ⚠️ The intersection's OWN Rule A leading-run freeze slices its first
                 // member verbatim, shell and all — so widening an enclosing gap over that
@@ -1732,9 +1829,11 @@ impl<'a> Printer<'a> {
                     .composite_leading_run_freeze(i.span.start, i.types)
                     .is_some()
                 {
-                    return None;
+                    return HeadStep::Answer(None);
                 }
-                let first = i.types.first()?;
+                let Some(first) = i.types.first() else {
+                    return HeadStep::Answer(None);
+                };
                 // ⚠️ A **leading-operator** MULTI-member intersection (`& /* c */ (⏎// d⏎A) & B`,
                 // whose span opens at the `&`) owns bytes AHEAD of the shell — its own
                 // leading-`&` gap, which the intersection emits itself. An enclosing gap's
@@ -1759,7 +1858,7 @@ impl<'a> Printer<'a> {
                     && i.span.start != first.span().start
                     && self.has_comments_on_page_between(i.span.start, first.span().start)
                 {
-                    return None;
+                    return HeadStep::Answer(None);
                 }
                 self.leading_edge_shell(
                     first,
@@ -1780,7 +1879,9 @@ impl<'a> Printer<'a> {
             // union's own member loop claims its first member's shell instead. A FROZEN
             // head declines exactly as the intersection link does (`sole_member_peels`).
             TSType::Union(u) if self.sole_member_peels(u.span.start, u.types) => {
-                let first = u.types.first()?;
+                let Some(first) = u.types.first() else {
+                    return HeadStep::Answer(None);
+                };
                 // The collapse builds the member with `union_member_parens(1)`, which
                 // requires no pair of its own, so nothing downstream of this gap emits the
                 // run.
@@ -1815,7 +1916,8 @@ impl<'a> Printer<'a> {
                 Some(self.shell_head_region(ty))
             }
             _ => None,
-        }
+        };
+        HeadStep::Answer(found)
     }
 
     /// Whether the descent peels a redundant paren LAYER — the sixth arm's own test.
@@ -1966,9 +2068,23 @@ impl<'a> Printer<'a> {
         downstream_owns_run: bool,
         run: EdgeRun,
     ) -> Option<HeadRegion> {
+        match self.leading_edge_shell_step(head, downstream_owns_run, run) {
+            HeadStep::Answer(found) => found,
+            HeadStep::Descend(head) => self.head_stripped_paren_shell(head, run),
+        }
+    }
+
+    /// [`Self::leading_edge_shell`] short of its tail descent: the answer, or the head
+    /// whose own descent answers it ([`Self::head_stripped_paren_shell_step`]).
+    fn leading_edge_shell_step<'t>(
+        &self,
+        head: &'t TSType<'t>,
+        downstream_owns_run: bool,
+        run: EdgeRun,
+    ) -> HeadStep<'t> {
         tsv_lang::fanout_probe::predicate();
         if downstream_owns_run {
-            return None;
+            return HeadStep::Answer(None);
         }
         // [`ShellPair::Stripped`]: a shell at a value's leading EDGE is redundant by
         // construction — the link it descends through strips it — and the one shape whose
@@ -1977,9 +2093,9 @@ impl<'a> Printer<'a> {
         if self.stripped_paren_hang_has_leading_run(head, run, ShellPair::Stripped)
             && !self.paren_retains_for_trailing_run(head)
         {
-            return Some(self.shell_head_region(head));
+            return HeadStep::Answer(Some(self.shell_head_region(head)));
         }
-        self.head_stripped_paren_shell(head, run)
+        HeadStep::Descend(head)
     }
 
     /// [`Self::leading_edge_shell`] for the three links whose head is rendered by the plain
@@ -1988,13 +2104,13 @@ impl<'a> Printer<'a> {
     /// The intersection's first member is the fourth link and resolves its own, because its
     /// builder answers a union operand differently
     /// ([`Self::intersection_member_run_owned_downstream`]).
-    fn required_pair_head_shell(
+    fn required_pair_head_shell_step<'t>(
         &self,
-        head: &TSType<'_>,
+        head: &'t TSType<'t>,
         needs_parens: TypeParenRule,
         run: EdgeRun,
-    ) -> Option<HeadRegion> {
-        self.leading_edge_shell(
+    ) -> HeadStep<'t> {
+        self.leading_edge_shell_step(
             head,
             self.required_paren_pair_opens_for_leading_run(head, needs_parens),
             run,
@@ -2582,32 +2698,43 @@ impl<'a> Printer<'a> {
         wrap(operand_doc)
     }
 
-    /// [`Self::build_required_paren_operand_doc`] for the two sites that OWN their shell's
-    /// leading run and wrap the operand in the plain pair — an **array element** and an
-    /// **indexed-access object**, each hanging its own suffix (`[]`, `[K]`) outside it. The
-    /// optional tuple element is the third such site and already asks this question, one
-    /// layer up (`ShellLeadingRun::Here`); the other two callers of the seam have an
-    /// upstream emitter for the run (the prefix operator's keyword→value hang, the shared
-    /// default arm's union / conditional callers) and must not.
-    ///
-    /// A shell whose leading gap holds a `//` opens over hardlines
-    /// ([`Self::build_open_required_paren_doc`]). Without that these two reached the
-    /// shell's STRIPPED arm — which emits the run and the inner with no parens of its own —
-    /// and closed the caller's bare pair around the result: `(// c⏎N extends O ? P : Q)[]`,
-    /// the `(` glued on the comment's line with no space, the operand never indented into
-    /// the shell, and the `)` welded onto its tail. That is exactly the third form
-    /// `build_open_required_paren_doc` exists to prevent, and it was reached at the two
-    /// required-pair positions that never asked for it — a fixed point that reparses, so no
-    /// gate sees it.
+    /// `ty` in the pair `needs_parens` asks for ([`Self::build_required_paren_pair_doc`]),
+    /// or bare where it asks for none — the entry an annotation's arrow return takes
+    /// ([`Self::build_annotation_value_doc`]). The postfix chain asks `needs_parens` itself
+    /// at each level ([`Self::build_postfix_type_doc`]), since its bare arm descends the
+    /// chain rather than re-entering [`Self::build_type_doc`].
     pub(in crate::printer) fn build_required_paren_pair_operand_doc(
         &self,
         ty: &TSType<'_>,
         needs_parens: TypeParenRule,
     ) -> DocId {
-        let d = self.d();
         if !needs_parens(self, ty) {
             return self.build_type_doc(ty);
         }
+        self.build_required_paren_pair_doc(ty)
+    }
+
+    /// [`Self::build_required_paren_operand_doc`] for the sites that OWN their shell's
+    /// leading run and wrap the operand in the plain pair — an **array element** and an
+    /// **indexed-access object** ([`Self::build_postfix_type_doc`]), each hanging its own
+    /// suffix (`[]`, `[K]`) outside it, and an arrow return
+    /// ([`Self::build_required_paren_pair_operand_doc`]). The optional tuple element is
+    /// another such site and already asks this question, one layer up
+    /// (`ShellLeadingRun::Here`); the other callers of the seam have an upstream emitter for
+    /// the run (the prefix operator's keyword→value hang, the shared default arm's union /
+    /// conditional callers) and must not.
+    ///
+    /// A shell whose leading gap holds a `//` opens over hardlines
+    /// ([`Self::build_open_required_paren_doc`]). Without that these sites reached the
+    /// shell's STRIPPED arm — which emits the run and the inner with no parens of its own —
+    /// and closed the caller's bare pair around the result: `(// c⏎N extends O ? P : Q)[]`,
+    /// the `(` glued on the comment's line with no space, the operand never indented into
+    /// the shell, and the `)` welded onto its tail. That is exactly the third form
+    /// `build_open_required_paren_doc` exists to prevent, and it was reached at the
+    /// required-pair positions that never asked for it — a fixed point that reparses, so no
+    /// gate sees it.
+    fn build_required_paren_pair_doc(&self, ty: &TSType<'_>) -> DocId {
+        let d = self.d();
         if !self.paren_retains_for_trailing_run(ty)
             && let Some(run) = self.required_paren_open_run(ty)
         {
@@ -2620,7 +2747,7 @@ impl<'a> Printer<'a> {
         })
     }
 
-    /// Whether the pair [`Self::build_required_paren_pair_operand_doc`] emits renders OPEN
+    /// Whether the pair [`Self::build_required_paren_pair_doc`] emits renders OPEN
     /// over hardlines — the shell **retained** for its trailing run (which opens wherever
     /// it is built), or **opened** for a leading `//`, which needs the pair to be required
     /// in the first place.
@@ -2641,7 +2768,7 @@ impl<'a> Printer<'a> {
     }
 
     /// The LEADING-`//` half of [`Self::required_paren_pair_opens`], and the half
-    /// [`Self::build_required_paren_pair_operand_doc`] opens itself — deliberately
+    /// [`Self::build_required_paren_pair_doc`] opens itself — deliberately
     /// disjoint from the retained half, which opens downstream through the shell's own
     /// emitter, so the builder's two arms partition rather than race.
     fn required_paren_pair_opens_for_leading_run(

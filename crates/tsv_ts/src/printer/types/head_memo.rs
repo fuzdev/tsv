@@ -27,7 +27,9 @@ use std::cell::{Cell, RefCell};
 
 use tsv_lang::FxHashMap;
 
-use super::{EdgeRun, HeadRegion, Printer};
+use smallvec::SmallVec;
+
+use super::{EdgeRun, HeadRegion, HeadStep, Printer};
 use crate::ast::TSType;
 
 /// The visits an outermost descent takes before it memoizes: the descent real code makes
@@ -148,39 +150,68 @@ impl HeadMemo {
     fn release(&self) {
         self.map.borrow_mut().take();
     }
+
+    /// Whether no call is in progress and no map is held — the state every outermost call
+    /// must leave the memo in, so no answer outlives the question it was read for.
+    fn is_at_rest(&self) -> bool {
+        self.depth.get() == 0 && self.map.borrow().is_none()
+    }
 }
 
 impl Printer<'_> {
-    /// [`Self::head_stripped_paren_shell_uncached`], answered once per `(node, axis)`
-    /// within an outermost call ([`HeadMemo`]).
+    /// The leading-edge descent ([`Self::head_stripped_paren_shell_step`]), answered once
+    /// per `(node, axis)` within an outermost call ([`HeadMemo`]).
+    ///
+    /// The descent's tail links ([`Printer::head_stripped_paren_shell_step`]) are walked
+    /// here as a loop rather than a recursion — a chain of array or indexed-access types is
+    /// bounded only by `SPINE_LIMIT` — with each level entering and leaving the memo exactly
+    /// as the recursion through this entry point did: entered outermost first, left
+    /// innermost first, every level storing the one answer the chain ends on (a tail link's
+    /// answer is its head's), and a memo hit ending the walk at the level it hits.
     pub(super) fn head_stripped_paren_shell<'t>(
         &self,
         ty: &'t TSType<'t>,
         run: EdgeRun,
     ) -> Option<HeadRegion> {
-        let key = (
-            std::ptr::from_ref(ty) as usize,
-            run,
-            self.claimed_shell_leading_run
-                .get()
-                .map(|claim| (claim.start, claim.end)),
-        );
-        if let Some(HeadAnswer(found)) = self.head_memo.enter(key) {
-            // Under test every hit is graded against the descent it stands in for: a key
-            // that dropped a context the answer reads can hand one question another's
-            // answer where the output happens not to move.
-            #[cfg(test)]
-            assert_eq!(
-                found.map(HeadRegion::bounds),
-                self.head_stripped_paren_shell_uncached(ty, run)
-                    .map(HeadRegion::bounds),
-                "a memo hit disagrees with the descent it stands in for"
+        let outermost = self.head_memo.depth.get() == 0;
+        let mut entered: SmallVec<[HeadKey; 4]> = SmallVec::new();
+        let mut ty = ty;
+        let found = loop {
+            // The claim is read at every level, as the recursion read it at every call.
+            let key = (
+                std::ptr::from_ref(ty) as usize,
+                run,
+                self.claimed_shell_leading_run
+                    .get()
+                    .map(|claim| (claim.start, claim.end)),
             );
-            self.head_memo.leave(key, None);
-            return found;
+            if let Some(HeadAnswer(found)) = self.head_memo.enter(key) {
+                // Under test every hit is graded against the descent it stands in for: a key
+                // that dropped a context the answer reads can hand one question another's
+                // answer where the output happens not to move.
+                #[cfg(test)]
+                assert_eq!(
+                    found.map(HeadRegion::bounds),
+                    self.head_stripped_paren_shell_uncached(ty, run)
+                        .map(HeadRegion::bounds),
+                    "a memo hit disagrees with the descent it stands in for"
+                );
+                self.head_memo.leave(key, None);
+                break found;
+            }
+            entered.push(key);
+            match self.head_stripped_paren_shell_step(ty, run) {
+                HeadStep::Answer(found) => break found,
+                HeadStep::Descend(head) => ty = head,
+            }
+        };
+        for &key in entered.iter().rev() {
+            self.head_memo.leave(key, Some(HeadAnswer(found)));
         }
-        let found = self.head_stripped_paren_shell_uncached(ty, run);
-        self.head_memo.leave(key, Some(HeadAnswer(found)));
+        debug_assert!(
+            !outermost || self.head_memo.is_at_rest(),
+            "an outermost descent left its memo in use"
+        );
         found
     }
 }
@@ -207,6 +238,8 @@ mod tests {
         "((A & B extends C ? D : E) extends F ? G : H)",
         "(((A) extends B ? C : D) extends E ? F : G)",
         "(((A)[] extends B ? C : D)[] extends E ? F : G)",
+        // runs of tail links, which the descent walks as a loop of levels
+        "(((A)[K][] extends B ? C : D)[][K] extends E ? F : G)[K][]",
     ];
 
     /// The positions a base is asked about in.
