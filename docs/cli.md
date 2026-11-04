@@ -540,7 +540,11 @@ count charges at least what the walks recurse through, so a construct the parse 
 uncounted fails here, whatever its stack), runs parse, both wire writers (span-only and
 `loc`), format and the type strip on a thread nine tenths of the contract's size, checks
 that the format's output parses again and is its own format, and that one level more is
-refused. An overflow
+refused. In an optimized build, a flat chain — thousands of links under a shallow wire —
+runs its walks again on a thread a small fraction of the contract's, since no walk may
+spend a frame per spine link ([below](#the-other-surfaces)): a recursion down the spine
+whose frames add up past that thread fails there natively, where the contract's thread still
+fits it (the shapes whose walks are known to recurse that way are a named exemption). An overflow
 aborts the test binary. The tenth kept in hand is the minimum margin the gate enforces: a frame that grows
 fails the gate while every accepted input still fits the contract. Frame sizes move with
 every printer change, and differ between optimizations by more than that margin, so the

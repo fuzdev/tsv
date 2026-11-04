@@ -13,6 +13,10 @@
 //!   format, the imports walk (TypeScript and Svelte) and the type strip (TypeScript)** on
 //!   a thread nine tenths of the contract's size ([`GATE_STACK`]), which it must survive: a
 //!   stack overflow aborts this test binary, which fails the gate;
+//! - in an optimized build, a **spine shape** — a flat chain, thousands of links under a
+//!   shallow wire — runs the same walks again on a thread a small fraction of the
+//!   contract's ([`SPINE_STACK`]), so a walk that recurses down the spine fails natively,
+//!   where the contract's thread still fits it ([`is_spine_shape`]);
 //! - its format's output **parses again and is its own format** (F1): the pairs the printer
 //!   adds are levels of the output's nesting, which the parse charges as it reads the input
 //!   (`tsv_lang::SpineCount::try_pair`), so an accepted input's output is never refused;
@@ -502,7 +506,61 @@ fn run_every_phase(shape: &'static Shape, n: usize) {
 /// strip and the combined strip-and-imports walk (TypeScript) over `source`, on a thread of
 /// the contract's stack named `contract <name>`.
 fn run_walks(name: String, lang: Lang, source: String) {
-    on_thread(format!("contract {name}"), gate_stack(), move || {
+    run_walks_on(format!("contract {name}"), gate_stack(), lang, source);
+}
+
+/// Whether a shape accepted at `n` repetitions is a SPINE shape, whose walks run again on
+/// [`SPINE_STACK`] in an optimized build: several times more repetitions than
+/// [`NESTING_LIMIT`] allows levels — a chain the count charges a link at the spine's own
+/// rate, not at a level's — under a wire no deeper than a few times a document's frame
+/// ([`FRAME_LEVELS`]), so its depth is links the walks iterate, not levels they recurse
+/// through. The wire alone does not decide it: a chain the count charges as nesting
+/// (`a()!!…`) has a shallow wire too, and its walks recurse through its levels by right.
+fn is_spine_shape(n: usize, counts: WireCounts) -> bool {
+    !cfg!(debug_assertions) && n > 4 * NESTING_LIMIT as usize && counts.nesting <= 4 * FRAME_LEVELS
+}
+
+/// The thread a spine shape's walks run on again ([`is_spine_shape`]): a small fraction of
+/// the contract's, since no walk may spend a frame per spine link (`docs/cli.md` §The
+/// other surfaces — an engine's optimized frames overflow its main thread's stack on a
+/// recursion the native contract still fits). The walks that iterate a chain's spine need
+/// little stack, whatever its length; a walk that recurses down it spends its frame once
+/// per link, thousands of times, so a recursion whose frames come to a fraction of an
+/// engine main thread's budget fails here natively, with no engine involved. The contract
+/// leg cannot see one: the contract's thread fits it with room left.
+///
+/// Its size is also kept well under a quarter of [`GATE_STACK`]: glibc's thread-stack
+/// cache hands a new thread an exited thread's stack up to four times the size it asked
+/// for (its guard page included), and a spine thread running on an exited contract
+/// thread's stack would grade nothing.
+///
+/// Optimized builds only: an unoptimized build's frames grow over an optimized one's by a
+/// factor that differs from function to function, so no fraction of the debug contract
+/// passes exactly the walks this one passes.
+const SPINE_STACK: usize = 384 << 10;
+
+const _: () = assert!(
+    SPINE_STACK * 4 + 3 * (64 << 10) < GATE_STACK,
+    "a cached contract stack can be reused for a spine thread"
+);
+
+/// The spine shapes whose walks are known to recurse down their spine, exempt from the
+/// spine leg (the contract leg still grades them).
+// TODO: make the walks over an array type's element type, an indexed access type's object
+// type and a qualified name's left side (a type reference's, an import-equals target's)
+// iterate their spine, then empty this list. A smaller recursion down a spine fits this
+// thread and passes unexempted — a non-null chain with a comment in each `!`'s gap — and
+// once it iterates too, a smaller thread would hold every spine shape.
+const SPINE_RECURSION_KNOWN: &[&str] = &[
+    "ts_type_array_flat",
+    "ts_type_indexed_flat",
+    "ts_qualified_flat",
+    "ts_import_equals_flat",
+];
+
+/// [`run_walks`] on a thread of `stack` bytes named `name`.
+fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
+    on_thread(name.clone(), stack, move || {
         let arena = bumpalo::Bump::new();
         match lang {
             Lang::Ts => {
@@ -604,13 +662,27 @@ fn assert_output_reparses(name: &str, lang: Lang, formatted: &str) {
 /// every walk of the accepted tree within the contract's stack.
 #[test]
 fn every_shape_holds_its_limit_on_the_contract_stack() {
+    for name in SPINE_RECURSION_KNOWN {
+        assert!(
+            shapes(Scope::Check).iter().any(|shape| shape.name == *name),
+            "the spine exemption {name} names no shape"
+        );
+    }
     let graded = grade_in_parallel(graded_shapes(), |shape| {
         if std::env::var_os("TSV_DEPTH_REPORT").is_some() {
             eprintln!("start {}", shape.name);
         }
         let n = accepted_limit(shape)?;
-        check_wire(shape, n);
+        let counts = check_wire(shape, n);
         run_every_phase(shape, n);
+        if is_spine_shape(n, counts) && !SPINE_RECURSION_KNOWN.contains(&shape.name.as_str()) {
+            run_walks_on(
+                format!("spine {}", shape.name),
+                SPINE_STACK,
+                shape.lang,
+                shape.make(n),
+            );
+        }
         if std::env::var_os("TSV_DEPTH_REPORT").is_some() {
             eprintln!("done {}", shape.name);
         }
@@ -659,7 +731,7 @@ const FRAME_LEVELS: u32 = 4;
 /// (the search steps a whole repetition at a time, up to five links), give or take a link
 /// (the head may count none, or count a cheaper link than the rest, which the wire count,
 /// at the shape's units a link, does not see).
-fn check_wire(shape: &'static Shape, n: usize) {
+fn check_wire(shape: &'static Shape, n: usize) -> WireCounts {
     let source = shape.make(n);
     let counts = on_thread(format!("wire {}", shape.name), SEARCH_STACK, move || {
         wire_counts(shape.lang, &source)
@@ -701,7 +773,7 @@ fn check_wire(shape: &'static Shape, n: usize) {
             SPINE_LIMIT - charged - units * 6,
             SPINE_LIMIT - charged + units,
         ),
-        Wire::Bounded => return,
+        Wire::Bounded => return counts,
     };
     let counted = if shape.wire == Wire::Nesting {
         counts.nesting
@@ -714,6 +786,7 @@ fn check_wire(shape: &'static Shape, n: usize) {
          counts {counted}, outside {low}..={high}",
         shape.name,
     );
+    counts
 }
 
 /// The spec line of every shape at its accepted depth, written to the path
