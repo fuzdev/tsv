@@ -2926,13 +2926,16 @@ fn type_operator_grade(
         }
 
         // The operand is an array/tuple type: an element type reference (`readonly T[]`,
-        // `readonly Ns.T[]`), a tuple literal (`readonly [T, U]`), or a parenthesized
-        // element type whose postfix run ends in an array suffix `[]` (`readonly (A | B)[]`).
+        // `readonly Ns.T[]`), a tuple literal (`readonly [T, U]`), or a parenthesized or
+        // literal element type whose postfix run ends in an array suffix `[]`
+        // (`readonly (A | B)[]`, `readonly 'a'[]`). The literal heads are a string, a
+        // template, an unsigned numeric literal and an object type literal's braces.
         // Otherwise a parenthesized operand is no array or tuple, so acorn-typescript
         // refuses the type and reads a call in a comparison (`p < readonly (x) > (t, u)`,
-        // `a < readonly (d)[e] > (f)`); a literal operand is no type at all. Skip the
-        // operand and ask the shared follow filter — its indexed arm is what tells
-        // `readonly zz[] ? q : r` (a comparison) from `f<readonly zz[]>()`.
+        // `a < readonly (d)[e] > (f)`), and a literal one is no type acorn-typescript reads
+        // at all (`readonly 1[0]`). Skip the operand and ask the shared follow filter — its
+        // indexed arm is what tells `readonly zz[] ? q : r` (a comparison) from
+        // `f<readonly zz[]>()`.
         TypeOperator::Readonly => {
             // A type query heads the element type (`readonly typeof b[]`), and is graded
             // as one from there — where the array suffix follows it, which is what
@@ -2963,26 +2966,23 @@ fn type_operator_grade(
                 // which acorn-typescript refuses under `readonly`, reading the call
                 // `readonly(d)[e]` in a comparison instead; `readonly (d)[e][]` is an array.
                 // The run's indices are left for the follow filter to grade, from `close + 1`.
-                let mut end = close + 1;
-                let mut ends_in_array_suffix = false;
-                loop {
-                    let open = skip_whitespace_and_comments(bytes, end);
-                    if bytes.get(open) != Some(&b'[')
-                        || has_line_terminator_between(bytes, end, open)
-                    {
-                        break;
-                    }
-                    let Some(group_close) = matching_delimiter_close(bytes, open) else {
-                        return HeadGrade::Decided(false);
-                    };
-                    ends_in_array_suffix =
-                        skip_whitespace_and_comments(bytes, open + 1) == group_close;
-                    end = group_close + 1;
+                match postfix_run_ends_in_array_suffix(bytes, close + 1) {
+                    Some(true) => close + 1,
+                    _ => return HeadGrade::Decided(false),
                 }
-                if !ends_in_array_suffix {
-                    return HeadGrade::Decided(false);
+            } else if let Some(literal_end) = readonly_literal_element_end(bytes, after_kw) {
+                // A literal element type (`readonly 1[]`, `readonly 'a'[]`, `` readonly `t`[] ``,
+                // `readonly {}[]`), under the same rule: the run must end in an empty `[]`.
+                // No value reading of the operand exists then — an empty `[]` is no member
+                // access — so the comparison reading is gone; the follow filter still decides
+                // whether a type-argument list closes here. A negative literal stays out:
+                // acorn-typescript reads it with its expression parser, whose member read
+                // meets the `]` (`readonly -1[]` does not parse there), and the printer
+                // always pairs one ahead of `[]`.
+                match postfix_run_ends_in_array_suffix(bytes, literal_end) {
+                    Some(true) => literal_end,
+                    _ => return HeadGrade::Decided(false),
                 }
-                close + 1
             } else {
                 return HeadGrade::Decided(false);
             };
@@ -2991,6 +2991,44 @@ fn type_operator_grade(
                 kind: OperandEnd::Other,
             }
         }
+    }
+}
+
+/// Whether the same-line run of `[…]` groups from `from` ends in an EMPTY `[]` — the array
+/// suffix a `readonly` operand needs: `Some(true)` when it does, `Some(false)` when the run
+/// is empty or ends in an index, `None` when a group is unbalanced.
+fn postfix_run_ends_in_array_suffix(bytes: &[u8], from: usize) -> Option<bool> {
+    let mut end = from;
+    let mut ends_in_array_suffix = false;
+    loop {
+        let open = skip_whitespace_and_comments(bytes, end);
+        if bytes.get(open) != Some(&b'[') || has_line_terminator_between(bytes, end, open) {
+            return Some(ends_in_array_suffix);
+        }
+        let group_close = matching_delimiter_close(bytes, open)?;
+        ends_in_array_suffix = skip_whitespace_and_comments(bytes, open + 1) == group_close;
+        end = group_close + 1;
+    }
+}
+
+/// Where a literal element type behind `readonly` ends: a string or template literal, an
+/// unsigned numeric literal, or an object type literal's braces. `None` for any other head.
+fn readonly_literal_element_end(bytes: &[u8], pos: usize) -> Option<usize> {
+    match bytes.get(pos)? {
+        b'\'' | b'"' => skip_trivia(bytes, pos, bytes.len(), TriviaProfile::JS),
+        b'`' => Some(skip_template_literal(
+            bytes,
+            pos,
+            bytes.len(),
+            crate::__private::OPERAND_GRAMMAR,
+        )),
+        b'{' => matching_delimiter_close(bytes, pos).map(|close| close + 1),
+        b'-' => None,
+        _ if numeric_literal_starts_at(bytes, pos) => {
+            let end = skip_numeric_literal(bytes, pos);
+            (end > pos).then_some(end)
+        }
+        _ => None,
     }
 }
 

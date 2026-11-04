@@ -1,0 +1,1260 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 803,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 770,
+				"end": 772,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 772,
+				"end": 802,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 775,
+							"end": 798,
+							"expression": {
+								"type": "CallExpression",
+								"start": 776,
+								"end": 797,
+								"callee": {
+									"type": "Identifier",
+									"start": 776,
+									"end": 778,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 795,
+										"end": 796,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 778,
+									"end": 794,
+									"params": [
+										{
+											"type": "TSTypeOperator",
+											"start": 779,
+											"end": 793,
+											"operator": "readonly",
+											"typeAnnotation": {
+												"type": "TSArrayType",
+												"start": 788,
+												"end": 793,
+												"elementType": {
+													"type": "TSLiteralType",
+													"start": 788,
+													"end": 791,
+													"literal": {
+														"type": "Literal",
+														"start": 788,
+														"end": 791,
+														"value": "a",
+														"raw": "'a'"
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " `readonly` over an array of a LITERAL element type, as a type argument. An empty",
+			"start": 20,
+			"end": 103
+		},
+		{
+			"type": "Line",
+			"value": " `[]` is no member access, so the operand reads only as a type",
+			"start": 105,
+			"end": 169
+		},
+		{
+			"type": "Line",
+			"value": " An index ahead of the array suffix, and a second suffix",
+			"start": 345,
+			"end": 403
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 472,
+			"end": 479
+		},
+		{
+			"type": "Line",
+			"value": " Every carrier of a type-argument list, and a sibling argument on either side",
+			"start": 489,
+			"end": 568
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 770,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 761,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 171,
+					"end": 191,
+					"expression": {
+						"type": "CallExpression",
+						"start": 171,
+						"end": 190,
+						"callee": {
+							"type": "Identifier",
+							"start": 171,
+							"end": 173,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 188,
+								"end": 189,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 173,
+							"end": 187,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 174,
+									"end": 186,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 183,
+										"end": 186,
+										"elementType": {
+											"type": "TSLiteralType",
+											"start": 183,
+											"end": 184,
+											"literal": {
+												"type": "Literal",
+												"start": 183,
+												"end": 184,
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `readonly` over an array of a LITERAL element type, as a type argument. An empty",
+							"start": 20,
+							"end": 103
+						},
+						{
+							"type": "Line",
+							"value": " `[]` is no member access, so the operand reads only as a type",
+							"start": 105,
+							"end": 169
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 193,
+					"end": 215,
+					"expression": {
+						"type": "CallExpression",
+						"start": 193,
+						"end": 214,
+						"callee": {
+							"type": "Identifier",
+							"start": 193,
+							"end": 195,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 212,
+								"end": 213,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 195,
+							"end": 211,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 196,
+									"end": 210,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 205,
+										"end": 210,
+										"elementType": {
+											"type": "TSLiteralType",
+											"start": 205,
+											"end": 208,
+											"literal": {
+												"type": "Literal",
+												"start": 205,
+												"end": 208,
+												"value": "a",
+												"raw": "'a'"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 217,
+					"end": 239,
+					"expression": {
+						"type": "CallExpression",
+						"start": 217,
+						"end": 238,
+						"callee": {
+							"type": "Identifier",
+							"start": 217,
+							"end": 219,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 236,
+								"end": 237,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 219,
+							"end": 235,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 220,
+									"end": 234,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 229,
+										"end": 234,
+										"elementType": {
+											"type": "TSLiteralType",
+											"start": 229,
+											"end": 232,
+											"literal": {
+												"type": "TemplateLiteral",
+												"start": 229,
+												"end": 232,
+												"expressions": [],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 230,
+														"end": 231,
+														"value": {
+															"raw": "a",
+															"cooked": "a"
+														},
+														"tail": true
+													}
+												]
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 241,
+					"end": 267,
+					"expression": {
+						"type": "CallExpression",
+						"start": 241,
+						"end": 266,
+						"callee": {
+							"type": "Identifier",
+							"start": 241,
+							"end": 243,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 264,
+								"end": 265,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 243,
+							"end": 263,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 244,
+									"end": 262,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 253,
+										"end": 262,
+										"elementType": {
+											"type": "TSLiteralType",
+											"start": 253,
+											"end": 260,
+											"literal": {
+												"type": "TemplateLiteral",
+												"start": 253,
+												"end": 260,
+												"expressions": [
+													{
+														"type": "TSTypeReference",
+														"start": 257,
+														"end": 258,
+														"typeName": {
+															"type": "Identifier",
+															"start": 257,
+															"end": 258,
+															"name": "B"
+														}
+													}
+												],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 254,
+														"end": 255,
+														"value": {
+															"raw": "a",
+															"cooked": "a"
+														},
+														"tail": false
+													},
+													{
+														"type": "TemplateElement",
+														"start": 259,
+														"end": 259,
+														"value": {
+															"raw": "",
+															"cooked": ""
+														},
+														"tail": true
+													}
+												]
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 269,
+					"end": 290,
+					"expression": {
+						"type": "CallExpression",
+						"start": 269,
+						"end": 289,
+						"callee": {
+							"type": "Identifier",
+							"start": 269,
+							"end": 271,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 287,
+								"end": 288,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 271,
+							"end": 286,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 272,
+									"end": 285,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 281,
+										"end": 285,
+										"elementType": {
+											"type": "TSTypeLiteral",
+											"start": 281,
+											"end": 283,
+											"members": []
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 292,
+					"end": 319,
+					"expression": {
+						"type": "CallExpression",
+						"start": 292,
+						"end": 318,
+						"callee": {
+							"type": "Identifier",
+							"start": 292,
+							"end": 294,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 316,
+								"end": 317,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 294,
+							"end": 315,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 295,
+									"end": 314,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 304,
+										"end": 314,
+										"elementType": {
+											"type": "TSTypeLiteral",
+											"start": 304,
+											"end": 312,
+											"members": [
+												{
+													"type": "TSPropertySignature",
+													"start": 306,
+													"end": 310,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 306,
+														"end": 307,
+														"name": "a"
+													},
+													"typeAnnotation": {
+														"type": "TSTypeAnnotation",
+														"start": 307,
+														"end": 310,
+														"typeAnnotation": {
+															"type": "TSLiteralType",
+															"start": 309,
+															"end": 310,
+															"literal": {
+																"type": "Literal",
+																"start": 309,
+																"end": 310,
+																"value": 1,
+																"raw": "1"
+															}
+														}
+													}
+												}
+											]
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 321,
+					"end": 342,
+					"expression": {
+						"type": "CallExpression",
+						"start": 321,
+						"end": 341,
+						"callee": {
+							"type": "Identifier",
+							"start": 321,
+							"end": 323,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 339,
+								"end": 340,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 323,
+							"end": 338,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 324,
+									"end": 337,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 333,
+										"end": 337,
+										"elementType": {
+											"type": "TSLiteralType",
+											"start": 333,
+											"end": 335,
+											"literal": {
+												"type": "Literal",
+												"start": 333,
+												"end": 335,
+												"value": "1",
+												"raw": "1n",
+												"bigint": "1"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 405,
+					"end": 428,
+					"expression": {
+						"type": "CallExpression",
+						"start": 405,
+						"end": 427,
+						"callee": {
+							"type": "Identifier",
+							"start": 405,
+							"end": 407,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 425,
+								"end": 426,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 407,
+							"end": 424,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 408,
+									"end": 423,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 417,
+										"end": 423,
+										"elementType": {
+											"type": "TSIndexedAccessType",
+											"start": 417,
+											"end": 421,
+											"objectType": {
+												"type": "TSLiteralType",
+												"start": 417,
+												"end": 418,
+												"literal": {
+													"type": "Literal",
+													"start": 417,
+													"end": 418,
+													"value": 1,
+													"raw": "1"
+												}
+											},
+											"indexType": {
+												"type": "TSLiteralType",
+												"start": 419,
+												"end": 420,
+												"literal": {
+													"type": "Literal",
+													"start": 419,
+													"end": 420,
+													"value": 0,
+													"raw": "0"
+												}
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An index ahead of the array suffix, and a second suffix",
+							"start": 345,
+							"end": 403
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 430,
+					"end": 454,
+					"expression": {
+						"type": "CallExpression",
+						"start": 430,
+						"end": 453,
+						"callee": {
+							"type": "Identifier",
+							"start": 430,
+							"end": 432,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 451,
+								"end": 452,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 432,
+							"end": 450,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 433,
+									"end": 449,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 442,
+										"end": 449,
+										"elementType": {
+											"type": "TSArrayType",
+											"start": 442,
+											"end": 447,
+											"elementType": {
+												"type": "TSLiteralType",
+												"start": 442,
+												"end": 445,
+												"literal": {
+													"type": "Literal",
+													"start": 442,
+													"end": 445,
+													"value": "a",
+													"raw": "'a'"
+												}
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 456,
+					"end": 486,
+					"expression": {
+						"type": "CallExpression",
+						"start": 456,
+						"end": 485,
+						"callee": {
+							"type": "Identifier",
+							"start": 456,
+							"end": 458,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 483,
+								"end": 484,
+								"name": "x",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 472,
+										"end": 479
+									}
+								]
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 458,
+							"end": 482,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 459,
+									"end": 481,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 468,
+										"end": 481,
+										"elementType": {
+											"type": "TSLiteralType",
+											"start": 468,
+											"end": 471,
+											"literal": {
+												"type": "Literal",
+												"start": 468,
+												"end": 471,
+												"value": "a",
+												"raw": "'a'"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 570,
+					"end": 595,
+					"expression": {
+						"type": "NewExpression",
+						"start": 570,
+						"end": 594,
+						"callee": {
+							"type": "Identifier",
+							"start": 574,
+							"end": 577,
+							"name": "Cls"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 577,
+							"end": 591,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 578,
+									"end": 590,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 587,
+										"end": 590,
+										"elementType": {
+											"type": "TSLiteralType",
+											"start": 587,
+											"end": 588,
+											"literal": {
+												"type": "Literal",
+												"start": 587,
+												"end": 588,
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									}
+								}
+							]
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 592,
+								"end": 593,
+								"name": "x"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Every carrier of a type-argument list, and a sibling argument on either side",
+							"start": 489,
+							"end": 568
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 597,
+					"end": 625,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 603,
+							"end": 624,
+							"id": {
+								"type": "Identifier",
+								"start": 603,
+								"end": 605,
+								"name": "a1"
+							},
+							"init": {
+								"type": "TSInstantiationExpression",
+								"start": 608,
+								"end": 624,
+								"expression": {
+									"type": "Identifier",
+									"start": 608,
+									"end": 610,
+									"name": "fn"
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 610,
+									"end": 624,
+									"params": [
+										{
+											"type": "TSTypeOperator",
+											"start": 611,
+											"end": 623,
+											"operator": "readonly",
+											"typeAnnotation": {
+												"type": "TSArrayType",
+												"start": 620,
+												"end": 623,
+												"elementType": {
+													"type": "TSLiteralType",
+													"start": 620,
+													"end": 621,
+													"literal": {
+														"type": "Literal",
+														"start": 620,
+														"end": 621,
+														"value": 1,
+														"raw": "1"
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 627,
+					"end": 647,
+					"expression": {
+						"type": "TaggedTemplateExpression",
+						"start": 627,
+						"end": 646,
+						"tag": {
+							"type": "Identifier",
+							"start": 627,
+							"end": 629,
+							"name": "fn"
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 643,
+							"end": 646,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 644,
+									"end": 645,
+									"value": {
+										"raw": "t",
+										"cooked": "t"
+									},
+									"tail": true
+								}
+							]
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 629,
+							"end": 643,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 630,
+									"end": 642,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 639,
+										"end": 642,
+										"elementType": {
+											"type": "TSLiteralType",
+											"start": 639,
+											"end": 640,
+											"literal": {
+												"type": "Literal",
+												"start": 639,
+												"end": 640,
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 649,
+					"end": 674,
+					"expression": {
+						"type": "CallExpression",
+						"start": 649,
+						"end": 673,
+						"callee": {
+							"type": "Identifier",
+							"start": 649,
+							"end": 651,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 671,
+								"end": 672,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 651,
+							"end": 670,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 652,
+									"end": 666,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 661,
+										"end": 666,
+										"elementType": {
+											"type": "TSLiteralType",
+											"start": 661,
+											"end": 664,
+											"literal": {
+												"type": "Literal",
+												"start": 661,
+												"end": 664,
+												"value": "a",
+												"raw": "'a'"
+											}
+										}
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 668,
+									"end": 669,
+									"typeName": {
+										"type": "Identifier",
+										"start": 668,
+										"end": 669,
+										"name": "B"
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 676,
+					"end": 701,
+					"expression": {
+						"type": "CallExpression",
+						"start": 676,
+						"end": 700,
+						"callee": {
+							"type": "Identifier",
+							"start": 676,
+							"end": 678,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 698,
+								"end": 699,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 678,
+							"end": 697,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 679,
+									"end": 680,
+									"typeName": {
+										"type": "Identifier",
+										"start": 679,
+										"end": 680,
+										"name": "B"
+									}
+								},
+								{
+									"type": "TSTypeOperator",
+									"start": 682,
+									"end": 696,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 691,
+										"end": 696,
+										"elementType": {
+											"type": "TSLiteralType",
+											"start": 691,
+											"end": 694,
+											"literal": {
+												"type": "Literal",
+												"start": 691,
+												"end": 694,
+												"value": "a",
+												"raw": "'a'"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 703,
+					"end": 729,
+					"expression": {
+						"type": "CallExpression",
+						"start": 703,
+						"end": 728,
+						"callee": {
+							"type": "Identifier",
+							"start": 703,
+							"end": 705,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 726,
+								"end": 727,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 705,
+							"end": 725,
+							"params": [
+								{
+									"type": "TSUnionType",
+									"start": 706,
+									"end": 724,
+									"types": [
+										{
+											"type": "TSTypeOperator",
+											"start": 706,
+											"end": 720,
+											"operator": "readonly",
+											"typeAnnotation": {
+												"type": "TSArrayType",
+												"start": 715,
+												"end": 720,
+												"elementType": {
+													"type": "TSLiteralType",
+													"start": 715,
+													"end": 718,
+													"literal": {
+														"type": "Literal",
+														"start": 715,
+														"end": 718,
+														"value": "a",
+														"raw": "'a'"
+													}
+												}
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 723,
+											"end": 724,
+											"typeName": {
+												"type": "Identifier",
+												"start": 723,
+												"end": 724,
+												"name": "B"
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 731,
+					"end": 760,
+					"expression": {
+						"type": "CallExpression",
+						"start": 731,
+						"end": 759,
+						"callee": {
+							"type": "Identifier",
+							"start": 731,
+							"end": 736,
+							"name": "outer"
+						},
+						"arguments": [
+							{
+								"type": "CallExpression",
+								"start": 737,
+								"end": 758,
+								"callee": {
+									"type": "Identifier",
+									"start": 737,
+									"end": 739,
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 756,
+										"end": 757,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 739,
+									"end": 755,
+									"params": [
+										{
+											"type": "TSTypeOperator",
+											"start": 740,
+											"end": 754,
+											"operator": "readonly",
+											"typeAnnotation": {
+												"type": "TSArrayType",
+												"start": 749,
+												"end": 754,
+												"elementType": {
+													"type": "TSLiteralType",
+													"start": 749,
+													"end": 752,
+													"literal": {
+														"type": "Literal",
+														"start": 749,
+														"end": 752,
+														"value": "a",
+														"raw": "'a'"
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

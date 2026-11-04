@@ -195,6 +195,41 @@ fn readonly_parenthesized_operand_needs_an_array_suffix() {
     }
 }
 
+/// A literal element type under `readonly` takes the paren arm's rule: its same-line postfix
+/// run must end in an empty `[]`. A run ending in an index, a negative literal (which
+/// acorn-typescript reads with its expression parser, whose member read meets the `]`) and a
+/// suffix on the next line are no array type acorn-typescript reads, and tsv rejects them as
+/// it does. A paired negative literal is the parenthesized arm, and its pair stays.
+#[test]
+fn readonly_literal_operand_needs_an_array_suffix() {
+    for source in [
+        "f<readonly 1[0]>(x);\n",
+        "f<readonly 'a'[0]>(x);\n",
+        "f<readonly -1[]>(x);\n",
+        "f<readonly 1\n[]>(x);\n",
+        "f<readonly 1>(x);\n",
+    ] {
+        let arena = bumpalo::Bump::new();
+        assert!(
+            tsv_ts::__private::parse(source, &arena).is_err(),
+            "{source:?}"
+        );
+    }
+    for (source, printed) in [
+        ("f<readonly (-1)[]>(x);\n", "f<readonly (-1)[]>(x);\n"),
+        ("f<readonly 1[]>(x);\n", "f<readonly 1[]>(x);\n"),
+        ("f<readonly (1)[]>(x);\n", "f<readonly 1[]>(x);\n"),
+        ("f<readonly 'a'[0][]>(x);\n", "f<readonly 'a'[0][]>(x);\n"),
+    ] {
+        assert_prints_fixed(source, printed);
+        assert_eq!(
+            expression_kinds(source),
+            ["CallExpression", "Identifier", "Identifier"],
+            "{source:?}"
+        );
+    }
+}
+
 /// An index's body is graded by the same walk as the list around it, through any paren
 /// shell: a body only the type grammar spells keeps the call, and its shelled spellings
 /// print bare and stay calls.
