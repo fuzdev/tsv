@@ -15,9 +15,11 @@
 
 use crate::ast::{self, AssignmentOperator, Expression, ExpressionKind};
 use crate::printer::calls::chain_has_calls;
-use crate::printer::chain::{chain_paren_leading_gap, find_bracket_position};
+use crate::printer::chain::{
+    chain_mid_chain_paren_gaps, chain_paren_leading_gap, find_bracket_position,
+};
 use crate::printer::class_expr_has_decorators;
-use crate::printer::comments::ValueGap;
+use crate::printer::comments::{ValueGap, left_spine_shell_is_comment_free};
 use crate::printer::conditional_should_break_after_op;
 use crate::printer::expressions::functions::HeadForcedChainLead;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
@@ -631,6 +633,13 @@ pub(crate) fn is_poorly_breakable_chain(expr: &Expression<'_>, printer: &Printer
         // `MemberExpression` arm.
         chain_has_calls: chain_has_calls(expr),
     };
+    // A stripped shell the chain prints MID-CHAIN hands its run to the member gap after the
+    // chain's head, so a comment it puts on the head's line is the `MemberExpression` arm's
+    // trailing comment, read where it prints rather than where it was written. Widening a
+    // gap needs a call, so the chain's own gate scopes this one too.
+    if walk.chain_has_calls && printer.mid_chain_shell_run(expr).trails_head {
+        return false;
+    }
     is_poorly_breakable_chain_walk(expr, false, &walk)
 }
 
@@ -726,10 +735,14 @@ fn is_poorly_breakable_chain_walk(
             // printMemberChain's unlabeled short-chain return, the labeled doc opts out of
             // isPoorlyBreakableMemberOrCallChain (member-chain.js `nodeHasComment`), and
             // fluid keeps the fittable head on the operator line. An OWN-LINE gap comment
-            // is deliberately not counted: it makes the head multi-line from its first
-            // token, and there prettier's operator break stands
-            // (`member/prettier_ignore_base_comment` pins that side). **On page**, because
-            // this is a layout gate. Otherwise continue down.
+            // counts where it cannot split the head: in a gap ahead of a `.` holding no `//`,
+            // the chain prints every comment on the object's line (`x⏎/* c */⏎.y.q()` prints
+            // `x /* c */.y`) or on the line of a link it breaks before, so every one counts.
+            // In a gap holding a `//`, or ahead of a computed member's `[`, an own-line
+            // comment is not counted: it makes the head multi-line from its first token, and
+            // there prettier's operator break stands (`member/prettier_ignore_base_comment`
+            // pins the `//` side). **On page**, because this is a layout gate. Otherwise
+            // continue down.
             //
             // ⚠️ Scoped to a chain that HOLDS A CALL, because that is the only chain the
             // modelled prettier path can reach: the `memberChain` label lives on a CALL's
@@ -750,13 +763,18 @@ fn is_poorly_breakable_chain_walk(
                     } else {
                         member.property.span().start
                     };
+                    let line_free = !member.computed
+                        && !printer
+                            .comments_on_page_between(object_end, gap_end)
+                            .any(|c| !c.is_block);
                     if printer
                         .comments_on_page_between(object_end, gap_end)
                         .any(|c| {
-                            !tsv_lang::source_scan::has_newline_before_position(
-                                printer.source,
-                                c.span.start,
-                            )
+                            line_free
+                                || !tsv_lang::source_scan::has_newline_before_position(
+                                    printer.source,
+                                    c.span.start,
+                                )
                         })
                     {
                         return false;
@@ -1617,6 +1635,11 @@ impl<'a> Printer<'a> {
     /// Check for line comments in a chain (calls, members, non-null) — a loop down the
     /// spine, not a recursion, since a frame per link is what the stack contract prices.
     fn has_line_comments_in_chain(&self, mut expr: &Expression<'_>) -> bool {
+        // A `//` in a stripped shell the chain prints MID-CHAIN breaks the chain at the member
+        // gap after its head, as one written in that gap does ([`Self::mid_chain_shell_run`]).
+        if self.mid_chain_shell_run(expr).holds_line_comment {
+            return true;
+        }
         loop {
             // The base's own LEADING gap, where the pair the base prints keeps the run
             // inside it (`const m = ( // c⏎\ta?.b⏎)!.ccc`, `const z = ( // c⏎\t() => {}⏎)().p`).
@@ -1723,6 +1746,67 @@ impl<'a> Printer<'a> {
                 _ => return false,
             };
         }
+    }
+}
+
+/// What the member gap after a chain's head prints out of the stripped shells the chain
+/// prints MID-CHAIN ([`Printer::mid_chain_shell_run`]).
+#[derive(Clone, Copy, Default)]
+struct MidChainShellRun {
+    /// A comment of the run prints on the head's line: the gap's TRAILING comment.
+    trails_head: bool,
+    /// The run holds a `//`, which ends its line wherever it prints.
+    holds_line_comment: bool,
+}
+
+impl Printer<'_> {
+    /// The run of `expr`'s stripped chain-base shells that its member chain prints MID-CHAIN,
+    /// in the member gap after the chain's head ([`chain_mid_chain_paren_gaps`], the
+    /// linearizer's own widening: `x = (// a⏎x.y).q()` prints `x = x // a⏎\t.y.q()`), as the
+    /// layout readers of that gap read it on the reparse.
+    ///
+    /// A run with no `//` prints on the head's line whole. In a run holding a `//`, a comment
+    /// the source puts on a new line prints on one of its own, and only the rest trail the
+    /// head — so everything after a `//` takes a line of its own, the `//` having ended its
+    /// line. A comment the head's leaf OWNS is no part of the run — the leaf prints it ahead
+    /// of the head.
+    ///
+    /// Asked at every operator→value seam, so the common answer is one byte: a run needs a
+    /// shell at the value's start and a comment among the `(`s there.
+    fn mid_chain_shell_run(&self, expr: &Expression<'_>) -> MidChainShellRun {
+        let start = expr.span().start;
+        if self.source.as_bytes().get(start as usize) != Some(&b'(')
+            || left_spine_shell_is_comment_free(self.source, start)
+        {
+            return MidChainShellRun::default();
+        }
+        let gaps = chain_mid_chain_paren_gaps(expr, self.linearize_input());
+        let holds_line_comment = gaps.iter().any(|&(gap_start, object_start)| {
+            self.comments_on_page_between(gap_start, object_start)
+                .any(|c| !c.owned_by_node && !c.is_block)
+        });
+        let mut run = MidChainShellRun {
+            trails_head: false,
+            holds_line_comment,
+        };
+        // The source position the next comment's line is read from: the value's first `(`,
+        // then the end of each comment of the run in turn.
+        let mut prev_end = start;
+        for &(gap_start, object_start) in &gaps {
+            for c in self.comments_on_page_between(gap_start, object_start) {
+                if c.owned_by_node {
+                    continue;
+                }
+                run.trails_head |= !holds_line_comment
+                    || !tsv_lang::printing::has_newline_between(
+                        self.source,
+                        prev_end,
+                        c.span.start,
+                    );
+                prev_end = c.span.end;
+            }
+        }
+        run
     }
 }
 

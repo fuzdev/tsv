@@ -1,0 +1,50 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2%%
+<script lang="ts">
+	x = x.y // a
+		.q();
+	const v = x.y // a
+		.q(1);
+	let w = x.y.z // a
+		.q();
+	x += x /* c */.y
+		.q();
+	class A {
+		k = x.y[0](); // a
+	}
+	x = x.y // a
+		.q();
+	x = x/* b */ // a
+	.y
+		.q();
+	x = await x.y // a
+		.q();
+</script>
+
+%%PASS=3 (fixed point)%%
+<script lang="ts">
+	x = x.y // a
+		.q();
+	const v = x.y // a
+		.q(1);
+	let w = x.y.z // a
+		.q();
+	x += x /* c */.y
+		.q();
+	class A {
+		k = x.y[0](); // a
+	}
+	x = x.y // a
+		.q();
+	x = x /* b */.y // a
+		.q();
+	x = await x.y // a
+		.q();
+</script>

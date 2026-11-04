@@ -1,0 +1,81 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	x = x// a
+	.y
+		.q();
+	const v = x// a
+	.y
+		.q(1);
+	let w = x.y// a
+	.z
+		.q();
+	x += x/* c */
+	.y
+		.q();
+	class A {
+		k = x// a
+		.y[0]();
+	}
+	x = x// a
+	.y
+		.q();
+	x = x// a
+	/* b */
+	.y
+		.q();
+	x = await x// a
+	.y
+		.q();
+</script>
+
+%%PASS=2%%
+<script lang="ts">
+	x = x.y // a
+		.q();
+	const v = x.y // a
+		.q(1);
+	let w = x.y.z // a
+		.q();
+	x += x /* c */.y
+		.q();
+	class A {
+		k = x.y[0](); // a
+	}
+	x = x.y // a
+		.q();
+	x = x/* b */ // a
+	.y
+		.q();
+	x = await x.y // a
+		.q();
+</script>
+
+%%PASS=3 (fixed point)%%
+<script lang="ts">
+	x = x.y // a
+		.q();
+	const v = x.y // a
+		.q(1);
+	let w = x.y.z // a
+		.q();
+	x += x /* c */.y
+		.q();
+	class A {
+		k = x.y[0](); // a
+	}
+	x = x.y // a
+		.q();
+	x = x /* b */.y // a
+		.q();
+	x = await x.y // a
+		.q();
+</script>
