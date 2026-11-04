@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 613,
+	"end": 893,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -54,26 +54,56 @@
 		},
 		{
 			"type": "Line",
-			"value": " an own-line block comment behaves identically — placement keys the freeze",
+			"value": " a decorated class in an authored pair keeps the pair, around its slice",
 			"start": 469,
-			"end": 545
+			"end": 542
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 561,
+			"end": 579
+		},
+		{
+			"type": "Line",
+			"value": " a line comment inside that pair keeps it, printed once around the slice",
+			"start": 605,
+			"end": 679
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 698,
+			"end": 716
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 737,
+			"end": 741
+		},
+		{
+			"type": "Line",
+			"value": " an own-line block comment behaves identically — placement keys the freeze",
+			"start": 749,
+			"end": 825
 		},
 		{
 			"type": "Block",
 			"value": " prettier-ignore ",
-			"start": 564,
-			"end": 585
+			"start": 844,
+			"end": 865
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 612,
+		"end": 892,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 603,
+			"end": 883,
 			"body": [
 				{
 					"type": "ExportDefaultDeclaration",
@@ -276,31 +306,132 @@
 				},
 				{
 					"type": "ExportDefaultDeclaration",
-					"start": 547,
+					"start": 544,
 					"end": 602,
 					"exportKind": "value",
 					"declaration": {
+						"type": "ClassExpression",
+						"start": 583,
+						"end": 600,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 583,
+								"end": 587,
+								"expression": {
+									"type": "Identifier",
+									"start": 584,
+									"end": 587,
+									"name": "dec"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 596,
+							"end": 597,
+							"name": "E"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 598,
+							"end": 600,
+							"body": []
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 561,
+								"end": 579
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a decorated class in an authored pair keeps the pair, around its slice",
+							"start": 469,
+							"end": 542
+						}
+					]
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 681,
+					"end": 746,
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassExpression",
+						"start": 724,
+						"end": 736,
+						"id": {
+							"type": "Identifier",
+							"start": 732,
+							"end": 733,
+							"name": "F"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 734,
+							"end": 736,
+							"body": []
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 698,
+								"end": 716
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 737,
+								"end": 741
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment inside that pair keeps it, printed once around the slice",
+							"start": 605,
+							"end": 679
+						}
+					]
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 827,
+					"end": 882,
+					"exportKind": "value",
+					"declaration": {
 						"type": "ObjectExpression",
-						"start": 588,
-						"end": 601,
+						"start": 868,
+						"end": 881,
 						"properties": [
 							{
 								"type": "Property",
-								"start": 591,
-								"end": 598,
+								"start": 871,
+								"end": 878,
 								"method": false,
 								"shorthand": false,
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 591,
-									"end": 594,
+									"start": 871,
+									"end": 874,
 									"name": "aaa"
 								},
 								"value": {
 									"type": "Literal",
-									"start": 597,
-									"end": 598,
+									"start": 877,
+									"end": 878,
 									"value": 1,
 									"raw": "1"
 								},
@@ -311,8 +442,8 @@
 							{
 								"type": "Block",
 								"value": " prettier-ignore ",
-								"start": 564,
-								"end": 585
+								"start": 844,
+								"end": 865
 							}
 						]
 					},
@@ -320,8 +451,8 @@
 						{
 							"type": "Line",
 							"value": " an own-line block comment behaves identically — placement keys the freeze",
-							"start": 469,
-							"end": 545
+							"start": 749,
+							"end": 825
 						}
 					]
 				}

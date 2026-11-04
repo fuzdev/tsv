@@ -37,6 +37,7 @@ governs every entry here live in [conformance_prettier.md](./conformance_prettie
 - Stripped-paren trailing line-comment convergence — ◆prettier_bug — [stripped_paren_trailing_line_comment](../tests/fixtures/typescript/syntax/comments/stripped_paren_trailing_line_comment_prettier_divergence/), [binary_stripped_operand_paren_line_comment](../tests/fixtures/svelte/expressions/binary_stripped_operand_paren_line_comment_prettier_divergence/), [interpolation_stripped_paren_comment](../tests/fixtures/typescript/expressions/literals/template/interpolation_stripped_paren_comment_prettier_divergence/), [computed_index_stripped_paren_comment](../tests/fixtures/typescript/expressions/member/computed_index_stripped_paren_comment_prettier_divergence/), [binary_stripped_operand_paren_line_comment_island_end](../tests/fixtures/svelte/expressions/binary_stripped_operand_paren_line_comment_island_end_prettier_divergence/)
 - Left-spine shell comment through nested discarded pairs, convergence — ◆prettier_bug — [left_spine_shell_comment_nested_pair](../tests/fixtures/typescript/syntax/comments/left_spine_shell_comment_nested_pair_prettier_divergence/)
 - Arrow-body leftmost decorated class parens — ◆prettier_bug — [body_leftmost_decorated_class](../tests/fixtures/typescript/expressions/arrow/body_leftmost_decorated_class_prettier_divergence/)
+- Export-default parenthesized decorated class — ◆design_choice — [after_export_default_paren](../tests/fixtures/typescript/typescript_specific/decorators/after_export_default_paren_prettier_divergence/)
 - Statement-head cast parens — ◆prettier_bug ◆parser_compat — [statement_cast_paren](../tests/fixtures/typescript/syntax/contextual_keywords/statement_cast_paren_prettier_divergence/), [async_cast_paren](../tests/fixtures/typescript/syntax/contextual_keywords/async_cast_paren_prettier_divergence/)
 - Exponentiation type-assertion operand — ◆prettier_bug — [exponentiation_type_assertion](../tests/fixtures/typescript/expressions/exponentiation_type_assertion_prettier_divergence/)
 - Function / class expression before `/` — ◆prettier_bug ◆parser_compat ◆design_choice — [division_after_function_parens](../tests/fixtures/svelte/expressions/division_after_function_parens_prettier_divergence/)
@@ -770,6 +771,22 @@ prints it back byte for byte (the plain-object twin `({a: 1}).k` the same way). 
 that same form from the **shell** authoring — the directive written inside the parens the
 parser erased — is the position-pair seam that also serves the expression statement:
 `() => (⏎// prettier-ignore⏎@dec class {}⏎).bbb` prints `(@dec class {}).bbb`.
+
+**Export-default parenthesized decorated class**: `export default (@dec class A {});` and the
+bare `export default @dec class A {}` are two programs. In the decorators grammar the bare
+spelling is a class DECLARATION, which binds `A` in the module scope (tsc reads it the same
+way), and the parenthesized one is the export of a class EXPRESSION, which binds nothing;
+acorn-typescript reads both as a `ClassExpression`, so only the grammar and tsc see the split.
+Both formatters keep the authored pair (prettier's `needs-parentheses.js` requires one around
+any `ClassExpression` under `ExportDefaultDeclaration.declaration`). The divergence is the
+layout: prettier's `printClass` returns `[indent([softline, decorators, class]), softline]` in
+a pair, and `printDecorators` opens a declaration's decorators with a `hardline` when the
+parent is an export declaration, so it prints a blank line below the `(` and keeps it on every
+later pass, a blank line no authoring wrote. tsv breaks the pair open the way it prints every
+decorated class in a required pair (`(⏎\t@dec⏎\tclass A {}⏎)`, the statement start and the
+arrow body above), with no blank line. A line comment before the `)` stays inside the pair
+(§Comment relocation in
+[conformance_prettier_ts_comments.md](./conformance_prettier_ts_comments.md#comment-relocation)).
 
 **Constrained infer extends-operand parens**: An `infer X extends C` only ever appears in a conditional type's extends-type, so a trailing token always follows the constraint. When a _nested_ arrow's return abuts the enclosing `? :`, the parens TypeScript requires are the only thing keeping the parse unambiguous, and Prettier strips them, emitting output that **fails to re-parse** (acorn-typescript rejects it): `M extends (() => () => infer U extends string) ? …` → `M extends () => () => infer U extends string ? …` (Prettier's `needs-parentheses` rule only inspects the immediate return type). tsv keeps the parens, staying valid. Two related forms are preserved by both formatters: the _conditional-type_ infer constraint (`X extends infer U extends (A extends B ? C : D) ? …` — Prettier keeps these parens) and the single-arrow return (`M extends (() => infer U extends string) ? …` — Prettier's single-level rule covers it; see [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens/), where tsv matches). A bare `<T extends (A extends B ? C : D)>` type-parameter declaration is unaffected: the `>` terminates it, so Prettier strips and tsv matches.
 

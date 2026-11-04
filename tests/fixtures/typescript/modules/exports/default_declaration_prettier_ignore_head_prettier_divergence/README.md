@@ -16,6 +16,11 @@ tsv keeps the author's line, since a head-trailing directive is inert under the 
 and the relocated form would lose the freeze on the second pass. **Both spellings** behave
 alike — placement keys the freeze, not the comment's spelling.
 
+A decorated class written in an authored pair (`(@dec   class E {})`) keeps the pair: it is
+what makes the class an expression rather than a declaration, so it prints around the frozen
+slice, as the undecorated class's does — once, with a line comment written inside it kept
+there.
+
 ## Reason
 
 Rule A binds a directive to the node that follows it; ◆comment_preservation. See

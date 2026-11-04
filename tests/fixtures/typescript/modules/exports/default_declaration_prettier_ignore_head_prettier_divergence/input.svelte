@@ -21,6 +21,18 @@
 		@dec
 		class  D  {}
 
+	// a decorated class in an authored pair keeps the pair, around its slice
+	export default
+		// prettier-ignore
+		(@dec   class E {});
+
+	// a line comment inside that pair keeps it, printed once around the slice
+	export default
+		// prettier-ignore
+		(
+			class   F {} // c
+		);
+
 	// an own-line block comment behaves identically — placement keys the freeze
 	export default
 		/* prettier-ignore */

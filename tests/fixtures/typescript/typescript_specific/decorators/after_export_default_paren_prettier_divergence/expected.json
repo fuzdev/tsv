@@ -1,0 +1,587 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 846,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an authored pair makes a decorated class an expression, not a declaration: the pair stays",
+			"start": 20,
+			"end": 112
+		},
+		{
+			"type": "Line",
+			"value": " two decorators and a body, one per line inside the pair",
+			"start": 197,
+			"end": 255
+		},
+		{
+			"type": "Line",
+			"value": " a line comment inside the pair, after the class, stays inside it",
+			"start": 323,
+			"end": 390
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 429,
+			"end": 434
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 479,
+			"end": 484
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 527,
+			"end": 532
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 537,
+			"end": 542
+		},
+		{
+			"type": "Line",
+			"value": " a block comment there prints past `);`, as for an undecorated class",
+			"start": 545,
+			"end": 615
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 658,
+			"end": 666
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 710,
+			"end": 718
+		},
+		{
+			"type": "Line",
+			"value": " a comment glued to the first decorator stays inside the pair",
+			"start": 721,
+			"end": 784
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 805,
+			"end": 813
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 845,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 836,
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 114,
+					"end": 154,
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassExpression",
+						"start": 133,
+						"end": 150,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 133,
+								"end": 137,
+								"expression": {
+									"type": "Identifier",
+									"start": 134,
+									"end": 137,
+									"name": "dec"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 146,
+							"end": 147,
+							"name": "A"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 148,
+							"end": 150,
+							"body": []
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an authored pair makes a decorated class an expression, not a declaration: the pair stays",
+							"start": 20,
+							"end": 112
+						}
+					]
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 156,
+					"end": 194,
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassExpression",
+						"start": 175,
+						"end": 190,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 175,
+								"end": 179,
+								"expression": {
+									"type": "Identifier",
+									"start": 176,
+									"end": 179,
+									"name": "dec"
+								}
+							}
+						],
+						"id": null,
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 188,
+							"end": 190,
+							"body": []
+						}
+					}
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 257,
+					"end": 320,
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassExpression",
+						"start": 276,
+						"end": 316,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 276,
+								"end": 280,
+								"expression": {
+									"type": "Identifier",
+									"start": 277,
+									"end": 280,
+									"name": "dec"
+								}
+							},
+							{
+								"type": "Decorator",
+								"start": 283,
+								"end": 290,
+								"expression": {
+									"type": "CallExpression",
+									"start": 284,
+									"end": 290,
+									"callee": {
+										"type": "Identifier",
+										"start": 284,
+										"end": 288,
+										"name": "dec2"
+									},
+									"arguments": []
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 299,
+							"end": 300,
+							"name": "B"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 301,
+							"end": 316,
+							"body": [
+								{
+									"type": "MethodDefinition",
+									"start": 306,
+									"end": 312,
+									"static": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 306,
+										"end": 307,
+										"name": "m"
+									},
+									"kind": "method",
+									"value": {
+										"type": "FunctionExpression",
+										"start": 307,
+										"end": 312,
+										"id": null,
+										"expression": false,
+										"generator": false,
+										"async": false,
+										"params": [],
+										"body": {
+											"type": "BlockStatement",
+											"start": 310,
+											"end": 312,
+											"body": []
+										}
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " two decorators and a body, one per line inside the pair",
+							"start": 197,
+							"end": 255
+						}
+					]
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 392,
+					"end": 438,
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassExpression",
+						"start": 411,
+						"end": 428,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 411,
+								"end": 415,
+								"expression": {
+									"type": "Identifier",
+									"start": 412,
+									"end": 415,
+									"name": "dec"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 424,
+							"end": 425,
+							"name": "C"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 426,
+							"end": 428,
+							"body": []
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 429,
+								"end": 434
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment inside the pair, after the class, stays inside it",
+							"start": 323,
+							"end": 390
+						}
+					]
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 440,
+					"end": 488,
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassExpression",
+						"start": 459,
+						"end": 476,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 459,
+								"end": 463,
+								"expression": {
+									"type": "Identifier",
+									"start": 460,
+									"end": 463,
+									"name": "dec"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 472,
+							"end": 473,
+							"name": "D"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 474,
+							"end": 476,
+							"body": []
+						}
+					}
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 490,
+					"end": 536,
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassExpression",
+						"start": 509,
+						"end": 526,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 509,
+								"end": 513,
+								"expression": {
+									"type": "Identifier",
+									"start": 510,
+									"end": 513,
+									"name": "dec"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 522,
+							"end": 523,
+							"name": "G"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 524,
+							"end": 526,
+							"body": []
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c5",
+								"start": 527,
+								"end": 532
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 479,
+							"end": 484
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c6",
+							"start": 537,
+							"end": 542
+						}
+					]
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 617,
+					"end": 657,
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassExpression",
+						"start": 636,
+						"end": 653,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 636,
+								"end": 640,
+								"expression": {
+									"type": "Identifier",
+									"start": 637,
+									"end": 640,
+									"name": "dec"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 649,
+							"end": 650,
+							"name": "E"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 651,
+							"end": 653,
+							"body": []
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment there prints past `);`, as for an undecorated class",
+							"start": 545,
+							"end": 615
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c3 ",
+							"start": 658,
+							"end": 666
+						}
+					]
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 668,
+					"end": 708,
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassExpression",
+						"start": 687,
+						"end": 704,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 687,
+								"end": 691,
+								"expression": {
+									"type": "Identifier",
+									"start": 688,
+									"end": 691,
+									"name": "dec"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 700,
+							"end": 701,
+							"name": "H"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 702,
+							"end": 704,
+							"body": []
+						}
+					}
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 786,
+					"end": 835,
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassExpression",
+						"start": 814,
+						"end": 831,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 814,
+								"end": 818,
+								"expression": {
+									"type": "Identifier",
+									"start": 815,
+									"end": 818,
+									"name": "dec"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 827,
+							"end": 828,
+							"name": "F"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 829,
+							"end": 831,
+							"body": []
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c4 ",
+								"start": 805,
+								"end": 813
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c7 ",
+							"start": 710,
+							"end": 718
+						},
+						{
+							"type": "Line",
+							"value": " a comment glued to the first decorator stays inside the pair",
+							"start": 721,
+							"end": 784
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

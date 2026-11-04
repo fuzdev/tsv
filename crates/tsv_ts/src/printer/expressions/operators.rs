@@ -1905,8 +1905,9 @@ impl<'a> Printer<'a> {
     /// The pair a position puts around `operand`, whose doc is `inner`. A DECORATED class
     /// takes it broken open and indented, as at a statement's start and in a heritage
     /// clause: the decorator owns a line of its own either way. The pairs a class operand
-    /// takes are a dividend's (`(@dec class {}) / 2`) and a dividend tail's
-    /// ([`Self::mark_dividend_tail`]).
+    /// takes are a dividend's (`(@dec class {}) / 2`), a dividend tail's
+    /// ([`Self::mark_dividend_tail`]) and an `export default` value's
+    /// (`export default (@dec class {});`).
     pub(in crate::printer) fn build_operand_pair_doc(
         &self,
         operand: &Expression<'_>,

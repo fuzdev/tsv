@@ -524,7 +524,7 @@ impl<'a> Printer<'a> {
             ast::ExportDefaultValue::Expression(expr) => {
                 // A multi-line comment the value owns prints outside the value's own group (the
                 // keyword gap's run never sees it), beneath the clarity parens added below.
-                let mut expr_doc = self.build_value_head_doc(keyword_end, expr, || {
+                let expr_doc = self.build_value_head_doc(keyword_end, expr, || {
                     self.build_expression_doc_claiming_outermost(expr)
                 });
                 // Prettier wraps the exported expression when its leftmost
@@ -532,23 +532,29 @@ impl<'a> Printer<'a> {
                 // `export default function () {}.m()` reparses the function as a
                 // *declaration* and the trailing `.m()` / `= …` / `as T` dangles.
                 // Mirrors prettier's `startsWithNoLookaheadToken(expr, isFunctionOrClass)`
-                // (parentheses/needs-parentheses.js). Decorated class expressions are
-                // handled by the decorated forms; the FunctionDeclaration/ClassDeclaration
-                // arms cover bare `export default function/class …`. A frozen value is read
-                // as its verbatim slice, which carries no pair the printer would add inside.
+                // (parentheses/needs-parentheses.js). A decorated class expression reaches
+                // here only inside an authored pair (bare, it takes the decorated form):
+                // the pair keeps it an expression, and it breaks open around the
+                // decorators ([`Printer::build_operand_pair_doc`]). The
+                // FunctionDeclaration/ClassDeclaration arms cover bare
+                // `export default function/class …`. A frozen value is read as its
+                // verbatim slice, which carries no pair the printer would add inside.
                 let frozen = self.value_head_frozen_span(keyword_end, expr.span());
-                if export_default_needs_parens(expr, LeftmostText::of_value(frozen.is_some())) {
-                    expr_doc = d.concat(&[d.text("("), expr_doc, d.text(")")]);
-                }
+                let needs_pair =
+                    export_default_needs_parens(expr, LeftmostText::of_value(frozen.is_some()));
                 let argument_end = value_span.end;
                 if !self.has_comments_to_emit_between(argument_end, span.end) {
-                    return d.concat(&[expr_doc, d.text(";")]);
+                    let doc = self.export_default_value_pair(expr, expr_doc, needs_pair, frozen);
+                    return d.concat(&[doc, d.text(";")]);
                 }
                 // A `//` the author wrote inside the value's own grouping parens keeps
                 // those parens: the terminator split below would carry it past the `)`
                 // and the `;`, onto a line that may already hold a `//`, where the two
                 // MERGE into one comment. The retained shell is the same answer the
                 // `return`/`throw` operand and the `await`/`yield` operand shell give.
+                // Where the value needs a pair, that authored pair IS the one it needs, so
+                // the shell takes the bare value and prints the pair once, comment inside
+                // (`export default (⏎\tclass {} // c⏎);`), a frozen slice's included.
                 if let Some((shell, after_close)) =
                     self.build_value_paren_line_comment_shell(expr_doc, argument_end, span.end)
                 {
@@ -564,7 +570,8 @@ impl<'a> Printer<'a> {
                     parts.extend(after);
                     return d.concat(&parts);
                 }
-                let mut parts = smallvec![expr_doc];
+                let mut parts =
+                    smallvec![self.export_default_value_pair(expr, expr_doc, needs_pair, frozen)];
                 // `operand_parens_printed: false` — this position's pair closes at the
                 // EXPRESSION's end, so it never encloses the terminator gap: a comment
                 // written inside the author's shell (`export default (x /* c */);`) is
@@ -604,6 +611,26 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The `export default` expression value's doc `value_doc` inside the pair the position
+    /// adds when `needs_pair` ([`export_default_needs_parens`]): a decorated class's pair
+    /// breaks open around its decorators ([`Printer::build_operand_pair_doc`]), any other
+    /// value's and a frozen slice's stays flat.
+    fn export_default_value_pair(
+        &self,
+        expr: &ast::Expression<'_>,
+        value_doc: DocId,
+        needs_pair: bool,
+        frozen: Option<Span>,
+    ) -> DocId {
+        if !needs_pair {
+            value_doc
+        } else if frozen.is_some() {
+            self.d().parens(value_doc)
+        } else {
+            self.build_operand_pair_doc(expr, value_doc)
+        }
+    }
+
     /// The DECORATED `export default` forms, which print declaration-style layouts of their
     /// own rather than the plain keyword→value shape — `None` when the value carries no
     /// decorators and the ordinary path applies.
@@ -613,7 +640,9 @@ impl<'a> Printer<'a> {
     /// emitted, then `export default`, then the class without them.
     /// Decorator-*after*-`default` `export default @dec class {}` is a class *expression*
     /// (acorn), which prettier still formats declaration-style: `export default` on its own
-    /// line, the (always own-line) decorators, and NO trailing `;`.
+    /// line, the (always own-line) decorators, and NO trailing `;`. Written inside a pair
+    /// (`export default (@dec class {});`) it is `None` here: the pair is what makes the
+    /// class an expression to tsc, so the keyword→value path keeps it.
     fn build_export_default_decorated_doc(
         &self,
         decl: &ast::ExportDefaultDeclaration<'_>,
@@ -645,14 +674,22 @@ impl<'a> Printer<'a> {
             ]));
         }
 
-        let ast::ExportDefaultValue::Expression(ast::Expression {
-            span: class_span,
-            kind: ast::ExpressionKind::ClassExpression(class_expr),
-        }) = &decl.declaration
+        let ast::ExportDefaultValue::Expression(
+            value @ ast::Expression {
+                span: class_span,
+                kind: ast::ExpressionKind::ClassExpression(class_expr),
+            },
+        ) = &decl.declaration
         else {
             return None;
         };
         let decorators = class_expr.decorators.filter(|dec| !dec.is_empty())?;
+        // An authored pair makes the class an expression where the bare spelling is a
+        // declaration to tsc (an export assignment, which binds no name in the module
+        // scope), so the pair is kept: the keyword→value path prints it, broken open.
+        if self.source_holds_pair_around(value) {
+            return None;
+        }
         // `export default` word by word: the gap *inside* the keyword is a position an
         // author can comment in, so the words are located rather than measured (measuring
         // never scans that gap — the comment would be dropped).

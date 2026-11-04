@@ -1,0 +1,134 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// an authored pair makes a decorated class an expression, not a declaration: the pair stays
+	export default (
+
+		@dec
+		class A {}
+	);
+	export default (
+
+		@dec
+		class {}
+	);
+
+	// two decorators and a body, one per line inside the pair
+	export default (
+
+		@dec
+		@dec2()
+		class B {
+			m() {}
+		}
+	);
+
+	// a line comment inside the pair, after the class, stays inside it
+	export default (
+
+		@dec
+		class C {}
+	); // c1
+	export default (
+
+		@dec
+		class D {}
+	);
+	// c2
+	export default (
+
+		@dec
+		class G {}
+	); // c5 // c6
+
+	// a block comment there prints past `);`, as for an undecorated class
+	export default (
+
+		@dec
+		class E {}
+	) /* c3 */;
+	export default (
+
+		@dec
+		class H {}
+	);
+	/* c7 */
+
+	// a comment glued to the first decorator stays inside the pair
+	export default /* c4 */ (
+
+		@dec
+		class F {}
+	);
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// an authored pair makes a decorated class an expression, not a declaration: the pair stays
+	export default (
+
+		@dec
+		class A {}
+	);
+	export default (
+
+		@dec
+		class {}
+	);
+
+	// two decorators and a body, one per line inside the pair
+	export default (
+
+		@dec
+		@dec2()
+		class B {
+			m() {}
+		}
+	);
+
+	// a line comment inside the pair, after the class, stays inside it
+	export default (
+
+		@dec
+		class C {}
+	); // c1
+	export default (
+
+		@dec
+		class D {}
+	);
+	// c2
+	export default (
+
+		@dec
+		class G {}
+	); // c5 // c6
+
+	// a block comment there prints past `);`, as for an undecorated class
+	export default (
+
+		@dec
+		class E {}
+	); /* c3 */
+	export default (
+
+		@dec
+		class H {}
+	);
+	/* c7 */
+
+	// a comment glued to the first decorator stays inside the pair
+	export default /* c4 */ (
+
+		@dec
+		class F {}
+	);
+</script>
