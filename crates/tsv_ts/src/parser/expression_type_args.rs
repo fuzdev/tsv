@@ -3020,10 +3020,28 @@ fn type_operator_grade(
                     kind: OperandEnd::Name,
                 };
             } else if bytes.get(after_kw) == Some(&b'[') {
-                match matching_delimiter_close(bytes, after_kw) {
-                    Some(close) => close + 1,
-                    None => return HeadGrade::Decided(false),
+                let Some(close) = matching_delimiter_close(bytes, after_kw) else {
+                    return HeadGrade::Decided(false);
+                };
+                // A tuple with a same-line index behind it has a value reading, a member
+                // access on the name `readonly` (`readonly [A]['k']` is `readonly[A]['k']`),
+                // which acorn-typescript reads in a comparison chain, refusing `readonly`
+                // over the indexed access — the paren arm's rule below. An empty `[]` anywhere
+                // in the run, the tuple's own brackets included, leaves no member access, so
+                // the type reading stands (`readonly [A]['k'][]`, `readonly []['k']`). Only
+                // the source reading takes the comparison: the printed-form readings keep the
+                // type reading, because tsc — one of the output's readers — reads the bare
+                // line as the call where a `(` or a template follows, and those readings
+                // never grade the follower, so the relational pair stands around it.
+                let next = skip_whitespace_and_comments(bytes, close + 1);
+                if scan.reads_source_as_written()
+                    && bytes.get(next) == Some(&b'[')
+                    && !has_line_terminator_between(bytes, close + 1, next)
+                    && postfix_run_holds_array_suffix(bytes, after_kw) != Some(true)
+                {
+                    return HeadGrade::Decided(false);
                 }
+                close + 1
             } else if bytes.get(after_kw) == Some(&b'(') {
                 let Some(close) = paren_type_head_close(bytes, after_kw) else {
                     return HeadGrade::Decided(false);

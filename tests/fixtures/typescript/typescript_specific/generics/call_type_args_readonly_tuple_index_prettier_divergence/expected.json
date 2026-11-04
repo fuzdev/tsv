@@ -1,0 +1,510 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 473,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 434,
+				"end": 436,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 436,
+				"end": 472,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 439,
+							"end": 468,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 440,
+								"end": 467,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 441,
+									"end": 462,
+									"left": {
+										"type": "Identifier",
+										"start": 441,
+										"end": 443,
+										"name": "fn"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 446,
+										"end": 462,
+										"object": {
+											"type": "MemberExpression",
+											"start": 446,
+											"end": 457,
+											"object": {
+												"type": "Identifier",
+												"start": 446,
+												"end": 454,
+												"name": "readonly"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 455,
+												"end": 456,
+												"name": "A"
+											},
+											"computed": true,
+											"optional": false
+										},
+										"property": {
+											"type": "Literal",
+											"start": 458,
+											"end": 461,
+											"value": "k",
+											"raw": "'k'"
+										},
+										"computed": true,
+										"optional": false
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "Identifier",
+									"start": 466,
+									"end": 467,
+									"name": "x"
+								}
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `readonly` tuple with an index behind it is a member access on the name `readonly`,",
+			"start": 20,
+			"end": 108
+		},
+		{
+			"type": "Line",
+			"value": " read in a comparison chain as acorn-typescript reads it; tsc's type reading of the same",
+			"start": 110,
+			"end": 200
+		},
+		{
+			"type": "Line",
+			"value": " list is its checker's TS1354, `readonly` over an indexed access",
+			"start": 202,
+			"end": 268
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 434,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 425,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 270,
+					"end": 295,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 270,
+						"end": 294,
+						"left": {
+							"type": "BinaryExpression",
+							"start": 271,
+							"end": 289,
+							"left": {
+								"type": "Identifier",
+								"start": 271,
+								"end": 272,
+								"name": "a"
+							},
+							"operator": "<",
+							"right": {
+								"type": "MemberExpression",
+								"start": 275,
+								"end": 289,
+								"object": {
+									"type": "MemberExpression",
+									"start": 275,
+									"end": 286,
+									"object": {
+										"type": "Identifier",
+										"start": 275,
+										"end": 283,
+										"name": "readonly"
+									},
+									"property": {
+										"type": "Literal",
+										"start": 284,
+										"end": 285,
+										"value": 0,
+										"raw": "0"
+									},
+									"computed": true,
+									"optional": false
+								},
+								"property": {
+									"type": "Literal",
+									"start": 287,
+									"end": 288,
+									"value": 1,
+									"raw": "1"
+								},
+								"computed": true,
+								"optional": false
+							}
+						},
+						"operator": ">",
+						"right": {
+							"type": "Identifier",
+							"start": 293,
+							"end": 294,
+							"name": "b"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `readonly` tuple with an index behind it is a member access on the name `readonly`,",
+							"start": 20,
+							"end": 108
+						},
+						{
+							"type": "Line",
+							"value": " read in a comparison chain as acorn-typescript reads it; tsc's type reading of the same",
+							"start": 110,
+							"end": 200
+						},
+						{
+							"type": "Line",
+							"value": " list is its checker's TS1354, `readonly` over an indexed access",
+							"start": 202,
+							"end": 268
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 297,
+					"end": 325,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 297,
+						"end": 324,
+						"left": {
+							"type": "BinaryExpression",
+							"start": 298,
+							"end": 319,
+							"left": {
+								"type": "Identifier",
+								"start": 298,
+								"end": 300,
+								"name": "fn"
+							},
+							"operator": "<",
+							"right": {
+								"type": "MemberExpression",
+								"start": 303,
+								"end": 319,
+								"object": {
+									"type": "MemberExpression",
+									"start": 303,
+									"end": 314,
+									"object": {
+										"type": "Identifier",
+										"start": 303,
+										"end": 311,
+										"name": "readonly"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 312,
+										"end": 313,
+										"name": "A"
+									},
+									"computed": true,
+									"optional": false
+								},
+								"property": {
+									"type": "Literal",
+									"start": 315,
+									"end": 318,
+									"value": "k",
+									"raw": "'k'"
+								},
+								"computed": true,
+								"optional": false
+							}
+						},
+						"operator": ">",
+						"right": {
+							"type": "Identifier",
+							"start": 323,
+							"end": 324,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 327,
+					"end": 358,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 327,
+						"end": 357,
+						"left": {
+							"type": "BinaryExpression",
+							"start": 328,
+							"end": 347,
+							"left": {
+								"type": "Identifier",
+								"start": 328,
+								"end": 330,
+								"name": "fn"
+							},
+							"operator": "<",
+							"right": {
+								"type": "MemberExpression",
+								"start": 333,
+								"end": 347,
+								"object": {
+									"type": "MemberExpression",
+									"start": 333,
+									"end": 344,
+									"object": {
+										"type": "Identifier",
+										"start": 333,
+										"end": 341,
+										"name": "readonly"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 342,
+										"end": 343,
+										"name": "A"
+									},
+									"computed": true,
+									"optional": false
+								},
+								"property": {
+									"type": "Literal",
+									"start": 345,
+									"end": 346,
+									"value": 0,
+									"raw": "0"
+								},
+								"computed": true,
+								"optional": false
+							}
+						},
+						"operator": ">",
+						"right": {
+							"type": "SequenceExpression",
+							"start": 352,
+							"end": 356,
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 352,
+									"end": 353,
+									"name": "x"
+								},
+								{
+									"type": "Identifier",
+									"start": 355,
+									"end": 356,
+									"name": "y"
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 360,
+					"end": 395,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 360,
+						"end": 394,
+						"left": {
+							"type": "BinaryExpression",
+							"start": 361,
+							"end": 389,
+							"left": {
+								"type": "NewExpression",
+								"start": 361,
+								"end": 370,
+								"callee": {
+									"type": "Identifier",
+									"start": 365,
+									"end": 368,
+									"name": "Cls"
+								},
+								"arguments": []
+							},
+							"operator": "<",
+							"right": {
+								"type": "MemberExpression",
+								"start": 373,
+								"end": 389,
+								"object": {
+									"type": "MemberExpression",
+									"start": 373,
+									"end": 384,
+									"object": {
+										"type": "Identifier",
+										"start": 373,
+										"end": 381,
+										"name": "readonly"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 382,
+										"end": 383,
+										"name": "A"
+									},
+									"computed": true,
+									"optional": false
+								},
+								"property": {
+									"type": "Literal",
+									"start": 385,
+									"end": 388,
+									"value": "k",
+									"raw": "'k'"
+								},
+								"computed": true,
+								"optional": false
+							}
+						},
+						"operator": ">",
+						"right": {
+							"type": "Identifier",
+							"start": 393,
+							"end": 394,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 397,
+					"end": 424,
+					"expression": {
+						"type": "CallExpression",
+						"start": 397,
+						"end": 423,
+						"callee": {
+							"type": "Identifier",
+							"start": 397,
+							"end": 399,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 421,
+								"end": 422,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 399,
+							"end": 420,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 400,
+									"end": 419,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 409,
+										"end": 419,
+										"elementType": {
+											"type": "TSIndexedAccessType",
+											"start": 409,
+											"end": 417,
+											"objectType": {
+												"type": "TSTupleType",
+												"start": 409,
+												"end": 412,
+												"elementTypes": [
+													{
+														"type": "TSTypeReference",
+														"start": 410,
+														"end": 411,
+														"typeName": {
+															"type": "Identifier",
+															"start": 410,
+															"end": 411,
+															"name": "A"
+														}
+													}
+												]
+											},
+											"indexType": {
+												"type": "TSLiteralType",
+												"start": 413,
+												"end": 416,
+												"literal": {
+													"type": "Literal",
+													"start": 413,
+													"end": 416,
+													"value": "k",
+													"raw": "'k'"
+												}
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

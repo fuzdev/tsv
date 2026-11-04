@@ -195,6 +195,75 @@ fn readonly_parenthesized_operand_needs_an_array_suffix() {
     }
 }
 
+/// A tuple operand takes the parenthesized arm's rule: a same-line index behind it leaves a
+/// member access on the name `readonly` (`readonly[A]['k']`), which acorn-typescript reads in
+/// a comparison, refusing `readonly` over the indexed access — so does tsv, where tsc's type
+/// reading is its checker's TS1354. The comparison prints inside the relational pair, since
+/// tsc reads the bare line as the call at a `(` or template follower. An empty `[]` anywhere in
+/// the run, the tuple's own included, is no member access, so the list stays a type; so does a
+/// type NAME, which is never an expression (acorn-typescript rejects that line, TS1354 again to
+/// tsc).
+#[test]
+fn readonly_tuple_operand_with_an_index_is_a_member_access() {
+    for (source, printed) in [
+        (
+            "f<readonly [A]['k']>(x);\n",
+            "(f < readonly[A]['k']) > x;\n",
+        ),
+        (
+            "a < readonly [0][1] > (b);\n",
+            "(a < readonly[0][1]) > b;\n",
+        ),
+        (
+            "f<readonly [A][0]>(x, y);\n",
+            "(f < readonly[A][0]) > (x, y);\n",
+        ),
+        (
+            "f < readonly[A][0] > (x, y);\n",
+            "(f < readonly[A][0]) > (x, y);\n",
+        ),
+        (
+            "(f < readonly[A]['k']) > (x, y);\n",
+            "(f < readonly[A]['k']) > (x, y);\n",
+        ),
+        (
+            "f<readonly [A] /* c */ ['k']>(x);\n",
+            "(f < readonly[A] /* c */['k']) > x;\n",
+        ),
+        // a break ends the type, so the source is the comparison too
+        (
+            "f<readonly [A]\n['k']>(x);\n",
+            "(f < readonly[A]['k']) > x;\n",
+        ),
+        // a `//` carries the break into the output, where it still ends the type
+        (
+            "f<readonly [A] // c\n['k']>(x);\n",
+            "(f <\n\treadonly\n\t\t[A] // c\n\t\t['k']) >\n\tx;\n",
+        ),
+    ] {
+        assert_prints_fixed(source, printed);
+        assert_eq!(
+            expression_kinds(source).first().map(String::as_str),
+            Some("BinaryExpression"),
+            "{source:?}"
+        );
+    }
+    for source in [
+        "f<readonly [A]['k'][]>(x);\n",
+        "f<readonly []['k']>(x);\n",
+        "f<readonly [A]>(x);\n",
+        "f<readonly A['k']>(x);\n",
+        "f<readonly A[]['k']>(x);\n",
+    ] {
+        assert_prints_fixed(source, source);
+        assert_eq!(
+            expression_kinds(source),
+            ["CallExpression", "Identifier", "Identifier"],
+            "{source:?}"
+        );
+    }
+}
+
 /// A literal element type under `readonly` takes the paren arm's rule: its same-line postfix
 /// run must end in an empty `[]`. A run ending in an index, a negative literal (which
 /// acorn-typescript reads with its expression parser, whose member read meets the `]`) and a
