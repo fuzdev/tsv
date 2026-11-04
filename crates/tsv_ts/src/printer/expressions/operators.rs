@@ -1544,9 +1544,15 @@ impl<'a> Printer<'a> {
         // the order a recursion down the left visits them in.
         let mut spine: SmallVec<[&ast::BinaryExpression<'_>; 8]> = smallvec![expr];
         let mut node = expr;
+        // Whether a link above has walked the chain's region, which covers every link
+        // below it ([`Self::mark_relational_chain_region`]).
+        let mut chain_region_walked = false;
         loop {
             self.mark_dividend_tail(node);
             self.withhold_clarity_pairs_behind_region_close(node);
+            if !chain_region_walked {
+                chain_region_walked = self.mark_relational_chain_region(node);
+            }
             let Some(left_binary) = self.flattenable_left(node) else {
                 break;
             };

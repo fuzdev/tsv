@@ -208,6 +208,13 @@ fn expression_holds_binary<'e>(
     any_expression_child(expr, |child, _| expression_holds_binary(child, predicate))
 }
 
+/// The key a chain link is recorded under in `Printer::relational_chain_walked_links`: the
+/// source its operands cover. A binary node holds no span of its own, and no two binaries
+/// cover the same operand source — an ancestor's reaches past its descendant's on one side.
+fn chain_link_key(node: &BinaryExpression<'_>) -> Span {
+    Span::new(node.left.span().start, node.right.span().end)
+}
+
 /// Whether `binary` is a `<` / `<<`, the operators that open a type-argument region.
 fn opens_region(binary: &BinaryExpression<'_>) -> bool {
     matches!(
@@ -315,6 +322,67 @@ impl Printer<'_> {
         }
     }
 
+    /// The chain twin of [`Self::mark_relational_sibling_authored_pairs`]: a `<` whose left
+    /// operand holds a `<` / `<<` and whose right operand holds a binary the parser flagged
+    /// `may_close_type_arguments` bounds a region inside one comparison chain, and the
+    /// pairs the printer would decide inside both operands follow the source
+    /// ([`Self::mark_region_source_pairs`]). Stripped, the author's pair around the left
+    /// comparison (``(f < A) < C >> `t` ``) or a `typeof` operand's shell
+    /// (``f < typeof (b) < C >> `t` ``) leaves a `<`…`>>` run every parser reads as a
+    /// type-argument list. Called by both chain collectors down the chain's left spine,
+    /// ahead of any operand's build and ahead of the flattening question, which asks the
+    /// marks.
+    ///
+    /// Answers whether the spine below `node` is covered, so the collector stops asking:
+    /// `node` marked its operands, or an earlier walk covered `node`
+    /// ([`Self::relational_chain_walked_links`]) — the same chain re-entered by another
+    /// layout candidate, or a chain anywhere inside a region a walk already visited, a
+    /// comma list's included. Every walk ([`Self::mark_region_source_pairs`]) visits a
+    /// binary's two operands with `ChildSlot::Other`, the slot this call gives them, so a
+    /// covered link's marks are the ones this call would set; and a deeper link of the same
+    /// spine lies inside a covered link's left operand. Each binary is walked once.
+    pub(in crate::printer) fn mark_relational_chain_region(
+        &self,
+        node: &BinaryExpression<'_>,
+    ) -> bool {
+        if node.operator != BinaryOperator::LessThan {
+            return false;
+        }
+        if self.has_relational_chain_walks.get()
+            && self
+                .relational_chain_walked_links
+                .is_marked(chain_link_key(node))
+        {
+            return true;
+        }
+        // The source preflight: the right operand of an ordinary `<` holds no `>` byte.
+        let right = node.right.span();
+        if !self
+            .source
+            .as_bytes()
+            .get(right.start as usize..right.end as usize)
+            .is_some_and(|text| text.contains(&b'>'))
+        {
+            return false;
+        }
+        self.relational_chain_region_marked(node)
+    }
+
+    /// [`Self::mark_relational_chain_region`] past its preflight, out of line: a `>` byte
+    /// behind a `<` link is the rare case.
+    #[cold]
+    fn relational_chain_region_marked(&self, node: &BinaryExpression<'_>) -> bool {
+        if !(holds_region_opener(node.left) && holds_region_closer(node.right)) {
+            return false;
+        }
+        self.mark_region_source_pairs(node.left, ChildSlot::Other);
+        self.mark_region_source_pairs(node.right, ChildSlot::Other);
+        self.relational_chain_walked_links
+            .mark(chain_link_key(node));
+        self.has_relational_chain_walks.set(true);
+        true
+    }
+
     fn mark_relational_sibling_pair(&self, span: Span) {
         self.relational_sibling_pair_targets.mark(span);
         self.has_relational_sibling_pairs.set(true);
@@ -350,6 +418,16 @@ impl Printer<'_> {
     /// was written; what the tree requires (`(c = d) + 1`, `() => ({})`, a sequence's own
     /// pair) is never asked.
     fn mark_region_source_pairs(&self, expr: &Expression<'_>, slot: ChildSlot) -> bool {
+        // A `<` this walk covers is a chain link whose operands it walks with the slot a
+        // direct chain-region walk gives them, so that chain need not walk them again
+        // ([`Self::mark_relational_chain_region`]).
+        if let ExpressionKind::BinaryExpression(binary) = &expr.kind
+            && binary.operator == BinaryOperator::LessThan
+        {
+            self.relational_chain_walked_links
+                .mark(chain_link_key(binary));
+            self.has_relational_chain_walks.set(true);
+        }
         let list_end = match slot {
             ChildSlot::Element { list_end } => {
                 self.region_walked_elements.mark(expr.span());

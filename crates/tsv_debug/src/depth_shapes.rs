@@ -1014,6 +1014,20 @@ fn construct_shapes() -> Vec<Shape> {
         // TypeScript: left spines
         ts_flat("ts_binary_flat", 1, "x = 1", " + 1", ";\n"),
         ts_flat("ts_logical_flat", 1, "x = a", " || a", ";\n"),
+        // a comparison chain whose links each close a region the authored pair at its head
+        // opens, which the printer walks for the pairs inside it once per chain. Bounded:
+        // the count charges it a few links above its wire's left spine
+        shape(
+            "ts_relational_shift_region_flat",
+            Lang::Ts,
+            Limit::Spine,
+            Wire::Bounded,
+            "x = (f < A) < C >> t",
+            " < A < C >> t",
+            "",
+            "",
+            ";\n",
+        ),
         ts_flat("ts_call_chain_flat", SUBSCRIPT, "x = a", ".b()", ";\n"),
         ts_flat("ts_member_flat", SUBSCRIPT, "x = a", ".b", ";\n"),
         ts_flat("ts_computed_flat", SUBSCRIPT, "x = a", "[0]", ";\n"),

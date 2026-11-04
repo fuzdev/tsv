@@ -1,0 +1,486 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 478,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The pair stays where the stripped line parses as a type-argument list that nothing",
+			"start": 20,
+			"end": 105
+		},
+		{
+			"type": "Line",
+			"value": " may follow: a regex past the `>>`, and a `>>` inside a bracket or a pair the region",
+			"start": 107,
+			"end": 193
+		},
+		{
+			"type": "Line",
+			"value": " holds, which tsc's list parse reads through",
+			"start": 195,
+			"end": 241
+		},
+		{
+			"type": "Line",
+			"value": " A `<<` opens the region too: stripped, tsc reads the list and rejects the line",
+			"start": 359,
+			"end": 440
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 477,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 468,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 243,
+					"end": 269,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 243,
+						"end": 268,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 243,
+							"end": 245,
+							"name": "x1"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 248,
+							"end": 268,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 249,
+								"end": 254,
+								"left": {
+									"type": "Identifier",
+									"start": 249,
+									"end": 250,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 253,
+									"end": 254,
+									"name": "A"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 258,
+								"end": 268,
+								"left": {
+									"type": "Identifier",
+									"start": 258,
+									"end": 259,
+									"name": "C"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "MemberExpression",
+									"start": 263,
+									"end": 268,
+									"object": {
+										"type": "Literal",
+										"start": 263,
+										"end": 266,
+										"value": {},
+										"raw": "/r/",
+										"regex": {
+											"pattern": "r",
+											"flags": ""
+										}
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 267,
+										"end": 268,
+										"name": "x"
+									},
+									"computed": false,
+									"optional": false
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The pair stays where the stripped line parses as a type-argument list that nothing",
+							"start": 20,
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " may follow: a regex past the `>>`, and a `>>` inside a bracket or a pair the region",
+							"start": 107,
+							"end": 193
+						},
+						{
+							"type": "Line",
+							"value": " holds, which tsc's list parse reads through",
+							"start": 195,
+							"end": 241
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 271,
+					"end": 297,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 271,
+						"end": 296,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 271,
+							"end": 273,
+							"name": "x2"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 276,
+							"end": 296,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 277,
+								"end": 282,
+								"left": {
+									"type": "Identifier",
+									"start": 277,
+									"end": 278,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 281,
+									"end": 282,
+									"name": "A"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "ArrayExpression",
+								"start": 286,
+								"end": 296,
+								"elements": [
+									{
+										"type": "BinaryExpression",
+										"start": 287,
+										"end": 295,
+										"left": {
+											"type": "Identifier",
+											"start": 287,
+											"end": 288,
+											"name": "C"
+										},
+										"operator": ">>",
+										"right": {
+											"type": "TemplateLiteral",
+											"start": 292,
+											"end": 295,
+											"expressions": [],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 293,
+													"end": 294,
+													"value": {
+														"raw": "t",
+														"cooked": "t"
+													},
+													"tail": true
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 299,
+					"end": 329,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 299,
+						"end": 328,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 299,
+							"end": 301,
+							"name": "x3"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 304,
+							"end": 328,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 305,
+								"end": 310,
+								"left": {
+									"type": "Identifier",
+									"start": 305,
+									"end": 306,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 309,
+									"end": 310,
+									"name": "A"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 314,
+								"end": 328,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 315,
+									"end": 323,
+									"left": {
+										"type": "Identifier",
+										"start": 315,
+										"end": 316,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "TemplateLiteral",
+										"start": 320,
+										"end": 323,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 321,
+												"end": 322,
+												"value": {
+													"raw": "t",
+													"cooked": "t"
+												},
+												"tail": true
+											}
+										]
+									}
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 327,
+									"end": 328,
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 331,
+					"end": 356,
+					"expression": {
+						"type": "CallExpression",
+						"start": 331,
+						"end": 355,
+						"callee": {
+							"type": "Identifier",
+							"start": 331,
+							"end": 333,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 334,
+								"end": 354,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 335,
+									"end": 340,
+									"left": {
+										"type": "Identifier",
+										"start": 335,
+										"end": 336,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 339,
+										"end": 340,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 344,
+									"end": 354,
+									"left": {
+										"type": "Identifier",
+										"start": 344,
+										"end": 345,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "MemberExpression",
+										"start": 349,
+										"end": 354,
+										"object": {
+											"type": "Literal",
+											"start": 349,
+											"end": 352,
+											"value": {},
+											"raw": "/r/",
+											"regex": {
+												"pattern": "r",
+												"flags": ""
+											}
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 353,
+											"end": 354,
+											"name": "x"
+										},
+										"computed": false,
+										"optional": false
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 442,
+					"end": 467,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 442,
+						"end": 466,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 442,
+							"end": 444,
+							"name": "x4"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 447,
+							"end": 466,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 448,
+								"end": 454,
+								"left": {
+									"type": "Identifier",
+									"start": 448,
+									"end": 449,
+									"name": "f"
+								},
+								"operator": "<<",
+								"right": {
+									"type": "Identifier",
+									"start": 453,
+									"end": 454,
+									"name": "A"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 458,
+								"end": 466,
+								"left": {
+									"type": "Identifier",
+									"start": 458,
+									"end": 459,
+									"name": "C"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "TemplateLiteral",
+									"start": 463,
+									"end": 466,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 464,
+											"end": 465,
+											"value": {
+												"raw": "t",
+												"cooked": "t"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `<<` opens the region too: stripped, tsc reads the list and rejects the line",
+							"start": 359,
+							"end": 440
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1,0 +1,1705 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1209,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 1152,
+				"end": 1154,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 1154,
+				"end": 1174,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 1155,
+					"end": 1173,
+					"left": {
+						"type": "BinaryExpression",
+						"start": 1156,
+						"end": 1161,
+						"left": {
+							"type": "Identifier",
+							"start": 1156,
+							"end": 1157,
+							"name": "f"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Identifier",
+							"start": 1160,
+							"end": 1161,
+							"name": "A"
+						}
+					},
+					"operator": "<",
+					"right": {
+						"type": "BinaryExpression",
+						"start": 1165,
+						"end": 1173,
+						"left": {
+							"type": "Identifier",
+							"start": 1165,
+							"end": 1166,
+							"name": "C"
+						},
+						"operator": ">>",
+						"right": {
+							"type": "TemplateLiteral",
+							"start": 1170,
+							"end": 1173,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 1171,
+									"end": 1172,
+									"value": {
+										"raw": "t",
+										"cooked": "t"
+									},
+									"tail": true
+								}
+							]
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1174,
+				"end": 1175,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 1175,
+				"end": 1208,
+				"test": {
+					"type": "BinaryExpression",
+					"start": 1180,
+					"end": 1198,
+					"left": {
+						"type": "BinaryExpression",
+						"start": 1181,
+						"end": 1186,
+						"left": {
+							"type": "Identifier",
+							"start": 1181,
+							"end": 1182,
+							"name": "f"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Identifier",
+							"start": 1185,
+							"end": 1186,
+							"name": "A"
+						}
+					},
+					"operator": "<",
+					"right": {
+						"type": "BinaryExpression",
+						"start": 1190,
+						"end": 1198,
+						"left": {
+							"type": "Identifier",
+							"start": 1190,
+							"end": 1191,
+							"name": "C"
+						},
+						"operator": ">>",
+						"right": {
+							"type": "TemplateLiteral",
+							"start": 1195,
+							"end": 1198,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 1196,
+									"end": 1197,
+									"value": {
+										"raw": "t",
+										"cooked": "t"
+									},
+									"tail": true
+								}
+							]
+						}
+					}
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1199,
+							"end": 1203,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				},
+				"alternate": null
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `<` whose left operand holds a `<` and whose right operand holds a `>>` that may",
+			"start": 20,
+			"end": 105
+		},
+		{
+			"type": "Line",
+			"value": " close the region the two open: the pairs the author wrote in the chain stay",
+			"start": 107,
+			"end": 185
+		},
+		{
+			"type": "Line",
+			"value": " A pair behind `typeof` or a unary `-` inside the region, in either operand",
+			"start": 336,
+			"end": 413
+		},
+		{
+			"type": "Line",
+			"value": " The follower is not read: the pair stays ahead of one that commits nothing",
+			"start": 513,
+			"end": 590
+		},
+		{
+			"type": "Line",
+			"value": " An inner link may bound the region: the outer `<` holds no closer",
+			"start": 618,
+			"end": 686
+		},
+		{
+			"type": "Line",
+			"value": " A comment in or beside the pair stays where it was written",
+			"start": 720,
+			"end": 781
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 790,
+			"end": 797
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 832,
+			"end": 839
+		},
+		{
+			"type": "Line",
+			"value": " No pair is added where none was written, and none is kept with no closer",
+			"start": 854,
+			"end": 929
+		},
+		{
+			"type": "Line",
+			"value": " A statement, an argument, a condition",
+			"start": 1026,
+			"end": 1066
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1152,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1143,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 187,
+					"end": 211,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 187,
+						"end": 210,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 187,
+							"end": 189,
+							"name": "x1"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 192,
+							"end": 210,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 193,
+								"end": 198,
+								"left": {
+									"type": "Identifier",
+									"start": 193,
+									"end": 194,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 197,
+									"end": 198,
+									"name": "A"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 202,
+								"end": 210,
+								"left": {
+									"type": "Identifier",
+									"start": 202,
+									"end": 203,
+									"name": "C"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "TemplateLiteral",
+									"start": 207,
+									"end": 210,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 208,
+											"end": 209,
+											"value": {
+												"raw": "t",
+												"cooked": "t"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `<` whose left operand holds a `<` and whose right operand holds a `>>` that may",
+							"start": 20,
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " close the region the two open: the pairs the author wrote in the chain stay",
+							"start": 107,
+							"end": 185
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 213,
+					"end": 240,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 213,
+						"end": 239,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 213,
+							"end": 215,
+							"name": "x2"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 218,
+							"end": 239,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 219,
+								"end": 224,
+								"left": {
+									"type": "Identifier",
+									"start": 219,
+									"end": 220,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 223,
+									"end": 224,
+									"name": "A"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 228,
+								"end": 239,
+								"left": {
+									"type": "Identifier",
+									"start": 228,
+									"end": 229,
+									"name": "C"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 234,
+									"end": 238,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 234,
+											"end": 235,
+											"name": "t"
+										},
+										{
+											"type": "Identifier",
+											"start": 237,
+											"end": 238,
+											"name": "u"
+										}
+									]
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 242,
+					"end": 270,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 242,
+						"end": 269,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 242,
+							"end": 244,
+							"name": "x3"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 247,
+							"end": 269,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 248,
+								"end": 253,
+								"left": {
+									"type": "Identifier",
+									"start": 248,
+									"end": 249,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 252,
+									"end": 253,
+									"name": "A"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 257,
+								"end": 269,
+								"left": {
+									"type": "Identifier",
+									"start": 257,
+									"end": 258,
+									"name": "C"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "AssignmentExpression",
+									"start": 263,
+									"end": 268,
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 263,
+										"end": 264,
+										"name": "a"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 267,
+										"end": 268,
+										"name": "b"
+									}
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 272,
+					"end": 301,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 272,
+						"end": 300,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 272,
+							"end": 274,
+							"name": "x4"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 277,
+							"end": 300,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 278,
+								"end": 287,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 278,
+									"end": 283,
+									"left": {
+										"type": "Identifier",
+										"start": 278,
+										"end": 279,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 282,
+										"end": 283,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 286,
+									"end": 287,
+									"name": "B"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 291,
+								"end": 300,
+								"left": {
+									"type": "Identifier",
+									"start": 291,
+									"end": 292,
+									"name": "C"
+								},
+								"operator": ">>>",
+								"right": {
+									"type": "TemplateLiteral",
+									"start": 297,
+									"end": 300,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 298,
+											"end": 299,
+											"value": {
+												"raw": "t",
+												"cooked": "t"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 303,
+					"end": 333,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 303,
+						"end": 332,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 303,
+							"end": 305,
+							"name": "x5"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 308,
+							"end": 332,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 309,
+								"end": 316,
+								"left": {
+									"type": "MemberExpression",
+									"start": 309,
+									"end": 312,
+									"object": {
+										"type": "Identifier",
+										"start": 309,
+										"end": 310,
+										"name": "f"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 311,
+										"end": 312,
+										"name": "g"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 315,
+									"end": 316,
+									"name": "A"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 320,
+								"end": 332,
+								"left": {
+									"type": "Identifier",
+									"start": 320,
+									"end": 321,
+									"name": "C"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "TemplateLiteral",
+									"start": 325,
+									"end": 332,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 329,
+											"end": 330,
+											"name": "u"
+										}
+									],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 326,
+											"end": 327,
+											"value": {
+												"raw": "t",
+												"cooked": "t"
+											},
+											"tail": false
+										},
+										{
+											"type": "TemplateElement",
+											"start": 331,
+											"end": 331,
+											"value": {
+												"raw": "",
+												"cooked": ""
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 415,
+					"end": 446,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 415,
+						"end": 445,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 415,
+							"end": 417,
+							"name": "x9"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 420,
+							"end": 445,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 420,
+								"end": 434,
+								"left": {
+									"type": "Identifier",
+									"start": 420,
+									"end": 421,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "UnaryExpression",
+									"start": 424,
+									"end": 434,
+									"operator": "typeof",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 432,
+										"end": 433,
+										"name": "b"
+									}
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 437,
+								"end": 445,
+								"left": {
+									"type": "Identifier",
+									"start": 437,
+									"end": 438,
+									"name": "C"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "TemplateLiteral",
+									"start": 442,
+									"end": 445,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 443,
+											"end": 444,
+											"value": {
+												"raw": "t",
+												"cooked": "t"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A pair behind `typeof` or a unary `-` inside the region, in either operand",
+							"start": 336,
+							"end": 413
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 448,
+					"end": 474,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 448,
+						"end": 473,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 448,
+							"end": 451,
+							"name": "x10"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 454,
+							"end": 473,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 454,
+								"end": 462,
+								"left": {
+									"type": "Identifier",
+									"start": 454,
+									"end": 455,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "UnaryExpression",
+									"start": 458,
+									"end": 462,
+									"operator": "-",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 460,
+										"end": 461,
+										"name": "b"
+									}
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 465,
+								"end": 473,
+								"left": {
+									"type": "Identifier",
+									"start": 465,
+									"end": 466,
+									"name": "C"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "TemplateLiteral",
+									"start": 470,
+									"end": 473,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 471,
+											"end": 472,
+											"value": {
+												"raw": "t",
+												"cooked": "t"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 476,
+					"end": 510,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 476,
+						"end": 509,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 476,
+							"end": 479,
+							"name": "x18"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 482,
+							"end": 509,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 483,
+								"end": 488,
+								"left": {
+									"type": "Identifier",
+									"start": 483,
+									"end": 484,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 487,
+									"end": 488,
+									"name": "A"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 492,
+								"end": 509,
+								"left": {
+									"type": "UnaryExpression",
+									"start": 492,
+									"end": 502,
+									"operator": "typeof",
+									"prefix": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 500,
+										"end": 501,
+										"name": "c"
+									}
+								},
+								"operator": ">>",
+								"right": {
+									"type": "TemplateLiteral",
+									"start": 506,
+									"end": 509,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 507,
+											"end": 508,
+											"value": {
+												"raw": "t",
+												"cooked": "t"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 592,
+					"end": 615,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 592,
+						"end": 614,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 592,
+							"end": 595,
+							"name": "x11"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 598,
+							"end": 614,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 599,
+								"end": 604,
+								"left": {
+									"type": "Identifier",
+									"start": 599,
+									"end": 600,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 603,
+									"end": 604,
+									"name": "A"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 608,
+								"end": 614,
+								"left": {
+									"type": "Identifier",
+									"start": 608,
+									"end": 609,
+									"name": "C"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "Identifier",
+									"start": 613,
+									"end": 614,
+									"name": "t"
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The follower is not read: the pair stays ahead of one that commits nothing",
+							"start": 513,
+							"end": 590
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 688,
+					"end": 717,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 688,
+						"end": 716,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 688,
+							"end": 691,
+							"name": "x15"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 694,
+							"end": 716,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 694,
+								"end": 712,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 695,
+									"end": 700,
+									"left": {
+										"type": "Identifier",
+										"start": 695,
+										"end": 696,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 699,
+										"end": 700,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 704,
+									"end": 712,
+									"left": {
+										"type": "Identifier",
+										"start": 704,
+										"end": 705,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "TemplateLiteral",
+										"start": 709,
+										"end": 712,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 710,
+												"end": 711,
+												"value": {
+													"raw": "t",
+													"cooked": "t"
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "Identifier",
+								"start": 715,
+								"end": 716,
+								"name": "D"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An inner link may bound the region: the outer `<` holds no closer",
+							"start": 618,
+							"end": 686
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 783,
+					"end": 816,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 783,
+						"end": 815,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 783,
+							"end": 786,
+							"name": "x16"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 789,
+							"end": 815,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 798,
+								"end": 803,
+								"left": {
+									"type": "Identifier",
+									"start": 798,
+									"end": 799,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 802,
+									"end": 803,
+									"name": "A"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 790,
+										"end": 797
+									}
+								]
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 807,
+								"end": 815,
+								"left": {
+									"type": "Identifier",
+									"start": 807,
+									"end": 808,
+									"name": "C"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "TemplateLiteral",
+									"start": 812,
+									"end": 815,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 813,
+											"end": 814,
+											"value": {
+												"raw": "t",
+												"cooked": "t"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment in or beside the pair stays where it was written",
+							"start": 720,
+							"end": 781
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 818,
+					"end": 851,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 818,
+						"end": 850,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 818,
+							"end": 821,
+							"name": "x17"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 824,
+							"end": 850,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 825,
+								"end": 830,
+								"left": {
+									"type": "Identifier",
+									"start": 825,
+									"end": 826,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 829,
+									"end": 830,
+									"name": "A"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 832,
+										"end": 839
+									}
+								]
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 842,
+								"end": 850,
+								"left": {
+									"type": "Identifier",
+									"start": 842,
+									"end": 843,
+									"name": "C"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "TemplateLiteral",
+									"start": 847,
+									"end": 850,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 848,
+											"end": 849,
+											"value": {
+												"raw": "t",
+												"cooked": "t"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 931,
+					"end": 954,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 931,
+						"end": 953,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 931,
+							"end": 934,
+							"name": "x12"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 937,
+							"end": 953,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 937,
+								"end": 942,
+								"left": {
+									"type": "Identifier",
+									"start": 937,
+									"end": 938,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Literal",
+									"start": 941,
+									"end": 942,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 945,
+								"end": 953,
+								"left": {
+									"type": "Identifier",
+									"start": 945,
+									"end": 946,
+									"name": "C"
+								},
+								"operator": ">>",
+								"right": {
+									"type": "TemplateLiteral",
+									"start": 950,
+									"end": 953,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 951,
+											"end": 952,
+											"value": {
+												"raw": "t",
+												"cooked": "t"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " No pair is added where none was written, and none is kept with no closer",
+							"start": 854,
+							"end": 929
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 956,
+					"end": 972,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 956,
+						"end": 971,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 956,
+							"end": 959,
+							"name": "x13"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 962,
+							"end": 971,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 962,
+								"end": 967,
+								"left": {
+									"type": "Identifier",
+									"start": 962,
+									"end": 963,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 966,
+									"end": 967,
+									"name": "A"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "Identifier",
+								"start": 970,
+								"end": 971,
+								"name": "C"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 974,
+					"end": 997,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 974,
+						"end": 996,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 974,
+							"end": 977,
+							"name": "x14"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 980,
+							"end": 996,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 980,
+								"end": 989,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 980,
+									"end": 985,
+									"left": {
+										"type": "Identifier",
+										"start": 980,
+										"end": 981,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 984,
+										"end": 985,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 988,
+									"end": 989,
+									"name": "C"
+								}
+							},
+							"operator": ">=",
+							"right": {
+								"type": "TemplateLiteral",
+								"start": 993,
+								"end": 996,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 994,
+										"end": 995,
+										"value": {
+											"raw": "t",
+											"cooked": "t"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 999,
+					"end": 1023,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 999,
+						"end": 1022,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 999,
+							"end": 1002,
+							"name": "x20"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 1005,
+							"end": 1022,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 1005,
+								"end": 1010,
+								"left": {
+									"type": "Identifier",
+									"start": 1005,
+									"end": 1006,
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 1009,
+									"end": 1010,
+									"name": "A"
+								}
+							},
+							"operator": "<",
+							"right": {
+								"type": "BinaryExpression",
+								"start": 1013,
+								"end": 1022,
+								"left": {
+									"type": "Identifier",
+									"start": 1013,
+									"end": 1014,
+									"name": "C"
+								},
+								"operator": ">>>",
+								"right": {
+									"type": "TemplateLiteral",
+									"start": 1019,
+									"end": 1022,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 1020,
+											"end": 1021,
+											"value": {
+												"raw": "t",
+												"cooked": "t"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1068,
+					"end": 1087,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 1068,
+						"end": 1086,
+						"left": {
+							"type": "BinaryExpression",
+							"start": 1069,
+							"end": 1074,
+							"left": {
+								"type": "Identifier",
+								"start": 1069,
+								"end": 1070,
+								"name": "f"
+							},
+							"operator": "<",
+							"right": {
+								"type": "Identifier",
+								"start": 1073,
+								"end": 1074,
+								"name": "A"
+							}
+						},
+						"operator": "<",
+						"right": {
+							"type": "BinaryExpression",
+							"start": 1078,
+							"end": 1086,
+							"left": {
+								"type": "Identifier",
+								"start": 1078,
+								"end": 1079,
+								"name": "C"
+							},
+							"operator": ">>",
+							"right": {
+								"type": "TemplateLiteral",
+								"start": 1083,
+								"end": 1086,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 1084,
+										"end": 1085,
+										"value": {
+											"raw": "t",
+											"cooked": "t"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A statement, an argument, a condition",
+							"start": 1026,
+							"end": 1066
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1089,
+					"end": 1112,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1089,
+						"end": 1111,
+						"callee": {
+							"type": "Identifier",
+							"start": 1089,
+							"end": 1091,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 1092,
+								"end": 1110,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 1093,
+									"end": 1098,
+									"left": {
+										"type": "Identifier",
+										"start": 1093,
+										"end": 1094,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 1097,
+										"end": 1098,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1102,
+									"end": 1110,
+									"left": {
+										"type": "Identifier",
+										"start": 1102,
+										"end": 1103,
+										"name": "C"
+									},
+									"operator": ">>",
+									"right": {
+										"type": "TemplateLiteral",
+										"start": 1107,
+										"end": 1110,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 1108,
+												"end": 1109,
+												"value": {
+													"raw": "t",
+													"cooked": "t"
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "IfStatement",
+					"start": 1114,
+					"end": 1142,
+					"test": {
+						"type": "BinaryExpression",
+						"start": 1118,
+						"end": 1136,
+						"left": {
+							"type": "BinaryExpression",
+							"start": 1119,
+							"end": 1124,
+							"left": {
+								"type": "Identifier",
+								"start": 1119,
+								"end": 1120,
+								"name": "f"
+							},
+							"operator": "<",
+							"right": {
+								"type": "Identifier",
+								"start": 1123,
+								"end": 1124,
+								"name": "A"
+							}
+						},
+						"operator": "<",
+						"right": {
+							"type": "BinaryExpression",
+							"start": 1128,
+							"end": 1136,
+							"left": {
+								"type": "Identifier",
+								"start": 1128,
+								"end": 1129,
+								"name": "C"
+							},
+							"operator": ">>",
+							"right": {
+								"type": "TemplateLiteral",
+								"start": 1133,
+								"end": 1136,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 1134,
+										"end": 1135,
+										"value": {
+											"raw": "t",
+											"cooked": "t"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 1138,
+						"end": 1142,
+						"body": []
+					},
+					"alternate": null
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

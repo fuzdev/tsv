@@ -911,6 +911,14 @@ pub(crate) struct Printer<'a> {
     /// so a nested list's owner, or the same owner re-entered by another layout
     /// candidate, skips an element already walked instead of walking its subtree again.
     pub(crate) region_walked_elements: SpanMarks,
+    /// The comparison-chain links a region walk has already covered, subtree and all: the
+    /// link that walked ([`Self::mark_relational_chain_region`]) and every `<` a walk
+    /// visited ([`Self::mark_region_source_pairs`]), so neither the same chain re-entered by
+    /// another layout candidate nor a chain nested in a walked region walks its subtree
+    /// again.
+    pub(crate) relational_chain_walked_links: SpanMarks,
+    /// Fast gate for the rare document holding a walked chain link.
+    pub(crate) has_relational_chain_walks: Cell<bool>,
     /// The comment-free window the last comment search on this printer established
     /// ([`CommentFreeWindow`]: the mechanism, its soundness argument, and the gate's
     /// inline/outlined shape live there).
@@ -1012,6 +1020,8 @@ impl<'a> Printer<'a> {
             region_kept_shell_targets: SpanMarks::default(),
             has_region_source_marks: Cell::new(false),
             region_walked_elements: SpanMarks::default(),
+            relational_chain_walked_links: SpanMarks::default(),
+            has_relational_chain_walks: Cell::new(false),
             comment_free_gap,
         }
     }
