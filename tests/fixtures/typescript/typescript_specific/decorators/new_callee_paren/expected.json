@@ -1,0 +1,383 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 313,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a decorated class as the whole `new` callee breaks its pair open",
+			"start": 20,
+			"end": 87
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 312,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 303,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 89,
+					"end": 118,
+					"expression": {
+						"type": "NewExpression",
+						"start": 89,
+						"end": 117,
+						"callee": {
+							"type": "ClassExpression",
+							"start": 97,
+							"end": 112,
+							"decorators": [
+								{
+									"type": "Decorator",
+									"start": 97,
+									"end": 101,
+									"expression": {
+										"type": "Identifier",
+										"start": 98,
+										"end": 101,
+										"name": "dec"
+									}
+								}
+							],
+							"id": null,
+							"superClass": null,
+							"body": {
+								"type": "ClassBody",
+								"start": 110,
+								"end": 112,
+								"body": []
+							}
+						},
+						"arguments": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a decorated class as the whole `new` callee breaks its pair open",
+							"start": 20,
+							"end": 87
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 120,
+					"end": 171,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 120,
+						"end": 170,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 120,
+							"end": 121,
+							"name": "a"
+						},
+						"right": {
+							"type": "NewExpression",
+							"start": 124,
+							"end": 170,
+							"callee": {
+								"type": "ClassExpression",
+								"start": 132,
+								"end": 161,
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 132,
+										"end": 138,
+										"expression": {
+											"type": "CallExpression",
+											"start": 133,
+											"end": 138,
+											"callee": {
+												"type": "Identifier",
+												"start": 133,
+												"end": 136,
+												"name": "dec"
+											},
+											"arguments": []
+										}
+									}
+								],
+								"id": {
+									"type": "Identifier",
+									"start": 147,
+									"end": 148,
+									"name": "A"
+								},
+								"superClass": {
+									"type": "Identifier",
+									"start": 157,
+									"end": 158,
+									"name": "B"
+								},
+								"body": {
+									"type": "ClassBody",
+									"start": 159,
+									"end": 161,
+									"body": []
+								}
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 165,
+									"end": 166,
+									"name": "x"
+								},
+								{
+									"type": "Identifier",
+									"start": 168,
+									"end": 169,
+									"name": "y"
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 173,
+					"end": 218,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 173,
+						"end": 217,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 173,
+							"end": 174,
+							"name": "b"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 177,
+							"end": 217,
+							"object": {
+								"type": "NewExpression",
+								"start": 177,
+								"end": 215,
+								"callee": {
+									"type": "ClassExpression",
+									"start": 185,
+									"end": 207,
+									"decorators": [
+										{
+											"type": "Decorator",
+											"start": 185,
+											"end": 191,
+											"expression": {
+												"type": "MemberExpression",
+												"start": 186,
+												"end": 191,
+												"object": {
+													"type": "Identifier",
+													"start": 186,
+													"end": 189,
+													"name": "dec"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 190,
+													"end": 191,
+													"name": "d"
+												},
+												"computed": false
+											}
+										},
+										{
+											"type": "Decorator",
+											"start": 194,
+											"end": 196,
+											"expression": {
+												"type": "Identifier",
+												"start": 195,
+												"end": 196,
+												"name": "e"
+											}
+										}
+									],
+									"id": null,
+									"superClass": null,
+									"body": {
+										"type": "ClassBody",
+										"start": 205,
+										"end": 207,
+										"body": []
+									}
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 210,
+									"end": 213,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 211,
+											"end": 212,
+											"typeName": {
+												"type": "Identifier",
+												"start": 211,
+												"end": 212,
+												"name": "T"
+											}
+										}
+									]
+								},
+								"arguments": []
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 216,
+								"end": 217,
+								"name": "x"
+							},
+							"computed": false,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 220,
+					"end": 259,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 220,
+						"end": 258,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 220,
+							"end": 221,
+							"name": "c"
+						},
+						"right": {
+							"type": "NewExpression",
+							"start": 224,
+							"end": 258,
+							"callee": {
+								"type": "NewExpression",
+								"start": 228,
+								"end": 256,
+								"callee": {
+									"type": "ClassExpression",
+									"start": 236,
+									"end": 251,
+									"decorators": [
+										{
+											"type": "Decorator",
+											"start": 236,
+											"end": 240,
+											"expression": {
+												"type": "Identifier",
+												"start": 237,
+												"end": 240,
+												"name": "dec"
+											}
+										}
+									],
+									"id": null,
+									"superClass": null,
+									"body": {
+										"type": "ClassBody",
+										"start": 249,
+										"end": 251,
+										"body": []
+									}
+								},
+								"arguments": []
+							},
+							"arguments": []
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 261,
+					"end": 302,
+					"expression": {
+						"type": "CallExpression",
+						"start": 261,
+						"end": 301,
+						"callee": {
+							"type": "Identifier",
+							"start": 261,
+							"end": 263,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "NewExpression",
+								"start": 267,
+								"end": 298,
+								"callee": {
+									"type": "ClassExpression",
+									"start": 276,
+									"end": 292,
+									"decorators": [
+										{
+											"type": "Decorator",
+											"start": 276,
+											"end": 280,
+											"expression": {
+												"type": "Identifier",
+												"start": 277,
+												"end": 280,
+												"name": "dec"
+											}
+										}
+									],
+									"id": null,
+									"superClass": null,
+									"body": {
+										"type": "ClassBody",
+										"start": 290,
+										"end": 292,
+										"body": []
+									}
+								},
+								"arguments": []
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -508,7 +508,8 @@ pub(in crate::printer) fn chain_has_calls(mut expr: &ast::Expression<'_>) -> boo
 pub(super) enum CalleeParens<'a> {
     /// `(x ? y : z)()` — the pair welds to the argument list and the operand takes its
     /// ordinary doc. Prettier's answer for every callee kind but the two below: a ternary,
-    /// an `await`, an optional chain and a sequence callee all weld.
+    /// an `await`, an optional chain and a sequence callee all weld. A decorated class is
+    /// the one operand that breaks this pair open instead ([`Self::build_doc`]).
     Welded(&'a ast::Expression<'a>),
     /// `(⏎\tx as T⏎)()` — prettier's `printBinaryCastExpression`
     /// (print/binary-cast-expression.js) gives an `as` / `satisfies` cast its own hanging
@@ -591,6 +592,14 @@ impl<'a> CalleeParens<'a> {
     /// The pair itself, around a body from [`Self::build_body_doc`].
     pub(super) fn build_doc(&self, printer: &Printer<'_>, body: DocId) -> DocId {
         match self {
+            // A decorated class breaks its pair open, as at every other position that pairs
+            // one (`new (⏎\t@dec⏎\tclass {}⏎)()`): the decorator owns its own line either way.
+            Self::Welded(ast::Expression {
+                kind: ast::ExpressionKind::ClassExpression(class_expr),
+                ..
+            }) if crate::printer::decorators::class_expr_has_decorators(class_expr) => {
+                printer.build_break_open_parens(body)
+            }
             Self::Welded(_) => printer.arena().parens(body),
             Self::Cast(_) | Self::Binary(..) => printer.build_expanding_parens_doc(body),
         }
