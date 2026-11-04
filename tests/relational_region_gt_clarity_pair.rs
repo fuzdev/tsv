@@ -28,6 +28,28 @@
 //! printed behind such a `>` shows as a second pass that rewrites the comparisons into a
 //! call's type arguments.
 
+/// The span-free wire of `source`, so a reparse must keep the same program.
+fn tree(source: &str) -> serde_json::Value {
+    fn strip(node: &mut serde_json::Value) {
+        match node {
+            serde_json::Value::Object(map) => {
+                for key in ["start", "end", "loc", "name_loc"] {
+                    map.remove(key);
+                }
+                map.values_mut().for_each(strip);
+            }
+            serde_json::Value::Array(items) => items.iter_mut().for_each(strip),
+            _ => {}
+        }
+    }
+    let arena = bumpalo::Bump::new();
+    let program = tsv_ts::__private::parse(source, &arena).expect("the case parses");
+    let mut value =
+        tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
+    strip(&mut value);
+    value
+}
+
 /// `source` formatted, asserted a fixed point.
 fn stable(source: &str) -> String {
     let output = tsv_ts::format(source).expect("the case parses");
@@ -136,9 +158,8 @@ fn a_called_or_tagging_function_takes_no_pair_behind_the_close() {
 
 #[test]
 fn two_case_tests_with_no_statement_between_are_one_region() {
-    // Only a `:` and a keyword part them, and tsv's own type-argument scan reads through
-    // both: with the pair, the second case is a line its parser rejects. So the region
-    // stays open across them, and the operand prints bare.
+    // Only a `:` and a keyword part them, and the printer's region reads through both: the
+    // operand behind the second case's `>>` prints bare.
     for source in [
         "switch (k) {\n\tcase a < b < c:\n\tcase d >> await e:\n}",
         "switch (k) {\n\tcase a < b < c:\n\tdefault:\n\tcase d >> e % f + g:\n}",
@@ -146,10 +167,13 @@ fn two_case_tests_with_no_statement_between_are_one_region() {
     ] {
         assert_eq!(stable(source), source, "{source}");
     }
-    assert!(
-        tsv_ts::format("switch (k) {\n\tcase a < b < c:\n\tcase d >> (e):\n}").is_err(),
-        "the scan stopped reading through a clause boundary: the region can end there too"
-    );
+    // The parse grades the list that closes into the shift (`c:⏎case d`), which is no type,
+    // so the source reads as the comparisons and the shift both oracles read, and prints as
+    // prettier prints it.
+    let source = "switch (k) {\n\tcase a < b < c:\n\tcase d >> (e):\n}";
+    let printed = "switch (k) {\n\tcase a < b < c:\n\tcase d >> e:\n}";
+    assert_eq!(stable(source), printed);
+    assert_eq!(tree(source), tree(printed), "the program changed");
 }
 
 #[test]

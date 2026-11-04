@@ -1,0 +1,1051 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 749,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 718,
+				"end": 720,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 720,
+				"end": 748,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 723,
+							"end": 744,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 724,
+								"end": 743,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 724,
+									"end": 729,
+									"left": {
+										"type": "Identifier",
+										"start": 724,
+										"end": 725,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 728,
+										"end": 729,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 732,
+									"end": 743,
+									"left": {
+										"type": "CallExpression",
+										"start": 732,
+										"end": 736,
+										"callee": {
+											"type": "Identifier",
+											"start": 732,
+											"end": 733,
+											"name": "g"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 734,
+												"end": 735,
+												"name": "C"
+											}
+										],
+										"optional": false
+									},
+									"operator": ">>",
+									"right": {
+										"type": "TemplateLiteral",
+										"start": 740,
+										"end": 743,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 741,
+												"end": 742,
+												"value": {
+													"raw": "t",
+													"cooked": "t"
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `<` behind a name whose would-be list closes INTO a shift token. The comparison",
+			"start": 20,
+			"end": 104
+		},
+		{
+			"type": "Line",
+			"value": " chain is valid there, so the list is read only where its body is a type: tsc and",
+			"start": 106,
+			"end": 189
+		},
+		{
+			"type": "Line",
+			"value": " acorn-typescript read each line below as comparisons and a shift",
+			"start": 191,
+			"end": 258
+		},
+		{
+			"type": "Line",
+			"value": " Controls: a single nest's `>>>` closes no list, and a type body keeps the list,",
+			"start": 467,
+			"end": 549
+		},
+		{
+			"type": "Line",
+			"value": " closed by the same shift",
+			"start": 551,
+			"end": 578
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 718,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 709,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 260,
+					"end": 291,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 266,
+							"end": 290,
+							"id": {
+								"type": "Identifier",
+								"start": 266,
+								"end": 268,
+								"name": "a1"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 271,
+								"end": 290,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 271,
+									"end": 276,
+									"left": {
+										"type": "Identifier",
+										"start": 271,
+										"end": 272,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 275,
+										"end": 276,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 279,
+									"end": 290,
+									"left": {
+										"type": "CallExpression",
+										"start": 279,
+										"end": 283,
+										"callee": {
+											"type": "Identifier",
+											"start": 279,
+											"end": 280,
+											"name": "g"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 281,
+												"end": 282,
+												"name": "C"
+											}
+										],
+										"optional": false
+									},
+									"operator": ">>",
+									"right": {
+										"type": "TemplateLiteral",
+										"start": 287,
+										"end": 290,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 288,
+												"end": 289,
+												"value": {
+													"raw": "t",
+													"cooked": "t"
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `<` behind a name whose would-be list closes INTO a shift token. The comparison",
+							"start": 20,
+							"end": 104
+						},
+						{
+							"type": "Line",
+							"value": " chain is valid there, so the list is read only where its body is a type: tsc and",
+							"start": 106,
+							"end": 189
+						},
+						{
+							"type": "Line",
+							"value": " acorn-typescript read each line below as comparisons and a shift",
+							"start": 191,
+							"end": 258
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 293,
+					"end": 322,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 299,
+							"end": 321,
+							"id": {
+								"type": "Identifier",
+								"start": 299,
+								"end": 301,
+								"name": "a2"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 304,
+								"end": 321,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 304,
+									"end": 309,
+									"left": {
+										"type": "Identifier",
+										"start": 304,
+										"end": 305,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 308,
+										"end": 309,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 312,
+									"end": 321,
+									"left": {
+										"type": "UnaryExpression",
+										"start": 312,
+										"end": 314,
+										"operator": "-",
+										"prefix": true,
+										"argument": {
+											"type": "Identifier",
+											"start": 313,
+											"end": 314,
+											"name": "C"
+										}
+									},
+									"operator": ">>",
+									"right": {
+										"type": "TemplateLiteral",
+										"start": 318,
+										"end": 321,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 319,
+												"end": 320,
+												"value": {
+													"raw": "t",
+													"cooked": "t"
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 324,
+					"end": 358,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 330,
+							"end": 357,
+							"id": {
+								"type": "Identifier",
+								"start": 330,
+								"end": 332,
+								"name": "a3"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 335,
+								"end": 357,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 335,
+									"end": 340,
+									"left": {
+										"type": "Identifier",
+										"start": 335,
+										"end": 336,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 339,
+										"end": 340,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 343,
+									"end": 357,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 344,
+										"end": 349,
+										"left": {
+											"type": "Identifier",
+											"start": 344,
+											"end": 345,
+											"name": "C"
+										},
+										"operator": "*",
+										"right": {
+											"type": "Identifier",
+											"start": 348,
+											"end": 349,
+											"name": "D"
+										}
+									},
+									"operator": ">>",
+									"right": {
+										"type": "TemplateLiteral",
+										"start": 354,
+										"end": 357,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 355,
+												"end": 356,
+												"value": {
+													"raw": "t",
+													"cooked": "t"
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 360,
+					"end": 394,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 366,
+							"end": 393,
+							"id": {
+								"type": "Identifier",
+								"start": 366,
+								"end": 368,
+								"name": "a4"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 371,
+								"end": 393,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 371,
+									"end": 376,
+									"left": {
+										"type": "Identifier",
+										"start": 371,
+										"end": 372,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 375,
+										"end": 376,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 379,
+									"end": 393,
+									"left": {
+										"type": "CallExpression",
+										"start": 379,
+										"end": 383,
+										"callee": {
+											"type": "Identifier",
+											"start": 379,
+											"end": 380,
+											"name": "g"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 381,
+												"end": 382,
+												"name": "C"
+											}
+										],
+										"optional": false
+									},
+									"operator": ">>",
+									"right": {
+										"type": "SequenceExpression",
+										"start": 388,
+										"end": 392,
+										"expressions": [
+											{
+												"type": "Identifier",
+												"start": 388,
+												"end": 389,
+												"name": "t"
+											},
+											{
+												"type": "Identifier",
+												"start": 391,
+												"end": 392,
+												"name": "u"
+											}
+										]
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 396,
+					"end": 432,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 402,
+							"end": 431,
+							"id": {
+								"type": "Identifier",
+								"start": 402,
+								"end": 404,
+								"name": "a5"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 407,
+								"end": 431,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 407,
+									"end": 416,
+									"left": {
+										"type": "BinaryExpression",
+										"start": 407,
+										"end": 412,
+										"left": {
+											"type": "Identifier",
+											"start": 407,
+											"end": 408,
+											"name": "f"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 411,
+											"end": 412,
+											"name": "A"
+										}
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 415,
+										"end": 416,
+										"name": "B"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 419,
+									"end": 431,
+									"left": {
+										"type": "CallExpression",
+										"start": 419,
+										"end": 423,
+										"callee": {
+											"type": "Identifier",
+											"start": 419,
+											"end": 420,
+											"name": "g"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 421,
+												"end": 422,
+												"name": "C"
+											}
+										],
+										"optional": false
+									},
+									"operator": ">>>",
+									"right": {
+										"type": "TemplateLiteral",
+										"start": 428,
+										"end": 431,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 429,
+												"end": 430,
+												"value": {
+													"raw": "t",
+													"cooked": "t"
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 434,
+					"end": 464,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 440,
+							"end": 463,
+							"id": {
+								"type": "Identifier",
+								"start": 440,
+								"end": 442,
+								"name": "a6"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 445,
+								"end": 463,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 445,
+									"end": 450,
+									"left": {
+										"type": "Identifier",
+										"start": 445,
+										"end": 446,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 449,
+										"end": 450,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 453,
+									"end": 463,
+									"left": {
+										"type": "CallExpression",
+										"start": 453,
+										"end": 458,
+										"callee": {
+											"type": "MemberExpression",
+											"start": 453,
+											"end": 456,
+											"object": {
+												"type": "Identifier",
+												"start": 453,
+												"end": 454,
+												"name": "c"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 455,
+												"end": 456,
+												"name": "d"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"arguments": [],
+										"optional": false
+									},
+									"operator": ">>",
+									"right": {
+										"type": "Identifier",
+										"start": 462,
+										"end": 463,
+										"name": "t"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 580,
+					"end": 612,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 586,
+							"end": 611,
+							"id": {
+								"type": "Identifier",
+								"start": 586,
+								"end": 588,
+								"name": "b1"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 591,
+								"end": 611,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 591,
+									"end": 596,
+									"left": {
+										"type": "Identifier",
+										"start": 591,
+										"end": 592,
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 595,
+										"end": 596,
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 599,
+									"end": 611,
+									"left": {
+										"type": "CallExpression",
+										"start": 599,
+										"end": 603,
+										"callee": {
+											"type": "Identifier",
+											"start": 599,
+											"end": 600,
+											"name": "g"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 601,
+												"end": 602,
+												"name": "C"
+											}
+										],
+										"optional": false
+									},
+									"operator": ">>>",
+									"right": {
+										"type": "TemplateLiteral",
+										"start": 608,
+										"end": 611,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 609,
+												"end": 610,
+												"value": {
+													"raw": "t",
+													"cooked": "t"
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Controls: a single nest's `>>>` closes no list, and a type body keeps the list,",
+							"start": 467,
+							"end": 549
+						},
+						{
+							"type": "Line",
+							"value": " closed by the same shift",
+							"start": 551,
+							"end": 578
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 614,
+					"end": 636,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 620,
+							"end": 635,
+							"id": {
+								"type": "Identifier",
+								"start": 620,
+								"end": 622,
+								"name": "b2"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 625,
+								"end": 635,
+								"tag": {
+									"type": "Identifier",
+									"start": 625,
+									"end": 626,
+									"name": "f"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 632,
+									"end": 635,
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 633,
+											"end": 634,
+											"value": {
+												"raw": "t",
+												"cooked": "t"
+											},
+											"tail": true
+										}
+									]
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 626,
+									"end": 632,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 627,
+											"end": 631,
+											"typeName": {
+												"type": "Identifier",
+												"start": 627,
+												"end": 628,
+												"name": "A"
+											},
+											"typeArguments": {
+												"type": "TSTypeParameterInstantiation",
+												"start": 628,
+												"end": 631,
+												"params": [
+													{
+														"type": "TSTypeReference",
+														"start": 629,
+														"end": 630,
+														"typeName": {
+															"type": "Identifier",
+															"start": 629,
+															"end": 630,
+															"name": "C"
+														}
+													}
+												]
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 638,
+					"end": 664,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 644,
+							"end": 663,
+							"id": {
+								"type": "Identifier",
+								"start": 644,
+								"end": 646,
+								"name": "b3"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 649,
+								"end": 663,
+								"callee": {
+									"type": "Identifier",
+									"start": 649,
+									"end": 650,
+									"name": "f"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 661,
+										"end": 662,
+										"name": "x"
+									}
+								],
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 650,
+									"end": 660,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 651,
+											"end": 659,
+											"typeName": {
+												"type": "Identifier",
+												"start": 651,
+												"end": 652,
+												"name": "A"
+											},
+											"typeArguments": {
+												"type": "TSTypeParameterInstantiation",
+												"start": 652,
+												"end": 659,
+												"params": [
+													{
+														"type": "TSUnionType",
+														"start": 653,
+														"end": 658,
+														"types": [
+															{
+																"type": "TSTypeReference",
+																"start": 653,
+																"end": 654,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 653,
+																	"end": 654,
+																	"name": "C"
+																}
+															},
+															{
+																"type": "TSTypeReference",
+																"start": 657,
+																"end": 658,
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 657,
+																	"end": 658,
+																	"name": "D"
+																}
+															}
+														]
+													}
+												]
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 666,
+					"end": 708,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 672,
+							"end": 707,
+							"id": {
+								"type": "Identifier",
+								"start": 672,
+								"end": 674,
+								"name": "b4"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 677,
+								"end": 707,
+								"callee": {
+									"type": "Identifier",
+									"start": 681,
+									"end": 684,
+									"name": "Map"
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 684,
+									"end": 705,
+									"params": [
+										{
+											"type": "TSStringKeyword",
+											"start": 685,
+											"end": 691
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 693,
+											"end": 704,
+											"typeName": {
+												"type": "Identifier",
+												"start": 693,
+												"end": 696,
+												"name": "Set"
+											},
+											"typeArguments": {
+												"type": "TSTypeParameterInstantiation",
+												"start": 696,
+												"end": 704,
+												"params": [
+													{
+														"type": "TSNumberKeyword",
+														"start": 697,
+														"end": 703
+													}
+												]
+											}
+										}
+									]
+								},
+								"arguments": []
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

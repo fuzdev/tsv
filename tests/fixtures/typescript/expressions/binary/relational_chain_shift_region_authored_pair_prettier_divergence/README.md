@@ -13,7 +13,7 @@ The cells whose stripped line no parser can follow live in [relational_chain_shi
 
 This is the comma-list owner's rule ([relational_sibling_authored_pair](../relational_sibling_authored_pair_prettier_divergence/), [relational_region_prefix_shell](../relational_region_prefix_shell_prettier_divergence/)) over one comparison chain: between the region's opener and its closer, every pair the printer would decide follows the source. So the pair behind `typeof` stays too, in either operand (`x9`, `x18`; bare, `typeof b` is a type query and the line a generic call).
 
-The rule keeps a pair and never adds one, and it does not read what follows the `>>`. `x10` and `x11` are its cost: the pair behind the unary `-` and the one ahead of a plain follower are harmless (`-b` is no type, and nothing commits the list), bare both read as written, and tsv keeps the authored pair anyway. `x12` writes no pair and gets none. `x13`, `x14` and `x20` hold no closer (a `>>>` behind two `<` closes no region), so a redundant pair strips.
+The rule keeps a pair and never adds one, and it reads neither what follows the `>>` nor what the right operand holds ahead of it. `x10`, `x11` and `x6`–`x8` are its cost: the pair behind the unary `-`, the one ahead of a plain follower, and the ones ahead of a right operand whose closer stands behind a call, a binary pair or a unary (`g(C) >>`, `(C * D) >>`, `-C >>`) are harmless (`-b` is no type, nothing commits the list, and a call or an arithmetic pair is no type argument either, so the would-be list is refused), bare all read as written, and tsv keeps the authored pair anyway. `x12` writes no pair and gets none. `x13`, `x14` and `x20` hold no closer (a `>>>` behind two `<` closes no region), so a redundant pair strips.
 
 ## Variants
 

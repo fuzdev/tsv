@@ -13,6 +13,7 @@ use super::scan::{
     skip_whitespace_and_comments,
 };
 use smallvec::SmallVec;
+use tsv_lang::NESTING_LIMIT;
 use tsv_lang::source_scan::{
     OperandAnchor, OperandGrammar, TriviaProfile, skip_regex_literal, skip_template_literal,
     skip_trivia,
@@ -638,8 +639,28 @@ fn type_arg_head_walk(
     scan: TypeArgScan,
     split_unclaimed: &mut bool,
 ) -> bool {
+    type_arg_head_walk_nested(bytes, pos, scan, split_unclaimed, 0)
+}
+
+/// [`type_arg_head_walk`] for a list `graded_lists` levels inside the region the walk was
+/// asked about: each level a nested list that closes into a shift, graded as a list of its
+/// own (the `<` arm of [`type_arg_region_walk`] behind a name).
+fn type_arg_head_walk_nested(
+    bytes: &[u8],
+    pos: usize,
+    scan: TypeArgScan,
+    split_unclaimed: &mut bool,
+    graded_lists: u32,
+) -> bool {
     let mut through_default = false;
-    let commits = type_arg_region_walk(bytes, pos, scan, split_unclaimed, &mut through_default);
+    let commits = type_arg_region_walk(
+        bytes,
+        pos,
+        scan,
+        split_unclaimed,
+        &mut through_default,
+        graded_lists,
+    );
     if commits && through_default {
         *split_unclaimed = true;
         return false;
@@ -649,13 +670,15 @@ fn type_arg_head_walk(
 
 /// [`type_arg_head_walk`]'s walk of the region. `through_default` is set where it passes,
 /// inside an index that opens as no type, a generic function head whose parameter list
-/// holds a default ([`HeadGrade::DefaultedPrefix`]).
+/// holds a default ([`HeadGrade::DefaultedPrefix`]). `graded_lists` counts the nested
+/// lists the walk is inside of ([`type_arg_head_walk_nested`]).
 fn type_arg_region_walk(
     bytes: &[u8],
     pos: usize,
     scan: TypeArgScan,
     split_unclaimed: &mut bool,
     through_default: &mut bool,
+    graded_lists: u32,
 ) -> bool {
     // The nested regions still open, innermost last; empty at the list's own level.
     let mut frames: SmallVec<[Frame; 8]> = SmallVec::new();
@@ -851,8 +874,36 @@ fn type_arg_region_walk(
                 // then read like any other operand's follow token, so `f<A | B<C>>(x)`
                 // commits at the `>` that closes the outer list while `a < b | c<d>(e) > (f)`
                 // — a generic CALL, which no type spells — stays the comparison both oracles
-                // read. The list's own arguments are not graded, only its delimiters matched
-                // ([`matching_angle_close`]).
+                // read.
+                //
+                // Where the nested list closes INTO a shift (`A<…>>`, `A<…>>>`) its arguments
+                // are graded too, as a list of its own: the comparison chain both parsers
+                // read there is valid (`f < A < g(C) >> t` is `(f < A) < (g(C) >> t)`), so a
+                // body that is no type leaves the source no list, and the region is refused.
+                // The list is graded over the bytes through its own close — the end bound:
+                // nothing follows it there, as nothing the follow filter reads does in the
+                // source either, since the shift's next `>` is the enclosing list's close,
+                // which every type list takes. A refusal in that walk ends this one on the
+                // same token, so its `split_unclaimed` is this walk's own; a commit leaves
+                // both flags as they were. Elsewhere the list's arguments are not graded,
+                // only its delimiters matched ([`matching_angle_close`]): a list closed by a
+                // lone `>` (a `,`, a `|` or a second `>` behind it leaves no comparison either
+                // parser reads; an index behind it does, `f < A < B<g(C)>[0] >> t` holding
+                // the array `[0]`, and stays claimed and rejected, since grading there admits
+                // readings the printer moves), a list inside a bracket of the region (the
+                // bracketed-head family, whose body the type parse grades), and one
+                // whose `<` is the second of a `<<`. tsc reads that shift as two `<`, and
+                // rejects the spellings whose list closes into a shift
+                // (``x = a < b << c >>> `t` ``), so the region keeps the claim it makes and the
+                // type parse rejects it as tsc does. Past [`NESTING_LIMIT`] graded lists the
+                // claim stands too: the type parse refuses that depth whatever the grade.
+                //
+                // The cost is bounded. One grade walks the region's bytes once per level of
+                // shift-closed nesting below it — O(bytes × depth) — and the parser grades a
+                // region at every `<` of a comparison chain, so a comparison-shaped nest
+                // (`f < A < A < … < g(C) >>>…`) re-grades per `<`: cubic. That shape holds
+                // four or more `>` in a row, which lexes as no valid expression, so only an
+                // input that fails to parse reaches it, and [`NESTING_LIMIT`] caps the depth.
                 //
                 // A `<` past a line terminator opens no list of the name's: the type
                 // grammar takes a reference's arguments on the name's own line (tsc and
@@ -927,6 +978,20 @@ fn type_arg_region_walk(
                     let Some(close) = matching_angle_close(bytes, pos + 1, scan) else {
                         return false;
                     };
+                    if frames.is_empty()
+                        && bytes.get(close + 1) == Some(&b'>')
+                        && bytes.get(pos + 1) != Some(&b'<')
+                        && graded_lists < NESTING_LIMIT
+                        && !type_arg_head_walk_nested(
+                            &bytes[..=close],
+                            skip_whitespace_and_comments(bytes, pos + 1),
+                            scan,
+                            split_unclaimed,
+                            graded_lists + 1,
+                        )
+                    {
+                        return false;
+                    }
                     if frames.is_empty() {
                         passed_list_or_import = true;
                     }

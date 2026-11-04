@@ -15,6 +15,13 @@
 	// The follower is not read: the pair stays ahead of one that commits nothing
 	x11 = f < A < C >> t;
 
+	// The closer behind a call, a binary pair or a unary in the right operand: no type
+	// argument, so the bare line reads as written and the pair is kept as a cost
+	x6 = f < A < g(C) >> `t`;
+	x7 = f < A < (C * D) >> `t`;
+	x8 = f < A < -C >> `t`;
+	fn(f < A < g(C) >> `t`);
+
 	// An inner link may bound the region: the outer `<` holds no closer
 	x15 = f < A < C >> `t` < D;
 

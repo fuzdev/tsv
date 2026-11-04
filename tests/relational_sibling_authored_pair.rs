@@ -596,19 +596,3 @@ fn a_blank_line_inside_a_kept_pair_keeps_the_comparisons() {
         assert_eq!(stable(&twice), second.trim_end());
     }
 }
-
-/// Inside one comparison chain, the closer may stand anywhere in the right operand — behind a
-/// call, a binary pair or a unary — and the pair around the left comparison stays. Bare, tsv's
-/// own parse refuses these lines, which tsc and acorn-typescript read as comparisons, so a
-/// fixture cannot hold prettier's output for them.
-#[test]
-fn a_chain_keeps_the_pair_ahead_of_a_closer_anywhere_in_its_right_operand() {
-    for source in [
-        "x6 = (f < A) < g(C) >> `t`;",
-        "x7 = (f < A) < (C * D) >> `t`;",
-        "x8 = (f < A) < -C >> `t`;",
-        "fn((f < A) < g(C) >> `t`);",
-    ] {
-        assert_eq!(stable(source), source);
-    }
-}
