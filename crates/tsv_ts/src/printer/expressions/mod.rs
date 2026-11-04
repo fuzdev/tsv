@@ -49,6 +49,14 @@ use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
+/// One level of a commented non-null run ([`Printer::build_commented_non_null_operand_doc`]):
+/// the level's expression, its non-null, and its stripped-paren leading run.
+type CommentedNonNullLevel<'e, 'arena> = (
+    &'e Expression<'arena>,
+    &'e crate::ast::TSNonNullExpression<'arena>,
+    Option<DocId>,
+);
+
 /// What a comment-blind binary-chain layout builder gets to work with, produced by
 /// `Printer::prepare_binary_chain_layout`.
 enum BinaryChainLayout {
@@ -1776,14 +1784,7 @@ impl<'a> Printer<'a> {
     /// expression-statement flag needs no restating: every non-null level of the dispatch
     /// hands it on unchanged.
     fn build_commented_non_null_operand_doc(&self, operand: &Expression<'_>) -> DocId {
-        let d = self.d();
-        let mut levels: SmallVec<
-            [(
-                &Expression<'_>,
-                &crate::ast::TSNonNullExpression<'_>,
-                Option<DocId>,
-            ); 4],
-        > = SmallVec::new();
+        let mut levels: SmallVec<[CommentedNonNullLevel<'_, '_>; 4]> = SmallVec::new();
         let mut inner = operand;
         while let ExpressionKind::TSNonNullExpression(non_null) = &inner.kind {
             let argument_end = non_null.expression.span().end;
@@ -1801,16 +1802,62 @@ impl<'a> Printer<'a> {
             levels.push((inner, non_null, leading));
             inner = non_null.expression;
         }
-        let mut doc = self.build_expression_doc(inner);
-        for &(level, non_null, leading) in levels.iter().rev() {
-            let core = self.close_commented_non_null_doc(doc, non_null, level.span);
-            let level_doc = match leading {
-                Some(lead) => d.concat(&[lead, core]),
-                None => core,
-            };
-            doc = self.prepend_owned_leading_comment(level, level_doc);
+        let doc = self.build_expression_doc(inner);
+        if levels.is_empty() {
+            return doc;
         }
-        doc
+        self.lay_commented_non_null_levels(doc, &levels)
+    }
+
+    /// The levels [`Self::build_commented_non_null_operand_doc`] collected, closed over the
+    /// innermost operand's `doc` — out of line, so the buffers stay off the frame that
+    /// recursion through the operand's own build passes.
+    #[inline(never)]
+    fn lay_commented_non_null_levels(
+        &self,
+        doc: DocId,
+        levels: &[CommentedNonNullLevel<'_, '_>],
+    ) -> DocId {
+        // The levels print into ONE flat concat rather than a doc level apiece — the run's
+        // length is bounded only by `SPINE_LIMIT`, and every later walk of a doc nested a
+        // level per `!` would recurse once per link. Each level adds a suffix (its gap's
+        // comments and `!`) after everything inside it and a prefix (its stripped-paren
+        // leading run, then the owned comment ahead of that) before everything inside it:
+        // `prefix` holds the prefixes innermost first, so it is laid down reversed.
+        let mut prefix: SmallVec<[DocId; 4]> = SmallVec::new();
+        let mut parts: DocBuf = smallvec![doc];
+        for &(level, non_null, leading) in levels.iter().rev() {
+            self.push_commented_non_null_suffix(&mut parts, non_null, level.span.end);
+            if let Some(lead) = leading {
+                prefix.push(lead);
+            }
+            // No level the parser builds today owns a comment here — a level's operand starts
+            // at the level unless a grouping paren was dropped, and a comment glued to a
+            // dropped `(` is never owned — but the level is built in place of
+            // `build_expression_doc`, so it asks as that does: an owned comment nothing asks
+            // for is a dropped comment.
+            if let Some([comment, separator]) = self.owned_leading_comment_prefix(level) {
+                prefix.extend([separator, comment]);
+            }
+        }
+        if !prefix.is_empty() {
+            prefix.reverse();
+            parts.insert_many(0, prefix);
+        }
+        self.d().concat(&parts)
+    }
+
+    /// The comments of a non-null's operand→`!` gap, then `!`, pushed onto `parts` — the
+    /// suffix [`Printer::close_commented_non_null_doc`] closes an operand doc with. `end` is
+    /// the non-null expression's own end, where its gap stops.
+    fn push_commented_non_null_suffix(
+        &self,
+        parts: &mut DocBuf,
+        non_null: &crate::ast::TSNonNullExpression<'_>,
+        end: u32,
+    ) {
+        self.append_trailing_paren_comments(parts, non_null.expression.span().end, end);
+        parts.push(self.d().text("!"));
     }
 
     /// Close a non-null's operand doc in the trailing-comment branch of
@@ -1821,11 +1868,9 @@ impl<'a> Printer<'a> {
         non_null: &crate::ast::TSNonNullExpression<'_>,
         span: Span,
     ) -> DocId {
-        let d = self.d();
         let mut parts: DocBuf = smallvec![operand_doc];
-        self.append_trailing_paren_comments(&mut parts, non_null.expression.span().end, span.end);
-        parts.push(d.text("!"));
-        d.concat(&parts)
+        self.push_commented_non_null_suffix(&mut parts, non_null, span.end);
+        self.d().concat(&parts)
     }
 
     /// When `expr` is a non-null assertion sealing a parenthesized optional chain
@@ -2211,5 +2256,33 @@ impl<'a> Printer<'a> {
         // but sit earlier in source) — the boundary for a `@dec /* c */ readonly x`
         // comment between the decorator and the modifier.
         self.with_param_decorators(decorators, self.d().concat(&parts), param_prop_span.start)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! The commented non-null run ([`super::Printer::build_commented_non_null_operand_doc`])
+    //! lays its levels into one flat concat, each level's prefix ahead of everything inside
+    //! it — so the leading runs of several stripped pairs, nested one in the next, print
+    //! outermost first. The run's own levels start below the outermost `!`, which the
+    //! dispatch prints, so the inputs nest enough pairs for the run to hold several.
+
+    /// `source` formats to `expected`, which is its own format.
+    fn assert_formats(source: &str, expected: &str) {
+        let out = crate::format(source).expect("formats");
+        assert_eq!(out, expected, "{source:?}");
+        assert_eq!(crate::format(&out).expect("formats"), out, "{source:?}");
+    }
+
+    #[test]
+    fn nested_stripped_pairs_keep_their_leading_runs_in_order() {
+        assert_formats(
+            "y = (/*a*/ (/*b*/ (/*c*/ (/*d*/ x)/*1*/!)/*2*/!)/*3*/!)/*4*/!;\n",
+            "y = /*a*/ /*b*/ /*c*/ /*d*/ x /*1*/! /*2*/! /*3*/! /*4*/!;\n",
+        );
+        assert_formats(
+            "f((/*a*/ (/*b*/ (/*c*/ x)/*1*/!)/*2*/!)/*3*/!/*4*/!, z);\n",
+            "f(/*a*/ /*b*/ /*c*/ x /*1*/! /*2*/! /*3*/! /*4*/!, z);\n",
+        );
     }
 }

@@ -667,14 +667,29 @@ impl<'a> Printer<'a> {
     ///
     /// The single seam, called from `build_expression_doc` — so the comment is part of
     /// the node's doc at every one of the ~29 sites where a *parent* decides to wrap that
-    /// doc in parens, present or future. Nothing else prints an owned comment.
+    /// doc in parens, present or future. Nothing else prints an owned comment but its
+    /// prefix half ([`Self::owned_leading_comment_prefix`]), which the commented non-null
+    /// run lays out for each level it builds in place of `build_expression_doc`.
     pub(crate) fn prepend_owned_leading_comment(&self, expr: &Expression<'_>, doc: DocId) -> DocId {
+        match self.owned_leading_comment_prefix(expr) {
+            Some([comment, separator]) => self.d().concat(&[comment, separator, doc]),
+            None => doc,
+        }
+    }
+
+    /// What [`Self::prepend_owned_leading_comment`] prints ahead of `expr`'s doc — the owned
+    /// comment and its separator — or `None` where it returns the doc unchanged. For a
+    /// builder that lays a run of levels into one flat concat rather than a doc level apiece.
+    pub(in crate::printer) fn owned_leading_comment_prefix(
+        &self,
+        expr: &Expression<'_>,
+    ) -> Option<[DocId; 2]> {
         // Document-level short-circuit: no comment in this document is owned, so nothing
         // here can prepend one. Skips even the byte gate below for the ~all documents with
         // no owned comment. (Every `CommentBoundPair` comment is owned, so a pair implies the
         // flag.)
         if !self.has_owned_comments {
-            return doc;
+            return None;
         }
         let start = expr.span().start;
         // Cheap byte gate next: this runs once per expression node (the highest-frequency
@@ -688,29 +703,25 @@ impl<'a> Printer<'a> {
         // is owned by a cast alone, and a cast is excluded two lines down anyway (it prints
         // its own copy). A second AnyLine producer would break that argument — widen the gate
         // with it, don't rediscover this comment.
-        if source_scan::block_comment_end_before(
+        source_scan::block_comment_end_before(
             self.source.as_bytes(),
             start as usize,
             source_scan::CommentGlue::SameLine,
-        )
-        .is_none()
-        {
-            return doc;
-        }
+        )?;
         // A JSDoc cast holds its own copy of its comment and prints it against its own
         // `(` — see `build_comment_bound_pair_lead_doc`. Claiming it here would print it twice.
         if matches!(expr.kind, ExpressionKind::CommentBoundPair(_)) {
-            return doc;
+            return None;
         }
         // A node whose left-spine child starts here is not the innermost — that child is
         // (or something below it). Let the recursion reach it.
         if left_spine_child(expr).is_some_and(|c| c.span().start == start) {
-            return doc;
+            return None;
         }
         // The enclosing-claim check is `prepend_owned_leading_comment_at`'s, so the
         // reassembly callers get it too — a frozen slice reached it without one and printed
         // a hoisted comment twice.
-        self.prepend_owned_leading_comment_at(start, doc)
+        self.owned_leading_comment_prefix_at(start)
     }
 
     /// [`Self::prepend_owned_leading_comment`] keyed on a span start rather than a node,
@@ -757,10 +768,19 @@ impl<'a> Printer<'a> {
     /// last one. `grep prepend_owned_leading_comment_at` is the authority; a bullet here is a
     /// per-caller *argument*, and a caller with no bullet is a claim nobody has justified.
     pub(crate) fn prepend_owned_leading_comment_at(&self, start: u32, doc: DocId) -> DocId {
+        match self.owned_leading_comment_prefix_at(start) {
+            Some([comment, separator]) => self.d().concat(&[comment, separator, doc]),
+            None => doc,
+        }
+    }
+
+    /// [`Self::owned_leading_comment_prefix`] keyed on a span start, as
+    /// [`Self::prepend_owned_leading_comment_at`] is.
+    fn owned_leading_comment_prefix_at(&self, start: u32) -> Option<[DocId; 2]> {
         // Document-level short-circuit (also covers the arrow-reassembly callers, which
         // reach here without going through `prepend_owned_leading_comment`).
         if !self.has_owned_comments {
-            return doc;
+            return None;
         }
         // An ENCLOSING node already claims this comment and prints text ahead of us — the
         // synthesized `(` of a paren-less arrow, whose span starts at this very parameter, or
@@ -775,11 +795,9 @@ impl<'a> Printer<'a> {
         // printed the comment a second time — the mirror image of the DROP the claim exists
         // to prevent (`prettier_ignore_base_comment`'s multi-line block).
         if self.claimed_owned_comment_start.get() == Some(start) {
-            return doc;
+            return None;
         }
-        let Some(comment) = self.owned_leading_comment_at(start) else {
-            return doc;
-        };
+        let comment = self.owned_leading_comment_at(start)?;
         let d = self.d();
         // The separator is the author's: a general owned comment is glued on the token's
         // own line, so it is always the space — but a JSDoc cast may own its comment from
@@ -794,7 +812,7 @@ impl<'a> Printer<'a> {
         } else {
             d.text(" ")
         };
-        d.concat(&[self.build_comment_doc(comment), separator, doc])
+        Some([self.build_comment_doc(comment), separator])
     }
 
     /// **on page**: whether the comment leading `value` is a JSDoc cast's that the author gave
