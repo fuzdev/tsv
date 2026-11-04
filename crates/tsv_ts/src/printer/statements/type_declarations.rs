@@ -277,7 +277,7 @@ impl<'a> Printer<'a> {
                 // The operand's own [`ShellPair`] travels with both reads: a shell whose
                 // pair this position re-mints is not stripped, so a gate that assumed it was
                 // would force a break for a hang that never fires.
-                let pair = prefix_operator_shell_pair(self, o.type_annotation);
+                let pair = prefix_operator_shell_pair(self, o.operator, o.type_annotation);
                 let hang_start = self
                     .keyword_value_stripped_paren_hang_with_pair(o.type_annotation, pair)
                     .value_start;

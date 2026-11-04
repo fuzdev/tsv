@@ -230,6 +230,56 @@ fn readonly_literal_operand_needs_an_array_suffix() {
     }
 }
 
+/// A predicate with a type under `readonly` prints bare, and the `readonly` type over it
+/// takes the pair a right-open type takes where a token follows it. Paired inside,
+/// `readonly (this is B[])` is a list argument tsv's lookahead refuses — acorn-typescript
+/// reads `readonly (` only ahead of an array suffix — so a call's type argument would not
+/// read back. acorn-typescript rejects every spelling here (`readonly` over no array or
+/// tuple); tsc reads each as written, and the output as it read the input.
+#[test]
+fn readonly_predicate_operand_prints_bare() {
+    for (source, printed) in [
+        (
+            "f<readonly this is B[]>(x);\n",
+            "f<readonly this is B[]>(x);\n",
+        ),
+        (
+            "f<(readonly this is B[])>(x);\n",
+            "f<readonly this is B[]>(x);\n",
+        ),
+        (
+            "f<(readonly this is B) | C>(x);\n",
+            "f<(readonly this is B) | C>(x);\n",
+        ),
+    ] {
+        assert_prints_fixed(source, printed);
+        assert_eq!(expression_kind(source), "CallExpression", "{source:?}");
+    }
+    for (source, printed) in [
+        (
+            "type X = readonly (this is B) | C;\n",
+            "type X = (readonly this is B) | C;\n",
+        ),
+        (
+            "type X = readonly (this is B) extends C ? D : E;\n",
+            "type X = (readonly this is B) extends C ? D : E;\n",
+        ),
+        (
+            "type X = [readonly this is B?];\n",
+            "type X = [(readonly this is B)?];\n",
+        ),
+        (
+            "type X = readonly (this is B)[];\n",
+            "type X = readonly (this is B)[];\n",
+        ),
+        // a bare optional element: acorn-typescript's tree is the optional predicate, which
+        // tsc reads as `this is (B?)` until the pair settles it on acorn's reading
+        ("type X = [this is B?];\n", "type X = [(this is B)?];\n"),
+    ] {
+        assert_prints_fixed(source, printed);
+    }
+}
+
 /// An index's body is graded by the same walk as the list around it, through any paren
 /// shell: a body only the type grammar spells keeps the call, and its shelled spellings
 /// print bare and stay calls.
@@ -244,9 +294,12 @@ fn index_bodies_read_as_types_through_shells() {
         ("f<A[(keyof B) | C]>(x);\n", "f<A[keyof B | C]>(x);\n"),
         ("f < A[() => B] > (x);\n", "f<A[() => B]>(x);\n"),
         ("f<A[() => B]>\n(x);\n", "f<A[() => B]>(x);\n"),
-        // a type predicate, as a function type's return and as the argument itself
+        // a type predicate, as a function type's return and as the argument itself — a
+        // last union member takes the pair a function type takes there: bare it reads alike
+        // only while nothing follows the whole type (`keyof this is B | C` is
+        // `keyof (this is B | C)`), so the pair is the one rule for every member position
         ("f<A[(a) => a is B]>(x);\n", "f<A[(a) => a is B]>(x);\n"),
-        ("f<A | this is B>(x);\n", "f<A | this is B>(x);\n"),
+        ("f<A | this is B>(x);\n", "f<A | (this is B)>(x);\n"),
         // an assertion predicate's subject ends at a shell's `)` as it does at the `]`
         (
             "f<A[((a) => asserts a)]>(x);\n",

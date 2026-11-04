@@ -1,0 +1,1755 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1384,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `this is T` predicate's type runs on to the right, as a function type's return",
+			"start": 20,
+			"end": 103
+		},
+		{
+			"type": "Line",
+			"value": " does, so a predicate keeps its pair wherever a token follows it",
+			"start": 105,
+			"end": 171
+		},
+		{
+			"type": "Line",
+			"value": " A union or intersection member, a conditional's check type, an optional element",
+			"start": 379,
+			"end": 461
+		},
+		{
+			"type": "Line",
+			"value": " A last member and an operator's operand take the pair a function type takes there,",
+			"start": 621,
+			"end": 706
+		},
+		{
+			"type": "Line",
+			"value": " written or not: bare, they read alike only where nothing follows the whole type",
+			"start": 708,
+			"end": 790
+		},
+		{
+			"type": "Line",
+			"value": " A comment inside the pair stays inside it",
+			"start": 931,
+			"end": 975
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 988,
+			"end": 995
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1032,
+			"end": 1039
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1069,
+			"end": 1073
+		},
+		{
+			"type": "Line",
+			"value": " An annotation, a type argument, a return type",
+			"start": 1082,
+			"end": 1130
+		},
+		{
+			"type": "Line",
+			"value": " Where the predicate ends its type, the pair strips",
+			"start": 1227,
+			"end": 1280
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1383,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1374,
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 173,
+					"end": 197,
+					"id": {
+						"type": "Identifier",
+						"start": 178,
+						"end": 180,
+						"name": "A1"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 183,
+						"end": 196,
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 183,
+							"end": 194,
+							"typeAnnotation": {
+								"type": "TSTypePredicate",
+								"start": 184,
+								"end": 193,
+								"parameterName": {
+									"type": "TSThisType",
+									"start": 184,
+									"end": 188
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 192,
+									"end": 193,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 192,
+										"end": 193,
+										"typeName": {
+											"type": "Identifier",
+											"start": 192,
+											"end": 193,
+											"name": "B"
+										}
+									}
+								},
+								"asserts": false
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `this is T` predicate's type runs on to the right, as a function type's return",
+							"start": 20,
+							"end": 103
+						},
+						{
+							"type": "Line",
+							"value": " does, so a predicate keeps its pair wherever a token follows it",
+							"start": 105,
+							"end": 171
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 199,
+					"end": 224,
+					"id": {
+						"type": "Identifier",
+						"start": 204,
+						"end": 206,
+						"name": "A2"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 209,
+						"end": 223,
+						"objectType": {
+							"type": "TSParenthesizedType",
+							"start": 209,
+							"end": 220,
+							"typeAnnotation": {
+								"type": "TSTypePredicate",
+								"start": 210,
+								"end": 219,
+								"parameterName": {
+									"type": "TSThisType",
+									"start": 210,
+									"end": 214
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 218,
+									"end": 219,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 218,
+										"end": 219,
+										"typeName": {
+											"type": "Identifier",
+											"start": 218,
+											"end": 219,
+											"name": "B"
+										}
+									}
+								},
+								"asserts": false
+							}
+						},
+						"indexType": {
+							"type": "TSTypeReference",
+							"start": 221,
+							"end": 222,
+							"typeName": {
+								"type": "Identifier",
+								"start": 221,
+								"end": 222,
+								"name": "K"
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 226,
+					"end": 254,
+					"id": {
+						"type": "Identifier",
+						"start": 231,
+						"end": 233,
+						"name": "A3"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 236,
+						"end": 253,
+						"objectType": {
+							"type": "TSTypeReference",
+							"start": 236,
+							"end": 237,
+							"typeName": {
+								"type": "Identifier",
+								"start": 236,
+								"end": 237,
+								"name": "C"
+							}
+						},
+						"indexType": {
+							"type": "TSIndexedAccessType",
+							"start": 238,
+							"end": 252,
+							"objectType": {
+								"type": "TSParenthesizedType",
+								"start": 238,
+								"end": 249,
+								"typeAnnotation": {
+									"type": "TSTypePredicate",
+									"start": 239,
+									"end": 248,
+									"parameterName": {
+										"type": "TSThisType",
+										"start": 239,
+										"end": 243
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 247,
+										"end": 248,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 247,
+											"end": 248,
+											"typeName": {
+												"type": "Identifier",
+												"start": 247,
+												"end": 248,
+												"name": "B"
+											}
+										}
+									},
+									"asserts": false
+								}
+							},
+							"indexType": {
+								"type": "TSTypeReference",
+								"start": 250,
+								"end": 251,
+								"typeName": {
+									"type": "Identifier",
+									"start": 250,
+									"end": 251,
+									"name": "K"
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 256,
+					"end": 282,
+					"id": {
+						"type": "Identifier",
+						"start": 261,
+						"end": 263,
+						"name": "A4"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 266,
+						"end": 281,
+						"elementType": {
+							"type": "TSArrayType",
+							"start": 266,
+							"end": 279,
+							"elementType": {
+								"type": "TSParenthesizedType",
+								"start": 266,
+								"end": 277,
+								"typeAnnotation": {
+									"type": "TSTypePredicate",
+									"start": 267,
+									"end": 276,
+									"parameterName": {
+										"type": "TSThisType",
+										"start": 267,
+										"end": 271
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 275,
+										"end": 276,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 275,
+											"end": 276,
+											"typeName": {
+												"type": "Identifier",
+												"start": 275,
+												"end": 276,
+												"name": "B"
+											}
+										}
+									},
+									"asserts": false
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 284,
+					"end": 317,
+					"id": {
+						"type": "Identifier",
+						"start": 289,
+						"end": 291,
+						"name": "A5"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 294,
+						"end": 316,
+						"operator": "readonly",
+						"typeAnnotation": {
+							"type": "TSArrayType",
+							"start": 303,
+							"end": 316,
+							"elementType": {
+								"type": "TSParenthesizedType",
+								"start": 303,
+								"end": 314,
+								"typeAnnotation": {
+									"type": "TSTypePredicate",
+									"start": 304,
+									"end": 313,
+									"parameterName": {
+										"type": "TSThisType",
+										"start": 304,
+										"end": 308
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 312,
+										"end": 313,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 312,
+											"end": 313,
+											"typeName": {
+												"type": "Identifier",
+												"start": 312,
+												"end": 313,
+												"name": "B"
+											}
+										}
+									},
+									"asserts": false
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 319,
+					"end": 347,
+					"id": {
+						"type": "Identifier",
+						"start": 324,
+						"end": 326,
+						"name": "A6"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 329,
+						"end": 346,
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 329,
+							"end": 344,
+							"typeAnnotation": {
+								"type": "TSTypePredicate",
+								"start": 330,
+								"end": 343,
+								"parameterName": {
+									"type": "TSThisType",
+									"start": 330,
+									"end": 334
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 338,
+									"end": 343,
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 338,
+										"end": 343,
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 338,
+												"end": 339,
+												"typeName": {
+													"type": "Identifier",
+													"start": 338,
+													"end": 339,
+													"name": "B"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 342,
+												"end": 343,
+												"typeName": {
+													"type": "Identifier",
+													"start": 342,
+													"end": 343,
+													"name": "C"
+												}
+											}
+										]
+									}
+								},
+								"asserts": false
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 349,
+					"end": 376,
+					"id": {
+						"type": "Identifier",
+						"start": 354,
+						"end": 356,
+						"name": "A7"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 359,
+						"end": 375,
+						"objectType": {
+							"type": "TSParenthesizedType",
+							"start": 359,
+							"end": 372,
+							"typeAnnotation": {
+								"type": "TSTypePredicate",
+								"start": 360,
+								"end": 371,
+								"parameterName": {
+									"type": "TSThisType",
+									"start": 360,
+									"end": 364
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 368,
+									"end": 371,
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 368,
+										"end": 371,
+										"elementType": {
+											"type": "TSTypeReference",
+											"start": 368,
+											"end": 369,
+											"typeName": {
+												"type": "Identifier",
+												"start": 368,
+												"end": 369,
+												"name": "B"
+											}
+										}
+									}
+								},
+								"asserts": false
+							}
+						},
+						"indexType": {
+							"type": "TSTypeReference",
+							"start": 373,
+							"end": 374,
+							"typeName": {
+								"type": "Identifier",
+								"start": 373,
+								"end": 374,
+								"name": "K"
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 463,
+					"end": 489,
+					"id": {
+						"type": "Identifier",
+						"start": 468,
+						"end": 470,
+						"name": "B1"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 473,
+						"end": 488,
+						"types": [
+							{
+								"type": "TSParenthesizedType",
+								"start": 473,
+								"end": 484,
+								"typeAnnotation": {
+									"type": "TSTypePredicate",
+									"start": 474,
+									"end": 483,
+									"parameterName": {
+										"type": "TSThisType",
+										"start": 474,
+										"end": 478
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 482,
+										"end": 483,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 482,
+											"end": 483,
+											"typeName": {
+												"type": "Identifier",
+												"start": 482,
+												"end": 483,
+												"name": "B"
+											}
+										}
+									},
+									"asserts": false
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 487,
+								"end": 488,
+								"typeName": {
+									"type": "Identifier",
+									"start": 487,
+									"end": 488,
+									"name": "C"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A union or intersection member, a conditional's check type, an optional element",
+							"start": 379,
+							"end": 461
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 491,
+					"end": 521,
+					"id": {
+						"type": "Identifier",
+						"start": 496,
+						"end": 498,
+						"name": "B2"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 501,
+						"end": 520,
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 501,
+								"end": 502,
+								"typeName": {
+									"type": "Identifier",
+									"start": 501,
+									"end": 502,
+									"name": "C"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 505,
+								"end": 516,
+								"typeAnnotation": {
+									"type": "TSTypePredicate",
+									"start": 506,
+									"end": 515,
+									"parameterName": {
+										"type": "TSThisType",
+										"start": 506,
+										"end": 510
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 514,
+										"end": 515,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 514,
+											"end": 515,
+											"typeName": {
+												"type": "Identifier",
+												"start": 514,
+												"end": 515,
+												"name": "B"
+											}
+										}
+									},
+									"asserts": false
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 519,
+								"end": 520,
+								"typeName": {
+									"type": "Identifier",
+									"start": 519,
+									"end": 520,
+									"name": "D"
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 523,
+					"end": 549,
+					"id": {
+						"type": "Identifier",
+						"start": 528,
+						"end": 530,
+						"name": "B3"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 533,
+						"end": 548,
+						"types": [
+							{
+								"type": "TSParenthesizedType",
+								"start": 533,
+								"end": 544,
+								"typeAnnotation": {
+									"type": "TSTypePredicate",
+									"start": 534,
+									"end": 543,
+									"parameterName": {
+										"type": "TSThisType",
+										"start": 534,
+										"end": 538
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 542,
+										"end": 543,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 542,
+											"end": 543,
+											"typeName": {
+												"type": "Identifier",
+												"start": 542,
+												"end": 543,
+												"name": "B"
+											}
+										}
+									},
+									"asserts": false
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 547,
+								"end": 548,
+								"typeName": {
+									"type": "Identifier",
+									"start": 547,
+									"end": 548,
+									"name": "C"
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 551,
+					"end": 591,
+					"id": {
+						"type": "Identifier",
+						"start": 556,
+						"end": 558,
+						"name": "B4"
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 561,
+						"end": 590,
+						"checkType": {
+							"type": "TSParenthesizedType",
+							"start": 561,
+							"end": 572,
+							"typeAnnotation": {
+								"type": "TSTypePredicate",
+								"start": 562,
+								"end": 571,
+								"parameterName": {
+									"type": "TSThisType",
+									"start": 562,
+									"end": 566
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 570,
+									"end": 571,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 570,
+										"end": 571,
+										"typeName": {
+											"type": "Identifier",
+											"start": 570,
+											"end": 571,
+											"name": "B"
+										}
+									}
+								},
+								"asserts": false
+							}
+						},
+						"extendsType": {
+							"type": "TSTypeReference",
+							"start": 581,
+							"end": 582,
+							"typeName": {
+								"type": "Identifier",
+								"start": 581,
+								"end": 582,
+								"name": "C"
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 585,
+							"end": 586,
+							"typeName": {
+								"type": "Identifier",
+								"start": 585,
+								"end": 586,
+								"name": "D"
+							}
+						},
+						"falseType": {
+							"type": "TSTypeReference",
+							"start": 589,
+							"end": 590,
+							"typeName": {
+								"type": "Identifier",
+								"start": 589,
+								"end": 590,
+								"name": "E"
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 593,
+					"end": 618,
+					"id": {
+						"type": "Identifier",
+						"start": 598,
+						"end": 600,
+						"name": "B5"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 603,
+						"end": 617,
+						"elementTypes": [
+							{
+								"type": "TSOptionalType",
+								"start": 604,
+								"end": 616,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 604,
+									"end": 615,
+									"typeAnnotation": {
+										"type": "TSTypePredicate",
+										"start": 605,
+										"end": 614,
+										"parameterName": {
+											"type": "TSThisType",
+											"start": 605,
+											"end": 609
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 613,
+											"end": 614,
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 613,
+												"end": 614,
+												"typeName": {
+													"type": "Identifier",
+													"start": 613,
+													"end": 614,
+													"name": "B"
+												}
+											}
+										},
+										"asserts": false
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 792,
+					"end": 818,
+					"id": {
+						"type": "Identifier",
+						"start": 797,
+						"end": 799,
+						"name": "C1"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 802,
+						"end": 817,
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 802,
+								"end": 803,
+								"typeName": {
+									"type": "Identifier",
+									"start": 802,
+									"end": 803,
+									"name": "C"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 806,
+								"end": 817,
+								"typeAnnotation": {
+									"type": "TSTypePredicate",
+									"start": 807,
+									"end": 816,
+									"parameterName": {
+										"type": "TSThisType",
+										"start": 807,
+										"end": 811
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 815,
+										"end": 816,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 815,
+											"end": 816,
+											"typeName": {
+												"type": "Identifier",
+												"start": 815,
+												"end": 816,
+												"name": "B"
+											}
+										}
+									},
+									"asserts": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A last member and an operator's operand take the pair a function type takes there,",
+							"start": 621,
+							"end": 706
+						},
+						{
+							"type": "Line",
+							"value": " written or not: bare, they read alike only where nothing follows the whole type",
+							"start": 708,
+							"end": 790
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 820,
+					"end": 848,
+					"id": {
+						"type": "Identifier",
+						"start": 825,
+						"end": 827,
+						"name": "C2"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 830,
+						"end": 847,
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSParenthesizedType",
+							"start": 836,
+							"end": 847,
+							"typeAnnotation": {
+								"type": "TSTypePredicate",
+								"start": 837,
+								"end": 846,
+								"parameterName": {
+									"type": "TSThisType",
+									"start": 837,
+									"end": 841
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 845,
+									"end": 846,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 845,
+										"end": 846,
+										"typeName": {
+											"type": "Identifier",
+											"start": 845,
+											"end": 846,
+											"name": "B"
+										}
+									}
+								},
+								"asserts": false
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 850,
+					"end": 882,
+					"id": {
+						"type": "Identifier",
+						"start": 855,
+						"end": 857,
+						"name": "C3"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 860,
+						"end": 881,
+						"types": [
+							{
+								"type": "TSTypeOperator",
+								"start": 860,
+								"end": 877,
+								"operator": "keyof",
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 866,
+									"end": 877,
+									"typeAnnotation": {
+										"type": "TSTypePredicate",
+										"start": 867,
+										"end": 876,
+										"parameterName": {
+											"type": "TSThisType",
+											"start": 867,
+											"end": 871
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 875,
+											"end": 876,
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 875,
+												"end": 876,
+												"typeName": {
+													"type": "Identifier",
+													"start": 875,
+													"end": 876,
+													"name": "B"
+												}
+											}
+										},
+										"asserts": false
+									}
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 880,
+								"end": 881,
+								"typeName": {
+									"type": "Identifier",
+									"start": 880,
+									"end": 881,
+									"name": "C"
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 884,
+					"end": 928,
+					"id": {
+						"type": "Identifier",
+						"start": 889,
+						"end": 891,
+						"name": "C4"
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 894,
+						"end": 927,
+						"checkType": {
+							"type": "TSUnionType",
+							"start": 894,
+							"end": 909,
+							"types": [
+								{
+									"type": "TSTypeReference",
+									"start": 894,
+									"end": 895,
+									"typeName": {
+										"type": "Identifier",
+										"start": 894,
+										"end": 895,
+										"name": "C"
+									}
+								},
+								{
+									"type": "TSParenthesizedType",
+									"start": 898,
+									"end": 909,
+									"typeAnnotation": {
+										"type": "TSTypePredicate",
+										"start": 899,
+										"end": 908,
+										"parameterName": {
+											"type": "TSThisType",
+											"start": 899,
+											"end": 903
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 907,
+											"end": 908,
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 907,
+												"end": 908,
+												"typeName": {
+													"type": "Identifier",
+													"start": 907,
+													"end": 908,
+													"name": "B"
+												}
+											}
+										},
+										"asserts": false
+									}
+								}
+							]
+						},
+						"extendsType": {
+							"type": "TSTypeReference",
+							"start": 918,
+							"end": 919,
+							"typeName": {
+								"type": "Identifier",
+								"start": 918,
+								"end": 919,
+								"name": "D"
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 922,
+							"end": 923,
+							"typeName": {
+								"type": "Identifier",
+								"start": 922,
+								"end": 923,
+								"name": "E"
+							}
+						},
+						"falseType": {
+							"type": "TSTypeReference",
+							"start": 926,
+							"end": 927,
+							"typeName": {
+								"type": "Identifier",
+								"start": 926,
+								"end": 927,
+								"name": "F"
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 977,
+					"end": 1009,
+					"id": {
+						"type": "Identifier",
+						"start": 982,
+						"end": 984,
+						"name": "D1"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 987,
+						"end": 1008,
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 987,
+							"end": 1006,
+							"typeAnnotation": {
+								"type": "TSTypePredicate",
+								"start": 996,
+								"end": 1005,
+								"parameterName": {
+									"type": "TSThisType",
+									"start": 996,
+									"end": 1000
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1004,
+									"end": 1005,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 1004,
+										"end": 1005,
+										"typeName": {
+											"type": "Identifier",
+											"start": 1004,
+											"end": 1005,
+											"name": "B"
+										}
+									}
+								},
+								"asserts": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 988,
+										"end": 995
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment inside the pair stays inside it",
+							"start": 931,
+							"end": 975
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1011,
+					"end": 1043,
+					"id": {
+						"type": "Identifier",
+						"start": 1016,
+						"end": 1018,
+						"name": "D2"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 1021,
+						"end": 1042,
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 1021,
+							"end": 1040,
+							"typeAnnotation": {
+								"type": "TSTypePredicate",
+								"start": 1022,
+								"end": 1031,
+								"parameterName": {
+									"type": "TSThisType",
+									"start": 1022,
+									"end": 1026
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1030,
+									"end": 1031,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 1030,
+										"end": 1031,
+										"typeName": {
+											"type": "Identifier",
+											"start": 1030,
+											"end": 1031,
+											"name": "B"
+										}
+									}
+								},
+								"asserts": false,
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 1032,
+										"end": 1039
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1045,
+					"end": 1079,
+					"id": {
+						"type": "Identifier",
+						"start": 1050,
+						"end": 1052,
+						"name": "D3"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 1055,
+						"end": 1078,
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 1055,
+							"end": 1076,
+							"typeAnnotation": {
+								"type": "TSTypePredicate",
+								"start": 1059,
+								"end": 1068,
+								"parameterName": {
+									"type": "TSThisType",
+									"start": 1059,
+									"end": 1063
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1067,
+									"end": 1068,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 1067,
+										"end": 1068,
+										"typeName": {
+											"type": "Identifier",
+											"start": 1067,
+											"end": 1068,
+											"name": "B"
+										}
+									}
+								},
+								"asserts": false,
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 1069,
+										"end": 1073
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1132,
+					"end": 1154,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1136,
+							"end": 1153,
+							"id": {
+								"type": "Identifier",
+								"start": 1136,
+								"end": 1153,
+								"name": "e1",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1138,
+									"end": 1153,
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 1140,
+										"end": 1153,
+										"elementType": {
+											"type": "TSParenthesizedType",
+											"start": 1140,
+											"end": 1151,
+											"typeAnnotation": {
+												"type": "TSTypePredicate",
+												"start": 1141,
+												"end": 1150,
+												"parameterName": {
+													"type": "TSThisType",
+													"start": 1141,
+													"end": 1145
+												},
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 1149,
+													"end": 1150,
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 1149,
+														"end": 1150,
+														"typeName": {
+															"type": "Identifier",
+															"start": 1149,
+															"end": 1150,
+															"name": "B"
+														}
+													}
+												},
+												"asserts": false
+											}
+										}
+									}
+								}
+							},
+							"init": null
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An annotation, a type argument, a return type",
+							"start": 1082,
+							"end": 1130
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1156,
+					"end": 1177,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1156,
+						"end": 1176,
+						"callee": {
+							"type": "Identifier",
+							"start": 1156,
+							"end": 1158,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 1174,
+								"end": 1175,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 1158,
+							"end": 1173,
+							"params": [
+								{
+									"type": "TSArrayType",
+									"start": 1159,
+									"end": 1172,
+									"elementType": {
+										"type": "TSParenthesizedType",
+										"start": 1159,
+										"end": 1170,
+										"typeAnnotation": {
+											"type": "TSTypePredicate",
+											"start": 1160,
+											"end": 1169,
+											"parameterName": {
+												"type": "TSThisType",
+												"start": 1160,
+												"end": 1164
+											},
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 1168,
+												"end": 1169,
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 1168,
+													"end": 1169,
+													"typeName": {
+														"type": "Identifier",
+														"start": 1168,
+														"end": 1169,
+														"name": "B"
+													}
+												}
+											},
+											"asserts": false
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1179,
+					"end": 1224,
+					"id": {
+						"type": "Identifier",
+						"start": 1188,
+						"end": 1191,
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 1192,
+							"end": 1205,
+							"name": "this",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 1196,
+								"end": 1205,
+								"typeAnnotation": {
+									"type": "TSUnknownKeyword",
+									"start": 1198,
+									"end": 1205
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 1206,
+						"end": 1221,
+						"typeAnnotation": {
+							"type": "TSArrayType",
+							"start": 1208,
+							"end": 1221,
+							"elementType": {
+								"type": "TSParenthesizedType",
+								"start": 1208,
+								"end": 1219,
+								"typeAnnotation": {
+									"type": "TSTypePredicate",
+									"start": 1209,
+									"end": 1218,
+									"parameterName": {
+										"type": "TSThisType",
+										"start": 1209,
+										"end": 1213
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 1217,
+										"end": 1218,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 1217,
+											"end": 1218,
+											"typeName": {
+												"type": "Identifier",
+												"start": 1217,
+												"end": 1218,
+												"name": "B"
+											}
+										}
+									},
+									"asserts": false
+								}
+							}
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 1222,
+						"end": 1224,
+						"body": []
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1282,
+					"end": 1308,
+					"id": {
+						"type": "Identifier",
+						"start": 1287,
+						"end": 1289,
+						"name": "F1"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 1292,
+						"end": 1307,
+						"parameters": [],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 1295,
+							"end": 1307,
+							"typeAnnotation": {
+								"type": "TSTypePredicate",
+								"start": 1298,
+								"end": 1307,
+								"parameterName": {
+									"type": "TSThisType",
+									"start": 1298,
+									"end": 1302
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 1306,
+									"end": 1307,
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 1306,
+										"end": 1307,
+										"typeName": {
+											"type": "Identifier",
+											"start": 1306,
+											"end": 1307,
+											"name": "B"
+										}
+									}
+								},
+								"asserts": false
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Where the predicate ends its type, the pair strips",
+							"start": 1227,
+							"end": 1280
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1310,
+					"end": 1333,
+					"id": {
+						"type": "Identifier",
+						"start": 1315,
+						"end": 1317,
+						"name": "F2"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 1320,
+						"end": 1332,
+						"typeName": {
+							"type": "Identifier",
+							"start": 1320,
+							"end": 1321,
+							"name": "A"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 1321,
+							"end": 1332,
+							"params": [
+								{
+									"type": "TSTypePredicate",
+									"start": 1322,
+									"end": 1331,
+									"parameterName": {
+										"type": "TSThisType",
+										"start": 1322,
+										"end": 1326
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 1330,
+										"end": 1331,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 1330,
+											"end": 1331,
+											"typeName": {
+												"type": "Identifier",
+												"start": 1330,
+												"end": 1331,
+												"name": "B"
+											}
+										}
+									},
+									"asserts": false
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1335,
+					"end": 1373,
+					"id": {
+						"type": "Identifier",
+						"start": 1340,
+						"end": 1342,
+						"name": "F3"
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 1345,
+						"end": 1372,
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 1345,
+							"end": 1346,
+							"typeName": {
+								"type": "Identifier",
+								"start": 1345,
+								"end": 1346,
+								"name": "C"
+							}
+						},
+						"extendsType": {
+							"type": "TSTypePredicate",
+							"start": 1355,
+							"end": 1364,
+							"parameterName": {
+								"type": "TSThisType",
+								"start": 1355,
+								"end": 1359
+							},
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 1363,
+								"end": 1364,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 1363,
+									"end": 1364,
+									"typeName": {
+										"type": "Identifier",
+										"start": 1363,
+										"end": 1364,
+										"name": "B"
+									}
+								}
+							},
+							"asserts": false
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 1367,
+							"end": 1368,
+							"typeName": {
+								"type": "Identifier",
+								"start": 1367,
+								"end": 1368,
+								"name": "D"
+							}
+						},
+						"falseType": {
+							"type": "TSTypeReference",
+							"start": 1371,
+							"end": 1372,
+							"typeName": {
+								"type": "Identifier",
+								"start": 1371,
+								"end": 1372,
+								"name": "E"
+							}
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -65,8 +65,8 @@ use helpers::type_needs_parens_for_array_element;
 use helpers::type_needs_parens_for_conditional_check;
 use helpers::type_needs_parens_for_indexed_access_object;
 use helpers::type_needs_parens_for_optional_element;
-use helpers::type_needs_parens_for_prefix_operator;
 use helpers::type_needs_parens_in_union_or_intersection;
+use helpers::type_operator_operand_rule;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -145,14 +145,15 @@ impl<'t> StrippedParenHang<'t> {
 /// The [`ShellPair`] a prefix type operator's operand sits at — the one position that
 /// RE-MINTS the pair a redundant shell's strip would drop, so the one whose hang seam and
 /// gates must be told ([`ShellPair`]'s claim reading). Reads through the author's shell
-/// exactly as [`type_needs_parens_for_prefix_operator`] does, since what the pair is
+/// exactly as the operator's paren rule does ([`type_operator_operand_rule`]), since what the pair is
 /// re-minted around is the unwrapped operand. Named rather than spelled twice so the
 /// emitter and the alias-`=` gate cannot come to different answers about one operand.
 pub(in crate::printer) fn prefix_operator_shell_pair(
     p: &Printer<'_>,
+    operator: crate::ast::TSTypeOperatorKind,
     operand: &TSType<'_>,
 ) -> ShellPair {
-    if type_needs_parens_for_prefix_operator(p, operand) {
+    if type_operator_operand_rule(operator)(p, operand) {
         ShellPair::Kept
     } else {
         ShellPair::Stripped
@@ -538,7 +539,8 @@ impl<'a> Printer<'a> {
                 // `needs_parens` below, and as the [`ShellPair`] the hang seam and its gate
                 // are told (see the ⚠️ further down). Asking it twice is how the emitter and
                 // the seam would come to disagree about one operand.
-                let operand_pair = prefix_operator_shell_pair(self, o.type_annotation);
+                let operand_rule = type_operator_operand_rule(o.operator);
+                let operand_pair = prefix_operator_shell_pair(self, o.operator, o.type_annotation);
                 let needs_parens = operand_pair == ShellPair::Kept;
                 // Comments between keyword and operand type
                 let keyword_end = o.span.start + o.operator.as_str().len() as u32;
@@ -548,7 +550,7 @@ impl<'a> Printer<'a> {
                 // via its own leading-run walk, which reaches the directive across the gap's
                 // whitespace and the transparent `(`). The precedence parens are the
                 // printer's, not the author's, so they ride outside the slice — the freeze is
-                // told the same `type_needs_parens_for_prefix_operator` rule the layouts below
+                // told the same operand rule (`type_operator_operand_rule`) the layouts below
                 // apply, so a bare operand that needs them gets them re-synthesized and a
                 // source-parenthesized one freezes whole.
                 if self.single_child_frozen(keyword_end, o.type_annotation) {
@@ -556,10 +558,7 @@ impl<'a> Printer<'a> {
                         o.operator.as_str(),
                         keyword_end,
                         o.type_annotation.span().start,
-                        self.build_frozen_head_doc(
-                            o.type_annotation,
-                            type_needs_parens_for_prefix_operator,
-                        ),
+                        self.build_frozen_head_doc(o.type_annotation, operand_rule),
                     );
                 }
                 // A line comment, a multiline block, or a block run whose break is forced
@@ -620,7 +619,7 @@ impl<'a> Printer<'a> {
                             } else {
                                 self.build_type_doc(operand_hang_type)
                             };
-                            if type_needs_parens_for_prefix_operator(self, operand_hang_type) {
+                            if operand_rule(self, operand_hang_type) {
                                 d.parens(operand_doc)
                             } else {
                                 operand_doc

@@ -18,6 +18,7 @@ governs every entry here live in [conformance_prettier.md](./conformance_prettie
 - Parenthesized binary member base — ◆design_choice ◆print_width — [paren_binary_base_long](../tests/fixtures/typescript/expressions/member/paren_binary_base_long_prettier_divergence/)
 - Constrained infer extends-operand parens — ◆prettier_bug — [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)
 - Negative literal postfix-operand parens — ◆prettier_bug ◆parser_compat — [negative_literal_postfix_parens](../tests/fixtures/typescript/types/negative_literal_postfix_parens_prettier_divergence/), [negative_literal_postfix_parens_comment](../tests/fixtures/typescript/types/negative_literal_postfix_parens_comment_prettier_divergence/), [negative_literal_indexed_access](../tests/fixtures/typescript/types/negative_literal_indexed_access_svelte_prettier_divergence/)
+- This-predicate operand parens — ◆prettier_bug ◆parser_compat — [this_predicate_operand_parens](../tests/fixtures/typescript/types/this_predicate_operand_parens_prettier_divergence/)
 - Arrow type param trailing comma — ◆design_choice — [single_type_param](../tests/fixtures/typescript/expressions/arrow/generic/single_type_param_prettier_divergence/)
 - Empty-object comment bracket spacing — ◆design_choice — [empty_block_comment](../tests/fixtures/typescript/expressions/objects/empty_block_comment_prettier_divergence/), [destructure empty_comment](../tests/fixtures/typescript/expressions/destructuring/empty_comment_prettier_divergence/), [enum empty_comment](../tests/fixtures/typescript/declarations/enum/body_empty_comment_prettier_divergence/), [literal_body_empty](../tests/fixtures/typescript/types/comments/literal_body_empty_prettier_divergence/), [union_empty_object_member](../tests/fixtures/typescript/types/union_empty_object_member_prettier_divergence/), [call_type_arg_empty_comment](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_prettier_divergence/)
 - Optional rest parameter `?` — ◆design_choice — [rest_optional_param](../tests/fixtures/typescript/typescript_specific/rest_optional_param_prettier_divergence/)
@@ -813,6 +814,33 @@ which also pins the parse divergence. Where acorn-typescript rejects the bare te
 `-1[K][]`, `readonly -1[]`) tsv REPAIRS it to the paired spelling every parser reads alike;
 no fixture input can hold those, since they are not tsv fixed points, so they are pinned in
 [tests/negative_literal_postfix_parens.rs](../tests/negative_literal_postfix_parens.rs).
+
+**This-predicate operand parens**: tsc reads `this is T` as a type predicate wherever a
+primary type stands (`parseThisTypePredicate`), and the predicate's type is a whole `Type`, so
+it runs on to the right as a function type's return does. tsv gives a predicate with a type
+the pair a function type takes: as an array element and an indexed-access object
+(`(this is B)[]`, `(this is B)[K]`), a union or intersection member, a conditional's check
+type, an optional tuple element and a `keyof` / `unique` operand. Prettier's paren rules have
+no arm for a predicate and strip the pair, so `(this is B)[]` prints as `this is B[]`, the
+predicate over `B[]` — a different type to tsc and acorn-typescript — and
+`readonly (this is B)[]` as a line acorn-typescript rejects, so a compiling component stops
+compiling. A last union member and a `keyof` operand read alike bare only where nothing
+follows the whole type: `keyof (this is B) | C` stripped is `keyof (this is B | C)`, and
+`C | (this is B) extends D ? E : F` a predicate over the conditional. So tsv gives them the
+pair a function type takes there, which prettier gives a function type too, written or not
+(`C | this is B` prints as `C | (this is B)`; prettier keeps it bare), one fixed point per
+document. Where the predicate ends the type (a function type's return, a type argument, a
+conditional's extends type) both formatters strip it. The positions are checker errors
+(TS1228), not parse errors. Pinned by
+[this_predicate_operand_parens](../tests/fixtures/typescript/types/this_predicate_operand_parens_prettier_divergence/).
+Under `readonly` the pair goes around the `readonly` type instead
+(`(readonly this is B) | C`): acorn-typescript reads `readonly (` only ahead of an array
+suffix, so `readonly (this is B[])` as a call's type argument would not read back. And a bare
+optional element (`[this is B?]`) is the optional predicate to acorn-typescript but
+`this is (B?)` to tsc, which the pair settles on acorn-typescript's tree. Neither spelling fits
+a fixture input (acorn-typescript rejects `readonly` over a predicate, and the bare element is
+not a fixed point), so both are pinned in
+[tests/index_type_args_follow.rs](../tests/index_type_args_follow.rs).
 
 **Module path calls**: Prettier special-cases `require`/`import` identifiers:
 

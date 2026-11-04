@@ -412,6 +412,10 @@ pub(in crate::printer) fn type_needs_parens_for_indexed_access_object(
             | TSType::Conditional(_)
             | TSType::Infer(_)
             | TSType::Function(_)
+            | TSType::TypePredicate(ast::TSTypePredicate {
+                type_annotation: Some(_),
+                ..
+            })
             | TSType::Constructor(_)
     ) || authored_pair_leads_with_bare_negative_literal(p, ts_type)
         || (is_negative_literal(ts_type) && p.negative_literal_array_run_pairs(ts_type))
@@ -441,6 +445,10 @@ pub(in crate::printer) fn type_needs_parens_for_array_element(
             | TSType::Conditional(_)
             | TSType::Infer(_)
             | TSType::Function(_)
+            | TSType::TypePredicate(ast::TSTypePredicate {
+                type_annotation: Some(_),
+                ..
+            })
             | TSType::Constructor(_)
     ) || is_negative_literal(inner)
         || authored_pair_leads_with_bare_negative_literal(p, ts_type)
@@ -521,6 +529,10 @@ pub(super) fn type_needs_parens_for_optional_element(
             | TSType::Conditional(_)
             | TSType::Infer(_)
             | TSType::Function(_)
+            | TSType::TypePredicate(ast::TSTypePredicate {
+                type_annotation: Some(_),
+                ..
+            })
             | TSType::Constructor(_)
     )
 }
@@ -531,14 +543,14 @@ pub(super) fn type_needs_parens_for_optional_element(
 /// without them the `extends`/`?` rebinds. Union/intersection/keyof check types need
 /// none. Matches Prettier's `checkType` rule (`needs-parentheses.js`).
 pub(super) fn type_needs_parens_for_conditional_check(
-    _: &Printer<'_>,
+    p: &Printer<'_>,
     ts_type: &TSType<'_>,
 ) -> bool {
     let inner = unwrap_parenthesized(ts_type);
     matches!(
         inner,
         TSType::Function(_) | TSType::Constructor(_) | TSType::Conditional(_)
-    )
+    ) || is_right_open_predicate(p, inner)
 }
 
 /// Check if a type needs parentheses when used as the extends type of a conditional
@@ -613,6 +625,13 @@ fn return_type_is_constrained_infer(return_type: &ast::TSTypeAnnotation<'_>) -> 
 /// and lower-precedence operands lose their meaning entirely (`keyof (() => void)` →
 /// the invalid `keyof () => void`). Matches Prettier's `TSTypeOperator` case in
 /// `needs-parentheses.js` (parens when `parent.type === "TSTypeOperator"`).
+///
+/// A predicate with a type takes the pair under `keyof` / `unique` as a function type does
+/// (`keyof (this is B) | C`), but not under `readonly`: there the pair spells
+/// `readonly (this is B[])`, which acorn-typescript reads only as an array's or a tuple's
+/// operand, so as a type argument of a call no parser but tsc reads it back. The predicate
+/// prints bare instead, and the `readonly` type over it is the right-open one
+/// ([`is_right_open_predicate`]), paired where a token follows it.
 pub(super) fn type_needs_parens_for_prefix_operator(p: &Printer<'_>, ts_type: &TSType<'_>) -> bool {
     let inner = p.printed_operand(ts_type);
     matches!(
@@ -623,8 +642,60 @@ pub(super) fn type_needs_parens_for_prefix_operator(p: &Printer<'_>, ts_type: &T
             | TSType::Conditional(_)
             | TSType::Infer(_)
             | TSType::Function(_)
+            | TSType::TypePredicate(ast::TSTypePredicate {
+                type_annotation: Some(_),
+                ..
+            })
             | TSType::Constructor(_)
     )
+}
+
+/// [`type_needs_parens_for_prefix_operator`] under `readonly`: every operand but a
+/// predicate with a type.
+pub(super) fn type_needs_parens_for_readonly_operand(
+    p: &Printer<'_>,
+    ts_type: &TSType<'_>,
+) -> bool {
+    !is_predicate_with_type(p.printed_operand(ts_type))
+        && type_needs_parens_for_prefix_operator(p, ts_type)
+}
+
+/// The paren rule for the operand of the type operator `operator`.
+pub(in crate::printer) fn type_operator_operand_rule(
+    operator: ast::TSTypeOperatorKind,
+) -> TypeParenRule {
+    match operator {
+        ast::TSTypeOperatorKind::Readonly => type_needs_parens_for_readonly_operand,
+        ast::TSTypeOperatorKind::Keyof | ast::TSTypeOperatorKind::Unique => {
+            type_needs_parens_for_prefix_operator
+        }
+    }
+}
+
+/// Whether `ts_type` is a type predicate with a type (`this is B`): the type is a whole
+/// `Type` to tsc (`parseThisTypePredicate`), so it runs on to the right as a function
+/// type's return does.
+fn is_predicate_with_type(ts_type: &TSType<'_>) -> bool {
+    matches!(
+        ts_type,
+        TSType::TypePredicate(ast::TSTypePredicate {
+            type_annotation: Some(_),
+            ..
+        })
+    )
+}
+
+/// Whether `ts_type` prints running on to the right: a predicate with a type
+/// ([`is_predicate_with_type`]), or a `readonly` type over one, which prints its predicate
+/// bare ([`type_needs_parens_for_readonly_operand`]).
+fn is_right_open_predicate(p: &Printer<'_>, ts_type: &TSType<'_>) -> bool {
+    match p.printed_operand(ts_type) {
+        TSType::TypeOperator(o) => {
+            o.operator == ast::TSTypeOperatorKind::Readonly
+                && is_predicate_with_type(p.printed_operand(o.type_annotation))
+        }
+        inner => is_predicate_with_type(inner),
+    }
 }
 
 /// Check if a type needs parentheses when used as a member of a union or
@@ -661,7 +732,7 @@ pub(super) fn type_needs_parens_in_union_or_intersection(
         | TSType::Function(_)
         | TSType::Constructor(_)
         | TSType::Conditional(_) => true,
-        other => is_constrained_infer(other),
+        other => is_constrained_infer(other) || is_right_open_predicate(p, other),
     }
 }
 
