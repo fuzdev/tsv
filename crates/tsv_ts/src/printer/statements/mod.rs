@@ -578,7 +578,9 @@ impl<'a> Printer<'a> {
         // The plain statement IS its expression, so the `;` follows the value directly and
         // its gap may take over the value's trailing region ([`Printer::with_statement_tail`]);
         // a statement that wraps its value in parens of its own keeps the region inside them.
-        let plain = !needs_parens && !source_paren && shell_close.is_none();
+        // A source pair this print DROPS wraps nothing: the `;` follows the value there too,
+        // and the terminator gap opens at the region the value handed it.
+        let plain = !needs_parens && shell_close.is_none();
         let mut tail_gap_start = expr_end;
         let expr_doc = match frozen {
             Some(span) => self.build_frozen_expression_doc(stmt.expression, span),
@@ -686,8 +688,9 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(")"));
             }
         }
-        let gap_start =
-            consumed_close.map_or(expr_end, |close| Self::past_grouping_close(close, span.end));
+        let gap_start = consumed_close.map_or(tail_gap_start, |close| {
+            Self::past_grouping_close(close, span.end)
+        });
         (d.concat(&parts), gap_start)
     }
 

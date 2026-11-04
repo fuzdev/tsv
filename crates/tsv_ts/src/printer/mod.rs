@@ -689,7 +689,9 @@ pub(crate) struct Printer<'a> {
     /// parenthesized base ([`Printer::member_gap_start`]): from the base's printed end to
     /// its span's end. The base's own trailing emitters decline it
     /// ([`Printer::wrap_chain_with_paren_comments`]) and the gap prints it after the `)`.
-    /// Save/restored around the chain's build.
+    /// A pair the printer adds around a binary or cast operand claims the same region the
+    /// same way ([`Printer::minted_pair_trailing_region`]). Save/restored around the
+    /// claimer's build.
     pub(crate) claimed_right_spine_run: Cell<Option<Span>>,
     /// The statement whose value is being built, when its terminator gap may take over the
     /// value's TRAILING region ([`Printer::with_statement_tail`]): where the value ends, and

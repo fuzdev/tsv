@@ -1265,6 +1265,20 @@ impl<'a> Printer<'a> {
                 // an arrow body, an inner `await`) re-marks the target, so a read afterwards
                 // would see the nested answer instead of this operand's.
                 let expands = needs_parens && self.ternary_takes_extra_indent(expression);
+                // A pair the printer adds here prints the operand's trailing stripped-shell
+                // blocks after its `)`, where the reparse reads them
+                // ([`Printer::minted_pair_trailing_region`]); the claim keeps the operand's own
+                // trailing emitters from printing them inside.
+                let minted_region = needs_parens
+                    .then(|| {
+                        self.minted_pair_trailing_region(
+                            expression,
+                            operators::MintedPairFollower::Keyword,
+                        )
+                    })
+                    .flatten();
+                let outer_claim =
+                    minted_region.map(|r| self.claimed_right_spine_run.replace(Some(r)));
                 // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
                 // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]);
                 // left inside, its body's forced break explodes an operand prettier keeps flat.
@@ -1284,6 +1298,9 @@ impl<'a> Printer<'a> {
                         }
                     },
                 );
+                if let Some(outer) = outer_claim {
+                    self.claimed_right_spine_run.set(outer);
+                }
                 parts.push(if expands {
                     self.build_expanding_parens_body_doc(operand)
                 } else {
@@ -1291,6 +1308,9 @@ impl<'a> Printer<'a> {
                 });
                 if needs_parens {
                     parts.push(d.text(")"));
+                }
+                if let Some(region) = minted_region {
+                    self.append_trailing_paren_comments(&mut parts, region.start, region.end);
                 }
 
                 // Comments between expression and keyword → place before the keyword. Skip the

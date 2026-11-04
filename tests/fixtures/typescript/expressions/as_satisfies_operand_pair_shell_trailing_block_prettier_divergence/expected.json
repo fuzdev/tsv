@@ -1,0 +1,731 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 629,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 596,
+				"end": 598,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 598,
+				"end": 628,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 601,
+							"end": 624,
+							"expression": {
+								"type": "TSAsExpression",
+								"start": 602,
+								"end": 623,
+								"expression": {
+									"type": "BinaryExpression",
+									"start": 603,
+									"end": 608,
+									"left": {
+										"type": "Identifier",
+										"start": 603,
+										"end": 604,
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 607,
+										"end": 608,
+										"name": "b"
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c8 ",
+											"start": 610,
+											"end": 618
+										}
+									]
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 622,
+									"end": 623,
+									"typeName": {
+										"type": "Identifier",
+										"start": 622,
+										"end": 623,
+										"name": "T"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment ending a redundant pair inside a cast operand that takes the pair the",
+			"start": 20,
+			"end": 108
+		},
+		{
+			"type": "Line",
+			"value": " cast needs around a binary operand trails that pair, ahead of the keyword.",
+			"start": 110,
+			"end": 187
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 207,
+			"end": 215
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 242,
+			"end": 250
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 274,
+			"end": 282
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 324,
+			"end": 332
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 356,
+			"end": 364
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 393,
+			"end": 401
+		},
+		{
+			"type": "Line",
+			"value": " The pair written around the whole operand: the comment already trails it.",
+			"start": 412,
+			"end": 488
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 502,
+			"end": 510
+		},
+		{
+			"type": "Line",
+			"value": " A statement header's test.",
+			"start": 524,
+			"end": 553
+		},
+		{
+			"type": "Block",
+			"value": " c9 ",
+			"start": 567,
+			"end": 575
+		},
+		{
+			"type": "Block",
+			"value": " c8 ",
+			"start": 610,
+			"end": 618
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 596,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 587,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 189,
+					"end": 221,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 189,
+						"end": 220,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 189,
+							"end": 190,
+							"name": "x"
+						},
+						"right": {
+							"type": "TSAsExpression",
+							"start": 193,
+							"end": 220,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 194,
+								"end": 205,
+								"left": {
+									"type": "Identifier",
+									"start": 194,
+									"end": 195,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 199,
+									"end": 204,
+									"left": {
+										"type": "Identifier",
+										"start": 199,
+										"end": 200,
+										"name": "b"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 203,
+										"end": 204,
+										"name": "c"
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 207,
+											"end": 215
+										}
+									]
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 219,
+								"end": 220,
+								"typeName": {
+									"type": "Identifier",
+									"start": 219,
+									"end": 220,
+									"name": "T"
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment ending a redundant pair inside a cast operand that takes the pair the",
+							"start": 20,
+							"end": 108
+						},
+						{
+							"type": "Line",
+							"value": " cast needs around a binary operand trails that pair, ahead of the keyword.",
+							"start": 110,
+							"end": 187
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 224,
+					"end": 263,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 230,
+							"end": 262,
+							"id": {
+								"type": "Identifier",
+								"start": 230,
+								"end": 231,
+								"name": "y"
+							},
+							"init": {
+								"type": "TSSatisfiesExpression",
+								"start": 234,
+								"end": 262,
+								"expression": {
+									"type": "BinaryExpression",
+									"start": 235,
+									"end": 240,
+									"left": {
+										"type": "Identifier",
+										"start": 235,
+										"end": 236,
+										"name": "a"
+									},
+									"operator": "-",
+									"right": {
+										"type": "Identifier",
+										"start": 239,
+										"end": 240,
+										"name": "b"
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 242,
+											"end": 250
+										}
+									]
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 261,
+									"end": 262,
+									"typeName": {
+										"type": "Identifier",
+										"start": 261,
+										"end": 262,
+										"name": "T"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 266,
+					"end": 288,
+					"expression": {
+						"type": "TSAsExpression",
+						"start": 266,
+						"end": 287,
+						"expression": {
+							"type": "BinaryExpression",
+							"start": 267,
+							"end": 272,
+							"left": {
+								"type": "Identifier",
+								"start": 267,
+								"end": 268,
+								"name": "a"
+							},
+							"operator": "+",
+							"right": {
+								"type": "Identifier",
+								"start": 271,
+								"end": 272,
+								"name": "b"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c3 ",
+									"start": 274,
+									"end": 282
+								}
+							]
+						},
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 286,
+							"end": 287,
+							"typeName": {
+								"type": "Identifier",
+								"start": 286,
+								"end": 287,
+								"name": "T"
+							}
+						}
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 291,
+					"end": 341,
+					"id": {
+						"type": "Identifier",
+						"start": 300,
+						"end": 302,
+						"name": "f1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 305,
+						"end": 341,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 309,
+								"end": 338,
+								"argument": {
+									"type": "TSAsExpression",
+									"start": 316,
+									"end": 337,
+									"expression": {
+										"type": "BinaryExpression",
+										"start": 317,
+										"end": 322,
+										"left": {
+											"type": "Identifier",
+											"start": 317,
+											"end": 318,
+											"name": "a"
+										},
+										"operator": "*",
+										"right": {
+											"type": "Identifier",
+											"start": 321,
+											"end": 322,
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c4 ",
+												"start": 324,
+												"end": 332
+											}
+										]
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 336,
+										"end": 337,
+										"typeName": {
+											"type": "Identifier",
+											"start": 336,
+											"end": 337,
+											"name": "T"
+										}
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 344,
+					"end": 372,
+					"expression": {
+						"type": "CallExpression",
+						"start": 344,
+						"end": 371,
+						"callee": {
+							"type": "Identifier",
+							"start": 344,
+							"end": 345,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "CallExpression",
+								"start": 346,
+								"end": 370,
+								"callee": {
+									"type": "Identifier",
+									"start": 346,
+									"end": 347,
+									"name": "g"
+								},
+								"arguments": [
+									{
+										"type": "TSAsExpression",
+										"start": 348,
+										"end": 369,
+										"expression": {
+											"type": "BinaryExpression",
+											"start": 349,
+											"end": 354,
+											"left": {
+												"type": "Identifier",
+												"start": 349,
+												"end": 350,
+												"name": "a"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 353,
+												"end": 354,
+												"name": "b"
+											},
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " c5 ",
+													"start": 356,
+													"end": 364
+												}
+											]
+										},
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 368,
+											"end": 369,
+											"typeName": {
+												"type": "Identifier",
+												"start": 368,
+												"end": 369,
+												"name": "T"
+											}
+										}
+									}
+								],
+								"optional": false
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 375,
+					"end": 409,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 375,
+						"end": 408,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 375,
+							"end": 376,
+							"name": "o"
+						},
+						"right": {
+							"type": "ObjectExpression",
+							"start": 379,
+							"end": 408,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 381,
+									"end": 406,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 381,
+										"end": 382,
+										"name": "k"
+									},
+									"value": {
+										"type": "TSAsExpression",
+										"start": 384,
+										"end": 406,
+										"expression": {
+											"type": "LogicalExpression",
+											"start": 385,
+											"end": 391,
+											"left": {
+												"type": "Identifier",
+												"start": 385,
+												"end": 386,
+												"name": "a"
+											},
+											"operator": "??",
+											"right": {
+												"type": "Identifier",
+												"start": 390,
+												"end": 391,
+												"name": "b"
+											},
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " c6 ",
+													"start": 393,
+													"end": 401
+												}
+											]
+										},
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 405,
+											"end": 406,
+											"typeName": {
+												"type": "Identifier",
+												"start": 405,
+												"end": 406,
+												"name": "T"
+											}
+										}
+									},
+									"kind": "init"
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 490,
+					"end": 521,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 490,
+						"end": 520,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 490,
+							"end": 491,
+							"name": "z"
+						},
+						"right": {
+							"type": "TSAsExpression",
+							"start": 494,
+							"end": 520,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 495,
+								"end": 500,
+								"left": {
+									"type": "Identifier",
+									"start": 495,
+									"end": 496,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 499,
+									"end": 500,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c7 ",
+										"start": 502,
+										"end": 510
+									}
+								]
+							},
+							"typeAnnotation": {
+								"type": "TSNumberKeyword",
+								"start": 514,
+								"end": 520
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The pair written around the whole operand: the comment already trails it.",
+							"start": 412,
+							"end": 488
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 555,
+					"end": 586,
+					"test": {
+						"type": "TSAsExpression",
+						"start": 559,
+						"end": 580,
+						"expression": {
+							"type": "BinaryExpression",
+							"start": 560,
+							"end": 565,
+							"left": {
+								"type": "Identifier",
+								"start": 560,
+								"end": 561,
+								"name": "a"
+							},
+							"operator": "-",
+							"right": {
+								"type": "Identifier",
+								"start": 564,
+								"end": 565,
+								"name": "b"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c9 ",
+									"start": 567,
+									"end": 575
+								}
+							]
+						},
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 579,
+							"end": 580,
+							"typeName": {
+								"type": "Identifier",
+								"start": 579,
+								"end": 580,
+								"name": "T"
+							}
+						}
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 582,
+						"end": 586,
+						"body": []
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A statement header's test.",
+							"start": 524,
+							"end": 553
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

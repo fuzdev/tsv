@@ -197,6 +197,17 @@ struct OperatorPosition {
     end: u32,
 }
 
+/// What follows the `)` of a pair the printer mints around an operand
+/// ([`Printer::minted_pair_trailing_region`]).
+#[derive(Clone, Copy)]
+pub(in crate::printer) enum MintedPairFollower {
+    /// A binary operator, which a line break ahead of it leaves in place.
+    Operator,
+    /// An `as` / `satisfies` keyword, which must share the `)`'s line: a line break ahead
+    /// of it, a multi-line block's included, ends the expression there.
+    Keyword,
+}
+
 impl<'a> Printer<'a> {
     /// Build a Doc for an update expression
     pub(in crate::printer) fn build_update_doc(
@@ -1938,13 +1949,73 @@ impl<'a> Printer<'a> {
         // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]).
         // Asked only where the pair is KEPT — see that seam's ⚠️.
         if self.needs_parens(operand, ctx) || (is_right && self.is_dividend_tail(operand)) {
-            let inner = self.build_value_with_outermost_owned_comment(operand, || {
-                self.build_chain_aware_operand_doc(operand)
-            });
-            self.build_operand_pair_doc(operand, inner)
+            // A pair the printer MINTS around an operand whose right spine ends in stripped
+            // shells: the shells' same-line blocks print after the minted `)`, where the
+            // reparse reads them (the shell-trailing gap of the pair it now sees).
+            let region = self.minted_pair_trailing_region(operand, MintedPairFollower::Operator);
+            let build = || {
+                let inner = self.build_value_with_outermost_owned_comment(operand, || {
+                    self.build_chain_aware_operand_doc(operand)
+                });
+                self.build_operand_pair_doc(operand, inner)
+            };
+            let Some(region) = region else {
+                return build();
+            };
+            let outer = self.claimed_right_spine_run.replace(Some(region));
+            let pair = build();
+            self.claimed_right_spine_run.set(outer);
+            let mut parts: DocBuf = smallvec![pair];
+            self.append_trailing_paren_comments(&mut parts, region.start, region.end);
+            self.d().concat(&parts)
         } else {
             self.build_chain_aware_operand_doc(operand)
         }
+    }
+
+    /// The stripped-shell region at the end of `operand` that a pair the printer mints
+    /// around it must print AFTER its `)`: from the operand's printed end
+    /// ([`Printer::right_spine_printed_end`]) to its span's end, when no enclosing claim
+    /// already owns it.
+    ///
+    /// The minted `)` closes the operand's right edge, where the author's stripped `)`
+    /// stood, so the reparse reads a comment written there in that pair's trailing gap; the
+    /// operand's own trailing emitters, printing a block inside the pair, would take two
+    /// passes to reach the form this one prints in one. The region prints through the same
+    /// emitter the operand's would use ([`Printer::append_trailing_paren_comments`]), so a
+    /// same-line block ahead of a `//` or an own-line comment keeps its place after the `)`,
+    /// and a deferred run flushes at the indent of the line the pair ends rather than one
+    /// level deeper.
+    ///
+    /// A keyword `follower` must share the `)`'s line, so there no region holding a
+    /// multi-line block is claimed: printed after the `)`, its line break would end the
+    /// expression ahead of the keyword. A `//` or an own-line block defers past the
+    /// keyword (the run flushes where the operand's own would), so it does not count.
+    pub(in crate::printer) fn minted_pair_trailing_region(
+        &self,
+        operand: &Expression<'_>,
+        follower: MintedPairFollower,
+    ) -> Option<Span> {
+        let end = operand.span().end;
+        if !self.has_comments_to_emit_between(operand.span().start, end) {
+            return None;
+        }
+        if self
+            .claimed_right_spine_run
+            .get()
+            .is_some_and(|claim| claim.start <= end && end <= claim.end)
+        {
+            return None;
+        }
+        let start = self.right_spine_printed_end(operand);
+        if start >= end || !self.has_comments_to_emit_between(start, end) {
+            return None;
+        }
+        let claims = matches!(follower, MintedPairFollower::Operator)
+            || !self
+                .comments_to_emit_between(start, end)
+                .any(|c| c.multiline);
+        claims.then(|| Span::new(start, end))
     }
 
     /// Build a binary operand's doc, routing a curried arrow-chain operand

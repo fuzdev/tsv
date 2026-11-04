@@ -1,0 +1,144 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// A block comment ending a redundant pair inside an operand that takes the clarity pair
+	// the printer adds around a mixed-precedence operand trails that clarity pair.
+	(a >> b /* c1 */) >> d;
+
+	x = (a - b /* c2 */) << d;
+
+	const y = (a % b /* c3 */) * d;
+
+	function f1() {
+		return (a >> b /* c4 */) >> d;
+	}
+
+	f(g((a >> b /* c5 */) >> d));
+
+	o = { k: (a >> b /* c6 */) >> d };
+
+	for (a ?? (b && c /* c7 */); ;) {}
+
+	// The pair written around the whole operand: the comment already trails it.
+	z = (a - b) /* c8 */ >> 1;
+
+	// A right-nested power: the comment leaves the statement.
+	w = a ** (b ** c /* c9 */);
+
+	// A comment written after the author's pair stays behind the moved one, in source order.
+	(a >> b /* c11 */) /* e */ >> d;
+
+	// A statement header's test.
+	if ((a >> b /* c12 */) >> d) {
+	}
+
+	// A multi-line block trails the pair as well: a line break ahead of an operator is harmless.
+	v =
+		(a >>
+			b /* c13
+			 */) >>
+		d;
+
+	// The author's pair around a whole statement strips too: the comment trails the statement.
+	a >> b /* c14 */;
+</script>
+
+<p>{(a >> b /* c10 */) >> d}</p>
+
+%%PASS=2%%
+<script lang="ts">
+	// A block comment ending a redundant pair inside an operand that takes the clarity pair
+	// the printer adds around a mixed-precedence operand trails that clarity pair.
+	(a >> b) /* c1 */ >> d;
+
+	x = (a - b) /* c2 */ << d;
+
+	const y = (a % b) /* c3 */ * d;
+
+	function f1() {
+		return (a >> b) /* c4 */ >> d;
+	}
+
+	f(g((a >> b) /* c5 */ >> d));
+
+	o = { k: (a >> b) /* c6 */ >> d };
+
+	for (a ?? (b && c) /* c7 */; ;) {}
+
+	// The pair written around the whole operand: the comment already trails it.
+	z = (a - b) /* c8 */ >> 1;
+
+	// A right-nested power: the comment leaves the statement.
+	w = a ** (b ** c) /* c9 */;
+
+	// A comment written after the author's pair stays behind the moved one, in source order.
+	(a >> b) /* c11 */ /* e */ >> d;
+
+	// A statement header's test.
+	if ((a >> b) /* c12 */ >> d) {
+	}
+
+	// A multi-line block trails the pair as well: a line break ahead of an operator is harmless.
+	v =
+		(a >> b) /* c13
+		 */ >>
+		d;
+
+	// The author's pair around a whole statement strips too: the comment trails the statement.
+	a >> b; /* c14 */
+</script>
+
+<p>{(a >> b) /* c10 */ >> d}</p>
+
+%%PASS=3 (fixed point)%%
+<script lang="ts">
+	// A block comment ending a redundant pair inside an operand that takes the clarity pair
+	// the printer adds around a mixed-precedence operand trails that clarity pair.
+	(a >> b) /* c1 */ >> d;
+
+	x = (a - b) /* c2 */ << d;
+
+	const y = (a % b) /* c3 */ * d;
+
+	function f1() {
+		return (a >> b) /* c4 */ >> d;
+	}
+
+	f(g((a >> b) /* c5 */ >> d));
+
+	o = { k: (a >> b) /* c6 */ >> d };
+
+	for (a ?? (b && c) /* c7 */; ;) {}
+
+	// The pair written around the whole operand: the comment already trails it.
+	z = (a - b) /* c8 */ >> 1;
+
+	// A right-nested power: the comment leaves the statement.
+	w = a ** (b ** c); /* c9 */
+
+	// A comment written after the author's pair stays behind the moved one, in source order.
+	(a >> b) /* c11 */ /* e */ >> d;
+
+	// A statement header's test.
+	if ((a >> b) /* c12 */ >> d) {
+	}
+
+	// A multi-line block trails the pair as well: a line break ahead of an operator is harmless.
+	v =
+		(a >> b) /* c13
+		 */ >>
+		d;
+
+	// The author's pair around a whole statement strips too: the comment trails the statement.
+	a >> b; /* c14 */
+</script>
+
+<p>{(a >> b) /* c10 */ >> d}</p>
