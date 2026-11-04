@@ -1,0 +1,946 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 751,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 97,
+				"data": " the alternate's pair holds the comment: Svelte rejects one before this head's `}` or `,` "
+			},
+			{
+				"type": "Text",
+				"start": 97,
+				"end": 98,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 98,
+				"end": 157,
+				"expression": {
+					"type": "ConditionalExpression",
+					"start": 105,
+					"end": 137,
+					"test": {
+						"type": "Identifier",
+						"start": 105,
+						"end": 106,
+						"name": "a"
+					},
+					"consequent": {
+						"type": "Identifier",
+						"start": 110,
+						"end": 111,
+						"name": "b",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 112,
+								"end": 117
+							}
+						]
+					},
+					"alternate": {
+						"type": "Identifier",
+						"start": 126,
+						"end": 127,
+						"name": "c",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 128,
+								"end": 133
+							}
+						]
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 139,
+							"end": 141,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 141,
+							"end": 149,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 144,
+										"end": 145,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 149,
+							"end": 150,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": null
+			},
+			{
+				"type": "Text",
+				"start": 157,
+				"end": 159,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 159,
+				"end": 202,
+				"expression": {
+					"type": "ConditionalExpression",
+					"start": 166,
+					"end": 186,
+					"test": {
+						"type": "Identifier",
+						"start": 166,
+						"end": 167,
+						"name": "a"
+					},
+					"consequent": {
+						"type": "Identifier",
+						"start": 170,
+						"end": 171,
+						"name": "b"
+					},
+					"alternate": {
+						"type": "Identifier",
+						"start": 175,
+						"end": 176,
+						"name": "c",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c3 ",
+								"start": 177,
+								"end": 185
+							}
+						]
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 187,
+							"end": 195,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 190,
+										"end": 191,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				},
+				"context": null
+			},
+			{
+				"type": "Text",
+				"start": 202,
+				"end": 204,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 204,
+				"end": 261,
+				"expression": {
+					"type": "ConditionalExpression",
+					"start": 211,
+					"end": 241,
+					"test": {
+						"type": "Identifier",
+						"start": 211,
+						"end": 212,
+						"name": "a"
+					},
+					"consequent": {
+						"type": "Identifier",
+						"start": 216,
+						"end": 217,
+						"name": "b",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c13",
+								"start": 218,
+								"end": 224
+							}
+						]
+					},
+					"alternate": {
+						"type": "Identifier",
+						"start": 229,
+						"end": 230,
+						"name": "c",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c14 ",
+								"start": 231,
+								"end": 240
+							}
+						]
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 243,
+							"end": 245,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 245,
+							"end": 253,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 248,
+										"end": 249,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 253,
+							"end": 254,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": null
+			},
+			{
+				"type": "Text",
+				"start": 261,
+				"end": 263,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 263,
+				"end": 320,
+				"expression": {
+					"type": "ConditionalExpression",
+					"start": 270,
+					"end": 299,
+					"test": {
+						"type": "Identifier",
+						"start": 270,
+						"end": 271,
+						"name": "a"
+					},
+					"consequent": {
+						"type": "Identifier",
+						"start": 274,
+						"end": 275,
+						"name": "b",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c4 ",
+								"start": 276,
+								"end": 284
+							}
+						]
+					},
+					"alternate": {
+						"type": "Identifier",
+						"start": 288,
+						"end": 289,
+						"name": "c",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c5 ",
+								"start": 290,
+								"end": 298
+							}
+						]
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 303,
+							"end": 313,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 306,
+										"end": 309,
+										"expression": {
+											"type": "Identifier",
+											"start": 307,
+											"end": 308,
+											"name": "i"
+										}
+									}
+								]
+							}
+						}
+					]
+				},
+				"context": null,
+				"index": "i"
+			},
+			{
+				"type": "Text",
+				"start": 320,
+				"end": 322,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 322,
+				"end": 387,
+				"expression": {
+					"type": "ConditionalExpression",
+					"start": 329,
+					"end": 362,
+					"test": {
+						"type": "Identifier",
+						"start": 329,
+						"end": 330,
+						"name": "a"
+					},
+					"consequent": {
+						"type": "Identifier",
+						"start": 334,
+						"end": 335,
+						"name": "b",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c9",
+								"start": 336,
+								"end": 341
+							}
+						]
+					},
+					"alternate": {
+						"type": "Identifier",
+						"start": 350,
+						"end": 351,
+						"name": "c",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c10",
+								"start": 352,
+								"end": 358
+							}
+						]
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 367,
+							"end": 369,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 369,
+							"end": 379,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 372,
+										"end": 375,
+										"expression": {
+											"type": "Identifier",
+											"start": 373,
+											"end": 374,
+											"name": "i"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 379,
+							"end": 380,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": null,
+				"index": "i"
+			},
+			{
+				"type": "Text",
+				"start": 387,
+				"end": 389,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 389,
+				"end": 473,
+				"data": " a nested conditional's alternate, and a nested conditional as the alternate "
+			},
+			{
+				"type": "Text",
+				"start": 473,
+				"end": 474,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 474,
+				"end": 547,
+				"expression": {
+					"type": "ConditionalExpression",
+					"start": 481,
+					"end": 527,
+					"test": {
+						"type": "Identifier",
+						"start": 481,
+						"end": 482,
+						"name": "a"
+					},
+					"consequent": {
+						"type": "Identifier",
+						"start": 486,
+						"end": 487,
+						"name": "b",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c6",
+								"start": 488,
+								"end": 493
+							}
+						]
+					},
+					"alternate": {
+						"type": "ConditionalExpression",
+						"start": 497,
+						"end": 527,
+						"test": {
+							"type": "Identifier",
+							"start": 497,
+							"end": 498,
+							"name": "x"
+						},
+						"consequent": {
+							"type": "Identifier",
+							"start": 503,
+							"end": 504,
+							"name": "d"
+						},
+						"alternate": {
+							"type": "Identifier",
+							"start": 515,
+							"end": 516,
+							"name": "e",
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c7",
+									"start": 517,
+									"end": 522
+								}
+							]
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 529,
+							"end": 531,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 531,
+							"end": 539,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 534,
+										"end": 535,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 539,
+							"end": 540,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": null
+			},
+			{
+				"type": "Text",
+				"start": 547,
+				"end": 549,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 549,
+				"end": 600,
+				"expression": {
+					"type": "ConditionalExpression",
+					"start": 556,
+					"end": 584,
+					"test": {
+						"type": "Identifier",
+						"start": 556,
+						"end": 557,
+						"name": "a"
+					},
+					"consequent": {
+						"type": "Identifier",
+						"start": 560,
+						"end": 561,
+						"name": "b"
+					},
+					"alternate": {
+						"type": "ConditionalExpression",
+						"start": 565,
+						"end": 574,
+						"test": {
+							"type": "Identifier",
+							"start": 565,
+							"end": 566,
+							"name": "x"
+						},
+						"consequent": {
+							"type": "Identifier",
+							"start": 569,
+							"end": 570,
+							"name": "d"
+						},
+						"alternate": {
+							"type": "Identifier",
+							"start": 573,
+							"end": 574,
+							"name": "e"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c8 ",
+								"start": 575,
+								"end": 583
+							}
+						]
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 585,
+							"end": 593,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 588,
+										"end": 589,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				},
+				"context": null
+			},
+			{
+				"type": "Text",
+				"start": 600,
+				"end": 602,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 602,
+				"end": 662,
+				"expression": {
+					"type": "ConditionalExpression",
+					"start": 609,
+					"end": 642,
+					"test": {
+						"type": "Identifier",
+						"start": 609,
+						"end": 610,
+						"name": "a"
+					},
+					"consequent": {
+						"type": "Identifier",
+						"start": 614,
+						"end": 615,
+						"name": "b"
+					},
+					"alternate": {
+						"type": "ConditionalExpression",
+						"start": 623,
+						"end": 632,
+						"test": {
+							"type": "Identifier",
+							"start": 623,
+							"end": 624,
+							"name": "x"
+						},
+						"consequent": {
+							"type": "Identifier",
+							"start": 627,
+							"end": 628,
+							"name": "d"
+						},
+						"alternate": {
+							"type": "Identifier",
+							"start": 631,
+							"end": 632,
+							"name": "e"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c11",
+								"start": 633,
+								"end": 639
+							}
+						]
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 644,
+							"end": 646,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 646,
+							"end": 654,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 649,
+										"end": 650,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 654,
+							"end": 655,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": null
+			},
+			{
+				"type": "Text",
+				"start": 662,
+				"end": 664,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 664,
+				"end": 750,
+				"expression": {
+					"type": "ConditionalExpression",
+					"start": 671,
+					"end": 730,
+					"test": {
+						"type": "Identifier",
+						"start": 671,
+						"end": 672,
+						"name": "a"
+					},
+					"consequent": {
+						"type": "Identifier",
+						"start": 676,
+						"end": 677,
+						"name": "b"
+					},
+					"alternate": {
+						"type": "ConditionalExpression",
+						"start": 708,
+						"end": 719,
+						"test": {
+							"type": "Identifier",
+							"start": 708,
+							"end": 709,
+							"name": "x"
+						},
+						"consequent": {
+							"type": "Identifier",
+							"start": 714,
+							"end": 715,
+							"name": "d"
+						},
+						"alternate": {
+							"type": "Identifier",
+							"start": 718,
+							"end": 719,
+							"name": "e"
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 686,
+								"end": 704
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c12",
+								"start": 720,
+								"end": 726
+							}
+						]
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 732,
+							"end": 734,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 734,
+							"end": 742,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 737,
+										"end": 738,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 742,
+							"end": 743,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": null
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 112,
+			"end": 117
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 128,
+			"end": 133
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 177,
+			"end": 185
+		},
+		{
+			"type": "Line",
+			"value": " c13",
+			"start": 218,
+			"end": 224
+		},
+		{
+			"type": "Block",
+			"value": " c14 ",
+			"start": 231,
+			"end": 240
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 276,
+			"end": 284
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 290,
+			"end": 298
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 336,
+			"end": 341
+		},
+		{
+			"type": "Line",
+			"value": " c10",
+			"start": 352,
+			"end": 358
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 488,
+			"end": 493
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 517,
+			"end": 522
+		},
+		{
+			"type": "Block",
+			"value": " c8 ",
+			"start": 575,
+			"end": 583
+		},
+		{
+			"type": "Line",
+			"value": " c11",
+			"start": 633,
+			"end": 639
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 686,
+			"end": 704
+		},
+		{
+			"type": "Line",
+			"value": " c12",
+			"start": 720,
+			"end": 726
+		}
+	]
+}

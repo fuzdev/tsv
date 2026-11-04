@@ -1803,7 +1803,10 @@ impl<'a> Printer<'a> {
     /// when the value's ordinary build ends on a comment, and the kept pair is valid either
     /// way. Nested redundant pairs (`((b // c1⏎) // c2⏎)`) keep the outermost one, holding
     /// every comment the layers held.
-    fn value_end_kept_pair(&self, operand: &Expression<'_>) -> Option<(u32, u32)> {
+    pub(in crate::printer) fn value_end_kept_pair(
+        &self,
+        operand: &Expression<'_>,
+    ) -> Option<(u32, u32)> {
         if !self.embed.value_end_takes_no_comment {
             return None;
         }
