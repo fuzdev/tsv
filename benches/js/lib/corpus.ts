@@ -561,7 +561,7 @@ const COLLECTIONS: Record<string, CollectionPlacement> = {
 	fuz_blog: { perf: true },
 	fuz_code: { perf: true },
 	fuz_css: { perf: true },
-	fuz_docs: { perf: true },
+	'docs.fuz.dev': { perf: true },
 	fuz_repos: { perf: true },
 	fuz_template: { perf: true },
 	fuz_ui: { perf: true },

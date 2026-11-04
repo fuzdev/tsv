@@ -97,7 +97,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	// `collections/` tree (see above); what each collection vendors is its manifest.
 	[CORPORA_ROOT]: {
 		tree: CORPORA_TREE,
-		hash: '98dc2cc10',
+		hash: '722351344',
 		pins: [
 			'corpus_format_pins.txt',
 			'corpus_parse_pins.txt',

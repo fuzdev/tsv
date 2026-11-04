@@ -24,9 +24,9 @@ fuz_code css match=3 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 fuz_css svelte match=31 known=18 partial=0 unknown=0 errors=0 expected_errors=0
 fuz_css typescript match=151 known=0 partial=0 unknown=1 errors=0 expected_errors=0
 fuz_css css match=0 known=2 partial=0 unknown=0 errors=0 expected_errors=0
-fuz_docs svelte match=38 known=5 partial=0 unknown=0 errors=0 expected_errors=0
-fuz_docs typescript match=19 known=0 partial=0 unknown=0 errors=0 expected_errors=0
-fuz_docs css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+docs.fuz.dev svelte match=38 known=5 partial=0 unknown=0 errors=0 expected_errors=0
+docs.fuz.dev typescript match=19 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+docs.fuz.dev css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 fuz_repos svelte match=28 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 fuz_repos typescript match=73 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 fuz_repos css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0

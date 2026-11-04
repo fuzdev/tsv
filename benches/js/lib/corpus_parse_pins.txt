@@ -24,9 +24,9 @@ fuz_code css compared=3 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_css svelte compared=49 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_css typescript compared=152 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_css css compared=2 tsv_errors=0 canonical_errors=0 both_errors=0
-fuz_docs svelte compared=43 tsv_errors=0 canonical_errors=0 both_errors=0
-fuz_docs typescript compared=19 tsv_errors=0 canonical_errors=0 both_errors=0
-fuz_docs css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
+docs.fuz.dev svelte compared=43 tsv_errors=0 canonical_errors=0 both_errors=0
+docs.fuz.dev typescript compared=19 tsv_errors=0 canonical_errors=0 both_errors=0
+docs.fuz.dev css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_repos svelte compared=28 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_repos typescript compared=73 tsv_errors=0 canonical_errors=0 both_errors=0
 fuz_repos css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
