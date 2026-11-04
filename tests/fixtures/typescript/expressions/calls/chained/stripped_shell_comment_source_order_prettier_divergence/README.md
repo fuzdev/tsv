@@ -12,6 +12,10 @@ tsv prints them, in one pass.
   spelling without the parens puts it (`// c5⏎x /* c6 */.b`). A comment inside a computed
   lookup's brackets prints after the run either way, so the run still prints in front of
   the lookup (c10).
+- **tsv**, where the object OWNS a single-line comment of the run (glued to its first
+  token, c12–c17): the owned comment prints at the head with the object, so the whole run
+  leads the chain with it, in authored order, as the paren-free spelling prints it
+  (`/* c12 */ /* c13 */ x.y.p.q()`), at statement and value positions alike (c16).
 - **prettier**: prints it in front of the member regardless, after everything the object
   prints, and buckets the member gap's comments by kind, so the comment the author wrote
   first prints after the others (`/* c4 */ q /* c3 */.p`, `x /* c6 */.b // c5`, and c1 on

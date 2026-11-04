@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 681,
+	"end": 947,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -111,17 +111,65 @@
 			"value": " c11 ",
 			"start": 650,
 			"end": 659
+		},
+		{
+			"type": "Line",
+			"value": " A comment the object OWNS (glued to its first token) prints at the head with the object,",
+			"start": 673,
+			"end": 764
+		},
+		{
+			"type": "Line",
+			"value": " so the rest of the run leads the chain with it, in the authored order.",
+			"start": 766,
+			"end": 839
+		},
+		{
+			"type": "Block",
+			"value": " c12 ",
+			"start": 841,
+			"end": 850
+		},
+		{
+			"type": "Block",
+			"value": " c13 ",
+			"start": 851,
+			"end": 860
+		},
+		{
+			"type": "Line",
+			"value": " c14",
+			"start": 873,
+			"end": 879
+		},
+		{
+			"type": "Block",
+			"value": " c15 ",
+			"start": 881,
+			"end": 890
+		},
+		{
+			"type": "Block",
+			"value": " c16 ",
+			"start": 907,
+			"end": 916
+		},
+		{
+			"type": "Block",
+			"value": " c17 ",
+			"start": 917,
+			"end": 926
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 680,
+		"end": 946,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 671,
+			"end": 937,
 			"body": [
 				{
 					"type": "ExpressionStatement",
@@ -545,6 +593,238 @@
 							"end": 636
 						}
 					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 861,
+					"end": 871,
+					"expression": {
+						"type": "CallExpression",
+						"start": 861,
+						"end": 870,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 861,
+							"end": 868,
+							"object": {
+								"type": "MemberExpression",
+								"start": 861,
+								"end": 866,
+								"object": {
+									"type": "MemberExpression",
+									"start": 861,
+									"end": 864,
+									"object": {
+										"type": "Identifier",
+										"start": 861,
+										"end": 862,
+										"name": "x"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 863,
+										"end": 864,
+										"name": "y"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 865,
+									"end": 866,
+									"name": "p"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 867,
+								"end": 868,
+								"name": "q"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment the object OWNS (glued to its first token) prints at the head with the object,",
+							"start": 673,
+							"end": 764
+						},
+						{
+							"type": "Line",
+							"value": " so the rest of the run leads the chain with it, in the authored order.",
+							"start": 766,
+							"end": 839
+						},
+						{
+							"type": "Block",
+							"value": " c12 ",
+							"start": 841,
+							"end": 850
+						},
+						{
+							"type": "Block",
+							"value": " c13 ",
+							"start": 851,
+							"end": 860
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 891,
+					"end": 901,
+					"expression": {
+						"type": "CallExpression",
+						"start": 891,
+						"end": 900,
+						"callee": {
+							"type": "MemberExpression",
+							"start": 891,
+							"end": 898,
+							"object": {
+								"type": "MemberExpression",
+								"start": 891,
+								"end": 896,
+								"object": {
+									"type": "MemberExpression",
+									"start": 891,
+									"end": 894,
+									"object": {
+										"type": "Identifier",
+										"start": 891,
+										"end": 892,
+										"name": "x"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 893,
+										"end": 894,
+										"name": "y"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 895,
+									"end": 896,
+									"name": "p"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 897,
+								"end": 898,
+								"name": "q"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c14",
+							"start": 873,
+							"end": 879
+						},
+						{
+							"type": "Block",
+							"value": " c15 ",
+							"start": 881,
+							"end": 890
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 903,
+					"end": 936,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 903,
+						"end": 935,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 903,
+							"end": 904,
+							"name": "x"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 927,
+							"end": 935,
+							"callee": {
+								"type": "MemberExpression",
+								"start": 927,
+								"end": 932,
+								"object": {
+									"type": "MemberExpression",
+									"start": 927,
+									"end": 930,
+									"object": {
+										"type": "Identifier",
+										"start": 927,
+										"end": 928,
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 929,
+										"end": 930,
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 931,
+									"end": 932,
+									"name": "m"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "Literal",
+									"start": 933,
+									"end": 934,
+									"value": 1,
+									"raw": "1"
+								}
+							],
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c16 ",
+									"start": 907,
+									"end": 916
+								},
+								{
+									"type": "Block",
+									"value": " c17 ",
+									"start": 917,
+									"end": 926
+								}
+							]
+						}
+					}
 				}
 			],
 			"sourceType": "module"

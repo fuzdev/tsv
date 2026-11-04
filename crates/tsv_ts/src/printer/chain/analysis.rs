@@ -203,13 +203,25 @@ fn apply_paren_gaps(nodes: &mut [ChainNode<'_>], paren_gaps: &[ParenGap], printe
         // shell's run is the head's, ahead of the whole chain and so in source order, where
         // the spelling without the shell prints it (`// a⏎x /* b */.p.m()`).
         //
-        // TODO: a comment in the run that the object OWNS (glued to its first token) still
-        // prints at the head while the rest of the run widens, out of order
-        // (`(/* a */ /* b */ x.y.p).q()` prints `/* b */ x.y /* a */.p`). Declining the
-        // relocation there leaves an owned multi-line block printed inside the chain's first
-        // group, which force-expands the chain on the first pass only
-        // (`y = (// c⏎/*⏎ */ a.b).m(1).n(2).o(3)`, the same instability as
-        // `y = (// c⏎(/*⏎ */ a).b.m(1).n(2).o(3))`), so it waits on that fix.
+        //
+        // A run holding a single-line comment the object OWNS (glued to its first token)
+        // declines whole: the owned comment prints at the head with the object, so the rest
+        // of the run prints there too, ahead of it, in source order — the paren-free
+        // spelling's form (`(/* a */ /* b */ x.y.p).q()` prints `/* a */ /* b */ x.y.p.q()`).
+        // Widened, the un-owned part printed at the member's lookup, after the owned one.
+        //
+        // TODO: an owned MULTI-line block still widens out of order
+        // (`(// c⏎/*⏎ */ a.b).m()` prints the block at the head and `// c` at `.b`).
+        // Declining there leaves the block printed inside the chain's first group, which
+        // force-expands the chain on the first pass only (`y = (/*⏎ */ a.b).m(1).n(2).o(3)`,
+        // unstable already, the same instability as `y = (// c⏎(/*⏎ */ a).b.m(1).n(2).o(3))`),
+        // so it waits on printing that block after the run, outside the chain's group.
+        if printer
+            .comments_on_page_between(gap_start, object_start)
+            .any(|c| c.owned_by_node && !c.multiline)
+        {
+            continue;
+        }
         let Some((natural_object_end, property_start)) = nodes[node_index].comment_range() else {
             continue;
         };

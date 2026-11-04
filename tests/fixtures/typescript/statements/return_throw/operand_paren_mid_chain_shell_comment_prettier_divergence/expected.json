@@ -78,15 +78,15 @@
 		},
 		{
 			"type": "Block",
-			"value": " e ",
+			"value": "\n ",
 			"start": 733,
-			"end": 740
+			"end": 742
 		},
 		{
 			"type": "Block",
-			"value": "\n ",
+			"value": " e ",
 			"start": 743,
-			"end": 752
+			"end": 750
 		},
 		{
 			"type": "Block",
@@ -520,33 +520,25 @@
 								"end": 789,
 								"argument": {
 									"type": "CallExpression",
-									"start": 741,
+									"start": 751,
 									"end": 784,
 									"callee": {
 										"type": "MemberExpression",
-										"start": 741,
+										"start": 751,
 										"end": 782,
 										"object": {
 											"type": "MemberExpression",
-											"start": 741,
+											"start": 751,
 											"end": 756,
 											"object": {
 												"type": "MemberExpression",
-												"start": 741,
+												"start": 751,
 												"end": 754,
 												"object": {
 													"type": "Identifier",
-													"start": 741,
-													"end": 742,
-													"name": "a",
-													"trailingComments": [
-														{
-															"type": "Block",
-															"value": "\n ",
-															"start": 743,
-															"end": 752
-														}
-													]
+													"start": 751,
+													"end": 752,
+													"name": "a"
 												},
 												"property": {
 													"type": "Identifier",
@@ -596,9 +588,15 @@
 									"leadingComments": [
 										{
 											"type": "Block",
-											"value": " e ",
+											"value": "\n ",
 											"start": 733,
-											"end": 740
+											"end": 742
+										},
+										{
+											"type": "Block",
+											"value": " e ",
+											"start": 743,
+											"end": 750
 										}
 									]
 								}

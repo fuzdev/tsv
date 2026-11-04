@@ -15,4 +15,11 @@
 
 	// A comment in a computed lookup's brackets prints after the run either way.
 	(/* c10 */ (x)[/* c11 */ i]).q();
+
+	// A comment the object OWNS (glued to its first token) prints at the head with the object,
+	// so the rest of the run leads the chain with it, in the authored order.
+	(/* c12 */ /* c13 */ x.y.p).q();
+	(// c14
+	/* c15 */ x.y.p).q();
+	x = (/* c16 */ /* c17 */ a.b).m(1);
 </script>

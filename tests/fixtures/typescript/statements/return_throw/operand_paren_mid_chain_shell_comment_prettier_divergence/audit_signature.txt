@@ -35,10 +35,12 @@
 
 	// a comment on a multi-line block's closing line in a called member's gap hangs the argument
 	function fn5() {
-		return /* e */ a /*
-		 */.b.c /*
-		 */ /* e */
-			.m();
+		return (
+			/*
+			 */ /* e */ a.b.c /*
+			 */ /* e */
+				.m()
+		);
 	}
 	function fn6() {
 		return a.b.c /*

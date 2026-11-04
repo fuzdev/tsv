@@ -31,9 +31,19 @@
 	// A comment in a computed lookup's brackets prints after the run either way.
 	x/* c10 */ [/* c11 */ i]
 		.q();
+
+	// A comment the object OWNS (glued to its first token) prints at the head with the object,
+	// so the rest of the run leads the chain with it, in the authored order.
+	x.y/* c12 */ /* c13 */ .p
+		.q();
+	x.y// c14
+	/* c15 */ .p
+		.q();
+	x = a/* c16 */ /* c17 */ .b
+		.m(1);
 </script>
 
-%%PASS=2 (fixed point)%%
+%%PASS=2%%
 <script lang="ts">
 	// A comment in grouping parens the parser strips from around a member's object, in a member
 	// chain, prints in front of that member only while that keeps the authored order. Where the
@@ -55,4 +65,46 @@
 	// A comment in a computed lookup's brackets prints after the run either way.
 	x /* c10 */[/* c11 */ i]
 		.q();
+
+	// A comment the object OWNS (glued to its first token) prints at the head with the object,
+	// so the rest of the run leads the chain with it, in the authored order.
+	x.y /* c12 */ /* c13 */.p
+		.q();
+	x.y/* c15 */ .p // c14
+		.q();
+	x = a /* c16 */ /* c17 */.b
+		.m(1);
+</script>
+
+%%PASS=3 (fixed point)%%
+<script lang="ts">
+	// A comment in grouping parens the parser strips from around a member's object, in a member
+	// chain, prints in front of that member only while that keeps the authored order. Where the
+	// object or the member's own gap holds a comment too, it leads the chain instead, where the
+	// spelling without the parens prints it.
+	x /* c2 */()
+		/* c1 */ .h[x]();
+	/* c4 */ q /* c3 */.p[x]
+		.p();
+	x /* c6 */.b // c5
+		.g();
+	x /* c8 */ /* c7 */.b
+		.g();
+
+	// Alone in the member's gap, it prints in front of the member.
+	x.y /* c9 */.p
+		.t();
+
+	// A comment in a computed lookup's brackets prints after the run either way.
+	x /* c10 */[/* c11 */ i]
+		.q();
+
+	// A comment the object OWNS (glued to its first token) prints at the head with the object,
+	// so the rest of the run leads the chain with it, in the authored order.
+	x.y /* c12 */ /* c13 */.p
+		.q();
+	x.y /* c15 */.p // c14
+		.q();
+	x = a /* c16 */ /* c17 */.b
+		.m(1);
 </script>
