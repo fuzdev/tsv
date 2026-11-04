@@ -3,7 +3,8 @@
 //! source the comparison chain tsc and acorn-typescript read (`type_arg_region_walk`'s `<`
 //! arm behind a name).
 //!
-//! The readings are a fixture claim (`expressions/binary/relational_chain_nested_list_shift_close`).
+//! The readings are a fixture claim
+//! (`expressions/binary/relational_chain_nested_list_shift_close`).
 //! Pinned here: the scope the grade keeps to — a nested list opened by the second `<` of a
 //! `<<` keeps the claim the region makes, and the type parse rejects the line, as tsc does —
 //! that the grade nests without running past the depth limit, and the bracket it keeps out of.

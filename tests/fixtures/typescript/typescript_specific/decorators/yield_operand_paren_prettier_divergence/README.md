@@ -28,7 +28,7 @@ second is added: an assignment's (`yield (@dec⏎class {}.x = 1)`) and a sequenc
 (`yield (@dec⏎class {},⏎1)`), which prettier prints alike. So is the hanging pair a `//`
 comment after the `(` takes ([yield_operand_paren_line_comment](../yield_operand_paren_line_comment_prettier_divergence/)).
 A comment inside the author's shell around the class alone, behind the class
-(`yield (@dec class {} // c⏎)!.x`), is printed by what follows that shell, so there the class
+(`yield (@dec class {} // c⏎) < 1`), is printed by what follows that shell, so there the class
 keeps no pair and prints bare, as prettier prints it: a known gap.
 
 `yield*` is the control: acorn reads the `@` after the `*`, and both tools print the class

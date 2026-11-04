@@ -2153,11 +2153,12 @@ impl<'a> Printer<'a> {
     /// class, which is where the reparse needs it.
     ///
     /// One authoring keeps no pair at all: a comment on the page inside the author's shell
-    /// around the class alone, behind the class (`yield (@dec class {} // c⏎)!.x`,
+    /// around the class alone, behind the class (`yield (@dec class {} // c⏎) < 1`,
     /// `yield (@dec class {} /* c */).x`). What follows that shell prints the comment — a
     /// retained comment shell, an operator's or a member's gap — so a pair of the class's
     /// own would close ahead of it and print twice or move it. The class prints bare there,
-    /// as it does without the rule, which acorn rejects.
+    /// as it does without the rule, which acorn rejects; behind a `!` / `as` / `satisfies`
+    /// tail the retained comment shell keeps the author's `(` instead.
     // TODO: the class's pair could print that comment inside itself and claim it, which
     // would keep the pair here and fix the arrow-body and statement-start twins of this
     // shape (`() => (@dec class {} // c⏎)!.x` breaks F1 the same way). It needs a claim
@@ -2178,7 +2179,7 @@ impl<'a> Printer<'a> {
             return None;
         }
         // A comment inside the author's shell around the class ALONE, behind the class
-        // (`yield (@dec class {} // c⏎)!.x`), belongs to whatever follows the shell: a
+        // (`yield (@dec class {} // c⏎) < 1`), belongs to whatever follows the shell: a
         // retained comment shell, an operator's gap, a member gap. The class's own pair
         // would close ahead of it, printing a second pair or moving the comment on the next
         // pass, so the class takes none and the line prints as it did without the rule.
