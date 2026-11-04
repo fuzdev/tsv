@@ -11,6 +11,7 @@ use super::{
 };
 use crate::ast;
 use ast::TSKeywordKind;
+use smallvec::SmallVec;
 
 /// Emits a `TSTypeAnnotation` node. A Svelte block pattern's top-level
 /// annotation (`ctx.pattern_ann_span`) is its own comment island
@@ -41,11 +42,8 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
     match ts_type {
         ast::TSType::Keyword(kw) => write_keyword_type(w, kw, ctx),
         ast::TSType::Literal(lit) => write_literal_type(w, lit, ctx),
-        ast::TSType::Array(arr) => {
-            node_header(w, "TSArrayType", arr.span, ctx);
-            w.raw(",\"elementType\":");
-            write_type(w, arr.element_type, ctx);
-            close_node(w, "TSArrayType", arr.span, ctx);
+        ast::TSType::Array(_) | ast::TSType::IndexedAccess(_) => {
+            write_postfix_type_chain(w, ts_type, ctx);
         }
         ast::TSType::Union(u) => {
             node_header(w, "TSUnionType", u.span, ctx);
@@ -196,14 +194,6 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
             write_type_arguments_field(w, q.type_arguments.as_ref(), ctx);
             close_node(w, "TSTypeQuery", q.span, ctx);
         }
-        ast::TSType::IndexedAccess(i) => {
-            node_header(w, "TSIndexedAccessType", i.span, ctx);
-            w.raw(",\"objectType\":");
-            write_type(w, i.object_type, ctx);
-            w.raw(",\"indexType\":");
-            write_type(w, i.index_type, ctx);
-            close_node(w, "TSIndexedAccessType", i.span, ctx);
-        }
         ast::TSType::Rest(r) => {
             node_header(w, "TSRestType", r.span, ctx);
             w.raw(",\"typeAnnotation\":");
@@ -348,14 +338,83 @@ pub(super) fn write_entity_name(w: &mut JsonWriter, name: &ast::TSEntityName<'_>
     }
 }
 
-/// Emits a `TSQualifiedName` node (`left`, `right`).
+/// Emits a `TSQualifiedName` node (`left`, `right`) and the qualified names down its
+/// `left` side, written without recursing down that side — a dotted name's length is
+/// bounded only by `SPINE_LIMIT`, so a recursion per link would spend a frame per `.`.
+/// Each name's header and `left` key outermost first, then the leftmost identifier, then
+/// each name's `right` and close innermost first: the bytes, and the order of the
+/// comment-attach node events, of the recursion down the left.
+#[inline(never)]
 fn write_qualified_name(w: &mut JsonWriter, qn: &ast::TSQualifiedName<'_>, ctx: &Ctx<'_>) {
-    node_header(w, "TSQualifiedName", qn.span, ctx);
-    w.raw(",\"left\":");
-    write_entity_name(w, &qn.left, ctx);
-    w.raw(",\"right\":");
-    write_identifier_plain(w, &qn.right, ctx);
-    close_node(w, "TSQualifiedName", qn.span, ctx);
+    let mut spine: SmallVec<[&ast::TSQualifiedName<'_>; 8]> = SmallVec::new();
+    let mut node = qn;
+    loop {
+        node_header(w, "TSQualifiedName", node.span, ctx);
+        w.raw(",\"left\":");
+        spine.push(node);
+        match &node.left {
+            ast::TSEntityName::QualifiedName(left) => node = left,
+            ast::TSEntityName::Identifier(id) => {
+                write_identifier_plain(w, id, ctx);
+                break;
+            }
+        }
+    }
+    for node in spine.iter().rev() {
+        w.raw(",\"right\":");
+        write_identifier_plain(w, &node.right, ctx);
+        close_node(w, "TSQualifiedName", node.span, ctx);
+    }
+}
+
+/// One link of an array / indexed-access type chain ([`write_postfix_type_chain`]).
+#[derive(Clone, Copy)]
+enum PostfixTypeLink<'a, 'arena> {
+    Array(&'a ast::TSArrayType<'arena>),
+    IndexedAccess(&'a ast::TSIndexedAccessType<'arena>),
+}
+
+/// Emits an array or indexed-access type and the array and indexed-access types down its
+/// element / object side (`A[][]`, `A['k']['k']`, mixed), written without recursing down
+/// that side — the chain's length is bounded only by `SPINE_LIMIT`, so a recursion per
+/// link would spend a frame per suffix. Each link's header and element / object key
+/// outermost first, then the innermost element / object through [`write_type`], then
+/// each link's index type (an indexed access) and close innermost first: the bytes, and
+/// the order of the comment-attach node events, of the recursion down that side.
+#[inline(never)]
+fn write_postfix_type_chain(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ctx<'_>) {
+    let mut spine: SmallVec<[PostfixTypeLink<'_, '_>; 8]> = SmallVec::new();
+    let mut node = ts_type;
+    loop {
+        match node {
+            ast::TSType::Array(arr) => {
+                node_header(w, "TSArrayType", arr.span, ctx);
+                w.raw(",\"elementType\":");
+                spine.push(PostfixTypeLink::Array(arr));
+                node = arr.element_type;
+            }
+            ast::TSType::IndexedAccess(i) => {
+                node_header(w, "TSIndexedAccessType", i.span, ctx);
+                w.raw(",\"objectType\":");
+                spine.push(PostfixTypeLink::IndexedAccess(i));
+                node = i.object_type;
+            }
+            _ => {
+                write_type(w, node, ctx);
+                break;
+            }
+        }
+    }
+    for link in spine.iter().rev() {
+        match *link {
+            PostfixTypeLink::Array(arr) => close_node(w, "TSArrayType", arr.span, ctx),
+            PostfixTypeLink::IndexedAccess(i) => {
+                w.raw(",\"indexType\":");
+                write_type(w, i.index_type, ctx);
+                close_node(w, "TSIndexedAccessType", i.span, ctx);
+            }
+        }
+    }
 }
 
 /// Emits a `TSTypeParameterInstantiation` node.
