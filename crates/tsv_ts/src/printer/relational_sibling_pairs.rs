@@ -9,6 +9,7 @@ use crate::ast::{
     Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, UnaryExpression,
     UnaryOperator,
 };
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 
@@ -196,16 +197,29 @@ fn decorators_any<'e>(
 
 /// Whether an expression or one of its expression children ([`any_expression_child`])
 /// holds a binary satisfying `predicate`.
+///
+/// The walk keeps its own stack of the children still to visit rather than recursing: an
+/// operand chain's spine is thousands of links deep at the depth limits, and a frame per
+/// link spends an engine's main-thread stack whatever the frame (`docs/cli.md` §The other
+/// surfaces). The answer is a pure predicate over the subtree, so the visiting order is
+/// free.
 fn expression_holds_binary<'e>(
     expr: &'e Expression<'e>,
-    predicate: impl Copy + Fn(&BinaryExpression<'_>) -> bool,
+    predicate: impl Fn(&BinaryExpression<'_>) -> bool,
 ) -> bool {
-    if let ExpressionKind::BinaryExpression(binary) = &expr.kind
-        && predicate(binary)
-    {
-        return true;
+    let mut pending: SmallVec<[&'e Expression<'e>; 16]> = smallvec![expr];
+    while let Some(expr) = pending.pop() {
+        if let ExpressionKind::BinaryExpression(binary) = &expr.kind
+            && predicate(binary)
+        {
+            return true;
+        }
+        any_expression_child(expr, |child, _| {
+            pending.push(child);
+            false
+        });
     }
-    any_expression_child(expr, |child, _| expression_holds_binary(child, predicate))
+    false
 }
 
 /// The key a chain link is recorded under in `Printer::relational_chain_walked_links`: the
@@ -391,8 +405,8 @@ impl Printer<'_> {
     /// From the `<` holder to the closer ([`Self::mark_relational_sibling_authored_pairs`]),
     /// the pairs the printer otherwise decides print iff the author wrote them, for `expr`
     /// and every expression child of it ([`any_expression_child`], whose boundary —
-    /// function, class and block bodies — is this walk's), answering whether `expr` holds a
-    /// `<` / `<<` ([`opens_region`]), bottom-up so the walk stays linear:
+    /// function, class and block bodies — is this walk's), each node's question whether it
+    /// holds a `<` / `<<` ([`opens_region`]) answered bottom-up so the walk stays linear:
     ///
     /// - a pair around a node holding a `<` / `<<`, at whatever position, unless the node
     ///   prints a pair of its own there ([`supplies_its_own_pair`])
@@ -417,7 +431,72 @@ impl Printer<'_> {
     /// fixed point. The tree decides what is marked and the source only whether the pair
     /// was written; what the tree requires (`(c = d) + 1`, `() => ({})`, a sequence's own
     /// pair) is never asked.
-    fn mark_region_source_pairs(&self, expr: &Expression<'_>, slot: ChildSlot) -> bool {
+    ///
+    /// The walk keeps its own stack rather than recursing, for the reason
+    /// [`expression_holds_binary`] does. It enters the nodes in the order a recursion
+    /// would, setting each node's marks on the way down ([`Self::mark_region_node`]), and
+    /// decides each node's own pair on the way back up, once every child has answered
+    /// whether it holds a `<` / `<<` — the one order that matters, since the marks are sets
+    /// and nothing the walk asks reads them.
+    fn mark_region_source_pairs<'e>(&self, expr: &'e Expression<'e>, slot: ChildSlot) {
+        /// A step of the walk: enter a child of the node at `parent` (`None` for the root),
+        /// or leave the node at an index into `visited` once its children are done.
+        enum Step<'e> {
+            Enter(&'e Expression<'e>, ChildSlot, Option<usize>),
+            Leave(usize),
+        }
+        /// A node entered and not yet left: what its pair decision reads.
+        struct Visited<'e> {
+            expr: &'e Expression<'e>,
+            list_end: Option<u32>,
+            holds_opener: bool,
+            parent: Option<usize>,
+        }
+        let mut steps: SmallVec<[Step<'e>; 16]> = smallvec![Step::Enter(expr, slot, None)];
+        let mut visited: SmallVec<[Visited<'e>; 16]> = SmallVec::new();
+        while let Some(step) = steps.pop() {
+            match step {
+                Step::Enter(expr, slot, parent) => {
+                    let list_end = self.mark_region_node(expr, slot);
+                    let index = visited.len();
+                    visited.push(Visited {
+                        expr,
+                        list_end,
+                        holds_opener: matches!(
+                            &expr.kind,
+                            ExpressionKind::BinaryExpression(binary) if opens_region(binary)
+                        ),
+                        parent,
+                    });
+                    steps.push(Step::Leave(index));
+                    let first_child = steps.len();
+                    any_expression_child(expr, |child, slot| {
+                        steps.push(Step::Enter(child, slot, Some(index)));
+                        false
+                    });
+                    // reversed, so the first child is entered first, as a recursion would
+                    steps[first_child..].reverse();
+                }
+                Step::Leave(index) => {
+                    let node = &visited[index];
+                    let (holds_opener, parent) = (node.holds_opener, node.parent);
+                    if holds_opener
+                        && !supplies_its_own_pair(node.expr)
+                        && self.holds_authored_pair(node.expr, node.list_end)
+                    {
+                        self.mark_relational_sibling_pair(node.expr.span());
+                    }
+                    if let Some(parent) = parent {
+                        visited[parent].holds_opener |= holds_opener;
+                    }
+                }
+            }
+        }
+    }
+
+    /// The marks [`Self::mark_region_source_pairs`] sets on entering `expr` at `slot`,
+    /// ahead of its children — answering the list end its authored-pair question reads.
+    fn mark_region_node(&self, expr: &Expression<'_>, slot: ChildSlot) -> Option<u32> {
         // A `<` this walk covers is a chain link whose operands it walks with the slot a
         // direct chain-region walk gives them, so that chain need not walk them again
         // ([`Self::mark_relational_chain_region`]).
@@ -495,17 +574,7 @@ impl Printer<'_> {
             }
             _ => {}
         }
-        let mut holds_opener =
-            matches!(&expr.kind, ExpressionKind::BinaryExpression(binary) if opens_region(binary));
-        any_expression_child(expr, |child, slot| {
-            holds_opener |= self.mark_region_source_pairs(child, slot);
-            false
-        });
-        if holds_opener && !supplies_its_own_pair(expr) && self.holds_authored_pair(expr, list_end)
-        {
-            self.mark_relational_sibling_pair(expr.span());
-        }
-        holds_opener
+        list_end
     }
 
     fn mark_region_bare(&self, span: Span) {
