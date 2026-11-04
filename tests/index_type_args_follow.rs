@@ -157,7 +157,7 @@ fn spaced_negative_literals_read_as_types() {
 }
 
 /// A `readonly` operand is an array or tuple type: a parenthesized one only when its
-/// postfix run ends in an array suffix `[]`. Otherwise acorn-typescript refuses the type
+/// postfix run holds an array suffix `[]`. Otherwise acorn-typescript refuses the type
 /// and reads the call `readonly(d)[e]` in a comparison, and so does tsv — printed so that
 /// acorn reads it the same way again.
 #[test]
