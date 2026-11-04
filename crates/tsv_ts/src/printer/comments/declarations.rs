@@ -903,17 +903,35 @@ impl<'a> Printer<'a> {
         gap_start: u32,
         gap_end: u32,
     ) -> DocId {
+        let mut parts: DocBuf = smallvec![left];
+        self.push_dotted_pair_tail(&mut parts, right, gap_start, gap_end);
+        self.d().concat(&parts)
+    }
+
+    /// Everything [`Self::build_dotted_pair_doc`] prints after `left`, pushed onto `parts`
+    /// (which already ends with `left`) — so a run of dotted pairs nested down their left
+    /// side (a qualified name, `A.B.C`) can print as ONE flat concat rather than a doc
+    /// level per `.`.
+    pub(crate) fn push_dotted_pair_tail(
+        &self,
+        parts: &mut DocBuf,
+        right: DocId,
+        gap_start: u32,
+        gap_end: u32,
+    ) {
         let d = self.d();
         // Both gaps empty — every ordinary occurrence, and the only one that is hot.
         if !self.has_comments_to_emit_between(gap_start, gap_end) {
-            return d.concat(&[left, d.text("."), right]);
+            parts.extend([d.text("."), right]);
+            return;
         }
         let Some(dot) = self.find_char_outside_comments(gap_start, gap_end, b'.') else {
             debug_assert!(
                 false,
                 "a dotted pair always spells a `.` between its two names"
             );
-            return d.concat(&[left, d.text("."), right]);
+            parts.extend([d.text("."), right]);
+            return;
         };
         // `.`→right, then left→`.` wrapping it: the tail is built first so a line comment
         // in the left gap takes the whole `.right` down with it.
@@ -921,10 +939,7 @@ impl<'a> Printer<'a> {
             d.text("."),
             self.build_dot_gap_doc(dot + 1, gap_end, right, CommentSpacing::Trailing),
         ]);
-        d.concat(&[
-            left,
-            self.build_dot_gap_doc(gap_start, dot, tail, CommentSpacing::Leading),
-        ])
+        parts.push(self.build_dot_gap_doc(gap_start, dot, tail, CommentSpacing::Leading));
     }
 
     /// One of the two gaps around a dotted pair's `.`: the comments authored in

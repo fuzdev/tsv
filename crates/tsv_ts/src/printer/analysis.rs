@@ -6,7 +6,9 @@
 
 use crate::ast;
 use crate::printer::Printer;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 /// Skip past identifier characters (alphanumeric, `_`, `$`, non-ASCII) starting at `pos`,
@@ -318,19 +320,36 @@ pub(crate) fn is_multiline_template_expression(expr: &ast::Expression<'_>) -> bo
 ///
 /// Needs the printer for the name-emission seam (span-identity source slices,
 /// arena-string escaped names).
+///
+/// A qualified name nests down its `left` side, one level per `.`, and its length is
+/// bounded only by `SPINE_LIMIT` — so the names are collected iteratively and the pairs
+/// print into one flat concat, leftmost name first, each `.right` (with whatever its two
+/// gaps hold) after the names to its left: neither this builder nor any later walk of its
+/// doc spends a frame per link.
+#[inline(never)]
 pub(crate) fn build_entity_name_doc(printer: &Printer<'_>, name: &ast::TSEntityName<'_>) -> DocId {
-    match name {
-        ast::TSEntityName::Identifier(id) => printer.identifier_name_doc(id),
-        // A qualified name is a dotted pair, so both gaps around the `.` are positions an
-        // author can comment in (`ns /* c */.Type`, `ns./* c */ Type`). The shared printer
-        // emits them; concatenating the three pieces scans neither and drops what's there.
-        // One printer serves every qualified name, so this reaches type references,
-        // interface heritage, and import-equals module references alike.
-        ast::TSEntityName::QualifiedName(qn) => printer.build_dotted_pair_doc(
-            build_entity_name_doc(printer, &qn.left),
-            printer.identifier_name_doc(&qn.right),
-            qn.left.span().end,
-            qn.right.span.start,
-        ),
+    let qn = match name {
+        ast::TSEntityName::Identifier(id) => return printer.identifier_name_doc(id),
+        ast::TSEntityName::QualifiedName(qn) => qn,
+    };
+    let mut spine: SmallVec<[&ast::TSQualifiedName<'_>; 8]> = SmallVec::new();
+    let mut node: &ast::TSQualifiedName<'_> = qn;
+    let base = loop {
+        spine.push(node);
+        match &node.left {
+            ast::TSEntityName::QualifiedName(left) => node = left,
+            ast::TSEntityName::Identifier(id) => break id,
+        }
+    };
+    // A qualified name is a dotted pair, so both gaps around the `.` are positions an
+    // author can comment in (`ns /* c */.Type`, `ns./* c */ Type`). The shared printer
+    // emits them; concatenating the three pieces scans neither and drops what's there.
+    // One printer serves every qualified name, so this reaches type references,
+    // interface heritage, and import-equals module references alike.
+    let mut parts: DocBuf = smallvec![printer.identifier_name_doc(base)];
+    for qn in spine.iter().rev() {
+        let right = printer.identifier_name_doc(&qn.right);
+        printer.push_dotted_pair_tail(&mut parts, right, qn.left.span().end, qn.right.span.start);
     }
+    printer.d().concat(&parts)
 }
