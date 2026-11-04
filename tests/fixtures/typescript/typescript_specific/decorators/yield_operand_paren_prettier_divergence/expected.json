@@ -1,0 +1,649 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 791,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An authored pair around a decorated class at the leftmost position of a `yield` operand",
+			"start": 20,
+			"end": 110
+		},
+		{
+			"type": "Line",
+			"value": " is kept: without it the `@` follows `yield`, which acorn (Svelte's parser) rejects",
+			"start": 112,
+			"end": 197
+		},
+		{
+			"type": "Line",
+			"value": " a pair the operand prints anyway is the class's: an assignment's, a sequence's",
+			"start": 500,
+			"end": 581
+		},
+		{
+			"type": "Line",
+			"value": " `yield*` takes the class bare in both tools: acorn reads the `@` after the `*`",
+			"start": 670,
+			"end": 751
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 790,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 781,
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 199,
+					"end": 780,
+					"id": {
+						"type": "Identifier",
+						"start": 209,
+						"end": 212,
+						"name": "gen"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 215,
+						"end": 780,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 219,
+								"end": 251,
+								"expression": {
+									"type": "YieldExpression",
+									"start": 219,
+									"end": 250,
+									"delegate": false,
+									"argument": {
+										"type": "ClassExpression",
+										"start": 230,
+										"end": 246,
+										"decorators": [
+											{
+												"type": "Decorator",
+												"start": 230,
+												"end": 234,
+												"expression": {
+													"type": "Identifier",
+													"start": 231,
+													"end": 234,
+													"name": "dec"
+												}
+											}
+										],
+										"id": null,
+										"superClass": null,
+										"body": {
+											"type": "ClassBody",
+											"start": 244,
+											"end": 246,
+											"body": []
+										}
+									}
+								}
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 254,
+								"end": 300,
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 260,
+										"end": 299,
+										"id": {
+											"type": "Identifier",
+											"start": 260,
+											"end": 261,
+											"name": "a"
+										},
+										"init": {
+											"type": "YieldExpression",
+											"start": 264,
+											"end": 299,
+											"delegate": false,
+											"argument": {
+												"type": "BinaryExpression",
+												"start": 270,
+												"end": 299,
+												"left": {
+													"type": "ClassExpression",
+													"start": 275,
+													"end": 291,
+													"decorators": [
+														{
+															"type": "Decorator",
+															"start": 275,
+															"end": 279,
+															"expression": {
+																"type": "Identifier",
+																"start": 276,
+																"end": 279,
+																"name": "dec"
+															}
+														}
+													],
+													"id": null,
+													"superClass": null,
+													"body": {
+														"type": "ClassBody",
+														"start": 289,
+														"end": 291,
+														"body": []
+													}
+												},
+												"operator": "%",
+												"right": {
+													"type": "Literal",
+													"start": 298,
+													"end": 299,
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										}
+									}
+								],
+								"kind": "const"
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 303,
+								"end": 350,
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 309,
+										"end": 349,
+										"id": {
+											"type": "Identifier",
+											"start": 309,
+											"end": 310,
+											"name": "b"
+										},
+										"init": {
+											"type": "YieldExpression",
+											"start": 313,
+											"end": 349,
+											"delegate": false,
+											"argument": {
+												"type": "BinaryExpression",
+												"start": 319,
+												"end": 349,
+												"left": {
+													"type": "ClassExpression",
+													"start": 324,
+													"end": 340,
+													"decorators": [
+														{
+															"type": "Decorator",
+															"start": 324,
+															"end": 328,
+															"expression": {
+																"type": "Identifier",
+																"start": 325,
+																"end": 328,
+																"name": "dec"
+															}
+														}
+													],
+													"id": null,
+													"superClass": null,
+													"body": {
+														"type": "ClassBody",
+														"start": 338,
+														"end": 340,
+														"body": []
+													}
+												},
+												"operator": "**",
+												"right": {
+													"type": "Literal",
+													"start": 348,
+													"end": 349,
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										}
+									}
+								],
+								"kind": "const"
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 353,
+								"end": 397,
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 359,
+										"end": 396,
+										"id": {
+											"type": "Identifier",
+											"start": 359,
+											"end": 360,
+											"name": "c"
+										},
+										"init": {
+											"type": "YieldExpression",
+											"start": 363,
+											"end": 396,
+											"delegate": false,
+											"argument": {
+												"type": "MemberExpression",
+												"start": 369,
+												"end": 396,
+												"object": {
+													"type": "ClassExpression",
+													"start": 374,
+													"end": 390,
+													"decorators": [
+														{
+															"type": "Decorator",
+															"start": 374,
+															"end": 378,
+															"expression": {
+																"type": "Identifier",
+																"start": 375,
+																"end": 378,
+																"name": "dec"
+															}
+														}
+													],
+													"id": null,
+													"superClass": null,
+													"body": {
+														"type": "ClassBody",
+														"start": 388,
+														"end": 390,
+														"body": []
+													}
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 395,
+													"end": 396,
+													"name": "x"
+												},
+												"computed": false,
+												"optional": false
+											}
+										}
+									}
+								],
+								"kind": "const"
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 400,
+								"end": 448,
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 406,
+										"end": 447,
+										"id": {
+											"type": "Identifier",
+											"start": 406,
+											"end": 407,
+											"name": "d"
+										},
+										"init": {
+											"type": "YieldExpression",
+											"start": 410,
+											"end": 447,
+											"delegate": false,
+											"argument": {
+												"type": "CallExpression",
+												"start": 416,
+												"end": 447,
+												"callee": {
+													"type": "ClassExpression",
+													"start": 421,
+													"end": 441,
+													"decorators": [
+														{
+															"type": "Decorator",
+															"start": 421,
+															"end": 423,
+															"expression": {
+																"type": "Identifier",
+																"start": 422,
+																"end": 423,
+																"name": "a"
+															}
+														},
+														{
+															"type": "Decorator",
+															"start": 427,
+															"end": 429,
+															"expression": {
+																"type": "Identifier",
+																"start": 428,
+																"end": 429,
+																"name": "b"
+															}
+														}
+													],
+													"id": null,
+													"superClass": null,
+													"body": {
+														"type": "ClassBody",
+														"start": 439,
+														"end": 441,
+														"body": []
+													}
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									}
+								],
+								"kind": "const"
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 451,
+								"end": 496,
+								"expression": {
+									"type": "CallExpression",
+									"start": 451,
+									"end": 495,
+									"callee": {
+										"type": "Identifier",
+										"start": 451,
+										"end": 452,
+										"name": "f"
+									},
+									"arguments": [
+										{
+											"type": "YieldExpression",
+											"start": 457,
+											"end": 491,
+											"delegate": false,
+											"argument": {
+												"type": "ClassExpression",
+												"start": 469,
+												"end": 486,
+												"decorators": [
+													{
+														"type": "Decorator",
+														"start": 469,
+														"end": 473,
+														"expression": {
+															"type": "Identifier",
+															"start": 470,
+															"end": 473,
+															"name": "dec"
+														}
+													}
+												],
+												"id": null,
+												"superClass": null,
+												"body": {
+													"type": "ClassBody",
+													"start": 484,
+													"end": 486,
+													"body": []
+												}
+											}
+										}
+									],
+									"optional": false
+								}
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 584,
+								"end": 624,
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 590,
+										"end": 623,
+										"id": {
+											"type": "Identifier",
+											"start": 590,
+											"end": 591,
+											"name": "e"
+										},
+										"init": {
+											"type": "YieldExpression",
+											"start": 594,
+											"end": 623,
+											"delegate": false,
+											"argument": {
+												"type": "AssignmentExpression",
+												"start": 601,
+												"end": 622,
+												"operator": "=",
+												"left": {
+													"type": "MemberExpression",
+													"start": 601,
+													"end": 618,
+													"object": {
+														"type": "ClassExpression",
+														"start": 601,
+														"end": 616,
+														"decorators": [
+															{
+																"type": "Decorator",
+																"start": 601,
+																"end": 605,
+																"expression": {
+																	"type": "Identifier",
+																	"start": 602,
+																	"end": 605,
+																	"name": "dec"
+																}
+															}
+														],
+														"id": null,
+														"superClass": null,
+														"body": {
+															"type": "ClassBody",
+															"start": 614,
+															"end": 616,
+															"body": []
+														}
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 617,
+														"end": 618,
+														"name": "x"
+													},
+													"computed": false,
+													"optional": false
+												},
+												"right": {
+													"type": "Literal",
+													"start": 621,
+													"end": 622,
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										}
+									}
+								],
+								"kind": "const",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " a pair the operand prints anyway is the class's: an assignment's, a sequence's",
+										"start": 500,
+										"end": 581
+									}
+								]
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 627,
+								"end": 666,
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 633,
+										"end": 665,
+										"id": {
+											"type": "Identifier",
+											"start": 633,
+											"end": 634,
+											"name": "g"
+										},
+										"init": {
+											"type": "YieldExpression",
+											"start": 637,
+											"end": 665,
+											"delegate": false,
+											"argument": {
+												"type": "SequenceExpression",
+												"start": 644,
+												"end": 664,
+												"expressions": [
+													{
+														"type": "ClassExpression",
+														"start": 644,
+														"end": 659,
+														"decorators": [
+															{
+																"type": "Decorator",
+																"start": 644,
+																"end": 648,
+																"expression": {
+																	"type": "Identifier",
+																	"start": 645,
+																	"end": 648,
+																	"name": "dec"
+																}
+															}
+														],
+														"id": null,
+														"superClass": null,
+														"body": {
+															"type": "ClassBody",
+															"start": 657,
+															"end": 659,
+															"body": []
+														}
+													},
+													{
+														"type": "Literal",
+														"start": 663,
+														"end": 664,
+														"value": 1,
+														"raw": "1"
+													}
+												]
+											}
+										}
+									}
+								],
+								"kind": "const"
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 754,
+								"end": 777,
+								"expression": {
+									"type": "YieldExpression",
+									"start": 754,
+									"end": 776,
+									"delegate": true,
+									"argument": {
+										"type": "ClassExpression",
+										"start": 761,
+										"end": 776,
+										"decorators": [
+											{
+												"type": "Decorator",
+												"start": 761,
+												"end": 765,
+												"expression": {
+													"type": "Identifier",
+													"start": 762,
+													"end": 765,
+													"name": "dec"
+												}
+											}
+										],
+										"id": null,
+										"superClass": null,
+										"body": {
+											"type": "ClassBody",
+											"start": 774,
+											"end": 776,
+											"body": []
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " `yield*` takes the class bare in both tools: acorn reads the `@` after the `*`",
+										"start": 670,
+										"end": 751
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An authored pair around a decorated class at the leftmost position of a `yield` operand",
+							"start": 20,
+							"end": 110
+						},
+						{
+							"type": "Line",
+							"value": " is kept: without it the `@` follows `yield`, which acorn (Svelte's parser) rejects",
+							"start": 112,
+							"end": 197
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

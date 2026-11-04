@@ -5,7 +5,9 @@
 // - Clarity-based parens (mixing logical operators, etc.)
 
 use crate::ast::{self, BinaryOperator, Expression, ExpressionKind};
-use crate::printer::comments::{AsiOperandShell, CommentSpacing, left_spine_shell_is_comment_free};
+use crate::printer::comments::{
+    AsiOperandShell, CommentSpacing, leading_decorated_class, left_spine_shell_is_comment_free,
+};
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::statements::restricted_production::ArgumentHang;
 use crate::printer::{
@@ -2116,6 +2118,89 @@ impl<'a> Printer<'a> {
         yield_expr: &ast::YieldExpression<'_>,
         yield_expr_span: Span,
     ) -> DocId {
+        let Some(target) = self.yield_operand_class_pair_target(yield_expr, yield_expr_span) else {
+            return self.build_yield_doc_inner(yield_expr, yield_expr_span);
+        };
+        let prev = self.leftmost_pair_target.replace(Some(target));
+        let doc = self.build_yield_doc_inner(yield_expr, yield_expr_span);
+        self.leftmost_pair_target.set(prev);
+        doc
+    }
+
+    /// The decorated class at a plain `yield` operand's leftmost position whose AUTHORED pair
+    /// the printer keeps — `yield (@dec class {}).x` — or `None`.
+    ///
+    /// The pair is kept, never added: a bare `yield @dec class {}` is grammatical (tsc reads
+    /// it, and prettier prints it), but acorn — Svelte's parser — rejects an `@` right after
+    /// `yield`, so stripping an authored pair would turn a component that compiles into one
+    /// that does not. `yield*` reads the `@` fine in every parser and takes no pair.
+    ///
+    /// The pair is the class's unless the operand already prints one ahead of the `@`, which
+    /// then carries the class's `(` — three such pairs, and the class takes no second:
+    ///
+    /// - **the operand's own required pair**: an assignment (`yield (x = 1)`), a sequence, or
+    ///   any pair on the printed left spine between the operand and the class
+    ///   ([`leading_decorated_class`] stops at the first one). This is also what keeps the
+    ///   rule a fixed point: a `(` the printer writes right before the `@` for one of these
+    ///   three is read by the same test on the next pass, which declines it the same way;
+    /// - **a comment kept before the `)` of the author's shell around the WHOLE operand**,
+    ///   which retains that shell ([`Self::build_keyword_operand_pair_doc`]);
+    /// - **the hanging restricted-production pair** (`yield (⏎// c⏎…⏎)`), which the hang
+    ///   arms of [`Self::build_yield_doc_inner`] clear the target under.
+    ///
+    /// An author's pair around the WHOLE operand (`yield (@dec class {}.x)`) is read as the
+    /// class's: the `(` stands right before the `@` either way, and the pair moves onto the
+    /// class, which is where the reparse needs it.
+    ///
+    /// One authoring keeps no pair at all: a comment on the page inside the author's shell
+    /// around the class alone, behind the class (`yield (@dec class {} // c⏎)!.x`,
+    /// `yield (@dec class {} /* c */).x`). What follows that shell prints the comment — a
+    /// retained comment shell, an operator's or a member's gap — so a pair of the class's
+    /// own would close ahead of it and print twice or move it. The class prints bare there,
+    /// as it does without the rule, which acorn rejects.
+    // TODO: the class's pair could print that comment inside itself and claim it, which
+    // would keep the pair here and fix the arrow-body and statement-start twins of this
+    // shape (`() => (@dec class {} // c⏎)!.x` breaks F1 the same way). It needs a claim
+    // every one of those followers reads.
+    fn yield_operand_class_pair_target(
+        &self,
+        yield_expr: &ast::YieldExpression<'_>,
+        yield_expr_span: Span,
+    ) -> Option<Span> {
+        let arg = yield_expr.argument.filter(|_| !yield_expr.delegate)?;
+        if self.needs_parens(arg, ParenContext::YieldArgument) {
+            return None;
+        }
+        let class = leading_decorated_class(arg)?;
+        if self.prev_significant_byte(class.span.start) != Some(b'(')
+            || self.has_comments_on_page_between(arg.span().end, yield_expr_span.end)
+        {
+            return None;
+        }
+        // A comment inside the author's shell around the class ALONE, behind the class
+        // (`yield (@dec class {} // c⏎)!.x`), belongs to whatever follows the shell: a
+        // retained comment shell, an operator's gap, a member gap. The class's own pair
+        // would close ahead of it, printing a second pair or moving the comment on the next
+        // pass, so the class takes none and the line prints as it did without the rule.
+        let mut end = class.span.end;
+        while let Some(close) = self.paren_shell_close_after(end) {
+            if close > yield_expr_span.end {
+                break;
+            }
+            if self.has_comments_on_page_between(end, close) {
+                return None;
+            }
+            end = close;
+        }
+        Some(class.span)
+    }
+
+    /// [`Self::build_yield_doc`] once its leftmost-class target is set.
+    fn build_yield_doc_inner(
+        &self,
+        yield_expr: &ast::YieldExpression<'_>,
+        yield_expr_span: Span,
+    ) -> DocId {
         let d = self.d();
         let keyword = if yield_expr.delegate {
             "yield*"
@@ -2152,13 +2237,16 @@ impl<'a> Printer<'a> {
             // productions on one path: a same-line-as-`(` `//` comment trails the `(`, a
             // sequence operand renders bare, and a comment before the `)` stays inside. The
             // boundary is discarded — `yield` is an expression, so its enclosing statement
-            // (not this doc) appends the `;`, and `yield_expr_span.end` is the `)`.
+            // (not this doc) appends the `;`, and `yield_expr_span.end` is the `)`. The
+            // hanging pair is the one a leftmost decorated class needs, so it takes no second.
+            let prev = self.leftmost_pair_target.replace(None);
             let (hanging, _boundary) = self.build_restricted_production_paren_doc(
                 keyword,
                 keyword_end,
                 arg,
                 yield_expr_span.end,
             );
+            self.leftmost_pair_target.set(prev);
             return hanging;
         }
 
@@ -2201,12 +2289,15 @@ impl<'a> Printer<'a> {
         };
         match edge {
             LeadingBreak::Hard => {
+                // the hanging pair is a leftmost decorated class's, as above
+                let prev = self.leftmost_pair_target.replace(None);
                 let (hanging, _boundary) = self.build_restricted_production_paren_doc(
                     keyword,
                     keyword_end,
                     arg,
                     yield_expr_span.end,
                 );
+                self.leftmost_pair_target.set(prev);
                 hanging
             }
             LeadingBreak::Soft => {

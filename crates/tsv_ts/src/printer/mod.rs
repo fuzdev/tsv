@@ -481,20 +481,27 @@ pub(crate) struct Printer<'a> {
     /// ([`Self::arrow_variable_type_args_start`]); it takes the ordinary group. Set only
     /// while that binding builds.
     pub(crate) arrow_variable_type_args: Cell<Option<u32>>,
-    /// Span of the node at the leftmost position of an arrow body that must be wrapped in
-    /// parens because a concise body cannot start with its first token — an object's `{`
-    /// (read as a block body) or a decorated class's `@`: `() => ({}) as Logger`,
-    /// `() => ({}).prop`, `() => ({}) && a`, `() => ({}).b++`,
-    /// `() => (@dec class {}).k`. Matches prettier's `startsWithNoLookaheadToken`
-    /// traversal. Keyed by span (not consumed) so a chain rebuilding its base across
-    /// conditional-group variants wraps consistently, and a same-shaped node nested
-    /// deeper (a call argument) never matches.
-    pub(crate) arrow_body_leftmost_parens_target: Cell<Option<Span>>,
+    /// Span of the node at the leftmost position of an operand that takes a pair of its
+    /// own there. Two positions set it:
+    ///
+    /// - an **arrow body**, whose concise form cannot start with the node's first token —
+    ///   an object's `{` (read as a block body) or a decorated class's `@`:
+    ///   `() => ({}) as Logger`, `() => ({}).prop`, `() => ({}) && a`, `() => ({}).b++`,
+    ///   `() => (@dec class {}).k`. Matches prettier's `startsWithNoLookaheadToken`
+    ///   traversal;
+    /// - a plain **`yield` operand** whose leftmost decorated class the author wrote in a
+    ///   pair (`yield (@dec class {}).x`), which is KEPT, never added
+    ///   ([`Self::yield_operand_class_pair_target`]).
+    ///
+    /// Keyed by span (not consumed) so a chain rebuilding its base across conditional-group
+    /// variants wraps consistently, and a same-shaped node nested deeper (a call argument)
+    /// never matches.
+    pub(crate) leftmost_pair_target: Cell<Option<Span>>,
     /// Span of the object/function/class node that starts an expression statement
     /// and must be wrapped in parens, even when nested as the leftmost token of a
     /// member/binary/etc. chain: `(class {}).foo`, `({}).foo`, `(class {}) + 1`,
     /// `({a: 1}).b().c()`. Matches prettier's `startsWithNoLookaheadToken` traversal.
-    /// Keyed by span (not consumed, like `arrow_body_leftmost_parens_target`) so a chain
+    /// Keyed by span (not consumed, like `leftmost_pair_target`) so a chain
     /// rebuilding its base across conditional-group variants wraps consistently; cleared
     /// once per statement in `build_expression_statement_doc`.
     pub(crate) expr_stmt_paren_target: Cell<Option<Span>>,
@@ -983,7 +990,7 @@ impl<'a> Printer<'a> {
             forced_list_elements: RefCell::new(Vec::new()),
             nullable_union_type_args: RefCell::new(Vec::new()),
             arrow_variable_type_args: Cell::new(None),
-            arrow_body_leftmost_parens_target: Cell::new(None),
+            leftmost_pair_target: Cell::new(None),
             expr_stmt_paren_target: Cell::new(None),
             ternary_hang_target: Cell::new(None),
             assignment_value_target: Cell::new(None),

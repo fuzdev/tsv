@@ -12,6 +12,7 @@ use crate::printer::ParenContext;
 use crate::printer::chain::{
     chain_mid_chain_paren_gaps, chain_paren_leading_gap, tag_paren_leading_start,
 };
+use crate::printer::class_expr_has_decorators;
 use crate::printer::expressions::conditional::ternary_test_needs_parens;
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::ignore::FrozenOperandPair;
@@ -185,6 +186,37 @@ pub(crate) fn leading_regex_start(expr: &ast::Expression<'_>) -> Option<u32> {
             ExpressionKind::RegexLiteral(_) => return Some(node.span().start),
             // A sequence at a value position prints its own envelope (`build_sequence_doc`'s
             // default layout), so its `(` comes first.
+            ExpressionKind::SequenceExpression(_) => return None,
+            _ => {}
+        }
+        let (child, parenthesized) = printed_left_spine_step(node, false)?;
+        if parenthesized {
+            return None;
+        }
+        node = child;
+    }
+}
+
+/// The decorated class expression `expr` PRINTS FIRST, at a position that adds no pair of
+/// its own — `None` when a pair the printer prints (or any other token) comes first.
+///
+/// [`leading_regex_start`]'s walk ([`printed_left_spine_step`]), stopping at the first pair
+/// that stands: `@dec class {}.x` and `@dec class {} % 2` reach the class, while
+/// `(@dec class {} + 1).x` stops at the member object's pair, `@dec class {} / 2` at the
+/// dividend's and `(@dec class {}, 1)` at the sequence's envelope. The question a `yield`
+/// operand asks of an authored pair around its leftmost class
+/// ([`Printer::yield_operand_class_pair_target`]): a pair the operand prints anyway ahead of
+/// the `@` already guards it, so the class takes none of its own there.
+pub(in crate::printer) fn leading_decorated_class<'e>(
+    expr: &'e ast::Expression<'e>,
+) -> Option<&'e ast::Expression<'e>> {
+    use ast::ExpressionKind;
+    let mut node = expr;
+    loop {
+        match &node.kind {
+            ExpressionKind::ClassExpression(class) if class_expr_has_decorators(class) => {
+                return Some(node);
+            }
             ExpressionKind::SequenceExpression(_) => return None,
             _ => {}
         }

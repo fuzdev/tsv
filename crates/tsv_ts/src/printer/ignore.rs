@@ -689,7 +689,7 @@ impl<'a> Printer<'a> {
     /// twin applies at this very position, plus the one the SLICE needs beyond it), the
     /// expression statement's target ([`Printer::maybe_wrap_expr_stmt_paren`] — the node that
     /// must not open the line with `{` / `function` / `class`) and the arrow body's
-    /// leftmost-object one ([`Printer::arrow_body_leftmost_parens_target`], whose `{` would
+    /// leftmost-object one ([`Printer::leftmost_pair_target`], whose `{` would
     /// read as a block body).
     ///
     /// All three are cells or verdicts the node's OWN builder reads, and a verbatim slice
@@ -714,7 +714,7 @@ impl<'a> Printer<'a> {
             return self.d().parens(doc);
         }
         let span = operand.span();
-        let doc = if self.arrow_body_leftmost_parens_target.get() == Some(span) {
+        let doc = if self.leftmost_pair_target.get() == Some(span) {
             self.d().parens(doc)
         } else {
             doc

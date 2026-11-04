@@ -3239,7 +3239,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             | TokenKind::Slash
             | TokenKind::SlashEquals
             | TokenKind::LessThan
-            | TokenKind::Hash => true,
+            | TokenKind::Hash
+            // A decorated class expression (`yield @dec class {}`): the decorators proposal's
+            // `ClassExpression : DecoratorList? class …` is an `AssignmentExpression` like any
+            // other, and tsc's `isStartOfExpression` admits its `@`. The primary parser's `@`
+            // arm takes it from here.
+            | TokenKind::At => true,
             // Most keywords can start expressions (as primaries, unary ops, or contextual
             // identifiers); the statement, clause and binary-operator keywords cannot. The set
             // is shared with the type-argument follower lookahead.

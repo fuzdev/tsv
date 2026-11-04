@@ -3437,11 +3437,9 @@ impl<'a> Printer<'a> {
         expr: &ast::Expression<'_>,
     ) -> Option<DocId> {
         let leftmost_span = leftmost_arrow_body_parens_span(expr)?;
-        let prev = self
-            .arrow_body_leftmost_parens_target
-            .replace(Some(leftmost_span));
+        let prev = self.leftmost_pair_target.replace(Some(leftmost_span));
         let doc = self.build_flat_chain_expression_doc(expr);
-        self.arrow_body_leftmost_parens_target.set(prev);
+        self.leftmost_pair_target.set(prev);
         Some(doc)
     }
 

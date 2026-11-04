@@ -344,8 +344,7 @@ impl<'a> Printer<'a> {
                 // (`() => ({}) && a`). Matched by span (not consumed): a chain may rebuild
                 // its base across conditional-group variants, and a nested call-argument
                 // object has a different span so it never matches.
-                let needs_arrow_parens =
-                    self.arrow_body_leftmost_parens_target.get() == Some(expr.span);
+                let needs_arrow_parens = self.leftmost_pair_target.get() == Some(expr.span);
                 let doc = self.build_object_doc(obj, expr.span);
                 let doc = if needs_arrow_parens {
                     self.d().parens(doc)
@@ -392,15 +391,17 @@ impl<'a> Printer<'a> {
                 // A DECORATED class expression at the leftmost position of an arrow body
                 // takes the same pair its object twin above takes, and for the same
                 // reason: `@` is not a token `ConciseBody` admits, so `() => @dec class
-                // {}.k` does not reparse. Only a decorated class is ever the target
-                // (`leftmost_arrow_body_parens_span`), so the kind needs no second test
-                // here. It breaks its parens open like the statement-start form below —
-                // the decorator owns its own line either way.
+                // {}.k` does not reparse. The `yield` operand's kept pair is this one too
+                // (`Printer::yield_operand_class_pair_target`). Only a decorated class is
+                // ever the target (`leftmost_arrow_body_parens_span`,
+                // `leading_decorated_class`), so the kind needs no second test here. It
+                // breaks its parens open like the statement-start form below — the
+                // decorator owns its own line either way.
                 // A decorated class expression that self-wraps at an expression-statement
                 // start (`(@dec class {}).foo`, `(@dec class {})()`) breaks its parens
                 // open + indents, like the bare-statement form; an undecorated
                 // `(class {}).foo` keeps the flat wrap.
-                if self.arrow_body_leftmost_parens_target.get() == Some(expr.span)
+                if self.leftmost_pair_target.get() == Some(expr.span)
                     || (self.expr_stmt_paren_target.get() == Some(expr.span)
                         && class_expr_has_decorators(class_expr))
                 {
