@@ -603,8 +603,7 @@ impl<'a> Printer<'a> {
             );
 
         // Which grouping `)` this print retains and emits the expression→`)` gap inside.
-        // The two paren-KEEPING branches below claim it; the decorated one does not (its
-        // layout has no seam for a trailing run), so there the terminator gap keeps it.
+        // The three paren-KEEPING branches below claim it.
         // The plain statement — no required, directive-avoiding, or source paren — IS its
         // expression: the branch below would push it alone and `concat` would hand it
         // back, so the buffer is skipped outright (the common case by a wide margin).
@@ -635,7 +634,12 @@ impl<'a> Printer<'a> {
             parts.push(d.hardline());
             parts.push(d.text(")"));
         } else if decorated_class_expr {
-            parts.push(self.build_break_open_parens(expr_doc));
+            // The pair is broken open already, so a `//` before its `)` stays inside it,
+            // after the class, rather than deferring past the `;` onto a line a trailing
+            // comment may hold, where the two merge (`(@dec class {}⏎// c⏎); // d`).
+            let mut inner: DocBuf = smallvec![expr_doc];
+            consumed_close = self.push_retained_gap_trailing_run(&mut inner, expr_end, shell_close);
+            parts.push(self.build_break_open_parens(d.concat(&inner)));
         } else if let Some(close) = shell_close {
             // The value's authored parens are RETAINED around a `//` that would otherwise
             // escape them. This pair is the position's pair — a shell whose `(` leads the
@@ -691,7 +695,7 @@ impl<'a> Printer<'a> {
     /// report the `)` claimed — `None` when there is nothing to retain, which leaves the
     /// gap to the caller's terminator scan.
     ///
-    /// One seam so the two paren-keeping branches of
+    /// One seam so the three paren-keeping branches of
     /// [`Self::build_expression_statement_value_doc`] cannot claim different ranges: a
     /// region claimed here and re-read there is a DOUBLE-PRINT, and one claimed at
     /// neither is a DROP.
