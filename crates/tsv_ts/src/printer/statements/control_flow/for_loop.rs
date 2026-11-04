@@ -634,9 +634,25 @@ impl<'a> Printer<'a> {
             // header isn't collapsed to `;;` — prettier keeps it whenever the header
             // isn't fully empty (`for (x = 0; ;)`, not `for (x = 0;;)`; the fully-empty
             // `for (;;)` returned above).
-            inner_parts.push(d.line());
+            // A `//` on the `;`'s own line trails that `;` (`a; // c`), as it does when the
+            // test clause is present ([`Self::push_for_clause_same_line_comments`]): the slot
+            // is empty, but the comment's line is the separator's. It is also where an
+            // init→`;` `//` prints ([`Self::push_for_clause_semicolon`]), so its reparse,
+            // which reads the comment in this slot, keeps it there.
+            let mut slot_start = first_semi.map(|semi| semi + 1);
             if let (Some(semi), Some(region_end)) = (first_semi, spans.test_region_end())
-                && self.push_for_empty_slot_comments(&mut inner_parts, semi + 1, region_end)
+                && self.semicolon_line_is_open(init_end, semi)
+                && let Some(glued) = self
+                    .comments_to_emit_between(semi + 1, region_end)
+                    .next()
+                    .filter(|c| !c.is_block && self.is_same_line(semi, c.span.start))
+            {
+                inner_parts.push(self.build_trailing_line_comment_doc(glued));
+                slot_start = Some(glued.span.end);
+            }
+            inner_parts.push(d.line());
+            if let (Some(start), Some(region_end)) = (slot_start, spans.test_region_end())
+                && self.push_for_empty_slot_comments(&mut inner_parts, start, region_end)
             {
                 inner_parts.push(d.line());
             }
@@ -708,13 +724,24 @@ impl<'a> Printer<'a> {
                 )
             }));
         }
-        if let Some(start) = spans.update_trailing_start() {
-            self.push_for_update_trailing_comments(
-                &mut inner_parts,
-                start,
-                spans.close_paren.unwrap_or(span.end),
-                update_end,
-            );
+        if let Some(mut start) = spans.update_trailing_start() {
+            let close = spans.close_paren.unwrap_or(span.end);
+            // An absent update clause's slot: a `//` on the second `;`'s line trails that
+            // `;`, as the test slot's does, and through the same deferred doc, which keeps it
+            // behind a `//` the test→`;` gap already hung on that `;` rather than welded onto
+            // its line.
+            if update_end.is_none()
+                && let Some(semi) = second_semi
+                && self.semicolon_line_is_open(test_end, semi)
+                && let Some(glued) = self
+                    .comments_to_emit_between(start, close)
+                    .next()
+                    .filter(|c| !c.is_block && self.is_same_line(semi, c.span.start))
+            {
+                inner_parts.push(self.build_trailing_line_comment_doc(glued));
+                start = glued.span.end;
+            }
+            self.push_for_update_trailing_comments(&mut inner_parts, start, close, update_end);
         }
 
         let closing = if has_own_line_comments {
@@ -729,6 +756,19 @@ impl<'a> Printer<'a> {
             closing,
             d.text(")"),
         ]))
+    }
+
+    /// Whether the line a clause terminator `;` prints on ends with nothing but what trails
+    /// it — the line a `//` written after it can take ([`Self::push_for_clause_semicolon`]).
+    /// A comment in the clause→`;` gap that starts a line of its own defers past the `;`
+    /// onto a line of its own, which the `;`'s trailing comment would land on and weld to;
+    /// one on the clause's line trails the `;` as a deferred doc and keeps its own place. An
+    /// absent clause's slot ends its comments with a break of its own, so its `;` is open.
+    fn semicolon_line_is_open(&self, clause_end: Option<u32>, semi: u32) -> bool {
+        clause_end.is_none_or(|end| {
+            self.comments_to_emit_between(end, semi)
+                .all(|c| self.is_same_line(end, c.span.start))
+        })
     }
 
     /// Check if for header has any own-line comments that force expansion

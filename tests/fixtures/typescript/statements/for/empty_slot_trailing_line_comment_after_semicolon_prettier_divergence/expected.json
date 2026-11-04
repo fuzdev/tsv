@@ -1,0 +1,559 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 911,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `//` on the init `;`'s line before an empty test slot trails that `;`",
+			"start": 10,
+			"end": 84
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 96,
+			"end": 101
+		},
+		{
+			"type": "Line",
+			"value": " The update slot's twin: a `//` on the test `;`'s line trails it",
+			"start": 120,
+			"end": 186
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 203,
+			"end": 208
+		},
+		{
+			"type": "Line",
+			"value": " A run: the first `//` trails the `;`, the second keeps the slot's own line",
+			"start": 217,
+			"end": 294
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 307,
+			"end": 312
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 315,
+			"end": 320
+		},
+		{
+			"type": "Line",
+			"value": " A block after the trailing `//` keeps the slot's own line too",
+			"start": 339,
+			"end": 403
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 416,
+			"end": 421
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 424,
+			"end": 432
+		},
+		{
+			"type": "Line",
+			"value": " The update slot's run",
+			"start": 451,
+			"end": 475
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 493,
+			"end": 498
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 501,
+			"end": 506
+		},
+		{
+			"type": "Line",
+			"value": " A `//` the test hangs on the `;` keeps it: the slot's own comment takes the next line",
+			"start": 515,
+			"end": 603
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 621,
+			"end": 626
+		},
+		{
+			"type": "Line",
+			"value": " c10",
+			"start": 629,
+			"end": 635
+		},
+		{
+			"type": "Line",
+			"value": " So it does after an own-line comment the clause before the `;` defers past it",
+			"start": 644,
+			"end": 724
+		},
+		{
+			"type": "Line",
+			"value": " c11",
+			"start": 742,
+			"end": 748
+		},
+		{
+			"type": "Line",
+			"value": " c12",
+			"start": 751,
+			"end": 757
+		},
+		{
+			"type": "Line",
+			"value": " c13",
+			"start": 760,
+			"end": 766
+		},
+		{
+			"type": "Line",
+			"value": " The init's `//` on the `;`, with an own-line comment deferred past it",
+			"start": 775,
+			"end": 847
+		},
+		{
+			"type": "Line",
+			"value": " c14",
+			"start": 860,
+			"end": 866
+		},
+		{
+			"type": "Line",
+			"value": " c15",
+			"start": 869,
+			"end": 875
+		},
+		{
+			"type": "Line",
+			"value": " c16",
+			"start": 878,
+			"end": 884
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 910,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 901,
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 86,
+					"end": 117,
+					"init": null,
+					"test": null,
+					"update": {
+						"type": "UpdateExpression",
+						"start": 108,
+						"end": 111,
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 108,
+							"end": 109,
+							"name": "i"
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 96,
+								"end": 101
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 115,
+						"end": 117,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `//` on the init `;`'s line before an empty test slot trails that `;`",
+							"start": 10,
+							"end": 84
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 188,
+					"end": 214,
+					"init": {
+						"type": "Identifier",
+						"start": 196,
+						"end": 197,
+						"name": "a"
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 212,
+						"end": 214,
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 203,
+								"end": 208
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The update slot's twin: a `//` on the test `;`'s line trails it",
+							"start": 120,
+							"end": 186
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 296,
+					"end": 336,
+					"init": {
+						"type": "Identifier",
+						"start": 304,
+						"end": 305,
+						"name": "a"
+					},
+					"test": null,
+					"update": {
+						"type": "UpdateExpression",
+						"start": 327,
+						"end": 330,
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 327,
+							"end": 328,
+							"name": "i"
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c3",
+								"start": 307,
+								"end": 312
+							},
+							{
+								"type": "Line",
+								"value": " c4",
+								"start": 315,
+								"end": 320
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 334,
+						"end": 336,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run: the first `//` trails the `;`, the second keeps the slot's own line",
+							"start": 217,
+							"end": 294
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 405,
+					"end": 448,
+					"init": {
+						"type": "Identifier",
+						"start": 413,
+						"end": 414,
+						"name": "a"
+					},
+					"test": null,
+					"update": {
+						"type": "UpdateExpression",
+						"start": 439,
+						"end": 442,
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 439,
+							"end": 440,
+							"name": "i"
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c5",
+								"start": 416,
+								"end": 421
+							},
+							{
+								"type": "Block",
+								"value": " c6 ",
+								"start": 424,
+								"end": 432
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 446,
+						"end": 448,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block after the trailing `//` keeps the slot's own line too",
+							"start": 339,
+							"end": 403
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 477,
+					"end": 512,
+					"init": {
+						"type": "Identifier",
+						"start": 485,
+						"end": 486,
+						"name": "a"
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 490,
+						"end": 491,
+						"name": "b"
+					},
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 510,
+						"end": 512,
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c7",
+								"start": 493,
+								"end": 498
+							},
+							{
+								"type": "Line",
+								"value": " c8",
+								"start": 501,
+								"end": 506
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The update slot's run",
+							"start": 451,
+							"end": 475
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 605,
+					"end": 641,
+					"init": {
+						"type": "Identifier",
+						"start": 613,
+						"end": 614,
+						"name": "a"
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 618,
+						"end": 619,
+						"name": "b"
+					},
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 639,
+						"end": 641,
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c9",
+								"start": 621,
+								"end": 626
+							},
+							{
+								"type": "Line",
+								"value": " c10",
+								"start": 629,
+								"end": 635
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `//` the test hangs on the `;` keeps it: the slot's own comment takes the next line",
+							"start": 515,
+							"end": 603
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 726,
+					"end": 772,
+					"init": {
+						"type": "Identifier",
+						"start": 734,
+						"end": 735,
+						"name": "a"
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 739,
+						"end": 740,
+						"name": "b"
+					},
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 770,
+						"end": 772,
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c11",
+								"start": 742,
+								"end": 748
+							},
+							{
+								"type": "Line",
+								"value": " c12",
+								"start": 751,
+								"end": 757
+							},
+							{
+								"type": "Line",
+								"value": " c13",
+								"start": 760,
+								"end": 766
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " So it does after an own-line comment the clause before the `;` defers past it",
+							"start": 644,
+							"end": 724
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 849,
+					"end": 900,
+					"init": {
+						"type": "Identifier",
+						"start": 857,
+						"end": 858,
+						"name": "a"
+					},
+					"test": null,
+					"update": {
+						"type": "UpdateExpression",
+						"start": 891,
+						"end": 894,
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 891,
+							"end": 892,
+							"name": "i"
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c14",
+								"start": 860,
+								"end": 866
+							},
+							{
+								"type": "Line",
+								"value": " c15",
+								"start": 869,
+								"end": 875
+							},
+							{
+								"type": "Line",
+								"value": " c16",
+								"start": 878,
+								"end": 884
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 898,
+						"end": 900,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The init's `//` on the `;`, with an own-line comment deferred past it",
+							"start": 775,
+							"end": 847
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

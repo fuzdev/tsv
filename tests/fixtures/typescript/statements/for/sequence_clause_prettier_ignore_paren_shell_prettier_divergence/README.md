@@ -15,9 +15,9 @@ under it). The operands stay on one line, which is where the reparse reads the
 directive: ahead of the whole clause, leading the sequence node.
 **Prettier** drops every operand after the first onto a continuation line
 (`('aaa'  in  bbb),⏎\tg;`) and keeps that break, so the authored form normalizes to
-`input.svelte` for tsv only, and prettier's own stable form is a third one tsv
-rewrites (`divergent_variant_paren_shell` — reading the directive from the clause's
-leading gap, tsv freezes the whole clause there and holds prettier's break verbatim).
+`input.svelte` for tsv only, and prettier's own stable form is one tsv keeps too
+(`variant_paren_shell` — reading the directive from the clause's leading gap, tsv
+freezes the whole clause there and holds prettier's break verbatim).
 
 **Frozen operand's trailing gap.** The freeze does not take the operand out of its
 shell: the slice is the operand's own node span, so the gap between it and the erased

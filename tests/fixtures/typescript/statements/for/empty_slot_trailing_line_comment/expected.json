@@ -1,0 +1,355 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 389,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment on the init's `;` line, before an empty test slot, trails the init",
+			"start": 10,
+			"end": 94
+		},
+		{
+			"type": "Line",
+			"value": " forever",
+			"start": 115,
+			"end": 125
+		},
+		{
+			"type": "Line",
+			"value": " Before an empty update slot, it trails the test",
+			"start": 154,
+			"end": 204
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 222,
+			"end": 227
+		},
+		{
+			"type": "Line",
+			"value": " Both later slots empty",
+			"start": 246,
+			"end": 271
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 284,
+			"end": 289
+		},
+		{
+			"type": "Line",
+			"value": " A non-block body",
+			"start": 312,
+			"end": 331
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 352,
+			"end": 357
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 388,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 379,
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 96,
+					"end": 151,
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 104,
+						"end": 113,
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 108,
+								"end": 113,
+								"id": {
+									"type": "Identifier",
+									"start": 108,
+									"end": 109,
+									"name": "i"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 112,
+									"end": 113,
+									"value": 0,
+									"raw": "0"
+								}
+							}
+						],
+						"kind": "let"
+					},
+					"test": null,
+					"update": {
+						"type": "UpdateExpression",
+						"start": 132,
+						"end": 135,
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 132,
+							"end": 133,
+							"name": "i"
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " forever",
+								"start": 115,
+								"end": 125
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 139,
+						"end": 151,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 143,
+								"end": 148,
+								"expression": {
+									"type": "CallExpression",
+									"start": 143,
+									"end": 147,
+									"callee": {
+										"type": "Identifier",
+										"start": 143,
+										"end": 145,
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment on the init's `;` line, before an empty test slot, trails the init",
+							"start": 10,
+							"end": 94
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 206,
+					"end": 243,
+					"init": {
+						"type": "Identifier",
+						"start": 214,
+						"end": 215,
+						"name": "a"
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 219,
+						"end": 220,
+						"name": "b"
+					},
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 231,
+						"end": 243,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 235,
+								"end": 240,
+								"expression": {
+									"type": "CallExpression",
+									"start": 235,
+									"end": 239,
+									"callee": {
+										"type": "Identifier",
+										"start": 235,
+										"end": 237,
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 222,
+								"end": 227
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Before an empty update slot, it trails the test",
+							"start": 154,
+							"end": 204
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 273,
+					"end": 309,
+					"init": {
+						"type": "Identifier",
+						"start": 281,
+						"end": 282,
+						"name": "a"
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 297,
+						"end": 309,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 301,
+								"end": 306,
+								"expression": {
+									"type": "CallExpression",
+									"start": 301,
+									"end": 305,
+									"callee": {
+										"type": "Identifier",
+										"start": 301,
+										"end": 303,
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 284,
+								"end": 289
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Both later slots empty",
+							"start": 246,
+							"end": 271
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 333,
+					"end": 378,
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 341,
+						"end": 350,
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 345,
+								"end": 350,
+								"id": {
+									"type": "Identifier",
+									"start": 345,
+									"end": 346,
+									"name": "i"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 349,
+									"end": 350,
+									"value": 0,
+									"raw": "0"
+								}
+							}
+						],
+						"kind": "let"
+					},
+					"test": null,
+					"update": {
+						"type": "UpdateExpression",
+						"start": 364,
+						"end": 367,
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 364,
+							"end": 365,
+							"name": "i"
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c3",
+								"start": 352,
+								"end": 357
+							}
+						]
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 373,
+						"end": 378,
+						"expression": {
+							"type": "CallExpression",
+							"start": 373,
+							"end": 377,
+							"callee": {
+								"type": "Identifier",
+								"start": 373,
+								"end": 375,
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A non-block body",
+							"start": 312,
+							"end": 331
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
