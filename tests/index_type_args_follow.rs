@@ -158,16 +158,28 @@ fn spaced_negative_literals_read_as_types() {
 
 /// A `readonly` operand is an array or tuple type: a parenthesized one only when its
 /// postfix run holds an array suffix `[]`. Otherwise acorn-typescript refuses the type
-/// and reads the call `readonly(d)[e]` in a comparison, and so does tsv — printed so that
-/// acorn reads it the same way again.
+/// and reads the call `readonly(d)[e]` in a comparison, and so does tsv — printed inside
+/// the relational pair, since tsc reads the bare line as the call at a `(` or template
+/// follower.
 #[test]
 fn readonly_parenthesized_operand_needs_an_array_suffix() {
     for (source, printed) in [
-        ("a < readonly (d)[e] > (f);\n", "a < readonly(d)[e] > f;\n"),
-        ("f<readonly (A)[K]>(x);\n", "f < readonly(A)[K] > x;\n"),
+        (
+            "a < readonly (d)[e] > (f);\n",
+            "(a < readonly(d)[e]) > f;\n",
+        ),
+        ("f<readonly (A)[K]>(x);\n", "(f < readonly(A)[K]) > x;\n"),
         (
             "a < b[c] | readonly (d)[e] > (f);\n",
             "(a < b[c]) | (readonly(d)[e] > f);\n",
+        ),
+        (
+            "(f < readonly(A)['k']) > (x, y);\n",
+            "(f < readonly(A)['k']) > (x, y);\n",
+        ),
+        (
+            "f < readonly (A) > (x, y);\n",
+            "(f < readonly(A)) > (x, y);\n",
         ),
     ] {
         assert_prints_fixed(source, printed);

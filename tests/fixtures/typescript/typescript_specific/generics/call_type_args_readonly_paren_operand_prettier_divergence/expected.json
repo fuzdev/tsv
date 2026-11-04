@@ -1,0 +1,649 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 292,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 248,
+				"end": 250,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 250,
+				"end": 291,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 253,
+							"end": 287,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 254,
+								"end": 286,
+								"left": {
+									"type": "BinaryExpression",
+									"start": 255,
+									"end": 276,
+									"left": {
+										"type": "Identifier",
+										"start": 255,
+										"end": 257,
+										"name": "fn"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 260,
+										"end": 276,
+										"object": {
+											"type": "CallExpression",
+											"start": 260,
+											"end": 271,
+											"callee": {
+												"type": "Identifier",
+												"start": 260,
+												"end": 268,
+												"name": "readonly"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 269,
+													"end": 270,
+													"name": "A"
+												}
+											],
+											"optional": false
+										},
+										"property": {
+											"type": "Literal",
+											"start": 272,
+											"end": 275,
+											"value": "k",
+											"raw": "'k'"
+										},
+										"computed": true,
+										"optional": false
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "SequenceExpression",
+									"start": 281,
+									"end": 285,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 281,
+											"end": 282,
+											"name": "x"
+										},
+										{
+											"type": "Identifier",
+											"start": 284,
+											"end": 285,
+											"name": "y"
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 248,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 239,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 20,
+					"end": 45,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 20,
+						"end": 44,
+						"left": {
+							"type": "BinaryExpression",
+							"start": 21,
+							"end": 39,
+							"left": {
+								"type": "Identifier",
+								"start": 21,
+								"end": 22,
+								"name": "a"
+							},
+							"operator": "<",
+							"right": {
+								"type": "MemberExpression",
+								"start": 25,
+								"end": 39,
+								"object": {
+									"type": "CallExpression",
+									"start": 25,
+									"end": 36,
+									"callee": {
+										"type": "Identifier",
+										"start": 25,
+										"end": 33,
+										"name": "readonly"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 34,
+											"end": 35,
+											"name": "d"
+										}
+									],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 37,
+									"end": 38,
+									"name": "e"
+								},
+								"computed": true,
+								"optional": false
+							}
+						},
+						"operator": ">",
+						"right": {
+							"type": "Identifier",
+							"start": 43,
+							"end": 44,
+							"name": "b"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 47,
+					"end": 75,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 47,
+						"end": 74,
+						"left": {
+							"type": "BinaryExpression",
+							"start": 48,
+							"end": 69,
+							"left": {
+								"type": "Identifier",
+								"start": 48,
+								"end": 50,
+								"name": "fn"
+							},
+							"operator": "<",
+							"right": {
+								"type": "MemberExpression",
+								"start": 53,
+								"end": 69,
+								"object": {
+									"type": "CallExpression",
+									"start": 53,
+									"end": 64,
+									"callee": {
+										"type": "Identifier",
+										"start": 53,
+										"end": 61,
+										"name": "readonly"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 62,
+											"end": 63,
+											"name": "A"
+										}
+									],
+									"optional": false
+								},
+								"property": {
+									"type": "Literal",
+									"start": 65,
+									"end": 68,
+									"value": "k",
+									"raw": "'k'"
+								},
+								"computed": true,
+								"optional": false
+							}
+						},
+						"operator": ">",
+						"right": {
+							"type": "Identifier",
+							"start": 73,
+							"end": 74,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 77,
+					"end": 110,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 77,
+						"end": 109,
+						"left": {
+							"type": "BinaryExpression",
+							"start": 78,
+							"end": 99,
+							"left": {
+								"type": "Identifier",
+								"start": 78,
+								"end": 80,
+								"name": "fn"
+							},
+							"operator": "<",
+							"right": {
+								"type": "MemberExpression",
+								"start": 83,
+								"end": 99,
+								"object": {
+									"type": "CallExpression",
+									"start": 83,
+									"end": 94,
+									"callee": {
+										"type": "Identifier",
+										"start": 83,
+										"end": 91,
+										"name": "readonly"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 92,
+											"end": 93,
+											"name": "A"
+										}
+									],
+									"optional": false
+								},
+								"property": {
+									"type": "Literal",
+									"start": 95,
+									"end": 98,
+									"value": "k",
+									"raw": "'k'"
+								},
+								"computed": true,
+								"optional": false
+							}
+						},
+						"operator": ">",
+						"right": {
+							"type": "SequenceExpression",
+							"start": 104,
+							"end": 108,
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 104,
+									"end": 105,
+									"name": "x"
+								},
+								{
+									"type": "Identifier",
+									"start": 107,
+									"end": 108,
+									"name": "y"
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 112,
+					"end": 140,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 112,
+						"end": 139,
+						"left": {
+							"type": "BinaryExpression",
+							"start": 113,
+							"end": 129,
+							"left": {
+								"type": "Identifier",
+								"start": 113,
+								"end": 115,
+								"name": "fn"
+							},
+							"operator": "<",
+							"right": {
+								"type": "CallExpression",
+								"start": 118,
+								"end": 129,
+								"callee": {
+									"type": "Identifier",
+									"start": 118,
+									"end": 126,
+									"name": "readonly"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 127,
+										"end": 128,
+										"name": "A"
+									}
+								],
+								"optional": false
+							}
+						},
+						"operator": ">",
+						"right": {
+							"type": "SequenceExpression",
+							"start": 134,
+							"end": 138,
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 134,
+									"end": 135,
+									"name": "x"
+								},
+								{
+									"type": "Identifier",
+									"start": 137,
+									"end": 138,
+									"name": "y"
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 142,
+					"end": 170,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 142,
+						"end": 169,
+						"left": {
+							"type": "BinaryExpression",
+							"start": 143,
+							"end": 162,
+							"left": {
+								"type": "Identifier",
+								"start": 143,
+								"end": 145,
+								"name": "fn"
+							},
+							"operator": "<",
+							"right": {
+								"type": "MemberExpression",
+								"start": 148,
+								"end": 162,
+								"object": {
+									"type": "TaggedTemplateExpression",
+									"start": 148,
+									"end": 159,
+									"tag": {
+										"type": "Identifier",
+										"start": 148,
+										"end": 156,
+										"name": "readonly"
+									},
+									"quasi": {
+										"type": "TemplateLiteral",
+										"start": 156,
+										"end": 159,
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 157,
+												"end": 158,
+												"value": {
+													"raw": "t",
+													"cooked": "t"
+												},
+												"tail": true
+											}
+										]
+									}
+								},
+								"property": {
+									"type": "Literal",
+									"start": 160,
+									"end": 161,
+									"value": 0,
+									"raw": "0"
+								},
+								"computed": true,
+								"optional": false
+							}
+						},
+						"operator": ">",
+						"right": {
+							"type": "TemplateLiteral",
+							"start": 166,
+							"end": 169,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 167,
+									"end": 168,
+									"value": {
+										"raw": "u",
+										"cooked": "u"
+									},
+									"tail": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 172,
+					"end": 205,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 172,
+						"end": 204,
+						"left": {
+							"type": "BinaryExpression",
+							"start": 173,
+							"end": 199,
+							"left": {
+								"type": "NewExpression",
+								"start": 173,
+								"end": 182,
+								"callee": {
+									"type": "Identifier",
+									"start": 177,
+									"end": 180,
+									"name": "Cls"
+								},
+								"arguments": []
+							},
+							"operator": "<",
+							"right": {
+								"type": "MemberExpression",
+								"start": 185,
+								"end": 199,
+								"object": {
+									"type": "CallExpression",
+									"start": 185,
+									"end": 196,
+									"callee": {
+										"type": "Identifier",
+										"start": 185,
+										"end": 193,
+										"name": "readonly"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 194,
+											"end": 195,
+											"name": "A"
+										}
+									],
+									"optional": false
+								},
+								"property": {
+									"type": "Literal",
+									"start": 197,
+									"end": 198,
+									"value": 0,
+									"raw": "0"
+								},
+								"computed": true,
+								"optional": false
+							}
+						},
+						"operator": ">",
+						"right": {
+							"type": "Identifier",
+							"start": 203,
+							"end": 204,
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 207,
+					"end": 238,
+					"expression": {
+						"type": "CallExpression",
+						"start": 207,
+						"end": 237,
+						"callee": {
+							"type": "Identifier",
+							"start": 207,
+							"end": 209,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 235,
+								"end": 236,
+								"name": "x"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 209,
+							"end": 234,
+							"params": [
+								{
+									"type": "TSTypeOperator",
+									"start": 210,
+									"end": 233,
+									"operator": "readonly",
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 219,
+										"end": 233,
+										"elementType": {
+											"type": "TSIndexedAccessType",
+											"start": 219,
+											"end": 231,
+											"objectType": {
+												"type": "TSParenthesizedType",
+												"start": 219,
+												"end": 226,
+												"typeAnnotation": {
+													"type": "TSUnionType",
+													"start": 220,
+													"end": 225,
+													"types": [
+														{
+															"type": "TSTypeReference",
+															"start": 220,
+															"end": 221,
+															"typeName": {
+																"type": "Identifier",
+																"start": 220,
+																"end": 221,
+																"name": "A"
+															}
+														},
+														{
+															"type": "TSTypeReference",
+															"start": 224,
+															"end": 225,
+															"typeName": {
+																"type": "Identifier",
+																"start": 224,
+																"end": 225,
+																"name": "B"
+															}
+														}
+													]
+												}
+											},
+											"indexType": {
+												"type": "TSLiteralType",
+												"start": 227,
+												"end": 230,
+												"literal": {
+													"type": "Literal",
+													"start": 227,
+													"end": 230,
+													"value": "k",
+													"raw": "'k'"
+												}
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

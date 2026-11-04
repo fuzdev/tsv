@@ -3052,9 +3052,13 @@ fn type_operator_grade(
                 // acorn-typescript refuses under `readonly`, reading the call
                 // `readonly(d)[e]` in a comparison instead; `readonly (d)[e][]` is an array,
                 // and `readonly (d)[]['k']` an index into one. The run's indices are left for
-                // the follow filter to grade, from `close + 1`.
+                // the follow filter to grade, from `close + 1`. As at the tuple arm, only the
+                // source reading takes the comparison: the printed-form readings keep the type
+                // reading, since tsc reads the bare line as the call where a `(` or a template
+                // follows, so the relational pair stands around it.
                 match postfix_run_holds_array_suffix(bytes, close + 1) {
                     Some(true) => close + 1,
+                    Some(false) if !scan.reads_source_as_written() => close + 1,
                     _ => return HeadGrade::Decided(false),
                 }
             } else if let Some(literal_end) = readonly_literal_element_end(bytes, after_kw) {
@@ -3065,9 +3069,12 @@ fn type_operator_grade(
                 // whether a type-argument list closes here. A negative literal stays out:
                 // acorn-typescript reads it with its expression parser, whose member read
                 // meets the `]` (`readonly -1[]` does not parse there), and the printer
-                // always pairs one ahead of `[]`.
+                // always pairs one ahead of `[]`. The printed-form readings keep the type
+                // reading here too (a template is the one literal head a value spells,
+                // `` readonly`t`[0] ``, a tagged template).
                 match postfix_run_holds_array_suffix(bytes, literal_end) {
                     Some(true) => literal_end,
+                    Some(false) if !scan.reads_source_as_written() => literal_end,
                     _ => return HeadGrade::Decided(false),
                 }
             } else {
