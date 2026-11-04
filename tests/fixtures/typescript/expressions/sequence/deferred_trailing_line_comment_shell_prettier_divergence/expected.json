@@ -1,0 +1,664 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 635,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment inside the last operand's own redundant pair is the same deferred",
+			"start": 20,
+			"end": 103
+		},
+		{
+			"type": "Line",
+			"value": " run: the sequence's parens close before it, so the operand run stays on one line.",
+			"start": 105,
+			"end": 189
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 199,
+			"end": 204
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 224,
+			"end": 229
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 244,
+			"end": 249
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 264,
+			"end": 269
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 294,
+			"end": 299
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 324,
+			"end": 329
+		},
+		{
+			"type": "Line",
+			"value": " In a statement header's test and a ternary's test the comment ends its line inside the",
+			"start": 332,
+			"end": 421
+		},
+		{
+			"type": "Line",
+			"value": " construct, before its closer or the `?`.",
+			"start": 423,
+			"end": 466
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 482,
+			"end": 487
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 512,
+			"end": 517
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 545,
+			"end": 550
+		},
+		{
+			"type": "Line",
+			"value": " c10",
+			"start": 577,
+			"end": 583
+		},
+		{
+			"type": "Line",
+			"value": " c11",
+			"start": 605,
+			"end": 611
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 634,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 625,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 191,
+					"end": 198,
+					"expression": {
+						"type": "SequenceExpression",
+						"start": 192,
+						"end": 196,
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 192,
+								"end": 193,
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 195,
+								"end": 196,
+								"name": "b"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment inside the last operand's own redundant pair is the same deferred",
+							"start": 20,
+							"end": 103
+						},
+						{
+							"type": "Line",
+							"value": " run: the sequence's parens close before it, so the operand run stays on one line.",
+							"start": 105,
+							"end": 189
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 199,
+							"end": 204
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 207,
+					"end": 223,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 207,
+						"end": 222,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 207,
+							"end": 208,
+							"name": "x"
+						},
+						"right": {
+							"type": "SequenceExpression",
+							"start": 212,
+							"end": 221,
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 212,
+									"end": 213,
+									"name": "a"
+								},
+								{
+									"type": "SequenceExpression",
+									"start": 216,
+									"end": 220,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 216,
+											"end": 217,
+											"name": "b"
+										},
+										{
+											"type": "Identifier",
+											"start": 219,
+											"end": 220,
+											"name": "c"
+										}
+									]
+								}
+							]
+						}
+					},
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 224,
+							"end": 229
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 232,
+					"end": 243,
+					"expression": {
+						"type": "SequenceExpression",
+						"start": 233,
+						"end": 241,
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 233,
+								"end": 234,
+								"name": "a"
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 236,
+								"end": 241,
+								"left": {
+									"type": "Identifier",
+									"start": 236,
+									"end": 237,
+									"name": "b"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 240,
+									"end": 241,
+									"name": "c"
+								}
+							}
+						]
+					},
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c3",
+							"start": 244,
+							"end": 249
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 252,
+					"end": 273,
+					"expression": {
+						"type": "CallExpression",
+						"start": 252,
+						"end": 272,
+						"callee": {
+							"type": "Identifier",
+							"start": 252,
+							"end": 253,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "SequenceExpression",
+								"start": 258,
+								"end": 262,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 258,
+										"end": 259,
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 261,
+										"end": 262,
+										"name": "b"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c4",
+										"start": 264,
+										"end": 269
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 276,
+					"end": 303,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 276,
+						"end": 302,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 276,
+							"end": 277,
+							"name": "o"
+						},
+						"right": {
+							"type": "ObjectExpression",
+							"start": 280,
+							"end": 302,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 284,
+									"end": 293,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 284,
+										"end": 285,
+										"name": "k"
+									},
+									"value": {
+										"type": "SequenceExpression",
+										"start": 288,
+										"end": 292,
+										"expressions": [
+											{
+												"type": "Identifier",
+												"start": 288,
+												"end": 289,
+												"name": "a"
+											},
+											{
+												"type": "Identifier",
+												"start": 291,
+												"end": 292,
+												"name": "b"
+											}
+										],
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c5",
+												"start": 294,
+												"end": 299
+											}
+										]
+									},
+									"kind": "init"
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 306,
+					"end": 323,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 312,
+							"end": 322,
+							"id": {
+								"type": "Identifier",
+								"start": 312,
+								"end": 313,
+								"name": "y"
+							},
+							"init": {
+								"type": "SequenceExpression",
+								"start": 317,
+								"end": 321,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 317,
+										"end": 318,
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 320,
+										"end": 321,
+										"name": "b"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c6",
+							"start": 324,
+							"end": 329
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 468,
+					"end": 495,
+					"test": {
+						"type": "SequenceExpression",
+						"start": 476,
+						"end": 480,
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 476,
+								"end": 477,
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 479,
+								"end": 480,
+								"name": "b"
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c7",
+								"start": 482,
+								"end": 487
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 491,
+						"end": 495,
+						"body": []
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " In a statement header's test and a ternary's test the comment ends its line inside the",
+							"start": 332,
+							"end": 421
+						},
+						{
+							"type": "Line",
+							"value": " construct, before its closer or the `?`.",
+							"start": 423,
+							"end": 466
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 498,
+					"end": 525,
+					"test": {
+						"type": "SequenceExpression",
+						"start": 506,
+						"end": 510,
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 506,
+								"end": 507,
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 509,
+								"end": 510,
+								"name": "b"
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c8",
+								"start": 512,
+								"end": 517
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 521,
+						"end": 525,
+						"body": []
+					},
+					"alternate": null
+				},
+				{
+					"type": "WhileStatement",
+					"start": 528,
+					"end": 556,
+					"test": {
+						"type": "SequenceExpression",
+						"start": 539,
+						"end": 543,
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 539,
+								"end": 540,
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 542,
+								"end": 543,
+								"name": "b"
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c9",
+								"start": 545,
+								"end": 550
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 554,
+						"end": 556,
+						"body": []
+					}
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 559,
+					"end": 591,
+					"discriminant": {
+						"type": "SequenceExpression",
+						"start": 571,
+						"end": 575,
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 571,
+								"end": 572,
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 574,
+								"end": 575,
+								"name": "b"
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c10",
+								"start": 577,
+								"end": 583
+							}
+						]
+					},
+					"cases": []
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 594,
+					"end": 624,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 594,
+						"end": 623,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 594,
+							"end": 595,
+							"name": "x"
+						},
+						"right": {
+							"type": "ConditionalExpression",
+							"start": 598,
+							"end": 623,
+							"test": {
+								"type": "SequenceExpression",
+								"start": 599,
+								"end": 603,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 599,
+										"end": 600,
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 602,
+										"end": 603,
+										"name": "b"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c11",
+										"start": 605,
+										"end": 611
+									}
+								]
+							},
+							"consequent": {
+								"type": "Identifier",
+								"start": 616,
+								"end": 617,
+								"name": "d"
+							},
+							"alternate": {
+								"type": "Identifier",
+								"start": 622,
+								"end": 623,
+								"name": "e"
+							}
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

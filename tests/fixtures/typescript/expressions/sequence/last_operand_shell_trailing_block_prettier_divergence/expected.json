@@ -1,0 +1,861 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 767,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment ending a redundant pair around a sequence's last operand trails the",
+			"start": 20,
+			"end": 106
+		},
+		{
+			"type": "Line",
+			"value": " pair the sequence prints around its operands.",
+			"start": 108,
+			"end": 156
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 167,
+			"end": 175
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 193,
+			"end": 201
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 221,
+			"end": 229
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 253,
+			"end": 261
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 293,
+			"end": 301
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 321,
+			"end": 329
+		},
+		{
+			"type": "Line",
+			"value": " A multi-line block takes the same place.",
+			"start": 334,
+			"end": 377
+		},
+		{
+			"type": "Block",
+			"value": " c7\n ",
+			"start": 395,
+			"end": 406
+		},
+		{
+			"type": "Block",
+			"value": " c8\n ",
+			"start": 431,
+			"end": 442
+		},
+		{
+			"type": "Line",
+			"value": " A run of blocks on the operand's line, a multi-line one first.",
+			"start": 453,
+			"end": 518
+		},
+		{
+			"type": "Block",
+			"value": " c9\n ",
+			"start": 536,
+			"end": 547
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 548,
+			"end": 555
+		},
+		{
+			"type": "Line",
+			"value": " At a statement the comment trails the statement, past the `;`, with the author's pair",
+			"start": 562,
+			"end": 650
+		},
+		{
+			"type": "Line",
+			"value": " around the sequence or without it.",
+			"start": 652,
+			"end": 689
+		},
+		{
+			"type": "Block",
+			"value": " c10 ",
+			"start": 703,
+			"end": 712
+		},
+		{
+			"type": "Block",
+			"value": " c11 ",
+			"start": 723,
+			"end": 732
+		},
+		{
+			"type": "Block",
+			"value": " c12 ",
+			"start": 747,
+			"end": 756
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 766,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 757,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 158,
+					"end": 177,
+					"expression": {
+						"type": "CallExpression",
+						"start": 158,
+						"end": 176,
+						"callee": {
+							"type": "Identifier",
+							"start": 158,
+							"end": 159,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "SequenceExpression",
+								"start": 161,
+								"end": 165,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 161,
+										"end": 162,
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 164,
+										"end": 165,
+										"name": "b"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 167,
+										"end": 175
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment ending a redundant pair around a sequence's last operand trails the",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " pair the sequence prints around its operands.",
+							"start": 108,
+							"end": 156
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 180,
+					"end": 203,
+					"expression": {
+						"type": "CallExpression",
+						"start": 180,
+						"end": 202,
+						"callee": {
+							"type": "Identifier",
+							"start": 180,
+							"end": 181,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "SequenceExpression",
+								"start": 183,
+								"end": 191,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 183,
+										"end": 184,
+										"name": "a"
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 186,
+										"end": 191,
+										"left": {
+											"type": "Identifier",
+											"start": 186,
+											"end": 187,
+											"name": "b"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 190,
+											"end": 191,
+											"name": "c"
+										}
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 193,
+										"end": 201
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "IfStatement",
+					"start": 206,
+					"end": 235,
+					"test": {
+						"type": "SequenceExpression",
+						"start": 211,
+						"end": 219,
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 211,
+								"end": 212,
+								"name": "a"
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 214,
+								"end": 219,
+								"left": {
+									"type": "Identifier",
+									"start": 214,
+									"end": 215,
+									"name": "b"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 218,
+									"end": 219,
+									"name": "c"
+								}
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c3 ",
+								"start": 221,
+								"end": 229
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 231,
+						"end": 235,
+						"body": []
+					},
+					"alternate": null
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 238,
+					"end": 270,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 238,
+						"end": 269,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 238,
+							"end": 239,
+							"name": "x"
+						},
+						"right": {
+							"type": "ConditionalExpression",
+							"start": 242,
+							"end": 269,
+							"test": {
+								"type": "SequenceExpression",
+								"start": 243,
+								"end": 251,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 243,
+										"end": 244,
+										"name": "a"
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 246,
+										"end": 251,
+										"left": {
+											"type": "Identifier",
+											"start": 246,
+											"end": 247,
+											"name": "b"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 250,
+											"end": 251,
+											"name": "c"
+										}
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c4 ",
+										"start": 253,
+										"end": 261
+									}
+								]
+							},
+							"consequent": {
+								"type": "Identifier",
+								"start": 264,
+								"end": 265,
+								"name": "d"
+							},
+							"alternate": {
+								"type": "Identifier",
+								"start": 268,
+								"end": 269,
+								"name": "e"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 273,
+					"end": 304,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 273,
+						"end": 303,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 273,
+							"end": 274,
+							"name": "o"
+						},
+						"right": {
+							"type": "ObjectExpression",
+							"start": 277,
+							"end": 303,
+							"properties": [
+								{
+									"type": "Property",
+									"start": 279,
+									"end": 292,
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 279,
+										"end": 280,
+										"name": "k"
+									},
+									"value": {
+										"type": "SequenceExpression",
+										"start": 283,
+										"end": 291,
+										"expressions": [
+											{
+												"type": "Identifier",
+												"start": 283,
+												"end": 284,
+												"name": "a"
+											},
+											{
+												"type": "BinaryExpression",
+												"start": 286,
+												"end": 291,
+												"left": {
+													"type": "Identifier",
+													"start": 286,
+													"end": 287,
+													"name": "b"
+												},
+												"operator": "<",
+												"right": {
+													"type": "Identifier",
+													"start": 290,
+													"end": 291,
+													"name": "c"
+												}
+											}
+										],
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c5 ",
+												"start": 293,
+												"end": 301
+											}
+										]
+									},
+									"kind": "init"
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 307,
+					"end": 331,
+					"expression": {
+						"type": "CallExpression",
+						"start": 307,
+						"end": 330,
+						"callee": {
+							"type": "Identifier",
+							"start": 307,
+							"end": 308,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "SequenceExpression",
+								"start": 310,
+								"end": 319,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 310,
+										"end": 311,
+										"name": "a"
+									},
+									{
+										"type": "SequenceExpression",
+										"start": 314,
+										"end": 318,
+										"expressions": [
+											{
+												"type": "Identifier",
+												"start": 314,
+												"end": 315,
+												"name": "b"
+											},
+											{
+												"type": "Identifier",
+												"start": 317,
+												"end": 318,
+												"name": "c"
+											}
+										],
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c6 ",
+												"start": 321,
+												"end": 329
+											}
+										]
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 379,
+					"end": 410,
+					"expression": {
+						"type": "CallExpression",
+						"start": 379,
+						"end": 409,
+						"callee": {
+							"type": "Identifier",
+							"start": 379,
+							"end": 380,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "SequenceExpression",
+								"start": 385,
+								"end": 393,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 385,
+										"end": 386,
+										"name": "a"
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 388,
+										"end": 393,
+										"left": {
+											"type": "Identifier",
+											"start": 388,
+											"end": 389,
+											"name": "b"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 392,
+											"end": 393,
+											"name": "c"
+										}
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c7\n ",
+										"start": 395,
+										"end": 406
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line block takes the same place.",
+							"start": 334,
+							"end": 377
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 413,
+					"end": 450,
+					"test": {
+						"type": "SequenceExpression",
+						"start": 421,
+						"end": 429,
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 421,
+								"end": 422,
+								"name": "a"
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 424,
+								"end": 429,
+								"left": {
+									"type": "Identifier",
+									"start": 424,
+									"end": 425,
+									"name": "b"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 428,
+									"end": 429,
+									"name": "c"
+								}
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c8\n ",
+								"start": 431,
+								"end": 442
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 446,
+						"end": 450,
+						"body": []
+					},
+					"alternate": null
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 520,
+					"end": 559,
+					"expression": {
+						"type": "CallExpression",
+						"start": 520,
+						"end": 558,
+						"callee": {
+							"type": "Identifier",
+							"start": 520,
+							"end": 521,
+							"name": "f"
+						},
+						"arguments": [
+							{
+								"type": "SequenceExpression",
+								"start": 526,
+								"end": 534,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 526,
+										"end": 527,
+										"name": "a"
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 529,
+										"end": 534,
+										"left": {
+											"type": "Identifier",
+											"start": 529,
+											"end": 530,
+											"name": "b"
+										},
+										"operator": "<",
+										"right": {
+											"type": "Identifier",
+											"start": 533,
+											"end": 534,
+											"name": "c"
+										}
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c9\n ",
+										"start": 536,
+										"end": 547
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run of blocks on the operand's line, a multi-line one first.",
+							"start": 453,
+							"end": 518
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 691,
+					"end": 702,
+					"expression": {
+						"type": "SequenceExpression",
+						"start": 692,
+						"end": 700,
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 692,
+								"end": 693,
+								"name": "a"
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 695,
+								"end": 700,
+								"left": {
+									"type": "Identifier",
+									"start": 695,
+									"end": 696,
+									"name": "b"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 699,
+									"end": 700,
+									"name": "c"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " d ",
+							"start": 548,
+							"end": 555
+						},
+						{
+							"type": "Line",
+							"value": " At a statement the comment trails the statement, past the `;`, with the author's pair",
+							"start": 562,
+							"end": 650
+						},
+						{
+							"type": "Line",
+							"value": " around the sequence or without it.",
+							"start": 652,
+							"end": 689
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c10 ",
+							"start": 703,
+							"end": 712
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 715,
+					"end": 722,
+					"expression": {
+						"type": "SequenceExpression",
+						"start": 716,
+						"end": 720,
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 716,
+								"end": 717,
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 719,
+								"end": 720,
+								"name": "b"
+							}
+						]
+					},
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c11 ",
+							"start": 723,
+							"end": 732
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 735,
+					"end": 746,
+					"expression": {
+						"type": "SequenceExpression",
+						"start": 736,
+						"end": 744,
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 736,
+								"end": 737,
+								"name": "a"
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 739,
+								"end": 744,
+								"left": {
+									"type": "Identifier",
+									"start": 739,
+									"end": 740,
+									"name": "b"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 743,
+									"end": 744,
+									"name": "c"
+								}
+							}
+						]
+					},
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c12 ",
+							"start": 747,
+							"end": 756
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -494,7 +494,12 @@ impl<'a> Printer<'a> {
     #[cold]
     #[inline(never)]
     fn statement_tail_region_walk(&self, expr: &ast::Expression<'_>, end: u32) -> Option<Span> {
-        let start = self.right_spine_printed_end_with(expr, true);
+        // A sequence prints its operands inside a pair of its own, so the region opens where
+        // they print ([`Printer::sequence_printed_end`]), past that pair's `)`.
+        let start = match &expr.kind {
+            ast::ExpressionKind::SequenceExpression(seq) => self.sequence_printed_end(seq),
+            _ => self.right_spine_printed_end_with(expr, true),
+        };
         if start >= end || !self.has_comments_to_emit_between(start, end) {
             return None;
         }

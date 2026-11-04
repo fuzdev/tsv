@@ -295,8 +295,10 @@ pub(in crate::printer) fn printed_left_spine_step<'e>(
 /// every list element's trailing-comment seam takes, so widening it with this case would
 /// move that anchor at every one of them. The rule for choosing: ask `printed_end` where the
 /// question is "how far did this ELEMENT print?" and this where it is "where do the OPERANDS
-/// of a sequence end?" — the caller that then decides whether that region is the sequence's
-/// own to print, or the enclosing shell's ([`Printer::shell_trailing_gap_start`]).
+/// of a sequence end?". The value shell's trailing gap
+/// ([`Printer::shell_trailing_gap_start`]) asks the deeper question instead — where the
+/// operands' printed content ends ([`Printer::sequence_printed_end`]) — since a comment in a
+/// shell down the last operand's right spine is the pair's to keep inside too.
 ///
 /// Not widening `printed_end` has its own cost, paid at the list families: an array element,
 /// an object value or a call argument whose value is a sequence has no emitter for the shell
@@ -3104,9 +3106,12 @@ impl<'a> Printer<'a> {
     ///   form still carries the directive and re-freezes, one more copy on every later
     ///   pass;
     /// - a `SequenceExpression` whose gap holds the shell's `)` hands its operands' own
-    ///   trailing region to the single pair it prints ([`shell_content_end`]): that pair
-    ///   stands in for the shell the strip removed, so the comment stays where the shell
-    ///   held it (`const x = (fff, (aaa /* c */));` → `(fff, aaa /* c */)`, prettier #19263).
+    ///   trailing region to the single pair it prints, measured from where the operands'
+    ///   PRINTED content ends ([`Printer::sequence_printed_end`]: down nested sequences'
+    ///   last operands and the right spine): that pair stands in for the shell the strip
+    ///   removed, so the comment stays where the shell held it
+    ///   (`const x = (fff, (aaa /* c */));` → `(fff, aaa /* c */)`,
+    ///   `x = (a, b < (c /* c */));` → `(a, b < c /* c */)`, prettier #19263).
     ///   Anchored at `span.end` instead, the gap reads as empty, this builder hands back the
     ///   plain doc, and the sequence's own float-out envelope carries the comment OUT of the
     ///   pair, where the statement's terminator moves it again on the next pass;
@@ -3131,13 +3136,13 @@ impl<'a> Printer<'a> {
         printer_owns_grouping: bool,
     ) -> u32 {
         let span_end = expr.span().end;
-        let unfrozen = if matches!(expr.kind, ast::ExpressionKind::SequenceExpression(_))
+        let unfrozen = if let ast::ExpressionKind::SequenceExpression(seq) = &expr.kind
             && (printer_owns_grouping
                 || self
                     .collapsed_grouping_close(span_end, boundary_end)
                     .is_some())
         {
-            shell_content_end(expr)
+            self.sequence_printed_end(seq)
         } else {
             span_end
         };

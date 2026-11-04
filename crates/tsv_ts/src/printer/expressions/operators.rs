@@ -20,6 +20,8 @@ use tsv_lang::doc::{
     DocBuf,
     arena::{DocId, LeadingBreak},
 };
+use tsv_lang::is_js_whitespace;
+use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
 
 /// Holds information about an operand in a binary expression chain
 /// Used to track position information for comment placement
@@ -141,6 +143,16 @@ enum SeqParens {
     /// No parens — bare comma-joined operands; an enclosing construct supplies the
     /// grouping and owns the edge-comment gaps (a leading-comment-forced hanging paren).
     Bare,
+}
+
+/// What the line-comment twin hands its envelope and its run about the last operand's
+/// trailing shells ([`Printer::build_sequence_doc_claimed`] decides both).
+#[derive(Clone, Copy)]
+struct SeqTrailing {
+    /// The run the float-out envelope claimed and prints after its `)`.
+    float_run: Option<Span>,
+    /// Where the operands' own content ends for the keep-inside trailing gap.
+    run_end: u32,
 }
 
 /// Where a `SequenceExpression`'s operands sit once the list breaks — prettier's
@@ -2616,12 +2628,17 @@ impl<'a> Printer<'a> {
     /// `SeqParens::Bare` has no envelope at all: the enclosing construct supplies the parens
     /// and owns both edge gaps. `KeepInside` keeps the trailing comments inside the run (the
     /// caller has already appended them), so only the float-out mode reaches the epilogue.
+    ///
+    /// `float_run` is the trailing run the float-out mode CLAIMED for this envelope
+    /// ([`Self::sequence_float_run`]), printed in place of the last operand's own trailing
+    /// gap; with none, an enclosing float claim that already holds that gap prints it.
     fn build_sequence_envelope_doc(
         &self,
         seq: &ast::SequenceExpression<'_>,
         span: Span,
         body: DocId,
         parens: SeqParens,
+        float_run: Option<Span>,
     ) -> DocId {
         if matches!(parens, SeqParens::Bare) {
             return body;
@@ -2645,7 +2662,22 @@ impl<'a> Printer<'a> {
         parts.push(d.text("("));
         parts.push(body);
         parts.push(d.text(")"));
-        if !matches!(parens, SeqParens::KeepInside) {
+        if let Some(run) = float_run {
+            // The claimed run defers a `//` or an own-line comment past the `)` as the bare
+            // spelling's does, and the flush-scoped break holds it there: it forces only the
+            // group whose line opportunity follows the comment (a statement header's closer,
+            // a ternary's `?`, a call's `)`), so the comment ends its line inside the
+            // construct it was written in, and the operand run, which closed before it, stays
+            // flat.
+            if self.append_trailing_paren_comments(&mut parts, run.start, run.end) {
+                parts.push(d.flush_break());
+            }
+        } else if !matches!(parens, SeqParens::KeepInside)
+            && !self
+                .claimed_right_spine_run
+                .get()
+                .is_some_and(|claim| claim.start <= run_end && span.end <= claim.end)
+        {
             // Same-line block comments stay inline (`(x, y) /* c */`); own-line block
             // comments defer via `line_suffix` (`append_trailing_paren_comments`) so they
             // land past the enclosing comma/semicolon — where they re-parse to, keeping the
@@ -2686,7 +2718,6 @@ impl<'a> Printer<'a> {
         layout: SeqLayout,
     ) -> DocId {
         self.mark_relational_sibling_authored_pairs(seq.expressions.iter().copied().map(Some));
-        let keep_trailing_inside = matches!(parens, SeqParens::KeepInside);
         // Where this builder's comment scans open: the FIRST OPERAND, never `seq_span.start`.
         // The leading edge between the two — the grouping `(` the parser stripped from that
         // operand, and any comment inside it — is emitted by someone else in every mode:
@@ -2721,18 +2752,208 @@ impl<'a> Printer<'a> {
         // emits an inter-operand comment inline before its operand, which would glue an
         // own-line block directive onto the operand's line — an inert placement, so the
         // freeze would be lost on the second pass.
-        if self
-            .comments_to_emit_between(scan_start, trailing_end)
+        //
+        // In float-out mode the scan stops where the operands' PRINTED content ends
+        // ([`Self::sequence_printed_end`]): the stripped shells past it, the last operand's
+        // and those down its right spine and its nested sequences' last operands, print
+        // after the `)` ([`Self::sequence_float_run`]), so no comment there splits the run,
+        // exactly as none in the bare spelling's own grouping gap does.
+        let float_out = matches!(parens, SeqParens::FloatOut);
+        // The right-spine walk is asked only of a sequence holding a comment: with none, the
+        // scan bound and both claims below are moot.
+        let printed_end = if matches!(parens, SeqParens::Bare)
+            || !self.has_comments_to_emit_between(interior_start, trailing_end.max(seq_span.end))
+        {
+            last_operand_end
+        } else {
+            self.sequence_printed_end(seq)
+        };
+        let scan_end = if float_out {
+            trailing_end.min(printed_end)
+        } else {
+            trailing_end
+        };
+        let float_run = float_out
+            .then(|| self.sequence_float_run(seq_span, printed_end))
+            .flatten();
+        // A value position keeps the run INSIDE the pair (prettier #19263), and the stripped
+        // shells down the last operand hold it where the bare spelling's own grouping gap
+        // does: the pair claims them, so the operand's trailing emitters decline them, and
+        // the run prints from the operands' printed end as the bare spelling's gap does
+        // ([`Printer::shell_trailing_gap_start`] hands this builder that gap).
+        let inside_run = matches!(parens, SeqParens::KeepInside)
+            .then(|| self.sequence_inside_run(printed_end, last_operand_end))
+            .flatten();
+        let last_operand_end = inside_run.map_or(last_operand_end, |run| run.start);
+        let outer_claim = float_run
+            .or(inside_run)
+            .map(|run| self.claimed_right_spine_run.replace(Some(run)));
+        let doc = if self
+            .comments_to_emit_between(scan_start, scan_end)
             .any(|c| !c.is_block || self.is_honored_directive(c))
         {
-            return self.build_sequence_doc_with_line_comments(
+            self.build_sequence_doc_with_line_comments(
                 seq,
                 seq_span,
                 trailing_end,
                 parens,
                 layout,
-            );
+                SeqTrailing {
+                    float_run,
+                    run_end: last_operand_end,
+                },
+            )
+        } else {
+            self.build_sequence_doc_block_path(
+                seq,
+                seq_span,
+                interior_start,
+                last_operand_end,
+                trailing_end,
+                parens,
+                layout,
+                float_run,
+            )
+        };
+        if let Some(outer) = outer_claim {
+            self.claimed_right_spine_run.set(outer);
         }
+        doc
+    }
+
+    /// Where a float-out sequence's operands' PRINTED content ends: down its last operand,
+    /// through any nested sequence's last operand (each prints its own envelope, whose
+    /// trailing run floats the same way), then down that operand's right spine
+    /// ([`Printer::right_spine_printed_end`]). The stripped shells past it close at the
+    /// sequence's own end, with nothing but `)`s and trivia between.
+    pub(in crate::printer) fn sequence_printed_end(
+        &self,
+        seq: &ast::SequenceExpression<'_>,
+    ) -> u32 {
+        let mut last = seq.expressions.last().copied();
+        while let Some(ExpressionKind::SequenceExpression(inner)) = last.map(|e| &e.kind) {
+            last = inner.expressions.last().copied();
+        }
+        last.map_or_else(
+            || seq.expressions.last().map_or(0, |e| e.span().end),
+            |last| self.right_spine_printed_end(last),
+        )
+    }
+
+    /// The trailing run a float-out sequence's envelope CLAIMS and prints after its `)`:
+    /// `[printed_end, span.end)` ([`Self::sequence_printed_end`]), when it holds a line
+    /// comment, or only blocks on the operand's line, and no enclosing claim already owns
+    /// it.
+    ///
+    /// The bare spelling `(a, b // c⏎)` has its comment in the sequence's own grouping gap,
+    /// outside the node, where at a float-out position the enclosing construct prints it
+    /// after the `)` and ends its line inside that construct (at a value position the pair
+    /// keeps it inside instead, [`Self::sequence_inside_run`]). The shell spelling `(a, (b // c⏎))` has it inside the
+    /// node, in the last operand's stripped shell; the two are the same program and the same
+    /// comment position once the shell strips, so the envelope prints the claimed run the
+    /// same way, flush-scoped ([`Self::build_sequence_envelope_doc`]), and every emitter
+    /// below declines it: the last operand's trailing emitters and a nested sequence's
+    /// envelope. A same-line block takes the same place, after the `)` the envelope adds,
+    /// where the reparse reads it ([`Printer::minted_pair_trailing_region`] is the binary
+    /// operand's and the cast's form of that rule). A run with an own-line block and no `//`
+    /// is left where the operand's emitters print it: deferred past a ternary's `?` from the
+    /// envelope, the block would print at the envelope's indent, where its reparse reads it
+    /// as the test's own trailing comment and prints it elsewhere.
+    fn sequence_float_run(&self, span: Span, printed_end: u32) -> Option<Span> {
+        if printed_end >= span.end
+            || !self.has_comments_to_emit_between(printed_end, span.end)
+            || self
+                .claimed_right_spine_run
+                .get()
+                .is_some_and(|claim| claim.start <= printed_end && span.end <= claim.end)
+        {
+            return None;
+        }
+        // Ahead of a token that must share the `)`'s line, a multi-line block printed after
+        // the `)` would end the expression before it: the cast's keyword rule
+        // ([`MintedPairFollower::Keyword`]), at a sequence a cast or a non-null operator
+        // follows.
+        if self
+            .comments_to_emit_between(printed_end, span.end)
+            .any(|c| c.multiline)
+            && self.tight_follower_after(span.end)
+        {
+            return None;
+        }
+        let mut prev_end = printed_end;
+        let claims = self.has_line_comments_between(printed_end, span.end)
+            || self
+                .comments_to_emit_between(printed_end, span.end)
+                .all(|c| {
+                    // Past the arm above every comment here is a block.
+                    let glued = !self.comment_has_newline_between(prev_end, c.span.start);
+                    prev_end = c.span.end;
+                    glued
+                });
+        claims.then(|| Span::new(printed_end, span.end))
+    }
+
+    /// Whether the first token past `end`, behind every `)` ahead of it (an enclosing
+    /// construct's too, which over-reads only toward leaving a claim unmade), must share
+    /// the line of the token before it: an `as` / `satisfies` keyword or a non-null `!`
+    /// (`[no LineTerminator here]` in all three). Read from the source, which holds the
+    /// same token the output prints there: every printer that lays one out (the cast, the
+    /// non-null operator, a chain's non-null link) keeps it behind its operand. A newline
+    /// before it in the source reads it the same way, which only leaves a claim unmade.
+    fn tight_follower_after(&self, end: u32) -> bool {
+        let source = self.source;
+        let mut pos = end as usize;
+        loop {
+            pos = skip_trivia_run(source, pos, TriviaProfile::COMMENTS, is_js_whitespace);
+            if source.as_bytes().get(pos) == Some(&b')') {
+                pos += 1;
+            } else {
+                break;
+            }
+        }
+        let rest = source.get(pos..).unwrap_or_default();
+        if let Some(after) = rest.strip_prefix('!') {
+            return !after.starts_with('=');
+        }
+        ["as", "satisfies"].iter().any(|keyword| {
+            rest.strip_prefix(keyword).is_some_and(|after| {
+                !after
+                    .chars()
+                    .next()
+                    .is_some_and(crate::lexer::ident::is_id_continue)
+            })
+        })
+    }
+
+    /// The keep-inside counterpart of [`Self::sequence_float_run`]: the stripped shells
+    /// between the operands' printed end and the last operand's end, `[printed_end,
+    /// last_operand_end)`, when they hold a comment and no enclosing claim already owns
+    /// them. The keep-inside pair prints them as its own trailing gap, inside the `)`.
+    fn sequence_inside_run(&self, printed_end: u32, last_operand_end: u32) -> Option<Span> {
+        (printed_end < last_operand_end
+            && self.has_comments_to_emit_between(printed_end, last_operand_end)
+            && !self
+                .claimed_right_spine_run
+                .get()
+                .is_some_and(|claim| claim.start <= printed_end && last_operand_end <= claim.end))
+        .then(|| Span::new(printed_end, last_operand_end))
+    }
+
+    /// The block-comment path of [`Self::build_sequence_doc_claimed`]: no line comment
+    /// splits the operand run.
+    #[expect(clippy::too_many_arguments)] // the run's source bounds travel beside its span
+    fn build_sequence_doc_block_path(
+        &self,
+        seq: &ast::SequenceExpression<'_>,
+        seq_span: Span,
+        interior_start: u32,
+        last_operand_end: u32,
+        trailing_end: u32,
+        parens: SeqParens,
+        layout: SeqLayout,
+        float_run: Option<Span>,
+    ) -> DocId {
+        let keep_trailing_inside = matches!(parens, SeqParens::KeepInside);
 
         // A MULTI-LINE block the FIRST operand OWNS prints ahead of the run, outside the
         // layout's group — inside the envelope's `(`, where the author wrote it. Left
@@ -2761,7 +2982,7 @@ impl<'a> Printer<'a> {
                 )
             },
         );
-        self.build_sequence_envelope_doc(seq, seq_span, body, parens)
+        self.build_sequence_envelope_doc(seq, seq_span, body, parens, float_run)
     }
 
     /// The comma-joined operand RUN a sequence's block-comment path builds — the layout's
@@ -2938,6 +3159,7 @@ impl<'a> Printer<'a> {
         trailing_end: u32,
         parens: SeqParens,
         layout: SeqLayout,
+        trailing: SeqTrailing,
     ) -> DocId {
         // The claim the block path takes, at the twin that shares the question
         // ([`Printer::build_doc_with_outermost_owned_comment_at`]). Without it the twin
@@ -2955,7 +3177,14 @@ impl<'a> Printer<'a> {
         // prevent is not reachable there either: with no operand group to force, the body's
         // own break is the layout's to make.
         let body = if matches!(layout, SeqLayout::Hanging) {
-            self.build_sequence_line_comment_run_doc(seq, span, trailing_end, parens, layout)
+            self.build_sequence_line_comment_run_doc(
+                seq,
+                span,
+                trailing_end,
+                parens,
+                layout,
+                trailing.run_end,
+            )
         } else {
             self.build_doc_with_outermost_owned_comment_at(
                 span.start,
@@ -2967,11 +3196,12 @@ impl<'a> Printer<'a> {
                         trailing_end,
                         parens,
                         layout,
+                        trailing.run_end,
                     )
                 },
             )
         };
-        self.build_sequence_envelope_doc(seq, span, body, parens)
+        self.build_sequence_envelope_doc(seq, span, body, parens, trailing.float_run)
     }
 
     /// The comma-joined operand RUN the line-comment twin builds — the layout's group,
@@ -2980,6 +3210,10 @@ impl<'a> Printer<'a> {
     /// Split from its caller for the same reason the block path's run is
     /// ([`Self::build_sequence_operand_run_doc`]): the owned-comment claim has to cover the
     /// whole build, and the two paths must answer that the same way.
+    ///
+    /// `run_end` is where the operands' own content ends for the trailing-gap question: the
+    /// last operand's end, or, under a keep-inside claim, the operands' printed end
+    /// ([`Self::sequence_inside_run`]), from which the claimed shells print as the gap.
     fn build_sequence_line_comment_run_doc(
         &self,
         seq: &ast::SequenceExpression<'_>,
@@ -2987,6 +3221,7 @@ impl<'a> Printer<'a> {
         trailing_end: u32,
         parens: SeqParens,
         layout: SeqLayout,
+        run_end: u32,
     ) -> DocId {
         let keep_trailing_inside = matches!(parens, SeqParens::KeepInside);
         let d = self.d();
@@ -3011,7 +3246,7 @@ impl<'a> Printer<'a> {
         // no read on, so the one answer costs a first-pass match on the bare spelling
         // (`conformance_prettier_ts.md` §TypeScript, Sequence trailing line-comment
         // convergence). The separators stay `line`s either way, so width still breaks the run.
-        let (run_start, run_end) = sequence_operand_run(seq);
+        let (run_start, _) = sequence_operand_run(seq);
         let trailing_run_only = keep_trailing_inside
             && !self.has_line_comments_between(run_start, run_end)
             && self.has_line_comments_between(run_end, trailing_end);
@@ -3070,7 +3305,7 @@ impl<'a> Printer<'a> {
                 // line), an `Aligned` one has no break left before `)`, so it rides out past
                 // the `);` — which is prettier's split too. The comment lives up to the
                 // grouping `)` (`trailing_end`), outside `span`.
-                for comment in self.comments_to_emit_between(expr_end, trailing_end) {
+                for comment in self.comments_to_emit_between(run_end.min(expr_end), trailing_end) {
                     od.push(self.build_trailing_comment_doc(comment));
                 }
                 // The run's flush-scoped break, standing where the `break_parent` above would
