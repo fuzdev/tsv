@@ -811,13 +811,17 @@ impl<'a> Printer<'a> {
         // A comment in a shell below a pair this chain's left spine prints leads the whole
         // chain: the claim hands it to `wrap_chain_with_paren_comments` here
         // (`Printer::left_spine_run_claim`).
+        // A run that takes a line of its own breaks whatever group it prints in, so one
+        // hoisted from below with no pair between (through a call, a member, a tag or a
+        // binary of its own) must print outside this chain's group too, where its reparse,
+        // which reads the run ahead of the whole chain, prints it.
         let claim = self.left_spine_run_claim(span, span.start, binary.left, || {
             self.needs_parens(
                 binary.left,
                 ParenContext::BinaryLeft {
                     parent_op: binary.operator,
                 },
-            )
+            ) || self.left_spine_run_breaks_its_line(binary.left)
         });
         self.with_left_spine_claim(claim, || {
             self.build_binary_chain_doc_claimed(binary, span, style)
@@ -1971,6 +1975,28 @@ impl<'a> Printer<'a> {
         } else {
             self.build_chain_aware_operand_doc(operand)
         }
+    }
+
+    /// Whether the stripped shells on `expr`'s left spine hold a comment that breaks the line
+    /// it prints on in every layout: a `//`, an unowned multi-line block, or a block the
+    /// author gave a line of its own (a newline before it). A glued single-line block is not
+    /// one, since the soft `line` after it stays flat in the group it prints in. The scan
+    /// reads the comments to EMIT, so a block the leaf owns (glued to it, a multi-line one
+    /// included) never counts: the leaf prints it, inside whatever group the leaf is in.
+    fn left_spine_run_breaks_its_line(&self, expr: &Expression<'_>) -> bool {
+        let start = expr.span().start;
+        let end = self.left_spine_printed_start(expr);
+        if start >= end {
+            return false;
+        }
+        let mut prev_end = start;
+        self.comments_to_emit_between(start, end).any(|c| {
+            let breaks = !c.is_block
+                || c.multiline
+                || self.comment_has_newline_between(prev_end, c.span.start);
+            prev_end = c.span.end;
+            breaks
+        })
     }
 
     /// The stripped-shell region at the end of `operand` that a pair the printer mints
