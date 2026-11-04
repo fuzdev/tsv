@@ -822,6 +822,10 @@ impl<'a> Printer<'a> {
     /// `!`'s operand, a tag. The call must be to the left of the `new`'s argument list to be
     /// captured, so `new a[b]()` — no inner call — stays bare.
     ///
+    /// A dynamic import is a call here too (ecma262's `ImportCall` is a `CallExpression`
+    /// production, which `new MemberExpression Arguments` cannot take): `new (import(a))()`,
+    /// `new (import(a).B)()` — bare, `new import(a)()` is a syntax error.
+    ///
     /// The walk goes on through an instantiation expression's operand, where prettier's
     /// stops: `new (f()<T>)()` printed bare is `new f()<T>()`, a call — with the type
     /// arguments — on the constructed `f`.
@@ -844,7 +848,7 @@ impl<'a> Printer<'a> {
         // it be, and a frame per link is what the stack contract prices
         loop {
             let (holds, next) = match &callee.kind {
-                E::CallExpression(_) => return true,
+                E::CallExpression(_) | E::ImportExpression(_) => return true,
                 E::MemberExpression(member) => (
                     !self.needs_parens(member.object, ParenContext::ChainBase)
                         && !child_stops_optional_chain(

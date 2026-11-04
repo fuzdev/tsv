@@ -73,6 +73,8 @@ fn instantiation_over_a_call_keeps_the_pair() {
         ("new (f().c<T>)(x);", "new (f().c<T>)(x);\n"),
         ("new (f()`x`<T>)();", "new (f()`x`<T>)();\n"),
         ("new (f()!<T>)();", "new (f()!<T>)();\n"),
+        // a dynamic import is a call on the spine like any other
+        ("new (import(a)<T>)();", "new (import(a)<T>)();\n"),
         // the `new` takes its argument list, the pair stays
         ("new (f()<T>);", "new (f()<T>)();\n"),
     ] {
