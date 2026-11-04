@@ -537,26 +537,21 @@ fn is_spine_shape(n: usize, counts: WireCounts) -> bool {
 /// Optimized builds only: an unoptimized build's frames grow over an optimized one's by a
 /// factor that differs from function to function, so no fraction of the debug contract
 /// passes exactly the walks this one passes.
-const SPINE_STACK: usize = 384 << 10;
+const SPINE_STACK: usize = 32 << 10;
 
 const _: () = assert!(
     SPINE_STACK * 4 + 3 * (64 << 10) < GATE_STACK,
     "a cached contract stack can be reused for a spine thread"
 );
 
-/// The spine shapes whose walks are known to recurse down their spine, exempt from the
-/// spine leg (the contract leg still grades them).
-// TODO: make the walks over an array type's element type, an indexed access type's object
-// type and a qualified name's left side (a type reference's, an import-equals target's)
-// iterate their spine, then empty this list. A smaller recursion down a spine fits this
-// thread and passes unexempted — a non-null chain with a comment in each `!`'s gap — and
-// once it iterates too, a smaller thread would hold every spine shape.
-const SPINE_RECURSION_KNOWN: &[&str] = &[
-    "ts_type_array_flat",
-    "ts_type_indexed_flat",
-    "ts_qualified_flat",
-    "ts_import_equals_flat",
-];
+// The shortest spine shape holds more than `4 * NESTING_LIMIT` links (`is_spine_shape`), so
+// a recursion spending 32 bytes or more per link — a few machine words — outgrows the spine
+// thread on every spine shape. The floor is chosen, not the smallest frame there is: a frame
+// of two words (a return address and one saved register) can still fit the shortest shape.
+const _: () = assert!(
+    SPINE_STACK <= 4 * NESTING_LIMIT as usize * 32,
+    "a recursion down the shortest spine shape can fit the spine thread"
+);
 
 /// [`run_walks`] on a thread of `stack` bytes named `name`.
 fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
@@ -662,12 +657,6 @@ fn assert_output_reparses(name: &str, lang: Lang, formatted: &str) {
 /// every walk of the accepted tree within the contract's stack.
 #[test]
 fn every_shape_holds_its_limit_on_the_contract_stack() {
-    for name in SPINE_RECURSION_KNOWN {
-        assert!(
-            shapes(Scope::Check).iter().any(|shape| shape.name == *name),
-            "the spine exemption {name} names no shape"
-        );
-    }
     let graded = grade_in_parallel(graded_shapes(), |shape| {
         if std::env::var_os("TSV_DEPTH_REPORT").is_some() {
             eprintln!("start {}", shape.name);
@@ -675,7 +664,7 @@ fn every_shape_holds_its_limit_on_the_contract_stack() {
         let n = accepted_limit(shape)?;
         let counts = check_wire(shape, n);
         run_every_phase(shape, n);
-        if is_spine_shape(n, counts) && !SPINE_RECURSION_KNOWN.contains(&shape.name.as_str()) {
+        if is_spine_shape(n, counts) {
             run_walks_on(
                 format!("spine {}", shape.name),
                 SPINE_STACK,

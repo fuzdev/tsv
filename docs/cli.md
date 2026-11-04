@@ -543,9 +543,12 @@ that the format's output parses again and is its own format, and that one level 
 refused. In an optimized build, a flat chain — thousands of links under a shallow wire —
 runs its walks again on a thread a small fraction of the contract's, since no walk may
 spend a frame per spine link ([below](#the-other-surfaces)): a recursion down the spine
-whose frames add up past that thread fails there natively, where the contract's thread still
-fits it (the shapes whose walks are known to recurse that way are a named exemption). An overflow
-aborts the test binary. The tenth kept in hand is the minimum margin the gate enforces: a frame that grows
+whose frames add up past that thread fails there natively, where the contract's thread
+still fits it. The flat array, indexed-access and qualified-name type chains are also built
+where a group measures their doc (a type argument), so a printer that nests a doc level per
+link fails there, in the doc's own layout walks; the commented non-null run, already
+measured at an assignment, is built at a call argument too. An overflow aborts the test
+binary. The tenth kept in hand is the minimum margin the gate enforces: a frame that grows
 fails the gate while every accepted input still fits the contract. Frame sizes move with
 every printer change, and differ between optimizations by more than that margin, so the
 gate runs in each world it speaks for: `deno task test:depth:napi` in the shipped
@@ -624,12 +627,14 @@ The gate grades both, each pass in fresh processes: on the baseline compiler alo
 after a warm-up pass has tiered up every function the run makes hot — under V8's default
 dynamic tiering, which optimizes what runs hot; an engine flagged to compile everything
 optimized up front (`--no-liftoff`) lays out larger frames still, and is outside the
-contract. That is also why the
-walks over a binary operator chain, the wire writers over a member, call and non-null
+contract. That is also why the walks over a binary operator chain, the wire writers over
+a member, call and non-null chain and over an array, indexed-access or qualified-name type
 chain, and the type strip over any expression chain past its first few links, iterate the
 spine rather than recurse down it: a frame per link of a chain thousands of links long
 spends the optimized engine's main-thread stack whatever the per-link frame, where an
-iteration spends none.
+iteration spends none. The printer builds those type chains and a commented non-null run
+into one flat doc for the same reason, since every later walk of a doc nested a level per
+link would recurse once per link.
 
 The packages' `{locations: true}` reconstruction (`locations.js`) walks the tree with an
 explicit stack rather than recursion, so it adds no depth of its own.

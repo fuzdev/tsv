@@ -1077,6 +1077,39 @@ fn construct_shapes() -> Vec<Shape> {
         ts_flat("ts_type_indexed_flat", 5, "type T = A", "[K]", ";\n"),
         ts_flat("ts_qualified_flat", 1, "type T = A", ".B", ";\n"),
         ts_flat("ts_import_equals_flat", 1, "import x = A", ".B", ";\n"),
+        // the type chains where a group measures their doc (a type argument): `type T = …`
+        // and `import x = …` put no group around them, so a printer that nests a doc level
+        // per link recurses in the doc's layout and break walks only here. And the commented
+        // non-null run at a second measuring position (a call argument), beside the
+        // assignment above
+        ts_flat(
+            "ts_type_array_flat_type_argument",
+            5,
+            "let x: Array<A",
+            "[]",
+            "> = y;\n",
+        ),
+        ts_flat(
+            "ts_type_indexed_flat_type_argument",
+            5,
+            "let x: Array<A",
+            "[K]",
+            "> = y;\n",
+        ),
+        ts_flat(
+            "ts_qualified_flat_type_argument",
+            1,
+            "let x: Array<A",
+            ".B",
+            "> = y;\n",
+        ),
+        ts_flat(
+            "ts_non_null_block_comment_call_argument",
+            NON_NULL,
+            "f(a",
+            "!/*c*/",
+            ", b);\n",
+        ),
         // the operator chains the binary-chain printer does not flatten, each link of which
         // it walks by re-entering the expression printer — and parenthesizes, each pair a
         // level of the output's nesting
