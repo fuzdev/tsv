@@ -352,21 +352,18 @@ const PREFIX_PAIR_LINKS: &[&str] = &["", "!.b", "<T>", ".b().c()"];
 /// each of [`PREFIX_PAIR_LINKS`] — and, in an operator's place, the pair as a binary
 /// operator's right operand: `x = <op>(<inner>×n a)<link>×n` — the full sweep's alone.
 ///
-/// TODO: K305, K306 — two forms are left out, each a printer bug of its own that no depth
-/// reaches: they format at a single level to a form whose own format differs (F1). A block
-/// comment opening a prefix operator's bare pair before a link (K305: `-(/*c*/a)!.b` →
-/// `-/*c*/ a!.b` → `-(/*c*/ a!.b)`, the same with `<T>` and a member chain), and one closing a binary operand's
-/// pair (K306: `a == (a /*c*/)` → `a == a /*c*/` → `a == a; /*c*/`).
+/// TODO: one form is left out, a printer bug of its own that no depth reaches: it
+/// formats at a single level to a form whose own format differs (F1). A block comment
+/// opening a prefix operator's bare pair before a link (`-(/*c*/a)!.b` → `-/*c*/ a!.b` →
+/// `-(/*c*/ a!.b)`, the same with `<T>` and a member chain).
 fn prefix_pair_sweep(shapes: &mut Vec<Shape>) {
     for &op in PREFIXES.iter().chain(&["a == "]) {
         for &(before, after) in PREFIX_PAIR_FORMS {
             for &inner in PREFIX_PAIR_INNER {
                 for &link in PREFIX_PAIR_LINKS {
-                    let binary = op == "a == ";
                     let unary_comment_link =
-                        !binary && before == "(/*c*/" && inner.is_empty() && !link.is_empty();
-                    let binary_trailing_comment = binary && after == "/*c*/)" && link.is_empty();
-                    if unary_comment_link || binary_trailing_comment {
+                        op != "a == " && before == "(/*c*/" && inner.is_empty() && !link.is_empty();
+                    if unary_comment_link {
                         continue;
                     }
                     shapes.push(Shape {
