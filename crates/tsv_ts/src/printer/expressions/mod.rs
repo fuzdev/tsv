@@ -841,11 +841,11 @@ impl<'a> Printer<'a> {
                 // ([`Printer::build_binary_chain_doc`]). This builder differs in GROUP
                 // STRUCTURE: it puts each continuation directly in the outer group, so a
                 // break forced there breaks every operand, where the default's sub-group
-                // lets the continuation re-evaluate and stay flat. Collapsing the two was
-                // tried and measured: the whole fixture corpus stayed green and
-                // `prettier/tests/format/js/comments/binary-expressions-parens.js` moved
-                // match → unknown, where a multiline block comment ahead of the argument
-                // forces the break prettier propagates through the chain.
+                // lets the continuation re-evaluate and stay flat.
+                // TODO: fold into `Printer::build_binary_chain_doc` — the group-structure
+                // difference this builder keeps no longer shows in any output the suites
+                // reach; the `(expr)!` caller (`build_expression_doc_with_indent_on_break`)
+                // has not been measured.
                 self.build_binary_chain_doc_indented(binary, expr.span)
             }
             ExpressionKind::ConditionalExpression(cond) => {
@@ -1898,23 +1898,18 @@ impl<'a> Printer<'a> {
     /// Used when the binary expression is inside inline parens
     fn build_binary_chain_doc_indented(&self, binary: &BinaryExpression<'_>, span: Span) -> DocId {
         let d = self.d();
-        d.group(self.build_binary_chain_parts_indented(binary, span))
-    }
-
-    /// Build binary chain parts with indented continuations (no group wrapper)
-    ///
-    /// Returns the concat without a group wrapper, for cases where the caller
-    /// wants to control the grouping (e.g., chain printing).
-    pub(crate) fn build_binary_chain_parts_indented(
-        &self,
-        binary: &BinaryExpression<'_>,
-        span: Span,
-    ) -> DocId {
-        let d = self.d();
         // The comment-aware twin keeps comments and their line breaks: `fn(a && // c\n b)`.
-        // Continuation-indent style, matching this builder's own.
+        // Continuation-indent style, matching this builder's own, and grouped BEFORE the
+        // chain hoists its stripped shells' leading run, so that run prints outside the
+        // chain's group (`docs/comments.md` §The left-spine shell run): a `//` there breaks
+        // only its own line, never the chain (`f((// c⏎a || b) && c)` keeps `(a || b) && c`
+        // whole, the line its reparse reads with the comment ahead of the chain). The run and
+        // the chain still share one group of their own, so a block run's line breaks only
+        // when the two do not fit together, never because the argument list broke
+        // (`h((/* c */⏎a || b) && c, …)` keeps `/* c */ (a || b) && c` on one line).
         let (operands, operators) = match self.prepare_binary_chain_layout(binary, span, |p| {
-            p.build_binary_chain_parts_with_continuation_indent(binary, span)
+            p.d()
+                .group(p.build_binary_chain_doc_with_continuation_indent(binary, span))
         }) {
             BinaryChainLayout::Built(doc) => return doc,
             BinaryChainLayout::Operands(operands, operators) => (operands, operators),
@@ -2003,11 +1998,11 @@ impl<'a> Printer<'a> {
             }
         }
 
-        d.concat(&parts)
+        d.group(d.concat(&parts))
     }
 
     /// Prepare a binary chain for one of the two comment-blind layout builders
-    /// (`build_binary_chain_parts_indented`, `build_binary_chain_for_parens`).
+    /// (`build_binary_chain_doc_indented`, `build_binary_chain_for_parens`).
     ///
     /// Both lay a chain out as operand docs plus raw operator text, with nothing emitted
     /// in the operand→operator gaps — so a comment anywhere in the chain would be dropped

@@ -124,10 +124,6 @@ enum BinaryChainStyle {
     /// that do NOT take it are the ones worth naming, and they are named on
     /// [`Printer::build_flat_chain_expression_doc`].
     ContinuationIndent,
-    /// `ContinuationIndent` without the outer group wrapper, for contexts where
-    /// the caller controls grouping (the comment-aware twin for inline-paren
-    /// chains).
-    ContinuationIndentUngrouped,
 }
 
 /// How a `SequenceExpression`'s own grouping parens are emitted. One 3-valued mode
@@ -662,8 +658,9 @@ impl<'a> Printer<'a> {
     /// argument and an array element take `Printer::build_binary_chain_doc_indented`,
     /// which indents the continuation exactly as this default does but puts it directly in
     /// the outer group rather than in a sub-group. That is not an opt-in to the indent —
-    /// it is a break-propagation difference, and collapsing the two was measured and
-    /// refused; that builder's call site carries the evidence.
+    /// it is a group-structure difference: a break forced in that outer group breaks every
+    /// operand, where this default's sub-group lets the continuation re-evaluate and stay
+    /// flat.
     ///
     /// When the chain exceeds print width, breaks after operators:
     /// ```text
@@ -775,32 +772,17 @@ impl<'a> Printer<'a> {
     ///
     /// The style every position where prettier's `shouldNotIndent` chain yields false
     /// takes — which is to say the DEFAULT, reached through
-    /// [`Self::build_binary_chain_doc`]. The one caller that names it instead is the
-    /// Embedded expression root (`build_root_expression_doc`), because there it must
-    /// override an assignment-value mark the host may have set.
+    /// [`Self::build_binary_chain_doc`]. Two callers name it instead: the Embedded
+    /// expression root (`build_root_expression_doc`), because there it must override an
+    /// assignment-value mark the host may have set, and the argument / element builder's
+    /// comment-aware hand-off (`build_binary_chain_doc_indented`), which needs the group
+    /// inside the chain's stripped-shell run.
     pub(in crate::printer) fn build_binary_chain_doc_with_continuation_indent(
         &self,
         binary: &ast::BinaryExpression<'_>,
         span: Span,
     ) -> DocId {
         self.build_binary_chain_doc_core(binary, span, BinaryChainStyle::ContinuationIndent)
-    }
-
-    /// Build binary chain with continuation indent WITHOUT the outer group wrapper
-    ///
-    /// Use this when the caller controls grouping: the one caller is
-    /// `build_binary_chain_parts_indented`'s comment-aware twin hand-off
-    /// (`prepare_binary_chain_layout`, inline-paren contexts).
-    pub(in crate::printer) fn build_binary_chain_parts_with_continuation_indent(
-        &self,
-        binary: &ast::BinaryExpression<'_>,
-        span: Span,
-    ) -> DocId {
-        self.build_binary_chain_doc_core(
-            binary,
-            span,
-            BinaryChainStyle::ContinuationIndentUngrouped,
-        )
     }
 
     /// Core implementation for binary chain doc building
@@ -937,13 +919,6 @@ impl<'a> Printer<'a> {
             BinaryChainStyle::AssignmentValue | BinaryChainStyle::Flat => flat(self, true),
             BinaryChainStyle::Ungrouped | BinaryChainStyle::UngroupedCondition => flat(self, false),
             BinaryChainStyle::ContinuationIndent => indent_continuation(self),
-            BinaryChainStyle::ContinuationIndentUngrouped => self
-                .build_binary_chain_continuation_indent_parts(
-                    &operands,
-                    &operators,
-                    should_inline_last,
-                    should_group,
-                ),
         };
         self.wrap_chain_with_paren_comments(span, &operands, chain)
     }
@@ -1235,11 +1210,8 @@ impl<'a> Printer<'a> {
         ))
     }
 
-    /// Build binary chain continuation indent parts WITHOUT group wrapper.
-    ///
-    /// Returns the concat of first_parts + indent(continuation_parts) without
-    /// wrapping in a group. Used in Svelte template expressions and when the
-    /// caller controls grouping.
+    /// The parts [`Self::build_binary_chain_continuation_indent`] groups: the concat of
+    /// first_parts + indent(continuation_parts).
     ///
     /// When `should_group` is true, wraps the continuation in a sub-group so it
     /// can independently evaluate fit (bypassing the renderer's `will_break` check

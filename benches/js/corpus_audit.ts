@@ -35,8 +35,8 @@
  *   fixed point (boundary-whitespace idempotency). Real code only (Svelte).
  * - `paren_audit` — the same question on a different equivalence: a same-operator logical chain
  *   must format identically to the redundantly-parenthesized twin prettier rebalances it from.
- *   Real code only, and for the SAME reason `authoring_audit` is: the prettier suites hold six
- *   files that are not tsv F1 fixed points (`js/comments/binary-expressions-parens.js` among
+ *   Real code only, and for the SAME reason `authoring_audit` is: the prettier suites hold
+ *   files that are not tsv F1 fixed points (`typescript/prettier-ignore/mapped-types.ts` among
  *   them), which this audit reports as a failure of its own — that question belongs to the F1
  *   sweep below. Real code carries twice the fixture corpus's chains, and the class it gates is
  *   one a corpus of formatted code cannot otherwise show: the paren-nested authoring is exactly
