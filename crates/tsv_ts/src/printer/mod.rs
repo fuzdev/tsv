@@ -2224,26 +2224,77 @@ impl<'a> Printer<'a> {
                 | K::AssignmentExpression(_)
                 | K::YieldExpression(_)
         ) {
-            self.member_gap_start_after_spine(object)
+            self.pair_trailing_gap_start(object)
         } else {
             object.span().end
         }
     }
 
-    /// [`Self::member_gap_start`] for an object the walk can descend, out of line.
+    /// Where the trailing gap after `expr` OPENS for an emitter that prints it: `expr`'s
+    /// right-spine printed end ([`Self::right_spine_printed_end`]) when the stripped grouping
+    /// shells past it hold a comment to emit, else its span end. The one answer for every
+    /// gap that follows a value and prints its comments — a member gap
+    /// ([`Self::member_gap_start`]), a paren-headed statement's test and a `for` header's
+    /// clause item, and a pair the printer keeps around a value (a retained value shell,
+    /// an `as` / `satisfies` operand's pair, the required pair ahead of `!`, a JSDoc cast's
+    /// pair, the `export default` line-comment shell, a `case` test's head→`:` gap). A
+    /// comment written last in such a shell (`a + (b // c⏎)`) sits inside the value's span,
+    /// yet the gap's emitter is what the reparse hands it to once the shell strips; the
+    /// caller claims the region ([`Self::with_claimed_right_spine_run`]) so the value's own
+    /// trailing emitters decline it and the gap prints it in source order, ahead of the
+    /// comments written after the value.
     #[inline(never)]
-    fn member_gap_start_after_spine(&self, object: &ast::Expression<'_>) -> u32 {
-        let end = object.span().end;
-        // Only a comment inside the object can be claimed, and most objects hold none.
-        if !self.has_comments_to_emit_between(object.span().start, end) {
+    pub(in crate::printer) fn pair_trailing_gap_start(&self, expr: &ast::Expression<'_>) -> u32 {
+        let end = expr.span().end;
+        // Only a comment inside the value can be claimed, and most values hold none.
+        if !self.has_comments_to_emit_between(expr.span().start, end) {
             return end;
         }
-        let start = self.right_spine_printed_end(object);
+        let start = self.right_spine_printed_end(expr);
         if start < end && self.has_comments_to_emit_between(start, end) {
             start
         } else {
             end
         }
+    }
+
+    /// [`Self::pair_trailing_gap_start`] for a gap whose emitter prints nothing of its own
+    /// unless the gap past the value already holds a comment: there it widens only then,
+    /// so a lone comment in a stripped shell keeps the deferral the value gives it (past a
+    /// `case` test's `:`, past the `;` after a non-null operand) — the form both formatters
+    /// give that spelling.
+    pub(in crate::printer) fn pair_trailing_gap_start_guarded(
+        &self,
+        expr: &ast::Expression<'_>,
+        boundary_end: u32,
+    ) -> u32 {
+        let end = expr.span().end;
+        if self.has_comments_to_emit_between(end, boundary_end) {
+            self.pair_trailing_gap_start(expr)
+        } else {
+            end
+        }
+    }
+
+    /// Run `build` with the stripped-shell region `[gap, end)` claimed
+    /// ([`Printer::claimed_right_spine_run`]): the value's own trailing emitters decline it
+    /// for the gap emitter that opened at `gap` ([`Self::pair_trailing_gap_start`]), which
+    /// prints it. An empty region claims nothing.
+    pub(in crate::printer) fn with_claimed_right_spine_run<T>(
+        &self,
+        gap: u32,
+        end: u32,
+        build: impl FnOnce() -> T,
+    ) -> T {
+        if gap >= end {
+            return build();
+        }
+        let outer = self
+            .claimed_right_spine_run
+            .replace(Some(Span::new(gap, end)));
+        let out = build();
+        self.claimed_right_spine_run.set(outer);
+        out
     }
 
     /// Where `expr`'s printed content ends ahead of the stripped grouping shells a binary

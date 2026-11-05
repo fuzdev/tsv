@@ -1,0 +1,86 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// a comment written last inside a redundant pair down the right edge of an `as` or
+	// `satisfies` operand stays inside the operand's pair, ahead of a comment written after the
+	// pair, each on a line of its own
+	k1 = (a +
+		b) as T; // c1 // d1
+	k2 = (a +
+		(b +
+			c)) as T; // c2 // d2
+	k3 = (a +
+		b) as T;
+		// c3 // d3
+	k4 = (a +
+		b) satisfies T; // c4 // d4
+	fn1(
+		(a +
+			b) as T // c5 // d5
+	);
+
+	// an own-line comment after the pair already takes a line of its own, and the non-null
+	// operand keeps the two comments apart
+	k6 = (a +
+		b) as // d6 // c6
+	T;
+	k7 = (a +
+		b)!; // c7 // d7
+
+	// with nothing written after the pair, the comment trails the statement
+	k8 = (a +
+		b) as T; // c8
+	k11 = (a +
+		b)!; // c11
+
+	// a block written ahead of the comment after the pair leaves the two in the same order, the
+	// non-null operand's pair included
+	k9 = (a +
+		b) /* x9 */ as T; // c9 // d9
+	k10 = (a +
+		b) /* x10 */!; // c10 // d10
+
+	// a block alone after the pair stays after the comment, in the order written
+	k12 = (a +
+		b) /* x12 */!; // c12
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// a comment written last inside a redundant pair down the right edge of an `as` or
+	// `satisfies` operand stays inside the operand's pair, ahead of a comment written after the
+	// pair, each on a line of its own
+	k1 = (a + b) as T; // c1 // d1
+	k2 = (a + (b + c)) as T; // c2 // d2
+	k3 = (a + b) as T;
+	// c3 // d3
+	k4 = (a + b) satisfies T; // c4 // d4
+	fn1(
+		(a + b) as T // c5 // d5
+	);
+
+	// an own-line comment after the pair already takes a line of its own, and the non-null
+	// operand keeps the two comments apart
+	k6 = (a + b) as T; // d6 // c6
+	k7 = (a + b)!; // c7 // d7
+
+	// with nothing written after the pair, the comment trails the statement
+	k8 = (a + b) as T; // c8
+	k11 = (a + b)!; // c11
+
+	// a block written ahead of the comment after the pair leaves the two in the same order, the
+	// non-null operand's pair included
+	k9 = (a + b) /* x9 */ as T; // c9 // d9
+	k10 = (a + b) /* x10 */!; // c10 // d10
+
+	// a block alone after the pair stays after the comment, in the order written
+	k12 = (a + b) /* x12 */!; // c12
+</script>

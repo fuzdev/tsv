@@ -292,6 +292,17 @@ impl<'a> Printer<'a> {
 
         // case X: or default:
         let case_label_end = self.get_case_label_end(case);
+        // The colon sits exactly one byte before the label end, which `get_case_label_end`
+        // already located as colon+1, so no second scan is needed.
+        let colon_pos = case_label_end - 1;
+        // Where the head→`:` gap opens: the head's end, or — when the gap already holds a
+        // comment — the test's right-spine PRINTED end, so a comment written last in a
+        // stripped shell down the test's right edge (`case a + (b // c⏎) // d⏎:`) prints in
+        // the gap ahead of the one written after the shell, in source order, as the bare
+        // spelling `case a + b // c⏎// d⏎:` prints it
+        // ([`Printer::pair_trailing_gap_start_guarded`]). A lone such comment keeps deferring
+        // past the `:` to trail the label. A frozen test's slice prints its shells itself.
+        let mut head_end = Self::case_head_end(case);
 
         if let Some(test) = &case.test {
             // An assignment takes clarity parens here exactly as it does in a statement
@@ -316,18 +327,23 @@ impl<'a> Printer<'a> {
             // the gap at all. That is what the freeze disjunct in the gate buys: without it
             // the inline arm reflows the block onto the `case` line and the freeze is lost.
             let frozen = self.value_head_frozen_span(test_gap_start, test.span());
-            let test_doc = self.wrap_statement_test_parens(
-                test,
-                frozen.map_or_else(
-                    // The ordinary dispatch: a binary `case` test takes the
-                    // continuation-indent default (`SwitchCase` is in neither of
-                    // prettier's exempt lists — only a switch's DISCRIMINANT is
-                    // `isInsideParenthesis`). The frozen arm below emits the author's
-                    // bytes, where no layout rule applies.
-                    || self.build_expression_doc_claiming_outermost(test),
-                    |frozen| self.build_frozen_expression_doc(test, frozen),
-                ),
-            );
+            if frozen.is_none() {
+                head_end = self.pair_trailing_gap_start_guarded(test, colon_pos);
+            }
+            let test_doc = self.with_claimed_right_spine_run(head_end, test.span().end, || {
+                self.wrap_statement_test_parens(
+                    test,
+                    frozen.map_or_else(
+                        // The ordinary dispatch: a binary `case` test takes the
+                        // continuation-indent default (`SwitchCase` is in neither of
+                        // prettier's exempt lists — only a switch's DISCRIMINANT is
+                        // `isInsideParenthesis`). The frozen arm below emits the author's
+                        // bytes, where no layout rule applies.
+                        || self.build_expression_doc_claiming_outermost(test),
+                        |frozen| self.build_frozen_expression_doc(test, frozen),
+                    ),
+                )
+            });
             // The `case`→test gap needs its own emitter (`docs/comments.md` hazard 4): the
             // only comment here that survives on the test's own doc is the innermost block
             // GLUED to it, which ownership carries inside. Anything else has no owner at
@@ -388,11 +404,7 @@ impl<'a> Printer<'a> {
             parts.push(d.text("default"));
         }
         // The head→`:` gap is the same gap either way (`case 1 /* c */:`,
-        // `default /* c */:`), so its comments are emitted once rather than per arm. The
-        // colon sits exactly one byte before the label end, which `get_case_label_end`
-        // already located as colon+1, so no second scan is needed.
-        let colon_pos = case_label_end - 1;
-        let head_end = Self::case_head_end(case);
+        // `default /* c */:`), so its comments are emitted once rather than per arm.
         if self.has_line_comments_between(head_end, colon_pos) {
             // A `//` here runs to end-of-line, so emitting the gap inline would swallow
             // the colon into the comment (`case x // c:`, which does not reparse). The

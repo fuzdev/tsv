@@ -522,10 +522,25 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match &decl.declaration {
             ast::ExportDefaultValue::Expression(expr) => {
+                // The line-comment shell below opens its run where the value's PRINTED content
+                // ends ([`Printer::pair_trailing_gap_start`]), so a comment written last in a
+                // stripped shell down the value's right spine prints inside it, ahead of the
+                // run written after that shell — left to the value, a `//` there deferred
+                // behind a same-line block of that run and welded onto its line. Asked of the
+                // shell's own close, read from the value's span end, so a gap holding no `//`
+                // opens no shell; a FROZEN value's slice prints its shells itself.
+                let frozen = self.value_head_frozen_span(keyword_end, expr.span());
+                let line_comment_close = self
+                    .value_paren_line_comment_close(value_span.end, span.end)
+                    .filter(|_| frozen.is_none());
+                let run_start = line_comment_close
+                    .map_or(value_span.end, |_| self.pair_trailing_gap_start(expr));
                 // A multi-line comment the value owns prints outside the value's own group (the
                 // keyword gap's run never sees it), beneath the clarity parens added below.
-                let expr_doc = self.build_value_head_doc(keyword_end, expr, || {
-                    self.build_expression_doc_claiming_outermost(expr)
+                let expr_doc = self.with_claimed_right_spine_run(run_start, value_span.end, || {
+                    self.build_value_head_doc(keyword_end, expr, || {
+                        self.build_expression_doc_claiming_outermost(expr)
+                    })
                 });
                 // Prettier wraps the exported expression when its leftmost
                 // (first-printed) token is a function/class keyword — else
@@ -539,7 +554,6 @@ impl<'a> Printer<'a> {
                 // FunctionDeclaration/ClassDeclaration arms cover bare
                 // `export default function/class …`. A frozen value is read as its
                 // verbatim slice, which carries no pair the printer would add inside.
-                let frozen = self.value_head_frozen_span(keyword_end, expr.span());
                 let needs_pair =
                     export_default_needs_parens(expr, LeftmostText::of_value(frozen.is_some()));
                 let argument_end = value_span.end;
@@ -555,9 +569,15 @@ impl<'a> Printer<'a> {
                 // Where the value needs a pair, that authored pair IS the one it needs, so
                 // the shell takes the bare value and prints the pair once, comment inside
                 // (`export default (⏎\tclass {} // c⏎);`), a frozen slice's included.
-                if let Some((shell, after_close)) =
-                    self.build_value_paren_line_comment_shell(expr_doc, argument_end, span.end)
-                {
+                let shell = match line_comment_close {
+                    Some(close) => self
+                        .build_paren_operand_comment_doc(run_start, close, expr_doc, ")")
+                        .map(|shell| (shell, Self::past_grouping_close(close, span.end))),
+                    None => {
+                        self.build_value_paren_line_comment_shell(expr_doc, argument_end, span.end)
+                    }
+                };
+                if let Some((shell, after_close)) = shell {
                     let mut parts = smallvec![shell];
                     let after = self.split_terminator_gap_comments(
                         &mut parts,

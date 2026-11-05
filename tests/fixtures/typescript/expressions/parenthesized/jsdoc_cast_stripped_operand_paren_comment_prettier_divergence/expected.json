@@ -1,0 +1,644 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 780,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a comment written last inside a redundant pair down the right edge of a JSDoc cast's",
+			"start": 10,
+			"end": 97
+		},
+		{
+			"type": "Line",
+			"value": " inner stays inside the cast's pair, ahead of a comment written after the pair, each on a",
+			"start": 99,
+			"end": 190
+		},
+		{
+			"type": "Line",
+			"value": " line of its own",
+			"start": 192,
+			"end": 210
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 217,
+			"end": 233
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 244,
+			"end": 249
+		},
+		{
+			"type": "Line",
+			"value": " d1",
+			"start": 252,
+			"end": 257
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 272,
+			"end": 288
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 305,
+			"end": 310
+		},
+		{
+			"type": "Line",
+			"value": " d2",
+			"start": 313,
+			"end": 318
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 333,
+			"end": 349
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 362,
+			"end": 367
+		},
+		{
+			"type": "Line",
+			"value": " d3",
+			"start": 370,
+			"end": 375
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 388,
+			"end": 404
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 416,
+			"end": 421
+		},
+		{
+			"type": "Line",
+			"value": " d4",
+			"start": 425,
+			"end": 430
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 466,
+			"end": 482
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 494,
+			"end": 499
+		},
+		{
+			"type": "Line",
+			"value": " d5",
+			"start": 503,
+			"end": 508
+		},
+		{
+			"type": "Line",
+			"value": " an own-line comment after the pair already takes a line of its own",
+			"start": 519,
+			"end": 588
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 595,
+			"end": 611
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 622,
+			"end": 627
+		},
+		{
+			"type": "Line",
+			"value": " d6",
+			"start": 630,
+			"end": 635
+		},
+		{
+			"type": "Line",
+			"value": " with nothing written after the pair, the comment stays inside the cast's pair too",
+			"start": 642,
+			"end": 726
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 733,
+			"end": 749
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 760,
+			"end": 765
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 779,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 770,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 212,
+					"end": 261,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 212,
+						"end": 260,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 212,
+							"end": 214,
+							"name": "k1"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 238,
+							"end": 243,
+							"left": {
+								"type": "Identifier",
+								"start": 238,
+								"end": 239,
+								"name": "a"
+							},
+							"operator": "+",
+							"right": {
+								"type": "Identifier",
+								"start": 242,
+								"end": 243,
+								"name": "b"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "* @type {T} ",
+									"start": 217,
+									"end": 233
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c1",
+									"start": 244,
+									"end": 249
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment written last inside a redundant pair down the right edge of a JSDoc cast's",
+							"start": 10,
+							"end": 97
+						},
+						{
+							"type": "Line",
+							"value": " inner stays inside the cast's pair, ahead of a comment written after the pair, each on a",
+							"start": 99,
+							"end": 190
+						},
+						{
+							"type": "Line",
+							"value": " line of its own",
+							"start": 192,
+							"end": 210
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 263,
+					"end": 322,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 267,
+							"end": 321,
+							"id": {
+								"type": "Identifier",
+								"start": 267,
+								"end": 269,
+								"name": "k2"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 293,
+								"end": 304,
+								"left": {
+									"type": "Identifier",
+									"start": 293,
+									"end": 294,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 298,
+									"end": 303,
+									"left": {
+										"type": "Identifier",
+										"start": 298,
+										"end": 299,
+										"name": "b"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 302,
+										"end": 303,
+										"name": "c"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 305,
+											"end": 310
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 272,
+										"end": 288
+									}
+								]
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " d1",
+							"start": 252,
+							"end": 257
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 324,
+					"end": 379,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 328,
+							"end": 378,
+							"id": {
+								"type": "Identifier",
+								"start": 328,
+								"end": 330,
+								"name": "k3"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 354,
+								"end": 359,
+								"left": {
+									"type": "Identifier",
+									"start": 354,
+									"end": 355,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 358,
+									"end": 359,
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 333,
+										"end": 349
+									}
+								]
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " d2",
+							"start": 313,
+							"end": 318
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 381,
+					"end": 438,
+					"expression": {
+						"type": "CallExpression",
+						"start": 381,
+						"end": 437,
+						"callee": {
+							"type": "Identifier",
+							"start": 381,
+							"end": 384,
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 410,
+								"end": 415,
+								"left": {
+									"type": "Identifier",
+									"start": 410,
+									"end": 411,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 414,
+									"end": 415,
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 388,
+										"end": 404
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c4",
+										"start": 416,
+										"end": 421
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c3",
+							"start": 362,
+							"end": 367
+						},
+						{
+							"type": "Line",
+							"value": " d3",
+							"start": 370,
+							"end": 375
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 440,
+					"end": 516,
+					"id": {
+						"type": "Identifier",
+						"start": 449,
+						"end": 452,
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 455,
+						"end": 516,
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 459,
+								"end": 513,
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 488,
+									"end": 493,
+									"left": {
+										"type": "Identifier",
+										"start": 488,
+										"end": 489,
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 492,
+										"end": 493,
+										"name": "b"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "* @type {T} ",
+											"start": 466,
+											"end": 482
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c5",
+											"start": 494,
+											"end": 499
+										}
+									]
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " d5",
+										"start": 503,
+										"end": 508
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " d4",
+							"start": 425,
+							"end": 430
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 590,
+					"end": 639,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 590,
+						"end": 638,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 590,
+							"end": 592,
+							"name": "k6"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 616,
+							"end": 621,
+							"left": {
+								"type": "Identifier",
+								"start": 616,
+								"end": 617,
+								"name": "a"
+							},
+							"operator": "+",
+							"right": {
+								"type": "Identifier",
+								"start": 620,
+								"end": 621,
+								"name": "b"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "* @type {T} ",
+									"start": 595,
+									"end": 611
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c6",
+									"start": 622,
+									"end": 627
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line comment after the pair already takes a line of its own",
+							"start": 519,
+							"end": 588
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 728,
+					"end": 769,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 728,
+						"end": 768,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 728,
+							"end": 730,
+							"name": "k7"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 754,
+							"end": 759,
+							"left": {
+								"type": "Identifier",
+								"start": 754,
+								"end": 755,
+								"name": "a"
+							},
+							"operator": "+",
+							"right": {
+								"type": "Identifier",
+								"start": 758,
+								"end": 759,
+								"name": "b"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": "* @type {T} ",
+									"start": 733,
+									"end": 749
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c7",
+									"start": 760,
+									"end": 765
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " d6",
+							"start": 630,
+							"end": 635
+						},
+						{
+							"type": "Line",
+							"value": " with nothing written after the pair, the comment stays inside the cast's pair too",
+							"start": 642,
+							"end": 726
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -724,7 +724,7 @@ impl<'a> Printer<'a> {
             // The stripped shells' run is the trailing emitter's below: claimed, so the
             // clause's own trailing emitters decline it.
             let gap = update_gap.unwrap_or_else(|| update.span().end);
-            let update_doc = self.with_claimed_for_item_run(gap, update.span().end, || {
+            let update_doc = self.with_claimed_right_spine_run(gap, update.span().end, || {
                 self.with_for_clause_end(update_end, || {
                     update_frozen.map_or_else(
                         || self.build_for_update_doc(update),
@@ -782,23 +782,8 @@ impl<'a> Printer<'a> {
         ]))
     }
 
-    /// Builds `build` with the stripped-shell run `[gap, end)` of a header clause item
-    /// claimed ([`Printer::claimed_right_spine_run`]), so the item's own trailing emitters
-    /// decline it for the header emitter that prints it. An empty run claims nothing.
-    fn with_claimed_for_item_run<T>(&self, gap: u32, end: u32, build: impl FnOnce() -> T) -> T {
-        if gap >= end {
-            return build();
-        }
-        let outer = self
-            .claimed_right_spine_run
-            .replace(Some(Span::new(gap, end)));
-        let out = build();
-        self.claimed_right_spine_run.set(outer);
-        out
-    }
-
     /// Where the update clause's trailing region opens: its right spine's printed end
-    /// ([`Printer::header_trailing_gap_start`]), walked through a sequence's unfrozen last
+    /// ([`Printer::pair_trailing_gap_start`]), walked through a sequence's unfrozen last
     /// operand, which prints bare in a `for` header — no envelope prints its run here.
     fn for_update_trailing_gap_start(&self, update: &Expression<'_>) -> u32 {
         let end = update.span().end;
@@ -817,7 +802,7 @@ impl<'a> Printer<'a> {
             },
             _ => update,
         };
-        let start = self.header_trailing_gap_start(spine);
+        let start = self.pair_trailing_gap_start(spine);
         if start < end && self.has_comments_to_emit_between(start, end) {
             start
         } else {
@@ -1264,11 +1249,11 @@ impl<'a> Printer<'a> {
                         prev_gap = if frozen.is_some() {
                             e.span().end
                         } else {
-                            self.header_trailing_gap_start(e)
+                            self.pair_trailing_gap_start(e)
                         };
                         let core = frozen.map_or_else(
                             || {
-                                self.with_claimed_for_item_run(prev_gap, e.span().end, || {
+                                self.with_claimed_right_spine_run(prev_gap, e.span().end, || {
                                     build_elem(e)
                                 })
                             },
@@ -2186,7 +2171,7 @@ impl<'a> Printer<'a> {
                             && init_frozen.is_none()
                             && init.span().end == declarator.span.end
                         {
-                            prev_gap = self.header_trailing_gap_start(init);
+                            prev_gap = self.pair_trailing_gap_start(init);
                         }
                         // A header declarator is a declarator here too: prettier's
                         // call-object clause keys on the `VariableDeclarator` parent and
@@ -2198,15 +2183,18 @@ impl<'a> Printer<'a> {
                         self.mark_assignment_value(init);
                         let value_gap = prev_gap;
                         let build_value = || {
-                            let inner =
-                                self.with_claimed_for_item_run(value_gap, init.span().end, || {
+                            let inner = self.with_claimed_right_spine_run(
+                                value_gap,
+                                init.span().end,
+                                || {
                                     self.build_for_init_value_doc(
                                         init,
                                         declarator.span.end,
                                         position_parens,
                                         init_frozen,
                                     )
-                                });
+                                },
+                            );
                             self.wrap_value_position_parens(
                                 init,
                                 declarator.span.end,

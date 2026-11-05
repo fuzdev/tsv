@@ -653,7 +653,18 @@ impl<'a> Printer<'a> {
                 },
                 None,
             ) => operators::sequence_operand_run(seq),
-            _ => (cast.inner.span().start, cast.inner.span().end),
+            // Any other unfrozen inner: the interior run opens where the inner's PRINTED
+            // content ends ([`Printer::pair_trailing_gap_start`]), so a comment written last in
+            // a stripped shell down its right spine prints inside this pair, ahead of a run
+            // written after that shell (`(a + (b // c⏎) // d⏎)` as `(a + b // c⏎// d⏎)`), and is
+            // claimed from the inner's own trailing emitters, which deferred it past the `)`.
+            // The pair always prints, so a lone such comment stays inside it too — where the
+            // bare spelling and prettier's own fixed point keep it.
+            (_, None) => (
+                cast.inner.span().start,
+                self.pair_trailing_gap_start(cast.inner),
+            ),
+            (_, Some(_)) => (cast.inner.span().start, cast.inner.span().end),
         };
         let inner_doc = frozen_inner.map_or_else(
             || match &cast.inner.kind {
@@ -666,7 +677,9 @@ impl<'a> Printer<'a> {
                 ExpressionKind::SequenceExpression(seq) => {
                     self.build_sequence_doc_bare(seq, cast.inner.span, trail_start)
                 }
-                _ => self.build_expression_doc(cast.inner),
+                _ => self.with_claimed_right_spine_run(trail_start, cast.inner.span().end, || {
+                    self.build_expression_doc(cast.inner)
+                }),
             },
             // Built bare, like the ordinary arm: the cast's parens already group it. The
             // owned-comment claim still applies — a block glued before the inner rides
@@ -1669,35 +1682,65 @@ impl<'a> Printer<'a> {
             // it `(t)!` and `(t)!.prop` disagree about the very same base. Asked BEFORE
             // the operand is built, for the re-marking reason given at the cast site.
             let expands = self.ternary_takes_extra_indent(non_null_expr.expression);
+            // The pair's trailing run opens where the operand's PRINTED content ends when the
+            // gap past the operand holds a comment ([`Printer::pair_trailing_gap_start_guarded`]):
+            // a comment written last in a stripped shell down its right spine then prints
+            // inside the pair ahead of the run written after that shell, in source order —
+            // left to the operand, a `//` there deferred behind a same-line block of that run
+            // and welded onto its line. A lone such comment keeps trailing the statement. A
+            // FROZEN operand's slice prints its shells and their comments verbatim, so it
+            // widens nothing: claimed, the comment printed twice.
+            let argument_end = if self
+                .left_spine_operand_frozen_span(span.start, non_null_expr.expression)
+                .is_some()
+            {
+                non_null_expr.expression.span().end
+            } else {
+                self.pair_trailing_gap_start_guarded(non_null_expr.expression, span.end)
+            };
             // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
             // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]).
             // The operand's erased-paren freeze on the RETAINED-pair path too: the pair
             // survives, so the directive keeps its own line inside it and the reparse reads
             // it in the same place ([`Printer::build_left_spine_operand_doc`]).
-            let inner_doc = self.build_left_spine_operand_doc(
-                span.start,
-                non_null_expr.expression,
-                FrozenOperandPair::Emitted,
-                || {
-                    self.build_value_with_outermost_owned_comment(non_null_expr.expression, || {
-                        // The `!` follows the operand inside the pair too, unless the pair holds
-                        // a comment behind the operand, which follows it instead
-                        // ([`Printer::with_tight_follower_operand`]).
-                        let build = || {
-                            self.build_expression_doc_with_indent_on_break(non_null_expr.expression)
-                        };
-                        if self.has_comments_to_emit_between(
-                            non_null_expr.expression.span().end,
-                            span.end,
-                        ) {
-                            build()
-                        } else {
-                            self.with_tight_follower_operand(non_null_expr.expression.span(), build)
-                        }
-                    })
-                },
+            let build_operand = || {
+                self.build_left_spine_operand_doc(
+                    span.start,
+                    non_null_expr.expression,
+                    FrozenOperandPair::Emitted,
+                    || {
+                        self.build_value_with_outermost_owned_comment(
+                            non_null_expr.expression,
+                            || {
+                                // The `!` follows the operand inside the pair too, unless the pair
+                                // holds a comment behind the operand, which follows it instead
+                                // ([`Printer::with_tight_follower_operand`]).
+                                let build = || {
+                                    self.build_expression_doc_with_indent_on_break(
+                                        non_null_expr.expression,
+                                    )
+                                };
+                                if self.has_comments_to_emit_between(
+                                    non_null_expr.expression.span().end,
+                                    span.end,
+                                ) {
+                                    build()
+                                } else {
+                                    self.with_tight_follower_operand(
+                                        non_null_expr.expression.span(),
+                                        build,
+                                    )
+                                }
+                            },
+                        )
+                    },
+                )
+            };
+            let inner_doc = self.with_claimed_right_spine_run(
+                argument_end,
+                non_null_expr.expression.span().end,
+                build_operand,
             );
-            let argument_end = non_null_expr.expression.span().end;
             // A leading run that occupies a line — a `//`, an own-line block — takes
             // the family's expanded shell: `( // c` glue, the operand one indent in,
             // the `)!` back out (prettier glues the comment to the `(` and keeps the

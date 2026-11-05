@@ -2216,6 +2216,26 @@ impl<'a> Printer<'a> {
             self.split_located_paren_glued_run(leading_start, open, expr_start);
         let leading_run = self.build_rhs_comments_opt(run_start, expr_start);
 
+        // The pair's interior run opens where the operand's PRINTED content ends
+        // ([`Printer::pair_trailing_gap_start`]), so a comment written last in a stripped shell
+        // down its right spine prints ahead of the run written after that shell, in source
+        // order. Not for a sequence: its run already opens at its last operand's end
+        // (`expr_end`), ahead of that operand's stripped shell, where the walk would stop at the
+        // sequence's own span end and skip the shell's comment — dropped. Nor for a FROZEN
+        // operand, whose slice prints its shells and their comments verbatim — widened there,
+        // the claimed comment printed twice. A pair kept for its leading run alone ends the
+        // operand's line inside it either way, so the stripped shell's `//` lands there
+        // whichever emitter prints it.
+        let gap = match &expr.kind {
+            ast::ExpressionKind::SequenceExpression(_) => expr_end,
+            _ if self
+                .left_spine_operand_frozen_span(leading_start, expr)
+                .is_some() =>
+            {
+                expr_end
+            }
+            _ => self.pair_trailing_gap_start(expr),
+        };
         let mut body = DocBuf::new();
         if let Some(run) = leading_run {
             body.push(run);
@@ -2240,16 +2260,16 @@ impl<'a> Printer<'a> {
             // the directive keeps the line the author gave it inside it and the reparse
             // reads it in the very same place — a first pass that did not freeze would
             // normalize the author's bytes and then hold that form for good.
-            _ => self.build_left_spine_operand_doc(
-                leading_start,
-                expr,
-                FrozenOperandPair::Emitted,
-                || self.build_expression_doc_claiming_outermost(expr),
-            ),
+            _ => self.with_claimed_right_spine_run(gap, expr_end, || {
+                self.build_left_spine_operand_doc(
+                    leading_start,
+                    expr,
+                    FrozenOperandPair::Emitted,
+                    || self.build_expression_doc_claiming_outermost(expr),
+                )
+            }),
         });
-        if let Some((trailing, _needs_break)) =
-            self.trailing_paren_comment_parts(expr_end, inner_end)
-        {
+        if let Some((trailing, _needs_break)) = self.trailing_paren_comment_parts(gap, inner_end) {
             body.extend(trailing);
         }
 
@@ -3481,8 +3501,16 @@ impl<'a> Printer<'a> {
             return self.build_shell_sequence_doc(seq, expr.span, expr_end, boundary_end, layout);
         }
 
-        let inner = self.build_expression_doc(expr);
-        self.build_kept_paren_shell_doc(inner, expr_end, boundary_end)
+        // The pair's run opens where the value's PRINTED content ends: a comment written last
+        // in a stripped shell down its right spine (`(a + (b // c⏎) // d⏎)`) is this pair's
+        // to print, ahead of the run written after the shell, as the bare spelling
+        // `(a + b // c⏎// d⏎)` prints it. Left to the value, a `//` there deferred past the `)`,
+        // behind the inline run, where the two welded onto one line. Every caller reaches
+        // this arm with a comment already past the value, so the shell is retained either way.
+        let gap = self.pair_trailing_gap_start(expr);
+        let inner =
+            self.with_claimed_right_spine_run(gap, expr_end, || self.build_expression_doc(expr));
+        self.build_kept_paren_shell_doc(inner, gap, boundary_end)
             .unwrap_or(inner)
     }
 

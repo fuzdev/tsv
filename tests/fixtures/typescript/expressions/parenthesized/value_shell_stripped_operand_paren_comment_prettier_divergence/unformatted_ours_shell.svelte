@@ -1,0 +1,66 @@
+<script lang="ts">
+	// a comment written last inside a redundant pair down the right edge of a value shell the
+	// printer keeps stays inside the shell, ahead of a comment written after the pair, each on
+	// a line of its own
+	let k1 = (a + (b // c1
+	) // d1
+	);
+	const k2 = (a + (b + (c // c2
+	)) // d2
+	);
+	let k3 = (a + (b
+	// c3
+	) // d3
+	);
+	k4 = (a + (b // c4
+	) // d4
+	);
+	k5 += (a + (b // c5
+	) // d5
+	);
+	let j1 = 1, k6 = (a + (b // c6
+	) // d6
+	), m1 = 2;
+	h1 = () => (a + (b // c7
+	) // d7
+	);
+	for (let k8 = (a + (b // c8
+	) // d8
+	); ; ) {}
+	v1 = q ? r : (a + (b // c9
+	) // d9
+	);
+
+	// an own-line comment after the pair already takes a line of its own
+	let k10 = (a + (b // c10
+	)
+	// d10
+	);
+
+	// positions that strip the value's shell keep the two comments apart too
+	function fn1() {
+		return (a + (b // c11
+		) // d11
+		);
+	}
+	fn2(a + (b // c12
+	) // d12
+	);
+	class A {
+		x = (a + (b // c13
+		) // d13
+		);
+	}
+
+	// with nothing written after the pair, the shell strips and the comment trails the value
+	let k14 = (a + (b // c14
+	));
+
+	// a block written ahead of the comment after the pair leaves the two in the same order
+	let k15 = (a + (b // c15
+	) /* x15 */ // d15
+	);
+	export default (a + (b // c16
+	) /* x16 */ // d16
+	);
+</script>
