@@ -1544,6 +1544,14 @@ pub(crate) fn build_linearized_chain_doc(
         }
         _ => None,
     };
+    // The frozen base's slice prints its stripped shells and their comments verbatim, so the
+    // first member gap opens at the base's span end, not at its printed end
+    // ([`Printer::member_gap_start`]), which would claim the slice's comment a second time.
+    if frozen_base.is_some()
+        && let [ChainNode::Base { expr: base, .. }, link, ..] = &mut *nodes
+    {
+        link.open_gap_at_least(base.span().end);
+    }
     let outer_ungroups = printer
         .chain_ungroups_args
         .replace(long_curried && mark_long_curried_calls(nodes, printer));

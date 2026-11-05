@@ -189,6 +189,16 @@ fn expression_statement_frozen() {
     );
 }
 
+/// A member chain's frozen head: the first member gap opens at the head's span end, the
+/// slice printing its stripped shell's comment.
+#[test]
+fn member_chain_head_frozen() {
+    assert_frozen_once(
+        "k = (\n// prettier-ignore\na + (b // c\n)).m;\n",
+        "k =\n\t// prettier-ignore\n\t(a + (b // c\n)).m;\n",
+    );
+}
+
 /// A call chain's frozen head: the first call's callee gap opens at the head's span end, so the
 /// slice alone prints the stripped shell's comment.
 #[test]

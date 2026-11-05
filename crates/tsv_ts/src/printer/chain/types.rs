@@ -345,6 +345,20 @@ impl<'a> ChainNode<'a> {
         matches!(self, Self::Member { .. } | Self::PrivateMember { .. })
     }
 
+    /// Open this node's object→property gap no earlier than `start` — for a gap the linearizer
+    /// opened at its object's PRINTED end (`Printer::member_gap_start`) over an object whose
+    /// verbatim slice prints that region itself (a frozen chain base): left open there, the gap
+    /// printed the slice's stripped-shell comment a second time. A no-op on a node with no
+    /// object gap, or one already opening at or past `start`.
+    pub(crate) fn open_gap_at_least(&mut self, start: u32) {
+        if let Self::Member { object_end, .. }
+        | Self::PrivateMember { object_end, .. }
+        | Self::ComputedMember { object_end, .. } = self
+        {
+            *object_end = (*object_end).max(start);
+        }
+    }
+
     /// Get the **chain-level** comment range for this node (object_end, property_start)
     /// — the region whose comments the chain builder emits ahead of the line break it
     /// puts in front of the node.
