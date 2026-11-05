@@ -486,7 +486,7 @@ impl<'a> Printer<'a> {
         let (first_semi, second_semi) =
             self.find_for_semicolons(stmt, open_paren.unwrap_or(span.start), close_paren_approx);
 
-        let spans = ForHeaderSpans {
+        let mut spans = ForHeaderSpans {
             open_paren,
             init_start: stmt.init.as_ref().map(|i| match i {
                 ast::ForInit::VariableDeclaration(d) => d.span.start,
@@ -534,6 +534,18 @@ impl<'a> Printer<'a> {
             .and_then(|gap| clause_frozen(gap, spans.init_start, init_end));
         let test_frozen = clause_frozen(test_search_start, spans.test_start, test_end);
         let update_frozen = clause_frozen(update_search_start, spans.update_start, update_end);
+        // Where the update clause's trailing region opens: the end of what it PRINTS, ahead
+        // of the stripped shells down its right spine (`a + (b // c⏎)` prints `a + b // c`),
+        // so the header's one trailing emitter prints their comments with the `)`-gap's in
+        // source order ([`Self::for_update_trailing_gap_start`]). A frozen clause prints
+        // them in its own slice.
+        let update_gap = match &stmt.update {
+            Some(update) if update_frozen.is_none() => {
+                Some(self.for_update_trailing_gap_start(update))
+            }
+            _ => update_end,
+        };
+        spans.update_end = update_gap;
 
         // The opening-delimiter rule at the `for` header's `(`: a `//` the author glued to
         // it keeps that line ([`Printer::split_open_delimiter_glued_run`]), as at every
@@ -709,20 +721,26 @@ impl<'a> Printer<'a> {
         }
 
         if let Some(update) = &stmt.update {
-            inner_parts.push(self.with_for_clause_end(update_end, || {
-                update_frozen.map_or_else(
-                    || self.build_for_update_doc(update),
-                    // The clause prints BARE, exactly as the init clause's frozen arm does
-                    // ([`Self::build_frozen_init_clause_doc`]) and for the same reason: a
-                    // `SequenceExpression` clause is the one position that wants no grouping
-                    // pair, where [`Printer::build_frozen_expression_doc`] re-synthesizes the
-                    // one every other position needs. The update clause is `[+In]` and heads
-                    // no statement, so nothing else can want a pair here either — and the
-                    // re-synthesized one printed a grouping pair the author never wrote and
-                    // prettier does not print.
-                    |frozen| self.build_frozen_node_doc(frozen),
-                )
-            }));
+            // The stripped shells' run is the trailing emitter's below: claimed, so the
+            // clause's own trailing emitters decline it.
+            let gap = update_gap.unwrap_or_else(|| update.span().end);
+            let update_doc = self.with_claimed_for_item_run(gap, update.span().end, || {
+                self.with_for_clause_end(update_end, || {
+                    update_frozen.map_or_else(
+                        || self.build_for_update_doc(update),
+                        // The clause prints BARE, exactly as the init clause's frozen arm does
+                        // ([`Self::build_frozen_init_clause_doc`]) and for the same reason: a
+                        // `SequenceExpression` clause is the one position that wants no grouping
+                        // pair, where [`Printer::build_frozen_expression_doc`] re-synthesizes the
+                        // one every other position needs. The update clause is `[+In]` and heads
+                        // no statement, so nothing else can want a pair here either — and the
+                        // re-synthesized one printed a grouping pair the author never wrote and
+                        // prettier does not print.
+                        |frozen| self.build_frozen_node_doc(frozen),
+                    )
+                })
+            });
+            inner_parts.push(update_doc);
         }
         if let Some(mut start) = spans.update_trailing_start() {
             let close = spans.close_paren.unwrap_or(span.end);
@@ -741,7 +759,13 @@ impl<'a> Printer<'a> {
                 inner_parts.push(self.build_trailing_line_comment_doc(glued));
                 start = glued.span.end;
             }
-            self.push_for_update_trailing_comments(&mut inner_parts, start, close, update_end);
+            self.push_for_update_trailing_comments(
+                &mut inner_parts,
+                start,
+                close,
+                update_gap,
+                stmt.update.as_ref().map(|u| u.span()),
+            );
         }
 
         let closing = if has_own_line_comments {
@@ -756,6 +780,49 @@ impl<'a> Printer<'a> {
             closing,
             d.text(")"),
         ]))
+    }
+
+    /// Builds `build` with the stripped-shell run `[gap, end)` of a header clause item
+    /// claimed ([`Printer::claimed_right_spine_run`]), so the item's own trailing emitters
+    /// decline it for the header emitter that prints it. An empty run claims nothing.
+    fn with_claimed_for_item_run<T>(&self, gap: u32, end: u32, build: impl FnOnce() -> T) -> T {
+        if gap >= end {
+            return build();
+        }
+        let outer = self
+            .claimed_right_spine_run
+            .replace(Some(Span::new(gap, end)));
+        let out = build();
+        self.claimed_right_spine_run.set(outer);
+        out
+    }
+
+    /// Where the update clause's trailing region opens: its right spine's printed end
+    /// ([`Printer::header_trailing_gap_start`]), walked through a sequence's unfrozen last
+    /// operand, which prints bare in a `for` header — no envelope prints its run here.
+    fn for_update_trailing_gap_start(&self, update: &Expression<'_>) -> u32 {
+        let end = update.span().end;
+        let spine = match &update.kind {
+            ExpressionKind::SequenceExpression(seq) => match seq.expressions {
+                // Only a last operand with nothing but its own stripped shells behind it:
+                // a comment between it and the sequence's end is the sequence's. A last
+                // operand a comma-gap directive freezes prints its shells in its own slice.
+                [.., prev, last]
+                    if !self.has_comments_to_emit_between(last.span().end, end)
+                        && self.gap_frozen_span(prev.span().end, last.span()).is_none() =>
+                {
+                    *last
+                }
+                _ => return end,
+            },
+            _ => update,
+        };
+        let start = self.header_trailing_gap_start(spine);
+        if start < end && self.has_comments_to_emit_between(start, end) {
+            start
+        } else {
+            end
+        }
     }
 
     /// Whether the line a clause terminator `;` prints on ends with nothing but what trails
@@ -1030,15 +1097,32 @@ impl<'a> Printer<'a> {
         start: u32,
         close: u32,
         update_end: Option<u32>,
+        update: Option<Span>,
     ) {
         let d = self.d();
+        // Whether the update holds a `//` of its own, which its emitters may have deferred.
+        let update_holds_line_comment =
+            update.is_some_and(|u| self.has_line_comments_between(u.start, u.end));
         for comment in self.comments_to_emit_between(start, close) {
             if update_end.is_some_and(|end| self.is_same_line(end, comment.span.start)) {
-                parts.push(d.text(" "));
+                // A same-line `//` defers like a condition header's
+                // ([`Printer::build_trailing_comment_doc`]) when the update holds a `//`:
+                // one the update deferred from inside a pair it prints (`a + (b // c⏎) as
+                // T` prints `(a + b) as T // c`) is pending ahead of it, and the two flush
+                // in source order, each ending its line, where an inline one would print
+                // first and weld onto it. Without one the comment stays inline: deferred
+                // behind a pending own-line block, it would flush onto the block's line,
+                // which the next pass reads as a line of its own.
+                if comment.is_block || !update_holds_line_comment {
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                } else {
+                    parts.push(self.build_trailing_comment_doc(comment));
+                }
             } else {
                 parts.push(d.line());
+                parts.push(self.build_comment_doc(comment));
             }
-            parts.push(self.build_comment_doc(comment));
         }
     }
 
@@ -1128,10 +1212,15 @@ impl<'a> Printer<'a> {
                 // tracked rather than assumed to be 1 so the layout does not depend on how many
                 // docs an operand pushes.
                 let mut first_end = 0;
+                // Where the previous operand's comma gap opens: its right spine's printed end,
+                // ahead of the stripped shells past it (`a + (b // c⏎), d` prints
+                // `a + b, // c`), which the operand's own emitters would defer past every
+                // later operand. The gap prints them as the bare spelling's (`a + b // c⏎, d`).
+                let mut prev_gap = 0;
                 for (i, e) in seq.expressions.iter().enumerate() {
                     let frozen = if i > 0 {
                         let prev_end = seq.expressions[i - 1].span().end;
-                        self.push_for_clause_comma_gap(&mut docs, prev_end, e.span().start);
+                        self.push_for_clause_comma_gap(&mut docs, prev_gap, e.span().start);
                         // Rule A, the same as the general sequence printer's: an own-line
                         // directive in the comma gap freezes the FOLLOWING operand. The `[~In]`
                         // wrap `build_elem` would apply is owed by the frozen arm too — the
@@ -1171,8 +1260,18 @@ impl<'a> Printer<'a> {
                         // unfrozen arm's `build_elem` adds its own only around an `in`
                         // binary, which then supplies the kept pair.
                         let kept = self.relational_sibling_pair_is_kept(e);
+                        // A frozen operand prints its stripped shells in its own slice.
+                        prev_gap = if frozen.is_some() {
+                            e.span().end
+                        } else {
+                            self.header_trailing_gap_start(e)
+                        };
                         let core = frozen.map_or_else(
-                            || build_elem(e),
+                            || {
+                                self.with_claimed_for_item_run(prev_gap, e.span().end, || {
+                                    build_elem(e)
+                                })
+                            },
                             |frozen| {
                                 self.wrap_frozen_for_init_in(
                                     e,
@@ -2018,15 +2117,22 @@ impl<'a> Printer<'a> {
 
                 // Build each declarator's `id = value` doc.
                 let mut decl_docs: DocBuf = DocBuf::new();
+                let last = decl.declarations.len() - 1;
+                // Where the previous declarator's comma gap opens: its value's printed end,
+                // ahead of the stripped shells down the value's right spine, which the gap
+                // prints as the bare spelling's (`k = a + (b // c⏎), j` as `k = a + b // c⏎,
+                // j`) rather than the value's own emitters deferring them past every later
+                // declarator and the clause's `;`.
+                let mut prev_gap = 0;
                 for (i, declarator) in decl.declarations.iter().enumerate() {
                     if i > 0 {
-                        let prev_end = decl.declarations[i - 1].span.end;
                         self.push_for_clause_comma_gap(
                             &mut decl_docs,
-                            prev_end,
+                            prev_gap,
                             declarator.span.start,
                         );
                     }
+                    prev_gap = declarator.span.end;
                     // Rule A over the init clause's declarators, anchored exactly as the
                     // statement-level list (`build_variable_declaration_doc`): an own-line
                     // directive in the keyword→first-declarator gap or between two
@@ -2073,6 +2179,15 @@ impl<'a> Printer<'a> {
                         // freeze is stated once. The predicate opens on the document-level
                         // flag, so a directive-free document pays one predicted branch.
                         let init_frozen = self.value_head_frozen_span(eq_pos + 1, init.span());
+                        // A frozen value prints its stripped shells in its own slice, and a
+                        // pair around the whole value is the header's shell builder's, which
+                        // prints what lies inside it ([`Printer::build_for_init_value_doc`]).
+                        if i < last
+                            && init_frozen.is_none()
+                            && init.span().end == declarator.span.end
+                        {
+                            prev_gap = self.header_trailing_gap_start(init);
+                        }
                         // A header declarator is a declarator here too: prettier's
                         // call-object clause keys on the `VariableDeclarator` parent and
                         // never asks where the declaration sits, so this marks exactly
@@ -2081,13 +2196,17 @@ impl<'a> Printer<'a> {
                         // the assignment-value mark included.
                         self.mark_member_call_tail_operand(init);
                         self.mark_assignment_value(init);
+                        let value_gap = prev_gap;
                         let build_value = || {
-                            let inner = self.build_for_init_value_doc(
-                                init,
-                                declarator.span.end,
-                                position_parens,
-                                init_frozen,
-                            );
+                            let inner =
+                                self.with_claimed_for_item_run(value_gap, init.span().end, || {
+                                    self.build_for_init_value_doc(
+                                        init,
+                                        declarator.span.end,
+                                        position_parens,
+                                        init_frozen,
+                                    )
+                                });
                             self.wrap_value_position_parens(
                                 init,
                                 declarator.span.end,
