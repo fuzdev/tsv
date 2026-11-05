@@ -20,8 +20,6 @@ use tsv_lang::doc::{
     DocBuf,
     arena::{DocId, LeadingBreak},
 };
-use tsv_lang::is_js_whitespace;
-use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
 
 /// Holds information about an operand in a binary expression chain
 /// Used to track position information for comment placement
@@ -145,12 +143,31 @@ enum SeqParens {
     Bare,
 }
 
+/// A trailing run the float-out envelope CLAIMED ([`Printer::build_sequence_doc_claimed`]).
+#[derive(Clone, Copy)]
+enum SeqEnvelopeRun {
+    /// Printed after the envelope's `)` ([`Printer::sequence_float_run`]).
+    Float(Span),
+    /// Printed after the envelope's `)` inside a shell the envelope adds around itself: a
+    /// multi-line block ahead of a token that must share the `)`'s line
+    /// ([`Printer::sequence_tight_run`]).
+    Shell(Span),
+}
+
+impl SeqEnvelopeRun {
+    fn span(self) -> Span {
+        match self {
+            Self::Float(span) | Self::Shell(span) => span,
+        }
+    }
+}
+
 /// What the line-comment twin hands its envelope and its run about the last operand's
 /// trailing shells ([`Printer::build_sequence_doc_claimed`] decides both).
 #[derive(Clone, Copy)]
 struct SeqTrailing {
     /// The run the float-out envelope claimed and prints after its `)`.
-    float_run: Option<Span>,
+    float_run: Option<SeqEnvelopeRun>,
     /// Where the operands' own content ends for the keep-inside trailing gap.
     run_end: u32,
 }
@@ -258,23 +275,32 @@ impl<'a> Printer<'a> {
             }
         };
 
-        let inner_doc = self.build_expression_doc(update.argument);
+        // One `needs_parens` call for both spellings — the rule is
+        // `ParenContext::UpdateArgument`'s: every operand looser than a member access
+        // keeps its pair, and `postfix` decides the instantiation case alone (the ASI
+        // shell above takes the ctx on its postfix-only branch).
+        let argument_needs_parens = self.needs_parens(
+            update.argument,
+            ParenContext::UpdateArgument {
+                postfix: !update.prefix,
+            },
+        );
+        // A postfix operator follows its operand, pair or not
+        // ([`Printer::with_tight_follower_operand`]).
+        let inner_doc = if update.prefix {
+            self.build_expression_doc(update.argument)
+        } else {
+            self.with_tight_follower_operand(update.argument.span(), || {
+                self.build_expression_doc(update.argument)
+            })
+        };
         // The stripped shell's glued block leads the operand inside whatever pair the
         // operand keeps — where the reparse, which owns it, prints it too.
         let inner_doc = match shell_run {
             Some(run) => d.concat(&[run, inner_doc]),
             None => inner_doc,
         };
-        // One `needs_parens` call for both spellings — the rule is
-        // `ParenContext::UpdateArgument`'s: every operand looser than a member access
-        // keeps its pair, and `postfix` decides the instantiation case alone (the ASI
-        // shell above takes the ctx on its postfix-only branch).
-        let argument_doc = if self.needs_parens(
-            update.argument,
-            ParenContext::UpdateArgument {
-                postfix: !update.prefix,
-            },
-        ) {
+        let argument_doc = if argument_needs_parens {
             d.parens(inner_doc)
         } else {
             inner_doc
@@ -603,7 +629,15 @@ impl<'a> Printer<'a> {
             // No binary reaches here: `needs_parens_unary_arg_common` matches every
             // `BinaryExpression`, so a binaryish operand always takes one of the two arms
             // above — which is why neither of prettier's binaryish answers is spelled here.
-            self.build_expression_doc(unary.argument)
+            // A bare operand ends where the unary does, so a follower of the unary's is the
+            // operand's too ([`Printer::with_tight_follower_operand`]).
+            if self.is_tight_follower_operand(unary.span) {
+                self.with_tight_follower_operand(unary.argument.span(), || {
+                    self.build_expression_doc(unary.argument)
+                })
+            } else {
+                self.build_expression_doc(unary.argument)
+            }
         };
 
         // Keyword operators need a space before the operand
@@ -2630,15 +2664,16 @@ impl<'a> Printer<'a> {
     /// caller has already appended them), so only the float-out mode reaches the epilogue.
     ///
     /// `float_run` is the trailing run the float-out mode CLAIMED for this envelope
-    /// ([`Self::sequence_float_run`]), printed in place of the last operand's own trailing
-    /// gap; with none, an enclosing float claim that already holds that gap prints it.
+    /// ([`Self::sequence_float_run`], [`Self::sequence_tight_run`]), printed in place of the
+    /// last operand's own trailing gap; with none, an enclosing float claim that already
+    /// holds that gap prints it.
     fn build_sequence_envelope_doc(
         &self,
         seq: &ast::SequenceExpression<'_>,
         span: Span,
         body: DocId,
         parens: SeqParens,
-        float_run: Option<Span>,
+        float_run: Option<SeqEnvelopeRun>,
     ) -> DocId {
         if matches!(parens, SeqParens::Bare) {
             return body;
@@ -2662,7 +2697,13 @@ impl<'a> Printer<'a> {
         parts.push(d.text("("));
         parts.push(body);
         parts.push(d.text(")"));
-        if let Some(run) = float_run {
+        if let Some(SeqEnvelopeRun::Shell(run)) = float_run {
+            // The bare spelling's fixed point: the follower's own retained shell, the run
+            // after the sequence's `)` and inside the shell's.
+            let pair = d.concat(&parts);
+            return self.build_trailing_run_expanded_shell_doc(run.start, run.end, pair, ")");
+        }
+        if let Some(SeqEnvelopeRun::Float(run)) = float_run {
             // The claimed run defers a `//` or an own-line comment past the `)` as the bare
             // spelling's does, and the flush-scoped break holds it there: it forces only the
             // group whose line opportunity follows the comment (a statement header's closer,
@@ -2774,7 +2815,14 @@ impl<'a> Printer<'a> {
             trailing_end
         };
         let float_run = float_out
-            .then(|| self.sequence_float_run(seq_span, printed_end))
+            .then(|| {
+                self.sequence_float_run(seq_span, printed_end)
+                    .map(SeqEnvelopeRun::Float)
+                    .or_else(|| {
+                        self.sequence_tight_run(seq, seq_span)
+                            .map(SeqEnvelopeRun::Shell)
+                    })
+            })
             .flatten();
         // A value position keeps the run INSIDE the pair (prettier #19263), and the stripped
         // shells down the last operand hold it where the bare spelling's own grouping gap
@@ -2786,6 +2834,7 @@ impl<'a> Printer<'a> {
             .flatten();
         let last_operand_end = inside_run.map_or(last_operand_end, |run| run.start);
         let outer_claim = float_run
+            .map(SeqEnvelopeRun::span)
             .or(inside_run)
             .map(|run| self.claimed_right_spine_run.replace(Some(run)));
         let doc = if self
@@ -2871,12 +2920,12 @@ impl<'a> Printer<'a> {
         }
         // Ahead of a token that must share the `)`'s line, a multi-line block printed after
         // the `)` would end the expression before it: the cast's keyword rule
-        // ([`MintedPairFollower::Keyword`]), at a sequence a cast or a non-null operator
-        // follows.
-        if self
-            .comments_to_emit_between(printed_end, span.end)
-            .any(|c| c.multiline)
-            && self.tight_follower_after(span.end)
+        // ([`MintedPairFollower::Keyword`]), at a sequence a cast, a non-null operator or a
+        // postfix update follows.
+        if self.is_tight_follower_operand(span)
+            && self
+                .comments_to_emit_between(printed_end, span.end)
+                .any(|c| c.multiline)
         {
             return None;
         }
@@ -2893,36 +2942,76 @@ impl<'a> Printer<'a> {
         claims.then(|| Span::new(printed_end, span.end))
     }
 
-    /// Whether the first token past `end`, behind every `)` ahead of it (an enclosing
-    /// construct's too, which over-reads only toward leaving a claim unmade), must share
-    /// the line of the token before it: an `as` / `satisfies` keyword or a non-null `!`
-    /// (`[no LineTerminator here]` in all three). Read from the source, which holds the
-    /// same token the output prints there: every printer that lays one out (the cast, the
-    /// non-null operator, a chain's non-null link) keeps it behind its operand. A newline
-    /// before it in the source reads it the same way, which only leaves a claim unmade.
-    fn tight_follower_after(&self, end: u32) -> bool {
-        let source = self.source;
-        let mut pos = end as usize;
-        loop {
-            pos = skip_trivia_run(source, pos, TriviaProfile::COMMENTS, is_js_whitespace);
-            if source.as_bytes().get(pos) == Some(&b')') {
-                pos += 1;
-            } else {
-                break;
+    /// The envelope's own trailing region, `[last_operand_end, span.end)` — the stripped
+    /// shells past the last operand — holding a multi-line block ahead of a token that must
+    /// share the `)`'s line. The token is the follower of
+    /// a parent whose operand this sequence IS ([`Self::is_tight_follower_operand`]), never
+    /// one past an enclosing construct's `)` or a line break. The envelope prints the region
+    /// inside a shell of its own ([`SeqEnvelopeRun::Shell`]), where its line break ends no
+    /// expression: the bare spelling's fixed point. A comment before `last_operand_end` is
+    /// the last operand's, printed inside the envelope.
+    // TODO: a nested last-operand sequence's region (`x = (a, (b2, (b /* x⏎ */)))!`) is its
+    // own envelope's, which prints the block inside this one's pair: it parses, but the
+    // second pass reads the block in this region and adds the shell. Taking the nested
+    // region here instead moves the cast and update spellings to two passes: their second
+    // puts the block back inside the pair.
+    fn sequence_tight_run(&self, seq: &ast::SequenceExpression<'_>, span: Span) -> Option<Span> {
+        if !self.is_tight_follower_operand(span) {
+            return None;
+        }
+        let (_, last_operand_end) = sequence_operand_run(seq);
+        // No enclosing claim reaches a marked sequence's region: the right-spine walks stop at
+        // every follower, and the one pair that claims past its operand (the cast's) never
+        // holds a sequence, whose own pair prints first; a unary it holds (`(-f<T>) as T`)
+        // ends its operand before any sequence.
+        debug_assert!(
+            !self
+                .claimed_right_spine_run
+                .get()
+                .is_some_and(|claim| claim.start <= last_operand_end && span.end <= claim.end),
+            "a claim covers a tight-follower sequence's trailing region"
+        );
+        (last_operand_end < span.end && self.trailing_run_breaks_inline(last_operand_end, span.end))
+            .then(|| Span::new(last_operand_end, span.end))
+    }
+
+    /// Whether [`Printer::append_trailing_paren_comments`] would print a multi-line block of
+    /// `[start, end)` INLINE, where its line break lands ahead of whatever follows: before
+    /// the run defers (a `//` or an own-line comment opens the deferral, and everything
+    /// behind it rides past the enclosing line's end with it). Mirrors that emitter's
+    /// inline-versus-defer split, which must move with it. A `//` needs no arm of its own:
+    /// it is no multi-line block, and every comment after it opens a line.
+    fn trailing_run_breaks_inline(&self, start: u32, end: u32) -> bool {
+        let mut prev_end = start;
+        for c in self.comments_to_emit_between(start, end) {
+            if self.comment_has_newline_between(prev_end, c.span.start) {
+                return false;
             }
+            if c.multiline {
+                return true;
+            }
+            prev_end = c.span.end;
         }
-        let rest = source.get(pos..).unwrap_or_default();
-        if let Some(after) = rest.strip_prefix('!') {
-            return !after.starts_with('=');
-        }
-        ["as", "satisfies"].iter().any(|keyword| {
-            rest.strip_prefix(keyword).is_some_and(|after| {
-                !after
-                    .chars()
-                    .next()
-                    .is_some_and(crate::lexer::ident::is_id_continue)
-            })
-        })
+        false
+    }
+
+    /// Builds under `operand` as the operand of a parent that prints a token right behind
+    /// it which must share its line ([`Printer::tight_follower_operand`]).
+    pub(in crate::printer) fn with_tight_follower_operand<T>(
+        &self,
+        operand: Span,
+        build: impl FnOnce() -> T,
+    ) -> T {
+        let saved = self.tight_follower_operand.replace(Some(operand));
+        let out = build();
+        self.tight_follower_operand.set(saved);
+        out
+    }
+
+    /// Whether the expression at `span` is the operand of a parent that prints a token right
+    /// behind it which must share its line ([`Self::with_tight_follower_operand`]).
+    pub(in crate::printer) fn is_tight_follower_operand(&self, span: Span) -> bool {
+        self.tight_follower_operand.get() == Some(span)
     }
 
     /// The keep-inside counterpart of [`Self::sequence_float_run`]: the stripped shells
@@ -2951,7 +3040,7 @@ impl<'a> Printer<'a> {
         trailing_end: u32,
         parens: SeqParens,
         layout: SeqLayout,
-        float_run: Option<Span>,
+        float_run: Option<SeqEnvelopeRun>,
     ) -> DocId {
         let keep_trailing_inside = matches!(parens, SeqParens::KeepInside);
 

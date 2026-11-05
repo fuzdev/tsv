@@ -918,6 +918,14 @@ fn finish_non_null(
         *followed_by_non_null = true;
         nodes.push(ChainNode::non_null_after_paren_operand());
     } else {
+        // A bare base's `!` follows it the same way: its parent is the `!`.
+        if let Some(ChainNode::Base {
+            followed_by_non_null,
+            ..
+        }) = nodes.last_mut()
+        {
+            *followed_by_non_null = true;
+        }
         nodes.push(ChainNode::non_null(non_null, span));
     }
 }

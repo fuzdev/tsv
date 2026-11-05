@@ -693,6 +693,13 @@ pub(crate) struct Printer<'a> {
     /// same way ([`Printer::minted_pair_trailing_region`]). Save/restored around the
     /// claimer's build.
     pub(crate) claimed_right_spine_run: Cell<Option<Span>>,
+    /// The operand of the parent being built when that parent prints, behind the operand
+    /// (and behind any pair it adds around it), a token that must share the line of what
+    /// precedes it: a non-null `!`, an `as` / `satisfies` keyword, a postfix `++` / `--`
+    /// (`[no LineTerminator here]` in each) ([`Printer::with_tight_follower_operand`]).
+    /// Keyed on the operand's span; its readers (a sequence, a unary's bare operand) share
+    /// no span with a node below them. Save/restored around the parent's build.
+    pub(in crate::printer) tight_follower_operand: Cell<Option<Span>>,
     /// The statement whose value is being built, when its terminator gap may take over the
     /// value's TRAILING region ([`Printer::with_statement_tail`]): where the value ends, and
     /// where the region handed to the terminator so far begins. Save/restored around the
@@ -1008,6 +1015,7 @@ impl<'a> Printer<'a> {
             head_memo: types::HeadMemo::default(),
             claimed_left_spine_run: Cell::new(None),
             claimed_right_spine_run: Cell::new(None),
+            tight_follower_operand: Cell::new(None),
             statement_tail: Cell::new(None),
             has_paren_closing_block: Cell::new(None),
             frozen_chain_base: Cell::new(None),

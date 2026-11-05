@@ -1,0 +1,9 @@
+Prettier never reaches a fixed point on this input: it strips the pair around the sequence and
+prints the multi-line block after the sequence's `)`, ahead of the non-null `!`
+(`x = (a, b) /* x1⏎ */!;`). A `MultiLineComment` holding a line terminator IS one for ASI
+(ECMA-262 §12.4), and a postfix `!` must share its operand's line, so prettier cannot re-read
+its own pass-1 output (the template's `{…}` fails first); the `![0]` case parses but as a
+different program (`x = (a, b);` then `![0];`). No prettier-anchored claim file
+(output_prettier.*, audit_signature.txt, variants) is expressible. The validator live-verifies
+this claim (rule F5). tsv keeps a pair around the sequence and the block. See README.md and
+docs/conformance_prettier_ts_comments.md §Comment relocation.

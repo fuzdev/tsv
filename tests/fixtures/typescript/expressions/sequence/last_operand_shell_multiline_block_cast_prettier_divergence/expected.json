@@ -1,0 +1,254 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 341,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A multi-line block ending a redundant pair around a sequence's last operand, ahead of a",
+			"start": 20,
+			"end": 110
+		},
+		{
+			"type": "Line",
+			"value": " cast keyword, keeps a pair around the sequence and the block, as the bare spelling does.",
+			"start": 112,
+			"end": 203
+		},
+		{
+			"type": "Block",
+			"value": " x1\n ",
+			"start": 221,
+			"end": 232
+		},
+		{
+			"type": "Block",
+			"value": " x2\n ",
+			"start": 260,
+			"end": 271
+		},
+		{
+			"type": "Block",
+			"value": " x3\n ",
+			"start": 306,
+			"end": 317
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 340,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 331,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 205,
+					"end": 241,
+					"expression": {
+						"type": "TSAsExpression",
+						"start": 205,
+						"end": 240,
+						"expression": {
+							"type": "UnaryExpression",
+							"start": 205,
+							"end": 235,
+							"operator": "void",
+							"prefix": true,
+							"argument": {
+								"type": "SequenceExpression",
+								"start": 215,
+								"end": 219,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 215,
+										"end": 216,
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 218,
+										"end": 219,
+										"name": "b"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " x1\n ",
+										"start": 221,
+										"end": 232
+									}
+								]
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 239,
+							"end": 240,
+							"typeName": {
+								"type": "Identifier",
+								"start": 239,
+								"end": 240,
+								"name": "T"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line block ending a redundant pair around a sequence's last operand, ahead of a",
+							"start": 20,
+							"end": 110
+						},
+						{
+							"type": "Line",
+							"value": " cast keyword, keeps a pair around the sequence and the block, as the bare spelling does.",
+							"start": 112,
+							"end": 203
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 244,
+					"end": 287,
+					"expression": {
+						"type": "TSSatisfiesExpression",
+						"start": 244,
+						"end": 286,
+						"expression": {
+							"type": "UnaryExpression",
+							"start": 244,
+							"end": 274,
+							"operator": "void",
+							"prefix": true,
+							"argument": {
+								"type": "SequenceExpression",
+								"start": 254,
+								"end": 258,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 254,
+										"end": 255,
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 257,
+										"end": 258,
+										"name": "b"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " x2\n ",
+										"start": 260,
+										"end": 271
+									}
+								]
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 285,
+							"end": 286,
+							"typeName": {
+								"type": "Identifier",
+								"start": 285,
+								"end": 286,
+								"name": "T"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 290,
+					"end": 330,
+					"expression": {
+						"type": "TSAsExpression",
+						"start": 290,
+						"end": 329,
+						"expression": {
+							"type": "UnaryExpression",
+							"start": 290,
+							"end": 320,
+							"operator": "void",
+							"prefix": true,
+							"argument": {
+								"type": "SequenceExpression",
+								"start": 300,
+								"end": 304,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 300,
+										"end": 301,
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 303,
+										"end": 304,
+										"name": "b"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " x3\n ",
+										"start": 306,
+										"end": 317
+									}
+								]
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 324,
+							"end": 329,
+							"typeName": {
+								"type": "Identifier",
+								"start": 324,
+								"end": 329,
+								"name": "const"
+							}
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

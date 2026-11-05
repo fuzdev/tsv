@@ -328,7 +328,17 @@ pub(crate) fn print_node_inner<'a>(
                 } else {
                     printer.chain_share_key(expr, ShareTag::ChainBase)
                 };
-                printer.chain_shared_doc(key, || printer.build_expression_doc(expr))
+                // A base the next node's `!` follows is that `!`'s bare operand, as the
+                // standalone non-null's is ([`Printer::with_tight_follower_operand`]).
+                printer.chain_shared_doc(key, || {
+                    if *followed_by_non_null {
+                        printer.with_tight_follower_operand(expr.span(), || {
+                            printer.build_expression_doc(expr)
+                        })
+                    } else {
+                        printer.build_expression_doc(expr)
+                    }
+                })
             }
         }
 

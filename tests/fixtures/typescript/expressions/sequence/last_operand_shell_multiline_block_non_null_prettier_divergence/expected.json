@@ -1,0 +1,500 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 465,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 385,
+				"end": 387,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 387,
+				"end": 435,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 393,
+						"end": 427,
+						"name": "title",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 399,
+							"end": 427,
+							"expression": {
+								"type": "TSNonNullExpression",
+								"start": 400,
+								"end": 426,
+								"expression": {
+									"type": "SequenceExpression",
+									"start": 405,
+									"end": 409,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 405,
+											"end": 406,
+											"name": "a"
+										},
+										{
+											"type": "Identifier",
+											"start": 408,
+											"end": 409,
+											"name": "b"
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " x6\n ",
+											"start": 411,
+											"end": 422
+										}
+									]
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 435,
+				"end": 437,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 437,
+				"end": 464,
+				"expression": {
+					"type": "MemberExpression",
+					"start": 438,
+					"end": 463,
+					"object": {
+						"type": "TSNonNullExpression",
+						"start": 438,
+						"end": 461,
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 442,
+							"end": 446,
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 442,
+									"end": 443,
+									"name": "a"
+								},
+								{
+									"type": "Identifier",
+									"start": 445,
+									"end": 446,
+									"name": "b"
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " x7\n ",
+									"start": 448,
+									"end": 458
+								}
+							]
+						}
+					},
+					"property": {
+						"type": "Identifier",
+						"start": 462,
+						"end": 463,
+						"name": "m"
+					},
+					"computed": false,
+					"optional": false
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A multi-line block ending a redundant pair around a sequence's last operand, ahead of a",
+			"start": 20,
+			"end": 110
+		},
+		{
+			"type": "Line",
+			"value": " non-null `!`, keeps a pair around the sequence and the block, as the bare spelling does.",
+			"start": 112,
+			"end": 203
+		},
+		{
+			"type": "Block",
+			"value": " x1\n ",
+			"start": 220,
+			"end": 231
+		},
+		{
+			"type": "Block",
+			"value": " x2\n ",
+			"start": 254,
+			"end": 265
+		},
+		{
+			"type": "Block",
+			"value": " x3\n ",
+			"start": 291,
+			"end": 302
+		},
+		{
+			"type": "Block",
+			"value": " x4\n ",
+			"start": 327,
+			"end": 338
+		},
+		{
+			"type": "Block",
+			"value": " x5\n ",
+			"start": 359,
+			"end": 370
+		},
+		{
+			"type": "Block",
+			"value": " x6\n ",
+			"start": 411,
+			"end": 422
+		},
+		{
+			"type": "Block",
+			"value": " x7\n ",
+			"start": 448,
+			"end": 458
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 385,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 376,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 205,
+					"end": 236,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 205,
+						"end": 235,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 205,
+							"end": 206,
+							"name": "x"
+						},
+						"right": {
+							"type": "TSNonNullExpression",
+							"start": 209,
+							"end": 235,
+							"expression": {
+								"type": "SequenceExpression",
+								"start": 214,
+								"end": 218,
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 214,
+										"end": 215,
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 217,
+										"end": 218,
+										"name": "b"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " x1\n ",
+										"start": 220,
+										"end": 231
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line block ending a redundant pair around a sequence's last operand, ahead of a",
+							"start": 20,
+							"end": 110
+						},
+						{
+							"type": "Line",
+							"value": " non-null `!`, keeps a pair around the sequence and the block, as the bare spelling does.",
+							"start": 112,
+							"end": 203
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 239,
+					"end": 273,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 239,
+						"end": 272,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 239,
+							"end": 240,
+							"name": "x"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 243,
+							"end": 272,
+							"object": {
+								"type": "TSNonNullExpression",
+								"start": 243,
+								"end": 269,
+								"expression": {
+									"type": "SequenceExpression",
+									"start": 248,
+									"end": 252,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 248,
+											"end": 249,
+											"name": "a"
+										},
+										{
+											"type": "Identifier",
+											"start": 251,
+											"end": 252,
+											"name": "b"
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " x2\n ",
+											"start": 254,
+											"end": 265
+										}
+									]
+								}
+							},
+							"property": {
+								"type": "Literal",
+								"start": 270,
+								"end": 271,
+								"value": 0,
+								"raw": "0"
+							},
+							"computed": true,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 276,
+					"end": 309,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 276,
+						"end": 308,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 276,
+							"end": 277,
+							"name": "x"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 280,
+							"end": 308,
+							"object": {
+								"type": "TSNonNullExpression",
+								"start": 280,
+								"end": 306,
+								"expression": {
+									"type": "SequenceExpression",
+									"start": 285,
+									"end": 289,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 285,
+											"end": 286,
+											"name": "a"
+										},
+										{
+											"type": "Identifier",
+											"start": 288,
+											"end": 289,
+											"name": "b"
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " x3\n ",
+											"start": 291,
+											"end": 302
+										}
+									]
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 307,
+								"end": 308,
+								"name": "m"
+							},
+							"computed": false,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 312,
+					"end": 345,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 312,
+						"end": 344,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 312,
+							"end": 313,
+							"name": "x"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 316,
+							"end": 344,
+							"callee": {
+								"type": "TSNonNullExpression",
+								"start": 316,
+								"end": 342,
+								"expression": {
+									"type": "SequenceExpression",
+									"start": 321,
+									"end": 325,
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 321,
+											"end": 322,
+											"name": "a"
+										},
+										{
+											"type": "Identifier",
+											"start": 324,
+											"end": 325,
+											"name": "b"
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " x4\n ",
+											"start": 327,
+											"end": 338
+										}
+									]
+								}
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 348,
+					"end": 375,
+					"expression": {
+						"type": "TSNonNullExpression",
+						"start": 348,
+						"end": 374,
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 353,
+							"end": 357,
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 353,
+									"end": 354,
+									"name": "a"
+								},
+								{
+									"type": "Identifier",
+									"start": 356,
+									"end": 357,
+									"name": "b"
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " x5\n ",
+									"start": 359,
+									"end": 370
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

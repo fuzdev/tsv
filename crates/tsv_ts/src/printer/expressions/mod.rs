@@ -1286,16 +1286,20 @@ impl<'a> Printer<'a> {
                 // The cast's own erased-paren freeze: `cast_start` opens at the grouping `(`
                 // the parser dropped, so an alone-on-line directive inside it is the cast's to
                 // honor ([`Printer::build_left_spine_operand_doc`]).
+                // The keyword follows the operand, pair or not
+                // ([`Printer::with_tight_follower_operand`]).
                 let operand = self.build_left_spine_operand_doc(
                     cast_start,
                     expression,
                     FrozenOperandPair::Emitted,
                     || {
-                        if needs_parens {
-                            self.build_expression_doc_claiming_outermost(expression)
-                        } else {
-                            self.build_expression_doc(expression)
-                        }
+                        self.with_tight_follower_operand(expression.span(), || {
+                            if needs_parens {
+                                self.build_expression_doc_claiming_outermost(expression)
+                            } else {
+                                self.build_expression_doc(expression)
+                            }
+                        })
                     },
                 );
                 if let Some(outer) = outer_claim {
@@ -1676,7 +1680,20 @@ impl<'a> Printer<'a> {
                 FrozenOperandPair::Emitted,
                 || {
                     self.build_value_with_outermost_owned_comment(non_null_expr.expression, || {
-                        self.build_expression_doc_with_indent_on_break(non_null_expr.expression)
+                        // The `!` follows the operand inside the pair too, unless the pair holds
+                        // a comment behind the operand, which follows it instead
+                        // ([`Printer::with_tight_follower_operand`]).
+                        let build = || {
+                            self.build_expression_doc_with_indent_on_break(non_null_expr.expression)
+                        };
+                        if self.has_comments_to_emit_between(
+                            non_null_expr.expression.span().end,
+                            span.end,
+                        ) {
+                            build()
+                        } else {
+                            self.with_tight_follower_operand(non_null_expr.expression.span(), build)
+                        }
                     })
                 },
             );
@@ -1769,11 +1786,16 @@ impl<'a> Printer<'a> {
             // ([`Printer::build_left_spine_operand_doc`]): with the parens stripped the
             // directive hangs ahead of the operand, which is where the reparse reads it, so
             // the first pass must freeze what the second one would.
+            // The `!` follows the operand ([`Printer::with_tight_follower_operand`]).
             let inner_doc = self.build_left_spine_operand_doc(
                 span.start,
                 non_null_expr.expression,
                 FrozenOperandPair::position(ParenContext::NonNull),
-                || self.build_expression_doc(non_null_expr.expression),
+                || {
+                    self.with_tight_follower_operand(non_null_expr.expression.span(), || {
+                        self.build_expression_doc(non_null_expr.expression)
+                    })
+                },
             );
             d.concat(&[inner_doc, d.text("!")])
         };
@@ -1822,7 +1844,10 @@ impl<'a> Printer<'a> {
             levels.push((inner, non_null, leading));
             inner = non_null.expression;
         }
-        let doc = self.build_expression_doc(inner);
+        // The innermost operand's last token is a `!`'s neighbor, a single-line block between
+        // them at most ([`Printer::with_tight_follower_operand`]).
+        let doc =
+            self.with_tight_follower_operand(inner.span(), || self.build_expression_doc(inner));
         if levels.is_empty() {
             return doc;
         }

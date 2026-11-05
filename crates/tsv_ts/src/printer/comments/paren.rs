@@ -3773,7 +3773,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_paren_operand_comment_doc`]'s line-spanning arm — the expanded shell
     /// with `operand` one indent in and the trailing run anchored behind it — for a caller
     /// that has already asked whether the gap holds a line-spanning run.
-    fn build_trailing_run_expanded_shell_doc(
+    pub(in crate::printer) fn build_trailing_run_expanded_shell_doc(
         &self,
         start: u32,
         end: u32,
