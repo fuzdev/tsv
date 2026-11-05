@@ -2,11 +2,14 @@
 # Exact per-source counts over the `gates` view; see docs/gate_counts.md.
 #
 # <row> <language> match=<n> known=<n> partial=<n> unknown=<n> errors=<n> expected_errors=<n>
-benches/js/.cache/svelte_styles css match=22 known=2 partial=0 unknown=0 errors=0 expected_errors=0
+benches/js/.cache/svelte_styles css match=21 known=2 partial=0 unknown=0 errors=0 expected_errors=0
 continue typescript match=940 known=11 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground svelte match=83 known=48 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground typescript match=82 known=2 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground css match=1 known=1 partial=0 unknown=0 errors=0 expected_errors=0
+docs.fuz.dev svelte match=37 known=5 partial=0 unknown=0 errors=0 expected_errors=0
+docs.fuz.dev typescript match=19 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+docs.fuz.dev css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 earbetter svelte match=33 known=11 partial=0 unknown=0 errors=0 expected_errors=0
 earbetter typescript match=24 known=2 partial=0 unknown=0 errors=0 expected_errors=0
 earbetter css match=2 known=0 partial=0 unknown=0 errors=0 expected_errors=0
@@ -24,9 +27,6 @@ fuz_code css match=3 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 fuz_css svelte match=31 known=18 partial=0 unknown=0 errors=0 expected_errors=0
 fuz_css typescript match=151 known=0 partial=0 unknown=1 errors=0 expected_errors=0
 fuz_css css match=0 known=2 partial=0 unknown=0 errors=0 expected_errors=0
-docs.fuz.dev svelte match=38 known=5 partial=0 unknown=0 errors=0 expected_errors=0
-docs.fuz.dev typescript match=19 known=0 partial=0 unknown=0 errors=0 expected_errors=0
-docs.fuz.dev css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 fuz_repos svelte match=28 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 fuz_repos typescript match=73 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 fuz_repos css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
@@ -79,9 +79,6 @@ tsv.fuz.dev svelte match=15 known=5 partial=0 unknown=0 errors=0 expected_errors
 tsv.fuz.dev typescript match=38 known=0 partial=0 unknown=1 errors=0 expected_errors=0
 tsv.fuz.dev css match=2 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 typescript-parser typescript match=0 known=1 partial=0 unknown=0 errors=0 expected_errors=0
-webdevladder.net svelte match=22 known=2 partial=0 unknown=0 errors=0 expected_errors=0
-webdevladder.net typescript match=13 known=0 partial=0 unknown=0 errors=0 expected_errors=0
-webdevladder.net css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 zzz svelte match=173 known=13 partial=0 unknown=0 errors=0 expected_errors=0
 zzz typescript match=258 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 zzz css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0

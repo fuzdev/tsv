@@ -1358,7 +1358,7 @@ gates over every file.**
 - **`perf`** — `benched`, all real code, from the snapshot's collections: the author's own
   application & library source (the fuz.dev repos' `src/` — zzz, the fuz ecosystem, gro,
   svelte-docinfo, tsv.fuz.dev — plus the public SvelteKit sites and apps: ryanatkn.com,
-  webdevladder.net, earbetter, cosmicplayground), upstream framework source (kit, svelte, and
+  earbetter, cosmicplayground), upstream framework source (kit, svelte, and
   the svelte.dev subpaths), third-party Svelte libraries and tools (flowbite-svelte's `src/lib`,
   layerchart, layercake, svelte-ux, svelte-maplibre, language-tools) and neutral TypeScript
   (TypeScript's `parser.ts`, Storybook, Continue). Each group times ONE mixed set; the report

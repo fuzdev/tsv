@@ -97,7 +97,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	// `collections/` tree (see above); what each collection vendors is its manifest.
 	[CORPORA_ROOT]: {
 		tree: CORPORA_TREE,
-		hash: '722351344',
+		hash: '336643921',
 		pins: [
 			'corpus_format_pins.txt',
 			'corpus_parse_pins.txt',
@@ -315,7 +315,7 @@ export const TS_REPO_PINS = {
  * id), a collection joining the bench, or a broken extraction, and the harvest fails
  * BEFORE writing so a wrong cache never replaces a good one. Stamped on the snapshot's
  * `collections/` tree id and the perf view's entry list (`lib/harvest_stamp.ts`).
- * Measured at ../corpora `collections/` 98dc2cc10.
+ * Measured at ../corpora `collections/` 336643921.
  *
  * 401 → 619: the third-party collections join the bench, so the perf view gains their
  * `.svelte` blocks with the snapshot's tree id unmoved (layercake, layerchart,
@@ -327,8 +327,11 @@ export const TS_REPO_PINS = {
  * 615 → 647: a whole-snapshot refresh to upstream HEADs; mostly new components'
  * blocks in layercake (+17) and zzz (+10), the rest a few blocks either way across
  * fuz_css, svelte-docinfo, layerchart, svelte-maplibre, svelte.dev, fuz_ui, tsv.fuz.dev.
+ *
+ * 647 → 643: a personal-site collection leaves the snapshot, taking its 4 blocks; the
+ * ryanatkn.com and docs.fuz.dev refreshes move none.
  */
-export const SVELTE_STYLES_BLOCKS_PIN = 647;
+export const SVELTE_STYLES_BLOCKS_PIN = 643;
 
 /**
  * strip:corpus — exact counts over the strippable TypeScript of the `gates` view's snapshot
@@ -344,8 +347,11 @@ export const SVELTE_STYLES_BLOCKS_PIN = 647;
  * The growth is mostly storybook (+324), fuz_app (+221), zzz (+106) and layerchart
  * (+89). The new refusals are new files, both sides agreeing: storybook +6
  * (`ParameterProperty`) and layerchart +1 (`TypeAssertion`).
+ *
+ * files 5719 → 5707: a personal-site collection leaves the snapshot, taking its 12
+ * strippable files (none refused); the ryanatkn.com and docs.fuz.dev refreshes move none.
  */
-export const STRIP_CORPUS_PINS = { files: 5719, refusals: 182 };
+export const STRIP_CORPUS_PINS = { files: 5707, refusals: 182 };
 
 /**
  * imports:corpus — exact counts over the JS/TS-family files and Svelte components of the
@@ -355,8 +361,12 @@ export const STRIP_CORPUS_PINS = { files: 5719, refusals: 182 };
  * snapshot, or with a record rule changing on both sides at once (an oxc-parser bump), the one
  * move the per-file agreement cannot see. Measured over ../corpora `collections/`,
  * oxc-parser 0.156.0.
+ *
+ * files 8657 → 8619, records 42592 → 42495: a personal-site collection leaves the
+ * snapshot, taking its 37 files, and the docs.fuz.dev refresh deletes one component
+ * (`docs/library/+page.svelte`); the ryanatkn.com refresh moves no file.
  */
-export const IMPORTS_CORPUS_PINS = { files: 8657, records: 42592 };
+export const IMPORTS_CORPUS_PINS = { files: 8619, records: 42495 };
 
 /**
  * bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured

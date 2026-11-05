@@ -573,7 +573,6 @@ const COLLECTIONS: Record<string, CollectionPlacement> = {
 	'tsv.fuz.dev': { perf: true },
 	// Personal sites (public repos beyond the fuz ecosystem)
 	'ryanatkn.com': { perf: true },
-	'webdevladder.net': { perf: true },
 	// Personal apps (public, The Unlicense; prettier-shaped, so their divergences carry
 	// third-party-shaped signal the fuz repos cannot)
 	earbetter: { perf: true },
