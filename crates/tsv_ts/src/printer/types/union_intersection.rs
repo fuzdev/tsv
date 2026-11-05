@@ -1268,6 +1268,10 @@ impl<'a> Printer<'a> {
             return None;
         }
         let (_, trailing) = paren_shell_gaps(shell);
+        // A run a retained arrow-return shell claims is that shell's to print.
+        if self.type_trailing_gap_claimed(trailing.start, shell.span.end) {
+            return None;
+        }
         let mut run = self
             .comments_to_emit_between(trailing.start, trailing.end)
             .peekable();

@@ -1,0 +1,207 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// a comment written last in a pair down the right edge of an arrow's parenthesized
+	// return type stays inside the outer pair, as it does when written there
+	x = (
+		a
+	):
+		| B
+		| C /* x1
+		 */ => 1;
+
+	x = (
+		a
+	):
+		| B
+		| C => 1; // x2
+
+	x = (
+		a
+	): B &
+		C /* x3
+		 */ => 1;
+
+	x = (
+		a
+	): keyof C /* x4
+	 */ => 1;
+
+	x = (
+		a
+	): A extends B
+		? C
+		: D /* x5
+			 */ => 1;
+
+	x = (
+		a
+	):
+		| B
+		| C /* x6
+		 */ => 1;
+
+	// an inner pair that could stay is no authoring signal either
+	x = (
+		a
+	):
+		| B
+		| C[] => 1; // x7
+
+	// a `//` after the `:` hangs the kept pair below it
+	x = (
+		a
+	):
+		// p8
+		| B
+		| C /* x8
+		 */ => 1;
+
+	// a pair the printer adds keeps the comment after it
+	x = (
+		a
+	):
+		| B
+		| (C &
+				D) => 1; // x9
+
+	// a generic reference keeps the outer pair, which a `(` cannot misread
+	x = (
+		a
+	): G<T> => 1; // x10
+
+	// a comment leading the inner pair stays ahead of the member
+	x = (
+		a
+	):
+		| B // y11
+		| C /* x11
+		 */ => 1;
+
+	// an operator member and a constructor type's return type keep the outer pair too
+	x = (
+		a
+	):
+		| B
+		| keyof C /* x12
+		 */ => 1;
+
+	x = (
+		a
+	):
+		| B
+		| readonly C[] => 1; // x13
+
+	x = (
+		a
+	): new () => C => 1; // x14
+
+	// a `//` glued to the inner `(` keeps the outer `(` line
+	x = (
+		a
+	):
+		// g15
+		B | C => 1; // x15
+
+	// a directive in a member's stripped pair leads the member, which it freezes
+	x = (
+		a
+	):
+		| B
+		// prettier-ignore
+		| C => 1; // x16
+
+	// a directive ahead of a member's own pair freezes the pair as written
+	x = (
+		a
+	):
+		| B
+		// prettier-ignore
+		| C[] => 1; // x17
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// a comment written last in a pair down the right edge of an arrow's parenthesized
+	// return type stays inside the outer pair, as it does when written there
+	x = (a): B | C /* x1
+	 */ => 1;
+
+	x = (a): B | C => 1; // x2
+
+	x = (a): B & C /* x3
+	 */ => 1;
+
+	x = (a): keyof C /* x4
+	 */ => 1;
+
+	x = (a): A extends B ? C : D /* x5
+	 */ => 1;
+
+	x = (a): B | C /* x6
+	 */ => 1;
+
+	// an inner pair that could stay is no authoring signal either
+	x = (a): B | C[] => 1; // x7
+
+	// a `//` after the `:` hangs the kept pair below it
+	x = (
+		a
+	):
+		// p8
+		B | C /* x8
+	 */ => 1;
+
+	// a pair the printer adds keeps the comment after it
+	x = (a): B | (C & D) => 1; // x9
+
+	// a generic reference keeps the outer pair, which a `(` cannot misread
+	x = (a): G<T> => 1; // x10
+
+	// a comment leading the inner pair stays ahead of the member
+	x = (
+		a
+	):
+		| B // y11
+		| C /* x11
+	 */ => 1;
+
+	// an operator member and a constructor type's return type keep the outer pair too
+	x = (a): B | keyof C /* x12
+	 */ => 1;
+
+	x = (a): B | readonly C[] => 1; // x13
+
+	x = (a): new () => C => 1; // x14
+
+	// a `//` glued to the inner `(` keeps the outer `(` line
+	x = (
+		a
+	):
+		// g15
+		B | C => 1; // x15
+
+	// a directive in a member's stripped pair leads the member, which it freezes
+	x = (
+		a
+	):
+		| B
+		// prettier-ignore
+		| C => 1; // x16
+
+	// a directive ahead of a member's own pair freezes the pair as written
+	x = (
+		a
+	):
+		| B
+		// prettier-ignore
+		| C[] => 1; // x17
+</script>

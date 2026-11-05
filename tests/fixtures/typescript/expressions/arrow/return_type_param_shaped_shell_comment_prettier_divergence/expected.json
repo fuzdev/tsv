@@ -1,0 +1,1920 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1522,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a return type a lone pair would turn into a function type's parameters keeps the comment",
+			"start": 20,
+			"end": 111
+		},
+		{
+			"type": "Line",
+			"value": " in place, the type in a pair of its own inside the outer one",
+			"start": 113,
+			"end": 176
+		},
+		{
+			"type": "Block",
+			"value": " x1\n ",
+			"start": 200,
+			"end": 211
+		},
+		{
+			"type": "Line",
+			"value": " x2",
+			"start": 245,
+			"end": 250
+		},
+		{
+			"type": "Block",
+			"value": " l3 ",
+			"start": 280,
+			"end": 288
+		},
+		{
+			"type": "Block",
+			"value": " x3\n ",
+			"start": 293,
+			"end": 304
+		},
+		{
+			"type": "Block",
+			"value": " x4\n ",
+			"start": 345,
+			"end": 356
+		},
+		{
+			"type": "Line",
+			"value": " x5",
+			"start": 395,
+			"end": 400
+		},
+		{
+			"type": "Line",
+			"value": " x6",
+			"start": 437,
+			"end": 442
+		},
+		{
+			"type": "Block",
+			"value": " x7\n ",
+			"start": 478,
+			"end": 489
+		},
+		{
+			"type": "Line",
+			"value": " a run keeps its order",
+			"start": 501,
+			"end": 525
+		},
+		{
+			"type": "Block",
+			"value": " y8 ",
+			"start": 549,
+			"end": 557
+		},
+		{
+			"type": "Line",
+			"value": " x8",
+			"start": 558,
+			"end": 563
+		},
+		{
+			"type": "Line",
+			"value": " x9",
+			"start": 597,
+			"end": 602
+		},
+		{
+			"type": "Block",
+			"value": " y9 ",
+			"start": 605,
+			"end": 613
+		},
+		{
+			"type": "Line",
+			"value": " l10",
+			"start": 643,
+			"end": 649
+		},
+		{
+			"type": "Line",
+			"value": " x10",
+			"start": 656,
+			"end": 662
+		},
+		{
+			"type": "Line",
+			"value": " g11",
+			"start": 690,
+			"end": 696
+		},
+		{
+			"type": "Line",
+			"value": " x11",
+			"start": 703,
+			"end": 709
+		},
+		{
+			"type": "Line",
+			"value": " a comment inside the type stays there",
+			"start": 721,
+			"end": 761
+		},
+		{
+			"type": "Block",
+			"value": " i12 ",
+			"start": 789,
+			"end": 798
+		},
+		{
+			"type": "Line",
+			"value": " x12",
+			"start": 802,
+			"end": 808
+		},
+		{
+			"type": "Line",
+			"value": " a `//` after the `:` hangs the pairs below it",
+			"start": 820,
+			"end": 868
+		},
+		{
+			"type": "Line",
+			"value": " p13",
+			"start": 884,
+			"end": 890
+		},
+		{
+			"type": "Block",
+			"value": " x13\n ",
+			"start": 902,
+			"end": 915
+		},
+		{
+			"type": "Line",
+			"value": " with no line break ahead of the `=>` to hold, both pairs strip",
+			"start": 928,
+			"end": 993
+		},
+		{
+			"type": "Block",
+			"value": " c14 ",
+			"start": 1006,
+			"end": 1015
+		},
+		{
+			"type": "Line",
+			"value": " l15",
+			"start": 1038,
+			"end": 1044
+		},
+		{
+			"type": "Line",
+			"value": " a `readonly` tuple reads as a parameter too",
+			"start": 1057,
+			"end": 1103
+		},
+		{
+			"type": "Line",
+			"value": " x16",
+			"start": 1138,
+			"end": 1144
+		},
+		{
+			"type": "Line",
+			"value": " a comment after the author's inner `)` keeps trailing it",
+			"start": 1156,
+			"end": 1215
+		},
+		{
+			"type": "Line",
+			"value": " x17",
+			"start": 1239,
+			"end": 1245
+		},
+		{
+			"type": "Line",
+			"value": " an inner pair opened around its comment takes the tight pair too",
+			"start": 1257,
+			"end": 1324
+		},
+		{
+			"type": "Line",
+			"value": " x18",
+			"start": 1355,
+			"end": 1361
+		},
+		{
+			"type": "Block",
+			"value": " d18 ",
+			"start": 1364,
+			"end": 1373
+		},
+		{
+			"type": "Line",
+			"value": " a directive after the `:` freezes the pairs as written",
+			"start": 1385,
+			"end": 1442
+		},
+		{
+			"type": "Line",
+			"value": " p19",
+			"start": 1458,
+			"end": 1464
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 1467,
+			"end": 1485
+		},
+		{
+			"type": "Block",
+			"value": " x19\n\t ",
+			"start": 1492,
+			"end": 1503
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1521,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1512,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 178,
+					"end": 220,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 178,
+						"end": 219,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 178,
+							"end": 179,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 182,
+							"end": 219,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 190,
+								"end": 214,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 192,
+									"end": 214,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 196,
+										"end": 199,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 197,
+											"end": 198,
+											"typeName": {
+												"type": "Identifier",
+												"start": 197,
+												"end": 198,
+												"name": "C"
+											},
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " x1\n ",
+													"start": 200,
+													"end": 211
+												}
+											]
+										}
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 186,
+									"end": 187,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 218,
+								"end": 219,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a return type a lone pair would turn into a function type's parameters keeps the comment",
+							"start": 20,
+							"end": 111
+						},
+						{
+							"type": "Line",
+							"value": " in place, the type in a pair of its own inside the outer one",
+							"start": 113,
+							"end": 176
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 223,
+					"end": 259,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 223,
+						"end": 258,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 223,
+							"end": 224,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 227,
+							"end": 258,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 235,
+								"end": 253,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 237,
+									"end": 253,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 241,
+										"end": 244,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 242,
+											"end": 243,
+											"typeName": {
+												"type": "Identifier",
+												"start": 242,
+												"end": 243,
+												"name": "C"
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " x2",
+													"start": 245,
+													"end": 250
+												}
+											]
+										}
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 231,
+									"end": 232,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 257,
+								"end": 258,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 262,
+					"end": 313,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 262,
+						"end": 312,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 262,
+							"end": 263,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 266,
+							"end": 312,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 274,
+								"end": 307,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 276,
+									"end": 307,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 289,
+										"end": 292,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 290,
+											"end": 291,
+											"typeName": {
+												"type": "Identifier",
+												"start": 290,
+												"end": 291,
+												"name": "C"
+											},
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " x3\n ",
+													"start": 293,
+													"end": 304
+												}
+											]
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " l3 ",
+												"start": 280,
+												"end": 288
+											}
+										]
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 270,
+									"end": 271,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 311,
+								"end": 312,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 316,
+					"end": 365,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 316,
+						"end": 364,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 316,
+							"end": 317,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 320,
+							"end": 364,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 328,
+								"end": 359,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 330,
+									"end": 359,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 334,
+										"end": 344,
+										"typeAnnotation": {
+											"type": "TSTypeLiteral",
+											"start": 335,
+											"end": 343,
+											"members": [
+												{
+													"type": "TSPropertySignature",
+													"start": 337,
+													"end": 341,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 337,
+														"end": 338,
+														"name": "a"
+													},
+													"typeAnnotation": {
+														"type": "TSTypeAnnotation",
+														"start": 338,
+														"end": 341,
+														"typeAnnotation": {
+															"type": "TSTypeReference",
+															"start": 340,
+															"end": 341,
+															"typeName": {
+																"type": "Identifier",
+																"start": 340,
+																"end": 341,
+																"name": "C"
+															}
+														}
+													}
+												}
+											],
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " x4\n ",
+													"start": 345,
+													"end": 356
+												}
+											]
+										}
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 324,
+									"end": 325,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 363,
+								"end": 364,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 368,
+					"end": 409,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 368,
+						"end": 408,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 368,
+							"end": 369,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 372,
+							"end": 408,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 380,
+								"end": 403,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 382,
+									"end": 403,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 386,
+										"end": 394,
+										"typeAnnotation": {
+											"type": "TSStringKeyword",
+											"start": 387,
+											"end": 393,
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " x5",
+													"start": 395,
+													"end": 400
+												}
+											]
+										}
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 376,
+									"end": 377,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 407,
+								"end": 408,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 412,
+					"end": 451,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 412,
+						"end": 450,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 412,
+							"end": 413,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 416,
+							"end": 450,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 424,
+								"end": 445,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 426,
+									"end": 445,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 430,
+										"end": 436,
+										"typeAnnotation": {
+											"type": "TSThisType",
+											"start": 431,
+											"end": 435,
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " x6",
+													"start": 437,
+													"end": 442
+												}
+											]
+										}
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 420,
+									"end": 421,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 449,
+								"end": 450,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 454,
+					"end": 498,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 454,
+						"end": 497,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 454,
+							"end": 455,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 458,
+							"end": 497,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 466,
+								"end": 492,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 468,
+									"end": 492,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 472,
+										"end": 477,
+										"typeAnnotation": {
+											"type": "TSTupleType",
+											"start": 473,
+											"end": 476,
+											"elementTypes": [
+												{
+													"type": "TSTypeReference",
+													"start": 474,
+													"end": 475,
+													"typeName": {
+														"type": "Identifier",
+														"start": 474,
+														"end": 475,
+														"name": "C"
+													}
+												}
+											],
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " x7\n ",
+													"start": 478,
+													"end": 489
+												}
+											]
+										}
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 462,
+									"end": 463,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 496,
+								"end": 497,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 527,
+					"end": 572,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 527,
+						"end": 571,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 527,
+							"end": 528,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 531,
+							"end": 571,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 539,
+								"end": 566,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 541,
+									"end": 566,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 545,
+										"end": 548,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 546,
+											"end": 547,
+											"typeName": {
+												"type": "Identifier",
+												"start": 546,
+												"end": 547,
+												"name": "C"
+											},
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " y8 ",
+													"start": 549,
+													"end": 557
+												}
+											]
+										}
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 535,
+									"end": 536,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 570,
+								"end": 571,
+								"value": 1,
+								"raw": "1",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " x8",
+										"start": 558,
+										"end": 563
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a run keeps its order",
+							"start": 501,
+							"end": 525
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 575,
+					"end": 622,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 575,
+						"end": 621,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 575,
+							"end": 576,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 579,
+							"end": 621,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 587,
+								"end": 616,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 589,
+									"end": 616,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 593,
+										"end": 596,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 594,
+											"end": 595,
+											"typeName": {
+												"type": "Identifier",
+												"start": 594,
+												"end": 595,
+												"name": "C"
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " x9",
+													"start": 597,
+													"end": 602
+												}
+											]
+										}
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 583,
+									"end": 584,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 620,
+								"end": 621,
+								"value": 1,
+								"raw": "1",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " y9 ",
+										"start": 605,
+										"end": 613
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 625,
+					"end": 671,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 625,
+						"end": 670,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 625,
+							"end": 626,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 629,
+							"end": 670,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 637,
+								"end": 665,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 639,
+									"end": 665,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 652,
+										"end": 655,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 653,
+											"end": 654,
+											"typeName": {
+												"type": "Identifier",
+												"start": 653,
+												"end": 654,
+												"name": "C"
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " x10",
+													"start": 656,
+													"end": 662
+												}
+											]
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " l10",
+												"start": 643,
+												"end": 649
+											}
+										]
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 633,
+									"end": 634,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 669,
+								"end": 670,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 674,
+					"end": 718,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 674,
+						"end": 717,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 674,
+							"end": 675,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 678,
+							"end": 717,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 686,
+								"end": 712,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 688,
+									"end": 712,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 699,
+										"end": 702,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 700,
+											"end": 701,
+											"typeName": {
+												"type": "Identifier",
+												"start": 700,
+												"end": 701,
+												"name": "C"
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " x11",
+													"start": 703,
+													"end": 709
+												}
+											]
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " g11",
+												"start": 690,
+												"end": 696
+											}
+										]
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 682,
+									"end": 683,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 716,
+								"end": 717,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 763,
+					"end": 817,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 763,
+						"end": 816,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 763,
+							"end": 764,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 767,
+							"end": 816,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 775,
+								"end": 811,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 777,
+									"end": 811,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 781,
+										"end": 801,
+										"typeAnnotation": {
+											"type": "TSTypeLiteral",
+											"start": 782,
+											"end": 800,
+											"members": [
+												{
+													"type": "TSPropertySignature",
+													"start": 784,
+													"end": 788,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 784,
+														"end": 785,
+														"name": "a"
+													},
+													"typeAnnotation": {
+														"type": "TSTypeAnnotation",
+														"start": 785,
+														"end": 788,
+														"typeAnnotation": {
+															"type": "TSTypeReference",
+															"start": 787,
+															"end": 788,
+															"typeName": {
+																"type": "Identifier",
+																"start": 787,
+																"end": 788,
+																"name": "C"
+															}
+														}
+													},
+													"trailingComments": [
+														{
+															"type": "Block",
+															"value": " i12 ",
+															"start": 789,
+															"end": 798
+														}
+													]
+												}
+											],
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " x12",
+													"start": 802,
+													"end": 808
+												}
+											]
+										}
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 771,
+									"end": 772,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 815,
+								"end": 816,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment inside the type stays there",
+							"start": 721,
+							"end": 761
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 870,
+					"end": 925,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 870,
+						"end": 924,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 870,
+							"end": 871,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 874,
+							"end": 924,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 882,
+								"end": 919,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 893,
+									"end": 919,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 898,
+										"end": 901,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 899,
+											"end": 900,
+											"typeName": {
+												"type": "Identifier",
+												"start": 899,
+												"end": 900,
+												"name": "C"
+											},
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " x13\n ",
+													"start": 902,
+													"end": 915
+												}
+											]
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " p13",
+											"start": 884,
+											"end": 890
+										}
+									]
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 878,
+									"end": 879,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 923,
+								"end": 924,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a `//` after the `:` hangs the pairs below it",
+							"start": 820,
+							"end": 868
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 995,
+					"end": 1021,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 995,
+						"end": 1020,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 995,
+							"end": 996,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 999,
+							"end": 1020,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 1002,
+								"end": 1005,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 1004,
+									"end": 1005,
+									"typeName": {
+										"type": "Identifier",
+										"start": 1004,
+										"end": 1005,
+										"name": "C"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c14 ",
+										"start": 1006,
+										"end": 1015
+									}
+								]
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 1000,
+									"end": 1001,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 1019,
+								"end": 1020,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " with no line break ahead of the `=>` to hold, both pairs strip",
+							"start": 928,
+							"end": 993
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1024,
+					"end": 1054,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1024,
+						"end": 1053,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1024,
+							"end": 1025,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 1028,
+							"end": 1053,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 1036,
+								"end": 1048,
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 1047,
+									"end": 1048,
+									"typeName": {
+										"type": "Identifier",
+										"start": 1047,
+										"end": 1048,
+										"name": "C"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " l15",
+											"start": 1038,
+											"end": 1044
+										}
+									]
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 1032,
+									"end": 1033,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 1052,
+								"end": 1053,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1105,
+					"end": 1153,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1105,
+						"end": 1152,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1105,
+							"end": 1106,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 1109,
+							"end": 1152,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 1117,
+								"end": 1147,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 1119,
+									"end": 1147,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 1123,
+										"end": 1137,
+										"typeAnnotation": {
+											"type": "TSTypeOperator",
+											"start": 1124,
+											"end": 1136,
+											"operator": "readonly",
+											"typeAnnotation": {
+												"type": "TSTupleType",
+												"start": 1133,
+												"end": 1136,
+												"elementTypes": [
+													{
+														"type": "TSTypeReference",
+														"start": 1134,
+														"end": 1135,
+														"typeName": {
+															"type": "Identifier",
+															"start": 1134,
+															"end": 1135,
+															"name": "C"
+														}
+													}
+												]
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " x16",
+													"start": 1138,
+													"end": 1144
+												}
+											]
+										}
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 1113,
+									"end": 1114,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 1151,
+								"end": 1152,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a `readonly` tuple reads as a parameter too",
+							"start": 1057,
+							"end": 1103
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1217,
+					"end": 1254,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1217,
+						"end": 1253,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1217,
+							"end": 1218,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 1221,
+							"end": 1253,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 1229,
+								"end": 1248,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 1231,
+									"end": 1248,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 1235,
+										"end": 1238,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 1236,
+											"end": 1237,
+											"typeName": {
+												"type": "Identifier",
+												"start": 1236,
+												"end": 1237,
+												"name": "C"
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " x17",
+													"start": 1239,
+													"end": 1245
+												}
+											]
+										}
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 1225,
+									"end": 1226,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 1252,
+								"end": 1253,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment after the author's inner `)` keeps trailing it",
+							"start": 1156,
+							"end": 1215
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1326,
+					"end": 1382,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1326,
+						"end": 1381,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1326,
+							"end": 1327,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 1330,
+							"end": 1381,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 1338,
+								"end": 1376,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 1340,
+									"end": 1376,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 1344,
+										"end": 1354,
+										"typeAnnotation": {
+											"type": "TSTypeLiteral",
+											"start": 1345,
+											"end": 1353,
+											"members": [
+												{
+													"type": "TSPropertySignature",
+													"start": 1347,
+													"end": 1351,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 1347,
+														"end": 1348,
+														"name": "a"
+													},
+													"typeAnnotation": {
+														"type": "TSTypeAnnotation",
+														"start": 1348,
+														"end": 1351,
+														"typeAnnotation": {
+															"type": "TSTypeReference",
+															"start": 1350,
+															"end": 1351,
+															"typeName": {
+																"type": "Identifier",
+																"start": 1350,
+																"end": 1351,
+																"name": "C"
+															}
+														}
+													}
+												}
+											],
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " x18",
+													"start": 1355,
+													"end": 1361
+												}
+											]
+										}
+									}
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 1334,
+									"end": 1335,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 1380,
+								"end": 1381,
+								"value": 1,
+								"raw": "1",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " d18 ",
+										"start": 1364,
+										"end": 1373
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an inner pair opened around its comment takes the tight pair too",
+							"start": 1257,
+							"end": 1324
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1444,
+					"end": 1511,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1444,
+						"end": 1510,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1444,
+							"end": 1445,
+							"name": "x"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 1448,
+							"end": 1510,
+							"returnType": {
+								"type": "TSTypeAnnotation",
+								"start": 1456,
+								"end": 1505,
+								"typeAnnotation": {
+									"type": "TSParenthesizedType",
+									"start": 1488,
+									"end": 1505,
+									"typeAnnotation": {
+										"type": "TSParenthesizedType",
+										"start": 1489,
+										"end": 1504,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 1490,
+											"end": 1491,
+											"typeName": {
+												"type": "Identifier",
+												"start": 1490,
+												"end": 1491,
+												"name": "C"
+											},
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " x19\n\t ",
+													"start": 1492,
+													"end": 1503
+												}
+											]
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " p19",
+											"start": 1458,
+											"end": 1464
+										},
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 1467,
+											"end": 1485
+										}
+									]
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 1452,
+									"end": 1453,
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "Literal",
+								"start": 1509,
+								"end": 1510,
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a directive after the `:` freezes the pairs as written",
+							"start": 1385,
+							"end": 1442
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

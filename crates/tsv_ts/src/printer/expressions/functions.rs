@@ -2991,6 +2991,11 @@ impl<'a> Printer<'a> {
         // — reached no emitter and was DROPPED, at the one return-type position that has
         // no comment-aware twin to fall back to.
         let inner_type = unwrap_parenthesized(annotation.type_annotation);
+        if !matches!(inner_type, ast::TSType::Function(_))
+            && let Some(doc) = self.build_arrow_return_nested_tail_doc(annotation)
+        {
+            return self.prepend_opt(comment_prefix, doc);
+        }
         if matches!(inner_type, ast::TSType::Function(_)) {
             return self.prepend_opt(
                 comment_prefix,

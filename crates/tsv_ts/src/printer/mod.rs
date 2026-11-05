@@ -693,6 +693,12 @@ pub(crate) struct Printer<'a> {
     /// same way ([`Printer::minted_pair_trailing_region`]). Save/restored around the
     /// claimer's build.
     pub(crate) claimed_right_spine_run: Cell<Option<Span>>,
+    /// The stripped trailing shell REGION an arrow return type's retained outer shell
+    /// claims from the shells down its inner's right spine
+    /// ([`Printer::build_arrow_return_nested_tail_doc`]): those shells strip and decline the
+    /// region, and the outer shell's trailing emitter prints it before its `)`.
+    /// Save/restored around the claimer's build.
+    pub(crate) claimed_type_trailing_run: Cell<Option<Span>>,
     /// The operand of the parent being built when that parent prints, behind the operand
     /// (and behind any pair it adds around it), a token that must share the line of what
     /// precedes it: a non-null `!`, an `as` / `satisfies` keyword, a postfix `++` / `--`
@@ -1015,6 +1021,7 @@ impl<'a> Printer<'a> {
             head_memo: types::HeadMemo::default(),
             claimed_left_spine_run: Cell::new(None),
             claimed_right_spine_run: Cell::new(None),
+            claimed_type_trailing_run: Cell::new(None),
             tight_follower_operand: Cell::new(None),
             statement_tail: Cell::new(None),
             has_paren_closing_block: Cell::new(None),

@@ -1,0 +1,130 @@
+<script lang="ts">
+	// a return type a lone pair would turn into a function type's parameters keeps the comment
+	// in place, the type in a pair of its own inside the outer one
+	x = (
+		a
+	): (
+		(C) /* x1
+		 */
+	) => 1;
+
+	x = (
+		a
+	): (
+		(C) // x2
+	) => 1;
+
+	x = (
+		a
+	): (
+		/* l3 */ (C) /* x3
+		 */
+	) => 1;
+
+	x = (
+		a
+	): (
+		({ a: C }) /* x4
+		 */
+	) => 1;
+
+	x = (
+		a
+	): (
+		(string) // x5
+	) => 1;
+
+	x = (
+		a
+	): (
+		(this) // x6
+	) => 1;
+
+	x = (
+		a
+	): (
+		([C]) /* x7
+		 */
+	) => 1;
+
+	// a run keeps its order
+	x = (
+		a
+	): (
+		(C) /* y8 */ // x8
+	) => 1;
+
+	x = (
+		a
+	): (
+		(C) // x9
+		/* y9 */
+	) => 1;
+
+	x = (
+		a
+	): (
+		// l10
+		(C) // x10
+	) => 1;
+
+	x = (
+		a
+	): ( // g11
+		(C) // x11
+	) => 1;
+
+	// a comment inside the type stays there
+	x = (
+		a
+	): (
+		({ a: C /* i12 */ }) // x12
+	) => 1;
+
+	// a `//` after the `:` hangs the pairs below it
+	x = (
+		a
+	): // p13
+		(
+			(C) /* x13
+			 */
+		) => 1;
+
+	// with no line break ahead of the `=>` to hold, both pairs strip
+	x = (a): C /* c14 */ => 1;
+
+	x = (
+		a
+	): // l15
+		C => 1;
+
+	// a `readonly` tuple reads as a parameter too
+	x = (
+		a
+	): (
+		(readonly [C]) // x16
+	) => 1;
+
+	// a comment after the author's inner `)` keeps trailing it
+	x = (
+		a
+	): (
+		(C) // x17
+	) => 1;
+
+	// an inner pair opened around its comment takes the tight pair too
+	x = (
+		a
+	): (
+		({ a: C }) // x18
+		/* d18 */
+	) => 1;
+
+	// a directive after the `:` freezes the pairs as written
+	x = (
+		a
+	): // p19
+		// prettier-ignore
+		((C /* x19
+	 */)) => 1;
+</script>

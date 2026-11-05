@@ -10,6 +10,7 @@ use super::{CommentSpacing, Printer, ShiftRescan, TrailingBlock, UnionValueDoc};
 use crate::ast::{self, TSType};
 use crate::printer::ignore::RoutedScope;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::after_operator::hang_after_operator;
 use tsv_lang::doc::arena::DocId;
@@ -592,6 +593,158 @@ impl<'a> Printer<'a> {
         )
     }
 
+    /// An arrow return type whose authored outer shell holds, in the stripped shells down
+    /// its inner's right spine, a comment that spans a line — a `//` or a multi-line
+    /// block. Every shell below the outer one strips, so the comment would print after the
+    /// type's last token, right before the arrow's `=>` (`ArrowParameters [no
+    /// LineTerminator here] =>`), where its line break ends the arrow head. The outer shell
+    /// is the bare spelling's own shell (`(a): (B | C /* x⏎ */) => 1`), so it is RETAINED
+    /// and claims the run ([`Printer::claimed_type_trailing_run`]), printing it before its
+    /// `)` exactly as that spelling does. The inner is built from its fully unwrapped type
+    /// under the outer shell's DEEP leading window, so a `//` glued to a stripped inner `(`
+    /// keeps the outer `(` line ([`Printer::build_open_paren_shell_doc`]).
+    ///
+    /// A type with no single-pair form — one a lone `(` would open a function type's
+    /// parameter list over (`(C /* x⏎ */) => 1`, [`type_has_paren_form`]) — keeps TWO
+    /// pairs: the type in a tight pair the printer adds, which holds no comment, inside the
+    /// retained outer shell, which prints every comment of the stripped shells, leading and
+    /// trailing, in source order (`(a): (⏎\t(C) /* x⏎\t */⏎) => 1`). No inner shell is
+    /// built there, so nothing else prints that region and no claim is taken. That arm also
+    /// takes a comment written only in the outer shell's own gap, which makes the
+    /// two-pair spelling its own fixed point; when the stripped inner shells hold no
+    /// comment, the run reads its lines from the author's inner `)` rather than from the
+    /// type's end, so a comment written after that `)` keeps trailing it.
+    ///
+    /// `None` leaves the annotation to the ordinary emitters.
+    pub(in crate::printer) fn build_arrow_return_nested_tail_doc(
+        &self,
+        annotation: &ast::TSTypeAnnotation<'_>,
+    ) -> Option<DocId> {
+        let d = self.d();
+        let TSType::Parenthesized(p) = annotation.type_annotation else {
+            return None;
+        };
+        if !self.has_comments_to_emit_between(p.span.start, p.span.end) {
+            return None;
+        }
+        let core = unwrap_parenthesized(p.type_annotation);
+        let colon_end = annotation.span.start + 1;
+        // An own-line format-ignore directive in the `:`→type gap that freezes the type
+        // verbatim is the ordinary emitter's to print: the author's pairs are its slice, so
+        // the frozen form parses wherever the input did. A composite the directive does not
+        // freeze whole stays here, where its comment keeps a pair.
+        if self.single_child_frozen(colon_end, annotation.type_annotation) {
+            return None;
+        }
+        if !type_has_paren_form(core) {
+            // Two pairs: the type in a tight pair of its own (a lone pair would read as a
+            // function type's parameter list) inside the authored outer shell, which holds
+            // every comment of the stripped shells in source order.
+            if !self.has_line_spanning_comments_to_emit_between(core.span().end, p.span.end) {
+                return None;
+            }
+            // The tight `)` stands where the author's inner `)` did when nothing was
+            // written inside the inner shells, so the run's first line is read from there:
+            // `((C⏎) // x⏎)` keeps `// x` trailing the `)`, as `((C) // x⏎)` does. With a
+            // comment inside them, the run is read from the type's end, which keeps a
+            // comment after that `)` off the inner comment's line.
+            let inner_end = p.type_annotation.span().end;
+            let trailing_start = if self.has_comments_to_emit_between(core.span().end, inner_end) {
+                core.span().end
+            } else {
+                inner_end
+            };
+            let tight = d.concat(&[d.text("("), self.build_type_doc(core), d.text(")")]);
+            let shell = self.build_open_paren_shell_doc(
+                p.span.start,
+                core.span().start,
+                tight,
+                trailing_start,
+                p.span.end,
+            );
+            if self.has_line_comments_between(colon_end, p.span.start) {
+                return Some(self.build_keyword_hang_doc(":", colon_end, p.span.start, shell));
+            }
+            let mut parts: DocBuf = smallvec![d.text(": ")];
+            if let Some(comments) =
+                self.build_inline_comments_between_doc_trailing_space_opt(colon_end, p.span.start)
+            {
+                parts.push(comments);
+            }
+            parts.push(shell);
+            return Some(d.concat(&parts));
+        }
+        let spine_end = self.type_right_spine_printed_end(core);
+        let inner_end = p.type_annotation.span().end;
+        if spine_end >= inner_end
+            || !self.has_line_spanning_comments_to_emit_between(spine_end, inner_end)
+        {
+            return None;
+        }
+        let claim = Span::new(spine_end, inner_end);
+        let outer = self.claimed_type_trailing_run.replace(Some(claim));
+        let (edge_claim, run_start) = self.leading_edge_claim_and_start(false, core);
+        let inner = self.with_claimed_shell_leading_run(edge_claim, || self.build_type_doc(core));
+        self.claimed_type_trailing_run.set(outer);
+        let shell =
+            self.build_open_paren_shell_doc(p.span.start, run_start, inner, spine_end, p.span.end);
+        // A `:`-gap `//` hangs the shell under the `:`, the bare spelling's layout.
+        if self.has_line_comments_between(colon_end, p.span.start) {
+            return Some(self.build_keyword_hang_doc(":", colon_end, p.span.start, shell));
+        }
+        let mut parts: DocBuf = smallvec![d.text(": ")];
+        if let Some(comments) =
+            self.build_inline_comments_between_doc_trailing_space_opt(colon_end, p.span.start)
+        {
+            parts.push(comments);
+        }
+        parts.push(shell);
+        Some(d.concat(&parts))
+    }
+
+    /// Where a type's printed content ends ahead of the stripped shells on its right spine:
+    /// down a union's or intersection's last member, a conditional's false branch, a type
+    /// operator's operand and a constructor type's return type (each ends where its parent
+    /// does), and through a shell around a type that never needs one or around a type
+    /// operator, a pair every parent the walk descends from strips. It stops ahead of a
+    /// member, false branch or operand a format-ignore directive in the gap before it
+    /// freezes: that child's verbatim slice prints the comments inside it itself.
+    fn type_right_spine_printed_end(&self, ty: &TSType<'_>) -> u32 {
+        let mut ty = ty;
+        loop {
+            // `gap` is where the gap ahead of a child that is not a shell opens: a
+            // directive there may freeze the child, and a frozen slice prints the comments
+            // inside it itself, so the walk stops before it.
+            let (next, gap): (&TSType<'_>, Option<u32>) = match ty {
+                TSType::Union(ast::TSUnionType { types, .. })
+                | TSType::Intersection(ast::TSIntersectionType { types, .. }) => match types {
+                    [.., prev, last] => (*last, Some(prev.span().end)),
+                    [last] => (*last, Some(ty.span().start)),
+                    [] => return ty.span().end,
+                },
+                TSType::Conditional(c) => (c.false_type, Some(c.true_type.span().end)),
+                TSType::TypeOperator(o) => (o.type_annotation, Some(o.span.start)),
+                // A directive ahead of a constructor type's return type freezes the type
+                // inside its shell, leaving the shell's comments to the walk's claimer.
+                TSType::Constructor(c) => (c.return_type.type_annotation, None),
+                TSType::Parenthesized(p)
+                    if type_never_needs_parens(unwrap_parenthesized(p.type_annotation))
+                        || matches!(
+                            unwrap_parenthesized(p.type_annotation),
+                            TSType::TypeOperator(_)
+                        ) =>
+                {
+                    (p.type_annotation, None)
+                }
+                _ => return ty.span().end,
+            };
+            if gap.is_some_and(|gap| self.member_gap_frozen(gap, next.span().start)) {
+                return ty.span().end;
+            }
+            ty = next;
+        }
+    }
+
     /// Inner implementation for type annotation with wrapping support.
     ///
     /// When `always_wrap` is true, wraps any TypeReference with type args.
@@ -804,4 +957,45 @@ impl<'a> Printer<'a> {
         parts.push(self.intersection_hanging_with_indent(intersection));
         d.concat(&parts)
     }
+}
+
+/// Whether a lone `(` around `ty` reads as a parenthesized type ahead of an arrow's `=>`
+/// rather than as a function type's parameter list (`(C) => 1`, `({ a: C }) => 1`): what
+/// follows the `(` must not start a parameter (tsc's `skipParameterStart`, which skips a
+/// `readonly` modifier first) — a name, a keyword type, `this`, a `{` or a `[`, after any
+/// `readonly` and the pairs around its operand. Every keyword type answers `false`,
+/// `void` / `null` / `true` included: tsc reads those as a parenthesized type, but tsv's
+/// own parser does not, so they take the two pairs it can reread.
+fn type_has_paren_form(ty: &TSType<'_>) -> bool {
+    match ty {
+        TSType::TypeReference(r) => {
+            r.type_arguments.is_some() || !matches!(r.type_name, ast::TSEntityName::Identifier(_))
+        }
+        TSType::TypeOperator(o) if o.operator == ast::TSTypeOperatorKind::Readonly => {
+            type_has_paren_form(unwrap_parenthesized(o.type_annotation))
+        }
+        TSType::Keyword(_)
+        | TSType::ThisType(_)
+        | TSType::TypeLiteral(_)
+        | TSType::Mapped(_)
+        | TSType::Tuple(_) => false,
+        _ => true,
+    }
+}
+
+/// Whether `ty` is a primary type, which no position needs a pair around.
+fn type_never_needs_parens(ty: &TSType<'_>) -> bool {
+    matches!(
+        ty,
+        TSType::TypeReference(_)
+            | TSType::Keyword(_)
+            | TSType::Literal(_)
+            | TSType::ThisType(_)
+            | TSType::TypeLiteral(_)
+            | TSType::Mapped(_)
+            | TSType::Tuple(_)
+            | TSType::Array(_)
+            | TSType::IndexedAccess(_)
+            | TSType::TypeQuery(_)
+    )
 }

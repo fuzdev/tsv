@@ -2311,7 +2311,10 @@ impl<'a> Printer<'a> {
         trailing_block: TrailingBlock,
         blank: TrailingBlank,
     ) -> DocId {
-        if !self.has_comments_to_emit_between(trailing_start, trailing_end) {
+        // A run a retained arrow-return shell claims is that shell's to print.
+        if self.type_trailing_gap_claimed(trailing_start, trailing_end)
+            || !self.has_comments_to_emit_between(trailing_start, trailing_end)
+        {
             return value_doc;
         }
         let d = self.d();
@@ -2644,8 +2647,17 @@ impl<'a> Printer<'a> {
         let inner = p.type_annotation.span();
         (
             self.has_comments_to_emit_between(p.span.start, inner.start),
-            self.has_comments_to_emit_between(inner.end, p.span.end),
+            !self.type_trailing_gap_claimed(inner.end, p.span.end)
+                && self.has_comments_to_emit_between(inner.end, p.span.end),
         )
+    }
+
+    /// Whether the trailing gap `[start, end)` of a shell lies inside the region a retained
+    /// arrow-return shell claims ([`Printer::claimed_type_trailing_run`]).
+    pub(in crate::printer) fn type_trailing_gap_claimed(&self, start: u32, end: u32) -> bool {
+        self.claimed_type_trailing_run
+            .get()
+            .is_some_and(|claim| claim.start <= start && end <= claim.end)
     }
 
     /// Whether `ty` is a `TSParenthesizedType` that [`Self::build_parenthesized_type_unwrap_doc`]
@@ -2948,6 +2960,9 @@ impl<'a> Printer<'a> {
         // retained and printed the leading run itself, beside the enclosing gap's copy —
         // a DOUBLE-PRINT.
         let (_, trailing) = paren_shell_gaps(p);
+        if self.type_trailing_gap_claimed(trailing.start, p.span.end) {
+            return false;
+        }
         if self.has_line_comments_between(trailing.start, trailing.end) {
             return !self.type_member_separator_follows(p.span.end);
         }
