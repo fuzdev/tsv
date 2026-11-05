@@ -70,4 +70,15 @@
 		// i
 		// t
 	);
+
+	// a single argument after a comment keeps it too
+	fn(
+		/* l */ ...b
+		/* i */
+	);
+
+	fn(
+		/* l */ ...b
+		// i
+	);
 </script>

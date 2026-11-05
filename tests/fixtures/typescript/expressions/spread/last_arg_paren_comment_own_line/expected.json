@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 744,
+	"end": 862,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -141,17 +141,47 @@
 			"value": " t",
 			"start": 725,
 			"end": 729
+		},
+		{
+			"type": "Line",
+			"value": " a single argument after a comment keeps it too",
+			"start": 736,
+			"end": 785
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 793,
+			"end": 800
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 808,
+			"end": 815
+		},
+		{
+			"type": "Block",
+			"value": " l ",
+			"start": 828,
+			"end": 835
+		},
+		{
+			"type": "Line",
+			"value": " i",
+			"start": 843,
+			"end": 847
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 743,
+		"end": 861,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 734,
+			"end": 852,
 			"body": [
 				{
 					"type": "ExpressionStatement",
@@ -699,8 +729,46 @@
 							"start": 681,
 							"end": 685
 						}
-					],
-					"trailingComments": [
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 787,
+					"end": 819,
+					"expression": {
+						"type": "CallExpression",
+						"start": 787,
+						"end": 818,
+						"callee": {
+							"type": "Identifier",
+							"start": 787,
+							"end": 789,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "SpreadElement",
+								"start": 801,
+								"end": 805,
+								"argument": {
+									"type": "Identifier",
+									"start": 804,
+									"end": 805,
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l ",
+										"start": 793,
+										"end": 800
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
 						{
 							"type": "Line",
 							"value": " i",
@@ -712,6 +780,66 @@
 							"value": " t",
 							"start": 725,
 							"end": 729
+						},
+						{
+							"type": "Line",
+							"value": " a single argument after a comment keeps it too",
+							"start": 736,
+							"end": 785
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 822,
+					"end": 851,
+					"expression": {
+						"type": "CallExpression",
+						"start": 822,
+						"end": 850,
+						"callee": {
+							"type": "Identifier",
+							"start": 822,
+							"end": 824,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "SpreadElement",
+								"start": 836,
+								"end": 840,
+								"argument": {
+									"type": "Identifier",
+									"start": 839,
+									"end": 840,
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l ",
+										"start": 828,
+										"end": 835
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " i ",
+							"start": 808,
+							"end": 815
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " i",
+							"start": 843,
+							"end": 847
 						}
 					]
 				}

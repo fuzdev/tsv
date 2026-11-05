@@ -738,9 +738,15 @@ fn try_single_arg_comment_paths(
     // branches below — defer to the general comment path (which emits them
     // after the last arg, no trailing comma). Same-line inline trailing block
     // comments (e.g. `fn(/* c */ a /* t */)`) stay on this fast path.
+    // A spread's span runs through its stripped `)`, so the own-line comments its interior
+    // leaves to the parent ([`Printer::paren_interior_own_line_comments`]) sit inside the
+    // argument, where the gap scan cannot see them; only the general path prints that share.
     let has_own_line_trailing_comment = printer
         .comments_on_page_between(arg_end, paren_close)
-        .any(|c| !c.is_block || !printer.is_same_line(arg_end, c.span.start));
+        .any(|c| !c.is_block || !printer.is_same_line(arg_end, c.span.start))
+        || !printer
+            .paren_interior_own_line_comments(first_arg.paren_interior())
+            .is_empty();
 
     // A line comment, or a block comment that owns its line, forces the list open — the gap
     // question `new` and the member chain ask too. Such a gap takes the expanded layout
