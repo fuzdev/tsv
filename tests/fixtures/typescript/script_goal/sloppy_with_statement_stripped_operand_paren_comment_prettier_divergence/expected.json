@@ -1,0 +1,194 @@
+{
+	"type": "Program",
+	"start": 0,
+	"end": 385,
+	"body": [
+		{
+			"type": "WithStatement",
+			"start": 164,
+			"end": 189,
+			"object": {
+				"type": "BinaryExpression",
+				"start": 172,
+				"end": 177,
+				"left": {
+					"type": "Identifier",
+					"start": 172,
+					"end": 173,
+					"name": "a"
+				},
+				"operator": "+",
+				"right": {
+					"type": "Identifier",
+					"start": 176,
+					"end": 177,
+					"name": "b"
+				}
+			},
+			"body": {
+				"type": "BlockStatement",
+				"start": 186,
+				"end": 189,
+				"body": []
+			}
+		},
+		{
+			"type": "WithStatement",
+			"start": 191,
+			"end": 217,
+			"object": {
+				"type": "LogicalExpression",
+				"start": 199,
+				"end": 205,
+				"left": {
+					"type": "Identifier",
+					"start": 199,
+					"end": 200,
+					"name": "a"
+				},
+				"operator": "&&",
+				"right": {
+					"type": "Identifier",
+					"start": 204,
+					"end": 205,
+					"name": "b"
+				}
+			},
+			"body": {
+				"type": "BlockStatement",
+				"start": 214,
+				"end": 217,
+				"body": []
+			}
+		},
+		{
+			"type": "WithStatement",
+			"start": 219,
+			"end": 250,
+			"object": {
+				"type": "BinaryExpression",
+				"start": 227,
+				"end": 238,
+				"left": {
+					"type": "Identifier",
+					"start": 227,
+					"end": 228,
+					"name": "a"
+				},
+				"operator": "+",
+				"right": {
+					"type": "BinaryExpression",
+					"start": 232,
+					"end": 237,
+					"left": {
+						"type": "Identifier",
+						"start": 232,
+						"end": 233,
+						"name": "b"
+					},
+					"operator": "+",
+					"right": {
+						"type": "Identifier",
+						"start": 236,
+						"end": 237,
+						"name": "c"
+					}
+				}
+			},
+			"body": {
+				"type": "BlockStatement",
+				"start": 247,
+				"end": 250,
+				"body": []
+			}
+		},
+		{
+			"type": "WithStatement",
+			"start": 252,
+			"end": 278,
+			"object": {
+				"type": "BinaryExpression",
+				"start": 260,
+				"end": 265,
+				"left": {
+					"type": "Identifier",
+					"start": 260,
+					"end": 261,
+					"name": "a"
+				},
+				"operator": "+",
+				"right": {
+					"type": "Identifier",
+					"start": 264,
+					"end": 265,
+					"name": "b"
+				}
+			},
+			"body": {
+				"type": "BlockStatement",
+				"start": 275,
+				"end": 278,
+				"body": []
+			}
+		},
+		{
+			"type": "WithStatement",
+			"start": 280,
+			"end": 309,
+			"object": {
+				"type": "BinaryExpression",
+				"start": 288,
+				"end": 293,
+				"left": {
+					"type": "Identifier",
+					"start": 288,
+					"end": 289,
+					"name": "a"
+				},
+				"operator": "+",
+				"right": {
+					"type": "Identifier",
+					"start": 292,
+					"end": 293,
+					"name": "b"
+				}
+			},
+			"body": {
+				"type": "BlockStatement",
+				"start": 306,
+				"end": 309,
+				"body": []
+			}
+		},
+		{
+			"type": "WithStatement",
+			"start": 354,
+			"end": 384,
+			"object": {
+				"type": "BinaryExpression",
+				"start": 362,
+				"end": 367,
+				"left": {
+					"type": "Identifier",
+					"start": 362,
+					"end": 363,
+					"name": "a"
+				},
+				"operator": "+",
+				"right": {
+					"type": "Identifier",
+					"start": 366,
+					"end": 367,
+					"name": "b"
+				}
+			},
+			"body": {
+				"type": "BlockStatement",
+				"start": 381,
+				"end": 384,
+				"body": []
+			}
+		}
+	],
+	"sourceType": "script"
+}

@@ -1,0 +1,353 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 466,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a comment written last inside a redundant pair down the header expression's right edge",
+			"start": 20,
+			"end": 109
+		},
+		{
+			"type": "Line",
+			"value": " stays in the header, after the expression, as it does without the pair",
+			"start": 111,
+			"end": 184
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 208,
+			"end": 213
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 245,
+			"end": 250
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 287,
+			"end": 292
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 323,
+			"end": 328
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 359,
+			"end": 367
+		},
+		{
+			"type": "Line",
+			"value": " a multi-line block takes the same place",
+			"start": 374,
+			"end": 416
+		},
+		{
+			"type": "Block",
+			"value": " c6\n ",
+			"start": 440,
+			"end": 451
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 465,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 456,
+			"body": [
+				{
+					"type": "DoWhileStatement",
+					"start": 186,
+					"end": 217,
+					"body": {
+						"type": "BlockStatement",
+						"start": 189,
+						"end": 191,
+						"body": []
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 202,
+						"end": 207,
+						"left": {
+							"type": "Identifier",
+							"start": 202,
+							"end": 203,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 206,
+							"end": 207,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 208,
+								"end": 213
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment written last inside a redundant pair down the header expression's right edge",
+							"start": 20,
+							"end": 109
+						},
+						{
+							"type": "Line",
+							"value": " stays in the header, after the expression, as it does without the pair",
+							"start": 111,
+							"end": 184
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 220,
+					"end": 254,
+					"body": {
+						"type": "BlockStatement",
+						"start": 223,
+						"end": 225,
+						"body": []
+					},
+					"test": {
+						"type": "LogicalExpression",
+						"start": 236,
+						"end": 244,
+						"left": {
+							"type": "Identifier",
+							"start": 236,
+							"end": 237,
+							"name": "a"
+						},
+						"operator": "&&",
+						"right": {
+							"type": "Identifier",
+							"start": 243,
+							"end": 244,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 245,
+								"end": 250
+							}
+						]
+					}
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 257,
+					"end": 296,
+					"body": {
+						"type": "BlockStatement",
+						"start": 260,
+						"end": 262,
+						"body": []
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 273,
+						"end": 286,
+						"left": {
+							"type": "Identifier",
+							"start": 273,
+							"end": 274,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "BinaryExpression",
+							"start": 280,
+							"end": 285,
+							"left": {
+								"type": "Identifier",
+								"start": 280,
+								"end": 281,
+								"name": "b"
+							},
+							"operator": "+",
+							"right": {
+								"type": "Identifier",
+								"start": 284,
+								"end": 285,
+								"name": "c"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c3",
+									"start": 287,
+									"end": 292
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 299,
+					"end": 332,
+					"body": {
+						"type": "BlockStatement",
+						"start": 302,
+						"end": 304,
+						"body": []
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 315,
+						"end": 320,
+						"left": {
+							"type": "Identifier",
+							"start": 315,
+							"end": 316,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 319,
+							"end": 320,
+							"name": "b"
+						}
+					}
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 335,
+					"end": 371,
+					"body": {
+						"type": "BlockStatement",
+						"start": 338,
+						"end": 340,
+						"body": []
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 351,
+						"end": 356,
+						"left": {
+							"type": "Identifier",
+							"start": 351,
+							"end": 352,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 355,
+							"end": 356,
+							"name": "b"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c4",
+							"start": 323,
+							"end": 328
+						}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 418,
+					"end": 455,
+					"body": {
+						"type": "BlockStatement",
+						"start": 421,
+						"end": 423,
+						"body": []
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 434,
+						"end": 439,
+						"left": {
+							"type": "Identifier",
+							"start": 434,
+							"end": 435,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 438,
+							"end": 439,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c6\n ",
+								"start": 440,
+								"end": 451
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c5 ",
+							"start": 359,
+							"end": 367
+						},
+						{
+							"type": "Line",
+							"value": " a multi-line block takes the same place",
+							"start": 374,
+							"end": 416
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

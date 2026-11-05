@@ -1,0 +1,546 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 545,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a comment written last inside a redundant pair down the header expression's right edge",
+			"start": 20,
+			"end": 109
+		},
+		{
+			"type": "Line",
+			"value": " stays in the header, after the expression, as it does without the pair",
+			"start": 111,
+			"end": 184
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 199,
+			"end": 204
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 231,
+			"end": 236
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 268,
+			"end": 273
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 299,
+			"end": 304
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 330,
+			"end": 338
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 362,
+			"end": 370
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 371,
+			"end": 376
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 400,
+			"end": 405
+		},
+		{
+			"type": "Block",
+			"value": " d8 ",
+			"start": 409,
+			"end": 417
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 440,
+			"end": 445
+		},
+		{
+			"type": "Line",
+			"value": " a multi-line block takes the same place",
+			"start": 458,
+			"end": 500
+		},
+		{
+			"type": "Block",
+			"value": " c6\n ",
+			"start": 515,
+			"end": 526
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 544,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 535,
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 186,
+					"end": 212,
+					"test": {
+						"type": "BinaryExpression",
+						"start": 193,
+						"end": 198,
+						"left": {
+							"type": "Identifier",
+							"start": 193,
+							"end": 194,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 197,
+							"end": 198,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 199,
+								"end": 204
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 208,
+						"end": 212,
+						"body": []
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment written last inside a redundant pair down the header expression's right edge",
+							"start": 20,
+							"end": 109
+						},
+						{
+							"type": "Line",
+							"value": " stays in the header, after the expression, as it does without the pair",
+							"start": 111,
+							"end": 184
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 215,
+					"end": 244,
+					"test": {
+						"type": "LogicalExpression",
+						"start": 222,
+						"end": 230,
+						"left": {
+							"type": "Identifier",
+							"start": 222,
+							"end": 223,
+							"name": "a"
+						},
+						"operator": "&&",
+						"right": {
+							"type": "Identifier",
+							"start": 229,
+							"end": 230,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 231,
+								"end": 236
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 240,
+						"end": 244,
+						"body": []
+					},
+					"alternate": null
+				},
+				{
+					"type": "IfStatement",
+					"start": 247,
+					"end": 281,
+					"test": {
+						"type": "BinaryExpression",
+						"start": 254,
+						"end": 267,
+						"left": {
+							"type": "Identifier",
+							"start": 254,
+							"end": 255,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "BinaryExpression",
+							"start": 261,
+							"end": 266,
+							"left": {
+								"type": "Identifier",
+								"start": 261,
+								"end": 262,
+								"name": "b"
+							},
+							"operator": "+",
+							"right": {
+								"type": "Identifier",
+								"start": 265,
+								"end": 266,
+								"name": "c"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c3",
+									"start": 268,
+									"end": 273
+								}
+							]
+						}
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 277,
+						"end": 281,
+						"body": []
+					},
+					"alternate": null
+				},
+				{
+					"type": "IfStatement",
+					"start": 284,
+					"end": 312,
+					"test": {
+						"type": "BinaryExpression",
+						"start": 291,
+						"end": 296,
+						"left": {
+							"type": "Identifier",
+							"start": 291,
+							"end": 292,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 295,
+							"end": 296,
+							"name": "b"
+						}
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 308,
+						"end": 312,
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c4",
+								"start": 299,
+								"end": 304
+							}
+						]
+					},
+					"alternate": null
+				},
+				{
+					"type": "IfStatement",
+					"start": 315,
+					"end": 346,
+					"test": {
+						"type": "BinaryExpression",
+						"start": 322,
+						"end": 327,
+						"left": {
+							"type": "Identifier",
+							"start": 322,
+							"end": 323,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 326,
+							"end": 327,
+							"name": "b"
+						}
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 342,
+						"end": 346,
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c5 ",
+								"start": 330,
+								"end": 338
+							}
+						]
+					},
+					"alternate": null
+				},
+				{
+					"type": "IfStatement",
+					"start": 349,
+					"end": 384,
+					"test": {
+						"type": "BinaryExpression",
+						"start": 356,
+						"end": 361,
+						"left": {
+							"type": "Identifier",
+							"start": 356,
+							"end": 357,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 360,
+							"end": 361,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c7 ",
+								"start": 362,
+								"end": 370
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 380,
+						"end": 384,
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c7",
+								"start": 371,
+								"end": 376
+							}
+						]
+					},
+					"alternate": null
+				},
+				{
+					"type": "IfStatement",
+					"start": 387,
+					"end": 422,
+					"test": {
+						"type": "BinaryExpression",
+						"start": 394,
+						"end": 399,
+						"left": {
+							"type": "Identifier",
+							"start": 394,
+							"end": 395,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 398,
+							"end": 399,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c8",
+								"start": 400,
+								"end": 405
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 418,
+						"end": 422,
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " d8 ",
+								"start": 409,
+								"end": 417
+							}
+						]
+					},
+					"alternate": null
+				},
+				{
+					"type": "IfStatement",
+					"start": 425,
+					"end": 455,
+					"test": {
+						"type": "BinaryExpression",
+						"start": 432,
+						"end": 439,
+						"left": {
+							"type": "MemberExpression",
+							"start": 432,
+							"end": 435,
+							"object": {
+								"type": "Identifier",
+								"start": 432,
+								"end": 433,
+								"name": "a"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 434,
+								"end": 435,
+								"name": "b"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 438,
+							"end": 439,
+							"name": "c"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c9",
+								"start": 440,
+								"end": 445
+							}
+						]
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 451,
+						"end": 455,
+						"expression": {
+							"type": "CallExpression",
+							"start": 451,
+							"end": 454,
+							"callee": {
+								"type": "Identifier",
+								"start": 451,
+								"end": 452,
+								"name": "x"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"alternate": null
+				},
+				{
+					"type": "IfStatement",
+					"start": 502,
+					"end": 534,
+					"test": {
+						"type": "BinaryExpression",
+						"start": 509,
+						"end": 514,
+						"left": {
+							"type": "Identifier",
+							"start": 509,
+							"end": 510,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 513,
+							"end": 514,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c6\n ",
+								"start": 515,
+								"end": 526
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 530,
+						"end": 534,
+						"body": []
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multi-line block takes the same place",
+							"start": 458,
+							"end": 500
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

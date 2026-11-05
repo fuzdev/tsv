@@ -21,10 +21,10 @@ use smallvec::SmallVec;
 use crate::ast::{Expression, ExpressionKind, Statement, StatementKind, UnaryOperator};
 use crate::printer::statements::StatementContext;
 use crate::printer::{CommentVec, LeadingGlue, Printer};
-use tsv_lang::Comment;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::{Comment, Span};
 
 /// Which of prettier's three comment runs a control-flow gap's off-the-anchor-line
 /// comments form — the single fact all three of
@@ -1410,9 +1410,16 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let test_start = test_expr.span().start;
-        let test_end = test_expr.span().end;
+        // The trailing gap opens where the test's PRINTED content ends: the stripped shells
+        // down its right spine (`if (a + (b // c⏎))`) are the bare spelling's grouping gap
+        // once they strip (`if (a + b // c⏎)`), so the header prints them as its own and
+        // claims them from the test's trailing emitters, which would defer a `//` past the
+        // `)`. A sequence's envelope prints its own run ([`Printer::sequence_float_run`]).
+        let test_end = self.header_trailing_gap_start(test_expr);
 
-        if !self.header_parens_hold_comments(open_paren_pos, close_paren_pos, test_expr) {
+        if !self.header_parens_hold_comments(open_paren_pos, close_paren_pos, test_expr)
+            && !self.has_comments_to_emit_between(test_end, test_expr.span().end)
+        {
             // No comments - use the standard condition group
             return self.build_condition_group(test_expr, grouping);
         }
@@ -1425,12 +1432,19 @@ impl<'a> Printer<'a> {
         // condition's node span, so the `)` this layout supplies stays parent-owned; the
         // `StatementTest` clarity parens (`if ((a = b))`) stay outside it too, since they
         // are the printer's rather than the author's.
+        let claim = (test_end < test_expr.span().end).then(|| {
+            self.claimed_right_spine_run
+                .replace(Some(Span::new(test_end, test_expr.span().end)))
+        });
         let test_doc = match self.value_head_frozen_span(open_paren_pos + 1, test_expr.span()) {
             Some(frozen) => {
                 self.build_frozen_value_doc(test_expr, frozen, super::ParenContext::StatementTest)
             }
             None => self.build_condition_doc(test_expr, grouping),
         };
+        if let Some(outer) = claim {
+            self.claimed_right_spine_run.set(outer);
+        }
         let mut inner_parts = DocBuf::new();
 
         // The opening-delimiter rule: a `//` the author glued to the `(` keeps that line,
@@ -1537,6 +1551,24 @@ impl<'a> Printer<'a> {
             };
 
         d.group(d.concat(&[d.indent(d.concat(&inner_parts)), closing]))
+    }
+
+    /// Where a header test's trailing gap opens ([`Self::build_condition_group_with_comments`]):
+    /// its right spine's printed end ([`Printer::right_spine_printed_end`]) when the stripped
+    /// shells past it hold a comment, else its span end. The walk stops at a sequence, whose
+    /// envelope prints its own run.
+    fn header_trailing_gap_start(&self, test: &Expression<'_>) -> u32 {
+        let end = test.span().end;
+        // The walk is asked only of a test holding a comment: with none, the region is empty.
+        if !self.has_comments_to_emit_between(test.span().start, end) {
+            return end;
+        }
+        let start = self.right_spine_printed_end(test);
+        if self.has_comments_to_emit_between(start, end) {
+            start
+        } else {
+            end
+        }
     }
 
     /// Find the position of the opening paren for a keyword statement
