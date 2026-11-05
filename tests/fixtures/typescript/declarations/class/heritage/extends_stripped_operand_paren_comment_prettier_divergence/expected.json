@@ -1,0 +1,709 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 924,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a comment written last inside a redundant pair down the right edge of a superclass whose",
+			"start": 20,
+			"end": 111
+		},
+		{
+			"type": "Line",
+			"value": " required pair the printer emits stays after the pair, ahead of a comment written after",
+			"start": 113,
+			"end": 202
+		},
+		{
+			"type": "Line",
+			"value": " the inner pair, each on a line of its own",
+			"start": 204,
+			"end": 248
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 275,
+			"end": 280
+		},
+		{
+			"type": "Line",
+			"value": " d1",
+			"start": 282,
+			"end": 287
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 318,
+			"end": 323
+		},
+		{
+			"type": "Block",
+			"value": " x2 ",
+			"start": 325,
+			"end": 333
+		},
+		{
+			"type": "Line",
+			"value": " d2",
+			"start": 334,
+			"end": 339
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 383,
+			"end": 388
+		},
+		{
+			"type": "Line",
+			"value": " d3",
+			"start": 390,
+			"end": 395
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 429,
+			"end": 434
+		},
+		{
+			"type": "Line",
+			"value": " d4",
+			"start": 437,
+			"end": 442
+		},
+		{
+			"type": "Line",
+			"value": " with nothing written after the pair, the comment stays after the pair, ahead of the body",
+			"start": 463,
+			"end": 554
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 581,
+			"end": 586
+		},
+		{
+			"type": "Line",
+			"value": " a superclass with type arguments keeps its own gap",
+			"start": 593,
+			"end": 646
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 673,
+			"end": 678
+		},
+		{
+			"type": "Line",
+			"value": " d6",
+			"start": 680,
+			"end": 685
+		},
+		{
+			"type": "Line",
+			"value": " a block alone after the pair stays after the comment, in the order written",
+			"start": 696,
+			"end": 773
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 800,
+			"end": 805
+		},
+		{
+			"type": "Block",
+			"value": " x7 ",
+			"start": 807,
+			"end": 815
+		},
+		{
+			"type": "Line",
+			"value": " a lone comment stays ahead of type arguments too",
+			"start": 822,
+			"end": 873
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 900,
+			"end": 905
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 923,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 914,
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 250,
+					"end": 291,
+					"id": {
+						"type": "Identifier",
+						"start": 256,
+						"end": 258,
+						"name": "A1"
+					},
+					"superClass": {
+						"type": "BinaryExpression",
+						"start": 268,
+						"end": 273,
+						"left": {
+							"type": "Identifier",
+							"start": 268,
+							"end": 269,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 272,
+							"end": 273,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 275,
+								"end": 280
+							}
+						]
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 289,
+						"end": 291,
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " d1",
+								"start": 282,
+								"end": 287
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment written last inside a redundant pair down the right edge of a superclass whose",
+							"start": 20,
+							"end": 111
+						},
+						{
+							"type": "Line",
+							"value": " required pair the printer emits stays after the pair, ahead of a comment written after",
+							"start": 113,
+							"end": 202
+						},
+						{
+							"type": "Line",
+							"value": " the inner pair, each on a line of its own",
+							"start": 204,
+							"end": 248
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 293,
+					"end": 354,
+					"id": {
+						"type": "Identifier",
+						"start": 299,
+						"end": 301,
+						"name": "A2"
+					},
+					"superClass": {
+						"type": "BinaryExpression",
+						"start": 311,
+						"end": 316,
+						"left": {
+							"type": "Identifier",
+							"start": 311,
+							"end": 312,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 315,
+							"end": 316,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 318,
+								"end": 323
+							}
+						]
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 341,
+						"end": 354,
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 345,
+								"end": 351,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 345,
+									"end": 346,
+									"name": "x"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 349,
+									"end": 350,
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " x2 ",
+								"start": 325,
+								"end": 333
+							},
+							{
+								"type": "Line",
+								"value": " d2",
+								"start": 334,
+								"end": 339
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 356,
+					"end": 400,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 356,
+						"end": 399,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 356,
+							"end": 358,
+							"name": "k3"
+						},
+						"right": {
+							"type": "ClassExpression",
+							"start": 361,
+							"end": 399,
+							"id": null,
+							"superClass": {
+								"type": "BinaryExpression",
+								"start": 376,
+								"end": 381,
+								"left": {
+									"type": "Identifier",
+									"start": 376,
+									"end": 377,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 380,
+									"end": 381,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c3",
+										"start": 383,
+										"end": 388
+									}
+								]
+							},
+							"body": {
+								"type": "ClassBody",
+								"start": 397,
+								"end": 399,
+								"body": [],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " d3",
+										"start": 390,
+										"end": 395
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 402,
+					"end": 460,
+					"id": {
+						"type": "Identifier",
+						"start": 408,
+						"end": 410,
+						"name": "A4"
+					},
+					"superClass": {
+						"type": "BinaryExpression",
+						"start": 422,
+						"end": 427,
+						"left": {
+							"type": "Identifier",
+							"start": 422,
+							"end": 423,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 426,
+							"end": 427,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c4",
+								"start": 429,
+								"end": 434
+							}
+						]
+					},
+					"implements": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 456,
+							"end": 457,
+							"expression": {
+								"type": "Identifier",
+								"start": 456,
+								"end": 457,
+								"name": "I"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " d4",
+									"start": 437,
+									"end": 442
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "ClassBody",
+						"start": 458,
+						"end": 460,
+						"body": []
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 556,
+					"end": 590,
+					"id": {
+						"type": "Identifier",
+						"start": 562,
+						"end": 564,
+						"name": "A5"
+					},
+					"superClass": {
+						"type": "BinaryExpression",
+						"start": 574,
+						"end": 579,
+						"left": {
+							"type": "Identifier",
+							"start": 574,
+							"end": 575,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 578,
+							"end": 579,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c5",
+								"start": 581,
+								"end": 586
+							}
+						]
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 588,
+						"end": 590,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " with nothing written after the pair, the comment stays after the pair, ahead of the body",
+							"start": 463,
+							"end": 554
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 648,
+					"end": 693,
+					"id": {
+						"type": "Identifier",
+						"start": 654,
+						"end": 656,
+						"name": "A6"
+					},
+					"superClass": {
+						"type": "BinaryExpression",
+						"start": 666,
+						"end": 671,
+						"left": {
+							"type": "Identifier",
+							"start": 666,
+							"end": 667,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 670,
+							"end": 671,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c6",
+								"start": 673,
+								"end": 678
+							}
+						]
+					},
+					"superTypeParameters": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 687,
+						"end": 690,
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 688,
+								"end": 689,
+								"typeName": {
+									"type": "Identifier",
+									"start": 688,
+									"end": 689,
+									"name": "T"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " d6",
+								"start": 680,
+								"end": 685
+							}
+						]
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 691,
+						"end": 693,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a superclass with type arguments keeps its own gap",
+							"start": 593,
+							"end": 646
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 775,
+					"end": 819,
+					"id": {
+						"type": "Identifier",
+						"start": 781,
+						"end": 783,
+						"name": "A7"
+					},
+					"superClass": {
+						"type": "BinaryExpression",
+						"start": 793,
+						"end": 798,
+						"left": {
+							"type": "Identifier",
+							"start": 793,
+							"end": 794,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 797,
+							"end": 798,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c7",
+								"start": 800,
+								"end": 805
+							}
+						]
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 817,
+						"end": 819,
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " x7 ",
+								"start": 807,
+								"end": 815
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block alone after the pair stays after the comment, in the order written",
+							"start": 696,
+							"end": 773
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 875,
+					"end": 913,
+					"id": {
+						"type": "Identifier",
+						"start": 881,
+						"end": 883,
+						"name": "A8"
+					},
+					"superClass": {
+						"type": "BinaryExpression",
+						"start": 893,
+						"end": 898,
+						"left": {
+							"type": "Identifier",
+							"start": 893,
+							"end": 894,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 897,
+							"end": 898,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c8",
+								"start": 900,
+								"end": 905
+							}
+						]
+					},
+					"superTypeParameters": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 907,
+						"end": 910,
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 908,
+								"end": 909,
+								"typeName": {
+									"type": "Identifier",
+									"start": 908,
+									"end": 909,
+									"name": "T"
+								}
+							}
+						]
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 911,
+						"end": 913,
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a lone comment stays ahead of type arguments too",
+							"start": 822,
+							"end": 873
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

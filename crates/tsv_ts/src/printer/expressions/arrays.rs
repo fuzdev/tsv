@@ -381,7 +381,7 @@ impl<'a> Printer<'a> {
         span: Span,
         idx: usize,
     ) -> Option<Span> {
-        let interior = arr.elements[idx].as_ref()?.paren_interior()?;
+        let interior = self.printed_paren_interior(arr.elements[idx].as_ref()?)?;
         self.element_frozen_span(span.start + 1, arr.elements, idx)
             .is_none()
             .then_some(interior)

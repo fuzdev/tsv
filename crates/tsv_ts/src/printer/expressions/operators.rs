@@ -509,11 +509,23 @@ impl<'a> Printer<'a> {
             // still breaks — the comment's body forces it, as prettier's does — but the
             // operand inside it stays flat. The claim wraps the BUILD, not the finished
             // doc: prepending without suppressing double-prints.
-            let inner =
+            // The trailing run opens where the operand's PRINTED content ends when the gap past
+            // the operand holds a comment ([`Printer::pair_trailing_gap_start`]), so a comment
+            // written last in a stripped shell down the operand's right edge
+            // (`-(a + (b // c⏎) /* x */ // d⏎)`) prints inside this pair ahead of the run written
+            // after that shell, claimed from the operand's own trailing emitters, which deferred
+            // it behind the run. A FROZEN operand's slice prints its shells verbatim.
+            let trailing_start = if has_trailing_comments && frozen.is_none() {
+                self.pair_trailing_gap_start(unary.argument)
+            } else {
+                argument_end
+            };
+            let inner = self.with_claimed_right_spine_run(trailing_start, argument_end, || {
                 self.build_value_with_outermost_owned_comment(unary.argument, || match frozen {
                     Some(frozen) => self.build_frozen_expression_doc(unary.argument, frozen),
                     None => self.build_flat_chain_expression_doc(unary.argument),
-                });
+                })
+            });
             // The outer comment-holder parens already group the operand, so the inner
             // needs_parens layer is redundant for a binary/logical operand — prettier
             // strips it (`!(x + y /* c */)`). Assignment/ternary operands keep their
@@ -563,7 +575,7 @@ impl<'a> Printer<'a> {
             // dangling runs).
             self.push_anchored_trailing_run(
                 &mut parts,
-                argument_end,
+                trailing_start,
                 unary.span.end,
                 RunLeadingBlank::Keep,
             );
@@ -577,7 +589,7 @@ impl<'a> Printer<'a> {
             // through `push_trailing_run_separator`, a `//` or own-line block in the
             // LEADING run through `push_leading_comment_run`'s third separator.
             let trailing_line_comment =
-                self.has_line_comments_between(argument_end, unary.span.end);
+                self.has_line_comments_between(trailing_start, unary.span.end);
             let mut shell_parts: DocBuf = smallvec![d.text("(")];
             // The glued `//` rides on the `(`'s own line, ahead of the `indent` — no break
             // precedes it, so the indent would have nothing to act on anyway.
@@ -1600,18 +1612,34 @@ impl<'a> Printer<'a> {
         // ([`Self::wrap_chain_with_paren_comments`]). A later operand's shell keeps the
         // ordinary builder: its erased-paren region belongs to the operator gap before it,
         // which is a separate question.
-        let doc = self.build_left_spine_operand_doc_if(
-            operands.is_empty(),
-            chain_start,
-            left,
-            FrozenOperandPair::position(ParenContext::BinaryLeft {
-                parent_op: node.operator,
-            }),
-            || self.build_binary_operand_doc(left, node.operator, false),
-        );
+        // The operand→operator gap opens at the operand's printed end
+        // ([`Self::operand_operator_gap_start`]), the region claimed from the operand's doc —
+        // unless a directive freezes the leftmost operand, whose slice prints its shells.
+        let gap = self.operand_operator_gap_start(left);
+        let gap = if gap < left.span().end
+            && operands.is_empty()
+            && self
+                .left_spine_operand_frozen_span(chain_start, left)
+                .is_some()
+        {
+            left.span().end
+        } else {
+            gap
+        };
+        let doc = self.with_claimed_right_spine_run(gap, left.span().end, || {
+            self.build_left_spine_operand_doc_if(
+                operands.is_empty(),
+                chain_start,
+                left,
+                FrozenOperandPair::position(ParenContext::BinaryLeft {
+                    parent_op: node.operator,
+                }),
+                || self.build_binary_operand_doc(left, node.operator, false),
+            )
+        });
         operands.push(ChainOperand {
             doc,
-            span: left.span(),
+            span: Span::new(left.span().start, gap),
         });
         for (depth, &node) in spine.iter().enumerate().rev() {
             self.collect_binary_chain_link(
@@ -1654,9 +1682,12 @@ impl<'a> Printer<'a> {
         operands.push(if ends_chain {
             self.build_chain_end_operand(expr.right, expr.operator)
         } else {
+            let gap = self.operand_operator_gap_start(expr.right);
             ChainOperand {
-                doc: self.build_binary_operand_doc(expr.right, expr.operator, true),
-                span: expr.right.span(),
+                doc: self.with_claimed_right_spine_run(gap, expr.right.span().end, || {
+                    self.build_binary_operand_doc(expr.right, expr.operator, true)
+                }),
+                span: Span::new(expr.right.span().start, gap),
             }
         });
     }
@@ -1968,6 +1999,35 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Where an operator-followed chain operand's operand→operator gap opens: the operand's
+    /// right-spine printed end ([`Printer::pair_trailing_gap_start`]) when the gap up to the
+    /// operator — past any `)` the author wrote around the operand — already holds a comment,
+    /// so a comment written last in a stripped shell down the operand's right edge
+    /// (`(a + (b // c⏎) /* x */ // d⏎) * 2`) prints in that gap ahead of the run written after
+    /// the shell, as the bare spelling's does; the caller claims the region from the operand's
+    /// doc, and a pair the printer mints around it then appends nothing
+    /// ([`Printer::minted_pair_trailing_region`] declines a claimed region). A lone such comment
+    /// keeps the operand's own placement (after a minted `)`, or trailing the statement).
+    fn operand_operator_gap_start(&self, operand: &Expression<'_>) -> u32 {
+        let end = operand.span().end;
+        let start = self.pair_trailing_gap_start(operand);
+        if start >= end {
+            return end;
+        }
+        let mut pos = end;
+        while let Some(close) = self.paren_shell_close_after(pos) {
+            pos = close;
+        }
+        let boundary = self
+            .next_significant_byte(pos, self.source.len() as u32)
+            .map_or(pos, |b| b as u32);
+        if self.has_comments_to_emit_between(end, boundary) {
+            start
+        } else {
+            end
+        }
+    }
+
     /// Build operand with parens if needed for clarity
     pub(in crate::printer) fn build_binary_operand_doc(
         &self,
@@ -2124,24 +2184,41 @@ impl<'a> Printer<'a> {
     ///
     /// When both hold, the retained shell IS the position's pair. The claim is keyed on the
     /// position's pair alone, since the shell's `(` is re-added around this body either way.
-    /// The keyword→operand gap's run is the caller's and prints outside the pair.
+    /// The keyword→operand gap's run is the caller's and prints outside the pair. `frozen` says
+    /// a directive freezes the operand, whose slice prints its stripped shells itself.
     fn build_keyword_operand_pair_doc(
         &self,
         operand: &Expression<'_>,
         ctx: ParenContext,
         shell_end: u32,
+        frozen: bool,
         build_operand: impl FnOnce() -> DocId,
     ) -> DocId {
         let d = self.d();
         let needs_parens = self.needs_parens(operand, ctx);
-        let inner = if needs_parens {
-            self.build_value_with_outermost_owned_comment(operand, build_operand)
-        } else {
-            build_operand()
-        };
         let operand_end = operand.span().end;
-        let retained = if self.has_comments_to_emit_between(operand_end, shell_end) {
-            self.build_paren_operand_comment_doc(operand_end, shell_end, inner, ")")
+        // A shell retained for a comment past the operand opens its run where the operand's
+        // PRINTED content ends ([`Printer::pair_trailing_gap_start`]), so a comment written last
+        // in a stripped shell down the operand's right edge prints inside the shell ahead of the
+        // run written after that shell, claimed from the operand's own trailing emitters. Only
+        // a retained shell: without one, the comment trails the statement as the operand's own
+        // emitters place it — claimed with nothing to print it, it would be dropped. A FROZEN
+        // operand's slice prints its shells verbatim.
+        let retains = self.has_comments_to_emit_between(operand_end, shell_end);
+        let gap = if retains && !frozen {
+            self.pair_trailing_gap_start(operand)
+        } else {
+            operand_end
+        };
+        let inner = self.with_claimed_right_spine_run(gap, operand_end, || {
+            if needs_parens {
+                self.build_value_with_outermost_owned_comment(operand, build_operand)
+            } else {
+                build_operand()
+            }
+        });
+        let retained = if retains {
+            self.build_paren_operand_comment_doc(gap, shell_end, inner, ")")
         } else {
             None
         };
@@ -2201,6 +2278,7 @@ impl<'a> Printer<'a> {
                 await_expr.argument,
                 ParenContext::AwaitArgument,
                 await_expr_span.end,
+                frozen.is_some(),
                 operand_doc,
             );
 
@@ -2381,6 +2459,7 @@ impl<'a> Printer<'a> {
             arg,
             ParenContext::YieldArgument,
             yield_expr_span.end,
+            false,
             || self.build_expression_doc(arg),
         );
 

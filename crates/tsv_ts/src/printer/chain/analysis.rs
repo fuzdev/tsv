@@ -1572,8 +1572,26 @@ pub(crate) fn build_linearized_chain_doc(
         _ => None,
     };
     // The first member gap's claim on the base's stripped trailing shells
-    // ([`Printer::member_gap_start`]), which the base's own emitters decline.
+    // ([`Printer::member_gap_start`]), which the base's own emitters decline — and the first
+    // call's: a call link's callee gap opens at the callee's printed end too
+    // ([`crate::printer::calls::callee_printed_gap_start`], the start the link's argument side
+    // reads), unless its pair is owned or the base is frozen, whose slice prints its shells.
     let right_claim = match &*nodes {
+        [
+            ChainNode::Base { expr: base, .. },
+            ChainNode::Call { call, span, .. },
+            ..,
+        ] => {
+            let start = if crate::printer::right_spine_may_end_in_shells(base)
+                && frozen_base.is_none()
+                && call_callee_paren_leading_start(call, *span).is_none()
+            {
+                crate::printer::calls::callee_printed_gap_start(printer, call)
+            } else {
+                base.span().end
+            };
+            (start < base.span().end).then(|| Span::new(start, base.span().end))
+        }
         [ChainNode::Base { expr: base, .. }, link, ..] => link
             .comment_range()
             .map(|(gap_start, _)| gap_start)

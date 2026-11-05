@@ -51,6 +51,27 @@
 	// a block alone after the pair stays after the comment, in the order written
 	k12 = (a +
 		b) /* x12 */!; // c12
+
+	// a non-null operand a member or a call follows keeps the same order
+	k13 = (a +
+		b) /* x13 */! // c13 // d13
+	.m;
+	k14 = (a +
+		b) /* x14 */! // c14 // d14
+	();
+	k15 = (a +
+		(b +
+			c))!
+			// c15 // d15
+	.m;
+	k16 = (a +
+		b) /* x16 */! // c16
+	.m;
+
+	// with nothing written after the pair, the comment trails the statement ahead of a member too
+	k17 = (a +
+		b)! // c17
+	.m;
 </script>
 
 %%PASS=2 (fixed point)%%
@@ -83,4 +104,23 @@
 
 	// a block alone after the pair stays after the comment, in the order written
 	k12 = (a + b) /* x12 */!; // c12
+
+	// a non-null operand a member or a call follows keeps the same order
+	k13 = (a +
+		b) /* x13 */! // c13 // d13
+	.m;
+	k14 = (a +
+		b) /* x14 */! // c14 // d14
+	();
+	k15 =
+		// c15 // d15
+		(a + (b + c))!.m;
+	k16 = (a +
+		b) /* x16 */! // c16
+	.m;
+
+	// with nothing written after the pair, the comment trails the statement ahead of a member too
+	k17 = (a +
+		b)! // c17
+	.m;
 </script>

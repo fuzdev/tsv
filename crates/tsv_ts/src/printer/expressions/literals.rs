@@ -499,7 +499,10 @@ impl<'a> Printer<'a> {
             }
             inner.push(self.build_frozen_expression_doc(spread.argument, frozen));
             if has_trailing_comments {
-                self.append_paren_interior_trailing_comments(&mut inner, spread.paren_interior());
+                self.append_paren_interior_trailing_comments(
+                    &mut inner,
+                    self.spread_printed_interior(spread),
+                );
             }
             if needs_parens {
                 inner.push(d.text(")"));
@@ -523,7 +526,10 @@ impl<'a> Printer<'a> {
             // (`...(a &&\n\tb && {…})`), matching Prettier — a `SpreadElement` parent is
             // not in binaryish.js's `shouldNotIndent` set, so the logical/binary chain
             // gets the continuation indent. Non-binary arguments are unaffected.
-            let arg_doc = self.build_expression_doc_with_indent_on_break(spread.argument);
+            let interior_start = self.spread_printed_interior(spread).start;
+            let arg_doc = self.with_claimed_right_spine_run(interior_start, argument_end, || {
+                self.build_expression_doc_with_indent_on_break(spread.argument)
+            });
 
             // A block run the author broke AFTER, before an argument that WILL BREAK or holding a
             // multi-line comment, keeps its break — prettier's `printLeadingComment` newline-after
@@ -546,7 +552,7 @@ impl<'a> Printer<'a> {
                 if has_trailing_comments {
                     self.append_paren_interior_trailing_comments(
                         &mut parts,
-                        spread.paren_interior(),
+                        self.spread_printed_interior(spread),
                     );
                 }
                 return d.concat(&parts);
@@ -582,7 +588,10 @@ impl<'a> Printer<'a> {
                 // (array/call) which places them as siblings after the spread's comma.
                 // Using line_suffix for own-line block comments in spread causes them to
                 // escape past the enclosing array/call brackets entirely.
-                self.append_paren_interior_trailing_comments(&mut parts, spread.paren_interior());
+                self.append_paren_interior_trailing_comments(
+                    &mut parts,
+                    self.spread_printed_interior(spread),
+                );
             }
             if needs_parens {
                 parts.push(d.text(")"));

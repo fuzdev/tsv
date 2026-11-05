@@ -1,0 +1,107 @@
+<script lang="ts">
+	// a comment written last inside a redundant pair down the right edge of a callee, a `new`
+	// callee or a tag whose required pair the printer emits stays after the pair, ahead of a
+	// comment written after the inner pair, each on a line of its own
+	k1 = (
+		a + b
+	) // c1
+	// d1
+	();
+	k2 = (
+		a + b
+	) // c2
+	(
+		// d2
+		1
+	);
+	k3 = (
+		a + b
+	) // c3
+	// d3
+	?.();
+	k4 = (
+		a + b
+	) // c4
+	// d4
+	<T>();
+	k5 = new (
+		a + b
+	) // c5
+	// d5
+	();
+	k6 = (a + b) // c6
+	// d6
+	`t`;
+	k7 = (
+		a +
+		(b + c)
+	) // c7
+	// d7
+	();
+
+	// an own-line comment in the inner pair and a block written ahead of the comment after the
+	// pair take the same order
+	k8 = (
+		a + b
+	) // c8
+	// d8
+	();
+	k9 = (
+		a + b
+	) // c9
+	/* x9 */ // d9
+	();
+	k10 = new (
+		a + b
+	) // c10
+	(
+		/* x10 */ // d10
+		1
+	);
+
+	// a block alone after the pair stays after the comment, in the order written
+	k11 = (
+		a + b
+	) // c11
+	/* x11 */
+	();
+	k14 = (
+		a + b
+	) // c14
+	(
+		/* x14
+		 */ 1
+	);
+
+	// with nothing written after the pair, the comment stays after the pair, ahead of the
+	// arguments
+	k12 = (
+		a + b
+	) // c12
+	();
+
+	// a member chain's head already keeps the two apart
+	k13 = (a + b) // c13
+		// d13
+		.m();
+
+	// a call-headed chain takes the callee's form
+	k15 = (
+		a + b
+	) // c15
+	// d15
+	().m;
+	k16 = (
+		a + b
+	) // c16
+	().m;
+
+	// a tag with type arguments keeps the comment ahead of them
+	k17 = (a +
+		b)<T> // c17
+	`t`;
+
+	// a function callee's pair keeps its own interior, the comment trailing the statement
+	k18 = (() => a + b)(); // c18
+	k19 = (() => a + b)().m; // c19
+</script>

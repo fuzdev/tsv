@@ -82,6 +82,14 @@
 		b /* x15 */; // c15 // d15
 	export default a +
 		b /* x16 */; // c16 // d16
+
+	// an expression statement keeps its shell the same way
+	a +
+		b; /* x17 */ // c17 // d17
+	a +
+		(b +
+			c);
+			// c18 // d18
 </script>
 
 %%PASS=2 (fixed point)%%
@@ -128,4 +136,9 @@
 	// a block written ahead of the comment after the pair leaves the two in the same order
 	let k15 = a + b; /* x15 */ // c15 // d15
 	export default a + b; /* x16 */ // c16 // d16
+
+	// an expression statement keeps its shell the same way
+	a + b; /* x17 */ // c17 // d17
+	a + (b + c);
+	// c18 // d18
 </script>

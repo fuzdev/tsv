@@ -1788,7 +1788,7 @@ impl<'a> Printer<'a> {
     ) -> bool {
         elements
             .iter()
-            .any(|e| self.paren_interior_forces_expansion(e.paren_interior()))
+            .any(|e| self.paren_interior_forces_expansion(self.printed_paren_interior(e)))
     }
 
     /// Whether an element's own doc ends in a DEFERRED line comment — a spread or rest

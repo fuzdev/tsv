@@ -582,13 +582,31 @@ impl<'a> Printer<'a> {
         // and the terminator gap opens at the region the value handed it.
         let plain = !needs_parens && shell_close.is_none();
         let mut tail_gap_start = expr_end;
+        // A retained shell's run opens where the expression's PRINTED content ends
+        // ([`Printer::pair_trailing_gap_start`]), so a comment written last in a stripped shell
+        // down its right edge (`(a + (b // c⏎) /* x */ // d⏎);`) prints inside the shell ahead
+        // of the run written after that shell, claimed from the expression's own trailing
+        // emitters. A FROZEN expression's slice prints its shells verbatim.
+        let shell_run_start = match shell_close {
+            Some(_) if frozen.is_none() => self.pair_trailing_gap_start(stmt.expression),
+            _ => expr_end,
+        };
         let expr_doc = match frozen {
             Some(span) => self.build_frozen_expression_doc(stmt.expression, span),
             None => {
+                // Claimed in line rather than through a closure around the tail's own
+                // closure, which keeps the statement's build inline.
+                let outer_claim = (shell_run_start < expr_end).then(|| {
+                    self.claimed_right_spine_run
+                        .replace(Some(Span::new(shell_run_start, expr_end)))
+                });
                 let (doc, gap_start) = self
                     .with_statement_tail(plain.then_some(stmt.expression), || {
                         self.build_expression_statement_expr_doc(stmt, nested_paren)
                     });
+                if let Some(outer) = outer_claim {
+                    self.claimed_right_spine_run.set(outer);
+                }
                 tail_gap_start = gap_start.unwrap_or(expr_end);
                 doc
             }
@@ -630,7 +648,8 @@ impl<'a> Printer<'a> {
             // The parens are already open, so a `//` before the `)` stays inside them
             // rather than deferring past the `;` — the same claim the retained-shell
             // branch below makes, at the branch that got here for the leading run.
-            consumed_close = self.push_retained_gap_trailing_run(&mut inner, expr_end, shell_close);
+            consumed_close =
+                self.push_retained_gap_trailing_run(&mut inner, shell_run_start, shell_close);
             parts.push(d.text("("));
             parts.push(d.indent(d.concat(&inner)));
             parts.push(d.hardline());
@@ -640,7 +659,8 @@ impl<'a> Printer<'a> {
             // after the class, rather than deferring past the `;` onto a line a trailing
             // comment may hold, where the two merge (`(@dec class {}⏎// c⏎); // d`).
             let mut inner: DocBuf = smallvec![expr_doc];
-            consumed_close = self.push_retained_gap_trailing_run(&mut inner, expr_end, shell_close);
+            consumed_close =
+                self.push_retained_gap_trailing_run(&mut inner, shell_run_start, shell_close);
             parts.push(self.build_break_open_parens(d.concat(&inner)));
         } else if let Some(close) = shell_close {
             // The value's authored parens are RETAINED around a `//` that would otherwise
@@ -659,7 +679,8 @@ impl<'a> Printer<'a> {
                 );
             }
             inner.push(expr_doc);
-            consumed_close = self.push_retained_gap_trailing_run(&mut inner, expr_end, Some(close));
+            consumed_close =
+                self.push_retained_gap_trailing_run(&mut inner, shell_run_start, Some(close));
             parts.push(d.text("("));
             parts.push(d.indent_hardline(d.concat(&inner)));
             parts.push(d.hardline());

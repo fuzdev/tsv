@@ -183,13 +183,20 @@ impl CalleeGap {
 /// is known without a search: nothing owns a pair, nothing splits, and the windows open at
 /// the callee's end. That answer is given here, by tests that run no search, so the plain
 /// call pays for none of the scans the derivation ([`callee_gap_wide`]) makes; every other
-/// call is handed to it.
+/// call is handed to it. Always inlined into its callers, where the plain answer costs no call.
+#[expect(clippy::inline_always)]
+#[inline(always)]
 pub(super) fn callee_gap(
     printer: &Printer<'_>,
     call: &ast::CallExpression<'_>,
     span: Span,
 ) -> CalleeGap {
-    if !call.optional && call_callee_paren_leading_start(call, span).is_none() {
+    // A callee that can end in stripped shells opens its gap at its printed end
+    // ([`callee_printed_gap_start`]), which the derivation answers.
+    if !call.optional
+        && !super::right_spine_may_end_in_shells(call.callee)
+        && call_callee_paren_leading_start(call, span).is_none()
+    {
         let start = call.callee.span().end;
         // [`paren_split_for`]'s own gate, over the gap it would be asked about.
         let gap_start = args_side_start(call, start);
@@ -216,12 +223,33 @@ pub(super) fn callee_gap(
     callee_gap_wide(printer, call, span)
 }
 
+/// Where the callee→arguments gap opens for a callee whose required pair the printer emits
+/// (not an owned pair, which keeps its interior): the callee's right-spine printed end, so a
+/// comment written last in a stripped shell down the callee's right edge
+/// (`(a + (b // c⏎) // d⏎)()`) is the gap's, printed ahead of the comments written after that
+/// shell ([`Printer::required_pair_gap_start`]). Every window of [`CalleeGap`] opens from it,
+/// and the call's head claims the region from the callee's own doc.
+#[inline]
+pub(super) fn callee_printed_gap_start(
+    printer: &Printer<'_>,
+    call: &ast::CallExpression<'_>,
+) -> u32 {
+    printer.required_pair_gap_start(call.callee, || {
+        printer.needs_parens(call.callee, ParenContext::callee_of(call))
+            && printer.frozen_chain_base_span(call.callee).is_none()
+    })
+}
+
 /// The derivation behind [`callee_gap`] — the one definition of every field, out of line
 /// for the calls its inline tests cannot answer.
 #[inline(never)]
 fn callee_gap_wide(printer: &Printer<'_>, call: &ast::CallExpression<'_>, span: Span) -> CalleeGap {
-    let callee_end = call.callee.span().end;
     let owned_pair = call_callee_paren_leading_start(call, span).is_some();
+    let callee_end = if owned_pair {
+        call.callee.span().end
+    } else {
+        callee_printed_gap_start(printer, call)
+    };
     let trailing_gap = printer.owned_pair_trailing_gap(callee_end, owned_pair);
     let start = Printer::gap_start_after_owned_pair(callee_end, trailing_gap);
     let optional = call_optional(printer, call, span, start);

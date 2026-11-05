@@ -520,6 +520,24 @@ impl<'a> Printer<'a> {
         // emitted a second time outside them.
         let tag_gap_start =
             Printer::gap_start_after_owned_pair(tagged.tag.span().end, trailing_gap);
+        // A pair the PRINTER emits around the tag opens the tag→`` ` `` gap (and the
+        // type-argument gap) at the tag's printed end ([`Printer::required_pair_gap_start`]),
+        // so a comment written last in a stripped shell down the tag's right edge prints
+        // ahead of the comments written after that shell; the arm below claims the region from
+        // the tag's own doc. Not for a FROZEN tag, whose slice prints its shells verbatim, nor
+        // a sealed chain, whose pair prints its interior itself.
+        let tag_gap_start = if pair_open.is_none()
+            && !matches!(tagged.tag.kind, ExpressionKind::TSNonNullExpression(_))
+        {
+            self.required_pair_gap_start(tagged.tag, || {
+                self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
+                    && self
+                        .left_spine_operand_frozen_span(span.start, tagged.tag)
+                        .is_none()
+            })
+        } else {
+            tag_gap_start
+        };
 
         let tag_doc = if let Some(pair_open) = pair_open {
             // The tag has one rendering, so every arm takes the same body.
@@ -544,36 +562,38 @@ impl<'a> Printer<'a> {
             let claim = self.left_spine_run_claim(span, span.start, tagged.tag, || {
                 self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
             });
-            self.with_left_spine_claim(claim, || {
-                let tag_doc = self.build_left_spine_operand_doc(
-                    span.start,
-                    tagged.tag,
-                    FrozenOperandPair::position(ParenContext::TaggedTemplateTag),
-                    || {
-                        if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
-                            sealed
-                        } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
-                            || tagged.type_arguments.as_ref().is_some_and(|_| {
-                                self.instantiation_keeps_pair(
-                                    tagged.tag,
-                                    SecondTypeArgs::Expression,
-                                )
-                            })
-                        {
-                            d.parens(self.build_expression_doc(tagged.tag))
-                        } else {
-                            self.build_expression_doc(tagged.tag)
-                        }
-                    },
-                );
-                // Check for comments between removed parentheses and tag
-                // e.g., (/* comment */ tag)`template` has span.start at '(' and tag.span.start at 'tag'
-                self.prepend_removed_paren_comments(
-                    span,
-                    span.start,
-                    tagged.tag.span().start,
-                    tag_doc,
-                )
+            self.with_claimed_right_spine_run(tag_gap_start, tagged.tag.span().end, || {
+                self.with_left_spine_claim(claim, || {
+                    let tag_doc = self.build_left_spine_operand_doc(
+                        span.start,
+                        tagged.tag,
+                        FrozenOperandPair::position(ParenContext::TaggedTemplateTag),
+                        || {
+                            if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
+                                sealed
+                            } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
+                                || tagged.type_arguments.as_ref().is_some_and(|_| {
+                                    self.instantiation_keeps_pair(
+                                        tagged.tag,
+                                        SecondTypeArgs::Expression,
+                                    )
+                                })
+                            {
+                                d.parens(self.build_expression_doc(tagged.tag))
+                            } else {
+                                self.build_expression_doc(tagged.tag)
+                            }
+                        },
+                    );
+                    // Check for comments between removed parentheses and tag
+                    // e.g., (/* comment */ tag)`template` has span.start at '(' and tag.span.start at 'tag'
+                    self.prepend_removed_paren_comments(
+                        span,
+                        span.start,
+                        tagged.tag.span().start,
+                        tag_doc,
+                    )
+                })
             })
         };
 

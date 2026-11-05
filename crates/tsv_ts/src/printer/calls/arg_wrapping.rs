@@ -2347,7 +2347,7 @@ pub(super) fn build_expand_first_arg_doc(
             printer,
             &mut tail_parts,
             last_arg,
-            last_arg.paren_interior(),
+            printer.printed_paren_interior(last_arg),
             call_end,
         );
     }

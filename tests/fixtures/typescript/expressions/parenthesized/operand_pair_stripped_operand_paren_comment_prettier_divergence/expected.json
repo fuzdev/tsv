@@ -1,0 +1,2098 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 2005,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a comment written last inside a redundant pair down the right edge of an operand whose",
+			"start": 20,
+			"end": 109
+		},
+		{
+			"type": "Line",
+			"value": " required pair the printer emits stays inside that pair, after the operand, ahead of a",
+			"start": 111,
+			"end": 199
+		},
+		{
+			"type": "Line",
+			"value": " block and a comment written after the inner pair, each on a line of its own",
+			"start": 201,
+			"end": 279
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 297,
+			"end": 302
+		},
+		{
+			"type": "Block",
+			"value": " x1 ",
+			"start": 305,
+			"end": 313
+		},
+		{
+			"type": "Line",
+			"value": " d1",
+			"start": 314,
+			"end": 319
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 341,
+			"end": 346
+		},
+		{
+			"type": "Block",
+			"value": " x2 ",
+			"start": 349,
+			"end": 357
+		},
+		{
+			"type": "Line",
+			"value": " d2",
+			"start": 358,
+			"end": 363
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 391,
+			"end": 396
+		},
+		{
+			"type": "Block",
+			"value": " x3 ",
+			"start": 399,
+			"end": 407
+		},
+		{
+			"type": "Line",
+			"value": " d3",
+			"start": 408,
+			"end": 413
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 445,
+			"end": 450
+		},
+		{
+			"type": "Block",
+			"value": " x4 ",
+			"start": 453,
+			"end": 461
+		},
+		{
+			"type": "Line",
+			"value": " d4",
+			"start": 462,
+			"end": 467
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 520,
+			"end": 525
+		},
+		{
+			"type": "Block",
+			"value": " x5 ",
+			"start": 529,
+			"end": 537
+		},
+		{
+			"type": "Line",
+			"value": " d5",
+			"start": 538,
+			"end": 543
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 595,
+			"end": 600
+		},
+		{
+			"type": "Block",
+			"value": " x6 ",
+			"start": 604,
+			"end": 612
+		},
+		{
+			"type": "Line",
+			"value": " d6",
+			"start": 613,
+			"end": 618
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 647,
+			"end": 652
+		},
+		{
+			"type": "Block",
+			"value": " x7 ",
+			"start": 655,
+			"end": 663
+		},
+		{
+			"type": "Line",
+			"value": " d7",
+			"start": 664,
+			"end": 669
+		},
+		{
+			"type": "Line",
+			"value": " a binary chain's operand keeps the comment ahead of the operator's run, its pair required",
+			"start": 676,
+			"end": 768
+		},
+		{
+			"type": "Line",
+			"value": " or not",
+			"start": 770,
+			"end": 779
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 796,
+			"end": 801
+		},
+		{
+			"type": "Block",
+			"value": " x8 ",
+			"start": 804,
+			"end": 812
+		},
+		{
+			"type": "Line",
+			"value": " d8",
+			"start": 813,
+			"end": 818
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 840,
+			"end": 845
+		},
+		{
+			"type": "Block",
+			"value": " x9 ",
+			"start": 848,
+			"end": 856
+		},
+		{
+			"type": "Line",
+			"value": " d9",
+			"start": 857,
+			"end": 862
+		},
+		{
+			"type": "Line",
+			"value": " a spread's argument keeps the comment ahead of the run written after the inner pair",
+			"start": 873,
+			"end": 959
+		},
+		{
+			"type": "Line",
+			"value": " c10",
+			"start": 982,
+			"end": 988
+		},
+		{
+			"type": "Block",
+			"value": " x10 ",
+			"start": 991,
+			"end": 1000
+		},
+		{
+			"type": "Line",
+			"value": " d10",
+			"start": 1001,
+			"end": 1007
+		},
+		{
+			"type": "Line",
+			"value": " c11",
+			"start": 1031,
+			"end": 1037
+		},
+		{
+			"type": "Block",
+			"value": " x11 ",
+			"start": 1040,
+			"end": 1049
+		},
+		{
+			"type": "Line",
+			"value": " d11",
+			"start": 1050,
+			"end": 1056
+		},
+		{
+			"type": "Line",
+			"value": " c12",
+			"start": 1082,
+			"end": 1088
+		},
+		{
+			"type": "Block",
+			"value": " x12 ",
+			"start": 1091,
+			"end": 1100
+		},
+		{
+			"type": "Line",
+			"value": " d12",
+			"start": 1101,
+			"end": 1107
+		},
+		{
+			"type": "Line",
+			"value": " an own-line comment in the inner pair, a nested pair and a `//` alone after the pair take",
+			"start": 1114,
+			"end": 1206
+		},
+		{
+			"type": "Line",
+			"value": " the same order",
+			"start": 1208,
+			"end": 1225
+		},
+		{
+			"type": "Line",
+			"value": " c13",
+			"start": 1246,
+			"end": 1252
+		},
+		{
+			"type": "Block",
+			"value": " x13 ",
+			"start": 1255,
+			"end": 1264
+		},
+		{
+			"type": "Line",
+			"value": " d13",
+			"start": 1265,
+			"end": 1271
+		},
+		{
+			"type": "Line",
+			"value": " c14",
+			"start": 1302,
+			"end": 1308
+		},
+		{
+			"type": "Line",
+			"value": " d14",
+			"start": 1311,
+			"end": 1317
+		},
+		{
+			"type": "Line",
+			"value": " c15",
+			"start": 1352,
+			"end": 1358
+		},
+		{
+			"type": "Line",
+			"value": " d15",
+			"start": 1361,
+			"end": 1367
+		},
+		{
+			"type": "Line",
+			"value": " a block alone after the pair stays after the comment, in the order written, at a binary",
+			"start": 1374,
+			"end": 1464
+		},
+		{
+			"type": "Line",
+			"value": " chain's operand and a spread's argument too",
+			"start": 1466,
+			"end": 1512
+		},
+		{
+			"type": "Line",
+			"value": " c16",
+			"start": 1531,
+			"end": 1537
+		},
+		{
+			"type": "Block",
+			"value": " x16 ",
+			"start": 1540,
+			"end": 1549
+		},
+		{
+			"type": "Line",
+			"value": " c19",
+			"start": 1569,
+			"end": 1575
+		},
+		{
+			"type": "Block",
+			"value": " x19 ",
+			"start": 1578,
+			"end": 1587
+		},
+		{
+			"type": "Line",
+			"value": " c20",
+			"start": 1618,
+			"end": 1624
+		},
+		{
+			"type": "Block",
+			"value": " x20 ",
+			"start": 1627,
+			"end": 1636
+		},
+		{
+			"type": "Line",
+			"value": " a `//` alone after the pair already follows on its own line, and with nothing written",
+			"start": 1643,
+			"end": 1731
+		},
+		{
+			"type": "Line",
+			"value": " after the pair the comment trails the statement",
+			"start": 1733,
+			"end": 1783
+		},
+		{
+			"type": "Line",
+			"value": " c17",
+			"start": 1802,
+			"end": 1808
+		},
+		{
+			"type": "Line",
+			"value": " d17",
+			"start": 1811,
+			"end": 1817
+		},
+		{
+			"type": "Line",
+			"value": " c18",
+			"start": 1845,
+			"end": 1851
+		},
+		{
+			"type": "Line",
+			"value": " c21",
+			"start": 1871,
+			"end": 1877
+		},
+		{
+			"type": "Line",
+			"value": " c22",
+			"start": 1900,
+			"end": 1906
+		},
+		{
+			"type": "Line",
+			"value": " c23",
+			"start": 1951,
+			"end": 1957
+		},
+		{
+			"type": "Block",
+			"value": " l24 ",
+			"start": 1970,
+			"end": 1979
+		},
+		{
+			"type": "Line",
+			"value": " c24",
+			"start": 1988,
+			"end": 1994
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 2004,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1995,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 281,
+					"end": 323,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 281,
+						"end": 322,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 281,
+							"end": 283,
+							"name": "k1"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 286,
+							"end": 322,
+							"operator": "-",
+							"prefix": true,
+							"argument": {
+								"type": "BinaryExpression",
+								"start": 291,
+								"end": 296,
+								"left": {
+									"type": "Identifier",
+									"start": 291,
+									"end": 292,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 295,
+									"end": 296,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 297,
+										"end": 302
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment written last inside a redundant pair down the right edge of an operand whose",
+							"start": 20,
+							"end": 109
+						},
+						{
+							"type": "Line",
+							"value": " required pair the printer emits stays inside that pair, after the operand, ahead of a",
+							"start": 111,
+							"end": 199
+						},
+						{
+							"type": "Line",
+							"value": " block and a comment written after the inner pair, each on a line of its own",
+							"start": 201,
+							"end": 279
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 325,
+					"end": 367,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 325,
+						"end": 366,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 325,
+							"end": 327,
+							"name": "k2"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 330,
+							"end": 366,
+							"operator": "!",
+							"prefix": true,
+							"argument": {
+								"type": "BinaryExpression",
+								"start": 335,
+								"end": 340,
+								"left": {
+									"type": "Identifier",
+									"start": 335,
+									"end": 336,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 339,
+									"end": 340,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 341,
+										"end": 346
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " x1 ",
+							"start": 305,
+							"end": 313
+						},
+						{
+							"type": "Line",
+							"value": " d1",
+							"start": 314,
+							"end": 319
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 369,
+					"end": 417,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 369,
+						"end": 416,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 369,
+							"end": 371,
+							"name": "k3"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 374,
+							"end": 416,
+							"operator": "typeof",
+							"prefix": true,
+							"argument": {
+								"type": "BinaryExpression",
+								"start": 385,
+								"end": 390,
+								"left": {
+									"type": "Identifier",
+									"start": 385,
+									"end": 386,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 389,
+									"end": 390,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c3",
+										"start": 391,
+										"end": 396
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " x2 ",
+							"start": 349,
+							"end": 357
+						},
+						{
+							"type": "Line",
+							"value": " d2",
+							"start": 358,
+							"end": 363
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 419,
+					"end": 471,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 419,
+						"end": 470,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 419,
+							"end": 421,
+							"name": "k4"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 424,
+							"end": 470,
+							"operator": "void",
+							"prefix": true,
+							"argument": {
+								"type": "BinaryExpression",
+								"start": 433,
+								"end": 444,
+								"left": {
+									"type": "Identifier",
+									"start": 433,
+									"end": 434,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 438,
+									"end": 443,
+									"left": {
+										"type": "Identifier",
+										"start": 438,
+										"end": 439,
+										"name": "b"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 442,
+										"end": 443,
+										"name": "c"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c4",
+											"start": 445,
+											"end": 450
+										}
+									]
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " x3 ",
+							"start": 399,
+							"end": 407
+						},
+						{
+							"type": "Line",
+							"value": " d3",
+							"start": 408,
+							"end": 413
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 473,
+					"end": 551,
+					"id": {
+						"type": "Identifier",
+						"start": 488,
+						"end": 491,
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 494,
+						"end": 551,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 498,
+								"end": 548,
+								"expression": {
+									"type": "AssignmentExpression",
+									"start": 498,
+									"end": 547,
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 498,
+										"end": 500,
+										"name": "k5"
+									},
+									"right": {
+										"type": "AwaitExpression",
+										"start": 503,
+										"end": 547,
+										"argument": {
+											"type": "BinaryExpression",
+											"start": 514,
+											"end": 519,
+											"left": {
+												"type": "Identifier",
+												"start": 514,
+												"end": 515,
+												"name": "a"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 518,
+												"end": 519,
+												"name": "b"
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " c5",
+													"start": 520,
+													"end": 525
+												}
+											]
+										}
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " x5 ",
+										"start": 529,
+										"end": 537
+									},
+									{
+										"type": "Line",
+										"value": " d5",
+										"start": 538,
+										"end": 543
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " x4 ",
+							"start": 453,
+							"end": 461
+						},
+						{
+							"type": "Line",
+							"value": " d4",
+							"start": 462,
+							"end": 467
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 553,
+					"end": 626,
+					"id": {
+						"type": "Identifier",
+						"start": 563,
+						"end": 566,
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 569,
+						"end": 626,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 573,
+								"end": 623,
+								"expression": {
+									"type": "AssignmentExpression",
+									"start": 573,
+									"end": 622,
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 573,
+										"end": 575,
+										"name": "k6"
+									},
+									"right": {
+										"type": "YieldExpression",
+										"start": 578,
+										"end": 622,
+										"delegate": false,
+										"argument": {
+											"type": "BinaryExpression",
+											"start": 589,
+											"end": 594,
+											"left": {
+												"type": "Identifier",
+												"start": 589,
+												"end": 590,
+												"name": "a"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 593,
+												"end": 594,
+												"name": "b"
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " c6",
+													"start": 595,
+													"end": 600
+												}
+											]
+										}
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " x6 ",
+										"start": 604,
+										"end": 612
+									},
+									{
+										"type": "Line",
+										"value": " d6",
+										"start": 613,
+										"end": 618
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "TSExportAssignment",
+					"start": 628,
+					"end": 673,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 641,
+						"end": 646,
+						"left": {
+							"type": "Identifier",
+							"start": 641,
+							"end": 642,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 645,
+							"end": 646,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c7",
+								"start": 647,
+								"end": 652
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 781,
+					"end": 825,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 781,
+						"end": 824,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 781,
+							"end": 783,
+							"name": "k8"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 788,
+							"end": 824,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 789,
+								"end": 794,
+								"left": {
+									"type": "Identifier",
+									"start": 789,
+									"end": 790,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 793,
+									"end": 794,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c8",
+										"start": 796,
+										"end": 801
+									}
+								]
+							},
+							"operator": "*",
+							"right": {
+								"type": "Literal",
+								"start": 823,
+								"end": 824,
+								"value": 2,
+								"raw": "2",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " x8 ",
+										"start": 804,
+										"end": 812
+									},
+									{
+										"type": "Line",
+										"value": " d8",
+										"start": 813,
+										"end": 818
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " x7 ",
+							"start": 655,
+							"end": 663
+						},
+						{
+							"type": "Line",
+							"value": " d7",
+							"start": 664,
+							"end": 669
+						},
+						{
+							"type": "Line",
+							"value": " a binary chain's operand keeps the comment ahead of the operator's run, its pair required",
+							"start": 676,
+							"end": 768
+						},
+						{
+							"type": "Line",
+							"value": " or not",
+							"start": 770,
+							"end": 779
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 827,
+					"end": 870,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 827,
+						"end": 869,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 827,
+							"end": 829,
+							"name": "k9"
+						},
+						"right": {
+							"type": "LogicalExpression",
+							"start": 834,
+							"end": 869,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 834,
+								"end": 839,
+								"left": {
+									"type": "Identifier",
+									"start": 834,
+									"end": 835,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 838,
+									"end": 839,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c9",
+										"start": 840,
+										"end": 845
+									}
+								]
+							},
+							"operator": "&&",
+							"right": {
+								"type": "Identifier",
+								"start": 868,
+								"end": 869,
+								"name": "q",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " x9 ",
+										"start": 848,
+										"end": 856
+									},
+									{
+										"type": "Line",
+										"value": " d9",
+										"start": 857,
+										"end": 862
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 961,
+					"end": 1011,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 961,
+						"end": 1010,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 961,
+							"end": 964,
+							"name": "k10"
+						},
+						"right": {
+							"type": "ArrayExpression",
+							"start": 967,
+							"end": 1010,
+							"elements": [
+								{
+									"type": "SpreadElement",
+									"start": 971,
+									"end": 981,
+									"argument": {
+										"type": "BinaryExpression",
+										"start": 975,
+										"end": 980,
+										"left": {
+											"type": "Identifier",
+											"start": 975,
+											"end": 976,
+											"name": "a"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 979,
+											"end": 980,
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c10",
+												"start": 982,
+												"end": 988
+											}
+										]
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " x10 ",
+											"start": 991,
+											"end": 1000
+										},
+										{
+											"type": "Line",
+											"value": " d10",
+											"start": 1001,
+											"end": 1007
+										}
+									]
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a spread's argument keeps the comment ahead of the run written after the inner pair",
+							"start": 873,
+							"end": 959
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1013,
+					"end": 1060,
+					"expression": {
+						"type": "CallExpression",
+						"start": 1013,
+						"end": 1059,
+						"callee": {
+							"type": "Identifier",
+							"start": 1013,
+							"end": 1016,
+							"name": "fn3"
+						},
+						"arguments": [
+							{
+								"type": "SpreadElement",
+								"start": 1020,
+								"end": 1030,
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 1024,
+									"end": 1029,
+									"left": {
+										"type": "Identifier",
+										"start": 1024,
+										"end": 1025,
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1028,
+										"end": 1029,
+										"name": "b"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c11",
+											"start": 1031,
+											"end": 1037
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1062,
+					"end": 1111,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1062,
+						"end": 1110,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1062,
+							"end": 1064,
+							"name": "o1"
+						},
+						"right": {
+							"type": "ObjectExpression",
+							"start": 1067,
+							"end": 1110,
+							"properties": [
+								{
+									"type": "SpreadElement",
+									"start": 1071,
+									"end": 1081,
+									"argument": {
+										"type": "BinaryExpression",
+										"start": 1075,
+										"end": 1080,
+										"left": {
+											"type": "Identifier",
+											"start": 1075,
+											"end": 1076,
+											"name": "a"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 1079,
+											"end": 1080,
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c12",
+												"start": 1082,
+												"end": 1088
+											}
+										]
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " x12 ",
+											"start": 1091,
+											"end": 1100
+										},
+										{
+											"type": "Line",
+											"value": " d12",
+											"start": 1101,
+											"end": 1107
+										}
+									]
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " x11 ",
+							"start": 1040,
+							"end": 1049
+						},
+						{
+							"type": "Line",
+							"value": " d11",
+							"start": 1050,
+							"end": 1056
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1227,
+					"end": 1275,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1227,
+						"end": 1274,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1227,
+							"end": 1230,
+							"name": "k13"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 1233,
+							"end": 1274,
+							"operator": "-",
+							"prefix": true,
+							"argument": {
+								"type": "BinaryExpression",
+								"start": 1238,
+								"end": 1243,
+								"left": {
+									"type": "Identifier",
+									"start": 1238,
+									"end": 1239,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 1242,
+									"end": 1243,
+									"name": "b"
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line comment in the inner pair, a nested pair and a `//` alone after the pair take",
+							"start": 1114,
+							"end": 1206
+						},
+						{
+							"type": "Line",
+							"value": " the same order",
+							"start": 1208,
+							"end": 1225
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1277,
+					"end": 1321,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1277,
+						"end": 1320,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1277,
+							"end": 1280,
+							"name": "k14"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 1283,
+							"end": 1320,
+							"operator": "-",
+							"prefix": true,
+							"argument": {
+								"type": "BinaryExpression",
+								"start": 1288,
+								"end": 1299,
+								"left": {
+									"type": "Identifier",
+									"start": 1288,
+									"end": 1289,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "BinaryExpression",
+									"start": 1293,
+									"end": 1298,
+									"left": {
+										"type": "Identifier",
+										"start": 1293,
+										"end": 1294,
+										"name": "b"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1297,
+										"end": 1298,
+										"name": "c"
+									}
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c13",
+							"start": 1246,
+							"end": 1252
+						},
+						{
+							"type": "Block",
+							"value": " x13 ",
+							"start": 1255,
+							"end": 1264
+						},
+						{
+							"type": "Line",
+							"value": " d13",
+							"start": 1265,
+							"end": 1271
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1323,
+					"end": 1371,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1323,
+						"end": 1370,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1323,
+							"end": 1326,
+							"name": "k15"
+						},
+						"right": {
+							"type": "ArrayExpression",
+							"start": 1329,
+							"end": 1370,
+							"elements": [
+								{
+									"type": "SpreadElement",
+									"start": 1333,
+									"end": 1349,
+									"argument": {
+										"type": "BinaryExpression",
+										"start": 1337,
+										"end": 1348,
+										"left": {
+											"type": "Identifier",
+											"start": 1337,
+											"end": 1338,
+											"name": "a"
+										},
+										"operator": "+",
+										"right": {
+											"type": "BinaryExpression",
+											"start": 1342,
+											"end": 1347,
+											"left": {
+												"type": "Identifier",
+												"start": 1342,
+												"end": 1343,
+												"name": "b"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 1346,
+												"end": 1347,
+												"name": "c"
+											}
+										}
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c15",
+											"start": 1352,
+											"end": 1358
+										},
+										{
+											"type": "Line",
+											"value": " d15",
+											"start": 1361,
+											"end": 1367
+										}
+									]
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c14",
+							"start": 1302,
+							"end": 1308
+						},
+						{
+							"type": "Line",
+							"value": " d14",
+							"start": 1311,
+							"end": 1317
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1514,
+					"end": 1553,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1514,
+						"end": 1552,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1514,
+							"end": 1517,
+							"name": "k16"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 1520,
+							"end": 1552,
+							"operator": "-",
+							"prefix": true,
+							"argument": {
+								"type": "BinaryExpression",
+								"start": 1525,
+								"end": 1530,
+								"left": {
+									"type": "Identifier",
+									"start": 1525,
+									"end": 1526,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 1529,
+									"end": 1530,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c16",
+										"start": 1531,
+										"end": 1537
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block alone after the pair stays after the comment, in the order written, at a binary",
+							"start": 1374,
+							"end": 1464
+						},
+						{
+							"type": "Line",
+							"value": " chain's operand and a spread's argument too",
+							"start": 1466,
+							"end": 1512
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1555,
+					"end": 1595,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1555,
+						"end": 1594,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1555,
+							"end": 1558,
+							"name": "k19"
+						},
+						"right": {
+							"type": "LogicalExpression",
+							"start": 1563,
+							"end": 1594,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 1563,
+								"end": 1568,
+								"left": {
+									"type": "Identifier",
+									"start": 1563,
+									"end": 1564,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 1567,
+									"end": 1568,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c19",
+										"start": 1569,
+										"end": 1575
+									}
+								]
+							},
+							"operator": "&&",
+							"right": {
+								"type": "Identifier",
+								"start": 1593,
+								"end": 1594,
+								"name": "q",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " x19 ",
+										"start": 1578,
+										"end": 1587
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " x16 ",
+							"start": 1540,
+							"end": 1549
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1597,
+					"end": 1640,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1597,
+						"end": 1639,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1597,
+							"end": 1600,
+							"name": "k20"
+						},
+						"right": {
+							"type": "ArrayExpression",
+							"start": 1603,
+							"end": 1639,
+							"elements": [
+								{
+									"type": "SpreadElement",
+									"start": 1607,
+									"end": 1617,
+									"argument": {
+										"type": "BinaryExpression",
+										"start": 1611,
+										"end": 1616,
+										"left": {
+											"type": "Identifier",
+											"start": 1611,
+											"end": 1612,
+											"name": "a"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 1615,
+											"end": 1616,
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c20",
+												"start": 1618,
+												"end": 1624
+											}
+										]
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " x20 ",
+											"start": 1627,
+											"end": 1636
+										}
+									]
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1785,
+					"end": 1821,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1785,
+						"end": 1820,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1785,
+							"end": 1788,
+							"name": "k17"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 1791,
+							"end": 1820,
+							"operator": "-",
+							"prefix": true,
+							"argument": {
+								"type": "BinaryExpression",
+								"start": 1796,
+								"end": 1801,
+								"left": {
+									"type": "Identifier",
+									"start": 1796,
+									"end": 1797,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 1800,
+									"end": 1801,
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c17",
+										"start": 1802,
+										"end": 1808
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a `//` alone after the pair already follows on its own line, and with nothing written",
+							"start": 1643,
+							"end": 1731
+						},
+						{
+							"type": "Line",
+							"value": " after the pair the comment trails the statement",
+							"start": 1733,
+							"end": 1783
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1823,
+					"end": 1844,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1823,
+						"end": 1843,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1823,
+							"end": 1826,
+							"name": "k18"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 1829,
+							"end": 1843,
+							"operator": "typeof",
+							"prefix": true,
+							"argument": {
+								"type": "BinaryExpression",
+								"start": 1837,
+								"end": 1842,
+								"left": {
+									"type": "Identifier",
+									"start": 1837,
+									"end": 1838,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 1841,
+									"end": 1842,
+									"name": "b"
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " d17",
+							"start": 1811,
+							"end": 1817
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c18",
+							"start": 1845,
+							"end": 1851
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1853,
+					"end": 1870,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1853,
+						"end": 1869,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1853,
+							"end": 1856,
+							"name": "k21"
+						},
+						"right": {
+							"type": "LogicalExpression",
+							"start": 1859,
+							"end": 1869,
+							"left": {
+								"type": "BinaryExpression",
+								"start": 1859,
+								"end": 1864,
+								"left": {
+									"type": "Identifier",
+									"start": 1859,
+									"end": 1860,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 1863,
+									"end": 1864,
+									"name": "b"
+								}
+							},
+							"operator": "&&",
+							"right": {
+								"type": "Identifier",
+								"start": 1868,
+								"end": 1869,
+								"name": "q"
+							}
+						}
+					},
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c21",
+							"start": 1871,
+							"end": 1877
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1879,
+					"end": 1910,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1879,
+						"end": 1909,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1879,
+							"end": 1882,
+							"name": "k22"
+						},
+						"right": {
+							"type": "ArrayExpression",
+							"start": 1885,
+							"end": 1909,
+							"elements": [
+								{
+									"type": "SpreadElement",
+									"start": 1889,
+									"end": 1899,
+									"argument": {
+										"type": "BinaryExpression",
+										"start": 1893,
+										"end": 1898,
+										"left": {
+											"type": "Identifier",
+											"start": 1893,
+											"end": 1894,
+											"name": "a"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 1897,
+											"end": 1898,
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c22",
+												"start": 1900,
+												"end": 1906
+											}
+										]
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 1912,
+					"end": 1960,
+					"id": {
+						"type": "Identifier",
+						"start": 1922,
+						"end": 1925,
+						"name": "fn4"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 1928,
+						"end": 1960,
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 1932,
+								"end": 1950,
+								"expression": {
+									"type": "AssignmentExpression",
+									"start": 1932,
+									"end": 1949,
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 1932,
+										"end": 1935,
+										"name": "k23"
+									},
+									"right": {
+										"type": "YieldExpression",
+										"start": 1938,
+										"end": 1949,
+										"delegate": false,
+										"argument": {
+											"type": "BinaryExpression",
+											"start": 1944,
+											"end": 1949,
+											"left": {
+												"type": "Identifier",
+												"start": 1944,
+												"end": 1945,
+												"name": "a"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 1948,
+												"end": 1949,
+												"name": "b"
+											}
+										}
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c23",
+										"start": 1951,
+										"end": 1957
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1962,
+					"end": 1987,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1962,
+						"end": 1986,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1962,
+							"end": 1965,
+							"name": "k24"
+						},
+						"right": {
+							"type": "UnaryExpression",
+							"start": 1968,
+							"end": 1986,
+							"operator": "-",
+							"prefix": true,
+							"argument": {
+								"type": "BinaryExpression",
+								"start": 1980,
+								"end": 1985,
+								"left": {
+									"type": "Identifier",
+									"start": 1980,
+									"end": 1981,
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 1984,
+									"end": 1985,
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " l24 ",
+										"start": 1970,
+										"end": 1979
+									}
+								]
+							}
+						}
+					},
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c24",
+							"start": 1988,
+							"end": 1994
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

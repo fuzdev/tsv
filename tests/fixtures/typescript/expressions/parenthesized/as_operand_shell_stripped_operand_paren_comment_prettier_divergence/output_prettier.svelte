@@ -37,4 +37,27 @@
 	// a block alone after the pair stays after the comment, in the order written
 	k12 = (a + b)!; // c12
 	/* x12 */
+
+	// a non-null operand a member or a call follows keeps the same order
+	k13 = (a +
+		b)! // c13
+	/* x13 */ // d13
+	.m;
+	k14 = (a +
+		b)! // c14
+	/* x14 */ // d14
+	();
+	k15 = (a +
+		(b +
+			c))!
+	// c15
+	// d15
+	.m;
+	k16 = (a +
+		b)! // c16
+	/* x16 */
+	.m;
+
+	// with nothing written after the pair, the comment trails the statement ahead of a member too
+	k17 = (a + b)!.m; // c17
 </script>

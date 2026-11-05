@@ -1,0 +1,224 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// a comment written last inside a redundant pair down the right edge of an operand whose
+	// required pair the printer emits stays inside that pair, after the operand, ahead of a
+	// block and a comment written after the inner pair, each on a line of its own
+	k1 = -(
+		a +
+		b /* x1 */ // c1 // d1
+	);
+	k2 = !(
+		a +
+		b /* x2 */ // c2 // d2
+	);
+	k3 = typeof (
+		a +
+		b /* x3 */ // c3 // d3
+	);
+	k4 = void (
+		a +
+		(b +
+			c) /* x4 */ // c4 // d4
+	);
+	async function fn1() {
+		k5 = await (a +
+			b) /* x5 */; // c5 // d5
+	}
+	function* fn2() {
+		k6 = yield a +
+			b /* x6 */; // c6 // d6
+	}
+	export = a +
+		b /* x7 */; // c7 // d7
+
+	// a binary chain's operand keeps the comment ahead of the operator's run, its pair required
+	// or not
+	k8 =
+		(a +
+			b) /* x8 */ * // c8 // d8
+		2;
+	k9 =
+		a +
+			b /* x9 */ && // c9 // d9
+		q;
+
+	// a spread's argument keeps the comment ahead of the run written after the inner pair
+	k10 = [
+		...(a +
+			b) /* x10 */ // c10 // d10
+	];
+	fn3(
+		...(a +
+			b) /* x11 */ // c11 // d11
+	);
+	o1 = {
+		...(a +
+			b) /* x12 */ // c12 // d12
+	};
+
+	// an own-line comment in the inner pair, a nested pair and a `//` alone after the pair take
+	// the same order
+	k13 = -(
+		a +
+		b /* x13 */
+		// c13 // d13
+	);
+	k14 = -(
+		a +
+		(b +
+			c)
+			// c14 // d14
+	);
+	k15 = [
+		...(a +
+			(b +
+				c))
+				// c15 // d15
+	];
+
+	// a block alone after the pair stays after the comment, in the order written, at a binary
+	// chain's operand and a spread's argument too
+	k16 = -(
+		a +
+		b /* x16 */ // c16
+	);
+	k19 =
+		a +
+			b /* x19 */ && q; // c19
+	k20 = [
+		...(a +
+			b) /* x20 */ // c20
+	];
+
+	// a `//` alone after the pair already follows on its own line, and with nothing written
+	// after the pair the comment trails the statement
+	k17 = -(
+		a +
+		b // c17 // d17
+	);
+	k18 = typeof (
+		a +
+		b // c18
+	);
+	k21 =
+		a +
+			b && q; // c21
+	k22 = [
+		...(a +
+			b) // c22
+	];
+	function* fn4() {
+		k23 = yield a +
+			b; // c23
+	}
+	k24 = -(
+		/* l24 */ a +
+		b // c24
+	);
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// a comment written last inside a redundant pair down the right edge of an operand whose
+	// required pair the printer emits stays inside that pair, after the operand, ahead of a
+	// block and a comment written after the inner pair, each on a line of its own
+	k1 = -(
+		a +
+		b /* x1 */ // c1 // d1
+	);
+	k2 = !(
+		a +
+		b /* x2 */ // c2 // d2
+	);
+	k3 = typeof (
+		a +
+		b /* x3 */ // c3 // d3
+	);
+	k4 = void (
+		a + (b + c) /* x4 */ // c4 // d4
+	);
+	async function fn1() {
+		k5 = await (a + b); /* x5 */ // c5 // d5
+	}
+	function* fn2() {
+		k6 = yield a + b; /* x6 */ // c6 // d6
+	}
+	export = a + b /* x7 */; // c7 // d7
+
+	// a binary chain's operand keeps the comment ahead of the operator's run, its pair required
+	// or not
+	k8 =
+		(a + b) /* x8 */ * // c8 // d8
+		2;
+	k9 =
+		a + b /* x9 */ && // c9 // d9
+		q;
+
+	// a spread's argument keeps the comment ahead of the run written after the inner pair
+	k10 = [
+		...(a + b) /* x10 */ // c10 // d10
+	];
+	fn3(
+		...(a + b) /* x11 */ // c11 // d11
+	);
+	o1 = {
+		...(a + b) /* x12 */ // c12 // d12
+	};
+
+	// an own-line comment in the inner pair, a nested pair and a `//` alone after the pair take
+	// the same order
+	k13 = -(
+		a + b /* x13 */
+		// c13 // d13
+	);
+	k14 = -(
+		a + (b + c)
+		// c14 // d14
+	);
+	k15 = [
+		...(a + (b + c))
+		// c15 // d15
+	];
+
+	// a block alone after the pair stays after the comment, in the order written, at a binary
+	// chain's operand and a spread's argument too
+	k16 = -(
+		a +
+		b /* x16 */ // c16
+	);
+	k19 = a + b /* x19 */ && q; // c19
+	k20 = [
+		...(a + b) /* x20 */ // c20
+	];
+
+	// a `//` alone after the pair already follows on its own line, and with nothing written
+	// after the pair the comment trails the statement
+	k17 = -(
+		a +
+		b // c17 // d17
+	);
+	k18 = typeof (
+		a +
+		b // c18
+	);
+	k21 = a + b && q; // c21
+	k22 = [
+		...(a + b) // c22
+	];
+	function* fn4() {
+		k23 = yield a + b; // c23
+	}
+	k24 = -(
+		/* l24 */ a +
+		b // c24
+	);
+</script>

@@ -2213,21 +2213,8 @@ impl<'a> Printer<'a> {
     /// opens it here.
     #[inline]
     pub(crate) fn member_gap_start(&self, object: &ast::Expression<'_>) -> u32 {
-        use ast::ExpressionKind as K;
-        // Only the walk's own heads can end in a binary's shells: most member objects are
-        // none of them, and every member linearization asks.
-        if matches!(
-            object.kind,
-            K::BinaryExpression(_)
-                | K::ArrowFunctionExpression(_)
-                | K::ConditionalExpression(_)
-                | K::AssignmentExpression(_)
-                | K::YieldExpression(_)
-        ) {
-            self.pair_trailing_gap_start(object)
-        } else {
-            object.span().end
-        }
+        // Every member linearization asks; the gate is [`Self::pair_trailing_gap_start`]'s own.
+        self.pair_trailing_gap_start(object)
     }
 
     /// Where the trailing gap after `expr` OPENS for an emitter that prints it: `expr`'s
@@ -2243,8 +2230,18 @@ impl<'a> Printer<'a> {
     /// caller claims the region ([`Self::with_claimed_right_spine_run`]) so the value's own
     /// trailing emitters decline it and the gap prints it in source order, ahead of the
     /// comments written after the value.
-    #[inline(never)]
+    #[inline]
     pub(in crate::printer) fn pair_trailing_gap_start(&self, expr: &ast::Expression<'_>) -> u32 {
+        // Most values asked are no head of the walk — an identifier operand, a member callee.
+        if !right_spine_may_end_in_shells(expr) {
+            return expr.span().end;
+        }
+        self.pair_trailing_gap_start_wide(expr)
+    }
+
+    /// [`Self::pair_trailing_gap_start`] past its kind gate, out of line.
+    #[inline(never)]
+    fn pair_trailing_gap_start_wide(&self, expr: &ast::Expression<'_>) -> u32 {
         let end = expr.span().end;
         // Only a comment inside the value can be claimed, and most values hold none.
         if !self.has_comments_to_emit_between(expr.span().start, end) {
@@ -2295,6 +2292,81 @@ impl<'a> Printer<'a> {
         let out = build();
         self.claimed_right_spine_run.set(outer);
         out
+    }
+
+    /// [`Self::pair_trailing_gap_start`] for a value whose position prints a REQUIRED pair
+    /// around it and whose gap past that pair belongs to what follows the value — a callee's
+    /// argument list, a `new` callee's, a template tag's template, a superclass's class body
+    /// ([`Self::with_claimed_right_spine_run`] claims the region at the caller). Ungated: with
+    /// no comment after the stripped shell, the shell's comment still stays ahead of the
+    /// arguments, the template or the body, as the bare spelling's does (`(a + b // c⏎)()`
+    /// prints `(a + b) // c⏎\t();`); deferred past them instead, an own-line one moved again on
+    /// the next pass. `requires_pair` is the position's own answer; a value printing no pair
+    /// opens its gap at its span end.
+    #[inline]
+    pub(in crate::printer) fn required_pair_gap_start(
+        &self,
+        expr: &ast::Expression<'_>,
+        requires_pair: impl FnOnce() -> bool,
+    ) -> u32 {
+        let end = expr.span().end;
+        let start = self.pair_trailing_gap_start(expr);
+        if start < end && requires_pair() {
+            start
+        } else {
+            end
+        }
+    }
+
+    /// A spread's stripped-paren interior as the printer partitions it: from the argument's
+    /// right-spine printed end ([`Self::pair_trailing_gap_start`]) when the interior holds a
+    /// comment, so a comment written last in a stripped shell down the argument's right edge
+    /// (`...(a + (b // c⏎) /* x */ // d⏎)`) is the spread's share, ahead of the run written
+    /// after that shell, as in the bare spelling `...(a + b // c⏎/* x */ // d⏎)`. The ONE
+    /// answer for both halves of the partition — the spread's own doc and the parent list's
+    /// share ([`Self::paren_interior_own_line_comments`]) — so each comment is printed once.
+    /// A frozen argument's slice prints its shells and their comments verbatim, so its
+    /// interior opens at its span end.
+    pub(in crate::printer) fn spread_printed_interior(
+        &self,
+        spread: &ast::SpreadElement<'_>,
+    ) -> Span {
+        let interior = spread.paren_interior();
+        if !self.has_comments_to_emit_between(interior.start, interior.end) {
+            return interior;
+        }
+        let dots_end = spread.span.start + "...".len() as u32;
+        if self
+            .value_head_frozen_span(dots_end, spread.argument.span())
+            .is_some()
+        {
+            return interior;
+        }
+        Span::new(self.pair_trailing_gap_start(spread.argument), interior.end)
+    }
+
+    /// [`ast::Expression::paren_interior`] as the printer partitions it: a spread's from
+    /// [`Self::spread_printed_interior`]. Every reader of an element's interior asks this.
+    pub(in crate::printer) fn printed_paren_interior(
+        &self,
+        e: &ast::Expression<'_>,
+    ) -> Option<Span> {
+        match &e.kind {
+            ast::ExpressionKind::SpreadElement(s) => Some(self.spread_printed_interior(s)),
+            _ => e.paren_interior(),
+        }
+    }
+
+    /// [`ast::ObjectProperty::paren_interior`] as the printer partitions it
+    /// ([`Self::printed_paren_interior`]).
+    pub(in crate::printer) fn printed_property_paren_interior(
+        &self,
+        prop: &ast::ObjectProperty<'_>,
+    ) -> Option<Span> {
+        match prop {
+            ast::ObjectProperty::SpreadElement(s) => Some(self.spread_printed_interior(s)),
+            ast::ObjectProperty::Property(_) => None,
+        }
     }
 
     /// Where `expr`'s printed content ends ahead of the stripped grouping shells a binary
@@ -3544,6 +3616,22 @@ impl<'a> Printer<'a> {
         self.expr_stmt_paren_target.set(saved);
         result
     }
+}
+
+/// Whether `expr` is a head of the right-spine walk ([`Printer::right_spine_printed_end`]) — the
+/// only values whose printed content can end ahead of stripped grouping shells; the walk returns
+/// any other value's span end.
+#[inline]
+pub(crate) fn right_spine_may_end_in_shells(expr: &ast::Expression<'_>) -> bool {
+    use ast::ExpressionKind as K;
+    matches!(
+        expr.kind,
+        K::BinaryExpression(_)
+            | K::ArrowFunctionExpression(_)
+            | K::ConditionalExpression(_)
+            | K::AssignmentExpression(_)
+            | K::YieldExpression(_)
+    )
 }
 
 #[cfg(test)]

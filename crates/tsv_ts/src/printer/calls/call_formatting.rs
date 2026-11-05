@@ -188,33 +188,45 @@ fn build_call_head(printer: &Printer<'_>, call: &ast::CallExpression<'_>, span: 
             printer.left_spine_run_claim(span, span.start, call.callee, || callee_parens.is_some())
         })
         .flatten();
-    let callee_doc = printer.with_left_spine_claim(claim, || {
-        printer.build_left_spine_operand_doc_if(
-            callee_freezes,
-            span.start,
-            call.callee,
-            FrozenOperandPair::position(ParenContext::callee_of(call)),
-            || {
-                test_call_flat
-                    .then(|| build_test_callee_flat_doc(call.callee, printer))
-                    .flatten()
-                    .unwrap_or_else(|| {
-                        callee_parens.as_ref().map_or_else(
-                            || printer.build_expression_doc(call.callee),
-                            |parens| {
-                                parens.build_body_doc(
-                                    printer,
-                                    printer.pair_gaps_are_comment_free(
-                                        (span.start, call.callee.span().start),
-                                        trailing_gap,
-                                    ),
+    // The stripped-shell region down the callee's right edge belongs to the callee→arguments
+    // gap, which opens at the callee's printed end ([`super::callee_printed_gap_start`], the
+    // start every [`super::CalleeGap`] window takes): claimed, the callee's own trailing
+    // emitters decline it. An owned pair prints its interior itself.
+    let callee_claim_start = if owned_pair {
+        call.callee.span().end
+    } else {
+        super::callee_printed_gap_start(printer, call)
+    };
+    let callee_doc =
+        printer.with_claimed_right_spine_run(callee_claim_start, call.callee.span().end, || {
+            printer.with_left_spine_claim(claim, || {
+                printer.build_left_spine_operand_doc_if(
+                    callee_freezes,
+                    span.start,
+                    call.callee,
+                    FrozenOperandPair::position(ParenContext::callee_of(call)),
+                    || {
+                        test_call_flat
+                            .then(|| build_test_callee_flat_doc(call.callee, printer))
+                            .flatten()
+                            .unwrap_or_else(|| {
+                                callee_parens.as_ref().map_or_else(
+                                    || printer.build_expression_doc(call.callee),
+                                    |parens| {
+                                        parens.build_body_doc(
+                                            printer,
+                                            printer.pair_gaps_are_comment_free(
+                                                (span.start, call.callee.span().start),
+                                                trailing_gap,
+                                            ),
+                                        )
+                                    },
                                 )
-                            },
-                        )
-                    })
-            },
-        )
-    });
+                            })
+                    },
+                )
+            })
+        });
     if let Some(outer) = outer_target {
         printer.long_curried_target.set(outer);
     }
@@ -745,7 +757,7 @@ fn try_single_arg_comment_paths(
         .comments_on_page_between(arg_end, paren_close)
         .any(|c| !c.is_block || !printer.is_same_line(arg_end, c.span.start))
         || !printer
-            .paren_interior_own_line_comments(first_arg.paren_interior())
+            .paren_interior_own_line_comments(printer.printed_paren_interior(first_arg))
             .is_empty();
 
     // A line comment, or a block comment that owns its line, forces the list open — the gap

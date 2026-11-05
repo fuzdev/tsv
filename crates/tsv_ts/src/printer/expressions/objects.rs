@@ -341,7 +341,8 @@ impl<'a> Printer<'a> {
                     prop_end,
                     upper_bound,
                     is_last,
-                    prop.paren_interior().filter(|_| frozen_span.is_none()),
+                    self.printed_property_paren_interior(prop)
+                        .filter(|_| frozen_span.is_none()),
                 );
                 let comma = (!is_last).then(|| d.text(","));
                 self.push_element_comma_trailing(&mut parts, &trailing, comma);

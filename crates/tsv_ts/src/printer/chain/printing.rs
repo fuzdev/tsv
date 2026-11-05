@@ -188,6 +188,20 @@ pub(crate) fn print_node_inner<'a>(
                     // it opens is documented at the emitter call below, with the rest of the
                     // pair's gap reading.
                     let trailing_gap = trailing_gap();
+                    // The pair's trailing run opens at the base's printed end when the gap holds a
+                    // comment ([`Printer::pair_trailing_gap_start`]), so a comment written last in
+                    // a stripped shell down the base's right edge prints ahead of the run written
+                    // after that shell (`(a + (b // c⏎) /* x */ // d⏎)!.m`); claimed below from
+                    // the base's own trailing emitters, which deferred it behind the run. A lone
+                    // such comment keeps trailing the statement. A frozen base returned above.
+                    let trailing_gap = trailing_gap.map(|(start, end)| {
+                        if printer.has_comments_to_emit_between(start, end) {
+                            (printer.pair_trailing_gap_start(expr), end)
+                        } else {
+                            (start, end)
+                        }
+                    });
+                    let claim_start = trailing_gap.map_or(base_end, |(start, _)| start);
                     // A curried arrow chain that IS a callee (`paren_leading_start`, as below)
                     // takes prettier's callee shape, exactly as the bare-callee path gives it
                     // ([`crate::printer::ArrowChainContext::Callee`]) — and on the same terms: that
@@ -271,45 +285,50 @@ pub(crate) fn print_node_inner<'a>(
                     // arrow that is merely a member OBJECT (`(() => 1 /* c */).p`) prints
                     // the same pair but its trailing gap belongs to the member seam, and
                     // claiming it here double-printed the comment.
-                    printer.build_shaped_owned_required_pair_doc(
-                        leading_gap,
-                        trailing_gap,
-                        || claimed(&inner),
-                        |lead, trailing| {
-                            // The `)`-dropping group is the ternary's own layout, so both the
-                            // lead and the claimed block ride OUTSIDE it, where a multi-line
-                            // one's forced break cannot reach the `)`'s softline — inside, it
-                            // dropped the `)` even where the ternary fits. (A ternary base never
-                            // keeps a leading run inside its pair — that run hoists in front — so
-                            // `lead` is empty here and only the claimed block moves.)
-                            if let BaseShape::TernaryDirect = shape {
-                                let body = claimed(&|| {
-                                    shape.apply(
-                                        printer,
-                                        printer.concat_pair_runs(None, inner(), trailing),
-                                    )
-                                });
-                                return printer.concat_pair_runs(lead, body, None);
-                            }
-                            // The chain-for-parens operand doc for a binary base, so the whole
-                            // operand chain is what stays flat. Every operator family —
-                            // arithmetic, logical (`&&`/`||`), and nullish (`??`) — is laid
-                            // out identically: a logical base skipping it would break at its
-                            // own operators instead, welding the closing `).member` onto the
-                            // last operand. See conformance_prettier_ts.md §TypeScript
-                            // (Parenthesized binary member base).
-                            // Hugged, nothing wraps it in the hang it is built for, so a
-                            // hugged binary takes its plain doc.
-                            let content = claimed(&|| match (&expr.kind, shape) {
-                                (ExpressionKind::BinaryExpression(binary), BaseShape::Hang) => {
-                                    printer.build_binary_chain_for_parens(binary, expr.span)
+                    printer.with_claimed_right_spine_run(claim_start, base_end, || {
+                        printer.build_shaped_owned_required_pair_doc(
+                            leading_gap,
+                            trailing_gap,
+                            || claimed(&inner),
+                            |lead, trailing| {
+                                // The `)`-dropping group is the ternary's own layout, so both the
+                                // lead and the claimed block ride OUTSIDE it, where a multi-line
+                                // one's forced break cannot reach the `)`'s softline — inside, it
+                                // dropped the `)` even where the ternary fits. (A ternary base never
+                                // keeps a leading run inside its pair — that run hoists in front — so
+                                // `lead` is empty here and only the claimed block moves.)
+                                if let BaseShape::TernaryDirect = shape {
+                                    let body = claimed(&|| {
+                                        shape.apply(
+                                            printer,
+                                            printer.concat_pair_runs(None, inner(), trailing),
+                                        )
+                                    });
+                                    return printer.concat_pair_runs(lead, body, None);
                                 }
-                                _ => inner(),
-                            });
-                            shape.apply(printer, printer.concat_pair_runs(lead, content, trailing))
-                        },
-                        ")",
-                    )
+                                // The chain-for-parens operand doc for a binary base, so the whole
+                                // operand chain is what stays flat. Every operator family —
+                                // arithmetic, logical (`&&`/`||`), and nullish (`??`) — is laid
+                                // out identically: a logical base skipping it would break at its
+                                // own operators instead, welding the closing `).member` onto the
+                                // last operand. See conformance_prettier_ts.md §TypeScript
+                                // (Parenthesized binary member base).
+                                // Hugged, nothing wraps it in the hang it is built for, so a
+                                // hugged binary takes its plain doc.
+                                let content = claimed(&|| match (&expr.kind, shape) {
+                                    (ExpressionKind::BinaryExpression(binary), BaseShape::Hang) => {
+                                        printer.build_binary_chain_for_parens(binary, expr.span)
+                                    }
+                                    _ => inner(),
+                                });
+                                shape.apply(
+                                    printer,
+                                    printer.concat_pair_runs(lead, content, trailing),
+                                )
+                            },
+                            ")",
+                        )
+                    })
                 })
             } else {
                 // Every layout candidate of the chain prints its base, so it is built once and

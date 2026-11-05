@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1284,
+	"end": 1422,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -249,17 +249,53 @@
 			"value": " d16",
 			"start": 1263,
 			"end": 1269
+		},
+		{
+			"type": "Line",
+			"value": " an expression statement keeps its shell the same way",
+			"start": 1276,
+			"end": 1331
+		},
+		{
+			"type": "Line",
+			"value": " c17",
+			"start": 1343,
+			"end": 1349
+		},
+		{
+			"type": "Block",
+			"value": " x17 ",
+			"start": 1352,
+			"end": 1361
+		},
+		{
+			"type": "Line",
+			"value": " d17",
+			"start": 1362,
+			"end": 1368
+		},
+		{
+			"type": "Line",
+			"value": " c18",
+			"start": 1392,
+			"end": 1398
+		},
+		{
+			"type": "Line",
+			"value": " d18",
+			"start": 1401,
+			"end": 1407
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1283,
+		"end": 1421,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 1274,
+			"end": 1412,
 			"body": [
 				{
 					"type": "VariableDeclaration",
@@ -1229,8 +1265,39 @@
 							"start": 1207,
 							"end": 1213
 						}
-					],
-					"trailingComments": [
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1333,
+					"end": 1372,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 1337,
+						"end": 1342,
+						"left": {
+							"type": "Identifier",
+							"start": 1337,
+							"end": 1338,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 1341,
+							"end": 1342,
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c17",
+								"start": 1343,
+								"end": 1349
+							}
+						]
+					},
+					"leadingComments": [
 						{
 							"type": "Block",
 							"value": " x16 ",
@@ -1242,6 +1309,75 @@
 							"value": " d16",
 							"start": 1263,
 							"end": 1269
+						},
+						{
+							"type": "Line",
+							"value": " an expression statement keeps its shell the same way",
+							"start": 1276,
+							"end": 1331
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1374,
+					"end": 1411,
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 1378,
+						"end": 1389,
+						"left": {
+							"type": "Identifier",
+							"start": 1378,
+							"end": 1379,
+							"name": "a"
+						},
+						"operator": "+",
+						"right": {
+							"type": "BinaryExpression",
+							"start": 1383,
+							"end": 1388,
+							"left": {
+								"type": "Identifier",
+								"start": 1383,
+								"end": 1384,
+								"name": "b"
+							},
+							"operator": "+",
+							"right": {
+								"type": "Identifier",
+								"start": 1387,
+								"end": 1388,
+								"name": "c"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " x17 ",
+							"start": 1352,
+							"end": 1361
+						},
+						{
+							"type": "Line",
+							"value": " d17",
+							"start": 1362,
+							"end": 1368
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c18",
+							"start": 1392,
+							"end": 1398
+						},
+						{
+							"type": "Line",
+							"value": " d18",
+							"start": 1401,
+							"end": 1407
 						}
 					]
 				}

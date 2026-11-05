@@ -1,0 +1,89 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// a comment written last inside a redundant pair down the right edge of a superclass whose
+	// required pair the printer emits stays after the pair, ahead of a comment written after
+	// the inner pair, each on a line of its own
+	class A1 extends (a +
+		b) { // c1
+		// d1
+	}
+	class A2 extends (a +
+		b) { // c2
+		/* x2 */ // d2
+		x = 1;
+	}
+	k3 = class extends (
+		(a +
+			b) // c3
+	) {
+		// d3
+	};
+	class A4
+		extends (a +
+			b)
+			// c4 // d4
+		implements I {}
+
+	// with nothing written after the pair, the comment stays after the pair, ahead of the body
+	class A5 extends (a +
+		b) {} // c5
+
+	// a superclass with type arguments keeps its own gap
+	class A6
+		extends (a +
+			b)<T> {} // c6 // d6
+
+	// a block alone after the pair stays after the comment, in the order written
+	class A7
+		extends (a +
+			b) /* x7 */ {} // c7
+
+	// a lone comment stays ahead of type arguments too
+	class A8 extends (a +
+		b)<T> {} // c8
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// a comment written last inside a redundant pair down the right edge of a superclass whose
+	// required pair the printer emits stays after the pair, ahead of a comment written after
+	// the inner pair, each on a line of its own
+	class A1 extends (a + b) {
+		// c1
+		// d1
+	}
+	class A2 extends (a + b) {
+		// c2
+		/* x2 */ // d2
+		x = 1;
+	}
+	k3 = class extends (a + b) {
+		// c3
+		// d3
+	};
+	class A4
+		extends (a + b)
+		// c4 // d4
+		implements I {}
+
+	// with nothing written after the pair, the comment stays after the pair, ahead of the body
+	class A5 extends (a + b) {} // c5
+
+	// a superclass with type arguments keeps its own gap
+	class A6 extends (a + b)<T> {} // c6 // d6
+
+	// a block alone after the pair stays after the comment, in the order written
+	class A7 extends (a + b) /* x7 */ {} // c7
+
+	// a lone comment stays ahead of type arguments too
+	class A8 extends (a + b)<T> {} // c8
+</script>

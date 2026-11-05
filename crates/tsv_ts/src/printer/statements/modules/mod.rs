@@ -60,8 +60,20 @@ impl<'a> Printer<'a> {
         let shell_close = self.value_paren_line_comment_close(argument_end, span.end);
         let (keyword_doc, keyword_end) =
             self.build_keyword_words_doc(&["export", "="], span.start, value_span.start);
-        let value = self.build_value_head_doc(keyword_end, &decl.expression, || {
-            self.build_expression_doc_claiming_outermost(&decl.expression)
+        // The line-comment shell below opens its run where the value's PRINTED content ends
+        // ([`Printer::pair_trailing_gap_start`]), as `export default`'s twin does, so a comment
+        // written last in a stripped shell down the value's right spine prints inside the shell
+        // ahead of the run written after it, claimed from the value. A FROZEN value's slice
+        // prints its shells itself.
+        let frozen = self.value_head_frozen_span(keyword_end, value_span);
+        let run_start = match shell_close {
+            Some(_) if frozen.is_none() => self.pair_trailing_gap_start(&decl.expression),
+            _ => argument_end,
+        };
+        let value = self.with_claimed_right_spine_run(run_start, argument_end, || {
+            self.build_value_head_doc(keyword_end, &decl.expression, || {
+                self.build_expression_doc_claiming_outermost(&decl.expression)
+            })
         });
         // An assignment as the exported value takes clarity parens, the same answer every
         // other value position gives (`ParenContext::ExportAssignment`) — outside the freeze
@@ -73,7 +85,7 @@ impl<'a> Printer<'a> {
         };
         let value = match shell_close {
             Some(close) => self
-                .build_paren_operand_comment_doc(argument_end, close, value, ")")
+                .build_paren_operand_comment_doc(run_start, close, value, ")")
                 .unwrap_or(value),
             None => value,
         };

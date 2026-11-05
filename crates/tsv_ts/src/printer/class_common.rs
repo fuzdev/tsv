@@ -150,8 +150,9 @@ impl<'a> Printer<'a> {
             self.find_keyword_in_range(search_start, implements[0].span.start, "implements")
         };
         let first_heritage_start = extends_keyword_start.or(implements_keyword_start);
-        let extends_clause_end = super_class
-            .map(|sc| super_type_parameters.map_or_else(|| sc.span().end, |tp| tp.span.end));
+        let extends_clause_end = super_class.map(|sc| {
+            super_type_parameters.map_or_else(|| self.super_class_gap_start(sc), |tp| tp.span.end)
+        });
         let header_end = implements
             .last()
             .map(|i| i.span.end)
@@ -319,7 +320,7 @@ impl<'a> Printer<'a> {
                 let mut value_parts: DocBuf =
                     smallvec![self.build_super_class_doc(super_class, super_type_parameters)];
                 if let Some(type_args) = super_type_parameters {
-                    let gap_start = super_class.span().end;
+                    let gap_start = self.super_class_gap_start(super_class);
                     if let Some(doc) = self.build_name_to_type_params_comments_opt(
                         gap_start,
                         type_args.span.start,
@@ -352,7 +353,7 @@ impl<'a> Printer<'a> {
         }
         ext_parts.push(self.build_super_class_doc(super_class, super_type_parameters));
         if let Some(type_args) = super_type_parameters {
-            let gap_start = super_class.span().end;
+            let gap_start = self.super_class_gap_start(super_class);
             let gap_end = type_args.span.start;
             if let Some(doc) = self.build_name_to_type_params_comments_opt(
                 gap_start,
@@ -364,6 +365,18 @@ impl<'a> Printer<'a> {
             ext_parts.push(self.build_type_arguments_doc(type_args, ShiftRescan::Never));
         }
         Some(d.concat(&ext_parts))
+    }
+
+    /// Where the gap after a superclass opens — the type-argument gap, the extends→`implements`
+    /// gap, the header→body gap: at the superclass's printed end when the printer emits its
+    /// required pair ([`Printer::required_pair_gap_start`]), so a comment written last in a
+    /// stripped shell down its right edge (`extends (a + (b // c⏎) // d⏎) {}`) prints in that
+    /// gap ahead of the comments written after the shell, as the bare spelling's does. The
+    /// superclass's own doc claims the region ([`Self::build_super_class_doc`]).
+    fn super_class_gap_start(&self, super_class: &ast::Expression<'_>) -> u32 {
+        self.required_pair_gap_start(super_class, || {
+            self.needs_parens(super_class, super::ParenContext::SuperClass)
+        })
     }
 
     /// Render the superclass expression, wrapping it in parens when prettier's
@@ -380,7 +393,11 @@ impl<'a> Printer<'a> {
         // The ordinary dispatch — a binary superclass takes the continuation-indent
         // default. The parens below are the PRINTER's and stay outside the operand's own
         // doc.
-        let doc = self.build_expression_doc(super_class);
+        // The stripped-shell region past the printed end is the following gap's to print.
+        let gap = self.super_class_gap_start(super_class);
+        let doc = self.with_claimed_right_spine_run(gap, super_class.span().end, || {
+            self.build_expression_doc(super_class)
+        });
         if self.needs_parens(super_class, super::ParenContext::SuperClass)
             || (super_type_parameters.is_some()
                 && self.instantiation_keeps_pair(super_class, super::SecondTypeArgs::Heritage))

@@ -7,9 +7,10 @@ a comment written last inside a redundant grouping pair down the right edge of a
 written after the pair, which follows on its own line (`(a + (b // c⏎) // d⏎) as T`). A
 block written ahead of the comment after the pair takes the same place, and so does the
 non-null operand's pair there (`(a + (b // c⏎) /* x */ // d⏎)!` prints
-`a + b // c⏎\t/* x */ // d`). A block alone after the pair stays after the comment at `!`, in the
-order written, where prettier's fixed point from the stripped-pair spelling puts it ahead of the
-`//` (`(a + b) /* x */!; // c`).
+`a + b // c⏎\t/* x */ // d`), a member or a call after the `!` included (`(…)!.m`,
+`(…)!()`). A block alone after the pair stays after the comment at `!`, in the order written,
+where prettier's fixed point from the stripped-pair spelling puts it ahead of the `//`
+(`(a + b) /* x */!; // c`).
 
 tsv: `(⏎\ta + b // c⏎\t// d⏎) as T`, the two comments in the order written, each on its own
 line — the form tsv gives the bare spelling (`(a + b // c⏎// d⏎) as T`)
@@ -20,7 +21,9 @@ the stripped-pair spelling in the order written (`audit_signature_shell`)
 
 An own-line comment after the pair, and the non-null operand with nothing between its pair
 and the comment, already keep the two apart, and with nothing written after the pair, at `as`
-and at `!` alike, the comment trails the statement in both formatters — those are controls.
+and at `!` alike, the comment trails the statement in both formatters — ahead of a member after
+the `!` prettier keeps it after the `!` (`(a +⏎\tb)! // c⏎.m;`) — those are controls. A block
+alone after the pair stays after the comment ahead of a member too.
 
 See
 [conformance_prettier_ts.md §TypeScript](../../../../../../docs/conformance_prettier_ts.md#typescript)

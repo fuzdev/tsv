@@ -1,12 +1,13 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
 #![expect(clippy::expect_used)]
 
-//! A pair the printer keeps around a value opens its trailing run at the value's printed end,
-//! so a comment written last in a stripped shell down the value's right spine prints inside the
-//! pair ahead of the run written after that shell (`docs/comments.md` §The right-spine shell
-//! run). A FROZEN operand is the exception: a format-ignore directive ahead of it prints its
-//! slice verbatim, the stripped shell and its comment included, so the pair must not claim that
-//! comment as well — claimed, it printed twice, and the copy grew by a line every pass.
+//! A pair the printer keeps or requires around a value, and a gap that follows a value, opens
+//! its trailing run at the value's printed end, so a comment written last in a stripped shell
+//! down the value's right spine prints ahead of the run written after that shell
+//! (`docs/comments.md` §The right-spine shell run). A FROZEN operand is the exception: a
+//! format-ignore directive ahead of it prints its slice verbatim, the stripped shell and its
+//! comment included, so the pair or gap must not claim that comment as well — claimed, it
+//! printed twice, and the copy grew by a line every pass.
 //!
 //! Not a fixture: prettier moves the directive past the `=` and welds the two comments onto one
 //! line at every one of these, a prettier behaviour of its own, so the transitions are pinned
@@ -104,5 +105,96 @@ fn case_test_frozen() {
     assert_frozen_once(
         "switch (x) {\n\tcase (\n// prettier-ignore\na + (b // c\n) // d\n):\n\t\tf();\n}\n",
         "switch (x) {\n\tcase\n\t\t// prettier-ignore\n\t\ta + (b // c\n) // d\n\t\t:\n\t\tf();\n}\n",
+    );
+}
+
+/// A `new` callee, whose callee→arguments gap opens at the callee's end when frozen.
+#[test]
+fn new_callee_frozen() {
+    assert_frozen_once(
+        "k = new (\n// prettier-ignore\na + (b // c\n) /* x */ // d\n)();\n",
+        "k = new\n\t// prettier-ignore\n\t(a + (b // c\n)) /* x */ // d\n\t\t();\n",
+    );
+}
+
+/// A template tag.
+#[test]
+fn tag_frozen() {
+    assert_frozen_once(
+        "k = (\n// prettier-ignore\na + (b // c\n) /* x */ // d\n)`t`;\n",
+        "k =\n\t// prettier-ignore\n\t(a + (b // c\n)) /* x */ // d\n\t`t`;\n",
+    );
+}
+
+/// The `export =` line-comment shell.
+#[test]
+fn export_assignment_frozen() {
+    assert_frozen_once(
+        "export = (\n// prettier-ignore\na + (b // c\n) /* x */ // d\n);\n",
+        "export =\n\t// prettier-ignore\n\t(\n\t\ta + (b // c\n) /* x */ // d\n\t);\n",
+    );
+}
+
+/// A unary operator's comment-holder pair.
+#[test]
+fn unary_operand_frozen() {
+    assert_frozen_once(
+        "k = -(\n// prettier-ignore\na + (b // c\n) /* x */ // d\n);\n",
+        "k = -(\n\t// prettier-ignore\n\ta + (b // c\n) /* x */ // d\n);\n",
+    );
+}
+
+/// `await`'s operand pair.
+#[test]
+fn await_operand_frozen() {
+    assert_frozen_once(
+        "async function g() {\n\tk = await (\n// prettier-ignore\na + (b // c\n) /* x */ // d\n);\n}\n",
+        "async function g() {\n\tk = await\n\t\t// prettier-ignore\n\t\t(\n\t\t\ta + (b // c\n) /* x */ // d\n\t\t);\n}\n",
+    );
+}
+
+/// A binary chain's leftmost operand, its pair required.
+#[test]
+fn binary_left_operand_frozen() {
+    assert_frozen_once(
+        "k = (\n// prettier-ignore\na + (b // c\n) /* x */ // d\n) * 2;\n",
+        "k =\n\t// prettier-ignore\n\t(a + (b // c\n)) /* x */ // d\n\t* 2;\n",
+    );
+}
+
+/// A binary chain's leftmost operand, its pair redundant.
+#[test]
+fn logical_left_operand_frozen() {
+    assert_frozen_once(
+        "k = (\n// prettier-ignore\na + (b // c\n) /* x */ // d\n) && q;\n",
+        "k =\n\t// prettier-ignore\n\ta + (b // c\n) /* x */ // d\n\t&& q;\n",
+    );
+}
+
+/// A spread argument's stripped-paren interior.
+#[test]
+fn spread_argument_frozen() {
+    assert_frozen_once(
+        "k = [...(\n// prettier-ignore\na + (b // c\n) /* x */ // d\n)];\n",
+        "k = [\n\t...\n\t\t// prettier-ignore\n\t\t(a + (b // c\n) /* x */) // d\n];\n",
+    );
+}
+
+/// An expression statement's retained shell.
+#[test]
+fn expression_statement_frozen() {
+    assert_frozen_once(
+        "(\n// prettier-ignore\na + (b // c\n) /* x */ // d\n);\n",
+        "(\n\t// prettier-ignore\n\ta + (b // c\n) /* x */ // d\n);\n",
+    );
+}
+
+/// A call chain's frozen head: the first call's callee gap opens at the head's span end, so the
+/// slice alone prints the stripped shell's comment.
+#[test]
+fn call_chain_head_frozen() {
+    assert_frozen_once(
+        "k = (\n// prettier-ignore\na + (b // c\n))().m;\n",
+        "k =\n\t// prettier-ignore\n\t(a + (b // c\n))().m;\n",
     );
 }

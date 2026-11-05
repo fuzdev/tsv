@@ -166,33 +166,56 @@ impl<'a> Printer<'a> {
             .type_arguments
             .as_ref()
             .map(|_| SecondTypeArgs::Expression);
-        let callee = if let Some(frozen) = frozen {
-            self.build_frozen_new_callee_doc(new_expr.callee, frozen)
-        } else if let Some(sealed) = self.build_sealed_non_null_paren_doc(new_expr.callee) {
-            sealed
-        } else if let Some(parens) =
-            super::CalleeParens::of(self, new_expr.callee, ParenContext::NewCallee, new_list)
-        {
-            // The pair's shape and the operand's builder off ONE derivation of the callee's
-            // kind — a `new` callee and a call callee are the same position to prettier, so
-            // both read it from [`super::CalleeParens`].
-            let callee_span = new_expr.callee.span();
-            let pair_is_comment_free = self.pair_gaps_are_comment_free(
-                (span.start, callee_span.start),
-                self.paren_shell_close_after(callee_span.end)
-                    .map(|close| (callee_span.end, close)),
-            );
-            parens.build_doc(self, parens.build_body_doc(self, pair_is_comment_free))
+        // The callee→arguments gap opens at the callee's printed end when the printer emits
+        // the callee's required pair ([`Printer::required_pair_gap_start`]), so a comment written
+        // last in a stripped shell down the callee's right edge prints ahead of the comments
+        // written after that shell; the region is claimed from the callee's own doc below. Not
+        // for a FROZEN callee, whose slice prints its shells and their comments verbatim, nor
+        // for a sealed chain, whose pair prints its interior itself.
+        let callee_gap_start = if frozen.is_none()
+            && !matches!(
+                new_expr.callee.kind,
+                ast::ExpressionKind::TSNonNullExpression(_)
+            ) {
+            self.required_pair_gap_start(new_expr.callee, || {
+                self.needs_parens(new_expr.callee, ParenContext::NewCallee)
+            })
         } else {
-            self.build_expression_doc(new_expr.callee)
+            new_expr.callee.span().end
         };
+        let callee =
+            self.with_claimed_right_spine_run(callee_gap_start, new_expr.callee.span().end, || {
+                if let Some(frozen) = frozen {
+                    self.build_frozen_new_callee_doc(new_expr.callee, frozen)
+                } else if let Some(sealed) = self.build_sealed_non_null_paren_doc(new_expr.callee) {
+                    sealed
+                } else if let Some(parens) = super::CalleeParens::of(
+                    self,
+                    new_expr.callee,
+                    ParenContext::NewCallee,
+                    new_list,
+                ) {
+                    // The pair's shape and the operand's builder off ONE derivation of the callee's
+                    // kind — a `new` callee and a call callee are the same position to prettier, so
+                    // both read it from [`super::CalleeParens`].
+                    let callee_span = new_expr.callee.span();
+                    let pair_is_comment_free = self.pair_gaps_are_comment_free(
+                        (span.start, callee_span.start),
+                        self.paren_shell_close_after(callee_span.end)
+                            .map(|close| (callee_span.end, close)),
+                    );
+                    parens.build_doc(self, parens.build_body_doc(self, pair_is_comment_free))
+                } else {
+                    self.build_expression_doc(new_expr.callee)
+                }
+            });
 
         // Combine callee with type arguments (`new Foo<K, V>`), preserving comments
         // in the gap, e.g. `new Foo/* c */ <string>()` — comment between callee and `<`
         let callee_with_types_base = append_type_args_with_gap_comments(
             self,
             callee,
-            new_expr.callee.span().end,
+            callee_gap_start,
             new_expr.type_arguments.as_ref(),
         );
 
@@ -201,7 +224,7 @@ impl<'a> Printer<'a> {
         let paren_open = new_expr
             .type_arguments
             .as_ref()
-            .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
+            .map_or(callee_gap_start, |ta| ta.span.end);
 
         // Empty args: just `new Foo()` or `new Foo<K, V>()`, preserving dangling comments
         if new_expr.arguments.is_empty() {

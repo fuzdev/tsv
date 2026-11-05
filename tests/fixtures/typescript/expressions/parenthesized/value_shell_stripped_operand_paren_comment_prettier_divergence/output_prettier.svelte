@@ -67,4 +67,11 @@
 		/* x15 */ // d15
 	export default a + b; // c16
 	/* x16 */ // d16
+
+	// an expression statement keeps its shell the same way
+	a + b;
+	/* x17 */ // d17 // c17
+	a + (b + c);
+	// c18
+	// d18
 </script>

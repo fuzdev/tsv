@@ -91,7 +91,7 @@ impl<'a> Printer<'a> {
         args: &[&ast::Expression<'_>],
         i: usize,
     ) -> Option<Span> {
-        let interior = args[i].paren_interior()?;
+        let interior = self.printed_paren_interior(args[i])?;
         self.args_frozen_span(container_start, args, i)
             .is_none()
             .then_some(interior)
@@ -111,7 +111,7 @@ impl<'a> Printer<'a> {
         next_arg_start: u32,
     ) -> bool {
         self.has_comments_to_emit_between(prev_arg.span().end, next_arg_start)
-            || self.paren_interior_forces_expansion(prev_arg.paren_interior())
+            || self.paren_interior_forces_expansion(self.printed_paren_interior(prev_arg))
     }
 }
 
@@ -508,7 +508,7 @@ pub(super) fn any_comment_forces_expansion_slice(
         // line of its own or because its deferred `//` would otherwise flush past the
         // call's `)`. Asked per argument: a non-last spread's interior needs the expansion
         // just as much as the last one's.
-        if printer.paren_interior_forces_expansion(arg.paren_interior()) {
+        if printer.paren_interior_forces_expansion(printer.printed_paren_interior(arg)) {
             return true;
         }
 

@@ -395,7 +395,9 @@ impl<'a> Printer<'a> {
     /// An expression statement whose value the statement does not wrap calls this; a
     /// variable declaration that prints its own terminator arms its tail around the
     /// declarator loop instead ([`Self::arm_statement_tail`]), the shells alone opening it.
-    #[inline]
+    /// Forced: under a plain `#[inline]` the expression statement's call site outlines it.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     pub(in crate::printer) fn with_statement_tail<T>(
         &self,
         value: Option<&ast::Expression<'_>>,
