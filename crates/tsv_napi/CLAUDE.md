@@ -309,13 +309,17 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   instrumenting rustc's, which on a container row is the container's), and a merged
   profile fails unless it counts function entries (the instrumented builds pass
   `-pgo-instrument-entry`) and every hot function — the renderer, every parse entry, the
-  strip, the import records — was entered once for every input of its class it trained on. The use
+  strip, the import records — was entered once for every input of its class it trained on
+  (a CLI run that exits non-zero leaves through `std::process::exit`, which on Windows writes
+  no profile, so there the strip's floor leaves out the refused strips). The use
   builds turn LLVM's cost-benefit inliner off (`-inline-enable-cost-benefit-analysis=false`),
   the size lever. Then the PGO gates: `-Cprofile-use` on every workspace crate's rustc
-  command line, and no profile diagnostic in the use builds' logs but the build scripts'
-  (a hash mismatch or missing function is a stale profile, silently no PGO; registry crates
-  compile with `--cap-lints allow`, which silences theirs, and are source-pinned by
-  `Cargo.lock`); instrumentation sections in the trained binaries and none in the shipped
+  command line, and no profile diagnostic in the use builds' logs but the build scripts' and
+  those for dead code (a hash mismatch, or a missing function the instrumented binary's own
+  profile records, is a stale profile, silently no PGO; a missing function is dead code only
+  on Mach-O and COFF, whose links drop a dead function's records, and only when the
+  instrumented binary records nothing of it; registry crates compile with `--cap-lints
+  allow`, which silences theirs, and are source-pinned by `Cargo.lock`); instrumentation sections in the trained binaries and none in the shipped
   ones; the PGO CLI and addon byte-identical to the plain `release` CLI over the whole
   snapshot and every fixture (format) and over the fixture inputs plus a stride of the
   snapshot (parse, `parse --locations`, strip), and the PGO addon's import records equal to

@@ -241,7 +241,9 @@ jobs:
       # fuzdev/corpora snapshot's `origin: own` collections, pinned by the
       # `collections/` TREE id in benches/js/lib/gate_counts.ts — a tree cannot
       # be fetched, so the entry also records a commit, which is shallow-fetched
-      # and refused unless its tree is the pinned one. .pgo/ is made here, on
+      # and refused unless its tree is the pinned one and every file holds
+      # the commit's line endings (the Windows image sets core.autocrlf;
+      # the checkout turns conversion off). .pgo/ is made here, on
       # the host, so the steps that write it from the host can after a
       # container (as root) has built into it.
       - name: Fetch the training corpus
@@ -352,8 +354,11 @@ jobs:
               sh scripts/pgo/build.sh use .pgo'
 
       # The profile was APPLIED: no profile diagnostic in the use builds' logs
-      # but the build scripts' (a hash mismatch or a missing function is a stale
-      # or partly applied profile, which falls back to no PGO silently); and
+      # but the build scripts' and dead code's (a hash mismatch, or a missing
+      # function the instrumented binary's raw profiles record, is a stale or
+      # partly applied profile, which falls back to no PGO silently; the Mach-O
+      # and COFF links drop a dead function's records, so their use builds name
+      # the dead code — pgo.ts gate-builds sorts them); and
       # nothing instrumented ships — the trained binaries must show their
       # instrumentation sections (the check's positive control) and the use
       # binaries none.

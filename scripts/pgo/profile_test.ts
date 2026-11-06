@@ -8,17 +8,22 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 
 import {
+	classify_diagnostics,
 	demangle_legacy_path,
+	DROPS_DEAD_RECORDS,
 	floor_of,
 	grade_profile,
 	has_instrumentation_sections,
 	HOT_FUNCTIONS,
 	type HotFunction,
 	llvm_version,
+	missing_profile_function,
+	object_format,
 	parse_pgo_diagnostics,
 	parse_profile_show,
 	profile_instrumentation,
 	profile_use_crates,
+	record_symbol,
 	strip_ansi,
 	type TrainedCounts
 } from './profile.ts';
@@ -251,4 +256,116 @@ Deno.test('has_instrumentation_sections over each object format', () => {
 	ok(has_instrumentation_sections('    Name: __llvm_prf_data (5F 5F 6C 6C)\n'));
 	ok(has_instrumentation_sections('    Name: .lprfc (2E 6C 70 72 66 63)\n'));
 	ok(!has_instrumentation_sections('    Name: .text (27)\n    Name: .rodata (35)\n'));
+});
+
+Deno.test('object_format reads the Format line of each object format', () => {
+	// `llvm-readobj --file-headers` over objects the pinned toolchain's llc wrote per target
+	strictEqual(object_format('\nFile: tsv\nFormat: elf64-x86-64\nArch: x86_64\n'), 'elf');
+	strictEqual(object_format('File: tsv\nFormat: elf64-littleaarch64\nArch: aarch64\n'), 'elf');
+	strictEqual(object_format('\nFile: t.o\nFormat: Mach-O 64-bit x86-64\nArch: x86_64\n'), 'macho');
+	strictEqual(object_format('\nFile: t.o\nFormat: Mach-O arm64\nArch: aarch64\n'), 'macho');
+	strictEqual(object_format('\nFile: t.o\nFormat: COFF-x86-64\nArch: x86_64\n'), 'coff');
+	strictEqual(object_format('File: t.wasm\nFormat: WASM\n'), null);
+	strictEqual(object_format('no header'), null);
+	ok(!DROPS_DEAD_RECORDS.elf && DROPS_DEAD_RECORDS.macho && DROPS_DEAD_RECORDS.coff);
+});
+
+Deno.test('missing_profile_function and record_symbol name one function', () => {
+	strictEqual(
+		missing_profile_function(
+			'no profile data available for function _ZN4tsv_7fanout5Tally3add17h0123456789abcdefE Hash = 742261418966908927 up to 0 count discarded'
+		),
+		'_ZN4tsv_7fanout5Tally3add17h0123456789abcdefE'
+	);
+	strictEqual(
+		missing_profile_function(
+			'function control flow change detected (hash mismatch) _ZN6tsv_ts5lexer4next17h0123456789abcdefE Hash = 1'
+		),
+		null
+	);
+	strictEqual(
+		record_symbol('tsv.9c015dcffb65fca6-cgu.0;_ZN3std2rt10lang_start17h39a6dfff3ed9e07bE'),
+		'_ZN3std2rt10lang_start17h39a6dfff3ed9e07bE'
+	);
+	strictEqual(
+		record_symbol('_ZN3std2rt10lang_start17hdc14fff46d89b825E'),
+		'_ZN3std2rt10lang_start17hdc14fff46d89b825E'
+	);
+});
+
+/** A use-build log in the shape a Mach-O row writes: LLVM's diagnostics for the workspace
+ * crates' functions no training reached, a build script's, and (when asked) a hash mismatch. */
+const MACHO_LOG = [
+	'warning: tsv_lang.3f0c9d1e2a4b5c6d-cgu.0: no profile data available for function _ZN8tsv_lang10json_writer15stage_copy_cold17h1111111111111111E Hash = 742261418966908927 up to 0 count discarded',
+	'warning: tsv_lang.3f0c9d1e2a4b5c6d-cgu.0: no profile data available for function _ZN64_$LT$tsv_lang..error..Error$u20$as$u20$core..fmt..Debug$GT$3fmt17h2222222222222222E Hash = 1 up to 0 count discarded',
+	'warning: tsv_discover.0a1b2c3d4e5f6a7b-cgu.0: no profile data available for function _ZN12tsv_discover10is_ignored17h3333333333333333E Hash = 1 up to 0 count discarded',
+	'warning: build_script_build.28bececf194f0957-cgu.0: no profile data available for function _ZN18build_script_build4main17h26d66acf13bdd994E Hash = 742261418966908927 up to 0 count discarded'
+].join('\n');
+
+/** The record table an instrumented binary's raw profile lists (`llvm-profdata show
+ * --all-functions` over a `.profraw`): names only, some `<module>;`-prefixed. */
+const RAW_SHOW = [
+	'Counters:',
+	'  tsv.9c015dcffb65fca6-cgu.0;_ZN8tsv_lang3doc12arena_render20render_doc_iterative17h0123456789abcdefE:',
+	'    Hash: 0x03c13cf48702e2f5',
+	'    Counters: 23',
+	'  _ZN6tsv_ts9__private12parse_folded17hbed61a5168c09c4aE:',
+	'    Hash: 0x0a4d0ad3efffffff',
+	'    Counters: 1',
+	'Instrumentation level: IR  entry_first = 1  instrument_loop_entries = 0',
+	'Functions shown: 2',
+	''
+].join('\n');
+
+const raw_records = (text: string): Set<string> =>
+	new Set(parse_profile_show(text).map((r) => record_symbol(r.name)));
+
+Deno.test('classify_diagnostics passes a dead-stripped function on Mach-O and COFF', () => {
+	const records = raw_records(RAW_SHOW);
+	strictEqual(records.size, 2);
+	for (const format of ['macho', 'coff'] as const) {
+		const c = classify_diagnostics(parse_pgo_diagnostics(MACHO_LOG), records, format);
+		strictEqual(c.build_script.length, 1);
+		strictEqual(c.dead_stripped.length, 3);
+		strictEqual(c.stale.length + c.unexpected.length, 0);
+	}
+});
+
+Deno.test('classify_diagnostics fails a missing function on ELF, which keeps every record', () => {
+	const c = classify_diagnostics(parse_pgo_diagnostics(MACHO_LOG), raw_records(RAW_SHOW), 'elf');
+	strictEqual(c.dead_stripped.length, 0);
+	strictEqual(c.unexpected.length, 3);
+	strictEqual(c.build_script.length, 1);
+});
+
+Deno.test('classify_diagnostics fails a missing function the instrumented binary records', () => {
+	// a profile from other source: the binary records the function, the profile has none of it
+	const stale_log = [
+		MACHO_LOG,
+		'warning: tsv_lang.3f0c9d1e2a4b5c6d-cgu.0: no profile data available for function _ZN8tsv_lang3doc12arena_render20render_doc_iterative17h0123456789abcdefE Hash = 9 up to 0 count discarded'
+	].join('\n');
+	for (const format of ['macho', 'coff', 'elf'] as const) {
+		const c = classify_diagnostics(parse_pgo_diagnostics(stale_log), raw_records(RAW_SHOW), format);
+		strictEqual(c.stale.length, 1, format);
+		ok(c.stale[0]!.message.includes('render_doc_iterative'));
+	}
+});
+
+Deno.test('classify_diagnostics fails every hash mismatch, on every format', () => {
+	const log =
+		'warning: tsv_ts.eaeb575bf7bcacc2-cgu.0: function control flow change detected (hash mismatch) _ZN6tsv_ts9__private12parse_folded17hbed61a5168c09c4aE Hash = 1';
+	for (const format of ['macho', 'coff', 'elf'] as const) {
+		const c = classify_diagnostics(parse_pgo_diagnostics(log), raw_records(RAW_SHOW), format);
+		strictEqual(c.unexpected.length, 1, format);
+		strictEqual(c.dead_stripped.length + c.stale.length, 0);
+	}
+	// and one whose function the binary does not record
+	const c = classify_diagnostics(
+		parse_pgo_diagnostics(
+			log.replace('parse_folded17hbed61a5168c09c4aE', 'gone17h0000000000000000E')
+		),
+		raw_records(RAW_SHOW),
+		'macho'
+	);
+	strictEqual(c.unexpected.length, 1);
 });

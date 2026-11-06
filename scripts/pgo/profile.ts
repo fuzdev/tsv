@@ -273,6 +273,86 @@ export function parse_pgo_diagnostics(log: string): PgoDiagnostic[] {
 	return out;
 }
 
+/** The object format of a binary, from the `Format:` line `llvm-readobj` prints first. */
+export type ObjectFormat = 'elf' | 'macho' | 'coff';
+
+/** The object format `llvm-readobj` output names (`Format: elf64-x86-64`, `Format: Mach-O
+ * 64-bit x86-64`, `Format: COFF-x86-64`), or `null` when it names none this reads. */
+export function object_format(readobj: string): ObjectFormat | null {
+	const name = /^Format: (\S+)/m.exec(readobj)?.[1]?.toLowerCase();
+	if (!name) return null;
+	if (name.startsWith('elf')) return 'elf';
+	if (name.startsWith('mach-o')) return 'macho';
+	if (name.startsWith('coff')) return 'coff';
+	return null;
+}
+
+/**
+ * Whether a format's linker drops a dead function's profile records with its code. An
+ * instrumented function's counters and data record are tied to it: Mach-O's `-dead_strip`
+ * keeps a record only while something live references its counters, and COFF's `/OPT:REF`
+ * discards the comdats associated with a discarded function. ELF links keep each profile
+ * section whole, so every function compiled into the instrumented build has a record there.
+ */
+export const DROPS_DEAD_RECORDS: Readonly<Record<ObjectFormat, boolean>> = {
+	elf: false,
+	macho: true,
+	coff: true
+};
+
+/** The mangled function a `no profile data available for function …` diagnostic names, or
+ * `null` when the message is another one. */
+export function missing_profile_function(message: string): string | null {
+	return /no profile data available for function (\S+)/.exec(message)?.[1] ?? null;
+}
+
+/** A profile record's symbol: its name without the `<module>;` prefix a local function's
+ * record carries, so it compares with the name a build diagnostic prints. */
+export const record_symbol = (name: string): string => name.slice(name.lastIndexOf(';') + 1);
+
+/** The use build's profile diagnostics, by what each means (`classify_diagnostics`). */
+export interface DiagnosticClasses {
+	/** A build script's: never run in training, so never profiled. */
+	build_script: PgoDiagnostic[];
+	/** A function with no profile data that the instrumented binary holds no record of either,
+	 * on a format whose linker drops dead functions' records: dead code, which never runs. */
+	dead_stripped: PgoDiagnostic[];
+	/** A function with no profile data that the instrumented binary DOES record: the profile
+	 * is not that binary's — stale, or trained on other source. */
+	stale: PgoDiagnostic[];
+	/** Everything else: a hash mismatch, a missing function on a format that keeps every
+	 * record (the use build compiled code the instrumented one did not), any other message. */
+	unexpected: PgoDiagnostic[];
+}
+
+/**
+ * Sort the use build's diagnostics (`parse_pgo_diagnostics`) against the record names of
+ * the instrumented binary they were trained on (`record_symbol` of each record in a profile
+ * it wrote) and its object format. A missing function is benign only when the instrumented
+ * binary has no record of it AND its format drops dead functions' records — a stale profile
+ * leaves functions the binary records unmatched (`stale`), and on ELF no missing function
+ * is benign. A hash mismatch is never benign.
+ */
+export function classify_diagnostics(
+	diagnostics: readonly PgoDiagnostic[],
+	binary_records: ReadonlySet<string>,
+	format: ObjectFormat
+): DiagnosticClasses {
+	const out: DiagnosticClasses = { build_script: [], dead_stripped: [], stale: [], unexpected: [] };
+	for (const d of diagnostics) {
+		if (d.build_script) {
+			out.build_script.push(d);
+			continue;
+		}
+		const missing = missing_profile_function(d.message);
+		if (missing === null) out.unexpected.push(d);
+		else if (binary_records.has(missing)) out.stale.push(d);
+		else if (DROPS_DEAD_RECORDS[format]) out.dead_stripped.push(d);
+		else out.unexpected.push(d);
+	}
+	return out;
+}
+
 /** `text` without its ANSI escape sequences — a log cargo wrote with colour on (the builds
  * turn it off; this keeps a reader from depending on that). */
 export function strip_ansi(text: string): string {

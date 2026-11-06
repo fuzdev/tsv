@@ -13,7 +13,9 @@
  *    `collections/` tree (`GATE_CHECKOUT_IDS`), clean, with every own collection
  *    present; the manifest and the snapshot's `.gitignore` are read from the pinned
  *    COMMIT, not the working tree, and written to `corpus.json` for the steps that run
- *    without git. `--fetch` shallow-fetches the pinned commit first (the release rows).
+ *    without git. `--fetch` shallow-fetches the pinned commit first (the release rows),
+ *    checked out with no line-ending conversion; every checkout must hold the commit's
+ *    line endings, so every row trains on the same bytes.
  * 2. the plain `release` CLI — the byte-identity reference (`target/`, as ever).
  * 3. `build.sh instrument` — both binaries with `-Cprofile-generate`.
  * 4. `stage --phase instrument` — the instrumented pair as an installed loader +
@@ -35,14 +37,20 @@
  *    rustc reported, which a container row ran), then the NON-EMPTY gate: the profile
  *    counts function entries (`build.sh instrument` passes `-pgo-instrument-entry`), and
  *    every hot function (`HOT_FUNCTIONS`) was entered once for every input of its class
- *    it trained on (`floor_of`).
+ *    it trained on (`floor_of`) — whose profile was written: the CLI exits non-zero through
+ *    `std::process::exit`, which on Windows writes no profile, so where a refused strip's
+ *    rerun writes none (`run_writes_profile`) the strip's floor leaves the refusals out.
  * 7. `build.sh use` — both binaries with `-Cprofile-use` and the cost-benefit
  *    inliner off.
  * 8. `gate-builds` — the profile reached every workspace crate's compile (the
  *    `-Cprofile-use` flag on its rustc command line), and no profile diagnostic in
- *    the use builds' logs but the build scripts' (which never run in training): a
- *    hash mismatch or a missing function means a stale or partly applied profile,
- *    which falls back to no PGO silently.
+ *    the use builds' logs but the build scripts' (which never run in training) and
+ *    dead code's: a hash mismatch, or a missing function the instrumented binary's raw
+ *    profiles record, means a stale or partly applied profile, which falls back to no
+ *    PGO silently. A missing function is dead code when the instrumented binary records
+ *    nothing of it and its format's link drops a dead function's records with its code
+ *    (Mach-O, COFF — `classify_diagnostics`); on ELF every compiled function keeps its
+ *    record, so there no missing function passes.
  * 9. `gate-sections` — the instrumented binaries carry `__llvm_prf` sections and
  *    the use binaries none (the check's own positive control first).
  * 10. `stage --phase use` — the PGO pair into `crates/tsv_napi/pkg/<triple>/`, the
@@ -141,11 +149,18 @@ import {
 	WORLDS
 } from './layout.ts';
 import {
+	classify_diagnostics,
+	demangle_legacy_path,
 	grade_profile,
 	has_instrumentation_sections,
+	HOT_FUNCTIONS,
 	llvm_version,
+	type ObjectFormat,
+	object_format,
 	parse_pgo_diagnostics,
+	parse_profile_show,
 	profile_use_crates,
+	record_symbol,
 	type TrainedCounts
 } from './profile.ts';
 
@@ -318,7 +333,19 @@ const cmd_corpora = (fetch: boolean): void => {
 		mkdirSync(corpora_root, { recursive: true });
 		git('init', '-q');
 		git('fetch', '--depth', '1', '--no-tags', CORPORA_URL, commit);
-		git('checkout', '-q', '--detach', 'FETCH_HEAD');
+		// no line-ending conversion, whatever the runner's git config says (Windows images
+		// set `core.autocrlf`); the snapshot's `* -text` says the same, and the check below
+		// reads what the checkout wrote
+		git(
+			'-c',
+			'core.autocrlf=false',
+			'-c',
+			'core.eol=lf',
+			'checkout',
+			'-q',
+			'--detach',
+			'FETCH_HEAD'
+		);
 	}
 	if (!existsSync(join(corpora_root, '.git'))) {
 		fail(`${corpora_root} is not a git checkout — pass --fetch, or clone ${CORPORA_URL} there`);
@@ -346,6 +373,20 @@ const cmd_corpora = (fetch: boolean): void => {
 	}
 	const dirty = git('status', '--porcelain', '--untracked-files=all', '--', CORPORA_TREE);
 	if (dirty !== '') fail(`${corpora_root}/${CORPORA_TREE} has local changes:\n${dirty}`);
+	// every file's line endings as checked out are the commit's: `git status` reads a
+	// converted checkout as clean, since it converts back before comparing
+	const converted = git('ls-files', '--eol', '--', CORPORA_TREE)
+		.split('\n')
+		.filter((line) => {
+			const m = /^i\/(\S*)\s+w\/(\S*)/.exec(line);
+			return m !== null && m[1] !== m[2];
+		});
+	if (converted.length > 0) {
+		fail(
+			`${corpora_root}/${CORPORA_TREE} was checked out with converted line endings (core.autocrlf?) — ` +
+				`every row must train on the commit's bytes:\n${converted.slice(0, 10).join('\n')}`
+		);
+	}
 	const own = own_collections(commit);
 	const gitignore = capture('git', ['-C', corpora_root, 'show', `${commit}:.gitignore`]);
 	const corpus: Corpus = { own, gitignore: gitignore.status === 0 ? gitignore.stdout : null };
@@ -426,16 +467,17 @@ const list_files = (cmd: string[], root: string, env?: Record<string, string>): 
 	return files;
 };
 
-/** Run `cmd` once per file (`args` before the path), collecting the files whose exit code
- * is not in `accept` — a training run must not quietly skip what it claims to train. */
+/** Run `cmd` once per file (`args` before the path), collecting each exit code and the files
+ * whose code is not in `accept` — a training run must not quietly skip what it claims to train. */
 const per_file = (
 	cmd: string[],
 	args: string[],
 	files: string[],
 	env: Record<string, string>,
 	accept: readonly number[]
-): string[] => {
+): { failures: string[]; statuses: number[] } => {
 	const failures: string[] = [];
+	const statuses: number[] = [];
 	for (const file of files) {
 		const r = spawnSync(cmd[0]!, [...cmd.slice(1), ...args, file], {
 			stdio: ['ignore', 'ignore', 'pipe'],
@@ -443,11 +485,36 @@ const per_file = (
 			env: { ...process.env, ...env }
 		});
 		if (r.error) fail(`could not run ${cmd.join(' ')}: ${r.error.message}`);
+		statuses.push(r.status ?? -1);
 		if (!accept.includes(r.status ?? -1)) {
 			failures.push(`${file} (exit ${r.status ?? r.signal}): ${r.stderr.trim().split('\n')[0]}`);
 		}
 	}
-	return failures;
+	return { failures, statuses };
+};
+
+/**
+ * Whether a run of `cmd` that exits `status` writes its profile — run once more, its profile
+ * sent to a scratch directory read and deleted here. The CLI leaves through
+ * `std::process::exit` when it exits non-zero, which on Windows is `ExitProcess`: the C
+ * runtime's exit handlers, where the profile runtime writes, never run, so the counters of
+ * a run that exits that way are lost. Asked of the binary rather than assumed of a platform.
+ */
+const run_writes_profile = (cmd: string[], cmd_args: string[], status: number): boolean => {
+	const probe = join(dir, 'profraw', 'exit-probe');
+	rmSync(probe, { recursive: true, force: true });
+	mkdirSync(probe, { recursive: true });
+	const r = capture(cmd[0]!, [...cmd.slice(1), ...cmd_args], {
+		LLVM_PROFILE_FILE: join(probe, '%p.profraw')
+	});
+	if (r.status !== status) {
+		fail(`${cmd.join(' ')} ${cmd_args.join(' ')} exited ${r.status} on a rerun, not ${status}`);
+	}
+	const written = readdirSync(probe).some(
+		(f) => f.endsWith('.profraw') && statSync(join(probe, f)).size > 0
+	);
+	rmSync(probe, { recursive: true, force: true });
+	return written;
 };
 
 const cmd_train = (): void => {
@@ -500,11 +567,23 @@ const cmd_train = (): void => {
 		} else {
 			const cmd = world === 'cli' ? [instr.cli] : [NODE, loader.cli];
 			// the parse (and the CLI's `loc` writer), on every file: each must parse
-			failures.push(...per_file(cmd, ['parse'], files, env, [0]));
+			failures.push(...per_file(cmd, ['parse'], files, env, [0]).failures);
 			if (world === 'cli') {
-				failures.push(...per_file(cmd, ['parse', '--locations'], files, env, [0]));
+				failures.push(...per_file(cmd, ['parse', '--locations'], files, env, [0]).failures);
 				// the strip: 0 stripped, 1 refused — both verdicts; 2 is a parse error
-				failures.push(...per_file(cmd, ['strip'], strip_files, env, [0, 1]));
+				const strip = per_file(cmd, ['strip'], strip_files, env, [0, 1]);
+				failures.push(...strip.failures);
+				// a refusal exits through `std::process::exit`; where that writes no profile
+				// (`run_writes_profile`), the refused runs' entries never reach it, and the
+				// floor counts the strips whose profile was written
+				const refused = strip_files.filter((_, i) => strip.statuses[i] === 1);
+				if (refused.length > 0 && !run_writes_profile(cmd, ['strip', refused[0]!], 1)) {
+					trained.strip -= refused.length;
+					console.log(
+						`train ${world}: a refused strip writes no profile here — its ${refused.length} ` +
+							'refused strips are left out of the strip floor'
+					);
+				}
 			} else {
 				// the strip and the import records, in process through the loader
 				const list = join(paths.train(world), 'addon_ops.txt');
@@ -608,6 +687,46 @@ const cmd_merge = (): void => {
 
 // --- 8. the use builds' profile diagnostics --------------------------------------------
 
+/**
+ * The instrumented binary's object format and the symbol of every profile record it holds —
+ * every function compiled into it that its link kept, run or not — read from the profiles it
+ * wrote in training (a raw profile carries the binary's whole record table), never from the
+ * merged profile the use build read. Its symbol table cannot answer: release builds strip
+ * it, and a function inlined into every caller keeps its record but no symbol. The world's
+ * hot functions must be among the records, or the reading is refused.
+ */
+const instrumented_records = (world: World): { format: ObjectFormat; records: Set<string> } => {
+	const { profdata, readobj } = llvm_tools();
+	const binary = require_file(world_artifact('instrument', world), 'run build.sh instrument first');
+	const headers = capture(readobj, ['--file-headers', binary]);
+	if (headers.status !== 0) fail(`llvm-readobj --file-headers ${binary} failed: ${headers.stderr}`);
+	const format =
+		object_format(headers.stdout) ??
+		fail(`gate-builds ${world}: llvm-readobj names no object format this reads for ${binary}`);
+	const raw = paths.profraw(world);
+	const raws = existsSync(raw) ? readdirSync(raw).filter((f) => f.endsWith('.profraw')) : [];
+	if (raws.length === 0) fail(`gate-builds ${world}: no profraw files in ${raw} — run train first`);
+	const records = new Set<string>();
+	const paths_found = new Set<string>();
+	for (const f of raws.sort()) {
+		const show = capture(profdata, ['show', '--all-functions', join(raw, f)]);
+		if (show.status !== 0) fail(`llvm-profdata show ${join(raw, f)} failed: ${show.stderr}`);
+		for (const r of parse_profile_show(show.stdout)) {
+			records.add(record_symbol(r.name));
+			const path = demangle_legacy_path(r.name);
+			if (path !== null) paths_found.add(path);
+		}
+	}
+	const absent = HOT_FUNCTIONS.filter((h) => h.worlds.includes(world) && !paths_found.has(h.path));
+	if (absent.length > 0) {
+		fail(
+			`gate-builds ${world}: the instrumented binary's raw profiles in ${raw} record none of ` +
+				`${absent.map((h) => h.path).join(', ')} — not a record table this gate can grade against`
+		);
+	}
+	return { format, records };
+};
+
 const cmd_gate_builds = (): void => {
 	for (const world of worlds) {
 		const log_path = require_file(paths.build_log('use', world), 'run build.sh use first');
@@ -625,18 +744,25 @@ const cmd_gate_builds = (): void => {
 		}
 		// Registry crates compile with `--cap-lints allow`, which silences LLVM's warnings too,
 		// so the diagnostics graded here are the workspace crates' (the registry ones are
-		// source-pinned by Cargo.lock, so their profile cannot go stale apart from it).
+		// source-pinned by Cargo.lock, so their profile cannot go stale apart from it). A
+		// missing function is held to the instrumented binary's own records and its format
+		// (`classify_diagnostics`): Mach-O and COFF links drop a dead function's records, so
+		// their use builds name the dead code; a function the binary records is a stale profile.
 		const diagnostics = parse_pgo_diagnostics(log);
-		const unexpected = diagnostics.filter((d) => !d.build_script);
-		const build_scripts = diagnostics.length - unexpected.length;
+		const binary = instrumented_records(world);
+		const classes = classify_diagnostics(diagnostics, binary.records, binary.format);
+		const failures = [...classes.stale, ...classes.unexpected];
+		const build_scripts = classes.build_script.length;
 		console.log(
-			`gate-builds ${world}: -Cprofile-use on ${used.size} crates; ${unexpected.length} profile ` +
-				`diagnostics, ${build_scripts} from build scripts`
+			`gate-builds ${world}: -Cprofile-use on ${used.size} crates; ${diagnostics.length} profile ` +
+				`diagnostics: ${build_scripts} from build scripts, ${classes.dead_stripped.length} for functions ` +
+				`the instrumented ${binary.format} binary does not hold (${binary.records.size} records), ` +
+				`${classes.stale.length} for functions it holds, ${classes.unexpected.length} other`
 		);
-		if (unexpected.length > 0) {
+		if (failures.length > 0) {
 			fail(
 				`gate-builds ${world}: the profile does not cover the build it was applied to (stale, or trained ` +
-					`on other source) — ${log_path}:\n${unexpected
+					`on other source) — ${log_path}:\n${failures
 						.slice(0, 20)
 						.map((d) => `  ${d.module}: ${d.message}`)
 						.join('\n')}`
