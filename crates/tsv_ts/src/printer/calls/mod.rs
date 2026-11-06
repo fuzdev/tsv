@@ -250,7 +250,11 @@ fn callee_gap_wide(printer: &Printer<'_>, call: &ast::CallExpression<'_>, span: 
     } else {
         callee_printed_gap_start(printer, call)
     };
-    let trailing_gap = printer.owned_pair_trailing_gap(callee_end, owned_pair);
+    let trailing_gap = if owned_pair {
+        printer.owned_pair_printed_trailing_gap(call.callee, true)
+    } else {
+        printer.owned_pair_trailing_gap(callee_end, false)
+    };
     let start = Printer::gap_start_after_owned_pair(callee_end, trailing_gap);
     let optional = call_optional(printer, call, span, start);
     let paren_open = args_side_start(call, optional.arg_side_start().unwrap_or(start));

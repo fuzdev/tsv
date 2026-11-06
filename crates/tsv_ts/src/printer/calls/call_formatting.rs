@@ -193,7 +193,7 @@ fn build_call_head(printer: &Printer<'_>, call: &ast::CallExpression<'_>, span: 
     // start every [`super::CalleeGap`] window takes): claimed, the callee's own trailing
     // emitters decline it. An owned pair prints its interior itself.
     let callee_claim_start = if owned_pair {
-        call.callee.span().end
+        trailing_gap.map_or_else(|| call.callee.span().end, |(start, _)| start)
     } else {
         super::callee_printed_gap_start(printer, call)
     };

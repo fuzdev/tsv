@@ -2522,6 +2522,24 @@ impl<'a> Printer<'a> {
             .map(|close| (operand_end, close))
     }
 
+    /// [`Self::owned_pair_trailing_gap`] opened at `operand`'s printed end
+    /// ([`Self::pair_trailing_gap_start`]): a comment written last in a stripped shell down
+    /// the operand's right edge (`(() => a + (b // c⏎))()`) is the pair's interior, printed
+    /// inside the `)` as the bare spelling's is (`(() => a + b // c⏎)()`), ahead of anything
+    /// written after the pair. The caller claims `[gap.0, operand end)` from the operand's
+    /// own trailing emitters ([`Self::with_claimed_right_spine_run`]). Precondition: the
+    /// operand is built here, not frozen — a frozen slice prints its shells verbatim, and the
+    /// claim would print them again. The callers meet it: at a plain call or tag, a directive
+    /// inside the callee's or tag's own `(` freezes nothing.
+    pub(in crate::printer) fn owned_pair_printed_trailing_gap(
+        &self,
+        operand: &ast::Expression<'_>,
+        keeps_interior: bool,
+    ) -> Option<(u32, u32)> {
+        self.owned_pair_trailing_gap(operand.span().end, keeps_interior)
+            .map(|(_, close)| (self.pair_trailing_gap_start(operand), close))
+    }
+
     /// Whether neither gap of a paren pair holds a comment on the page: `leading` is the
     /// `(`→operand window, `trailing` the operand→`)` one (`None` where the pair has no
     /// trailing gap of its own). What a callee pair's caller hands

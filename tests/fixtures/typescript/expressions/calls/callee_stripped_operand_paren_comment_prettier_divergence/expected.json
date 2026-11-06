@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1533,
+	"end": 2134,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -276,32 +276,134 @@
 		},
 		{
 			"type": "Line",
-			"value": " a function callee's pair keeps its own interior, the comment trailing the statement",
+			"value": " a function callee's pair keeps its own interior: the comment stays inside the pair, as",
 			"start": 1372,
-			"end": 1458
+			"end": 1461
+		},
+		{
+			"type": "Line",
+			"value": " the bare spelling's does, ahead of a comment written after the pair",
+			"start": 1463,
+			"end": 1533
 		},
 		{
 			"type": "Line",
 			"value": " c18",
-			"start": 1483,
-			"end": 1489
+			"start": 1557,
+			"end": 1563
 		},
 		{
 			"type": "Line",
 			"value": " c19",
-			"start": 1516,
-			"end": 1522
+			"start": 1593,
+			"end": 1599
+		},
+		{
+			"type": "Line",
+			"value": " c20",
+			"start": 1631,
+			"end": 1637
+		},
+		{
+			"type": "Line",
+			"value": " d20",
+			"start": 1641,
+			"end": 1647
+		},
+		{
+			"type": "Line",
+			"value": " c21",
+			"start": 1677,
+			"end": 1683
+		},
+		{
+			"type": "Line",
+			"value": " d21",
+			"start": 1687,
+			"end": 1693
+		},
+		{
+			"type": "Line",
+			"value": " c22",
+			"start": 1725,
+			"end": 1731
+		},
+		{
+			"type": "Line",
+			"value": " d22",
+			"start": 1735,
+			"end": 1741
+		},
+		{
+			"type": "Line",
+			"value": " c23",
+			"start": 1771,
+			"end": 1777
+		},
+		{
+			"type": "Block",
+			"value": " x23 ",
+			"start": 1781,
+			"end": 1790
+		},
+		{
+			"type": "Line",
+			"value": " c24",
+			"start": 1817,
+			"end": 1823
+		},
+		{
+			"type": "Block",
+			"value": " x24 ",
+			"start": 1827,
+			"end": 1836
+		},
+		{
+			"type": "Line",
+			"value": " d24",
+			"start": 1837,
+			"end": 1843
+		},
+		{
+			"type": "Line",
+			"value": " a comment written after the statement stays there",
+			"start": 1853,
+			"end": 1905
+		},
+		{
+			"type": "Line",
+			"value": " c25",
+			"start": 1930,
+			"end": 1936
+		},
+		{
+			"type": "Line",
+			"value": " a block in a shell under the pair the printer adds around a conditional arrow body",
+			"start": 1939,
+			"end": 2024
+		},
+		{
+			"type": "Line",
+			"value": " prints past that pair, as the bare spelling's does",
+			"start": 2026,
+			"end": 2079
+		},
+		{
+			"type": "Block",
+			"value": " c26 ",
+			"start": 2110,
+			"end": 2119
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1532,
+		"end": 2133,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 1523,
+			"end": 2124,
 			"body": [
 				{
 					"type": "ExpressionStatement",
@@ -1502,27 +1604,27 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1460,
-					"end": 1482,
+					"start": 1535,
+					"end": 1569,
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 1460,
-						"end": 1481,
+						"start": 1535,
+						"end": 1568,
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
-							"start": 1460,
-							"end": 1463,
+							"start": 1535,
+							"end": 1538,
 							"name": "k18"
 						},
 						"right": {
 							"type": "CallExpression",
-							"start": 1466,
-							"end": 1481,
+							"start": 1541,
+							"end": 1568,
 							"callee": {
 								"type": "ArrowFunctionExpression",
-								"start": 1467,
-								"end": 1478,
+								"start": 1545,
+								"end": 1556,
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -1530,19 +1632,549 @@
 								"params": [],
 								"body": {
 									"type": "BinaryExpression",
-									"start": 1473,
-									"end": 1478,
+									"start": 1551,
+									"end": 1556,
 									"left": {
 										"type": "Identifier",
-										"start": 1473,
-										"end": 1474,
+										"start": 1551,
+										"end": 1552,
 										"name": "a"
 									},
 									"operator": "+",
 									"right": {
 										"type": "Identifier",
-										"start": 1477,
-										"end": 1478,
+										"start": 1555,
+										"end": 1556,
+										"name": "b"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c18",
+										"start": 1557,
+										"end": 1563
+									}
+								]
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a function callee's pair keeps its own interior: the comment stays inside the pair, as",
+							"start": 1372,
+							"end": 1461
+						},
+						{
+							"type": "Line",
+							"value": " the bare spelling's does, ahead of a comment written after the pair",
+							"start": 1463,
+							"end": 1533
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1571,
+					"end": 1607,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1571,
+						"end": 1606,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1571,
+							"end": 1574,
+							"name": "k19"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 1577,
+							"end": 1606,
+							"object": {
+								"type": "CallExpression",
+								"start": 1577,
+								"end": 1604,
+								"callee": {
+									"type": "ArrowFunctionExpression",
+									"start": 1581,
+									"end": 1592,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 1587,
+										"end": 1592,
+										"left": {
+											"type": "Identifier",
+											"start": 1587,
+											"end": 1588,
+											"name": "a"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 1591,
+											"end": 1592,
+											"name": "b"
+										}
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c19",
+											"start": 1593,
+											"end": 1599
+										}
+									]
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1605,
+								"end": 1606,
+								"name": "m"
+							},
+							"computed": false,
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1609,
+					"end": 1653,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1609,
+						"end": 1652,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1609,
+							"end": 1612,
+							"name": "k20"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 1615,
+							"end": 1652,
+							"callee": {
+								"type": "ArrowFunctionExpression",
+								"start": 1619,
+								"end": 1630,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 1625,
+									"end": 1630,
+									"left": {
+										"type": "Identifier",
+										"start": 1625,
+										"end": 1626,
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1629,
+										"end": 1630,
+										"name": "b"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c20",
+										"start": 1631,
+										"end": 1637
+									}
+								]
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1655,
+					"end": 1701,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1655,
+						"end": 1700,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1655,
+							"end": 1658,
+							"name": "k21"
+						},
+						"right": {
+							"type": "MemberExpression",
+							"start": 1661,
+							"end": 1700,
+							"object": {
+								"type": "CallExpression",
+								"start": 1661,
+								"end": 1698,
+								"callee": {
+									"type": "ArrowFunctionExpression",
+									"start": 1665,
+									"end": 1676,
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 1671,
+										"end": 1676,
+										"left": {
+											"type": "Identifier",
+											"start": 1671,
+											"end": 1672,
+											"name": "a"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 1675,
+											"end": 1676,
+											"name": "b"
+										}
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c21",
+											"start": 1677,
+											"end": 1683
+										}
+									]
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 1699,
+								"end": 1700,
+								"name": "m",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " d21",
+										"start": 1687,
+										"end": 1693
+									}
+								]
+							},
+							"computed": false,
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " d20",
+							"start": 1641,
+							"end": 1647
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1703,
+					"end": 1747,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1703,
+						"end": 1746,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1703,
+							"end": 1706,
+							"name": "k22"
+						},
+						"right": {
+							"type": "TaggedTemplateExpression",
+							"start": 1709,
+							"end": 1746,
+							"tag": {
+								"type": "ArrowFunctionExpression",
+								"start": 1713,
+								"end": 1724,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 1719,
+									"end": 1724,
+									"left": {
+										"type": "Identifier",
+										"start": 1719,
+										"end": 1720,
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1723,
+										"end": 1724,
+										"name": "b"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c22",
+										"start": 1725,
+										"end": 1731
+									}
+								]
+							},
+							"quasi": {
+								"type": "TemplateLiteral",
+								"start": 1743,
+								"end": 1746,
+								"expressions": [],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 1744,
+										"end": 1745,
+										"value": {
+											"raw": "t",
+											"cooked": "t"
+										},
+										"tail": true
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " d22",
+										"start": 1735,
+										"end": 1741
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1749,
+					"end": 1793,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1749,
+						"end": 1792,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1749,
+							"end": 1752,
+							"name": "k23"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 1755,
+							"end": 1792,
+							"callee": {
+								"type": "ArrowFunctionExpression",
+								"start": 1759,
+								"end": 1770,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 1765,
+									"end": 1770,
+									"left": {
+										"type": "Identifier",
+										"start": 1765,
+										"end": 1766,
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1769,
+										"end": 1770,
+										"name": "b"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c23",
+										"start": 1771,
+										"end": 1777
+									}
+								]
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1795,
+					"end": 1850,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1795,
+						"end": 1849,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1795,
+							"end": 1798,
+							"name": "k24"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 1801,
+							"end": 1849,
+							"callee": {
+								"type": "ArrowFunctionExpression",
+								"start": 1805,
+								"end": 1816,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 1811,
+									"end": 1816,
+									"left": {
+										"type": "Identifier",
+										"start": 1811,
+										"end": 1812,
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1815,
+										"end": 1816,
+										"name": "b"
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c24",
+										"start": 1817,
+										"end": 1823
+									}
+								]
+							},
+							"arguments": [
+								{
+									"type": "Literal",
+									"start": 1847,
+									"end": 1848,
+									"value": 1,
+									"raw": "1",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " x24 ",
+											"start": 1827,
+											"end": 1836
+										},
+										{
+											"type": "Line",
+											"value": " d24",
+											"start": 1837,
+											"end": 1843
+										}
+									]
+								}
+							],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " x23 ",
+							"start": 1781,
+							"end": 1790
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1907,
+					"end": 1929,
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 1907,
+						"end": 1928,
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1907,
+							"end": 1910,
+							"name": "k25"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 1913,
+							"end": 1928,
+							"callee": {
+								"type": "ArrowFunctionExpression",
+								"start": 1914,
+								"end": 1925,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 1920,
+									"end": 1925,
+									"left": {
+										"type": "Identifier",
+										"start": 1920,
+										"end": 1921,
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1924,
+										"end": 1925,
 										"name": "b"
 									}
 								}
@@ -1554,90 +2186,108 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " a function callee's pair keeps its own interior, the comment trailing the statement",
-							"start": 1372,
-							"end": 1458
+							"value": " a comment written after the statement stays there",
+							"start": 1853,
+							"end": 1905
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Line",
-							"value": " c18",
-							"start": 1483,
-							"end": 1489
+							"value": " c25",
+							"start": 1930,
+							"end": 1936
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1491,
-					"end": 1515,
+					"start": 2081,
+					"end": 2123,
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 1491,
-						"end": 1514,
+						"start": 2081,
+						"end": 2122,
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
-							"start": 1491,
-							"end": 1494,
-							"name": "k19"
+							"start": 2081,
+							"end": 2084,
+							"name": "k26"
 						},
 						"right": {
-							"type": "MemberExpression",
-							"start": 1497,
-							"end": 1514,
-							"object": {
-								"type": "CallExpression",
-								"start": 1497,
-								"end": 1512,
-								"callee": {
-									"type": "ArrowFunctionExpression",
-									"start": 1498,
-									"end": 1509,
-									"id": null,
-									"expression": true,
-									"generator": false,
-									"async": false,
-									"params": [],
-									"body": {
+							"type": "CallExpression",
+							"start": 2087,
+							"end": 2122,
+							"callee": {
+								"type": "ArrowFunctionExpression",
+								"start": 2088,
+								"end": 2109,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "ConditionalExpression",
+									"start": 2095,
+									"end": 2108,
+									"test": {
+										"type": "Identifier",
+										"start": 2095,
+										"end": 2096,
+										"name": "q"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 2099,
+										"end": 2100,
+										"name": "r"
+									},
+									"alternate": {
 										"type": "BinaryExpression",
-										"start": 1504,
-										"end": 1509,
+										"start": 2103,
+										"end": 2108,
 										"left": {
 											"type": "Identifier",
-											"start": 1504,
-											"end": 1505,
+											"start": 2103,
+											"end": 2104,
 											"name": "a"
 										},
 										"operator": "+",
 										"right": {
 											"type": "Identifier",
-											"start": 1508,
-											"end": 1509,
+											"start": 2107,
+											"end": 2108,
 											"name": "b"
 										}
-									}
-								},
-								"arguments": [],
-								"optional": false
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c26 ",
+											"start": 2110,
+											"end": 2119
+										}
+									]
+								}
 							},
-							"property": {
-								"type": "Identifier",
-								"start": 1513,
-								"end": 1514,
-								"name": "m"
-							},
-							"computed": false,
+							"arguments": [],
 							"optional": false
 						}
 					},
-					"trailingComments": [
+					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " c19",
-							"start": 1516,
-							"end": 1522
+							"value": " a block in a shell under the pair the printer adds around a conditional arrow body",
+							"start": 1939,
+							"end": 2024
+						},
+						{
+							"type": "Line",
+							"value": " prints past that pair, as the bare spelling's does",
+							"start": 2026,
+							"end": 2079
 						}
 					]
 				}

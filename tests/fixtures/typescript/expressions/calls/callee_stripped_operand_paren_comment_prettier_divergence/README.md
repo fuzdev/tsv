@@ -22,8 +22,21 @@ one comment (`(a +⏎\tb) // c // d⏎\`t\``, `audit_signature_shell`)
 
 A call-headed chain takes the callee's form (`(a + b) // c⏎\t// d⏎\t().m;`), and a tag with type
 arguments keeps the comment ahead of them (`(a + b) // c⏎<T>\`t\``), as the bare spelling does. A
-member chain's head already keeps the two apart, and a function callee's pair keeps its own
-interior, where the comment trails the statement, at a chain's head too — those are controls.
+member chain's head already keeps the two apart — a control.
+
+A function or arrow callee or tag keeps its own pair's interior instead, and there the comment
+written last in a stripped shell down its right edge is that interior: it prints inside the pair,
+which breaks open, as the bare spelling's does (`(() => a + (b // c⏎))()` prints
+`(⏎\t() => a + b // c⏎)();`, the form both formatters give `(() => a + b // c⏎)()`), at a
+chain's head and at a tag too. A comment written after the pair stays after it, in the order
+written (`(() => a + (b // c⏎)) // d⏎()` prints `(⏎\t() => a + b // c⏎) // d⏎\t();`), where
+prettier moves it inside the pair, below the first (`output_prettier`), and from the
+stripped-pair spelling puts the two on one line, where they weld into one comment
+(`audit_signature_shell`). A comment the author writes after the statement stays there — a
+control. A block in a shell under the pair the printer adds around a conditional or assignment
+arrow body prints past that pair (`(() => q ? r : a + (b /* c */))()` prints
+`(() => (q ? r : a + b) /* c */)();`), as both formatters print the bare spelling, where prettier
+keeps it inside the pair from the stripped-pair spelling.
 
 See
 [conformance_prettier_ts.md §TypeScript](../../../../../../docs/conformance_prettier_ts.md#typescript)

@@ -66,9 +66,31 @@
 	k17 = (a + (b // c17
 	))<T>`t`;
 
-	// a function callee's pair keeps its own interior, the comment trailing the statement
+	// a function callee's pair keeps its own interior: the comment stays inside the pair, as
+	// the bare spelling's does, ahead of a comment written after the pair
 	k18 = (() => a + (b // c18
 	))();
 	k19 = (() => a + (b // c19
 	))().m;
+	k20 = (() => a + (b // c20
+	)) // d20
+	();
+	k21 = (() => a + (b // c21
+	)) // d21
+	().m;
+	k22 = (() => a + (b // c22
+	)) // d22
+	`t`;
+	k23 = (() => a + (b // c23
+	)) /* x23 */ ();
+	k24 = (() => a + (b // c24
+	)) /* x24 */ // d24
+	(1);
+
+	// a comment written after the statement stays there
+	k25 = (() => a + b)(); // c25
+
+	// a block in a shell under the pair the printer adds around a conditional arrow body
+	// prints past that pair, as the bare spelling's does
+	k26 = (() => q ? r : a + (b /* c26 */))();
 </script>

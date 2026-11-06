@@ -514,7 +514,7 @@ impl<'a> Printer<'a> {
         // pair must be the author's own for a trailing gap to exist at all
         // (`paren_shell_close_after`).
         let pair_open = tag_paren_leading_start(tagged, span);
-        let trailing_gap = self.owned_pair_trailing_gap(tagged.tag.span().end, pair_open.is_some());
+        let trailing_gap = self.owned_pair_printed_trailing_gap(tagged.tag, pair_open.is_some());
         // Every window downstream — the type-argument gap, the tag→`` ` `` gap — opens
         // PAST the pair's `)`, so a comment this doc emitted inside the parens is not
         // emitted a second time outside them.
@@ -541,7 +541,11 @@ impl<'a> Printer<'a> {
 
         let tag_doc = if let Some(pair_open) = pair_open {
             // The tag has one rendering, so every arm takes the same body.
-            let inner = self.build_expression_doc(tagged.tag);
+            let inner = self.with_claimed_right_spine_run(
+                trailing_gap.map_or_else(|| tagged.tag.span().end, |(start, _)| start),
+                tagged.tag.span().end,
+                || self.build_expression_doc(tagged.tag),
+            );
             self.build_owned_required_pair_doc(
                 (pair_open, tagged.tag.span().start),
                 trailing_gap,

@@ -16,6 +16,4 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 2
-SWALLOW	))⟨⟩().	line
-SWALLOW	))⟨⟩();	line
+# shapes: 0

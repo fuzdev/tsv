@@ -205,9 +205,14 @@ pub(crate) fn print_node_inner<'a>(
                     // a stripped shell down the base's right edge prints ahead of the run written
                     // after that shell (`(a + (b // c⏎) /* x */ // d⏎)!.m`); claimed below from
                     // the base's own trailing emitters, which deferred it behind the run. A lone
-                    // such comment keeps trailing the statement. A frozen base returned above.
+                    // such comment keeps trailing the statement — except in a pair that keeps its
+                    // interior (an IIFE callee, `(() => a + (b // c⏎))().m`), where it is that
+                    // interior, printed inside the `)` as the bare spelling's is
+                    // ([`Printer::owned_pair_printed_trailing_gap`]). A frozen base returned above.
+                    let keeps_interior =
+                        paren_comment_end.is_none() && paren_leading_start.is_some();
                     let trailing_gap = trailing_gap.map(|(start, end)| {
-                        if printer.has_comments_to_emit_between(start, end) {
+                        if keeps_interior || printer.has_comments_to_emit_between(start, end) {
                             (printer.pair_trailing_gap_start(expr), end)
                         } else {
                             (start, end)

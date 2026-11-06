@@ -521,3 +521,13 @@ fn non_null_frozen_block_after_slice() {
         "/* x */",
     );
 }
+
+/// Control: a directive freezing an arrow callee's parameter leaves its body's shell to the
+/// walk, so the comment prints inside the callee's own pair, ahead of the one written after it.
+#[test]
+fn function_callee_spine_directive_on_parameter() {
+    assert_frozen_once(
+        "k = ((\n// prettier-ignore\np) => a + (b // c\n)) // d\n();\n",
+        "k = (\n\t(\n\t\t// prettier-ignore\n\t\tp\n\t) => a + b // c\n) // d\n\t();\n",
+    );
+}
