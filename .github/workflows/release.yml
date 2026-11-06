@@ -128,8 +128,7 @@ jobs:
           # trains and gates its binaries where they run. Under Rosetta 2 on an
           # arm64 runner the x86_64 training and gates run an order of magnitude
           # slower, and the depth gate's control pass, which natively dies of its
-          # stack overflow at once, neither dies nor finishes there. ⚠ Unverified
-          # on this runner until a dispatch dry run.
+          # stack overflow at once, neither dies nor finishes there.
           - triple: darwin-x64
             runner: macos-15-intel
             build: native
