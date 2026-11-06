@@ -273,6 +273,34 @@ pub(crate) fn read_identifier(
     Ok((token, decoded))
 }
 
+/// Read the run of ident-sequence continuation glued at `pos` — this lexer's ident code
+/// points (`[a-zA-Z0-9_-]`, and any code point at U+00A0 or above, as
+/// [`is_non_ascii_identifier_codepoint`] — `parseCss`'s set, not css-syntax-3 §4.2's
+/// enumerated ranges) and valid escapes, the continuation half of
+/// [`read_identifier`] — returning where it ends and its decoded text when an escape was
+/// present. `None` when nothing at `pos` continues an identifier.
+///
+/// Unlike [`read_identifier`] it never opens with a `$` (no ident code point), and it may
+/// open with a digit (a continuation, not a token start). A `\` at `pos` that is no valid
+/// escape is `read_identifier`'s error.
+pub(crate) fn read_ident_continuation(
+    source: &str,
+    pos: usize,
+) -> Result<Option<(usize, Option<String>)>, Error> {
+    let Some(&b) = source.as_bytes().get(pos) else {
+        return Ok(None);
+    };
+    // the guard keeps `read_identifier`'s leading-`$` arm out of reach: `$` is ASCII and no
+    // table member
+    if !(IDENT_CONTINUE_LUT[b as usize] || b == b'\\' || !b.is_ascii()) {
+        return Ok(None);
+    }
+    let mut end = pos;
+    let (_, decoded) = read_identifier(source, &mut end)?;
+    // a non-ASCII code point below U+00A0 continues no identifier
+    Ok((end > pos).then_some((end, decoded)))
+}
+
 /// Decode a CSS unicode escape sequence: \XXXXXX (1-6 hex digits)
 /// Advances position past the escape sequence.
 ///

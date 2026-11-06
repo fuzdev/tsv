@@ -768,12 +768,15 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         self.advance()
     }
 
-    /// Make current the token that begins at `end`: the current token's own end, or a split
+    /// Make current the token that begins at `end`: the current token's own end, a split
     /// INSIDE it that a reader established by scanning the token's source — the attribute
-    /// selector's value and case flag, which `parseCss` ends before the lexer does.
+    /// selector's value and case flag, which `parseCss` ends before the lexer does — or a
+    /// point PAST it that a reader extended the token to (a wildcard custom-property name,
+    /// `declarations::extend_wildcard_name`).
     ///
     /// The whole-token case is a plain [`advance`](Self::advance), which keeps a cached
-    /// lookahead; a split re-seats through [`resume_at`](Self::resume_at), which drops it.
+    /// lookahead; a split or an extension re-seats through [`resume_at`](Self::resume_at), which
+    /// drops it.
     pub(in crate::parser) fn advance_from(&mut self, end: usize) -> Result<(), Error> {
         if end == self.current_end() {
             self.advance()

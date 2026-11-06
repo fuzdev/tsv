@@ -248,7 +248,7 @@ enum Disambiguation {
     Declaration(ScannedDeclaration),
 }
 
-/// The declaration head from `from` (just past the property identifier), as bytes: to the
+/// The declaration head from `from` (just past the property name), as bytes: to the
 /// `:` across ASCII whitespace and comments, then across ASCII whitespace to the value's
 /// first byte. `None` declines, on anything the token head reads differently or might
 /// reject.

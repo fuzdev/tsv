@@ -1,7 +1,7 @@
 use super::CssParser;
 use super::decl_scan::{DeclarationHead, ScannedDeclaration};
 use crate::ast::*;
-use crate::lexer::TokenKind;
+use crate::lexer::{TokenKind, read_ident_continuation};
 use tsv_lang::{Error, Span};
 
 /// Check if we're looking at the start of a nested rule (selector) rather than a declaration.
@@ -181,8 +181,15 @@ fn parse_rule_body<'arena>(
 /// that byte head declines. Leaves the parser on the value's first token, which
 /// `parse_declaration` then re-seats past (the value is scanned, never tokenized), so
 /// nothing lexed here survives except the head's three facts.
-fn lex_declaration_head(parser: &mut CssParser<'_, '_>) -> Result<DeclarationHead, Error> {
-    parser.advance()?;
+///
+/// `property_end` is where the property name ends: the identifier token's own end, or past
+/// it for a wildcard custom-property name ([`extend_wildcard_name`]), whose `*` runs the
+/// lexer tokenizes apart.
+fn lex_declaration_head(
+    parser: &mut CssParser<'_, '_>,
+    property_end: usize,
+) -> Result<DeclarationHead, Error> {
+    parser.advance_from(property_end)?;
 
     // The property→colon gap is an `allow_whitespace()` juncture: `read_declaration` ends
     // the property at the first JS-`\s` code point (`read_until(/[\s:]/)`) and skips to the
@@ -203,6 +210,46 @@ fn lex_declaration_head(parser: &mut CssParser<'_, '_>) -> Result<DeclarationHea
     })
 }
 
+/// Extend a custom property's name over the `*` glued into it — Tailwind v4's theme
+/// namespace wildcard (`--color-*: initial`, `--*: initial`, `--text-*--line-height`).
+///
+/// A deliberate carve-out from the spec, which gives a custom property a `<dashed-ident>`
+/// name: `*` is a `<delim-token>`, never an ident code point, so the lexer ends the
+/// identifier at it. `parseCss` reads a property as everything up to whitespace or a `:`
+/// and accepts these; tsv accepts exactly the custom-property name whose code points are
+/// an ident sequence's plus `*` — after the identifier token `head`, which ends at
+/// `head_end` on a `*`, every glued run of `*` and of ident-sequence continuation
+/// ([`read_ident_continuation`]). Anything else past the name is left where it was: a plain
+/// property's `*` (`*zoom`, `a*b`) and other punctuation in a custom name (`--a.b`) still
+/// fail at the colon.
+///
+/// Returns the whole name — decoded, as every property is in the internal AST (the wire
+/// re-slices the raw source) — and where it ends. Cold: the caller asks the `*` byte inline,
+/// so this frame's `String`s stay out of `parse_declaration`'s.
+#[cold]
+#[inline(never)]
+fn extend_wildcard_name<'arena>(
+    parser: &CssParser<'_, 'arena>,
+    head: &str,
+    head_end: usize,
+) -> Result<(&'arena str, usize), Error> {
+    let source = parser.source();
+    let mut name = String::from(head);
+    let mut pos = head_end;
+    loop {
+        if source.as_bytes().get(pos) == Some(&b'*') {
+            name.push('*');
+            pos += 1;
+        } else if let Some((end, decoded)) = read_ident_continuation(source, pos)? {
+            name.push_str(decoded.as_deref().unwrap_or_else(|| &source[pos..end]));
+            pos = end;
+        } else {
+            break;
+        }
+    }
+    Ok((parser.arena.alloc_str(&name), pos))
+}
+
 /// The debug oracle for a head settled from the bytes: the token head must reach the same
 /// colon, gap-comment answer and value start. It moves the parser, which the terminator
 /// seat that follows every head undoes.
@@ -212,7 +259,7 @@ fn assert_token_head_agrees(
     property_end: usize,
     head: DeclarationHead,
 ) {
-    let lexed = lex_declaration_head(parser);
+    let lexed = lex_declaration_head(parser, property_end);
     assert!(
         lexed.as_ref().is_ok_and(|lexed| *lexed == head),
         "byte-scanned declaration head disagreed with the token head at {property_end}: \
@@ -232,8 +279,14 @@ pub(crate) fn parse_declaration<'arena>(
     }
     // Internal AST: use decoded value (spec-compliant)
     // Svelte quirk (raw value) will be applied in conversion layer
-    let property = parser.current_identifier_in_arena();
-    let property_end = parser.current_end();
+    let is_custom_property = parser.current_identifier_is_custom_property();
+    let (property, property_end) = if is_custom_property
+        && parser.source().as_bytes().get(parser.current_end()) == Some(&b'*')
+    {
+        extend_wildcard_name(parser, parser.current_identifier(), parser.current_end())?
+    } else {
+        (parser.current_identifier_in_arena(), parser.current_end())
+    };
 
     // Locate the value and scan it to its terminator (`;` / `}` at depth zero, or EOF),
     // collecting the few facts the declaration node needs: where its span ends, whether it
@@ -281,7 +334,7 @@ pub(crate) fn parse_declaration<'arena>(
             );
             let head = match byte_head {
                 Some(head) => head,
-                None => lex_declaration_head(parser)?,
+                None => lex_declaration_head(parser, property_end)?,
             };
             let (facts, class) = super::decl_scan::scan_value(parser, head.value_start)?;
             // A head located from the bytes is held to the token head once the value has
@@ -319,7 +372,6 @@ pub(crate) fn parse_declaration<'arena>(
     // `!important` text alone, and the value holds the same empty identifier as the custom
     // one. A bare empty non-custom value (`a:;`, `a: ;`) stays an error, as `parseCss`'s
     // "Declaration cannot be empty".
-    let is_custom_property = property.starts_with("--");
     if facts.is_empty && !has_value_comment && !is_custom_property && important_end.is_none() {
         return Err(parser.error_msg_at("Empty CSS value", start));
     }
@@ -400,4 +452,102 @@ pub(crate) fn parse_declaration<'arena>(
         colon_offset,
         has_block_comment,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bumpalo::Bump;
+
+    /// The block children of the one rule `source` holds.
+    fn rule_children<'arena>(
+        source: &str,
+        arena: &'arena Bump,
+    ) -> Result<&'arena [CssBlockChild<'arena>], Error> {
+        let sheet = super::super::parse_css(source, 0, 0, arena)?;
+        match sheet.nodes {
+            [CssNode::Rule(rule)] => Ok(rule.declarations),
+            nodes => panic!("{source:?}: expected one rule, got {} nodes", nodes.len()),
+        }
+    }
+
+    /// A custom property's name takes the `*` glued into it (Tailwind v4's namespace
+    /// wildcard), decoded like every other property name.
+    #[test]
+    fn wildcard_custom_property_names_parse() {
+        let cases = [
+            ("--*: initial", "--*"),
+            ("--a-*: initial", "--a-*"),
+            ("--a-*-b: red", "--a-*-b"),
+            ("--a*: red", "--a*"),
+            ("--a-**: red", "--a-**"),
+            ("--*-a: red", "--*-a"),
+            ("--A-*: red", "--A-*"),
+            ("--a-*1: red", "--a-*1"),
+            ("--text-*--line-height: initial", "--text-*--line-height"),
+            ("--a-* : red", "--a-*"),
+            ("--a-*/* c */: red", "--a-*"),
+            ("--a-*:;", "--a-*"),
+            ("--a-*: red !important", "--a-*"),
+            ("--a\\41-*: red", "--aA-*"),
+            ("--a-*\\41: red", "--a-*A"),
+            ("--a-*-\\41 b: red", "--a-*-Ab"),
+        ];
+        for (decl, property) in cases {
+            let source = format!("div {{ {decl} }}");
+            let arena = Bump::new();
+            let children = rule_children(&source, &arena)
+                .unwrap_or_else(|error| panic!("{source:?}: {error:?}"));
+            match children {
+                [CssBlockChild::Declaration(declaration)] => {
+                    assert_eq!(declaration.property, property, "{source:?}");
+                }
+                _ => panic!("{source:?}: expected one declaration"),
+            }
+        }
+    }
+
+    /// The carve-out is the custom property's name alone: a plain property's `*` (`*zoom`,
+    /// the IE star hack, or `a*b`) and other punctuation in a custom name still fail.
+    #[test]
+    fn non_wildcard_star_names_still_reject() {
+        for decl in [
+            "*zoom: 1",
+            "a*b: x",
+            "a-*: x",
+            "--a.b: x",
+            "--a+b: x",
+            "--a/b: x",
+            "--a,b: x",
+            "--a- *: x",
+            "--a-*.b: x",
+            // `$` and a C1 control continue no identifier, so the extension leaves them at
+            // the colon (`read_identifier` alone would open on the `$`)
+            "--a-*$b: x",
+            "--a-*\u{80}: x",
+        ] {
+            let source = format!("div {{ {decl} }}");
+            let arena = Bump::new();
+            assert!(rule_children(&source, &arena).is_err(), "{source:?} parsed");
+        }
+    }
+
+    /// A `*` that opens a block child is still the universal selector of a nested rule.
+    #[test]
+    fn nested_universal_selectors_stay_rules() {
+        for nested in [
+            "* { color: red }",
+            "*.a { color: red }",
+            "*:hover { color: red }",
+        ] {
+            let source = format!("div {{ {nested} }}");
+            let arena = Bump::new();
+            let children = rule_children(&source, &arena)
+                .unwrap_or_else(|error| panic!("{source:?}: {error:?}"));
+            assert!(
+                matches!(children, [CssBlockChild::Rule(_)]),
+                "{source:?}: expected a nested rule"
+            );
+        }
+    }
 }

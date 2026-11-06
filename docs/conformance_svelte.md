@@ -275,6 +275,19 @@ immediate, enforced goal is **parity with Svelte's `parseCss`** on the conforman
 subset: tsv is a drop-in replacement and Svelte's parser is the fixture baseline.
 Where the two goals conflict on conformant input, Svelte-parity wins for now.
 
+- **A wildcard custom-property name is accepted — a deliberate exception to spec-wins.**
+  Tailwind v4 resets a theme namespace with `*` in a custom property's name (`@theme {
+  --color-*: initial; }`, `--*: initial`). The spec gives a custom property a
+  `<dashed-ident>` name and `*` is a `<delim-token>`, so a spec parser drops the
+  declaration; `parseCss` reads the name with `read_until(/[\s:]/)` and accepts it, and
+  prettier keeps it verbatim. Rejecting it would make tsv unusable on Tailwind v4 sources,
+  so tsv widens exactly one thing: a **custom** property's name is an ident sequence's code
+  points plus `*` (`--a-*-b`, `--a**`, `--*-a`, escapes included), anywhere a declaration
+  may appear. The rest of the raw-scan gap below is untouched: a plain property's `*`
+  (`*zoom`, the IE star hack — an explicit non-goal below — or `a*b`) and other
+  punctuation in a custom name (`--a.b`, `--a+b`) still reject. The wire `property` is the
+  raw name, as `parseCss`'s; the internal AST's is decoded like every other property —
+  [css/values/variables/name_wildcard](../tests/fixtures/css/values/variables/name_wildcard/).
 - **A declaration's property and value are RAW SCANS in `parseCss`, and identifier TOKENS in
   tsv — a tracked gap.** `read_declaration` reads a property with `read_until(/[\s:]/)` and a
   value with `read_value`, so *any* character that is neither JS-`\s` nor the delimiter is

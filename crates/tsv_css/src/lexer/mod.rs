@@ -49,6 +49,7 @@ use identifiers::{
 };
 pub(crate) use identifiers::{
     IDENT_CONTINUE_LUT, hyphen_starts_own_token, is_non_ascii_identifier_codepoint,
+    read_ident_continuation,
 };
 use numbers::read_number_into;
 use strings::read_string;

@@ -427,6 +427,14 @@ Spec: `css-variables-1`
 - Empty custom property with `!important` (`--name: !important;`) — also
   normalizes to a single space; prettier is non-convergent here (grows a space
   per pass), so it's guarded by a `.css` fixture (no prettier oracle)
+- Wildcard custom-property name (`--color-*: initial`, `--*: initial`,
+  `--text-*--line-height`) — Tailwind v4's theme namespace reset. Not spec CSS (`*` is a
+  `<delim-token>`, never an ident code point), but `parseCss` accepts it and prettier
+  keeps it, so tsv admits `*` among a **custom** property name's code points and nowhere
+  else: a plain property's `*` (`*zoom`, the IE star hack, or `a*b`) and other punctuation
+  in a custom name (`--a.b`) still reject —
+  [css/values/variables/name_wildcard](../tests/fixtures/css/values/variables/name_wildcard/)
+  (see ./conformance_svelte.md §CSS Parser Scope & Error Model)
 - `var()` basic usage
 - `var()` with fallback
 - `var()` empty fallback (`var(--a,)`) — the trailing comma is significant

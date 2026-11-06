@@ -1,0 +1,150 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 224,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 175,
+				"name": "theme",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 16,
+					"end": 175,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 44,
+							"end": 56,
+							"property": "--*",
+							"value": "initial"
+						},
+						{
+							"type": "Declaration",
+							"start": 60,
+							"end": 74,
+							"property": "--a-*",
+							"value": "initial"
+						},
+						{
+							"type": "Declaration",
+							"start": 117,
+							"end": 129,
+							"property": "--a-*-b",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 133,
+							"end": 142,
+							"property": "--a*",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 146,
+							"end": 157,
+							"property": "--a-**",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 161,
+							"end": 171,
+							"property": "--*-a",
+							"value": "red"
+						}
+					]
+				}
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 178,
+					"end": 181,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 178,
+							"end": 181,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 178,
+											"end": 181
+										}
+									],
+									"start": 178,
+									"end": 181
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 182,
+					"end": 215,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 186,
+							"end": 196,
+							"property": "--a-*",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 200,
+							"end": 211,
+							"property": "--A-*",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 178,
+				"end": 215
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " namespace reset ",
+				"start": 20,
+				"end": 41
+			},
+			{
+				"type": "CSSComment",
+				"value": " wildcard mid-name and doubled ",
+				"start": 79,
+				"end": 114
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 216,
+			"styles": "\n\t@theme {\n\t\t/* namespace reset */\n\t\t--*: initial;\n\t\t--a-*: initial;\n\n\t\t/* wildcard mid-name and doubled */\n\t\t--a-*-b: red;\n\t\t--a*: red;\n\t\t--a-**: red;\n\t\t--*-a: red;\n\t}\n\n\tdiv {\n\t\t--a-*: red;\n\t\t--A-*: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 225,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
