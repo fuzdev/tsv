@@ -13,6 +13,8 @@ Each `## Unreleased` section must be non-empty and carry a
 ## Unreleased
 <!-- bump: patch -->
 
+## 0.8.1
+
 - feat: import records — `parse_imports_typescript(source, options?)` and
   `parse_imports_svelte(source, options?)` in `@fuzdev/tsv` and `@fuzdev/tsv-wasm` list
   each static import, re-export, dynamic import and `import x = require()` with its spans,
