@@ -124,26 +124,19 @@ jobs:
           - triple: darwin-arm64
             runner: macos-15
             build: native
-          # The one row whose staged triple is not its host's: Intel macOS
-          # runners are being retired, so darwin-x64 CROSS-COMPILES on the
-          # arm64 mac runner (`target` names the rust target; cargo then writes
-          # under target/<target>/) and runs its npm-shape test under x64 Node
-          # through Rosetta 2 (`node_arch`), where `process.arch` reads `x64` and
-          # the loader resolves the staged package. Its PGO training runs the
-          # same way, under Rosetta (⚠ unverified until a dispatch dry run).
+          # Native on an Intel runner (macOS 15, like the arm64 row): each row
+          # trains and gates its binaries where they run. Under Rosetta 2 on an
+          # arm64 runner the x86_64 training and gates run an order of magnitude
+          # slower, and the depth gate's control pass, which natively dies of its
+          # stack overflow at once, neither dies nor finishes there. ⚠ Unverified
+          # on this runner until a dispatch dry run.
           - triple: darwin-x64
-            runner: macos-15
+            runner: macos-15-intel
             build: native
-            target: x86_64-apple-darwin
-            node_arch: x64
           - triple: win32-x64
             runner: windows-2025
             build: native
     runs-on: ${{ matrix.runner }}
-    env:
-      # The rust target of a cross row (empty on every other) — what the PGO
-      # steps pass as `--target` and the build steps as cargo's.
-      TARGET: ${{ matrix.target }}
     # The fat-LTO builds (the plain CLI, the instrumented pair, the profile-use
     # pair), the depth shapes' test build, the two training passes, and the
     # byte-identity and depth gates.
@@ -168,13 +161,13 @@ jobs:
 
       # Toolchain for the native rows: the one pinned in rust-toolchain.toml,
       # installed by the runner's preinstalled rustup (any rustup 1.28+ reads the
-      # file with no arguments, so skip self-updating it), plus the cross row's
-      # std. The container rows install the same pin themselves. Every row also
-      # takes the pin's `llvm-tools-preview` on the HOST: its `llvm-profdata`
-      # merges the training profiles (it must be rustc's own LLVM —
-      # scripts/pgo/pgo.ts checks) and its `llvm-readobj` reads the binaries'
-      # sections. The container rows' host may lack rustup (the arm64 image), so
-      # it is installed there when missing.
+      # file with no arguments, so skip self-updating it). The container rows
+      # install the same pin themselves. Every row also takes the pin's
+      # `llvm-tools-preview` on the HOST: its `llvm-profdata` merges the
+      # training profiles (it must be rustc's own LLVM — scripts/pgo/pgo.ts
+      # checks) and its `llvm-readobj` reads the binaries' sections. The
+      # container rows' host may lack rustup (the arm64 image), so it is
+      # installed there when missing.
       - name: Install Rust
         run: |
           if ! command -v rustup >/dev/null; then
@@ -184,23 +177,14 @@ jobs:
           fi
           rustup toolchain install --no-self-update
           rustup component add llvm-tools-preview
-          if [ -n "$TARGET" ]; then rustup target add "$TARGET"; fi
           rustup show active-toolchain
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         if: matrix.build == 'native'
         with:
-          # Two rows share the macos-15 runner (darwin-arm64 and the darwin-x64
-          # cross row) and must not share a target-dir cache.
+          # One cache per row, keyed by the triple it builds rather than by the
+          # default key's job name.
           key: ${{ matrix.triple }}
-
-      # The cross row's test half runs x64 Node under Rosetta 2. The hosted arm64
-      # mac images ship it; this asks before the build rather than at the test
-      # step an hour in (`arch -x86_64` exits non-zero when no x64 slice can
-      # run), and installs it if an image ever stops shipping it.
-      - name: Rosetta 2 (cross rows)
-        if: matrix.node_arch
-        run: arch -x86_64 /usr/bin/true || sudo softwareupdate --install-rosetta --agree-to-license
 
       # The container rows' cache: cargo/rustup homes + target live under the
       # workspace (mounted into the container) so actions/cache can carry them.
@@ -227,14 +211,11 @@ jobs:
 
       # For the PGO steps (scripts/pgo/pgo.ts runs under Node) and the npm-shape
       # test (`node --test` executes the .ts directly via native type stripping,
-      # >= 22.18). Pinned to match check.yml. The cross row asks for the x64
-      # build of Node (run under Rosetta); the empty default everywhere else is
-      # the runner's own architecture.
+      # >= 22.18). Pinned to match check.yml.
       - name: Install Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24.14.1'
-          architecture: ${{ matrix.node_arch }}
 
       # The shipped binaries are profile-guided (scripts/pgo/pgo.ts, whose module
       # doc lists the steps below in order). The training corpus is the
@@ -253,15 +234,12 @@ jobs:
 
       # Each leg builds the PLAIN `release` tsv_cli (the byte-identity reference
       # the PGO binaries must match) and the instrumented pair (scripts/pgo/build.sh,
-      # the one spelling of the PGO RUSTFLAGS) in one environment. A row with a
-      # `target` cross-compiles; cargo then writes under <target-dir>/<target>/.
+      # the one spelling of the PGO RUSTFLAGS) in one environment.
       - name: Build plain + instrumented (native)
         if: matrix.build == 'native'
         run: |
-          flags=()
-          if [ -n "$TARGET" ]; then flags+=(--target "$TARGET"); fi
-          cargo build --locked -p tsv_cli --release "${flags[@]}"
-          sh scripts/pgo/build.sh instrument .pgo "$TARGET"
+          cargo build --locked -p tsv_cli --release
+          sh scripts/pgo/build.sh instrument .pgo
 
       - name: Build plain + instrumented (almalinux:8 — glibc 2.28 floor)
         if: matrix.build == 'gnu-container'
@@ -301,16 +279,14 @@ jobs:
       # package (under .pgo/, never left in crates/tsv_napi/pkg/), so the addon
       # trains through the loader's own cli.js.
       - name: Stage the instrumented pair
-        run: node scripts/pgo/pgo.ts stage --phase instrument --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
+        run: node scripts/pgo/pgo.ts stage --phase instrument --triple ${{ matrix.triple }}
 
       # Training runs each binary AS ITSELF where it runs: the gnu rows on the
       # host (the 2.28-floor binaries run on its newer glibc), the native rows
-      # natively. ⚠ UNVERIFIED on darwin-x64 until a dispatch dry run: the x64
-      # binaries train under Rosetta 2 (x64 Node, the x64 addon, the x64 CLI),
-      # and the profile they write is merged by the arm64 host's llvm-profdata.
+      # natively.
       - name: Train
         if: matrix.build != 'musl-container'
-        run: node scripts/pgo/pgo.ts train --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
+        run: node scripts/pgo/pgo.ts train --triple ${{ matrix.triple }}
 
       # The dynamic musl binaries cannot run on the glibc host: train in the
       # environment the npm-shape test already uses, the corpus mounted read-only.
@@ -328,7 +304,7 @@ jobs:
 
       - name: Build profile-use (native)
         if: matrix.build == 'native'
-        run: sh scripts/pgo/build.sh use .pgo "$TARGET"
+        run: sh scripts/pgo/build.sh use .pgo
 
       - name: Build profile-use (almalinux:8 — glibc 2.28 floor)
         if: matrix.build == 'gnu-container'
@@ -367,14 +343,14 @@ jobs:
       # binaries none.
       - name: Profile-applied and no-instrumentation gates
         run: |
-          node scripts/pgo/pgo.ts gate-builds --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
-          node scripts/pgo/pgo.ts gate-sections --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
+          node scripts/pgo/pgo.ts gate-builds --triple ${{ matrix.triple }}
+          node scripts/pgo/pgo.ts gate-sections --triple ${{ matrix.triple }}
 
       # The profile-use pair is the platform package: staged into
       # crates/tsv_napi/pkg/<triple>/ (and laid out under .pgo/ for the
       # byte-identity gate's cli.js run).
       - name: Stage platform package
-        run: node scripts/pgo/pgo.ts stage --phase use --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
+        run: node scripts/pgo/pgo.ts stage --phase use --triple ${{ matrix.triple }}
 
       # The measured floor: the highest versioned glibc symbol each shipped
       # artifact references must not exceed 2.28 — the gate that keeps the
@@ -422,10 +398,10 @@ jobs:
       # fixture to the plain CLI's bytes; over the fixture inputs and a stride of
       # the snapshot, both must parse and strip to its bytes, and the PGO addon's
       # import records must equal the instrumented addon's — on the target, in
-      # the environment that runs it (node:alpine for musl, Rosetta for darwin-x64).
+      # the environment that runs it (node:alpine for musl).
       - name: Byte identity (PGO vs plain)
         if: matrix.build != 'musl-container'
-        run: node scripts/pgo/pgo.ts byteid --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
+        run: node scripts/pgo/pgo.ts byteid --triple ${{ matrix.triple }}
 
       - name: Byte identity (PGO vs plain, node:alpine)
         if: matrix.build == 'musl-container'
@@ -443,13 +419,14 @@ jobs:
       # matches none of their functions) — so the binary itself is graded, on
       # every row. A native overflow kills the process; a control pass on a far
       # smaller thread must die first (the setting is a live limit), or the gate
-      # fails as vacuous. The shapes
+      # fails as vacuous; a pass still running at its bound is killed and fails
+      # as hung, so a wedged one never runs into the job's timeout. The shapes
       # are counts, not frames, so the host writes them (a `corpus`-profile test
       # build, under .pgo/ beside the container rows' root-owned target/).
       - name: Depth shapes
         run: CARGO_TARGET_DIR=.pgo/target-shapes node scripts/pgo/pgo.ts depth-shapes
 
-      # ⚠ UNVERIFIED on win32-x64 until a dispatch dry run: libuv asks Windows for
+      # On win32-x64 libuv asks Windows for
       # the worker's stack as its initial COMMIT, and the reserve is node.exe's own
       # unless the commit is not smaller (then the commit rounded up to a MiB). So
       # each pass runs under its own scratch COPY of node.exe (.pgo/depth/
@@ -462,11 +439,10 @@ jobs:
       # FALLBACK and a ::warning::, when a copy cannot be made or does not start, when
       # the gate's thread would still exceed the contract, or when the control
       # survives on a thread the reserve, not its request, sized. Any other
-      # surviving control fails. Likewise unverified on darwin-x64, which runs it
-      # under Rosetta.
+      # surviving control fails.
       - name: Depth contract (staged PGO addon)
         if: matrix.build != 'musl-container'
-        run: node scripts/pgo/pgo.ts depth --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
+        run: node scripts/pgo/pgo.ts depth --triple ${{ matrix.triple }}
 
       - name: Depth contract (staged PGO addon, node:alpine)
         if: matrix.build == 'musl-container'
@@ -482,9 +458,7 @@ jobs:
 
       # The npm-shape test over the REAL artifacts: loader platform-resolution,
       # the wasm-parity options surface, the packaged .node, and the `tsv` bin
-      # dispatching to the packaged CLI binary. On the cross row this is x64
-      # Node under Rosetta loading the x64 addon and exec'ing the x64 CLI, and
-      # its `platform_triple()` must equal the staged triple. (The panic-contract
+      # dispatching to the packaged CLI binary. (The panic-contract
       # probe test runs per OS in check.yml's platforms job on every PR; it
       # needs a separate probe build, and the contract is profile+attribute
       # determined — identical across targets — so it is not re-proven here.)

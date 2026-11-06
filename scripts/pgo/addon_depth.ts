@@ -39,7 +39,11 @@
  * the control survives on a thread the reserve, not its request, sized (the deepest shape
  * fit that reserve, so no worker there can show the setting is a live limit). Every
  * other surviving control fails: off Windows, on a thread its request sized, or returning
- * failures. Then the gate pass shards the shapes over a few workers.
+ * failures. Then the gate pass shards the shapes over a few workers. Either pass still
+ * running at `PASS_TIMEOUT_MS` is killed and fails as hung, never a fallback: a control
+ * that overflows dies at its first deep shape and one that survives finishes well inside
+ * the bound, so one still running is wedged — an overflow that did not end the process,
+ * or a stuck worker — and nothing it shows reads as a fallback reason.
  *
  * Exit codes: 0 graded and held, 1 a failure, 2 usage, 3 cannot grade here (above).
  *
@@ -75,8 +79,11 @@ import {
 	CONTROL_STACK_MB,
 	GATE_STACK_MB,
 	MIB,
+	PASS_TIMEOUT_MS,
 	pe_stack_sizes,
+	spawn_timed_out,
 	stack_request_bytes,
+	timeout_minutes,
 	windows_thread_bytes
 } from './depth_stack.ts';
 import {
@@ -270,7 +277,8 @@ if (!isMainThread) {
 		process.exit(0);
 	}
 
-	/** Run one pass in a child process of `exe`: its report, or how it died and what was running. */
+	/** Run one pass in a child process of `exe`, killed past `PASS_TIMEOUT_MS`: its report,
+	 * or how it died (or that it was killed as hung) and what was running. */
 	const pass = (
 		name: string,
 		exe: string,
@@ -281,6 +289,7 @@ if (!isMainThread) {
 		report?: { graded: number; failures: Array<Failure> };
 		died?: string;
 		overflowed?: boolean;
+		hung?: boolean;
 	} => {
 		const dir = join(options.dir, name);
 		rmSync(dir, { recursive: true, force: true });
@@ -292,8 +301,25 @@ if (!isMainThread) {
 				...['--filter', filter, '--jobs', String(pass_jobs)],
 				...['--stack-mb', String(stack_mb)]
 			],
-			{ encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 28 }
+			{
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'pipe'],
+				maxBuffer: 1 << 28,
+				// SIGKILL: a process wedged in its own fault handling may not answer a SIGTERM
+				// (Windows terminates the process whatever the signal)
+				timeout: PASS_TIMEOUT_MS,
+				killSignal: 'SIGKILL'
+			}
 		);
+		if (spawn_timed_out(r.error)) {
+			return {
+				hung: true,
+				died:
+					`killed after ${timeout_minutes(PASS_TIMEOUT_MS)}, running ` +
+					`${last_started(dir, pass_jobs).join(', ') || '(none noted)'}` +
+					(r.stderr?.trim() ? `\n${r.stderr.trim().slice(-2000)}` : '')
+			};
+		}
 		if (r.error) {
 			console.error(`✗ could not run the ${name} pass: ${r.error.message}`);
 			process.exit(1);
@@ -347,6 +373,16 @@ if (!isMainThread) {
 	if (control_node !== gate_node) console.log(`control: runs under ${control_node}`);
 	if (options.filter) console.log(`control: runs every shape (--filter narrows only the gate)`);
 	const control = pass('control', control_node, 1, CONTROL_STACK_MB, '');
+	if (control.hung) {
+		// not a slow control: one that overflows dies at its first deep shape, and one that
+		// survives finishes well inside the bound — this one did neither
+		console.error(
+			`✗ the control pass neither overflowed nor finished on its ${CONTROL_STACK_MB} MiB worker ` +
+				`thread (${control.died}) — an overflow that did not end the process, or a wedged ` +
+				'worker — so the gate cannot show the setting is a live limit'
+		);
+		process.exit(1);
+	}
 	if (control.report) {
 		const { graded, failures } = control.report;
 		if (
@@ -387,6 +423,13 @@ if (!isMainThread) {
 	// the gate
 	const started = performance.now();
 	const gate = pass('gate', gate_node, jobs, GATE_STACK_MB, options.filter);
+	if (gate.hung) {
+		console.error(
+			`✗ the gate pass did not finish on its ${GATE_STACK_MB} MiB worker threads within its ` +
+				`timeout (${gate.died})`
+		);
+		process.exit(1);
+	}
 	if (!gate.report) {
 		console.error(`✗ the gate pass died on its ${GATE_STACK_MB} MiB worker threads: ${gate.died}`);
 		process.exit(1);

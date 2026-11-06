@@ -3,8 +3,9 @@
  * the reserve writer over synthetic headers of both optional-header widths — the writer
  * through a round trip with the reader, both refusing bytes that are not a PE image, the
  * writer refusing an image whose commit exceeds the new reserve — the two copies' reserves
- * and the threads Windows' rule gives each pass under them, and which spawn errors read as a
- * copy that did not start. A field read or written at the wrong offset or width, or a
+ * and the threads Windows' rule gives each pass under them, which spawn errors read as a
+ * copy that did not start and which as a pass killed at its timeout, and that the run's bound
+ * outlasts its two passes'. A field read or written at the wrong offset or width, or a
  * reserve that leaves a pass off its request, fails here, not as a Windows row graded on
  * the wrong thread.
  */
@@ -18,10 +19,14 @@ import {
 	GATE_STACK_MB,
 	GATE_STACK_RESERVE,
 	MIB,
+	PASS_TIMEOUT_MS,
 	pe_set_stack_reserve,
 	pe_stack_sizes,
+	RUN_TIMEOUT_MS,
 	spawn_did_not_start,
+	spawn_timed_out,
 	stack_request_bytes,
+	timeout_minutes,
 	windows_thread_bytes
 } from './depth_stack.ts';
 
@@ -186,4 +191,19 @@ Deno.test('spawn_did_not_start reads only a start failure as one', () => {
 	for (const code of ['ENOBUFS', 'ETIMEDOUT', undefined]) {
 		ok(!spawn_did_not_start(error(code)), String(code));
 	}
+});
+
+Deno.test('spawn_timed_out reads only a timeout as one', () => {
+	const error = (code?: string): Error & { code?: string } =>
+		Object.assign(new Error('spawn'), { code });
+	ok(spawn_timed_out(error('ETIMEDOUT')));
+	for (const code of ['ENOENT', 'ENOBUFS', undefined])
+		ok(!spawn_timed_out(error(code)), String(code));
+	// a spawn that ran to an exit has no error at all
+	ok(!spawn_timed_out(undefined));
+});
+
+Deno.test('the run outlasts both of its passes, so a hung pass is named by its own bound', () => {
+	ok(RUN_TIMEOUT_MS > 2 * PASS_TIMEOUT_MS);
+	strictEqual(timeout_minutes(PASS_TIMEOUT_MS), '30 min');
 });

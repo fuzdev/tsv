@@ -20,8 +20,9 @@
  *
  * One platform per invocation by design: a machine can only have built its own
  * triple, and the release workflow runs this once per matrix target
- * (`--triple` + `--artifact`/`--cli-artifact` name cross-built binaries;
- * defaults are the host triple, `target/napi/`, and `target/release/`).
+ * (`--triple` + `--artifact`/`--cli-artifact` name the binaries to stage — the PGO
+ * pipeline's, under `.pgo/`; defaults are the host triple, `target/napi/`, and
+ * `target/release/`).
  * `--loader-only` skips the platform half entirely — the release workflow's
  * publish job stages the loader beside downloaded platform artifacts, on a
  * machine that built nothing. The cargo builds themselves are the
@@ -84,10 +85,8 @@ const native_library_filename = (): string => {
 
 const triple = args.triple ?? host_triple();
 const artifact = args.artifact ?? `target/napi/${native_library_filename()}`;
-// The staged NAME follows the target triple; the default SOURCE path follows
-// the host (every matrix leg but darwin-x64 builds natively or in a same-arch
-// container, so the two agree — that one cross-compiles on the arm64 mac
-// runner and names both binaries via --artifact / --cli-artifact).
+// The staged NAME follows the triple; the default SOURCE path follows the host
+// (every matrix leg builds natively or in a same-arch container, so the two agree).
 const cli_binary = cli_binary_name(triple);
 const cli_artifact =
 	args['cli-artifact'] ?? `target/release/${Deno.build.os === 'windows' ? 'tsv.exe' : 'tsv'}`;

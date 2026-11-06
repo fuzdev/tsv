@@ -91,12 +91,10 @@ into `crates/tsv_napi/pkg/` (gitignored):
   `linux-arm64-gnu`, `linux-x64-musl`, `darwin-arm64`, `darwin-x64`, `win32-x64`.
   One per invocation by design — a machine can only have built its own triple; the
   release workflow runs the script once per matrix target with `--triple` —
-  every row but one builds on its own architecture (the gnu/musl rows in pinned
-  containers, the arm row on an arm runner, mac and Windows on native runners).
-  The exception is `darwin-x64`: Intel macOS runners are being retired, so it
-  cross-compiles on the arm64 mac runner (`cargo build --target x86_64-apple-darwin`),
-  names its binaries via `--artifact`/`--cli-artifact`, and runs the npm-shape test under
-  x64 Node through Rosetta 2, where `platform_triple()` reads the staged triple.
+  every row builds on its own architecture (the gnu/musl rows in pinned
+  containers, the arm row on an arm runner, mac and Windows on native runners,
+  `darwin-x64` on an Intel mac runner), never cross-compiled: each row trains and
+  gates the binaries it ships where they run.
 
 **The loader is ESM**, the same module system as the wasm packages — one
 dialect across tsv's whole npm surface, which is what lets shared sources
@@ -299,8 +297,7 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   process; `parse` on every file (the CLI also with `--locations`), the type strip on every
   TypeScript file, the import records on every TypeScript and Svelte file (the addon's
   alone), then `format --jobs 1` — on the host for the gnu rows (their 2.28-floor binaries
-  run there), in node:alpine for musl, under Rosetta 2 for `darwin-x64` (⚠ unverified until
-  a dispatch dry run). `--jobs 1` fixes WHAT runs, not the profile's bytes: address-keyed
+  run there), in node:alpine for musl. `--jobs 1` fixes WHAT runs, not the profile's bytes: address-keyed
   and per-process-seeded hash tables count differently run to run, so two trainings write
   different profiles and the binaries' bytes differ. That is the contract: the
   OUTPUT is gated byte-identical to a plain build's; the profile and the binary's bytes are
@@ -339,15 +336,14 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   thread would exceed the contract, or the control survives on a thread the reserve rather
   than its request sized — `win32-x64`'s PGO addon depth is graded by the plain-profile
   `test:depth:napi` run instead, logged as a fallback and a workflow warning, and any other
-  surviving control fails; ⚠ unverified on `win32-x64` and on `darwin-x64` under
-  Rosetta). Every PGO build goes to `.pgo/`, outside the `target/` every row caches, so no
-  profile-use build is ever restored from a cache. The bench's native rows measure the same
+  surviving control fails; either pass still running at its bound, `PASS_TIMEOUT_MS`, is
+  killed and fails as hung, never a fallback). Every PGO build goes to `.pgo/`, outside the
+  `target/` every row caches, so no profile-use build is ever restored from a cache. The bench's native rows measure the same
   pipeline's output: `deno task build:bench:pgo` runs it locally (`pgo.ts all --ffi`, with
   the bench's C-FFI library as a third world) and stages the gated pair in `.pgo/bench/`.
   The gnu rows build in almalinux:8 → glibc 2.28 floor (Node's own binary floor), measured
   by the workflow's floor gate over both artifacts; musl in rust:alpine with `-crt-static`
-  off, both gated GLIBC-free; `darwin-x64` cross-compiles on the arm64 mac runner and is
-  tested under Rosetta 2 (above). Then per-artifact size bounds (`scripts/validate_napi_artifact.ts --triple <t> --pgo`, the script behind `deno task validate:napi`;
+  off, both gated GLIBC-free. Then per-artifact size bounds (`scripts/validate_napi_artifact.ts --triple <t> --pgo`, the script behind `deno task validate:napi`;
   one tight anchored band per binary, a PGO set for what ships and a plain set graded on
   every PR over the Linux host build by `check.yml`'s `artifacts` job) and the npm-shape
   test over the real artifacts (node:alpine for musl).

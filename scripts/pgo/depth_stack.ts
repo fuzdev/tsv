@@ -1,10 +1,10 @@
 /**
  * The thread-stack facts the PGO depth gate shares between its orchestrator (`pgo.ts depth`)
- * and its runner (`addon_depth.ts`): the threads each pass asks for, the "cannot grade here"
- * exit and the stderr line that must come with it, the thread Windows gives a worker, and
- * the PE image's `SizeOfStackReserve` — read to learn that thread, and written into the
- * scratch copies of node.exe that make a worker's `resourceLimits.stackSizeMb` size its
- * thread there too.
+ * and its runner (`addon_depth.ts`): the threads each pass asks for, how long a pass and the
+ * whole run may take, the "cannot grade here" exit and the stderr line that must come with
+ * it, the thread Windows gives a worker, and the PE image's `SizeOfStackReserve` — read to
+ * learn that thread, and written into the scratch copies of node.exe that make a worker's
+ * `resourceLimits.stackSizeMb` size its thread there too.
  *
  * Pure (no I/O), so it unit-tests over synthetic headers (`depth_stack_test.ts`).
  *
@@ -31,6 +31,25 @@ export const CANNOT_GRADE_EXIT = 3;
  * back only on the exit AND this line, so an unrelated process death that happens to exit 3
  * (the MSVC CRT's `abort()` does) still fails. */
 export const CANNOT_GRADE_LINE = 'addon_depth: cannot grade the stack contract here';
+
+/**
+ * How long one `addon_depth.ts` pass may run before it is killed as hung, ms. A native pass
+ * takes minutes: the gate shards the shapes over a few workers, and the control either
+ * overflows at its first deep shape, within a second, or, if it survives, grades every
+ * shape on one worker, about the gate's work unsharded. The bound is several times the
+ * gate's wall on the slowest native row measured (darwin-arm64) and about twice a surviving
+ * control's there, so a pass still running at it is stuck rather than slow: an overflow
+ * that did not end the process, or a wedged worker. It fails fast instead of spending the rest of the row's job timeout.
+ */
+export const PASS_TIMEOUT_MS = 30 * 60 * 1000;
+
+/** How long `pgo.ts depth` waits on the whole `addon_depth.ts` run, ms: its two passes in
+ * sequence, each under `PASS_TIMEOUT_MS`, plus the run's own setup. Only a runner that
+ * stops enforcing its own pass bounds can reach it. */
+export const RUN_TIMEOUT_MS = 2 * PASS_TIMEOUT_MS + 5 * 60 * 1000;
+
+/** A timeout in minutes, for the messages that name one. */
+export const timeout_minutes = (ms: number): string => `${Math.round(ms / 60_000)} min`;
 
 /** Windows' page (x64 and arm64), which a thread's commit is rounded up to. */
 const PAGE = 4096;
@@ -77,6 +96,11 @@ const NOT_STARTED_CODES: ReadonlySet<string> = new Set(['ENOENT', 'EACCES', 'EPE
 /** Whether a spawn's `error` means the executable did not start. */
 export const spawn_did_not_start = (error: Error & { code?: string }): boolean =>
 	NOT_STARTED_CODES.has(error.code ?? '');
+
+/** Whether a spawn's `error` means its `timeout` elapsed and the child was killed — the
+ * `ETIMEDOUT` Node and Deno both set, beside the kill signal, when a `spawnSync` times out. */
+export const spawn_timed_out = (error: (Error & { code?: string }) | undefined): boolean =>
+	error?.code === 'ETIMEDOUT';
 
 /** A PE image's stack fields: where `SizeOfStackReserve` and `SizeOfStackCommit` live and
  * how wide they are. */

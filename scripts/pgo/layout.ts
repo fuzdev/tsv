@@ -82,20 +82,16 @@ export const ffi_library_name = (triple: string): string =>
 
 /**
  * The artifacts of one cargo target dir: the `release` CLI, the `napi`-profile addon and the
- * `release` FFI library, under `<target>/` for a cross build (`rust_target` set).
+ * `release` FFI library.
  */
 export const cargo_artifacts = (
 	target_dir: string,
-	triple: string,
-	rust_target?: string
-): { cli: string; addon: string; ffi: string } => {
-	const base = rust_target ? join(target_dir, rust_target) : target_dir;
-	return {
-		cli: join(base, 'release', cli_binary_name(triple)),
-		addon: join(base, 'napi', addon_library_name(triple)),
-		ffi: join(base, 'release', ffi_library_name(triple))
-	};
-};
+	triple: string
+): { cli: string; addon: string; ffi: string } => ({
+	cli: join(target_dir, 'release', cli_binary_name(triple)),
+	addon: join(target_dir, 'napi', addon_library_name(triple)),
+	ffi: join(target_dir, 'release', ffi_library_name(triple))
+});
 
 /** The loader's `index.js` and `cli.js` inside a `pgo_paths().loader` tree. */
 export const loader_entries = (node_modules: string): { index: string; cli: string } => ({

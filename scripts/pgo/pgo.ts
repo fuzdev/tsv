@@ -86,7 +86,8 @@
  *     nearly the tenth margin of elsewhere; where that still cannot grade (a copy does not
  *     start, the gate's thread would exceed the contract, or the control
  *     survives on a thread the reserve sized), the plain-profile native gate
- *     (`test:depth:napi`'s run) grades it instead (`cmd_depth`).
+ *     (`test:depth:napi`'s run) grades it instead (`cmd_depth`). A pass still running at
+ *     its bound (`PASS_TIMEOUT_MS`) is killed and fails as hung, never a fallback.
  *     `--no-depth` skips it locally; the release rows always run it.
  *
  * Runs under Deno (`deno task build:pgo`) and under Node ≥ 22.18 (the release rows,
@@ -94,14 +95,14 @@
  * uses node builtins only. Run from the repo root.
  *
  * Options: `--dir` the working directory (default `.pgo`), `--triple` the platform
- * triple (default the host's), `--target` a cross row's rust target, `--corpora` the
- * snapshot checkout (default `../corpora`), `--reference` the plain CLI `byteid`
- * compares against (default the `release` build under `target/`), `--shapes` a shapes
+ * triple (default the host's), `--corpora` the snapshot checkout (default `../corpora`),
+ * `--reference` the plain CLI `byteid` compares against (default the `release` build under
+ * `target/`), `--shapes` a shapes
  * file for `depth` (default the one `depth-shapes` writes under `--dir`), `--ffi` the bench's
  * third world (above), `--reuse` lets `all` skip a build its stamp says is current (`cmd_all`).
  *
- * Usage: deno task build:pgo [--dir <d>] [--triple <t>] [--target <rust-target>]
- *          [--corpora <root>] [--no-depth] [--ffi] [--reuse]
+ * Usage: deno task build:pgo [--dir <d>] [--triple <t>] [--corpora <root>] [--no-depth]
+ *          [--ffi] [--reuse]
  *        node scripts/pgo/pgo.ts <corpora [--fetch]|stage --phase <p>|train|merge|
  *          gate-builds|gate-sections|byteid|byteid-ffi|depth-shapes|depth|cache-key|all> [options]
  *
@@ -142,7 +143,10 @@ import {
 	GATE_STACK_RESERVE,
 	pe_set_stack_reserve,
 	pe_stack_sizes,
-	spawn_did_not_start
+	RUN_TIMEOUT_MS,
+	spawn_did_not_start,
+	spawn_timed_out,
+	timeout_minutes
 } from './depth_stack.ts';
 import {
 	ALL_WORLDS,
@@ -191,7 +195,6 @@ const { values: args, positionals } = parseArgs({
 	options: {
 		dir: { type: 'string', default: '.pgo' },
 		triple: { type: 'string' },
-		target: { type: 'string' },
 		corpora: { type: 'string', default: CORPORA_ROOT },
 		phase: { type: 'string' },
 		reference: { type: 'string' },
@@ -239,10 +242,9 @@ const host_triple = (): string => {
 
 const dir = resolve(args.dir!);
 const triple = args.triple ?? host_triple();
-const rust_target = args.target || undefined;
 const corpora_root = resolve(args.corpora!);
 const paths = pgo_paths(dir);
-const artifacts = (phase: Phase) => cargo_artifacts(paths.target(phase), triple, rust_target);
+const artifacts = (phase: Phase) => cargo_artifacts(paths.target(phase), triple);
 /** The worlds this run builds: the shipped two, plus the bench's FFI library under `--ffi`. */
 const worlds: readonly World[] = args.ffi ? ALL_WORLDS : WORLDS;
 /** One world's binary in a phase's target dir. */
@@ -792,12 +794,11 @@ const cmd_gate_builds = (): void => {
 						.join('\n')}`
 			);
 		}
-		// The napi build's own build script never runs in training, so a host build (whose
-		// build scripts take RUSTFLAGS) always reports it missing — the proof that
+		// The napi build's own build script never runs in training, and its build scripts
+		// take RUSTFLAGS (host == target), so it always reports one missing — the proof that
 		// `-pgo-warn-missing-function` reached LLVM and its warnings reach this reader, without
-		// which a zero above would be vacuous. A cross build compiles its build scripts without
-		// RUSTFLAGS, so the cross row has the flag-spelling check above alone.
-		if (world === 'napi' && !rust_target && build_scripts === 0) {
+		// which a zero above would be vacuous.
+		if (world === 'napi' && build_scripts === 0) {
 			fail(
 				`gate-builds napi: no build-script diagnostic in ${log_path} — did -pgo-warn-missing-function reach the build?`
 			);
@@ -900,7 +901,7 @@ const all_fixture_inputs = (): string[] => {
 
 const cmd_byteid = (): void => {
 	const corpus = read_corpus();
-	const reference = resolve(args.reference ?? cargo_artifacts('target', triple, rust_target).cli);
+	const reference = resolve(args.reference ?? cargo_artifacts('target', triple).cli);
 	require_file(reference, 'build the plain CLI first (cargo build --locked -p tsv_cli --release)');
 	const pgo = artifacts('use');
 	require_file(pgo.cli, 'run build.sh use first');
@@ -1061,13 +1062,13 @@ const cmd_byteid = (): void => {
  * output's hash, or the same failure).
  */
 const cmd_byteid_ffi = (): void => {
-	const plain = resolve(cargo_artifacts('target', triple, rust_target).ffi);
+	const plain = resolve(cargo_artifacts('target', triple).ffi);
 	require_file(
 		plain,
 		'build the plain FFI library first (cargo build --locked -p tsv_ffi --release)'
 	);
 	const pgo = require_file(artifacts('use').ffi, 'run build.sh use first');
-	const reference = resolve(args.reference ?? cargo_artifacts('target', triple, rust_target).cli);
+	const reference = resolve(args.reference ?? cargo_artifacts('target', triple).cli);
 	require_file(reference, 'build the plain CLI first (cargo build --locked -p tsv_cli --release)');
 	const files = [
 		...all_fixture_inputs(),
@@ -1126,7 +1127,7 @@ const cmd_byteid_ffi = (): void => {
  * are counts, so any build writes the same lines: the `corpus` profile, the cheapest
  * optimized one, with the audit seams `deno task test:depth` builds it with, so a local run
  * after `deno task check` reuses that build; into `CARGO_TARGET_DIR` as the caller set it.
- * Always a HOST build — on a cross row too, since the shapes do not depend on the target. */
+ * The shapes do not depend on the target, so the build is any the host can run. */
 const cmd_depth_shapes = (): void => {
 	mkdirSync(paths.depth, { recursive: true });
 	if (
@@ -1242,7 +1243,8 @@ const cmd_depth = (): void => {
 
 /** Run `addon_depth.ts` under `nodes.gate`, its control pass under `nodes.control`: `null`
  * when it graded and held, the fallback's reason when it cannot grade here (Windows only),
- * and a pipeline failure otherwise. */
+ * and a pipeline failure otherwise — a run still going at `RUN_TIMEOUT_MS` among them, killed
+ * (the runner bounds each of its passes well inside that, so only a wedged runner gets here). */
 const run_addon_depth = (
 	nodes: { control: string; gate: string },
 	shapes: string,
@@ -1257,10 +1259,18 @@ const run_addon_depth = (
 	const r = spawnSync(nodes.gate, depth_args, {
 		stdio: ['inherit', 'inherit', 'pipe'],
 		encoding: 'utf8',
-		maxBuffer: 1 << 28
+		maxBuffer: 1 << 28,
+		timeout: RUN_TIMEOUT_MS,
+		killSignal: 'SIGKILL'
 	});
 	if (r.stderr) process.stderr.write(r.stderr);
 	const win32 = process.platform === 'win32';
+	if (spawn_timed_out(r.error)) {
+		fail(
+			`depth: addon_depth.ts did not finish within ${timeout_minutes(RUN_TIMEOUT_MS)} and was killed ` +
+				'— a hung run, not a fallback reason'
+		);
+	}
 	if (r.error) {
 		// on Windows `nodes.gate` is the gate copy, which the start check ran once already;
 		// any other spawn error (ENOBUFS from a flood of failure output) is the gate's own
@@ -1279,9 +1289,7 @@ const run_addon_depth = (
 // --- all ---------------------------------------------------------------------------------
 
 const build_sh = (phase: string): void =>
-	run('sh', ['scripts/pgo/build.sh', phase, dir, ...(rust_target ? [rust_target] : [])], {
-		PGO_WORLDS: worlds.join(' ')
-	});
+	run('sh', ['scripts/pgo/build.sh', phase, dir], { PGO_WORLDS: worlds.join(' ') });
 
 /** Run one step, then print its wall time — the release rows' per-step durations, read off
  * a dispatch dry run to size the job's timeout. */
@@ -1424,8 +1432,8 @@ const cargo_configs = (): string[] => {
  * environment (`cargo_configs`, `build_env`), the compiler (`rustc -vV`), `build.sh` (the
  * flags) and the repo modules the pipeline runs (`import_closure` over `PIPELINE_ENTRIES` —
  * itself, the training drivers, the bench FFI wrapper the FFI library trains through, the
- * staging, the size bands), the snapshot pin the corpus is checked against, and the worlds,
- * triple and target. `depth` adds the depth gate's own inputs (its driver's closure and the
+ * staging, the size bands), the snapshot pin the corpus is checked against, and the worlds
+ * and triple. `depth` adds the depth gate's own inputs (its driver's closure and the
  * native test that writes its shapes), which can move with no binary moving.
  *
  * Deliberately left out: the Node and Deno versions the drivers run under, and the fixture
@@ -1450,7 +1458,7 @@ const cache_keys = (): { build: string; depth: string } => {
 	for (const variable of build_env()) hash.update(`env\0${variable}\n`);
 	hash.update(`rustc\0${capture('rustc', ['-vV']).stdout}\n`);
 	hash.update(`pin\0${JSON.stringify(GATE_CHECKOUT_IDS[CORPORA_ROOT])}\n`);
-	hash.update(`run\0${worlds.join(',')}\0${triple}\0${rust_target ?? ''}\n`);
+	hash.update(`run\0${worlds.join(',')}\0${triple}\n`);
 	const build = hash.digest('hex');
 	const depth = createHash('sha256').update(build);
 	const depth_files = [
@@ -1562,27 +1570,9 @@ const cmd_all = (): void => {
 	}
 	console.log(`reuse: rebuilding — ${refusal}`);
 	rmSync(paths.stamp, { force: true });
-	timed('plain cli', () =>
-		run('cargo', [
-			'build',
-			'--locked',
-			'-p',
-			'tsv_cli',
-			'--release',
-			...(rust_target ? ['--target', rust_target] : [])
-		])
-	);
+	timed('plain cli', () => run('cargo', ['build', '--locked', '-p', 'tsv_cli', '--release']));
 	if (worlds.includes('ffi')) {
-		timed('plain ffi', () =>
-			run('cargo', [
-				'build',
-				'--locked',
-				'-p',
-				'tsv_ffi',
-				'--release',
-				...(rust_target ? ['--target', rust_target] : [])
-			])
-		);
+		timed('plain ffi', () => run('cargo', ['build', '--locked', '-p', 'tsv_ffi', '--release']));
 	}
 	timed('build.sh instrument', () => build_sh('instrument'));
 	timed('stage instrument', () => cmd_stage('instrument'));

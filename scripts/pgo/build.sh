@@ -6,7 +6,7 @@
 # Everything that is not a cargo build (training, the merge, the gates) is
 # scripts/pgo/pgo.ts.
 #
-# usage: sh scripts/pgo/build.sh <instrument|use> <pgo-dir> [<rust-target>]
+# usage: sh scripts/pgo/build.sh <instrument|use> <pgo-dir>
 #
 # The worlds built are `PGO_WORLDS` (space-separated, default `cli napi` — the two shipped
 # binaries); `pgo.ts --ffi` adds `ffi`, the bench's C-FFI library (`tsv_ffi`, `release`).
@@ -48,9 +48,8 @@
 
 set -eu
 
-phase=${1:?usage: build.sh <instrument|use> <pgo-dir> [<rust-target>]}
-dir=${2:?usage: build.sh <instrument|use> <pgo-dir> [<rust-target>]}
-target=${3:-}
+phase=${1:?usage: build.sh <instrument|use> <pgo-dir>}
+dir=${2:?usage: build.sh <instrument|use> <pgo-dir>}
 
 mkdir -p "$dir/logs"
 # An absolute path rustc can read: on Windows (Git Bash) `pwd -W` gives the
@@ -80,8 +79,6 @@ done
 
 base=${RUSTFLAGS:-}
 export CARGO_TERM_COLOR=never
-target_args=
-if [ -n "$target" ]; then target_args="--target $target"; fi
 
 use_flags() {
 	echo "-Cprofile-use=$dir/$1.profdata -Cllvm-args=-pgo-warn-missing-function -Cllvm-args=-inline-enable-cost-benefit-analysis=false"
@@ -95,8 +92,7 @@ run() {
 	shift 2
 	echo "build.sh: cargo $* (RUSTFLAGS: ${base:+$base }$flags)"
 	started=$(date +%s)
-	# shellcheck disable=SC2086 # target_args splits into its flag and value on purpose
-	if RUSTFLAGS="${base:+$base }$flags" cargo "$@" $target_args >"$log" 2>&1; then
+	if RUSTFLAGS="${base:+$base }$flags" cargo "$@" >"$log" 2>&1; then
 		grep -v '^ *Running `' "$log" | tail -n 2
 		echo "build.sh: $name took $(($(date +%s) - started)) s"
 	else
