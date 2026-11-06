@@ -182,6 +182,14 @@ import {
 import { type CorpusRepoRef, type CorpusSource, format_mb } from './lib/corpus.ts';
 import type { UnavailableImpl } from './lib/implementations.ts';
 import { generate_group_omissions_markdown, type GroupOmissions } from './lib/perf_omit.ts';
+import { native_artifact_check } from './lib/check_artifact_freshness.ts';
+import { split_collection_path } from './lib/corpora.ts';
+import {
+	type NativeBuild,
+	native_build_disclosure,
+	native_build_summary,
+	refuse_ffi_profile_override
+} from './lib/pgo_bench.ts';
 import {
 	alternative_version_parts,
 	type CoverageBySource,
@@ -371,6 +379,10 @@ process.on('exit', () => {
 });
 process.on('SIGINT', () => exit(130));
 process.on('SIGTERM', () => exit(143));
+
+// Every native row measures the profile-guided library; a set TSV_FFI_PROFILE would point
+// the Deno rows (this process's children inherit it) at a plain build instead.
+refuse_ffi_profile_override('bench');
 
 // What labels the report — when the run started, and the commit and tsv version it
 // measures — read now, before anything is built into a measurement: a run is hours
@@ -1056,8 +1068,16 @@ interface BaselineVersions extends ReportVersions {
  * fuz ecosystem's own code, or `third_party`) and language, over the corpus each group's
  * timed set is drawn from. The perf corpus is one mixed set per group, so this is the
  * disclosure of what the headline blends, not a split of its timings. Perf reports only.
+ *
+ * 23: `native_build` — every native tsv row measures a profile-guided build; the field hashes
+ * the library the rows loaded (`loaded`) and says `build: 'pgo'` only when the PGO stamp names
+ * those bytes (`plain` when it names others, `null` with no stamp), with the stamp's bindings
+ * (library and profile sha256s, what each profile was trained through), the training
+ * collections, and whether no training collection is one the run's corpus loaded (`null`
+ * when the corpus holds no snapshot collection). And `binary_sizes[].build` (`pgo` | `plain`)
+ * on tsv's native size rows, read the same way, since the size-only subset builds stay plain.
  */
-const REPORT_SCHEMA_VERSION = 22;
+const REPORT_SCHEMA_VERSION = 23;
 
 interface Baseline {
 	/** See `REPORT_SCHEMA_VERSION`. */
@@ -1138,6 +1158,12 @@ interface Baseline {
 	 */
 	coverage_by_source?: Record<string, Record<string, Record<string, SourceCoverageCell>>>;
 	versions: BaselineVersions;
+	/**
+	 * What the native tsv rows measured: the library they loaded, hashed, and whether the PGO
+	 * stamp names it, with the stamp's training and the held-out check (`lib/pgo_bench.ts`).
+	 * Since `version` 23.
+	 */
+	native_build: NativeBuild;
 	binary_sizes: BinarySize[];
 	/**
 	 * Labels the size table reached for and did not find (see
@@ -1444,6 +1470,10 @@ async function build_results_data(
 		// (an unlisted per-file failure hard-fails the run instead).
 		coverage_by_source: snapshot.coverage_by_source ?? undefined,
 		versions,
+		native_build: native_build_disclosure(
+			{ binding: RUNTIME === 'deno' ? 'ffi' : 'napi', path: native_artifact_check().path },
+			corpus_collections(snapshot.corpus_sources)
+		),
 		binary_sizes: collected_sizes.sizes,
 		binary_sizes_absent: collected_sizes.absent,
 		omissions: snapshot.omissions ?? undefined,
@@ -1455,6 +1485,17 @@ async function build_results_data(
 		process_noise,
 		exit_hangs
 	};
+}
+
+/**
+ * The snapshot collections the run's corpus loaded, by name (`null` when it loaded none — the
+ * conformance surface), for `native_build`'s held-out check.
+ */
+function corpus_collections(sources: readonly CorpusSource[]): string[] | null {
+	const names = [
+		...new Set(sources.flatMap((s) => split_collection_path(s.path)?.name ?? []))
+	].sort();
+	return names.length > 0 ? names : null;
 }
 
 /** Generate a full markdown report from benchmark data */
@@ -1515,6 +1556,7 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 	if (data.corpus_by_origin) {
 		lines.push(`**By origin:** ${format_corpus_by_origin(data.corpus_by_origin)}\n`);
 	}
+	lines.push(`**Native build:** ${native_build_summary(data.native_build)}\n`);
 	if (data.corpus_sources.length > 0) {
 		lines.push(
 			`**Sources:** ${data.corpus_sources.map((s) => `${s.path} (${s.files})`).join(', ')}\n`

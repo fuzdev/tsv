@@ -100,6 +100,9 @@ delta on the same row is the detector.
     sibling's (the site publishes both from this directory).
   - **`mixed_machine`** — the siblings' hardware identity disagrees; cross-runtime ratios are only
     meaningful on same-box siblings.
+  - **`mixed_native_build`** — the siblings measured different profile-guided builds (two
+    pipeline runs, whose bytes need not agree) or some recorded none; the shared one is
+    `native_build`, each sibling's `sources[].native_build`.
   - **`within_noise`** — per-runtime cells whose difference is smaller than the combined noise of
     the two means they divide. A ratio inherits both means' noise while printing neither, so the
     cells that are NOT a runtime effect are named — a reading aid, not a significance test (that is
@@ -139,7 +142,12 @@ delta on the same row is the detector.
   the other dependency-free `lib/` modules' tests (`node:assert` + relative imports).
 - **The native row differs by runtime, fairly.** Deno → FFI (`tsv_ffi`, via
   `Deno.dlopen`); Node/Bun → N-API (`tsv_napi`, via `process.dlopen`). Same engine,
-  same per-thread arena reuse, different binding boundary.
+  same per-thread arena reuse, different binding boundary. Both are **profile-guided**
+  (`deno task build:bench:pgo`, `lib/pgo_bench.ts`): the addon is the shipped addon's own
+  pipeline, and the FFI library — which ships nowhere — a third world of it, trained as
+  itself through this harness's own FFI wrapper (a profile applies only to the build it was
+  trained on). Each report discloses it as `native_build`
+  (../../docs/benchmarks.md §Fairness caveats, the PGO entry).
 - **The WASM row uses each runtime's own wasm-pack target bundle** (same
   `tsv_wasm_bg.wasm`, different JS glue) — Deno the `deno` target, Node the `nodejs`
   target — both with the full export set incl. `parse_internal_*`. The shipped web
@@ -225,8 +233,13 @@ selects the profile itself, so a direct run loads `target/corpus` — what the b
 produces — not `target/release`. It matters: `corpus` is `panic = "unwind"`, so a formatter panic
 is a reported per-file error, where `release` (`panic = "abort"`) kills the run. It also aims the
 freshness guard (same env var) at the binary actually loaded, so its verdict and rebuild hint name
-`build:ffi:corpus`. The **bench** and **smoke** tasks deliberately stay on `release` — the
-artifact they measure.
+`build:ffi:corpus`. The **bench** and **smoke** tasks deliberately set no profile: unset, the
+loader opens the profile-guided library `build:bench:pgo` stages (`lib/pgo_bench.ts`) — the
+artifact they measure. A set `TSV_FFI_PROFILE` would load that cargo profile's plain build
+from `target/` instead, so the bench (its orchestrator, pre-flight and row processes) and
+smoke REFUSE one (`refuse_ffi_profile_override`); the report's `native_build` also hashes
+the library the rows loaded and calls it `pgo` only when the stamp names those bytes. The
+corpus and over-acceptance tools keep the variable — they publish no native timing.
 
 `corpus:compare:format:run` sets `PRETTIER_DEBUG=1` so prettier-plugin-svelte's
 verbatim-on-error fallback (the whole `<script>` block echoed when the embedded formatter throws)
@@ -722,7 +735,12 @@ deno task bench:clean     # wipe local-only (gitignored) bench state
 ```
 
 - Every bench task builds the runtime's artifacts first; `:run` skips that, guarded against stale
-  artifacts (§Artifact Freshness Guard). Each standalone leg builds the WHOLE artifact set
+  artifacts (§Artifact Freshness Guard). The native pair is profile-guided (`build:bench:pgo`):
+  a stamp-hit skips it in seconds, but after an edit that reaches the binaries it reruns the PGO
+  pipeline (instrumented builds, training, profile-use builds, the gates) — minutes. That
+  includes `bench:conformance`, though its coverage is build-invariant (byte-identity is a
+  gate): every native row means every one, so it needs `../corpora` at its pin and
+  `llvm-tools-preview` like the perf legs. Each standalone leg builds the WHOLE artifact set
   (`build:bench`), not just the half it executes — every report carries the same tsv size rows
   (deno.json `//bench:deno`); a `:run` leg warns when a size-only artifact is stale.
 - `bench` closes with its own `bench:compose`: `bench:perf` composes too, but before
@@ -1014,7 +1032,14 @@ beyond timing stats:
   `corpus_by_origin` (files and bytes per manifest `origin` and language — the corpus each
   group's one mixed timed set is drawn from; perf only); `corpus_snapshot` (the
   `fuzdev/corpora` commit every real-code source was read from, absent on conformance-only runs);
-  `versions`; and `binary_sizes` (each with `gzip_bytes`).
+  `versions`; from `version` 23, `native_build` (`loaded` — the library the native rows
+  loaded, hashed; `build` — `pgo` only when the stamp names those bytes, `plain` when it names
+  others, `null` with no stamp; the stamp's `bindings` with each profile's sha256 and what it
+  was trained through, the `training` collections, and `disjoint_from_timed_corpus` —
+  whether no training collection is one the run's corpus loaded, `null` when the corpus holds
+  no snapshot collection — the md's **Native build:** line); and `binary_sizes` (each with
+  `gzip_bytes`, and on tsv's native rows `build` — `pgo` for a slot whose bytes the stamp
+  names, `plain` for the size-only FFI subsets or an unnamed slot).
 - per `entries[]` row: `runtime`; `files_processed`/`files_total` (per-impl preflight coverage —
   the `Coverage:` line); `files_iterated` (the timed set — the `Files (intersection):` count) and,
   from `version` 15, `files_iterated_digest` (a hash of that set's sorted paths — what
@@ -1253,6 +1278,17 @@ names always clears it; a bare `cargo build` does not stamp. `BENCH_STALE_OK=1` 
 _stale_ artifact to a `⚠` warning (a _missing_ one stays fatal); see the module doc for why stale
 is a hard error by default.
 
+**The profile-guided pair answers to its stamp as well.** An mtime cannot tell a plain library
+from a profile-guided one — a plain build copied into the slot is newer than every source — so
+the FFI and N-API checks also require `.pgo/bench/stamp.json` (`lib/pgo_bench.ts`) to name the
+file's sha256, which `build:bench:pgo` writes only after the pipeline's gates pass. A library
+the stamp does not name is refused like a missing one (`BENCH_STALE_OK=1` does not reach it:
+the report would publish a plain build as the profile-guided one); as a size-only artifact it
+is a warning. Whether `build:bench:pgo` rebuilds is the pipeline's own question, asked by
+content: `pgo.ts all --reuse` skips the build and its gates when a hash of everything that can
+change the binaries matches the stamp it wrote last (deno.json `//build:pgo`), a cache it
+shares with `deno task build:pgo`.
+
 **Behind the override: the span-only wire is probed at init.** An mtime can only
 say an artifact is old, not what it does, and a stale binding whose `parse_<lang>` still
 returns the loc-bearing wire would pass it — under
@@ -1309,7 +1345,7 @@ deliberately unwrapped.
 ```bash
 # After editing a crate, the fast/correct paths:
 deno task bench:deno                             # rebuilds, then runs — always fresh
-deno task build:ffi && deno task bench:deno:run  # rebuild just what you changed, then :run
+deno task build:bench:pgo && deno task bench:deno:run  # rebuild the PGO pair (minutes), then :run
 BENCH_STALE_OK=1 deno task bench:deno:run        # deliberately measure the current (stale) binary
 ```
 
@@ -1664,6 +1700,9 @@ benches/js/
     │                      # its docs/conformance_svelte.md section); unit-tested by
     │                      # parse_divergences_test.ts
     ├── parse_sanctions.ts # Shared parse-parity vocabulary: Sanction (keep) + KnownGap (fix)
+    ├── pgo_bench.ts       # The bench's profile-guided native pair: where `build:bench:pgo` stages it,
+    │                      # the stamp naming its bytes, profiles and training (what the freshness
+    │                      # guard requires and the report's `native_build` discloses)
     ├── perf_omit.ts       # PERF_OMITS — the only excused per-file failures on the perf view, each
     │                      # typed by WHY the tool fails (`category`) — plus the per-group
     │                      # omissions summary the report publishes
@@ -1929,8 +1968,8 @@ a message when `Deno.dlopen` loads it (it can segfault at init with nothing nami
 so a stale one aborts with the rebuild hint (`BENCH_STALE_OK=1` downgrades it). That includes
 the ones that measure only the native path (`skip_triage`), where an unbuilt bundle otherwise
 fails a run that would never have touched it, with a WASM error naming nothing the script is
-about: `deno task build:ffi && deno task build:wasm:all:deno` first (it reads the `release`
-FFI, not `corpus`). The two with `deno task` entries — `css:over-acceptance` and
+about: `deno task build:bench:pgo && deno task build:wasm:all:deno` first (it reads the
+profile-guided FFI library, not `corpus`). The two with `deno task` entries — `css:over-acceptance` and
 `ts-repo:over-acceptance` — build what they need themselves.
 
 Documented above, though they live here: the parse-conformance gates

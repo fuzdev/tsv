@@ -13,6 +13,7 @@
 import { exit } from 'node:process';
 import { check_executed_artifacts } from './lib/check_artifact_freshness.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
+import { refuse_ffi_profile_override } from './lib/pgo_bench.ts';
 import {
 	type BenchmarkTask,
 	get_benchmark_tasks,
@@ -56,6 +57,7 @@ function record_fail(f: Failure): void {
 // bench/corpus :run tasks). Which artifacts this runtime executes — FFI or N-API,
 // plus that runtime's WASM target — is `check_executed_artifacts`'s subject;
 // override with BENCH_STALE_OK=1.
+refuse_ffi_profile_override('smoke');
 await check_executed_artifacts();
 
 // Friendly preflight: the canonical impls (prettier + svelte/compiler) resolve

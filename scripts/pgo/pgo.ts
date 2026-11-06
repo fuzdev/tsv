@@ -56,6 +56,15 @@
  *     and optimization without the profile — the CLI has no import records).
  * 12. the size bands (`validate_napi_artifact.ts --pgo`), so a silently re-enabled
  *     inliner reads as a size jump.
+ * With `--ffi` (the bench's build, `scripts/pgo/bench.ts`) a third world rides every step
+ * above: the C-FFI library (`tsv_ffi`, `release`) the Deno bench row loads — built plain
+ * beside the CLI as its byte-identity reference, instrumented, trained AS ITSELF through the
+ * bench's own FFI wrapper (`ffi_ops.ts`, under Deno: `parse`, `parse_internal` and `format`
+ * on every file, in order, in one process), merged and gated like the others, rebuilt with
+ * its profile, and held byte-identical to the plain library and to a size band of it
+ * (`byteid-ffi`). It ships nowhere;
+ * the release rows never pass the flag.
+ *
  * 13. `depth-shapes` + `depth` — the depth limits' stack contract in the staged PGO
  *     addon itself (`addon_depth.ts`), whose frames no test build reproduces. On Windows
  *     each pass runs under its own scratch node.exe copy whose PE stack reserve sits just
@@ -74,12 +83,13 @@
  * triple (default the host's), `--target` a cross row's rust target, `--corpora` the
  * snapshot checkout (default `../corpora`), `--reference` the plain CLI `byteid`
  * compares against (default the `release` build under `target/`), `--shapes` a shapes
- * file for `depth` (default the one `depth-shapes` writes under `--dir`).
+ * file for `depth` (default the one `depth-shapes` writes under `--dir`), `--ffi` the bench's
+ * third world (above), `--reuse` lets `all` skip a build its stamp says is current (`cmd_all`).
  *
  * Usage: deno task build:pgo [--dir <d>] [--triple <t>] [--target <rust-target>]
- *          [--corpora <root>] [--no-depth]
+ *          [--corpora <root>] [--no-depth] [--ffi] [--reuse]
  *        node scripts/pgo/pgo.ts <corpora [--fetch]|stage --phase <p>|train|merge|
- *          gate-builds|gate-sections|byteid|depth-shapes|depth|all> [options]
+ *          gate-builds|gate-sections|byteid|byteid-ffi|depth-shapes|depth|cache-key|all> [options]
  *
  * @module
  */
@@ -96,8 +106,10 @@ import {
 	statSync,
 	writeFileSync
 } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { homedir } from 'node:os';
+import { dirname, join, relative, resolve } from 'node:path';
 import process from 'node:process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import {
@@ -119,11 +131,13 @@ import {
 	spawn_did_not_start
 } from './depth_stack.ts';
 import {
+	ALL_WORLDS,
 	cargo_artifacts,
 	loader_entries,
 	parse_language,
 	pgo_paths,
 	type Phase,
+	type World,
 	WORLDS
 } from './layout.ts';
 import {
@@ -143,6 +157,14 @@ const PARSE_SAMPLE_STRIDE = 8;
  * must carry the world's `-Cprofile-use` (`gate-builds`). */
 const PROFILED_CRATES = ['tsv_lang', 'tsv_ts', 'tsv_css', 'tsv_svelte'] as const;
 
+/** The band the PGO FFI library's size must sit in, as a multiple of the plain library the same
+ * run built (`byteid-ffi`): wide enough for the profile to move between trainings, narrow enough
+ * to refuse a plain-sized build and the default inliner's growth. */
+const FFI_SIZE_RATIO = { min: 1.1, max: 1.4 } as const;
+
+/** Each world's own crate — the one its build selects, whose compile must carry its profile too. */
+const WORLD_CRATE: Record<World, string> = { cli: 'tsv_cli', napi: 'tsv_napi', ffi: 'tsv_ffi' };
+
 const { values: args, positionals } = parseArgs({
 	allowPositionals: true,
 	options: {
@@ -154,7 +176,9 @@ const { values: args, positionals } = parseArgs({
 		reference: { type: 'string' },
 		shapes: { type: 'string' },
 		fetch: { type: 'boolean', default: false },
-		'no-depth': { type: 'boolean', default: false }
+		'no-depth': { type: 'boolean', default: false },
+		ffi: { type: 'boolean', default: false },
+		reuse: { type: 'boolean', default: false }
 	}
 });
 
@@ -166,6 +190,18 @@ const fail = (message: string): never => {
 /** The node binary: this process under Node, `node` from PATH under Deno. */
 const NODE = typeof Deno !== 'undefined' ? 'node' : process.execPath;
 const DENO = typeof Deno !== 'undefined' ? Deno.execPath() : 'deno';
+
+/** `deno run` with what `ffi_ops.ts` needs: FFI, reading the library and the corpus, writing
+ * its records, and the environment the bench's FFI wrapper reads. */
+const FFI_OPS_RUN = [
+	'run',
+	'--no-lock',
+	'--allow-ffi',
+	'--allow-read',
+	'--allow-write',
+	'--allow-env',
+	'scripts/pgo/ffi_ops.ts'
+];
 
 /** The host's platform triple, in the platform packages' terms. `scripts/napi_host.ts`
  * spells the same from `Deno.build`, which this pipeline cannot read under Node. */
@@ -186,6 +222,13 @@ const rust_target = args.target || undefined;
 const corpora_root = resolve(args.corpora!);
 const paths = pgo_paths(dir);
 const artifacts = (phase: Phase) => cargo_artifacts(paths.target(phase), triple, rust_target);
+/** The worlds this run builds: the shipped two, plus the bench's FFI library under `--ffi`. */
+const worlds: readonly World[] = args.ffi ? ALL_WORLDS : WORLDS;
+/** One world's binary in a phase's target dir. */
+const world_artifact = (phase: Phase, world: World): string => {
+	const a = artifacts(phase);
+	return world === 'cli' ? a.cli : world === 'napi' ? a.addon : a.ffi;
+};
 
 interface RunResult {
 	status: number;
@@ -413,10 +456,10 @@ const cmd_train = (): void => {
 	require_file(instr.cli, 'run build.sh instrument first');
 	const loader = loader_entries(paths.loader('instrument'));
 	require_file(loader.cli, 'run stage --phase instrument first');
+	if (worlds.includes('ffi')) require_file(instr.ffi, 'run build.sh instrument first');
 	const discard = { LLVM_PROFILE_FILE: join(paths.profraw_discard, '%m.profraw') };
-	for (const world of WORLDS) {
+	for (const world of worlds) {
 		const root = corpus_copy(paths.train(world), corpus.own, corpus);
-		const cmd = world === 'cli' ? [instr.cli] : [NODE, loader.cli];
 		const files = list_files([instr.cli], root, discard);
 		const raw = paths.profraw(world);
 		rmSync(raw, { recursive: true, force: true });
@@ -430,37 +473,60 @@ const cmd_train = (): void => {
 			typescript: by_language('typescript').length,
 			svelte: by_language('svelte').length,
 			css: by_language('css').length,
-			strip: strip_files.length,
+			strip: world === 'ffi' ? 0 : strip_files.length,
 			imports_typescript: 0,
 			imports_svelte: 0
 		};
-		// the parse (and the CLI's `loc` writer), on every file: each must parse
-		const failures = per_file(cmd, ['parse'], files, env, [0]);
-		if (world === 'cli') {
-			failures.push(...per_file(cmd, ['parse', '--locations'], files, env, [0]));
-			// the strip: 0 stripped, 1 refused — both verdicts; 2 is a parse error
-			failures.push(...per_file(cmd, ['strip'], strip_files, env, [0, 1]));
-		} else {
-			// the strip and the import records, in process through the loader
-			const list = join(paths.train(world), 'addon_ops.txt');
+		const failures: string[] = [];
+		let format: RunResult = { status: 0, stdout: '', stderr: '' };
+		if (world === 'ffi') {
+			// the library itself, in process under Deno, through the bench's own FFI wrapper:
+			// every file's parse, parse_internal and format, in order — each must succeed
+			const list = join(paths.train(world), 'ffi_ops.txt');
 			writeFileSync(list, files.join('\n') + '\n');
 			const ops = capture(
-				NODE,
+				DENO,
 				[
-					'scripts/pgo/addon_ops.ts',
-					...['--loader', loader.index, '--list', list],
-					...['--out', join(paths.train(world), 'addon_ops.ndjson')],
-					...['--ops', 'strip,imports', '--require-ok']
+					...FFI_OPS_RUN,
+					...['--lib', instr.ffi, '--list', list],
+					...['--out', join(paths.train(world), 'ffi_ops.ndjson')],
+					...['--ops', 'parse,parse_internal,format', '--require-ok']
 				],
 				env
 			);
 			process.stdout.write(ops.stdout);
 			if (ops.status !== 0)
-				fail(`train ${world}: the addon's strip or import records failed:\n${ops.stderr}`);
-			trained.imports_typescript = trained.typescript;
-			trained.imports_svelte = trained.svelte;
+				fail(`train ${world}: the FFI library's training calls failed:\n${ops.stderr}`);
+		} else {
+			const cmd = world === 'cli' ? [instr.cli] : [NODE, loader.cli];
+			// the parse (and the CLI's `loc` writer), on every file: each must parse
+			failures.push(...per_file(cmd, ['parse'], files, env, [0]));
+			if (world === 'cli') {
+				failures.push(...per_file(cmd, ['parse', '--locations'], files, env, [0]));
+				// the strip: 0 stripped, 1 refused — both verdicts; 2 is a parse error
+				failures.push(...per_file(cmd, ['strip'], strip_files, env, [0, 1]));
+			} else {
+				// the strip and the import records, in process through the loader
+				const list = join(paths.train(world), 'addon_ops.txt');
+				writeFileSync(list, files.join('\n') + '\n');
+				const ops = capture(
+					NODE,
+					[
+						'scripts/pgo/addon_ops.ts',
+						...['--loader', loader.index, '--list', list],
+						...['--out', join(paths.train(world), 'addon_ops.ndjson')],
+						...['--ops', 'strip,imports', '--require-ok']
+					],
+					env
+				);
+				process.stdout.write(ops.stdout);
+				if (ops.status !== 0)
+					fail(`train ${world}: the addon's strip or import records failed:\n${ops.stderr}`);
+				trained.imports_typescript = trained.typescript;
+				trained.imports_svelte = trained.svelte;
+			}
+			format = capture(cmd[0]!, [...cmd.slice(1), 'format', '--jobs', '1', root], env);
 		}
-		const format = capture(cmd[0]!, [...cmd.slice(1), 'format', '--jobs', '1', root], env);
 		const raws = readdirSync(raw).filter((f) => f.endsWith('.profraw'));
 		console.log(
 			`train ${world}: ${files.length} files (${trained.strip} stripped), ${failures.length} failed, ` +
@@ -475,7 +541,7 @@ const cmd_train = (): void => {
 			fail(`train ${world}: format exited ${format.status}:\n${format.stderr.slice(0, 4000)}`);
 		if (raws.length === 0 || raws.every((f) => statSync(join(raw, f)).size === 0)) {
 			fail(
-				`train ${world}: no profile was written to ${raw} — is ${world === 'cli' ? instr.cli : 'the staged addon'} instrumented?`
+				`train ${world}: no profile was written to ${raw} — is ${world_artifact('instrument', world)} instrumented?`
 			);
 		}
 		writeFileSync(paths.trained(world), JSON.stringify(trained) + '\n');
@@ -514,7 +580,7 @@ const cmd_merge = (): void => {
 				`(${paths.rustc_instrument}) — a profile must be merged by its compiler's LLVM`
 		);
 	}
-	for (const world of WORLDS) {
+	for (const world of worlds) {
 		const raw = paths.profraw(world);
 		const raws = existsSync(raw) ? readdirSync(raw).filter((f) => f.endsWith('.profraw')) : [];
 		if (raws.length === 0) fail(`no profraw files in ${raw} — run train first`);
@@ -543,12 +609,12 @@ const cmd_merge = (): void => {
 // --- 8. the use builds' profile diagnostics --------------------------------------------
 
 const cmd_gate_builds = (): void => {
-	for (const world of WORLDS) {
+	for (const world of worlds) {
 		const log_path = require_file(paths.build_log('use', world), 'run build.sh use first');
 		const log = readFileSync(log_path, 'utf8');
 		// the flag reached every workspace crate's compile — without this, zero diagnostics
 		// below could mean a profile that never reached the build
-		const crate = world === 'cli' ? 'tsv_cli' : 'tsv_napi';
+		const crate = WORLD_CRATE[world];
 		const used = profile_use_crates(log, `${world}.profdata`);
 		const unprofiled = [...PROFILED_CRATES, crate].filter((c) => !used.has(c));
 		if (unprofiled.length > 0) {
@@ -602,7 +668,7 @@ const cmd_gate_sections = (): void => {
 		['instrument', true],
 		['use', false]
 	] as const) {
-		for (const path of Object.values(artifacts(phase))) {
+		for (const path of worlds.map((world) => world_artifact(phase, world))) {
 			const has = has_instrumentation_sections(sections(path));
 			console.log(
 				`gate-sections: ${path}: ${has ? 'instrumented' : 'no instrumentation sections'}`
@@ -669,6 +735,19 @@ const addon_ops = (
 		.map((line) => JSON.parse(line) as AddonRecord);
 };
 
+/** Every fixture input of the parse, strip and import-record trees, as absolute paths. */
+const all_fixture_inputs = (): string[] => {
+	const inputs = (tree: string): string[] =>
+		walk(resolve(tree))
+			.filter((f) => /(^|\/)input\.(svelte|ts|mts|cts|svelte\.ts|css)$/.test(f))
+			.map((f) => join(resolve(tree), f));
+	return [
+		...inputs('tests/fixtures'),
+		...inputs('tests/fixtures_strip'),
+		...inputs('tests/fixtures_imports')
+	];
+};
+
 const cmd_byteid = (): void => {
 	const corpus = read_corpus();
 	const reference = resolve(args.reference ?? cargo_artifacts('target', triple, rust_target).cli);
@@ -728,15 +807,7 @@ const cmd_byteid = (): void => {
 
 	// the per-file half, over the pristine sources: every fixture input of the parse, strip
 	// and import-record trees, and a stride of the snapshot
-	const inputs = (tree: string): string[] =>
-		walk(resolve(tree))
-			.filter((f) => /(^|\/)input\.(svelte|ts|mts|cts|svelte\.ts|css)$/.test(f))
-			.map((f) => join(resolve(tree), f));
-	const fixture_inputs = [
-		...inputs('tests/fixtures'),
-		...inputs('tests/fixtures_strip'),
-		...inputs('tests/fixtures_imports')
-	];
+	const fixture_inputs = all_fixture_inputs();
 	const snapshot = list_files([reference], join(corpora_root, CORPORA_TREE)).filter(
 		(_, i) => i % PARSE_SAMPLE_STRIDE === 0
 	);
@@ -830,6 +901,73 @@ const cmd_byteid = (): void => {
 		);
 	}
 	console.log("byteid: the PGO CLI's and addon's output is byte-identical to the plain builds'");
+};
+
+/**
+ * The FFI world's byte identity (`--ffi`): the PGO library and the plain `release` one —
+ * the same source and features without the profile — called through the bench's FFI
+ * wrapper (`ffi_ops.ts`) on every fixture input and every file of the snapshot, `parse`,
+ * `parse_internal` and `format` each, must give the same answer to every call (the
+ * output's hash, or the same failure).
+ */
+const cmd_byteid_ffi = (): void => {
+	const plain = resolve(cargo_artifacts('target', triple, rust_target).ffi);
+	require_file(
+		plain,
+		'build the plain FFI library first (cargo build --locked -p tsv_ffi --release)'
+	);
+	const pgo = require_file(artifacts('use').ffi, 'run build.sh use first');
+	const reference = resolve(args.reference ?? cargo_artifacts('target', triple, rust_target).cli);
+	require_file(reference, 'build the plain CLI first (cargo build --locked -p tsv_cli --release)');
+	const files = [
+		...all_fixture_inputs(),
+		...list_files([reference], join(corpora_root, CORPORA_TREE))
+	];
+	const out_dir = join(paths.byteid, 'ffi');
+	rmSync(out_dir, { recursive: true, force: true });
+	mkdirSync(out_dir, { recursive: true });
+	const list = join(out_dir, 'files.txt');
+	writeFileSync(list, files.join('\n') + '\n');
+	const answers = (name: string, lib: string): string[] => {
+		const out = join(out_dir, `${name}.ndjson`);
+		run(DENO, [
+			...FFI_OPS_RUN,
+			...['--lib', lib, '--list', list, '--out', out],
+			...['--ops', 'parse,parse_internal,format']
+		]);
+		return readFileSync(out, 'utf8').split('\n').filter(Boolean);
+	};
+	// The size check, against the plain library this run just built rather than a fixed band
+	// (the library ships nowhere, so nothing else anchors one): a profile that never applied
+	// leaves the PGO build plain-sized, and the cost-benefit inliner coming back on grows it
+	// far past the band (`build.sh`'s module doc).
+	const ratio = statSync(pgo).size / statSync(plain).size;
+	console.log(`byteid-ffi: PGO library ${ratio.toFixed(3)}× the plain one`);
+	if (ratio < FFI_SIZE_RATIO.min || ratio > FFI_SIZE_RATIO.max) {
+		fail(
+			`byteid-ffi: the PGO FFI library is ${ratio.toFixed(3)}× the plain build, outside ` +
+				`${FFI_SIZE_RATIO.min}–${FFI_SIZE_RATIO.max}× — an unapplied profile reads near 1×, the ` +
+				'default inliner well above the band'
+		);
+	}
+	const plain_answers = answers('plain', plain);
+	const pgo_answers = answers('pgo', pgo);
+	if (plain_answers.length !== files.length * 3 || pgo_answers.length !== plain_answers.length) {
+		fail(
+			`byteid-ffi: ${plain_answers.length} plain / ${pgo_answers.length} PGO answers for ` +
+				`${files.length} files × 3 calls`
+		);
+	}
+	const mismatches = plain_answers.filter((line, i) => line !== pgo_answers[i]);
+	console.log(`byteid-ffi: ${files.length} files × parse, parse_internal, format compared`);
+	if (mismatches.length > 0) {
+		fail(
+			`byteid-ffi: the PGO FFI library's answers differ from the plain library's:\n  ${mismatches
+				.slice(0, 20)
+				.join('\n  ')}`
+		);
+	}
+	console.log("byteid-ffi: the PGO FFI library's output is byte-identical to the plain build's");
 };
 
 // --- 13. the depth limits in the staged addon ---------------------------------------------
@@ -991,7 +1129,9 @@ const run_addon_depth = (
 // --- all ---------------------------------------------------------------------------------
 
 const build_sh = (phase: string): void =>
-	run('sh', ['scripts/pgo/build.sh', phase, dir, ...(rust_target ? [rust_target] : [])]);
+	run('sh', ['scripts/pgo/build.sh', phase, dir, ...(rust_target ? [rust_target] : [])], {
+		PGO_WORLDS: worlds.join(' ')
+	});
 
 /** Run one step, then print its wall time — the release rows' per-step durations, read off
  * a dispatch dry run to size the job's timeout. */
@@ -1001,8 +1141,277 @@ const timed = (name: string, step: () => void): void => {
 	console.log(`pgo.ts ${name}: ${((performance.now() - started) / 1000).toFixed(1)} s`);
 };
 
+// --- the local cache (`all --reuse`) -------------------------------------------------------
+
+/** What a completed `all` run records (`pgo_paths().stamp`), written only once every gate it
+ * ran has passed, so a later `all --reuse` whose inputs hash the same can skip the pipeline. */
+interface PipelineStamp {
+	version: 1;
+	/** The hash of everything that can change the PGO binaries (`cache_keys().build`). */
+	build_key: string;
+	/** `build_key` plus the depth gate's own inputs, when the depth gate ran; else `null`. */
+	depth_key: string | null;
+	triple: string;
+	worlds: World[];
+	/** Each world's profile-use binary, by the sha256 the gates passed. */
+	artifacts: Record<string, { sha256: string; profile_sha256: string }>;
+}
+
+const STAMP_VERSION = 1;
+
+/** Directory names a crate holds that no build reads (generated packages, installs, output). */
+const UNHASHED_DIRS = new Set(['pkg', 'node_modules', 'target']);
+
+/** Every file under `root` but those in `UNHASHED_DIRS`, relative, `/`-separated, sorted. */
+const source_files = (root: string): string[] => {
+	const out: string[] = [];
+	const visit = (d: string): void => {
+		for (const e of readdirSync(d, { withFileTypes: true })) {
+			if (e.isDirectory()) {
+				if (!UNHASHED_DIRS.has(e.name)) visit(join(d, e.name));
+			} else if (e.isFile()) out.push(relative('.', join(d, e.name)).split('\\').join('/'));
+		}
+	};
+	if (existsSync(root)) visit(root);
+	return out.sort();
+};
+
+/** The workspace crates the packages compile, transitively — read from `cargo metadata`, so a
+ * crate joining the graph joins the key without an edit here. */
+const workspace_closure = (packages: readonly string[]): string[] => {
+	const r = capture('cargo', ['metadata', '--format-version', '1', '--no-deps', '--locked']);
+	if (r.status !== 0) fail(`cargo metadata failed: ${r.stderr}`);
+	const metadata = JSON.parse(r.stdout) as {
+		packages: {
+			name: string;
+			manifest_path: string;
+			dependencies: { name: string; path?: string }[];
+		}[];
+	};
+	const by_name = new Map(metadata.packages.map((p) => [p.name, p]));
+	const seen = new Set<string>();
+	const visit = (name: string): void => {
+		if (seen.has(name)) return;
+		const pkg = by_name.get(name) ?? fail(`cargo metadata names no workspace package ${name}`);
+		seen.add(name);
+		for (const dep of pkg.dependencies) if (dep.path !== undefined) visit(dep.name);
+	};
+	for (const name of packages) visit(name);
+	return [...seen].map((name) =>
+		relative('.', resolve(by_name.get(name)!.manifest_path, '..'))
+			.split('\\')
+			.join('/')
+	);
+};
+
+/** The repo's own modules each entry imports, transitively — read from `deno info --json`, so
+ * a driver gaining an import joins the key without an edit here. */
+const import_closure = (entries: readonly string[]): string[] => {
+	const root = pathToFileURL(resolve('.') + '/').href;
+	const files = new Set<string>();
+	for (const entry of entries) {
+		const r = capture(DENO, ['info', '--json', '--no-lock', entry]);
+		if (r.status !== 0) fail(`deno info ${entry} failed: ${r.stderr}`);
+		const info = JSON.parse(r.stdout) as { modules: { specifier: string }[] };
+		for (const m of info.modules) {
+			if (m.specifier.startsWith(root)) files.add(fileURLToPath(m.specifier));
+		}
+	}
+	return [...files].map((f) => relative('.', f).split('\\').join('/'));
+};
+
+/** The modules the pipeline runs: itself, its training and gate drivers (the FFI one through
+ * the bench's FFI wrapper), the staging and the size bands. */
+const PIPELINE_ENTRIES = [
+	'scripts/pgo/pgo.ts',
+	'scripts/pgo/ffi_ops.ts',
+	'scripts/pgo/addon_ops.ts',
+	'scripts/build_napi_packages.ts',
+	'scripts/validate_napi_artifact.ts'
+];
+
+/** Environment variables cargo or rustc read that can change a build's output — everything
+ * named `CARGO_*`, `RUSTC*`, `RUSTFLAGS` or `RUSTDOC*`, minus the ones that cannot: the
+ * output directory (build.sh sets its own), the job count (release codegen is one unit),
+ * terminal settings, cargo's home (its config is hashed by content) and credentials. */
+const build_env = (): string[] =>
+	Object.keys(process.env)
+		.filter((k) => /^(CARGO_|RUSTC|RUSTFLAGS$|RUSTDOC)/.test(k))
+		.filter(
+			(k) =>
+				!/^CARGO_(TARGET_DIR|BUILD_JOBS|TERM_|HOME$|MAKEFLAGS$)/.test(k) &&
+				!/TOKEN|CREDENTIAL/.test(k)
+		)
+		.sort()
+		.map((k) => `${k}=${process.env[k]}`);
+
+/** Every cargo config file cargo would read for a build here: `.cargo/config[.toml]` in this
+ * directory and each of its parents, then cargo's home. */
+const cargo_configs = (): string[] => {
+	const dirs: string[] = [];
+	for (let d = resolve('.'); ; d = dirname(d)) {
+		dirs.push(join(d, '.cargo'));
+		if (dirname(d) === d) break;
+	}
+	const home = process.env.CARGO_HOME ?? join(homedir(), '.cargo');
+	dirs.push(home);
+	return dirs
+		.flatMap((d) => [join(d, 'config.toml'), join(d, 'config')])
+		.filter((f) => {
+			try {
+				return statSync(f).isFile();
+			} catch {
+				return false;
+			}
+		});
+};
+
+/**
+ * The cache keys of this run: `build` hashes everything that can change the profile-use
+ * binaries — every file of each workspace crate the worlds compile (`workspace_closure`), the
+ * loader facade the addon trains through (`crates/tsv_wasm/npm`, `types`), the workspace
+ * manifest, lockfile and toolchain pin, every cargo config cargo would read and the build
+ * environment (`cargo_configs`, `build_env`), the compiler (`rustc -vV`), `build.sh` (the
+ * flags) and the repo modules the pipeline runs (`import_closure` over `PIPELINE_ENTRIES` —
+ * itself, the training drivers, the bench FFI wrapper the FFI library trains through, the
+ * staging, the size bands), the snapshot pin the corpus is checked against, and the worlds,
+ * triple and target. `depth` adds the depth gate's own inputs (its driver's closure and the
+ * native test that writes its shapes), which can move with no binary moving.
+ *
+ * Deliberately left out: the Node and Deno versions the drivers run under, and the fixture
+ * trees `byteid` reads. Neither changes a binary; a fixture edit can expose a PGO/plain
+ * output difference only a rebuilt run would grade — rebuild without `--reuse` to re-grade.
+ */
+const cache_keys = (): { build: string; depth: string } => {
+	const crate_dirs = workspace_closure(worlds.map((world) => WORLD_CRATE[world]));
+	const files = [
+		...crate_dirs.flatMap(source_files),
+		...source_files('crates/tsv_wasm/npm'),
+		...source_files('crates/tsv_wasm/types'),
+		'scripts/pgo/build.sh',
+		...import_closure(PIPELINE_ENTRIES),
+		...['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml'].filter((f) => existsSync(f))
+	];
+	const hash = createHash('sha256');
+	for (const file of [...new Set(files)].sort()) {
+		hash.update(`${file}\0${sha256_file(file)}\n`);
+	}
+	for (const config of cargo_configs()) hash.update(`config\0${config}\0${sha256_file(config)}\n`);
+	for (const variable of build_env()) hash.update(`env\0${variable}\n`);
+	hash.update(`rustc\0${capture('rustc', ['-vV']).stdout}\n`);
+	hash.update(`pin\0${JSON.stringify(GATE_CHECKOUT_IDS[CORPORA_ROOT])}\n`);
+	hash.update(`run\0${worlds.join(',')}\0${triple}\0${rust_target ?? ''}\n`);
+	const build = hash.digest('hex');
+	const depth = createHash('sha256').update(build);
+	const depth_files = [
+		...import_closure(['scripts/pgo/addon_depth.ts']),
+		'tests/depth_limit.rs'
+	].filter((f) => existsSync(f));
+	for (const file of [...new Set(depth_files)].sort()) {
+		depth.update(`${file}\0${sha256_file(file)}\n`);
+	}
+	return { build, depth: depth.digest('hex') };
+};
+
+/** The stamp `all` left, or `null` when there is none this run can read. */
+const read_stamp = (): PipelineStamp | null => {
+	try {
+		const stamp = JSON.parse(readFileSync(paths.stamp, 'utf8')) as PipelineStamp;
+		return stamp.version === STAMP_VERSION ? stamp : null;
+	} catch {
+		return null;
+	}
+};
+
+/**
+ * Why the stamped build cannot stand in for this run, or `null` when it can: its key must be
+ * this run's, its worlds must cover this run's, and each world's profile-use binary must
+ * still be the bytes its gates passed.
+ */
+const reuse_refusal = (stamp: PipelineStamp | null, build_key: string): string | null => {
+	if (stamp === null) return `no pipeline stamp at ${paths.stamp}`;
+	if (stamp.build_key !== build_key) return 'an input changed since the stamped build';
+	if (stamp.triple !== triple) return `the stamped build is ${stamp.triple}'s`;
+	const missing = worlds.filter((world) => !stamp.worlds.includes(world));
+	if (missing.length > 0) return `the stamped build has no ${missing.join(', ')} world`;
+	for (const world of worlds) {
+		const path = world_artifact('use', world);
+		if (!existsSync(path) || sha256_file(path) !== stamp.artifacts[world]?.sha256) {
+			return `${path} is not the binary the stamp names`;
+		}
+	}
+	if (!existsSync(loader_entries(paths.loader('use')).index)) return 'the use loader is gone';
+	return null;
+};
+
+const write_stamp = (keys: { build: string; depth: string }, depth_graded: boolean): void => {
+	const stamp: PipelineStamp = {
+		version: STAMP_VERSION,
+		build_key: keys.build,
+		depth_key: depth_graded ? keys.depth : null,
+		triple,
+		worlds: [...worlds],
+		artifacts: Object.fromEntries(
+			worlds.map((world) => [
+				world,
+				{
+					sha256: sha256_file(world_artifact('use', world)),
+					profile_sha256: sha256_file(paths.profdata(world))
+				}
+			])
+		)
+	};
+	writeFileSync(paths.stamp, JSON.stringify(stamp, null, '\t') + '\n');
+};
+
+// --- all ---------------------------------------------------------------------------------
+
+const size_bands = (): void =>
+	run(DENO, [
+		'run',
+		'--allow-read',
+		'scripts/validate_napi_artifact.ts',
+		'--triple',
+		triple,
+		'--pgo'
+	]);
+
+/**
+ * Every step in order, ending with the stamp (`write_stamp`) once every gate passed. With
+ * `--reuse` (the local tasks; the release workflow runs the steps one by one and never reaches
+ * this) a stamp whose key matches this run's skips the build and
+ * its gates — the instrumented builds, training, merge, profile-use builds, the build-log,
+ * section and byte-identity gates — since they passed for exactly these bytes; it still
+ * restages the pair and re-reads the size bands (both cheap), and runs the depth gate when
+ * asked and not yet passed for these inputs. Without `--reuse`, or on any mismatch, the whole
+ * pipeline runs, and a stamp is written only once every gate it ran has passed.
+ */
 const cmd_all = (): void => {
 	timed('corpora', () => cmd_corpora(false));
+	// the keys are computed on every run, so a run without `--reuse` still leaves a stamp for
+	// the next one; only `--reuse` reads it
+	const keys = cache_keys();
+	const stamp = args.reuse ? read_stamp() : null;
+	const refusal = args.reuse ? reuse_refusal(stamp, keys.build) : '--reuse not passed';
+	const want_depth = !args['no-depth'];
+	if (refusal === null) {
+		console.log(`reuse: the stamped PGO build matches this run's inputs — build and gates skipped`);
+		timed('stage use', () => cmd_stage('use'));
+		timed('size bands', size_bands);
+		const depth_done = stamp!.depth_key === keys.depth;
+		if (want_depth && !depth_done) {
+			timed('depth-shapes', cmd_depth_shapes);
+			timed('depth', cmd_depth);
+		}
+		// the stamp keeps its worlds and binaries (a narrower run must not drop a world it
+		// did not ask for); only the depth verdict can have moved
+		const depth_key = depth_done || want_depth ? keys.depth : null;
+		writeFileSync(paths.stamp, JSON.stringify({ ...stamp!, depth_key }, null, '\t') + '\n');
+		console.log(`build:pgo: done (reused) — the PGO pair is staged in ${PKG_ROOT}/${triple}/`);
+		return;
+	}
+	console.log(`reuse: rebuilding — ${refusal}`);
+	rmSync(paths.stamp, { force: true });
 	timed('plain cli', () =>
 		run('cargo', [
 			'build',
@@ -1013,6 +1422,18 @@ const cmd_all = (): void => {
 			...(rust_target ? ['--target', rust_target] : [])
 		])
 	);
+	if (worlds.includes('ffi')) {
+		timed('plain ffi', () =>
+			run('cargo', [
+				'build',
+				'--locked',
+				'-p',
+				'tsv_ffi',
+				'--release',
+				...(rust_target ? ['--target', rust_target] : [])
+			])
+		);
+	}
 	timed('build.sh instrument', () => build_sh('instrument'));
 	timed('stage instrument', () => cmd_stage('instrument'));
 	timed('train', cmd_train);
@@ -1022,20 +1443,13 @@ const cmd_all = (): void => {
 	timed('gate-sections', cmd_gate_sections);
 	timed('stage use', () => cmd_stage('use'));
 	timed('byteid', cmd_byteid);
-	timed('size bands', () =>
-		run(DENO, [
-			'run',
-			'--allow-read',
-			'scripts/validate_napi_artifact.ts',
-			'--triple',
-			triple,
-			'--pgo'
-		])
-	);
-	if (!args['no-depth']) {
+	if (worlds.includes('ffi')) timed('byteid-ffi', cmd_byteid_ffi);
+	timed('size bands', size_bands);
+	if (want_depth) {
 		timed('depth-shapes', cmd_depth_shapes);
 		timed('depth', cmd_depth);
 	}
+	write_stamp(keys, want_depth);
 	console.log(`build:pgo: done — the PGO pair is staged in ${PKG_ROOT}/${triple}/`);
 };
 
@@ -1051,6 +1465,13 @@ const commands: Record<string, () => void> = {
 	'gate-builds': cmd_gate_builds,
 	'gate-sections': cmd_gate_sections,
 	byteid: cmd_byteid,
+	// the `--reuse` keys this run would compare, and why the stamp would or would not stand in
+	'cache-key': () => {
+		const keys = cache_keys();
+		const refusal = reuse_refusal(read_stamp(), keys.build);
+		console.log(`build ${keys.build}\ndepth ${keys.depth}\nreuse ${refusal ?? 'yes'}`);
+	},
+	'byteid-ffi': cmd_byteid_ffi,
 	'depth-shapes': cmd_depth_shapes,
 	depth: cmd_depth,
 	all: cmd_all

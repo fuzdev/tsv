@@ -17,7 +17,7 @@ Mirrors `tsv_wasm`'s split so the bench can size scope-matched native artifacts:
 - `format` (default) — `tsv_format_<lang>` exports
 - `parse` (default) — `tsv_parse_<lang>` + `tsv_parse_internal_<lang>` exports, and the `json` layer on each language crate
 
-The default (both features) is the full `libtsv_ffi` the bench perf rows load and any FFI host links. The size table also reports two subset builds, each in its own target dir so they don't clobber the full lib: `--no-default-features --features format` (the native mirror of `@fuzdev/tsv-format-wasm`, no wire-JSON layer, scope-matched to oxfmt) and `--no-default-features --features parse` (the mirror of `@fuzdev/tsv-parse-wasm`, printers dropped, scope-matched to oxc-parser). See `deno task build:ffi:format` / `build:ffi:parse` — built only by `build:bench`, which the gate never runs, so `deno task typecheck:features` (in `check`) `cargo check`s each half on its own.
+The default (both features) is the full `libtsv_ffi` any FFI host links; the bench's perf rows load its profile-guided build (`deno task build:bench:pgo`, trained as itself through the bench's FFI wrapper). The size table also reports two subset builds, plain, each in its own target dir so they don't clobber the full lib: `--no-default-features --features format` (the native mirror of `@fuzdev/tsv-format-wasm`, no wire-JSON layer, scope-matched to oxfmt) and `--no-default-features --features parse` (the mirror of `@fuzdev/tsv-parse-wasm`, printers dropped, scope-matched to oxc-parser). See `deno task build:ffi:format` / `build:ffi:parse` — built only by `build:bench`, which the gate never runs, so `deno task typecheck:features` (in `check`) `cargo check`s each half on its own.
 
 ## Public API
 

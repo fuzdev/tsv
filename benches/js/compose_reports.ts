@@ -24,6 +24,11 @@ import { exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { sample_sd, unstable_readings } from './lib/bench_plan.ts';
+import {
+	type NativeBuild,
+	native_build_pair_summary,
+	native_build_summary
+} from './lib/pgo_bench.ts';
 import type { Machine, Runtime } from './lib/runtime.ts';
 
 /**
@@ -145,6 +150,8 @@ interface Report {
 	 * "not recorded", which the vintage key below spells `?`.
 	 */
 	corpus_snapshot?: { commit: string };
+	/** What the sibling's native rows measured. Absent on pre-`version` 23 siblings. */
+	native_build?: NativeBuild | null;
 }
 
 const results_dir = fileURLToPath(new URL('./results/', import.meta.url));
@@ -285,8 +292,31 @@ const sources = present.map((r) => ({
 	// other, which reads as a runtime PERFORMANCE difference in a table of ratios.
 	// `null` (not `[]`) when the sibling predates the field — "not recorded" and
 	// "nothing missing" are different claims, and only one of them is safe to make.
-	unavailable: reports.get(r)!.unavailable ?? null
+	unavailable: reports.get(r)!.unavailable ?? null,
+	// The profile-guided build the sibling's native rows loaded — `null` when the sibling
+	// predates the field
+	native_build: reports.get(r)!.native_build ?? null
 }));
+
+/**
+ * The native build every sibling measured, when they agree on it — one stamp, so the same
+ * profile-guided pair whichever binding a runtime loads — else the first recorded one,
+ * with `mixed_native_build` set: siblings built from two pipeline runs measured two
+ * builds, whose bytes (and so whose numbers) need not agree.
+ */
+const native_builds = sources
+	.map((s) => s.native_build)
+	.filter((n): n is NativeBuild => n !== null);
+const native_build_key = (n: NativeBuild): string =>
+	n.build === 'pgo' && n.bindings !== null
+		? `pgo:${n.bindings.ffi.sha256}|${n.bindings.napi.sha256}`
+		: `${n.build}:${n.loaded.sha256}`;
+const native_build = native_builds[0] ?? null;
+// one stamp's pair, profile-guided, on every present sibling — else mixed
+const mixed_native_build =
+	native_builds.length < sources.length ||
+	native_builds.some((n) => n.build !== 'pgo') ||
+	new Set(native_builds.map(native_build_key)).size > 1;
 
 /**
  * Row names each sibling recorded as unavailable, or `null` when the sibling
@@ -547,8 +577,13 @@ const machine = sources.find((s) => s.machine)?.machine ?? null;
  * needed (`MIN_NOISE_PASSES`). Only a sibling with one pass, or from before passes,
  * is read on its sweep-level `cv` as in 17. A consumer that read 17's `samples` as
  * cleaned sweeps reads 18's wrongly on every `passes` side.
+ *
+ * 19: `native_build` — the build the native rows measured (each sibling's per-runtime
+ * `native_build`, the first recorded), `mixed_native_build` when the siblings did not all
+ * load the one stamp's profile-guided pair (two stamps, a sibling whose loaded library the
+ * stamp does not name, or one recording none), and `sources[].native_build` per sibling.
  */
-const COMBINED_SCHEMA_VERSION = 18;
+const COMBINED_SCHEMA_VERSION = 19;
 
 // JSON: metadata + provenance per source + the comparison rows.
 /**
@@ -728,6 +763,8 @@ const combined = {
 	mixed_vintage,
 	conformance_vintage,
 	mixed_machine,
+	native_build,
+	mixed_native_build,
 	unavailable_by_runtime,
 	partial_rows,
 	unstable_cells,
@@ -784,6 +821,25 @@ if (conformance_vintage) {
 md.push('');
 if (machine) {
 	md.push(`**Machine:** ${machine.cpu_model} · ${machine.os}/${machine.arch}\n`);
+}
+if (native_build && !mixed_native_build) {
+	const verdicts = native_builds.map((n) => n.disjoint_from_timed_corpus);
+	const disjoint = verdicts.includes(false) ? false : verdicts.includes(null) ? null : true;
+	md.push(`**Native build:** ${native_build_pair_summary(native_build, disjoint)}\n`);
+} else {
+	for (const s of sources) {
+		md.push(
+			`**Native build (${s.runtime}):** ${s.native_build ? native_build_summary(s.native_build) : 'not recorded'}\n`
+		);
+	}
+}
+if (mixed_native_build) {
+	md.push(
+		'⚠ **Mixed native builds** — the siblings measured different profile-guided builds (or ' +
+			'some recorded none or a library the stamp does not name), so a native row’s ' +
+			'cross-runtime ratio mixes two binaries; re-run ' +
+			'every runtime on one build (`deno task bench:perf`).\n'
+	);
 }
 if (mixed_machine) {
 	md.push(

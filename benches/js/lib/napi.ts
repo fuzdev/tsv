@@ -3,11 +3,11 @@
  *
  * The runtime sibling of `ffi.ts` (Deno's `Deno.dlopen` C-FFI path): same engine
  * (`tsv_napi`, built from the same language crates), different binding boundary.
- * Loaded with `process.dlopen`, which accepts the built cdylib directly
- * (`target/napi/libtsv_napi.so`) as an N-API addon — no `.node` rename, so
- * `build:napi` is just `cargo build -p tsv_napi --profile napi` (the workspace's
- * unwinding release profile — the same artifact that ships, so the bench
- * measures the shipped panic contract).
+ * Loaded with `process.dlopen`, which accepts the built cdylib directly as an N-API
+ * addon — no `.node` rename. The library is the profile-guided addon
+ * `deno task build:bench:pgo` stages (`lib/pgo_bench.ts`): the shipped addon's own
+ * pipeline (`scripts/pgo/pgo.ts`), on the workspace's unwinding `napi` profile, so the
+ * bench measures what ships — its profile and its panic contract.
  *
  * Unlike FFI there are no raw pointers and no manual free: napi-rs marshals the
  * JS string in and the returned `String` out. `parse_<lang>_json` returns the span-only
@@ -30,7 +30,7 @@
  */
 
 import { stat } from 'node:fs/promises';
-import { napi_library_path } from './tsv_artifacts.ts';
+import { pgo_bench_library_path } from './pgo_bench.ts';
 import { type EngineFailure, type EngineFn, TsvBinding } from './tsv_api.ts';
 import type { InitScope } from './types.ts';
 
@@ -58,11 +58,9 @@ export interface NapiAddon {
 	__panic_probe?: () => void;
 }
 
-/** Path to the built `tsv_napi` cdylib (loaded directly as an N-API addon).
- * `target/napi/` is the workspace `napi` profile's output — release + unwind,
- * the shipped panic contract. */
+/** The profile-guided `tsv_napi` cdylib the bench loads (directly, as an N-API addon). */
 export function get_napi_library_path(): string {
-	return napi_library_path();
+	return pgo_bench_library_path('napi');
 }
 
 export class NapiImplementation extends TsvBinding {
@@ -71,7 +69,7 @@ export class NapiImplementation extends TsvBinding {
 		try {
 			await stat(path);
 		} catch {
-			throw new Error(`N-API addon not found at ${path}. Run 'deno task build:napi' first.`);
+			throw new Error(`N-API addon not found at ${path}. Run 'deno task build:bench:pgo' first.`);
 		}
 		// `process.dlopen` loads a native addon from any path/extension into the
 		// passed module's `exports` — the supported way to load a `.so`/`.dylib`
@@ -105,6 +103,6 @@ export class NapiImplementation extends TsvBinding {
 		// bindings can't come to disagree about what surfacing a refusal MEANS. And the parse wire is
 		// span-only, so a stale addon whose parse still emits `loc` can't be timed as the
 		// span-only default.
-		this.probe('tsv (N-API)', { path, rebuild: 'deno task build:napi' }, scope);
+		this.probe('tsv (N-API)', { path, rebuild: 'deno task build:bench:pgo' }, scope);
 	}
 }

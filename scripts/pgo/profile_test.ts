@@ -136,6 +136,15 @@ Deno.test('grade_profile passes a profile whose hot functions reach their floors
 	);
 	deepStrictEqual(cli.failures, []);
 	ok(cli.hot.every((h) => !h.path.includes('imports')));
+	// the FFI library has neither the import records nor the type strip
+	const ffi = grade_profile(
+		show(HOT_FUNCTIONS.filter((h) => h.worlds.includes('ffi')).map((h) => [mangle(h.path), [99]])),
+		'ffi',
+		TRAINED
+	);
+	deepStrictEqual(ffi.failures, []);
+	ok(ffi.hot.every((h) => !h.path.includes('imports') && !h.path.includes('strip')));
+	ok(ffi.hot.some((h) => h.path.includes('render_doc_iterative')));
 });
 
 Deno.test(

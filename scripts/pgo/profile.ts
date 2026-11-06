@@ -33,11 +33,15 @@ export interface HotFunction {
 	path: string;
 	/** The trained count its floor is read from (`floor_of`). */
 	per: keyof TrainedCounts;
-	/** The worlds that ship it (the CLI has no import records). */
-	worlds: readonly ('cli' | 'napi')[];
+	/** The worlds that compile it (the CLI has no import records; the FFI library neither
+	 * those nor the type strip). */
+	worlds: readonly ProfileWorld[];
 }
 
-const BOTH = ['cli', 'napi'] as const;
+/** A training world, as `layout.ts` names them (restated: this module imports nothing). */
+export type ProfileWorld = 'cli' | 'napi' | 'ffi';
+
+const EVERY = ['cli', 'napi', 'ffi'] as const;
 
 /**
  * The functions a trained profile must carry real counts on, by demangled path: the doc
@@ -50,14 +54,14 @@ const BOTH = ['cli', 'napi'] as const;
  * rename here is a rename in the gate (the gate fails, naming the path).
  */
 export const HOT_FUNCTIONS: readonly HotFunction[] = [
-	{ path: 'tsv_lang::doc::arena_render::render_doc_iterative', per: 'files', worlds: BOTH },
-	{ path: 'tsv_ts::__private::parse_with_goal', per: 'typescript', worlds: BOTH },
-	{ path: 'tsv_ts::__private::parse_folded', per: 'typescript', worlds: BOTH },
-	{ path: 'tsv_svelte::__private::parse', per: 'svelte', worlds: BOTH },
-	{ path: 'tsv_svelte::__private::parse_folded', per: 'svelte', worlds: BOTH },
-	{ path: 'tsv_css::__private::parse', per: 'css', worlds: BOTH },
-	{ path: 'tsv_css::__private::parse_folded', per: 'css', worlds: BOTH },
-	{ path: 'tsv_ts::strip::strip_in', per: 'strip', worlds: BOTH },
+	{ path: 'tsv_lang::doc::arena_render::render_doc_iterative', per: 'files', worlds: EVERY },
+	{ path: 'tsv_ts::__private::parse_with_goal', per: 'typescript', worlds: EVERY },
+	{ path: 'tsv_ts::__private::parse_folded', per: 'typescript', worlds: EVERY },
+	{ path: 'tsv_svelte::__private::parse', per: 'svelte', worlds: EVERY },
+	{ path: 'tsv_svelte::__private::parse_folded', per: 'svelte', worlds: EVERY },
+	{ path: 'tsv_css::__private::parse', per: 'css', worlds: EVERY },
+	{ path: 'tsv_css::__private::parse_folded', per: 'css', worlds: EVERY },
+	{ path: 'tsv_ts::strip::strip_in', per: 'strip', worlds: ['cli', 'napi'] },
 	{ path: 'tsv_ts::imports::parse_imports_in', per: 'imports_typescript', worlds: ['napi'] },
 	{ path: 'tsv_svelte::__private::parse_imports_in', per: 'imports_svelte', worlds: ['napi'] }
 ];
@@ -191,7 +195,7 @@ export interface ProfileVerdict {
  * every hot function the world ships entered at least its floor's times (`floor_of`). */
 export function grade_profile(
 	text: string,
-	world: 'cli' | 'napi',
+	world: ProfileWorld,
 	trained: TrainedCounts
 ): ProfileVerdict {
 	const records = parse_profile_show(text);

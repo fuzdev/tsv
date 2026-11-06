@@ -27,7 +27,8 @@ import { OXC_WASI_BINDING } from './versions.ts';
 import type { ImplementationSet } from './implementations.ts';
 import { current_arch, current_os, current_runtime } from './runtime.ts';
 import { rsvelte_binary_path } from './rsvelte.ts';
-import { type BinaryKind, TSV_ARTIFACTS } from './tsv_artifacts.ts';
+import { pgo_bench_mismatch } from './pgo_bench.ts';
+import { type BinaryKind, TSV_ARTIFACTS, type TsvArtifact } from './tsv_artifacts.ts';
 
 const exec_file = promisify(execFile);
 
@@ -45,6 +46,13 @@ export interface BinarySize {
 	gzip_bytes: number | null;
 	/** Binary kind for grouping comparisons */
 	kind: BinaryKind;
+	/**
+	 * Which build a tsv native row is: `pgo` for a profile-guided slot whose bytes the PGO stamp
+	 * names (the pair the timed native rows load), `plain` for a size-only build no row executes
+	 * or a slot holding bytes the stamp does not name. Absent on every other row. From report
+	 * `version` 23.
+	 */
+	build?: 'pgo' | 'plain';
 }
 
 /**
@@ -170,11 +178,13 @@ async function push_size(
 	out: SizeStaging,
 	label: string,
 	kind: BinaryKind,
-	path: string
+	path: string,
+	build?: 'pgo' | 'plain'
 ): Promise<void> {
 	const bytes = await file_size(path);
-	if (bytes !== null) out.found.push({ entry: { label, bytes, kind }, path });
-	else out.absent.push(label);
+	if (bytes !== null) {
+		out.found.push({ entry: { label, bytes, kind, ...(build ? { build } : {}) }, path });
+	} else out.absent.push(label);
 }
 
 /** Resolve the first existing file (by extension) under any of the candidate dirs. */
@@ -232,6 +242,18 @@ function napi_binding_dirs(
 }
 
 /**
+ * Which build a tsv artifact on disk is: a profile-guided slot is `pgo` only when the PGO
+ * stamp names its bytes (`pgo_bench_mismatch`), else `plain`; a plain build is `plain`; a
+ * wasm bundle carries none.
+ */
+function artifact_build(artifact: TsvArtifact): 'pgo' | 'plain' | undefined {
+	if (artifact.pgo_world !== undefined) {
+		return pgo_bench_mismatch(artifact.pgo_world, artifact.path) === null ? 'pgo' : 'plain';
+	}
+	return artifact.build;
+}
+
+/**
  * Collect binary sizes for all implementations.
  *
  * Uses known paths for tsv binaries (relative to project root)
@@ -261,7 +283,7 @@ export async function collect_binary_sizes(
 	// carries each entry's rationale). Unconditional: `native`/`wasm` are required
 	// impls, so an absent BUILD still shows up as `absent` below.
 	for (const artifact of Object.values(TSV_ARTIFACTS)) {
-		await push_size(staged, artifact.label, artifact.kind, artifact.path);
+		await push_size(staged, artifact.label, artifact.kind, artifact.path, artifact_build(artifact));
 	}
 
 	// The canonical toolchain — prettier and the canonical parsers, as the minimal JS
@@ -484,6 +506,30 @@ function anchor_note(native_anchor: string | null): string {
 	);
 }
 
+/**
+ * The sentence naming which build each tsv native size is (`BinarySize.build`), or `null`
+ * when no tsv native row carries one.
+ */
+function build_note(sizes: BinarySize[]): string | null {
+	const of = (build: 'pgo' | 'plain'): string[] =>
+		sizes.filter((s) => s.build === build).map((s) => `\`${s.label}\``);
+	const pgo = of('pgo');
+	const plain = of('plain');
+	if (pgo.length === 0 && plain.length === 0) return null;
+	const parts: string[] = [];
+	if (pgo.length > 0) {
+		parts.push(
+			`${pgo.join(' and ')} ${pgo.length === 1 ? 'is' : 'are'} the profile-guided build the native rows time`
+		);
+	}
+	if (plain.length > 0) {
+		parts.push(
+			`${plain.join(' and ')} ${plain.length === 1 ? 'is a plain build' : 'are plain builds'}, sized only`
+		);
+	}
+	return `Of tsv's native rows, ${parts.join('; ')}.`;
+}
+
 /** Display row: an entry plus ratios vs tsv on raw and gzipped bytes. */
 interface DisplayRow {
 	entry: BinarySize;
@@ -631,6 +677,8 @@ export function generate_binary_size_report(sizes: BinarySize[]): string | null 
 
 	lines.push('');
 	lines.push(`  ${anchor_note(native_anchor)}`);
+	const builds = build_note(sizes);
+	if (builds !== null) lines.push(`  ${builds}`);
 	if (show_gzip) {
 		lines.push('  Gzipped column ≈ the artifact’s wire size (`gzip -c`, system default level).');
 	}
@@ -674,9 +722,10 @@ export function generate_binary_size_markdown(sizes: BinarySize[]): string | nul
 	add_rows(native_entries);
 	add_rows(js_entries);
 
+	const builds = build_note(sizes);
 	lines.push('');
 	lines.push(
-		`_${anchor_note(native_anchor)}${
+		`_${anchor_note(native_anchor)}${builds === null ? '' : ` ${builds}`}${
 			show_gzip
 				? ' Gzipped ≈ the artifact’s wire size (`gzip -c`, system default level; the `tsv (napi)` platform package also ships the `tsv` CLI binary, so its tarball is larger than this row). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes.'
 				: ''

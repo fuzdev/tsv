@@ -10,8 +10,9 @@
  * The LOADERS are readers too, and that is the half worth stating: the guard's
  * subject has to be the file the loader actually opens, so `ffi.ts`, `napi.ts` and
  * `wasm.ts` build their paths from this module's exported builders
- * ({@link ffi_library_path}, {@link napi_library_path}, {@link wasm_bundle_dir} /
- * {@link wasm_bundle_path}) rather than re-deriving the layout. Only the two AXES a loader varies stay its
+ * ({@link ffi_library_path}, {@link wasm_bundle_dir} / {@link wasm_bundle_path}) and
+ * from `pgo_bench.ts`'s `pgo_bench_library_path` (the profile-guided native pair the
+ * timed rows load) rather than re-deriving the layout. Only the two AXES a loader varies stay its
  * own — the FFI profile (`TSV_FFI_PROFILE`) and the wasm-pack target — which is
  * exactly why the freshness guard's executed-vs-size-only split can be a path
  * comparison at all: an entry differing there is a real difference, not a spelling.
@@ -39,6 +40,7 @@
 
 import { fileURLToPath } from 'node:url';
 
+import { type PgoBenchWorld, pgo_bench_library_path } from './pgo_bench.ts';
 import { native_library_filename } from './runtime.ts';
 
 /**
@@ -86,22 +88,34 @@ export interface TsvArtifact {
 	binding_crates: readonly string[];
 	/** The task that rebuilds it — surfaced by every staleness message. */
 	rebuild: string;
+	/**
+	 * Which build a native row is: `pgo` for the profile-guided libraries the timed rows load
+	 * (`pgo_bench.ts` — the guard also requires the stamp to name their bytes), `plain` for a
+	 * size-only build no row executes. The size table publishes it beside each native size.
+	 */
+	build?: 'pgo' | 'plain';
+	/** The PGO world whose stamp entry must name this file's bytes (a `pgo` build only). */
+	pgo_world?: PgoBenchWorld;
 }
 
 const PROJECT_ROOT = fileURLToPath(new URL('../../..', import.meta.url)).replace(/\/$/, '');
 const FFI_LIB = native_library_filename('tsv_ffi');
 
 /**
- * The C-FFI shared library for a cargo profile — `release` for the measured
- * artifact, `corpus` for the unwinding build the corpus tools load
- * (`TSV_FFI_PROFILE`). The profile is the caller's axis; the layout is this
- * module's.
+ * The plain C-FFI shared library cargo builds for a profile — `corpus` for the unwinding
+ * build the corpus tools load (`TSV_FFI_PROFILE`). The bench's timed row loads the
+ * profile-guided library instead (`pgo_bench_library_path('ffi')`). The profile is the
+ * caller's axis; the layout is this module's.
  */
 export function ffi_library_path(profile: string): string {
 	return `${PROJECT_ROOT}/target/${profile}/${FFI_LIB}`;
 }
 
-/** The N-API addon — one build, the `napi` profile (release + unwind). */
+/**
+ * The plain N-API addon cargo builds — the `napi` profile (release + unwind) — which
+ * `test:napi` loads. The bench's rows load the profile-guided addon instead
+ * (`pgo_bench_library_path('napi')`).
+ */
 export function napi_library_path(): string {
 	return `${PROJECT_ROOT}/target/napi/${native_library_filename('tsv_napi')}`;
 }
@@ -138,12 +152,15 @@ export function wasm_bundle_path(variant: WasmVariant, target: string): string {
  * is the same bytes under each wasm-pack target, only the JS glue differs.
  */
 export const TSV_ARTIFACTS = {
+	// The profile-guided library the Deno row loads, as `build:bench:pgo` staged it.
 	tsv_ffi: {
 		label: 'tsv (ffi)',
 		kind: 'native',
-		path: ffi_library_path('release'),
+		path: pgo_bench_library_path('ffi'),
 		binding_crates: ['tsv_ffi'],
-		rebuild: 'deno task build:ffi'
+		rebuild: 'deno task build:bench:pgo',
+		build: 'pgo',
+		pgo_world: 'ffi'
 	},
 	// The native mirror of @fuzdev/tsv-format-wasm: dropping the convert/JSON layer
 	// (and the parse exports) leaves a scope-matched comparison against oxfmt
@@ -154,7 +171,8 @@ export const TSV_ARTIFACTS = {
 		kind: 'native',
 		path: `${PROJECT_ROOT}/target/ffi-format/release/${FFI_LIB}`,
 		binding_crates: ['tsv_ffi'],
-		rebuild: 'deno task build:ffi:format'
+		rebuild: 'deno task build:ffi:format',
+		build: 'plain'
 	},
 	// The native mirror of @fuzdev/tsv-parse-wasm: keeps the parse exports + the
 	// convert/JSON layer and drops the printers, scope-matched to oxc-parser
@@ -164,17 +182,20 @@ export const TSV_ARTIFACTS = {
 		kind: 'native',
 		path: `${PROJECT_ROOT}/target/ffi-parse/release/${FFI_LIB}`,
 		binding_crates: ['tsv_ffi'],
-		rebuild: 'deno task build:ffi:parse'
+		rebuild: 'deno task build:ffi:parse',
+		build: 'plain'
 	},
 	// The Node/Bun native path, the sibling of the FFI library Deno loads. Same
-	// engine, different binding boundary; sized from the built cdylib (the shipped
-	// `.node` is a byte-identical copy).
+	// engine, different binding boundary; the profile-guided addon `build:bench:pgo`
+	// staged — the shipped `.node` is the same pipeline's output, renamed.
 	tsv_napi: {
 		label: 'tsv (napi)',
 		kind: 'native',
-		path: napi_library_path(),
+		path: pgo_bench_library_path('napi'),
 		binding_crates: ['tsv_napi'],
-		rebuild: 'deno task build:napi'
+		rebuild: 'deno task build:bench:pgo',
+		build: 'pgo',
+		pgo_world: 'napi'
 	},
 	// Three WASM builds from one crate via the `format`/`parse` features:
 	// @fuzdev/tsv-format-wasm, @fuzdev/tsv-parse-wasm, and @fuzdev/tsv-wasm (both —

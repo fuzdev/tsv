@@ -52,6 +52,7 @@ import {
 import { assert_output_present, suppress_stderr_noise } from './lib/bench_sweep.ts';
 import { assert_artifacts_unchanged } from './lib/check_artifact_freshness.ts';
 import { init_row_task } from './lib/implementations.ts';
+import { refuse_ffi_profile_override } from './lib/pgo_bench.ts';
 import type { SourceFile } from './lib/types.ts';
 
 const spec = read_child_spec<RowSpec>();
@@ -102,6 +103,7 @@ const files = load_file_set();
 
 // Before anything loads: the artifacts are the ones pre-flight graded, not a build
 // that landed in this checkout since (`assert_artifacts_unchanged`).
+refuse_ffi_profile_override('bench row');
 assert_artifacts_unchanged(spec.artifacts);
 
 const { task, impl } = await init_row_task(row, spec.task_options);

@@ -62,6 +62,7 @@ import {
 	executed_artifact_identities,
 	warn_stale_reported_artifacts
 } from './lib/check_artifact_freshness.ts';
+import { refuse_ffi_profile_override } from './lib/pgo_bench.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
 import {
 	corpus_file_origin_resolver,
@@ -246,6 +247,7 @@ if (total_files === 0) {
 // Refuse to measure stale binaries (the `:run` tasks skip the rebuild). Which
 // artifacts this runtime executes — FFI or N-API, plus that runtime's WASM target
 // — is `check_executed_artifacts`'s subject; override with BENCH_STALE_OK=1.
+refuse_ffi_profile_override('bench pre-flight');
 await check_executed_artifacts();
 await warn_stale_reported_artifacts();
 // What those artifacts ARE, read before anything loads them — the bytes every timed

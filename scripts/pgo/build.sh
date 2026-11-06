@@ -8,7 +8,11 @@
 #
 # usage: sh scripts/pgo/build.sh <instrument|use> <pgo-dir> [<rust-target>]
 #
-#   instrument  tsv_cli (`release`) + tsv_napi (`napi`), -Cprofile-generate, into
+# The worlds built are `PGO_WORLDS` (space-separated, default `cli napi` — the two shipped
+# binaries); `pgo.ts --ffi` adds `ffi`, the bench's C-FFI library (`tsv_ffi`, `release`).
+#
+#   instrument  each world (tsv_cli `release`, tsv_napi `napi`, tsv_ffi `release`),
+#               -Cprofile-generate, into
 #               <pgo-dir>/target-instrument. The build scripts it runs are
 #               instrumented too (RUSTFLAGS reaches host artifacts when host ==
 #               target), so their profiles go to <pgo-dir>/build-profraw — a
@@ -16,8 +20,8 @@
 #               keeps them out of the merge. The instrumenting rustc's `-vV` goes
 #               to <pgo-dir>/logs/rustc-instrument.txt: the merge must run in that
 #               compiler's LLVM, and on a container row it is the container's.
-#   use         the same two, -Cprofile-use with each world's own profile
-#               (<pgo-dir>/cli.profdata, <pgo-dir>/napi.profdata), into
+#   use         the same worlds, -Cprofile-use with each world's own profile
+#               (<pgo-dir>/<world>.profdata), into
 #               <pgo-dir>/target-use, verbose (`-v`), so the log carries each
 #               rustc command line for the gate to read the flag back from. The
 #               dir is DELETED first: cargo fingerprints the RUSTFLAGS text, not
@@ -40,7 +44,7 @@
 #
 # Any RUSTFLAGS already set are kept in front (the musl row's
 # `-C target-feature=-crt-static`). Each build's output goes to
-# <pgo-dir>/logs/build-<phase>-<cli|napi>.log; a failure prints its tail.
+# <pgo-dir>/logs/build-<phase>-<world>.log; a failure prints its tail.
 
 set -eu
 
@@ -62,6 +66,17 @@ case $dir in
 	exit 2
 	;;
 esac
+
+worlds=${PGO_WORLDS:-cli napi}
+for world in $worlds; do
+	case $world in
+	cli | napi | ffi) ;;
+	*)
+		echo "build.sh: unknown world '$world' in PGO_WORLDS (cli, napi, ffi)" >&2
+		exit 2
+		;;
+	esac
+done
 
 base=${RUSTFLAGS:-}
 export CARGO_TERM_COLOR=never
@@ -91,16 +106,27 @@ run() {
 	fi
 }
 
+# The cargo selection of one world: the package and its profile.
+world_args() {
+	case $1 in
+	cli) echo "-p tsv_cli --release" ;;
+	napi) echo "-p tsv_napi --profile napi" ;;
+	ffi) echo "-p tsv_ffi --release" ;;
+	esac
+}
+
 case $phase in
 instrument)
 	export CARGO_TARGET_DIR="$dir/target-instrument"
 	gen="-Cprofile-generate=$dir/build-profraw -Cllvm-args=-pgo-instrument-entry"
 	rustc -vV >"$dir/logs/rustc-instrument.txt"
-	run instrument-cli "$gen" build --locked -p tsv_cli --release
-	run instrument-napi "$gen" build --locked -p tsv_napi --profile napi
+	for world in $worlds; do
+		# shellcheck disable=SC2046 # world_args splits into cargo's arguments on purpose
+		run "instrument-$world" "$gen" build --locked $(world_args "$world")
+	done
 	;;
 use)
-	for world in cli napi; do
+	for world in $worlds; do
 		if [ ! -s "$dir/$world.profdata" ]; then
 			echo "build.sh: $dir/$world.profdata is missing or empty — train and merge first" >&2
 			exit 1
@@ -108,8 +134,10 @@ use)
 	done
 	rm -rf "$dir/target-use"
 	export CARGO_TARGET_DIR="$dir/target-use"
-	run use-cli "$(use_flags cli)" build -v --locked -p tsv_cli --release
-	run use-napi "$(use_flags napi)" build -v --locked -p tsv_napi --profile napi
+	for world in $worlds; do
+		# shellcheck disable=SC2046 # world_args splits into cargo's arguments on purpose
+		run "use-$world" "$(use_flags "$world")" build -v --locked $(world_args "$world")
+	done
 	;;
 *)
 	echo "build.sh: unknown phase '$phase' (instrument, use)" >&2

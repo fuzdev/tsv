@@ -843,6 +843,41 @@ cost, and — the sharper case — a path documented as "cold" is usually cold i
 success rate while its cost follows its call rate. Both rules were learned by
 getting them wrong.
 
+## Profile-guided builds
+
+The shipped CLI and N-API addon, and every native row the bench times, are profile-guided
+([benchmarks.md §Fairness caveats](benchmarks.md#fairness-caveats), the PGO entry). The
+recipe — training on the snapshot's own collections, LLVM's cost-benefit inliner off in the
+profile-use build — rests on one measurement, recorded here because the bench no longer
+shows a plain native row to compare against:
+
+**Measured 2026-11-05**, rustc 1.94.1, one machine (AMD Ryzen 7
+5800X, `performance` governor, boost on, frequency unpinned), the machine's quiescence
+checked before and after (the instruction and task-clock spread of repeated pinned runs). Both binaries trained on the own collections and
+measured on the held-out third-party set; each PGO output graded byte-identical to the plain
+build's. Eight rounds, arm order rotated each round, medians (IQR ≤ 1% outside CSS). The
+CLI rows run `tsv format --check --jobs 1` and a per-file `tsv parse`, pinned to one core;
+the addon rows are in-process steady state after two dropped warm-ups; the end-to-end rows
+are `hyperfine -N` over the whole set, three rotated rounds of ten runs.
+
+| plain → PGO (cost-benefit inliner off) | CLI | addon |
+| --- | --- | --- |
+| stripped size | +20.3% | +22.0% |
+| format, all languages | −19.5% | −23.5% |
+| parse, all languages | −0.8% | −4.8% |
+| end to end, one job | −20.0% | — |
+| end to end, default pool (`cli.js` for the addon) | −16.6% | −9.1% |
+
+Default PGO (the inliner on) measured −13.8% / −16.8% on format but **+3.9% / +3.8% on
+parse** at +47.7% / +43.4% size: it retires fewer instructions and loses them back to
+i-cache misses (2.3× plain's on the addon's TypeScript parse, against 1.18× with the
+cost-benefit inliner off). The size bands in `scripts/validate_napi_artifact.ts` (`--pgo`)
+are what catch that inliner coming back on.
+
+`deno task perf:ab` keeps comparing PLAIN builds: a profile retrained for each side would
+make every A/B a draw of two trainings (the profile's bytes vary run to run), so source
+changes are graded without PGO and the bench reports what ships.
+
 ## Measurement Process
 
 ### Before an optimization

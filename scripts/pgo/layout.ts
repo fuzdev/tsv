@@ -17,10 +17,19 @@ import { join } from 'node:path';
 
 import { cli_binary_name } from '../napi_host.ts';
 
-/** The two training worlds — the abort-profile CLI and the unwind-profile addon train apart,
- * since a profile does not transfer across the panic strategy's CFG changes. */
+/** The two shipped training worlds — the abort-profile CLI and the unwind-profile addon train
+ * apart, since a profile does not transfer across the panic strategy's CFG changes. */
 export const WORLDS = ['cli', 'napi'] as const;
-export type World = (typeof WORLDS)[number];
+
+/**
+ * Every training world: the shipped two, plus the bench's C-FFI library (`tsv_ffi`, `release`),
+ * which ships nowhere but is what the Deno bench's native row loads (`pgo.ts --ffi`). It trains
+ * as itself too: its language crates compile at another feature set than the CLI's (no
+ * `locations`) and another profile than the addon's, and the crate hash in every symbol name
+ * keeps either profile from applying to it.
+ */
+export const ALL_WORLDS = [...WORLDS, 'ffi'] as const;
+export type World = (typeof ALL_WORLDS)[number];
 
 /** A build phase of `build.sh`, as its target dir is named. */
 export type Phase = 'instrument' | 'use';
@@ -48,6 +57,8 @@ export const pgo_paths = (dir: string) => ({
 	/** The instrumenting rustc's `rustc -vV` (`build.sh instrument`). */
 	rustc_instrument: join(dir, 'logs', 'rustc-instrument.txt'),
 	byteid: join(dir, 'byteid'),
+	/** What a completed `pgo.ts all` run built and gated, keyed on its inputs (`--reuse`). */
+	stamp: join(dir, 'stamp.json'),
 	/** The depth gate's shapes (`write_shape_limits`) and its scratch. */
 	depth: join(dir, 'depth'),
 	depth_shapes: join(dir, 'depth', 'shapes.tsv')
@@ -61,19 +72,28 @@ export const addon_library_name = (triple: string): string =>
 			? 'libtsv_napi.dylib'
 			: 'libtsv_napi.so';
 
+/** The cdylib filename cargo writes for `tsv_ffi` on the triple's OS. */
+export const ffi_library_name = (triple: string): string =>
+	triple.startsWith('win32-')
+		? 'tsv_ffi.dll'
+		: triple.startsWith('darwin-')
+			? 'libtsv_ffi.dylib'
+			: 'libtsv_ffi.so';
+
 /**
- * The two shipped artifacts of one cargo target dir: the `release` CLI and the
- * `napi`-profile addon, under `<target>/` for a cross build (`rust_target` set).
+ * The artifacts of one cargo target dir: the `release` CLI, the `napi`-profile addon and the
+ * `release` FFI library, under `<target>/` for a cross build (`rust_target` set).
  */
 export const cargo_artifacts = (
 	target_dir: string,
 	triple: string,
 	rust_target?: string
-): { cli: string; addon: string } => {
+): { cli: string; addon: string; ffi: string } => {
 	const base = rust_target ? join(target_dir, rust_target) : target_dir;
 	return {
 		cli: join(base, 'release', cli_binary_name(triple)),
-		addon: join(base, 'napi', addon_library_name(triple))
+		addon: join(base, 'napi', addon_library_name(triple)),
+		ffi: join(base, 'release', ffi_library_name(triple))
 	};
 };
 

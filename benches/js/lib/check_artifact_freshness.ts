@@ -48,6 +48,12 @@
  * last confirmation instead, which is also what makes every `rebuild:` hint below
  * able to clear the refusal it is printed under. A bare `cargo build` does not
  * stamp, so after one the hint is still the remedy.
+ *
+ * The native pair the timed rows load is profile-guided (`lib/pgo_bench.ts`), and for
+ * those an mtime cannot say enough: a plain library copied into the slot is newer than
+ * every source. So their checks also require the PGO stamp to name the file's bytes, and
+ * a library it does not name is refused like a missing one — `BENCH_STALE_OK=1` does not
+ * reach it, since the report would publish a plain build as the profile-guided one.
  */
 
 import { createHash } from 'node:crypto';
@@ -56,8 +62,9 @@ import { readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { get_library_path } from './ffi.ts';
+import { get_library_path, library_rebuild_task } from './ffi.ts';
 import { get_napi_library_path } from './napi.ts';
+import { type PgoBenchWorld, pgo_bench_mismatch } from './pgo_bench.ts';
 import { current_runtime, wasm_target } from './runtime.ts';
 import { CORE_CRATES, TSV_ARTIFACTS, wasm_bundle_path } from './tsv_artifacts.ts';
 
@@ -88,6 +95,8 @@ export interface ArtifactCheck {
 	binding_crates: readonly string[];
 	/** Command that rebuilds this artifact, surfaced in the error message. */
 	rebuild: string;
+	/** A profile-guided artifact: the PGO stamp entry that must name its bytes. */
+	pgo_world?: PgoBenchWorld;
 }
 
 export interface SourceMtime {
@@ -100,8 +109,10 @@ export interface SourceMtime {
 interface StaleArtifact {
 	label: string;
 	path: string;
-	reason: 'missing' | 'stale';
+	reason: 'missing' | 'stale' | 'unstamped';
 	rebuild: string;
+	/** Why the PGO stamp refuses it, present only for `reason: 'unstamped'`. */
+	detail?: string;
 	/** Newest source path + mtimes, present only for `reason: 'stale'`. */
 	source_path?: string;
 	artifact_ms?: number;
@@ -204,6 +215,19 @@ async function find_stale(checks: readonly ArtifactCheck[]): Promise<StaleArtifa
 			continue;
 		}
 
+		const mismatch =
+			check.pgo_world === undefined ? null : pgo_bench_mismatch(check.pgo_world, check.path);
+		if (mismatch !== null) {
+			stale.push({
+				label: check.label,
+				path: check.path,
+				reason: 'unstamped',
+				rebuild: check.rebuild,
+				detail: mismatch
+			});
+			continue;
+		}
+
 		// Strict `<` so an artifact built in the same second as its source passes.
 		if (artifact_ms < source.ms) {
 			stale.push({
@@ -231,7 +255,8 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 	const stale = await find_stale(checks);
 	if (stale.length === 0) return;
 
-	const has_missing = stale.some((s) => s.reason === 'missing');
+	// a missing artifact, or a profile-guided slot holding bytes its stamp does not name
+	const has_missing = stale.some((s) => s.reason !== 'stale');
 	const fatal = has_missing || !stale_ok;
 
 	const lines: string[] = [];
@@ -244,6 +269,8 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 	for (const s of stale) {
 		if (s.reason === 'missing') {
 			lines.push(`  • ${s.label}: not built — ${s.path}`);
+		} else if (s.reason === 'unstamped') {
+			lines.push(`  • ${s.label}: not the gated PGO build — ${s.detail}`);
 		} else {
 			lines.push(
 				`  • ${s.label}: built ${fmt_mtime(s.artifact_ms!)}, ` +
@@ -259,7 +286,9 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 			'  `deno task corpus:compare:format`), or `deno task build:bench` then re-run `deno task smoke`,'
 		);
 		lines.push('  run the specific rebuild command(s) above, or set BENCH_STALE_OK=1 to override');
-		lines.push('  (the override applies to stale artifacts only — a missing one is always fatal).');
+		lines.push(
+			'  (the override applies to stale artifacts only — a missing or unstamped one is always fatal).'
+		);
 	}
 	lines.push('');
 
@@ -282,19 +311,28 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 export function native_artifact_check(): ArtifactCheck {
 	if (current_runtime() !== 'deno') {
 		return {
-			label: 'N-API',
+			label: 'N-API (pgo)',
 			path: get_napi_library_path(),
 			binding_crates: ['tsv_napi'],
-			rebuild: 'deno task build:napi'
+			rebuild: TSV_ARTIFACTS.tsv_napi.rebuild,
+			pgo_world: 'napi'
 		};
 	}
-	const profile = env.TSV_FFI_PROFILE ?? 'release';
-	return {
-		label: `FFI (${profile})`,
-		path: get_library_path(),
-		binding_crates: ['tsv_ffi'],
-		rebuild: profile === 'corpus' ? 'deno task build:ffi:corpus' : 'deno task build:ffi'
-	};
+	const profile = env.TSV_FFI_PROFILE;
+	return profile === undefined
+		? {
+				label: 'FFI (pgo)',
+				path: get_library_path(),
+				binding_crates: ['tsv_ffi'],
+				rebuild: TSV_ARTIFACTS.tsv_ffi.rebuild,
+				pgo_world: 'ffi'
+			}
+		: {
+				label: `FFI (${profile})`,
+				path: get_library_path(),
+				binding_crates: ['tsv_ffi'],
+				rebuild: library_rebuild_task()
+			};
 }
 
 /**
@@ -416,9 +454,10 @@ export async function warn_stale_reported_artifacts(): Promise<void> {
 			label: a.label,
 			path: a.path,
 			binding_crates: a.binding_crates,
-			rebuild: a.rebuild
+			rebuild: a.rebuild,
+			pgo_world: 'pgo_world' in a ? a.pgo_world : undefined
 		}));
-	const stale = (await find_stale(checks)).filter((s) => s.reason === 'stale');
+	const stale = (await find_stale(checks)).filter((s) => s.reason !== 'missing');
 	if (stale.length === 0) return;
 	const lines = [
 		'',
@@ -426,8 +465,10 @@ export async function warn_stale_reported_artifacts(): Promise<void> {
 	];
 	for (const s of stale) {
 		lines.push(
-			`  • ${s.label}: built ${fmt_mtime(s.artifact_ms!)}, but ${s.source_path} changed ` +
-				`${fmt_mtime(s.source_ms!)}\n      rebuild: ${s.rebuild}`
+			s.reason === 'unstamped'
+				? `  • ${s.label}: not the gated PGO build — ${s.detail}\n      rebuild: ${s.rebuild}`
+				: `  • ${s.label}: built ${fmt_mtime(s.artifact_ms!)}, but ${s.source_path} changed ` +
+						`${fmt_mtime(s.source_ms!)}\n      rebuild: ${s.rebuild}`
 		);
 	}
 	lines.push(

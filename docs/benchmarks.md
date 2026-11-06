@@ -136,32 +136,53 @@ Things the published numbers measure that aren't quite what they look like.
   The harvest dedents each block by the one level it carried inside `<style>`, so
   the concats read as standalone CSS and measure the same already-formatted
   steady state the standalone `.css` files do.
-- **PGO (what ships vs what is benched).** The native binaries the
+- **PGO (the bench measures what ships).** The native binaries the
   `@fuzdev/tsv` platform packages ship — the `tsv` CLI and the N-API addon —
   are profile-guided: each trained as itself on its target over the author's
   own collections of the snapshot, rebuilt with the profile and LLVM's
   cost-benefit inliner off, and gated byte-identical to a plain build
   (`scripts/pgo/pgo.ts`). Native-only — the WASM packages are not. **Every
-  native row in the report today is a plain build** (FFI, N-API), so it
-  understates what ships. The policy for publishing PGO numbers: **(1) both
-  rows** — a standard-release native row *and* a PGO one, never PGO silently
-  folded into the single native number; **(2) measure what ships** — a PGO row
-  measures the shipped recipe, labeled as such; **(3) disjoint training
-  corpus** — trained on a corpus disjoint from the measurement corpus, so a
-  published number is never train-on-test (the profile generalizes, so
-  disjointness costs nothing) — the author's own collections, which the perf
-  view leaves out for exactly this; **(4) byte-identical** — PGO changes code
+  native tsv row in the report measures a profile-guided build** — the FFI row
+  under Deno and the N-API rows under Node and Bun, `+locations` and `-internal`
+  included — under the same row names; there is no plain twin row. The policy:
+  **(1) measure what ships** — the N-API rows load the addon the shipped
+  pipeline builds (`deno task build:bench:pgo` runs that pipeline, every gate but
+  the depth one). The C FFI ships in no package, so its library is profile-guided
+  by the same recipe as a third training world: trained as itself, in process
+  through the bench's own FFI wrapper (parse, `parse_internal`, format on every
+  file), since a profile applies only to the build it was trained on — neither
+  the CLI's (another feature set) nor the addon's (another profile) reaches it.
+  The two size-only FFI subset builds (`tsv format (ffi)`, `tsv parse (ffi)`)
+  stay plain: no row times them, and each would need a training of its own.
+  **(2) disclosed** — the report's `native_build` hashes the library the native
+  rows actually loaded and calls it profile-guided only when the PGO stamp names
+  those bytes (the bench and smoke also refuse `TSV_FFI_PROFILE`, which would load a
+  plain build), and names each binding's library and profile, what each profile
+  was trained through and on, and whether the run's corpus holds none of the
+  training's collections; the `.md` reports carry it as
+  the **Native build:** line, and each tsv native size row says which build it is
+  (`binary_sizes[].build`, `pgo` | `plain`). **(3) disjoint training corpus** —
+  trained on a corpus disjoint from the measurement corpus, so a published
+  number is never train-on-test (the profile generalizes, so disjointness costs
+  nothing) — the author's own collections, which the perf view leaves out for
+  exactly this, and which `native_build.disjoint_from_timed_corpus` checks by
+  collection name against the corpus the run loaded. **(4) byte-identical** — PGO changes code
   layout, not output. That is the contract, and the only one: the OUTPUT is
   gated byte-identical to a plain build's, while the profile and the binary's
   own bytes may differ from one training to the next (address-keyed and
   per-process-seeded tables count differently each run), so two builds of one
-  commit are equivalent, not identical. Fairness framing: against the JS reference tools PGO
-  partly *closes a gap* (V8's JIT already does profile-guided runtime
-  optimization for free); against native AOT competitors shipping standard
-  release builds it's a build-config advantage they don't take — fair to report
-  as "what tsv ships vs what they ship," disclosed so a native-vs-native read
-  isn't mistaken for same-build-config. Never mix a PGO or instrumented binary
-  into a regression anchor series.
+  commit are equivalent, not identical — which is why the composed report flags
+  siblings that measured different builds (`mixed_native_build`). Fairness
+  framing: against the JS reference tools PGO partly *closes a gap* (V8's JIT
+  already does profile-guided runtime optimization for free); against native
+  AOT competitors shipping standard release builds it's a build-config advantage
+  they don't take — fair to report as "what tsv ships vs what they ship,"
+  disclosed so a native-vs-native read isn't mistaken for same-build-config.
+  Never mix a PGO or instrumented binary into a regression anchor series:
+  `deno task perf:ab` builds plain release drivers on both sides and stays the
+  regression instrument, so a measured change is the source's, not a training
+  run's. The plain-vs-PGO delta, measured once with its method, lives in
+  [performance.md §Profile-guided builds](performance.md#profile-guided-builds).
 - **Conformance-surface semantics (`BENCH_CORPUS=conformance`).** Parse-only by
   design, and the committed surface is **coverage-only** (per-tool preflight
   parse success over the fixtures-only conformance corpus) — the timed phase is
@@ -285,8 +306,8 @@ Things the published numbers measure that aren't quite what they look like.
   engine `@fuzdev/tsv-wasm` ships, behind that target's glue) for _both_ parse and format, while subset consumers
   ship the smaller `@fuzdev/tsv-format-wasm` (~2.5 MB, no convert layer) or
   `@fuzdev/tsv-parse-wasm` (~1.0 MB, no printers). Same story natively: the perf
-  row loads the full `libtsv_ffi` (the full N-API addon under Node/Bun), while the Binary Sizes table also lists the
-  `tsv format (ffi)` / `tsv parse (ffi)` subset builds (no perf rows of their own
+  row loads the full profile-guided `libtsv_ffi` (the profile-guided N-API addon under Node/Bun), while the Binary Sizes table also lists the
+  `tsv format (ffi)` / `tsv parse (ffi)` subset builds (plain, no perf rows of their own
   — they exist only to size scope-matched against `oxfmt` and `oxc-parser`).
 - **Intersection-corpus iteration (default).** Within each group every impl is
   timed on the same all-N intersection: the files every impl in the group
@@ -1014,14 +1035,16 @@ with nothing else wrong.
 
 - **`tsv`**: native FFI (`.so`/`.dylib`/`.dll`), N-API addon (`.node`), and WASM.
   The FFI side ships three rows from one `tsv_ffi` crate via its `format`/`parse`
-  features (matching the three WASM rows): full `libtsv_ffi` (`target/release`,
-  both features — what the perf rows load), `tsv format (ffi)`
+  features (matching the three WASM rows): full `libtsv_ffi` (both features — the
+  profile-guided build the perf rows load, from `.pgo/bench/`), `tsv format (ffi)`
   (`target/ffi-format/release`, no convert layer — scope-matched to `oxfmt
   (napi)`), and `tsv parse (ffi)` (`target/ffi-parse/release`, printers dropped —
-  scope-matched to `oxc-parser (napi)`). `tsv (napi)` is the Node/Bun native path,
-  built with the `napi` profile (`release` + `panic = "unwind"` → `target/napi/`,
-  the shipped panic contract), so its size carries unwind tables the abort-profile
-  FFI rows don't.
+  scope-matched to `oxc-parser (napi)`). The two subsets are PLAIN builds, so against the
+  full row they differ by build as well as by scope (profile-guided code is about a fifth
+  larger); each size row says which it is (`binary_sizes[].build`). `tsv (napi)` is the
+  Node/Bun native path, the profile-guided addon from `.pgo/bench/`, built with the `napi`
+  profile (`release` + `panic = "unwind"`, the shipped panic contract), so its size carries
+  unwind tables the abort-profile FFI rows don't.
   Native-kind labels name the binding (`ffi`/`napi`), not just "native". `deno task
   bench` builds all of them; subset rows are omitted if those builds haven't run.
 - **prettier + the canonical parsers**: three `js bundle` rows, the one family that is

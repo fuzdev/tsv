@@ -509,9 +509,10 @@ section('Build artifacts (built on demand — absence is normal before a run)');
 const ffi_lib = native_library_filename('tsv_ffi');
 const napi_lib = native_library_filename('tsv_napi');
 const artifacts: [string, string][] = [
-	[`target/release/${ffi_lib}`, 'deno task build:ffi'],
+	[`.pgo/bench/${ffi_lib}`, 'deno task build:bench:pgo (bench:deno, profile-guided)'],
+	[`.pgo/bench/${napi_lib}`, 'deno task build:bench:pgo (bench:node/bun, profile-guided)'],
 	[`target/corpus/${ffi_lib}`, 'deno task build:ffi:corpus (conformance gates)'],
-	[`target/napi/${napi_lib}`, 'deno task build:napi (bench:node/bun)'],
+	[`target/napi/${napi_lib}`, 'deno task build:napi (test:napi)'],
 	['crates/tsv_wasm/pkg/all/deno', 'deno task build:wasm:all:deno (bench:deno)'],
 	['crates/tsv_wasm/pkg/all/nodejs', 'deno task build:wasm:all:nodejs (bench:node/bun)'],
 	['crates/tsv_wasm/pkg/all/npm', 'deno task build:npm:all (publish)']

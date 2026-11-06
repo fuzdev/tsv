@@ -30,10 +30,11 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { Worker } from 'node:worker_threads';
-import { get_napi_library_path, type NapiAddon } from '../benches/js/lib/napi.ts';
+import type { NapiAddon } from '../benches/js/lib/napi.ts';
+import { napi_library_path } from '../benches/js/lib/tsv_artifacts.ts';
 import { create_locator } from '../crates/tsv_wasm/npm/locations.js';
 
-const lib_path = get_napi_library_path();
+const lib_path = napi_library_path();
 if (!existsSync(lib_path)) {
 	console.error(`tsv_napi addon not found at ${lib_path}. Run 'deno task build:napi' first.`);
 	process.exit(1);
