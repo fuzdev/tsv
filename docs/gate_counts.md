@@ -27,10 +27,10 @@ real move in a number is a deliberate, visible edit.
     JS/TS-family files and Svelte components of the `gates` view's snapshot tiers.
   - **the six harvests**, all exact: wpt block count, test262 positive count, the
     ts-repo corpus + rejects counts, svelte-rejects count, prettier-jsx count,
-    svelte-styles block count (the last over the `../corpora` snapshot's perf view). The
-    ts-repo pair is graded by tsc itself, so its harvest stamps the **tsc version**
-    alongside the checkout commit — a tsc bump can move a file between the two lists
-    with the corpus unchanged.
+    svelte-styles block count (the last over the `../corpora` snapshot's perf view, its
+    third-party collections). The ts-repo pair is graded by tsc itself, so its harvest
+    stamps the **tsc version** alongside the checkout commit — a tsc bump can move a
+    file between the two lists with the corpus unchanged.
   - **the CSS reject count** `diagnostics/css_over_acceptance.ts` grades over — derived
     live from pinned inputs rather than harvested, and the one pin whose list filters
     nothing (see `CSS_REJECTS_PIN`), but stamped and graded on the harvests' cadence

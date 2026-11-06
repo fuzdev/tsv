@@ -84,8 +84,8 @@ taken on — enough to hold a sub-percent read steady:
    ecosystem repos — the product's own gitignore-aware scope rule, never a bare
    `find`, which pulls in minified build bundles.
 3. **Add `benches/js/.cache/svelte_styles/`** (`deno task
-   bench:harvest:svelte-styles`), the snapshot's `.svelte` `<style>` blocks
-   concatenated one file per collection.
+   bench:harvest:svelte-styles`), the `.svelte` `<style>` blocks of the perf view's
+   (third-party) collections, concatenated one file per collection.
 4. **Add vendored-but-authored stylesheets** — icon fonts, map widgets,
    `fuz_css/dist/{theme,style}.css`.
 

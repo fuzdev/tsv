@@ -2,11 +2,14 @@
 # Exact per-source counts over the `gates` view; see docs/gate_counts.md.
 #
 # <row> <language> compared=<n> tsv_errors=<n> canonical_errors=<n> both_errors=<n>
-benches/js/.cache/svelte_styles css compared=23 tsv_errors=0 canonical_errors=0 both_errors=0
+benches/js/.cache/svelte_styles css compared=9 tsv_errors=0 canonical_errors=0 both_errors=0
+bits-ui svelte compared=226 tsv_errors=0 canonical_errors=0 both_errors=0
+bits-ui typescript compared=281 tsv_errors=0 canonical_errors=0 both_errors=0
 continue typescript compared=951 tsv_errors=0 canonical_errors=0 both_errors=0
 cosmicplayground svelte compared=131 tsv_errors=0 canonical_errors=0 both_errors=0
 cosmicplayground typescript compared=84 tsv_errors=0 canonical_errors=0 both_errors=0
 cosmicplayground css compared=2 tsv_errors=0 canonical_errors=0 both_errors=0
+daisyui css compared=72 tsv_errors=0 canonical_errors=0 both_errors=0
 docs.fuz.dev svelte compared=42 tsv_errors=0 canonical_errors=0 both_errors=0
 docs.fuz.dev typescript compared=19 tsv_errors=0 canonical_errors=0 both_errors=0
 docs.fuz.dev css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
@@ -52,15 +55,24 @@ layerchart css compared=6 tsv_errors=0 canonical_errors=0 both_errors=0
 mdz svelte compared=25 tsv_errors=0 canonical_errors=0 both_errors=0
 mdz typescript compared=50 tsv_errors=0 canonical_errors=0 both_errors=0
 mdz css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
+open-props typescript compared=11 tsv_errors=0 canonical_errors=0 both_errors=0
+open-props css compared=25 tsv_errors=0 canonical_errors=0 both_errors=0
 prettier-plugin-svelte/test svelte compared=318 tsv_errors=0 canonical_errors=4 both_errors=3
 prettier/tests/format/css typescript compared=78 tsv_errors=0 canonical_errors=0 both_errors=0
 prettier/tests/format/css css compared=117 tsv_errors=3 canonical_errors=7 both_errors=23
 prettier/tests/format/html svelte compared=84 tsv_errors=0 canonical_errors=3 both_errors=37
 prettier/tests/format/js typescript compared=853 tsv_errors=9 canonical_errors=70 both_errors=174
 prettier/tests/format/typescript typescript compared=716 tsv_errors=0 canonical_errors=65 both_errors=14
+runed typescript compared=105 tsv_errors=0 canonical_errors=0 both_errors=0
 ryanatkn.com svelte compared=31 tsv_errors=0 canonical_errors=0 both_errors=0
 ryanatkn.com typescript compared=19 tsv_errors=0 canonical_errors=0 both_errors=0
 ryanatkn.com css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
+shadcn-svelte svelte compared=417 tsv_errors=0 canonical_errors=0 both_errors=0
+shadcn-svelte typescript compared=146 tsv_errors=0 canonical_errors=0 both_errors=0
+shadcn-svelte css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
+skeleton svelte compared=307 tsv_errors=0 canonical_errors=0 both_errors=0
+skeleton typescript compared=178 tsv_errors=0 canonical_errors=0 both_errors=0
+skeleton css compared=55 tsv_errors=0 canonical_errors=0 both_errors=0
 storybook typescript compared=1670 tsv_errors=0 canonical_errors=1 both_errors=0
 svelte typescript compared=415 tsv_errors=0 canonical_errors=1 both_errors=0
 svelte-docinfo svelte compared=27 tsv_errors=0 canonical_errors=0 both_errors=0
@@ -75,10 +87,15 @@ svelte-ux css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
 svelte.dev svelte compared=104 tsv_errors=0 canonical_errors=0 both_errors=0
 svelte.dev typescript compared=166 tsv_errors=0 canonical_errors=0 both_errors=0
 svelte.dev css compared=13 tsv_errors=0 canonical_errors=0 both_errors=0
+threlte svelte compared=179 tsv_errors=0 canonical_errors=0 both_errors=0
+threlte typescript compared=423 tsv_errors=0 canonical_errors=0 both_errors=0
 tsv.fuz.dev svelte compared=20 tsv_errors=0 canonical_errors=0 both_errors=0
 tsv.fuz.dev typescript compared=39 tsv_errors=0 canonical_errors=0 both_errors=0
 tsv.fuz.dev css compared=2 tsv_errors=0 canonical_errors=0 both_errors=0
 typescript-parser typescript compared=1 tsv_errors=0 canonical_errors=0 both_errors=0
+xyflow svelte compared=52 tsv_errors=0 canonical_errors=0 both_errors=0
+xyflow typescript compared=122 tsv_errors=0 canonical_errors=0 both_errors=0
+xyflow css compared=6 tsv_errors=0 canonical_errors=0 both_errors=0
 zzz svelte compared=186 tsv_errors=0 canonical_errors=0 both_errors=0
 zzz typescript compared=258 tsv_errors=0 canonical_errors=0 both_errors=0
 zzz css compared=1 tsv_errors=0 canonical_errors=0 both_errors=0

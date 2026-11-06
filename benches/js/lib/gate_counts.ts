@@ -97,7 +97,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	// `collections/` tree (see above); what each collection vendors is its manifest.
 	[CORPORA_ROOT]: {
 		tree: CORPORA_TREE,
-		hash: '336643921',
+		hash: '1a14f15ac',
 		pins: [
 			'corpus_format_pins.txt',
 			'corpus_parse_pins.txt',
@@ -309,29 +309,22 @@ export const TS_REPO_PINS = {
 
 /**
  * bench:harvest:svelte-styles — EXACT extracted `<style>` block count over the perf
- * view, i.e. the `../corpora` snapshot's `.svelte` files. Pure input material (not a
- * tsv success count), and pinned like the suite harvests: the source is a pinned
- * snapshot, so a move is a snapshot refresh (re-pin with the new `collections/` tree
- * id), a collection joining the bench, or a broken extraction, and the harvest fails
- * BEFORE writing so a wrong cache never replaces a good one. Stamped on the snapshot's
- * `collections/` tree id and the perf view's entry list (`lib/harvest_stamp.ts`).
- * Measured at ../corpora `collections/` 336643921.
+ * view, i.e. the `.svelte` files of the `../corpora` snapshot's benched (third-party)
+ * collections. Pure input material (not a tsv success count), and pinned like the suite
+ * harvests: the source is a pinned snapshot, so a move is a snapshot refresh (re-pin with
+ * the new `collections/` tree id), a collection joining or leaving the bench, or a broken
+ * extraction, and the harvest fails BEFORE writing so a wrong cache never replaces a good
+ * one. Stamped on the snapshot's `collections/` tree id and the perf view's entry list
+ * (`lib/harvest_stamp.ts`). Measured at ../corpora `collections/` 1a14f15ac.
  *
- * 401 → 619: the third-party collections join the bench, so the perf view gains their
- * `.svelte` blocks with the snapshot's tree id unmoved (layercake, layerchart,
- * svelte-maplibre, svelte-ux and flowbite-svelte's `src/lib`; language-tools carries
- * none), the `lang="postcss"` blocks skipped.
- *
- * 619 → 615: fuz_mastodon leaves the bench, taking its 4 blocks.
- *
- * 615 → 647: a whole-snapshot refresh to upstream HEADs; mostly new components'
- * blocks in layercake (+17) and zzz (+10), the rest a few blocks either way across
- * fuz_css, svelte-docinfo, layerchart, svelte-maplibre, svelte.dev, fuz_ui, tsv.fuz.dev.
- *
- * 647 → 643: a personal-site collection leaves the snapshot, taking its 4 blocks; the
- * ryanatkn.com and docs.fuz.dev refreshes move none.
+ * 643 → 345: the bench becomes third-party code alone. The author's own collections leave
+ * the perf view, taking their 316 blocks (cosmicplayground 92, zzz and fuz_ui 48 apiece,
+ * earbetter 31, the rest from the other fuz repos and ryanatkn.com), and three of the
+ * collections that join it carry blocks: threlte 11, xyflow 5, bits-ui 2 (shadcn-svelte and
+ * skeleton have none; runed, daisyui and open-props no `.svelte` at all). The third-party
+ * collections already benched move none (svelte-ux's `lang="postcss"` blocks stay skipped).
  */
-export const SVELTE_STYLES_BLOCKS_PIN = 643;
+export const SVELTE_STYLES_BLOCKS_PIN = 345;
 
 /**
  * strip:corpus — exact counts over the strippable TypeScript of the `gates` view's snapshot
@@ -350,8 +343,13 @@ export const SVELTE_STYLES_BLOCKS_PIN = 643;
  *
  * files 5719 → 5707: a personal-site collection leaves the snapshot, taking its 12
  * strippable files (none refused); the ryanatkn.com and docs.fuz.dev refreshes move none.
+ *
+ * files 5707 → 6954, refusals 182 → 190: eight third-party collections join the snapshot,
+ * adding their strippable files (threlte 418, bits-ui 279, skeleton 178, shadcn-svelte 145,
+ * xyflow 122, runed 105; daisyui and open-props carry none). The new refusals are new files,
+ * both sides agreeing: xyflow +5 and threlte +2 (`Enum`), runed +1 (`ParameterProperty`).
  */
-export const STRIP_CORPUS_PINS = { files: 5707, refusals: 182 };
+export const STRIP_CORPUS_PINS = { files: 6954, refusals: 190 };
 
 /**
  * imports:corpus — exact counts over the JS/TS-family files and Svelte components of the
@@ -365,8 +363,13 @@ export const STRIP_CORPUS_PINS = { files: 5707, refusals: 182 };
  * files 8657 → 8619, records 42592 → 42495: a personal-site collection leaves the
  * snapshot, taking its 37 files, and the docs.fuz.dev refresh deletes one component
  * (`docs/library/+page.svelte`); the ryanatkn.com refresh moves no file.
+ *
+ * files 8619 → 11066, records 42495 → 52434: eight third-party collections join the
+ * snapshot, each file and record new — threlte 602 files / 2356 records, shadcn-svelte
+ * 563 / 1869, bits-ui 507 / 2459, skeleton 485 / 2426, xyflow 174 / 548, runed 105 / 277,
+ * open-props 11 / 4 (daisyui is CSS alone). No file the corpus already held moves.
  */
-export const IMPORTS_CORPUS_PINS = { files: 8619, records: 42495 };
+export const IMPORTS_CORPUS_PINS = { files: 11066, records: 52434 };
 
 /**
  * bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured

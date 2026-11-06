@@ -5,11 +5,12 @@
  * each placed by `COLLECTIONS` and spelled from the snapshot's own
  * manifest, plus the pinned suite checkouts and the derived caches), four views:
  *
- * - `perf` — real-world code only (the `benched` collections of the `../corpora`
- *   snapshot, whose manifest already leaves the upstreams' test fixtures behind;
- *   `*.test.ts` stays). The
- *   `deno task bench` corpus, so throughput reflects real code rather than formatter
- *   edge-case suites — and one pinned commit names all of it.
+ * - `perf` — real-world third-party code only (the `benched` collections of the
+ *   `../corpora` snapshot — each one of manifest `origin: third_party`, the author's own
+ *   collections being held off the bench — whose manifest already leaves the upstreams'
+ *   test fixtures behind; `*.test.ts` stays). The `deno task bench` corpus, so throughput
+ *   reflects real code rather than formatter edge-case suites, and code no tsv build was
+ *   tuned on — and one pinned commit names all of it.
  * - `gates` — every placed collection (`perf`'s `benched` plus the `gated` ones) +
  *   the prettier fixture suites. The correctness gates (`corpus:compare:*` `--all`,
  *   `skip_triage`, `wasm_json_probe`) keep this scope — their sanction lists and
@@ -48,6 +49,7 @@ import { basename, dirname, extname, join, relative, resolve, sep } from 'node:p
 import { promisify } from 'node:util';
 
 import {
+	benched_own_collections,
 	CORPORA_COLLECTIONS,
 	CORPORA_MANIFEST,
 	CORPORA_ROOT,
@@ -402,11 +404,12 @@ export function group_by_language(files: SourceFile[]): Record<Language, SourceF
  *   `collections/` tree, recorded in `GATE_CHECKOUT_IDS['../corpora']` and verified by
  *   `deno task pins:audit:checkouts` — real code the perf numbers reflect, AND a
  *   reproducible tier the count pins hold over.
- * - `gated` — snapshot code the correctness gates read but the bench does not: a
- *   collection placed for the gates' breadth while its bench triage is pending. In
- *   `gates` and `robustness`, NOT `perf`, because the perf invariant that every in-scope
- *   tool fully processes every file is unmeasured over it until it is triaged onto the
- *   bench (`COLLECTIONS`).
+ * - `gated` — snapshot code the correctness gates read but the bench does not: the
+ *   author's own collections (manifest `origin: own`), reserved as the training input for
+ *   profile-guided native builds and so never benched, and any third-party collection
+ *   placed for the gates' breadth while its bench triage is pending. In `gates` and
+ *   `robustness`, NOT `perf`, so the perf invariant that every in-scope tool fully
+ *   processes every file is unmeasured over it (`COLLECTIONS`).
  * - `live` — the `own` collections as WORKING TREES (`../zzz/src`, …): unpinned,
  *   machine-dependent, and in no bench or gate view. Read only by the real-code
  *   robustness sweeps (the `robustness` view), and only as a DIFF against the
@@ -537,7 +540,9 @@ interface CollectionPlacement {
  * table that places a collection, and the only thing it says is whether the bench
  * measures it: placed means gated (`gates`) and swept (`robustness`), and `perf` opts
  * the collection onto the bench as well (`TIERS_BY_VIEW`). Who wrote a collection is
- * not spelled here — the manifest's `origin` says it. The entries themselves are DERIVED
+ * not spelled here — the manifest's `origin` says it — but it bounds the answer: the
+ * bench measures third-party code alone, so an `own` collection placed `perf: true` is a
+ * refusal (`build_catalog`). The entries themselves are DERIVED
  * from the snapshot's manifest (`corpus_entries`): one per `subpath` the manifest names
  * for the collection, so an upstream's layout is spelled once, in the snapshot's own
  * recipe (language-tools alone has six subpaths), and a collection whose layout moves
@@ -554,41 +559,56 @@ interface CollectionPlacement {
  * table, and the perf view's entry list is part of the styles harvest's stamp.
  */
 const COLLECTIONS: Record<string, CollectionPlacement> = {
+	// The author's own code (manifest `origin: own`) — gated and swept, NOT benched: it is
+	// reserved as the training input for profile-guided native builds, and a throughput
+	// number measured over a binary's own training input would grade the training rather
+	// than the engine.
 	// Large apps
-	zzz: { perf: true },
+	zzz: { perf: false },
 	// Fuz ecosystem
-	fuz_app: { perf: true },
-	fuz_blog: { perf: true },
-	fuz_code: { perf: true },
-	fuz_css: { perf: true },
-	'docs.fuz.dev': { perf: true },
-	fuz_repos: { perf: true },
-	fuz_template: { perf: true },
-	fuz_ui: { perf: true },
-	fuz_util: { perf: true },
-	mdz: { perf: true },
+	fuz_app: { perf: false },
+	fuz_blog: { perf: false },
+	fuz_code: { perf: false },
+	fuz_css: { perf: false },
+	'docs.fuz.dev': { perf: false },
+	fuz_repos: { perf: false },
+	fuz_template: { perf: false },
+	fuz_ui: { perf: false },
+	fuz_util: { perf: false },
+	mdz: { perf: false },
 	// Build tooling
-	gro: { perf: true },
-	'svelte-docinfo': { perf: true },
-	'tsv.fuz.dev': { perf: true },
+	gro: { perf: false },
+	'svelte-docinfo': { perf: false },
+	'tsv.fuz.dev': { perf: false },
 	// Personal sites (public repos beyond the fuz ecosystem)
-	'ryanatkn.com': { perf: true },
+	'ryanatkn.com': { perf: false },
 	// Personal apps (public, The Unlicense; prettier-shaped, so their divergences carry
 	// third-party-shaped signal the fuz repos cannot)
-	earbetter: { perf: true },
-	cosmicplayground: { perf: true },
+	earbetter: { perf: false },
+	cosmicplayground: { perf: false },
+	// Everything below is third-party (`origin: third_party`) — the bench's corpus.
 	// Upstream framework source — each subpath a reviewed package `src/` tree, never a
 	// whole monorepo, so build output and scaffolding stay out
 	kit: { perf: true },
 	svelte: { perf: true },
 	'svelte.dev': { perf: true },
-	// Third-party Svelte libraries and tooling — prettier-shaped, not the author's
+	// Third-party Svelte libraries and tooling, not the author's — prettier-shaped except
+	// bits-ui and shadcn-svelte (oxfmt); daisyui is CSS alone, open-props CSS and a little JS
+	// that no formatter shaped
 	'flowbite-svelte': { perf: true },
 	layerchart: { perf: true },
 	layercake: { perf: true },
 	'svelte-ux': { perf: true },
 	'svelte-maplibre': { perf: true },
 	'language-tools': { perf: true },
+	'bits-ui': { perf: true },
+	'shadcn-svelte': { perf: true },
+	skeleton: { perf: true },
+	xyflow: { perf: true },
+	threlte: { perf: true },
+	runed: { perf: true },
+	daisyui: { perf: true },
+	'open-props': { perf: true },
 	// Neutral TypeScript the formatter benchmarks elsewhere compare on (TypeScript's own
 	// parser, Storybook, Continue) — not tsv-shaped, and not the author's
 	'typescript-parser': { perf: true },
@@ -703,6 +723,16 @@ async function build_catalog(): Promise<CorpusCatalog> {
 				`${dropped.join(', ')} — remove them from the table, or restore them in ${CORPORA_ROOT}`
 		);
 	}
+	const own_benched = benched_own_collections(
+		placed.map((c) => ({ name: c.name, benched: c.placement.perf, origin: c.origin }))
+	);
+	if (own_benched.length > 0) {
+		throw new Error(
+			`COLLECTIONS benches collections of manifest origin \`own\`: ` +
+				`${own_benched.join(', ')} — the perf view measures third-party ` +
+				"code only (the author's own is the profile-guided training input), so place them `perf: false`"
+		);
+	}
 	// One entry per manifest subpath, in table order then manifest order — the ORDER is
 	// part of the perf view's stamped entry list (`corpus_view_paths`), so it is a
 	// deliberate property of this derivation, not an incidental one.
@@ -744,9 +774,9 @@ function assemble_entries(snapshot_entries: CorpusEntry[], live_trees: LiveTree[
 		...snapshot_entries,
 		// Real-authored CSS extracted from the perf-view `.svelte` files' <style>
 		// blocks, concatenated per source collection (bench:harvest:svelte-styles).
-		// Derived but real content: more than doubles the otherwise-small standalone-CSS
-		// sample (about three fifths of the CSS bytes at the current snapshot) with
-		// naturally-sized files, and in the gates view exercises the *standalone* CSS
+		// Derived but real content: component CSS beside the standalone files (which are
+		// mostly CSS-framework source), in naturally-sized files, and in the gates view
+		// exercises the *standalone* CSS
 		// path on real content (embedded CSS rides EmbedContext — a different path).
 		// The same bytes are also timed in the svelte rows; rows are never summed.
 		{

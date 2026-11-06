@@ -119,16 +119,18 @@ Things the published numbers measure that aren't quite what they look like.
   (fixture suites live in the `gates`/`conformance` views — [corpus
   views](../benches/js/CLAUDE.md#corpus)), read from the pinned `fuzdev/corpora`
   snapshot (the report's `corpus_snapshot` names the one commit; each source's
-  `repo` names the upstream it vendored), and it mixes two kinds of code in every timed
-  set: the author's own fuz ecosystem and third-party code (the Svelte framework,
-  community Svelte libraries and tools, and TypeScript other formatter benchmarks
-  compare on). The report discloses the mix by manifest `origin`
-  (`corpus_by_origin`). Throughput tracks the syntactic mix of
-  _this_ corpus, so ratios are "N× on this corpus," not universal. CSS is by far
-  the weakest sample: few real standalone files exist in this ecosystem (most CSS
-  is authored inside `.svelte` `<style>` blocks), so the corpus adds the
-  `svelte_styles` harvest — those blocks extracted and concatenated per repo into
-  naturally-sized files, more bytes than the standalone files hold. Those harvest
+  `repo` names the upstream it vendored), and each collection placed on it is
+  third-party (manifest `origin: third_party`): the Svelte framework, community Svelte libraries
+  and tools, CSS frameworks, and TypeScript other formatter benchmarks compare on. The
+  author's own code is deliberately absent — it stays in the correctness gates' views
+  and is held out as the training input the PGO policy below requires to be disjoint
+  from what is measured. The report discloses its composition by manifest
+  `origin` (`corpus_by_origin`). Throughput tracks the syntactic mix of
+  _this_ corpus, so ratios are "N× on this corpus," not universal. CSS is the
+  thinnest sample: most Svelte-ecosystem CSS is authored inside `.svelte` `<style>`
+  blocks, and the standalone files are mostly CSS-framework source (daisyUI,
+  Skeleton, Open Props), so the corpus adds the `svelte_styles` harvest — those
+  blocks extracted and concatenated per repo into naturally-sized files. Those harvest
   bytes are also timed inside the svelte rows (rows are never summed, so this is
   disclosure, not distortion), and CSS per-file ratios stay the noisiest.
   The harvest dedents each block by the one level it carried inside `<style>`, so
@@ -147,7 +149,8 @@ Things the published numbers measure that aren't quite what they look like.
   numbers only once a shipped artifact carries the recipe, labeled with which
   one; **(3) disjoint training corpus** — trained on a corpus disjoint from the
   measurement corpus, so a published number is never train-on-test (the profile
-  generalizes, so disjointness costs nothing); **(4) byte-identical** — PGO
+  generalizes, so disjointness costs nothing) — the author's own collections, which
+  the perf view leaves out for exactly this; **(4) byte-identical** — PGO
   changes code layout, not output. Fairness framing: against the JS reference
   tools PGO partly *closes a gap* (V8's JIT already does profile-guided runtime
   optimization for free); against native AOT competitors shipping standard
@@ -804,10 +807,10 @@ prettier. Load-bearing on two axes:
   key is inert — verified in both directions), which is what lets it score
   script-goal test262 files rather than counting them as module-goal failures. It
   survives the whole conformance corpus with no host fault, unlike yuku's native
-  binding — which matters because swc has no WASM row to fall back on. Its real-corpus rejections are catalogued in `lib/perf_omit.ts`, and
-  differ in kind from oxc's and yuku's: swc rejects the ambient consts even with
-  `dts: true` passed explicitly, so that tolerance is the parser's own limit rather
-  than the bench's missing path threading.
+  binding — which matters because swc has no WASM row to fall back on. Its one
+  real-corpus rejection, catalogued in `lib/perf_omit.ts`, is the parser's own
+  limit: it enforces the strict-mode `eval`/`arguments` binding early error tsv
+  defers, with `dts: true` passed explicitly as well.
 - **malva (WASM)** — dprint's CSS formatter, loaded over the same
   `@dprint/formatter` host as `@dprint/typescript`, so it adds a wasm-tier engine
   to `format/css` for one more plugin wasm and no new machinery. **CSS only,
@@ -912,13 +915,13 @@ in `deno.json`).
 
 **Why it isn't timed.** It has an in-process API and would run in the warm loop like
 every other wasm row — the obstacle is what it accepts. It rejects valid Svelte the
-perf corpus holds, chiefly two shapes: a template literal containing markup inside
-an attribute expression (``content={`<details>…</details>`}``, which every docs
-page showing a code sample has) and `{…}` interpolation inside a quoted `style`
-attribute. On the perf surface every in-scope tool must process every file, and a
-file any timed row rejects leaves every row's timed set, so a timed row would need a
-`PERF_OMITS` entry per rejected file and would remove a large share of the Svelte
-bytes — the biggest docs pages — from every published Svelte number. Measured for
+perf corpus holds, chiefly a quoted `style` attribute whose value is no declaration
+list (a map component's `style="https://…/style.json"` prop, which it parses as CSS)
+and some inline arrow-function event handlers (`onkeydown={(e) => {…}}`). On the
+perf surface every in-scope tool must process every file, and a file any timed row
+rejects leaves every row's timed set, so a timed row would need a `PERF_OMITS` entry
+per rejected file and would remove those files — whole example and docs pages among
+them — from every published Svelte number. Measured for
 what it accepts instead (the report's coverage line carries the live rate). Time it
 once upstream accepts the corpus: drop `coverage_only` at its registration in
 `lib/implementations.ts` and its entry in `COVERAGE_ONLY_REASONS`.

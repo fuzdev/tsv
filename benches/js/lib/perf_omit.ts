@@ -42,7 +42,7 @@
  * - `harness_path_threading` — the tool WOULD accept the file under its real name;
  *   the bench hands every impl a synthetic `file.ts`, which withholds the
  *   declaration-file mode the content needs. The harness's doing, tolerated
- *   deliberately (see the first entry's comment).
+ *   deliberately (see the biome `motion/public.d.ts` entry's comment).
  * - `harvest_artifact` — the file exists only because a harvest made it, and it
  *   inherits a failure from its source (a `<style>` block's concat).
  * - `tsv_failure` — tsv itself fails the file. NONE today, and the one category a
@@ -95,54 +95,13 @@ export interface PerfOmit {
  * entry only for a deliberately-tolerated failure, each with a reason (see the
  * module doc).
  *
- * Most entries date from admitting `.d.ts` files to the corpus (which tsv and
- * prettier fully handle) and tolerate third-party limitations on
- * declaration-file-only syntax; the biome entries are its own parser's limits on
- * real Svelte and declaration files, surfaced once `lib/biome.ts` began reading
- * the diagnostics `formatContent` returns beside an unchanged input:
+ * Most entries tolerate third-party limits on declaration-file-only syntax (which tsv
+ * and prettier fully handle) or a CSS construct another tool's parser does not take;
+ * the biome entries are its own parser's limits on real Svelte, CSS and declaration
+ * files, surfaced once `lib/biome.ts` began reading the diagnostics `formatContent`
+ * returns beside an unchanged input:
  */
 export const PERF_OMITS: PerfOmit[] = [
-	// kit's runtime/app/{env,environment}/types.d.ts declare ambient consts with
-	// no initializer (`export const browser: boolean;`) — valid ONLY in a
-	// declaration file. acorn-typescript has no .d.ts mode at all, and the bench
-	// hands oxc/oxfmt a synthetic `file.ts` name (impl calls don't thread the
-	// real path), so they grade the content as invalid plain TS. `path:
-	// 'src/runtime/app/env'` matches both files (`env/` and `environment/`).
-	// Threading real filenames would fix oxc/oxfmt here but not acorn, and would
-	// also flip prettier's `.js` parser routing (babel vs typescript) — a
-	// measurement-semantics change deliberately not bundled into this tolerance.
-	{
-		task: 'parse/typescript/canonical',
-		path: 'kit/packages/kit/src/runtime/app/env',
-		category: 'tool_limit',
-		reason: 'acorn-typescript cannot parse ambient const declarations (no .d.ts mode)'
-	},
-	{
-		task: 'parse/typescript/oxc',
-		path: 'kit/packages/kit/src/runtime/app/env',
-		category: 'harness_path_threading',
-		reason:
-			'oxc (native, raw transfer + wasm) rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
-	},
-	{
-		task: 'format/typescript/oxfmt',
-		path: 'kit/packages/kit/src/runtime/app/env',
-		category: 'harness_path_threading',
-		reason:
-			'oxfmt rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
-	},
-	// Same two files, same cause, one tool later: yuku (native + wasm) rejects the
-	// ambient consts. It differs from oxc in having an explicit `lang: 'dts'` mode
-	// that would accept them — but selecting it needs the real path, the same
-	// threading the entries above decline, so the tolerance stays uniform across
-	// the alternative parsers rather than special-casing one of them.
-	{
-		task: 'parse/typescript/yuku',
-		path: 'kit/packages/kit/src/runtime/app/env',
-		category: 'harness_path_threading',
-		reason:
-			'yuku (native + wasm) rejects ambient consts under the pinned `lang: ts` (its `dts` mode needs path threading the bench does not do)'
-	},
 	// acorn-typescript enforces the `arguments`-in-class-field-initializer early
 	// error; tsv (permissive / defer-diagnostics policy) and prettier accept it.
 	{
@@ -151,18 +110,20 @@ export const PERF_OMITS: PerfOmit[] = [
 		category: 'tool_limit',
 		reason: 'acorn-typescript enforces an early error tsv defers (arguments in class field init)'
 	},
-	// swc on the same two declaration-file shapes as the entries above. It differs
-	// from oxc and yuku in WHY: for those, the bench's synthetic `file.ts` name (or a
-	// pinned `lang: ts`) is what withholds declaration-file mode, so the tolerance is
-	// really about path threading. swc rejects these with `dts: true` passed
-	// EXPLICITLY — verified — so this is the parser's own limit, not a harness
-	// artifact, and no amount of path threading would change it.
+	// A `declare module` body exporting a bodiless ambient const by name
+	// (`const load: LoadHookSync; export { load };`): acorn-typescript does not bind
+	// the ambient declaration, so the export reads as undefined. tsc's parser takes the
+	// file with no diagnostic and its checker raises no error at the export.
 	{
-		task: 'parse/typescript/swc',
-		path: 'kit/packages/kit/src/runtime/app/env',
+		task: 'parse/typescript/canonical',
+		path: 'storybook/code/core/src/typings.d.ts',
 		category: 'tool_limit',
-		reason: 'swc rejects ambient const declarations even with its own `dts` mode enabled'
+		reason:
+			'acorn-typescript does not bind an ambient const in a `declare module` body, so `export { load }` reads as undefined'
 	},
+	// swc on `ambient.d.ts`, the file of the first acorn entry. swc rejects it with
+	// `dts: true` passed EXPLICITLY — verified — so this is the parser's own limit, not
+	// a harness artifact, and no amount of path threading would change it.
 	{
 		task: 'parse/typescript/swc',
 		path: 'svelte/packages/svelte/src/ambient.d.ts',
@@ -171,72 +132,24 @@ export const PERF_OMITS: PerfOmit[] = [
 			'swc enforces the strict-mode eval/arguments binding early error tsv defers (`export const arguments: never`)'
 	},
 	// biome's `formatContent` reports these as syntax errors and hands the input
-	// back unformatted (see `biome_fatal_diagnostics`). The `.d.ts` pair is the same
-	// ambient-const shape as above, under the same synthetic `file.ts` name;
-	// `motion/public.d.ts` is a class method signature without a body, again
-	// declaration-file-only syntax. The svelte ones are biome's experimental HTML
-	// path rejecting real Svelte: a multi-statement template expression, a snippet
-	// block, `class` parameters, and a `>` selector in a `<style>` block — which
-	// its CSS parser rejects again in the harvested copy of that block.
-	{
-		task: 'format/typescript/biome',
-		path: 'kit/packages/kit/src/runtime/app/env',
-		category: 'harness_path_threading',
-		reason:
-			'biome rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
-	},
+	// back unformatted (see `biome_fatal_diagnostics`). `motion/public.d.ts` is a
+	// class method signature without a body, declaration-file-only syntax under the
+	// bench's synthetic `file.ts` name: impl calls don't thread the real path, so a
+	// tool with a declaration-file mode grades the content as invalid plain TS.
+	// Threading real filenames would not help a tool with no such mode at all
+	// (acorn-typescript), and would also flip prettier's `.js` parser routing (babel
+	// vs typescript) — a measurement-semantics change deliberately not bundled into
+	// this tolerance. The svelte ones are biome's experimental HTML
+	// path rejecting real Svelte: Svelte's leading-combinator `:global(> …)` in a
+	// `<style>` block — which its CSS parser rejects again in the harvested copy of
+	// that block.
 	{
 		task: 'format/typescript/biome',
 		path: 'svelte/packages/svelte/src/motion/public.d.ts',
 		category: 'harness_path_threading',
 		reason: 'biome rejects a bodiless class method signature under the synthetic file.ts name'
 	},
-	{
-		task: 'format/svelte/biome',
-		path: 'zzz/src/lib/Picker.svelte',
-		category: 'unsupported_syntax',
-		reason: 'biome: template expressions can only contain a single expression'
-	},
-	{
-		task: 'format/svelte/biome',
-		path: 'zzz/src/lib/PickerDialog.svelte',
-		category: 'unsupported_syntax',
-		reason: 'biome: template expressions can only contain a single expression'
-	},
-	{
-		task: 'format/svelte/biome',
-		path: 'zzz/src/lib/SortableList.svelte',
-		category: 'unsupported_syntax',
-		reason: 'biome: template expressions can only contain a single expression'
-	},
-	{
-		task: 'format/svelte/biome',
-		path: 'fuz_code/src/routes/docs/benchmark/+page.svelte',
-		category: 'unsupported_syntax',
-		reason: 'biome: expected a closing block (a snippet block its HTML path does not parse)'
-	},
-	{
-		task: 'format/svelte/biome',
-		path: 'fuz_css/src/routes/docs/classes/+page.svelte',
-		category: 'unsupported_syntax',
-		reason:
-			"biome: expected class parameters but found '<' (a class body its HTML path does not parse)"
-	},
-	{
-		task: 'format/svelte/biome',
-		path: 'cosmicplayground/src/routes/StarshipMenu.svelte',
-		category: 'unsupported_syntax',
-		reason: "biome: expected a selector but found '>' in a <style> block"
-	},
-	// the same `>` selector again, in the harvested per-collection `<style>`
-	// concatenation that carries StarshipMenu's block (`svelte_styles_harvest.ts`)
-	{
-		task: 'format/css/biome',
-		path: '.cache/svelte_styles/cosmicplayground.css',
-		category: 'harvest_artifact',
-		reason: "biome: expected a selector but found '>' (the harvested StarshipMenu.svelte styles)"
-	},
-	// Svelte's leading-combinator `:global(> svg)` — the same `>` biome's parser refuses
+	// Svelte's leading-combinator `:global(> svg)` — the `>` biome's parser refuses
 	{
 		task: 'format/svelte/biome',
 		path: 'svelte-ux/packages/svelte-ux/src/lib/components/Icon.svelte',
@@ -249,6 +162,40 @@ export const PERF_OMITS: PerfOmit[] = [
 		path: '.cache/svelte_styles/svelte-ux.css',
 		category: 'harvest_artifact',
 		reason: "biome: expected a selector but found '>' (the harvested Icon.svelte styles)"
+	},
+	// the same leading combinator, `:global(> *:first-child button)`
+	{
+		task: 'format/svelte/biome',
+		path: 'threlte/packages/studio/src/lib/components/HorizontalButtonGroup.svelte',
+		category: 'unsupported_syntax',
+		reason:
+			"biome: expected a selector but found '>' (`:global(> *:first-child button)` in a <style> block)"
+	},
+	// and again in threlte's harvested `<style>` concatenation
+	{
+		task: 'format/css/biome',
+		path: '.cache/svelte_styles/threlte.css',
+		category: 'harvest_artifact',
+		reason:
+			"biome: expected a selector but found '>' (the harvested HorizontalButtonGroup.svelte styles)"
+	},
+	// A custom property's value is any token sequence (css-variables-1
+	// `<declaration-value>`), so `--size: var(--size-selector, 0.25rem) * 4;` is valid
+	// though no standard property would take a bare `*` there.
+	{
+		task: 'format/css/biome',
+		path: 'daisyui/packages/daisyui/src/components/rating.css',
+		category: 'tool_limit',
+		reason:
+			'biome: unexpected value or character in a custom property value (`var(…) * 4`, valid as a `<declaration-value>`)'
+	},
+	// `::part()` takes one or more part names (the css-shadow-parts-1 Editor's Draft's
+	// `::part(<ident>+)`), so `::part(button day today)` is valid; malva reads only one.
+	{
+		task: 'format/css/malva',
+		path: 'daisyui/packages/daisyui/src/components/calendar.css',
+		category: 'tool_limit',
+		reason: 'malva: expects `)` after the first name of a multi-name `::part(button day today)`'
 	}
 ];
 

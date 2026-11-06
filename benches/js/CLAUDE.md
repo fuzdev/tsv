@@ -739,7 +739,7 @@ Environment variables (any runtime's `:run`):
 | Variable | Effect (default) |
 | --- | --- |
 | `BENCH_LIMIT=5` | files per language (all) |
-| `BENCH_FILTER=zzz` | path pattern (none) |
+| `BENCH_FILTER=bits-ui` | path pattern (none) |
 | `BENCH_PASSES=2` | fresh processes each row is timed in (3) |
 | `BENCH_DURATION=10000` | ms per PASS of a row (5000; conformance mode 15000) |
 | `BENCH_WARMUP=10` | warmup iteration FLOOR per pass (3) |
@@ -891,8 +891,8 @@ since tsc is its oracle and a bump can move a file between its two lists with th
 unchanged); pass `--force` after changing harvest/grading LOGIC, which the stamp can't see.
 `svelte-styles` is stamped too, on the `../corpora` snapshot's `collections/` tree id (not its
 commit — a tooling commit there moves no corpus byte), its exact block pin
-(`SVELTE_STYLES_BLOCKS_PIN`), and the perf view's entry list (a collection joining the bench
-changes what the harvest reads with no checkout moving): an unchanged triple skips the walk, and a
+(`SVELTE_STYLES_BLOCKS_PIN`), and the perf view's entry list (a collection joining or leaving the
+bench changes what the harvest reads with no checkout moving): an unchanged triple skips the walk, and a
 moved count fails before writing like every other harvest.
 
 **Two groups, because the corpus VIEWS decide who needs which cache.**
@@ -1331,7 +1331,8 @@ Every entry is `{path|files_from, tier, extensions?, skip?, conformance?, option
 names which views an entry reaches, never who wrote it: authorship is each collection's manifest
 `origin` (`own` | `third_party`). The snapshot's entries are DERIVED: `COLLECTIONS` places each
 `../corpora` collection by name and says only whether the bench measures it (`perf: true` or
-`false` — placed means gated either way; a bench-only slice is narrowed in the snapshot's manifest), and its entries are one per `subpath`
+`false` — placed means gated either way; a bench-only slice is narrowed in the snapshot's manifest;
+an `own` collection is never benched, a rule the catalog refuses to break), and its entries are one per `subpath`
 the snapshot's own `manifest.json` names for it — so an upstream's layout is spelled once, in the
 recipe — each `benched` or `gated` by that placement. The `live` working trees derive the same
 way, from the `own` collections. Extensions: `.svelte`, the JS/TS family `tsv format`
@@ -1343,8 +1344,9 @@ contribute `.mjs`/`.cjs`/`.mts`/`.cts` files that way).
 **The real code is a pinned snapshot.** `benched` + `gated` read the `../corpora`
 checkout (`fuzdev/corpora`): one collection per upstream repo — the author's dev repos (zzz,
 fuz\_\*, gro, the personal sites), the framework source (kit, svelte, the svelte.dev subpaths) and
-the third-party Svelte libraries and tools (flowbite-svelte, layerchart, layercake, svelte-ux,
-svelte-maplibre, language-tools) and neutral TypeScript other formatter benchmarks compare on
+the third-party Svelte libraries, tools and CSS frameworks (flowbite-svelte, layerchart, layercake,
+svelte-ux, svelte-maplibre, language-tools, bits-ui, shadcn-svelte, skeleton, xyflow, threlte,
+runed, daisyui, open-props) and neutral TypeScript other formatter benchmarks compare on
 (TypeScript's `parser.ts`, Storybook, Continue) — every collection vendored at a commit its `manifest.json`
 names, the whole `collections/` tree pinned by its git tree id in `GATE_CHECKOUT_IDS['../corpora']`
 (verified by `pins:audit:checkouts` — the tree, not the commit, so a tooling or doc commit in the
@@ -1355,15 +1357,19 @@ whose churn would make an aggregate pin a re-pin treadmill, survive as the `live
 `robustness` view only and only as a diff against the snapshot (below). **SAFETY (content loss)
 gates over every file.**
 
-- **`perf`** — `benched`, all real code, from the snapshot's collections: the author's own
-  application & library source (the fuz.dev repos' `src/` — zzz, the fuz ecosystem, gro,
-  svelte-docinfo, tsv.fuz.dev — plus the public SvelteKit sites and apps: ryanatkn.com,
-  earbetter, cosmicplayground), upstream framework source (kit, svelte, and
-  the svelte.dev subpaths), third-party Svelte libraries and tools (flowbite-svelte's `src/lib`,
-  layerchart, layercake, svelte-ux, svelte-maplibre, language-tools) and neutral TypeScript
-  (TypeScript's `parser.ts`, Storybook, Continue). Each group times ONE mixed set; the report
-  discloses its composition by manifest `origin` (`corpus_by_origin`, the **By origin:** line).
-  NOT a `gated` collection (one placed off the bench while its
+- **`perf`** — `benched`, all real code, and all of it third-party (each benched collection one of
+  manifest `origin: third_party`): upstream framework source (kit, svelte, and the svelte.dev subpaths),
+  third-party Svelte libraries and tools (flowbite-svelte's `src/lib`, layerchart, layercake,
+  svelte-ux, svelte-maplibre, language-tools, bits-ui, shadcn-svelte, skeleton, xyflow, threlte,
+  runed), CSS frameworks (daisyui, open-props) and neutral TypeScript (TypeScript's `parser.ts`,
+  Storybook, Continue). The author's own collections (zzz, the fuz ecosystem, gro, svelte-docinfo,
+  tsv.fuz.dev, the personal sites and apps) are `gated`, not `benched`: they are held out as the
+  training input for profile-guided native builds, so no published number is measured over a
+  binary's own training input ([docs/benchmarks.md §Fairness caveats](../../docs/benchmarks.md#fairness-caveats),
+  the PGO policy's disjoint training corpus), and they stay in the `gates` and `robustness` views, where the correctness gates
+  and sweeps still read them. Each group times ONE mixed set; the report discloses its composition
+  by manifest `origin` (`corpus_by_origin`, the **By origin:** line).
+  NOT a `gated` collection (an `own` one, or a third-party one placed off the bench while its
   triage is pending): the every-file invariant below is unmeasured over it. `.d.ts` files are IN
   scope (the product formats them; declaration-heavy shapes carry real divergence signal), and the curated entries skip the `/build/`+`/dist/`
   build-output pruning (a `build/` segment inside a reviewed `src/` tree is real source, e.g.
@@ -1401,8 +1407,9 @@ gates over every file.**
     is about, so only a full run grades that half) and the TASK (every alternative impl is
     optional, and one that fails to load registers no task at all, so on that machine its entries
     are unasked rather than stale).
-- **`gates`** — `benched` + `gated` + `prettier_fixture`: the perf view, plus any `gated`
-  collection (placed for its breadth while its bench triage is pending), plus
+- **`gates`** — `benched` + `gated` + `prettier_fixture`: the perf view, plus the `gated`
+  collections (the author's own, and any third-party one placed for its breadth while its bench
+  triage is pending), plus
   Prettier's `tests/format/{typescript,js,css,html}` suites and prettier-plugin-svelte's `test/`
   (`.html` treated as Svelte, files with a companion `options.json` skipped) — deliberately tricky
   edge cases. Every file comes from a pinned checkout, so the count pins gate over the whole view.

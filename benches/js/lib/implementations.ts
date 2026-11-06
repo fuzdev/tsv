@@ -998,9 +998,9 @@ export function get_benchmark_tasks(
 
 		// markup_fmt (Svelte only) — dprint's Svelte plugin, composed with the
 		// dprint and malva plugins for the embedded code (see lib/markup.ts) —
-		// COVERAGE-ONLY. It rejects valid Svelte the real corpus holds (markup inside
-		// a template literal in an attribute expression, `{…}` inside a quoted
-		// `style`), a large share of the perf corpus's Svelte bytes. A timed row would
+		// COVERAGE-ONLY. It rejects valid Svelte the real corpus holds (a quoted `style`
+		// attribute whose value is no declaration list, some inline arrow-function event
+		// handlers), whole example and docs pages among it. A timed row would
 		// need a `PERF_OMITS` entry per file, and each would leave EVERY row's timed
 		// set, so adding it would reshape every published Svelte number. Measured for
 		// what it accepts instead; time it once upstream accepts the corpus. See

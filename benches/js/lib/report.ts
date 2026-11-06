@@ -1541,9 +1541,9 @@ const COVERAGE_ONLY_REASONS: Readonly<Record<string, string>> = {
 	'rsvelte-fmt':
 		'no in-process API, so a timed row would measure process spawn rather than format work',
 	'markup-fmt-wasm':
-		'it rejects valid Svelte in the real corpus (markup inside a template literal in an ' +
-		'attribute expression, `{…}` inside a quoted `style`), and a file any timed row rejects ' +
-		'leaves every row’s timed set'
+		'it rejects valid Svelte in the real corpus (a quoted `style` attribute whose value is no ' +
+		'declaration list, some inline arrow-function event handlers), and a file any timed row ' +
+		'rejects leaves every row’s timed set'
 };
 
 /**

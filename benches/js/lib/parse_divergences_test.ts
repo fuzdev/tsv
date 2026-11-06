@@ -63,6 +63,127 @@ Deno.test('lone_surrogate_value: U+FFFD for a lone surrogate, and only that', ()
 	strictEqual(claims('lone_surrogate_value', entry('a', 'b'), {}), false);
 });
 
+Deno.test(
+	'svelte_empty_container_comment_drain: a comment walked as a node in an empty container',
+	() => {
+		// `if (a) {} else if (b) { // r⏎} else { // s⏎}` — `// r` leads the empty else block,
+		// and canonical nests `// s` in it; tsv trails `// s` on the `if`
+		const r = { type: 'Line', value: ' r', start: 30, end: 34 };
+		const s = { type: 'Line', value: ' s', start: 46, end: 50 };
+		const root = (block: unknown) => ({
+			instance: {
+				content: {
+					body: [{ type: 'IfStatement', start: 0, end: 52, alternate: { alternate: block } }]
+				}
+			}
+		});
+		const drained = root({
+			type: 'BlockStatement',
+			body: [],
+			start: 44,
+			end: 52,
+			leadingComments: [{ ...r, trailingComments: [s] }]
+		});
+		const nested =
+			'instance.content.body[0].alternate.alternate.leadingComments[0].trailingComments';
+		const trailing = 'instance.content.body[0].trailingComments';
+		const missing_ours: Entry = {
+			kind: 'missing_ours',
+			path: nested,
+			ours: undefined,
+			canonical: [s]
+		};
+		const missing_canonical = (ours: unknown): Entry => ({
+			kind: 'missing_canonical',
+			path: trailing,
+			ours,
+			canonical: undefined
+		});
+		const drain = (e: Entry, tree: unknown = drained) =>
+			claims('svelte_empty_container_comment_drain', e, tree, 'svelte');
+		strictEqual(drain(missing_ours), true);
+		strictEqual(drain(missing_canonical([s])), true);
+		// a NON-empty container: the leading comment is no walk node that passes `is_last_in_body`
+		const filled = root({
+			type: 'BlockStatement',
+			body: [{ type: 'ExpressionStatement' }],
+			start: 44,
+			end: 52,
+			leadingComments: [{ ...r, trailingComments: [s] }]
+		});
+		strictEqual(drain(missing_ours, filled), false);
+		strictEqual(drain(missing_canonical([s]), filled), false);
+		// a comment canonical never drained, attached by tsv where canonical has none, is a bug
+		const other = { type: 'Line', value: ' t', start: 60, end: 64 };
+		strictEqual(drain(missing_canonical([other])), false);
+		strictEqual(drain(missing_canonical([s, other])), false);
+		// a holder the walk cannot reach: a node ending before the container, for a trailing
+		// array, and one starting before its end, for a leading array
+		const early = root({
+			type: 'BlockStatement',
+			body: [],
+			start: 44,
+			end: 52,
+			leadingComments: [{ ...r, trailingComments: [s] }]
+		}) as { instance: { content: { body: unknown[] } } };
+		early.instance.content.body.unshift({ type: 'ExpressionStatement', start: 10, end: 20 });
+		const before: Entry = {
+			kind: 'missing_canonical',
+			path: 'instance.content.body[0].trailingComments',
+			ours: [s],
+			canonical: undefined
+		};
+		strictEqual(drain(before, early), false);
+		const leading_if: Entry = {
+			kind: 'missing_canonical',
+			path: 'instance.content.body[0].leadingComments',
+			ours: [s],
+			canonical: undefined
+		};
+		strictEqual(drain(leading_if), false);
+		// a leading holder is exactly the first node starting at or after the container's end:
+		// `… else { // s⏎} after(); later();` — `after()` (outermost, not its callee), never `later()`
+		const followed = root({
+			type: 'BlockStatement',
+			body: [],
+			start: 44,
+			end: 52,
+			leadingComments: [{ ...r, trailingComments: [s] }]
+		}) as { instance: { content: { body: unknown[] } } };
+		followed.instance.content.body.push(
+			{
+				type: 'ExpressionStatement',
+				start: 53,
+				end: 61,
+				expression: {
+					type: 'CallExpression',
+					start: 53,
+					end: 60,
+					callee: { type: 'Identifier', start: 53, end: 58 }
+				}
+			},
+			{ type: 'ExpressionStatement', start: 62, end: 70 }
+		);
+		const leading_at = (path: string): Entry => ({
+			kind: 'missing_canonical',
+			path,
+			ours: [s],
+			canonical: undefined
+		});
+		strictEqual(drain(leading_at('instance.content.body[1].leadingComments'), followed), true);
+		strictEqual(drain(leading_at('instance.content.body[2].leadingComments'), followed), false);
+		strictEqual(
+			drain(leading_at('instance.content.body[1].expression.callee.leadingComments'), followed),
+			false
+		);
+		// the direction: a comment array tsv LACKS on a node is a drop, not the drain
+		strictEqual(drain({ ...missing_canonical([s]), kind: 'missing_ours', canonical: [s] }), false);
+		// a nested array under something that is not a comment
+		const not_comment = 'instance.content.body[0].alternate.alternate.trailingComments';
+		strictEqual(drain({ ...missing_ours, path: not_comment }), false);
+	}
+);
+
 Deno.test('rest_param_type_end: the annotation end against the binding end, nothing else', () => {
 	// `(...args: Array<any>) => 1`, offsets as acorn-typescript writes them
 	const rest = (fields: Record<string, unknown>) => ({

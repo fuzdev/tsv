@@ -2,9 +2,9 @@
  * Harvest real-authored CSS for the corpus: extract every component-level
  * `<style>` block from the **perf view's** `.svelte` files and concatenate them
  * per source collection into `benches/js/.cache/svelte_styles/<collection>.css`.
- * That directory is a `benched` corpus entry, so the harvest ~3×es the
- * standalone-CSS sample (otherwise ~30 tiny files) with content people actually
- * wrote — and because the blocks are concatenated per collection, file sizes are
+ * That directory is a `benched` corpus entry, so the harvest adds component CSS
+ * people actually wrote beside the standalone files (mostly CSS-framework source) —
+ * and because the blocks are concatenated per collection, file sizes are
  * driven by reality (each collection's total embedded CSS), not an arbitrary chunking
  * knob, and large files measure engine throughput rather than per-call fixed
  * costs. In the gates view the concats additionally exercise the *standalone*

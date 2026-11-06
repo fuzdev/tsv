@@ -86,6 +86,24 @@ export interface CorporaCollection {
 /** A collection's `origin` in the manifest. */
 export type CorporaOrigin = 'own' | 'third_party';
 
+/**
+ * The collections of manifest origin `own` among `collections` that are placed on the
+ * bench — the ones the perf view must never hold, since it measures third-party code alone
+ * and the author's own is the training input for profile-guided native builds. Empty
+ * when the placement holds; `corpus.ts`'s catalog refuses to build otherwise.
+ *
+ * @param collections - each placed collection's name, whether the bench measures it, and
+ *   its manifest origin
+ * @returns the offending names, in the order given
+ */
+export function benched_own_collections(
+	collections: Iterable<{ name: string; benched: boolean; origin: CorporaOrigin }>
+): string[] {
+	const names: string[] = [];
+	for (const c of collections) if (c.benched && c.origin === 'own') names.push(c.name);
+	return names;
+}
+
 /** The manifest's shape, as far as this reader needs it — raw JSON, checked field by field. */
 interface CorporaManifest {
 	version: unknown;

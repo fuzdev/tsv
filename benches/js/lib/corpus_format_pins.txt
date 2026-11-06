@@ -2,11 +2,14 @@
 # Exact per-source counts over the `gates` view; see docs/gate_counts.md.
 #
 # <row> <language> match=<n> known=<n> partial=<n> unknown=<n> errors=<n> expected_errors=<n>
-benches/js/.cache/svelte_styles css match=21 known=2 partial=0 unknown=0 errors=0 expected_errors=0
+benches/js/.cache/svelte_styles css match=8 known=1 partial=0 unknown=0 errors=0 expected_errors=0
+bits-ui svelte match=224 known=2 partial=0 unknown=0 errors=0 expected_errors=0
+bits-ui typescript match=281 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 continue typescript match=940 known=11 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground svelte match=83 known=48 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground typescript match=82 known=2 partial=0 unknown=0 errors=0 expected_errors=0
 cosmicplayground css match=1 known=1 partial=0 unknown=0 errors=0 expected_errors=0
+daisyui css match=66 known=4 partial=0 unknown=2 errors=0 expected_errors=0
 docs.fuz.dev svelte match=37 known=5 partial=0 unknown=0 errors=0 expected_errors=0
 docs.fuz.dev typescript match=19 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 docs.fuz.dev css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
@@ -52,15 +55,24 @@ layerchart css match=1 known=5 partial=0 unknown=0 errors=0 expected_errors=0
 mdz svelte match=20 known=5 partial=0 unknown=0 errors=0 expected_errors=0
 mdz typescript match=50 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 mdz css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+open-props typescript match=11 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+open-props css match=20 known=1 partial=0 unknown=4 errors=0 expected_errors=0
 prettier-plugin-svelte/test svelte match=276 known=46 partial=0 unknown=0 errors=0 expected_errors=3
 prettier/tests/format/css typescript match=78 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 prettier/tests/format/css css match=87 known=15 partial=8 unknown=14 errors=8 expected_errors=18
 prettier/tests/format/html svelte match=55 known=29 partial=0 unknown=0 errors=39 expected_errors=1
 prettier/tests/format/js typescript match=823 known=64 partial=16 unknown=25 errors=124 expected_errors=54
 prettier/tests/format/typescript typescript match=691 known=56 partial=7 unknown=24 errors=14 expected_errors=3
+runed typescript match=105 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 ryanatkn.com svelte match=28 known=3 partial=0 unknown=0 errors=0 expected_errors=0
 ryanatkn.com typescript match=19 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 ryanatkn.com css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+shadcn-svelte svelte match=415 known=2 partial=0 unknown=0 errors=0 expected_errors=0
+shadcn-svelte typescript match=146 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+shadcn-svelte css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+skeleton svelte match=307 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+skeleton typescript match=178 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+skeleton css match=55 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 storybook typescript match=1660 known=8 partial=0 unknown=3 errors=0 expected_errors=0
 svelte typescript match=415 known=1 partial=0 unknown=0 errors=0 expected_errors=0
 svelte-docinfo svelte match=12 known=15 partial=0 unknown=0 errors=0 expected_errors=0
@@ -75,10 +87,15 @@ svelte-ux css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 svelte.dev svelte match=87 known=17 partial=0 unknown=0 errors=0 expected_errors=0
 svelte.dev typescript match=166 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 svelte.dev css match=11 known=2 partial=0 unknown=0 errors=0 expected_errors=0
+threlte svelte match=175 known=4 partial=0 unknown=0 errors=0 expected_errors=0
+threlte typescript match=421 known=0 partial=1 unknown=1 errors=0 expected_errors=0
 tsv.fuz.dev svelte match=15 known=5 partial=0 unknown=0 errors=0 expected_errors=0
 tsv.fuz.dev typescript match=38 known=0 partial=0 unknown=1 errors=0 expected_errors=0
 tsv.fuz.dev css match=2 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 typescript-parser typescript match=0 known=1 partial=0 unknown=0 errors=0 expected_errors=0
+xyflow svelte match=52 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+xyflow typescript match=122 known=0 partial=0 unknown=0 errors=0 expected_errors=0
+xyflow css match=6 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 zzz svelte match=173 known=13 partial=0 unknown=0 errors=0 expected_errors=0
 zzz typescript match=258 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 zzz css match=1 known=0 partial=0 unknown=0 errors=0 expected_errors=0

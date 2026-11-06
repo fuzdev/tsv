@@ -642,6 +642,91 @@ function reaches_tsc_refused_follower(node: NodeLike, text: string, depth = 0): 
 	});
 }
 
+/** The containers whose `is_last_in_body` test a comment walk node passes when they are empty. */
+const DRAINING_CONTAINERS: Readonly<Record<string, string>> = {
+	BlockStatement: 'body',
+	Program: 'body',
+	ArrayExpression: 'elements',
+	ObjectExpression: 'properties'
+};
+
+/** Whether `node` is one of `DRAINING_CONTAINERS` with nothing in its list. */
+function is_empty_draining_container(node: unknown): boolean {
+	const container = node as Record<string, unknown> | null;
+	const list =
+		typeof container?.type === 'string' ? DRAINING_CONTAINERS[container.type] : undefined;
+	return list !== undefined && Array.isArray(container![list]) && container![list].length === 0;
+}
+
+const drained_spans_by_root = new WeakMap<object, Map<string, { start: number; end: number }>>();
+
+/**
+ * The `start:end` span of every comment the canonical tree nests in a comment — each entry of
+ * a `trailingComments` array on a `leadingComments` entry of an EMPTY draining container, the
+ * shape Svelte's comment walk writes when it walks a leading comment as a node (docs
+ * conformance_svelte.md §Comment Attachment Differences) — mapped to that container's span,
+ * memoized per tree. A nested array anywhere else contributes nothing.
+ */
+function drained_comment_spans(root: unknown): Map<string, { start: number; end: number }> {
+	if (root == null || typeof root !== 'object') return new Map();
+	const cached = drained_spans_by_root.get(root);
+	if (cached) return cached;
+	const spans = new Map<string, { start: number; end: number }>();
+	const walk = (node: unknown): void => {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		const n = node as { leadingComments?: unknown; start?: unknown; end?: unknown };
+		const leading = n.leadingComments;
+		if (
+			is_empty_draining_container(node) &&
+			Array.isArray(leading) &&
+			typeof n.start === 'number' &&
+			typeof n.end === 'number'
+		) {
+			for (const comment of leading as ({ trailingComments?: unknown } | null)[]) {
+				const nested = comment?.trailingComments;
+				if (!Array.isArray(nested)) continue;
+				for (const c of nested as (CommentLike | null)[]) {
+					if (typeof c?.start === 'number') {
+						spans.set(`${c.start}:${c.end}`, { start: n.start, end: n.end });
+					}
+				}
+			}
+		}
+		for (const value of Object.values(node)) walk(value);
+	};
+	walk(root);
+	drained_spans_by_root.set(root, spans);
+	return spans;
+}
+
+const COMMENT_KEYS = new Set(['leadingComments', 'trailingComments', 'comments']);
+
+/**
+ * The node starting first at or after `at` (the outermost at that offset) — the node Svelte's
+ * walk hands a still-unclaimed comment before `at` as a leading comment.
+ */
+function first_node_from(root: unknown, at: number): unknown {
+	let found: { start: number } | undefined;
+	const walk = (node: unknown): void => {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		const n = node as { type?: unknown; start?: unknown };
+		if (typeof n.type === 'string' && typeof n.start === 'number' && n.start >= at) {
+			if (found === undefined || n.start < found.start) found = n as { start: number };
+		}
+		for (const [key, value] of Object.entries(node)) if (!COMMENT_KEYS.has(key)) walk(value);
+	};
+	walk(root);
+	return found;
+}
+
 export interface DocumentedMatcher {
 	name: string;
 	/** docs/conformance_svelte.md section the divergence is cataloged under */
@@ -876,6 +961,60 @@ export const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 			}
 			const attached = attached_comment_spans(ctx.canonical_root);
 			return comments.every((c) => !attached.has(`${c!.start}:${c!.end}`));
+		}
+	},
+	{
+		// Svelte's `add_comments` assigns a node's `leadingComments` before it recurses, so
+		// zimmerframe walks each leading comment as a node (its `type` is all it asks) with the
+		// node it leads as parent. Under an EMPTY `BlockStatement` / `Program` /
+		// `ArrayExpression` / `ObjectExpression` the comment passes `is_last_in_body`
+		// (`indexOf` −1 = `length − 1`) and drains every later comment up to the container's
+		// end into its own `trailingComments`. tsv attaches comments to wire nodes only, so
+		// the drained comments land where the walk puts them without it. Two arms, each
+		// gated on the drain's own shape, never on a comment field alone:
+		// (1) canonical's nested array — a `missing_ours` at a `leadingComments[i]
+		//     .trailingComments` whose owner is an empty draining container, the entry a
+		//     comment object;
+		// (2) tsv's attachment of the drained comments — a `missing_canonical` comment
+		//     array every entry of which canonical holds in such a nested array, AND at a
+		//     holder Svelte's walk could put it without the drain: a drained comment lies
+		//     inside its container (the leading shifts took every comment before its start,
+		//     the drain stops at its end), so it trails the container or an ancestor of it
+		//     (a holder spanning the container) or leads the first node after it (the
+		//     outermost node starting first at or past its end — the one node the walk hands
+		//     a still-unclaimed comment). A comment tsv attaches that canonical attaches elsewhere,
+		//     or nowhere but the root `comments`, or at a holder the walk cannot reach,
+		//     stays undocumented. What this cannot see — the matcher reads canonical's tree,
+		//     not tsv's — is a drained comment tsv attaches at TWO valid holders.
+		name: 'svelte_empty_container_comment_drain',
+		conformance_section: 'Comment Attachment Differences',
+		matches: (entry, canonical_parent, ctx) => {
+			if (entry.kind === 'missing_ours') {
+				const at = /^(.*)\.leadingComments\[\d+\]\.trailingComments$/.exec(entry.path);
+				if (!at || !Array.isArray(entry.canonical) || entry.canonical.length === 0) return false;
+				const comment = canonical_parent as { type?: unknown } | null;
+				if (comment?.type !== 'Line' && comment?.type !== 'Block') return false;
+				return is_empty_draining_container(get_at_path(ctx.canonical_root, at[1]!));
+			}
+			if (entry.kind === 'missing_canonical') {
+				if (!/(^|\.)(leadingComments|trailingComments)$/.test(entry.path)) return false;
+				if (!Array.isArray(entry.ours) || entry.ours.length === 0) return false;
+				const drained = drained_comment_spans(ctx.canonical_root);
+				const holder = canonical_parent as { start?: unknown; end?: unknown } | null;
+				if (typeof holder?.start !== 'number' || typeof holder.end !== 'number') return false;
+				const trailing = entry.path.endsWith('trailingComments');
+				return (entry.ours as (CommentLike | null)[]).every((c) => {
+					const container =
+						typeof c?.start === 'number' ? drained.get(`${c.start}:${c.end}`) : undefined;
+					if (container === undefined) return false;
+					// where Svelte's walk puts it without the drain: trailing the container or an
+					// ancestor of it, or leading the first node after it
+					return trailing
+						? (holder.start as number) <= container.start && container.end <= (holder.end as number)
+						: holder === first_node_from(ctx.canonical_root, container.end);
+				});
+			}
+			return false;
 		}
 	},
 	{
