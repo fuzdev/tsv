@@ -8,7 +8,9 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 
 import {
+	binary_holds,
 	classify_diagnostics,
+	crate_cgu_hashes,
 	demangle_legacy_path,
 	DROPS_DEAD_RECORDS,
 	floor_of,
@@ -19,11 +21,11 @@ import {
 	llvm_version,
 	missing_profile_function,
 	object_format,
+	parse_cgu_module,
 	parse_pgo_diagnostics,
 	parse_profile_show,
 	profile_instrumentation,
 	profile_use_crates,
-	record_symbol,
 	strip_ansi,
 	type TrainedCounts
 } from './profile.ts';
@@ -270,7 +272,7 @@ Deno.test('object_format reads the Format line of each object format', () => {
 	ok(!DROPS_DEAD_RECORDS.elf && DROPS_DEAD_RECORDS.macho && DROPS_DEAD_RECORDS.coff);
 });
 
-Deno.test('missing_profile_function and record_symbol name one function', () => {
+Deno.test('missing_profile_function names one function', () => {
 	strictEqual(
 		missing_profile_function(
 			'no profile data available for function _ZN4tsv_7fanout5Tally3add17h0123456789abcdefE Hash = 742261418966908927 up to 0 count discarded'
@@ -283,14 +285,6 @@ Deno.test('missing_profile_function and record_symbol name one function', () => 
 		),
 		null
 	);
-	strictEqual(
-		record_symbol('tsv.9c015dcffb65fca6-cgu.0;_ZN3std2rt10lang_start17h39a6dfff3ed9e07bE'),
-		'_ZN3std2rt10lang_start17h39a6dfff3ed9e07bE'
-	);
-	strictEqual(
-		record_symbol('_ZN3std2rt10lang_start17hdc14fff46d89b825E'),
-		'_ZN3std2rt10lang_start17hdc14fff46d89b825E'
-	);
 });
 
 /** A use-build log in the shape a Mach-O row writes: LLVM's diagnostics for the workspace
@@ -302,27 +296,54 @@ const MACHO_LOG = [
 	'warning: build_script_build.28bececf194f0957-cgu.0: no profile data available for function _ZN18build_script_build4main17h26d66acf13bdd994E Hash = 742261418966908927 up to 0 count discarded'
 ].join('\n');
 
+/** A local function inlinable across crates: rustc compiles a copy into each module that
+ * uses it, and each copy is its own record, `<module>;<symbol>`. */
+const U32_DEBUG =
+	'_ZN4core3fmt3num50_$LT$impl$u20$core..fmt..Debug$u20$for$u20$u32$GT$3fmt17h9e725510bb447855E';
+const RENDER = '_ZN8tsv_lang3doc12arena_render20render_doc_iterative17h0123456789abcdefE';
+const PARSE_FOLDED = '_ZN6tsv_ts9__private12parse_folded17hbed61a5168c09c4aE';
+const TSV_LANG = 'tsv_lang.3f0c9d1e2a4b5c6d-cgu.0';
+const TSV_TS = 'tsv_ts.eaeb575bf7bcacc2-cgu.0';
+
 /** The record table an instrumented binary's raw profile lists (`llvm-profdata show
- * --all-functions` over a `.profraw`): names only, some `<module>;`-prefixed. */
+ * --all-functions` over a `.profraw`): names only, local functions `<module>;`-prefixed,
+ * an external one bare. The `u32` copy survives in `tsv_ts` alone — the link dropped the
+ * `tsv_lang` copy's record with its dead code. */
 const RAW_SHOW = [
 	'Counters:',
-	'  tsv.9c015dcffb65fca6-cgu.0;_ZN8tsv_lang3doc12arena_render20render_doc_iterative17h0123456789abcdefE:',
+	`  ${TSV_LANG};${RENDER}:`,
 	'    Hash: 0x03c13cf48702e2f5',
 	'    Counters: 23',
-	'  _ZN6tsv_ts9__private12parse_folded17hbed61a5168c09c4aE:',
+	`  ${TSV_TS};${U32_DEBUG}:`,
+	'    Hash: 0x0000000000000018',
+	'    Counters: 1',
+	`  ${PARSE_FOLDED}:`,
 	'    Hash: 0x0a4d0ad3efffffff',
 	'    Counters: 1',
 	'Instrumentation level: IR  entry_first = 1  instrument_loop_entries = 0',
-	'Functions shown: 2',
+	'Functions shown: 3',
 	''
 ].join('\n');
 
 const raw_records = (text: string): Set<string> =>
-	new Set(parse_profile_show(text).map((r) => record_symbol(r.name)));
+	new Set(parse_profile_show(text).map((r) => r.name));
+
+const missing_in = (module: string, symbol: string): string =>
+	`warning: ${module}: no profile data available for function ${symbol} Hash = 9 up to 0 count discarded`;
+
+Deno.test('binary_holds matches a local record in its own module, an external one anywhere', () => {
+	const records = raw_records(RAW_SHOW);
+	ok(binary_holds(records, TSV_TS, U32_DEBUG));
+	ok(!binary_holds(records, TSV_LANG, U32_DEBUG));
+	ok(binary_holds(records, TSV_LANG, RENDER));
+	ok(!binary_holds(records, TSV_TS, RENDER));
+	ok(binary_holds(records, TSV_LANG, PARSE_FOLDED));
+	ok(binary_holds(records, TSV_TS, PARSE_FOLDED));
+});
 
 Deno.test('classify_diagnostics passes a dead-stripped function on Mach-O and COFF', () => {
 	const records = raw_records(RAW_SHOW);
-	strictEqual(records.size, 2);
+	strictEqual(records.size, 3);
 	for (const format of ['macho', 'coff'] as const) {
 		const c = classify_diagnostics(parse_pgo_diagnostics(MACHO_LOG), records, format);
 		strictEqual(c.build_script.length, 1);
@@ -338,16 +359,36 @@ Deno.test('classify_diagnostics fails a missing function on ELF, which keeps eve
 	strictEqual(c.build_script.length, 1);
 });
 
+Deno.test('classify_diagnostics reads a local copy recorded only in another module as dead', () => {
+	// the `tsv_lang` copy's record went with its dead code; the live `tsv_ts` copy's record
+	// names another function, so it holds nothing of the copy diagnosed
+	const log = missing_in(TSV_LANG, U32_DEBUG);
+	for (const format of ['macho', 'coff'] as const) {
+		const c = classify_diagnostics(parse_pgo_diagnostics(log), raw_records(RAW_SHOW), format);
+		strictEqual(c.dead_stripped.length, 1, format);
+		strictEqual(c.stale.length + c.unexpected.length, 0, format);
+	}
+	const c = classify_diagnostics(parse_pgo_diagnostics(log), raw_records(RAW_SHOW), 'elf');
+	strictEqual(c.unexpected.length, 1);
+	strictEqual(c.dead_stripped.length + c.stale.length, 0);
+});
+
 Deno.test('classify_diagnostics fails a missing function the instrumented binary records', () => {
-	// a profile from other source: the binary records the function, the profile has none of it
-	const stale_log = [
-		MACHO_LOG,
-		'warning: tsv_lang.3f0c9d1e2a4b5c6d-cgu.0: no profile data available for function _ZN8tsv_lang3doc12arena_render20render_doc_iterative17h0123456789abcdefE Hash = 9 up to 0 count discarded'
-	].join('\n');
-	for (const format of ['macho', 'coff', 'elf'] as const) {
-		const c = classify_diagnostics(parse_pgo_diagnostics(stale_log), raw_records(RAW_SHOW), format);
-		strictEqual(c.stale.length, 1, format);
-		ok(c.stale[0]!.message.includes('render_doc_iterative'));
+	// a profile from other source: the binary records the function in the module diagnosed
+	// (a local copy, or an external function from any module), the profile has none of it
+	const cases = [
+		[missing_in(TSV_TS, U32_DEBUG), 'u32'],
+		[missing_in(TSV_LANG, RENDER), 'render_doc_iterative'],
+		[missing_in(TSV_TS, PARSE_FOLDED), 'parse_folded'],
+		[missing_in('tsv_svelte.0123456789abcdef-cgu.0', PARSE_FOLDED), 'parse_folded']
+	] as const;
+	for (const [line, name] of cases) {
+		for (const format of ['macho', 'coff', 'elf'] as const) {
+			const log = [MACHO_LOG, line].join('\n');
+			const c = classify_diagnostics(parse_pgo_diagnostics(log), raw_records(RAW_SHOW), format);
+			strictEqual(c.stale.length, 1, `${name} ${format}`);
+			ok(c.stale[0]!.message.includes(name));
+		}
 	}
 });
 
@@ -367,5 +408,95 @@ Deno.test('classify_diagnostics fails every hash mismatch, on every format', () 
 		raw_records(RAW_SHOW),
 		'macho'
 	);
+	strictEqual(c.unexpected.length, 1);
+});
+
+Deno.test('parse_cgu_module reads a codegen unit name, and only that shape', () => {
+	deepStrictEqual(parse_cgu_module(TSV_LANG), { crate: 'tsv_lang', hash: '3f0c9d1e2a4b5c6d' });
+	// rustc drops a hash's leading zeros
+	deepStrictEqual(parse_cgu_module('argh.a1aa8553fa9069d-cgu.12'), {
+		crate: 'argh',
+		hash: 'a1aa8553fa9069d'
+	});
+	for (const other of [
+		'tsv_lang',
+		'tsv_lang.cgu.0',
+		'x.cgu.0',
+		'tsv_lang.3F0C-cgu.0',
+		'a.b-cgu.'
+	]) {
+		strictEqual(parse_cgu_module(other), null, other);
+	}
+});
+
+Deno.test('crate_cgu_hashes maps the crates the prefixed records name', () => {
+	const map = crate_cgu_hashes([
+		...raw_records(RAW_SHOW),
+		'tsv_lang.00aa-cgu.1;_ZN1a1b17h0123456789abcdefE',
+		'x.cgu.0;_ZN1a1c17h0123456789abcdefE'
+	]);
+	deepStrictEqual(
+		[...map].map(([crate, hashes]) => [crate, [...hashes].sort()]),
+		[
+			['tsv_lang', ['00aa', '3f0c9d1e2a4b5c6d']],
+			['tsv_ts', ['eaeb575bf7bcacc2']]
+		]
+	);
+});
+
+Deno.test('classify_diagnostics fails a module from another crate world, on every format', () => {
+	// `tsv_lang` compiled under another `-C metadata`: no `<module>;` record can match, so on
+	// Mach-O and COFF the missing function would otherwise read as dead code
+	const drifted = 'tsv_lang.9999999999999999-cgu.0';
+	const log = [missing_in(drifted, RENDER), missing_in(drifted, U32_DEBUG)].join('\n');
+	for (const format of ['macho', 'coff', 'elf'] as const) {
+		const c = classify_diagnostics(parse_pgo_diagnostics(log), raw_records(RAW_SHOW), format);
+		strictEqual(c.foreign_module.length, 2, format);
+		strictEqual(c.dead_stripped.length + c.stale.length + c.unexpected.length, 0, format);
+	}
+	// a hash mismatch from another crate world is graded the same way
+	const mismatch = `warning: ${drifted}: function control flow change detected (hash mismatch) ${RENDER} Hash = 1`;
+	const c = classify_diagnostics(parse_pgo_diagnostics(mismatch), raw_records(RAW_SHOW), 'macho');
+	strictEqual(c.foreign_module.length, 1);
+});
+
+Deno.test('classify_diagnostics fails a module name it cannot read', () => {
+	const log = missing_in('tsv_lang', U32_DEBUG);
+	for (const format of ['macho', 'coff', 'elf'] as const) {
+		const c = classify_diagnostics(parse_pgo_diagnostics(log), raw_records(RAW_SHOW), format);
+		strictEqual(c.foreign_module.length, 1, format);
+	}
+});
+
+Deno.test(
+	'classify_diagnostics keeps a dead copy in a module the instrumented build compiled',
+	() => {
+		// the same crate world: `tsv_lang`'s hash matches its records, the copy is just dead
+		for (const format of ['macho', 'coff'] as const) {
+			const c = classify_diagnostics(
+				parse_pgo_diagnostics(missing_in(TSV_LANG, U32_DEBUG)),
+				raw_records(RAW_SHOW),
+				format
+			);
+			strictEqual(c.foreign_module.length, 0, format);
+			strictEqual(c.dead_stripped.length, 1, format);
+		}
+	}
+);
+
+Deno.test('classify_diagnostics leaves a crate its records do not name ungraded by module', () => {
+	// `tsv_discover` has no prefixed record (every function of it external), so any hash is
+	// held to the record rule alone
+	const log = missing_in(
+		'tsv_discover.0a1b2c3d4e5f6a7b-cgu.0',
+		'_ZN12tsv_discover1f17h0123456789abcdefE'
+	);
+	for (const format of ['macho', 'coff'] as const) {
+		const c = classify_diagnostics(parse_pgo_diagnostics(log), raw_records(RAW_SHOW), format);
+		strictEqual(c.foreign_module.length, 0, format);
+		strictEqual(c.dead_stripped.length, 1, format);
+	}
+	const c = classify_diagnostics(parse_pgo_diagnostics(log), raw_records(RAW_SHOW), 'elf');
+	strictEqual(c.foreign_module.length, 0);
 	strictEqual(c.unexpected.length, 1);
 });

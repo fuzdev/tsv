@@ -306,19 +306,66 @@ export function missing_profile_function(message: string): string | null {
 	return /no profile data available for function (\S+)/.exec(message)?.[1] ?? null;
 }
 
-/** A profile record's symbol: its name without the `<module>;` prefix a local function's
- * record carries, so it compares with the name a build diagnostic prints. */
-export const record_symbol = (name: string): string => name.slice(name.lastIndexOf(';') + 1);
+/** A rustc codegen unit's LLVM module name, `<crate>.<hash>-cgu.<n>`, read apart. */
+export interface CguModule {
+	/** The crate the module belongs to (`tsv_lang`). */
+	crate: string;
+	/** The hash rustc derives from the crate's identity (its name and `-C metadata`), the
+	 * same in every module of one compilation of the crate and different in any other. */
+	hash: string;
+}
+
+/** The crate and hash of a codegen unit's module name (`tsv_lang.1189d0178b66a26f-cgu.0`),
+ * or `null` when `module` has another shape. The hash is lowercase hex of no fixed width
+ * (rustc drops leading zeros). */
+export function parse_cgu_module(module: string): CguModule | null {
+	const m = /^([A-Za-z0-9_]+)\.([0-9a-f]+)-cgu\.\d+$/.exec(module);
+	return m ? { crate: m[1]!, hash: m[2]! } : null;
+}
+
+/**
+ * Every crate the instrumented binary's records name a codegen unit of, with the CGU hashes
+ * they carry: read from each record's `<module>;` prefix, so a crate whose records are all
+ * bare (every function of it external) or all dropped is absent. A prefix of another shape names no crate
+ * and is skipped.
+ *
+ * @param records - every full record name the instrumented binary wrote, prefixes kept
+ * @returns crate name → the CGU hashes its records carry
+ */
+export function crate_cgu_hashes(records: Iterable<string>): Map<string, Set<string>> {
+	const out = new Map<string, Set<string>>();
+	for (const name of records) {
+		const semi = name.indexOf(';');
+		if (semi === -1) continue;
+		const cgu = parse_cgu_module(name.slice(0, semi));
+		if (cgu === null) continue;
+		let hashes = out.get(cgu.crate);
+		if (!hashes) out.set(cgu.crate, (hashes = new Set()));
+		hashes.add(cgu.hash);
+	}
+	return out;
+}
 
 /** The use build's profile diagnostics, by what each means (`classify_diagnostics`). */
 export interface DiagnosticClasses {
 	/** A build script's: never run in training, so never profiled. */
 	build_script: PgoDiagnostic[];
-	/** A function with no profile data that the instrumented binary holds no record of either,
-	 * on a format whose linker drops dead functions' records: dead code, which never runs. */
+	/**
+	 * A diagnostic whose module is not one the instrumented build compiled: its crate is
+	 * among those the instrumented records name, under a CGU hash none of them carries — the
+	 * use build compiled another crate world (a feature or `-C metadata` drift), so no
+	 * `<module>;` record can match and every missing function would read as dead code — or
+	 * its module name has no `<crate>.<hash>-cgu.<n>` shape to grade at all.
+	 */
+	foreign_module: PgoDiagnostic[];
+	/** A function with no profile data that the instrumented binary holds no record of in the
+	 * diagnostic's module (`binary_holds`), on a format whose linker drops dead functions'
+	 * records: dead code, which never runs. Another module's copy of the same local function
+	 * may stay live beside it. */
 	dead_stripped: PgoDiagnostic[];
-	/** A function with no profile data that the instrumented binary DOES record: the profile
-	 * is not that binary's — stale, or trained on other source. */
+	/** A function with no profile data that the instrumented binary DOES record in the
+	 * diagnostic's module: the profile is not that binary's — stale, or trained on other
+	 * source. */
 	stale: PgoDiagnostic[];
 	/** Everything else: a hash mismatch, a missing function on a format that keeps every
 	 * record (the use build compiled code the instrumented one did not), any other message. */
@@ -326,27 +373,68 @@ export interface DiagnosticClasses {
 }
 
 /**
- * Sort the use build's diagnostics (`parse_pgo_diagnostics`) against the record names of
- * the instrumented binary they were trained on (`record_symbol` of each record in a profile
- * it wrote) and its object format. A missing function is benign only when the instrumented
- * binary has no record of it AND its format drops dead functions' records — a stale profile
- * leaves functions the binary records unmatched (`stale`), and on ELF no missing function
- * is benign. A hash mismatch is never benign.
+ * Whether the instrumented binary holds the profile record a use-build diagnostic names: a
+ * record named `module;symbol` (the local copy compiled into that module) or bare `symbol`
+ * (an external function's). A local function's PGO name is `<source file>;<symbol>`, and
+ * rustc's source file is the codegen unit, the module a diagnostic names — so a function
+ * inlinable across crates is a distinct record per module that compiled a copy, and the
+ * bare symbol alone cannot tell the copy diagnosed from a live copy elsewhere.
+ *
+ * @param records - every full record name the instrumented binary wrote, prefixes kept
+ * @param module - the module the diagnostic names
+ * @param symbol - the mangled function the diagnostic names
+ */
+export const binary_holds = (
+	records: ReadonlySet<string>,
+	module: string,
+	symbol: string
+): boolean => records.has(`${module};${symbol}`) || records.has(symbol);
+
+/**
+ * Sort the use build's diagnostics (`parse_pgo_diagnostics`) against the full record names
+ * of the instrumented binary they were trained on (every record in a profile it wrote, the
+ * `<module>;` prefix a local function's record carries kept) and its object format. A
+ * missing function is held to its own module's record (`binary_holds`): it is benign only
+ * when the instrumented binary has no record of it there AND its format drops dead
+ * functions' records — a stale profile leaves functions the binary records unmatched
+ * (`stale`), and on ELF no missing function is benign. A hash mismatch is never benign.
+ *
+ * Per-module matching holds only while both builds compile the same crate world, so every
+ * other diagnostic is first held to the instrumented build's modules (`crate_cgu_hashes`):
+ * a crate the records name, diagnosed under a CGU hash they do not carry, is a use build
+ * from another crate world (`foreign_module`), where no `<module>;` record could match and
+ * a dead-code reading would pass a build no profile reached. A crate the records do not
+ * name (every function of it external, or every record of it dropped with dead code) is not
+ * held to this. A module name without the
+ * codegen-unit shape fails closed into the same class: rustc names every module it
+ * compiles that way, so another shape is a log this reader does not understand.
  */
 export function classify_diagnostics(
 	diagnostics: readonly PgoDiagnostic[],
 	binary_records: ReadonlySet<string>,
 	format: ObjectFormat
 ): DiagnosticClasses {
-	const out: DiagnosticClasses = { build_script: [], dead_stripped: [], stale: [], unexpected: [] };
+	const out: DiagnosticClasses = {
+		build_script: [],
+		foreign_module: [],
+		dead_stripped: [],
+		stale: [],
+		unexpected: []
+	};
+	const crate_hashes = crate_cgu_hashes(binary_records);
 	for (const d of diagnostics) {
 		if (d.build_script) {
 			out.build_script.push(d);
 			continue;
 		}
+		const cgu = parse_cgu_module(d.module);
+		if (cgu === null || crate_hashes.get(cgu.crate)?.has(cgu.hash) === false) {
+			out.foreign_module.push(d);
+			continue;
+		}
 		const missing = missing_profile_function(d.message);
 		if (missing === null) out.unexpected.push(d);
-		else if (binary_records.has(missing)) out.stale.push(d);
+		else if (binary_holds(binary_records, d.module, missing)) out.stale.push(d);
 		else if (DROPS_DEAD_RECORDS[format]) out.dead_stripped.push(d);
 		else out.unexpected.push(d);
 	}

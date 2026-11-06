@@ -48,9 +48,15 @@
  *    dead code's: a hash mismatch, or a missing function the instrumented binary's raw
  *    profiles record, means a stale or partly applied profile, which falls back to no
  *    PGO silently. A missing function is dead code when the instrumented binary records
- *    nothing of it and its format's link drops a dead function's records with its code
- *    (Mach-O, COFF — `classify_diagnostics`); on ELF every compiled function keeps its
- *    record, so there no missing function passes.
+ *    nothing of it in the module the diagnostic names — a local function's record is
+ *    per module (`<codegen unit>;<symbol>`), so one module's dead copy can sit beside
+ *    another's live one — and its format's link drops a dead function's records with its
+ *    code (Mach-O, COFF — `classify_diagnostics`); on ELF every compiled function keeps its
+ *    record, so there no missing function passes. Every diagnosed module of a crate the
+ *    instrumented records name must carry a CGU hash those records give it: a use build
+ *    from another crate world matches no per-module record, so it would read as all dead
+ *    code (a crate with no record is exempt, but a drift anywhere moves the hash of every
+ *    crate above it, the recorded root included).
  * 9. `gate-sections` — the instrumented binaries carry `__llvm_prf` sections and
  *    the use binaries none (the check's own positive control first).
  * 10. `stage --phase use` — the PGO pair into `crates/tsv_napi/pkg/<triple>/`, the
@@ -150,6 +156,7 @@ import {
 } from './layout.ts';
 import {
 	classify_diagnostics,
+	crate_cgu_hashes,
 	demangle_legacy_path,
 	grade_profile,
 	has_instrumentation_sections,
@@ -160,7 +167,6 @@ import {
 	parse_pgo_diagnostics,
 	parse_profile_show,
 	profile_use_crates,
-	record_symbol,
 	type TrainedCounts
 } from './profile.ts';
 
@@ -688,8 +694,10 @@ const cmd_merge = (): void => {
 // --- 8. the use builds' profile diagnostics --------------------------------------------
 
 /**
- * The instrumented binary's object format and the symbol of every profile record it holds —
- * every function compiled into it that its link kept, run or not — read from the profiles it
+ * The instrumented binary's object format and the full name of every profile record it
+ * holds — every function compiled into it that its link kept, run or not, a local function
+ * once per module that compiled a copy (`<module>;<symbol>`, the prefix kept so a
+ * diagnostic is held to its own module's copy, `binary_holds`) — read from the profiles it
  * wrote in training (a raw profile carries the binary's whole record table), never from the
  * merged profile the use build read. Its symbol table cannot answer: release builds strip
  * it, and a function inlined into every caller keeps its record but no symbol. The world's
@@ -712,7 +720,7 @@ const instrumented_records = (world: World): { format: ObjectFormat; records: Se
 		const show = capture(profdata, ['show', '--all-functions', join(raw, f)]);
 		if (show.status !== 0) fail(`llvm-profdata show ${join(raw, f)} failed: ${show.stderr}`);
 		for (const r of parse_profile_show(show.stdout)) {
-			records.add(record_symbol(r.name));
+			records.add(r.name);
 			const path = demangle_legacy_path(r.name);
 			if (path !== null) paths_found.add(path);
 		}
@@ -745,20 +753,36 @@ const cmd_gate_builds = (): void => {
 		// Registry crates compile with `--cap-lints allow`, which silences LLVM's warnings too,
 		// so the diagnostics graded here are the workspace crates' (the registry ones are
 		// source-pinned by Cargo.lock, so their profile cannot go stale apart from it). A
-		// missing function is held to the instrumented binary's own records and its format
-		// (`classify_diagnostics`): Mach-O and COFF links drop a dead function's records, so
-		// their use builds name the dead code; a function the binary records is a stale profile.
+		// missing function is held to the instrumented binary's own record in the diagnostic's
+		// module and its format (`classify_diagnostics`): Mach-O and COFF links drop a dead
+		// function's records, so their use builds name the dead code; a function the binary
+		// records there is a stale profile. A module whose CGU hash the instrumented records
+		// do not give its crate fails first: the per-module match presumes one crate world.
 		const diagnostics = parse_pgo_diagnostics(log);
 		const binary = instrumented_records(world);
 		const classes = classify_diagnostics(diagnostics, binary.records, binary.format);
 		const failures = [...classes.stale, ...classes.unexpected];
 		const build_scripts = classes.build_script.length;
+		const controlled = crate_cgu_hashes(binary.records).size;
 		console.log(
 			`gate-builds ${world}: -Cprofile-use on ${used.size} crates; ${diagnostics.length} profile ` +
-				`diagnostics: ${build_scripts} from build scripts, ${classes.dead_stripped.length} for functions ` +
-				`the instrumented ${binary.format} binary does not hold (${binary.records.size} records), ` +
-				`${classes.stale.length} for functions it holds, ${classes.unexpected.length} other`
+				`diagnostics: ${build_scripts} from build scripts, ${classes.foreign_module.length} in modules ` +
+				`the instrumented build did not compile or this gate cannot read (CGU hashes of ${controlled} crates), ` +
+				`${classes.dead_stripped.length} for functions the instrumented ${binary.format} binary does ` +
+				`not hold (${binary.records.size} records), ${classes.stale.length} for functions it holds, ` +
+				`${classes.unexpected.length} other`
 		);
+		if (classes.foreign_module.length > 0) {
+			fail(
+				`gate-builds ${world}: the use build compiled modules the instrumented build did not (a ` +
+					`feature or -C metadata drift between the two builds, or a module name this gate cannot ` +
+					`read), so no per-module record can match and the profile cannot be graded — ${log_path}:\n` +
+					classes.foreign_module
+						.slice(0, 20)
+						.map((d) => `  ${d.module}: ${d.message}`)
+						.join('\n')
+			);
+		}
 		if (failures.length > 0) {
 			fail(
 				`gate-builds ${world}: the profile does not cover the build it was applied to (stale, or trained ` +

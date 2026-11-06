@@ -316,10 +316,15 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   the size lever. Then the PGO gates: `-Cprofile-use` on every workspace crate's rustc
   command line, and no profile diagnostic in the use builds' logs but the build scripts' and
   those for dead code (a hash mismatch, or a missing function the instrumented binary's own
-  profile records, is a stale profile, silently no PGO; a missing function is dead code only
-  on Mach-O and COFF, whose links drop a dead function's records, and only when the
-  instrumented binary records nothing of it; registry crates compile with `--cap-lints
-  allow`, which silences theirs, and are source-pinned by `Cargo.lock`); instrumentation sections in the trained binaries and none in the shipped
+  profile records in the module diagnosed, is a stale profile, silently no PGO; a missing
+  function is dead code only on Mach-O and COFF, whose links drop a dead function's records,
+  and only when the instrumented binary records nothing of it in the module the diagnostic
+  names (a local function's record is per codegen unit, so one module's dead copy can sit
+  beside another's live one), and every diagnosed module of a crate the instrumented records
+  name carries a CGU hash they give it (a use build from another crate world, which no
+  per-module record matches, fails rather than reading as all dead code); registry crates
+  compile with `--cap-lints allow`, which silences theirs, and are source-pinned by
+  `Cargo.lock`); instrumentation sections in the trained binaries and none in the shipped
   ones; the PGO CLI and addon byte-identical to the plain `release` CLI over the whole
   snapshot and every fixture (format) and over the fixture inputs plus a stride of the
   snapshot (parse, `parse --locations`, strip), and the PGO addon's import records equal to

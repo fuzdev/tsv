@@ -355,10 +355,13 @@ jobs:
 
       # The profile was APPLIED: no profile diagnostic in the use builds' logs
       # but the build scripts' and dead code's (a hash mismatch, or a missing
-      # function the instrumented binary's raw profiles record, is a stale or
-      # partly applied profile, which falls back to no PGO silently; the Mach-O
-      # and COFF links drop a dead function's records, so their use builds name
-      # the dead code — pgo.ts gate-builds sorts them); and
+      # function the instrumented binary's raw profiles record in the module
+      # diagnosed, is a stale or partly applied profile, which falls back to no
+      # PGO silently; the Mach-O and COFF links drop a dead function's records,
+      # so their use builds name the dead code — pgo.ts gate-builds sorts them,
+      # failing any diagnosed module of a crate the instrumented records name
+      # under a CGU hash they do not give it, a use build from another crate
+      # world); and
       # nothing instrumented ships — the trained binaries must show their
       # instrumentation sections (the check's positive control) and the use
       # binaries none.
