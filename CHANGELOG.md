@@ -19,6 +19,7 @@ Each `## Unreleased` section must be non-empty and carry a
   decoded specifier and type-only verdict, plus whether the source uses module syntax; in
   Rust, `tsv_ts::parse_imports`, `tsv_svelte::parse_imports`, and
   `tsv_ts::strip_with_imports` for stripped output and records from one parse
+- perf: the native `tsv` CLI and N-API addon in `@fuzdev/tsv` ship profile-guided (PGO)
 - feat: CSS accepts Tailwind v4's `*` wildcard in custom property names (`--color-*: initial`)
 - fix: the parser accepts more valid TypeScript and matches acorn's tree in more places; the
   formatter keeps more meaning-carrying parens, `prettier-ignore`d type members verbatim, and
