@@ -76,40 +76,45 @@ const CLI_BOUNDS: Record<string, [number, number]> = {
 /** [min, max] bytes per triple for the PGO-use `tsv_napi.node` (`--pgo`), anchored on
  * PGO-use builds.
  *
- * linux-x64-gnu is MEASURED: ±8% around a host PGO build of the source its plain anchor
- * was measured on. Every other row is DERIVED until a matrix run prints its size: that
- * measured PGO size scaled by the row's TARGET ratio — its plain size over linux-x64-gnu's
- * in the one matrix run the plain CLI anchors come from (that run's plain addon sizes are
- * noted beside the bands; its linux-x64-gnu addon was 4,055,224 B, its CLI 3,923,256 B), a
- * ratio of one vintage — ±10%.
+ * MEASURED rows — every linux and win32 row — are ±8% around the row's own PGO-use size:
+ * linux-x64-gnu's a host PGO build of the source its plain anchor was measured on (the
+ * matrix build lands within a few KB of it), the others a release-matrix build in the
+ * environment that ships the row. The darwin rows are DERIVED until a matrix run prints
+ * their sizes: linux-x64-gnu's measured PGO size scaled by the row's TARGET ratio — its
+ * plain size over linux-x64-gnu's in the one matrix run the plain CLI anchors come from
+ * (that run's plain addon sizes are noted beside the derived bands; its linux-x64-gnu
+ * addon was 4,055,224 B, its CLI 3,923,256 B), a ratio of one vintage — ±10%, the wider
+ * band for the ratio's uncertainty.
  * The band has two failures to tell apart, each measured on linux-x64-gnu against a plain
  * build of the same source: a profile that did not apply reads as a plain-sized binary
  * (PGO-use is about 1.2× plain — addon +21%, CLI +19%), and LLVM's cost-benefit inliner
  * turned back on as a much larger one (default PGO is +43% for the addon, +48% for the
- * CLI). The measured bands span about [1.11, 1.30]× the plain anchor, so each failure
- * falls outside with margin. A derived band leans on its row's target ratio holding: while
- * it does, both failures fall outside a derived band too (by about 7% at its nearer edge,
- * the ±10% leaving less room than the measured ±8%); a ratio that drifts can move either
- * one inside, which the dispatch dry run's re-anchor to ±8% around the row's own size
- * guards against. */
+ * CLI). A measured band spans [0.92, 1.08]× its row's PGO size, about [1.10, 1.30]× plain
+ * where that ratio holds, so each failure falls outside with margin; the other measured
+ * rows lean on linux-x64-gnu's PGO-over-plain ratio holding on their targets, which no
+ * same-source plain build there has measured. A derived band leans on its row's target
+ * ratio as well: while it holds, both failures fall outside a derived band too (by about
+ * 7% at its nearer edge, the ±10% leaving less room than the measured ±8%); a ratio that
+ * drifts can move either one inside, until the row is re-anchored to ±8% around its own
+ * measured size. */
 const PGO_BOUNDS: Record<string, [number, number]> = {
 	'linux-x64-gnu': [4_906_000, 5_759_000], // 5,332,592
-	'linux-arm64-gnu': [4_430_000, 5_414_000], // derived 4,921,862 (plain 3,742,880)
-	'linux-x64-musl': [4_806_000, 5_874_000], // derived 5,339,903 (plain 4,060,784)
+	'linux-arm64-gnu': [4_347_000, 5_103_000], // 4,725,112
+	'linux-x64-musl': [4_908_000, 5_761_000], // 5,334,720
 	'darwin-arm64': [4_253_000, 5_198_000], // derived 4,725,265 (plain 3,593,376)
 	'darwin-x64': [4_443_000, 5_430_000], // derived 4,936,348 (plain 3,753,896)
-	'win32-x64': [4_781_000, 5_843_000] // derived 5,312,152 (plain 4,039,680)
+	'win32-x64': [4_953_000, 5_814_000] // 5,383,168
 };
 
 /** [min, max] bytes per triple for the PGO-use `tsv` CLI binary (`--pgo`), anchored and
  * derived as `PGO_BOUNDS` is. */
 const PGO_CLI_BOUNDS: Record<string, [number, number]> = {
 	'linux-x64-gnu': [4_691_000, 5_507_000], // 5,099,096
-	'linux-arm64-gnu': [4_226_000, 5_165_000], // derived 4,695,614
-	'linux-x64-musl': [4_591_000, 5_611_000], // derived 5,100,947
+	'linux-arm64-gnu': [4_226_000, 4_961_000], // 4,593,384
+	'linux-x64-musl': [4_700_000, 5_517_000], // 5,108,424
 	'darwin-arm64': [3_819_000, 4_667_000], // derived 4,242,940
 	'darwin-x64': [4_177_000, 5_105_000], // derived 4,641,328
-	'win32-x64': [4_076_000, 4_981_000] // derived 4,528,398
+	'win32-x64': [4_253_000, 4_992_000] // 4,622,336
 };
 
 const pkg_root = 'crates/tsv_napi/pkg';
