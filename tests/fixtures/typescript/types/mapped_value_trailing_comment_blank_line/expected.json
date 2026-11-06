@@ -1,0 +1,393 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 544,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an author blank line above an own-line comment after the member is kept, as a type",
+			"start": 20,
+			"end": 105
+		},
+		{
+			"type": "Line",
+			"value": " literal keeps one after its last member",
+			"start": 107,
+			"end": 149
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 180,
+			"end": 185
+		},
+		{
+			"type": "Line",
+			"value": " a block comment answers the same way",
+			"start": 192,
+			"end": 231
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 262,
+			"end": 270
+		},
+		{
+			"type": "Line",
+			"value": " behind a comment trailing the member, and between two own-line comments",
+			"start": 277,
+			"end": 351
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 389,
+			"end": 394
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 398,
+			"end": 403
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 406,
+			"end": 411
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 415,
+			"end": 420
+		},
+		{
+			"type": "Line",
+			"value": " null control: with no blank line, none is added",
+			"start": 427,
+			"end": 477
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 524,
+			"end": 529
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 543,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 534,
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 151,
+					"end": 189,
+					"id": {
+						"type": "Identifier",
+						"start": 156,
+						"end": 157,
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 160,
+						"end": 188,
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 165,
+							"end": 171,
+							"name": "K",
+							"constraint": {
+								"type": "TSTypeReference",
+								"start": 170,
+								"end": 171,
+								"typeName": {
+									"type": "Identifier",
+									"start": 170,
+									"end": 171,
+									"name": "T"
+								}
+							}
+						},
+						"nameType": null,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 174,
+							"end": 175,
+							"typeName": {
+								"type": "Identifier",
+								"start": 174,
+								"end": 175,
+								"name": "V"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank line above an own-line comment after the member is kept, as a type",
+							"start": 20,
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " literal keeps one after its last member",
+							"start": 107,
+							"end": 149
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 233,
+					"end": 274,
+					"id": {
+						"type": "Identifier",
+						"start": 238,
+						"end": 239,
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 242,
+						"end": 273,
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 247,
+							"end": 253,
+							"name": "K",
+							"constraint": {
+								"type": "TSTypeReference",
+								"start": 252,
+								"end": 253,
+								"typeName": {
+									"type": "Identifier",
+									"start": 252,
+									"end": 253,
+									"name": "T"
+								}
+							}
+						},
+						"nameType": null,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 256,
+							"end": 257,
+							"typeName": {
+								"type": "Identifier",
+								"start": 256,
+								"end": 257,
+								"name": "V"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 180,
+							"end": 185
+						},
+						{
+							"type": "Line",
+							"value": " a block comment answers the same way",
+							"start": 192,
+							"end": 231
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 353,
+					"end": 424,
+					"id": {
+						"type": "Identifier",
+						"start": 358,
+						"end": 359,
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 362,
+						"end": 423,
+						"readonly": true,
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 376,
+							"end": 382,
+							"name": "K",
+							"constraint": {
+								"type": "TSTypeReference",
+								"start": 381,
+								"end": 382,
+								"typeName": {
+									"type": "Identifier",
+									"start": 381,
+									"end": 382,
+									"name": "T"
+								}
+							}
+						},
+						"nameType": null,
+						"optional": true,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 386,
+							"end": 387,
+							"typeName": {
+								"type": "Identifier",
+								"start": 386,
+								"end": 387,
+								"name": "V"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c2 ",
+							"start": 262,
+							"end": 270
+						},
+						{
+							"type": "Line",
+							"value": " behind a comment trailing the member, and between two own-line comments",
+							"start": 277,
+							"end": 351
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 479,
+					"end": 533,
+					"id": {
+						"type": "Identifier",
+						"start": 484,
+						"end": 485,
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSMappedType",
+						"start": 488,
+						"end": 532,
+						"readonly": "-",
+						"typeParameter": {
+							"type": "TSTypeParameter",
+							"start": 503,
+							"end": 509,
+							"name": "K",
+							"constraint": {
+								"type": "TSTypeReference",
+								"start": 508,
+								"end": 509,
+								"typeName": {
+									"type": "Identifier",
+									"start": 508,
+									"end": 509,
+									"name": "T"
+								}
+							}
+						},
+						"nameType": {
+							"type": "TSTypeReference",
+							"start": 513,
+							"end": 514,
+							"typeName": {
+								"type": "Identifier",
+								"start": 513,
+								"end": 514,
+								"name": "U"
+							}
+						},
+						"optional": "-",
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 519,
+							"end": 520,
+							"typeName": {
+								"type": "Identifier",
+								"start": 519,
+								"end": 520,
+								"name": "V"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c3",
+							"start": 389,
+							"end": 394
+						},
+						{
+							"type": "Line",
+							"value": " c4",
+							"start": 398,
+							"end": 403
+						},
+						{
+							"type": "Line",
+							"value": " c5",
+							"start": 406,
+							"end": 411
+						},
+						{
+							"type": "Line",
+							"value": " c6",
+							"start": 415,
+							"end": 420
+						},
+						{
+							"type": "Line",
+							"value": " null control: with no blank line, none is added",
+							"start": 427,
+							"end": 477
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c7",
+							"start": 524,
+							"end": 529
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

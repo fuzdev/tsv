@@ -1768,12 +1768,18 @@ impl<'a> Printer<'a> {
             // closing `hardline` is where the run belongs; prettier reaches the same shape
             // by propagating the `breakParent` inside its `lineSuffix`, which tsv's suffix
             // deliberately does not carry (the caller answers the break question).
+            //
+            // An author blank above an own-line comment of the run survives: the run lands
+            // after the member's `;` inside the braces, the gap it was written in, so the reparse
+            // reads it back as this same trailing run — the stationary destination
+            // [`TrailingBlank::Keep`] names, and where a type literal keeps the blank after its
+            // last member too.
             let body_end = m.span.end.saturating_sub(1); // before `}`
             let run = self.push_trailing_comments_in_range_with(
                 &mut body_parts,
                 type_end,
                 body_end,
-                TrailingBlank::Drop,
+                TrailingBlank::Keep,
                 OwnLineBlock::Defer,
             );
             shell_is_multiline |= run.deferred;
