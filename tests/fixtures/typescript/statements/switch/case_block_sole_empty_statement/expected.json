@@ -1,0 +1,146 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 243,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a dropped `;` is not a statement: a block it leaves alone in the case keeps the label",
+			"start": 10,
+			"end": 98
+		},
+		{
+			"type": "Line",
+			"value": " line, whichever side of the block the `;` was written on",
+			"start": 100,
+			"end": 159
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 242,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 233,
+			"body": [
+				{
+					"type": "SwitchStatement",
+					"start": 161,
+					"end": 232,
+					"discriminant": {
+						"type": "Identifier",
+						"start": 169,
+						"end": 170,
+						"name": "x"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 176,
+							"end": 201,
+							"consequent": [
+								{
+									"type": "BlockStatement",
+									"start": 186,
+									"end": 201,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 191,
+											"end": 197,
+											"expression": {
+												"type": "CallExpression",
+												"start": 191,
+												"end": 196,
+												"callee": {
+													"type": "Identifier",
+													"start": 191,
+													"end": 194,
+													"name": "fn1"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 181,
+								"end": 184,
+								"value": "a",
+								"raw": "'a'"
+							}
+						},
+						{
+							"type": "SwitchCase",
+							"start": 204,
+							"end": 229,
+							"consequent": [
+								{
+									"type": "BlockStatement",
+									"start": 214,
+									"end": 229,
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 219,
+											"end": 225,
+											"expression": {
+												"type": "CallExpression",
+												"start": 219,
+												"end": 224,
+												"callee": {
+													"type": "Identifier",
+													"start": 219,
+													"end": 222,
+													"name": "fn2"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 209,
+								"end": 212,
+								"value": "b",
+								"raw": "'b'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a dropped `;` is not a statement: a block it leaves alone in the case keeps the label",
+							"start": 10,
+							"end": 98
+						},
+						{
+							"type": "Line",
+							"value": " line, whichever side of the block the `;` was written on",
+							"start": 100,
+							"end": 159
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -88,7 +88,7 @@ svelte.dev svelte match=87 known=17 partial=0 unknown=0 errors=0 expected_errors
 svelte.dev typescript match=166 known=0 partial=0 unknown=0 errors=0 expected_errors=0
 svelte.dev css match=11 known=2 partial=0 unknown=0 errors=0 expected_errors=0
 threlte svelte match=175 known=4 partial=0 unknown=0 errors=0 expected_errors=0
-threlte typescript match=421 known=0 partial=1 unknown=1 errors=0 expected_errors=0
+threlte typescript match=422 known=0 partial=0 unknown=1 errors=0 expected_errors=0
 tsv.fuz.dev svelte match=15 known=5 partial=0 unknown=0 errors=0 expected_errors=0
 tsv.fuz.dev typescript match=38 known=0 partial=0 unknown=1 errors=0 expected_errors=0
 tsv.fuz.dev css match=2 known=0 partial=0 unknown=0 errors=0 expected_errors=0

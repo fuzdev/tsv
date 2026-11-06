@@ -439,13 +439,48 @@ impl<'a> Printer<'a> {
         // hug (`case 7: /* block */ {`, the cataloged divergence), so the bound applies
         // only where no consequent exists and the "next" is a sibling label.
         let first_stmt_start = case.consequent.first().map(|s| s.span().start);
+        // The hug below is prettier's `printSwitchCase` rule: the case keeps its block on the
+        // label line only when that block is the consequent's ONLY printed statement (the
+        // dropped `;`s do not count). A block followed by anything else is one statement of a
+        // list, which takes the consequent's own indented lines like every other.
+        let printed_statements = case
+            .consequent
+            .iter()
+            .filter(|s| !matches!(&s.kind, StatementKind::EmptyStatement(_)))
+            .count();
+        // Such a block leaves the label's line, and a run of block comments the author glued
+        // between the `:` and its `{` (`case 1: /* c */ {`) goes with it, leading the block on
+        // its own line — where a glued comment ahead of any other first statement already
+        // lands, by ownership (`case 1: /* c */ f();`). Glued is read BETWEEN the comments, so
+        // a multi-line block's own line breaks do not count; a run the author broke after
+        // stays trailing the label.
+        let glued_run_leads_block = printed_statements > 1
+            && first_stmt_start.is_some_and(|start| {
+                matches!(
+                    case.consequent.first().map(|s| &s.kind),
+                    Some(StatementKind::BlockStatement(_))
+                ) && {
+                    let mut gap_start = case_label_end;
+                    self.comments_in_source_between(case_label_end, start)
+                        .all(|c| {
+                            let glued = !self.comment_has_newline_between(gap_start, c.span.start);
+                            gap_start = c.span.end;
+                            glued
+                        })
+                        && !self.comment_has_newline_between(gap_start, start)
+                }
+            });
         let fallthrough_claim_end = match (first_stmt_start, next_case_start) {
             (None, Some(ncs)) if body_has_comments => self.trailing_claim_end(case_label_end, ncs),
             _ => u32::MAX,
         };
-        let inline_comment_end = first_stmt_start
-            .unwrap_or(inline_comment_boundary)
-            .min(fallthrough_claim_end);
+        let inline_comment_end = if glued_run_leads_block {
+            case_label_end
+        } else {
+            first_stmt_start
+                .unwrap_or(inline_comment_boundary)
+                .min(fallthrough_claim_end)
+        };
         let label_trailing_end = if body_has_comments {
             parts.extend(
                 // The label's `:` is no terminator: one line, no jump.
@@ -486,6 +521,8 @@ impl<'a> Printer<'a> {
         // Set when the statement just emitted deferred a line comment past its own `;`, so
         // its doc ends on a later line than the `;` and cannot carry that line's comments.
         let mut prev_deferred_line_comment = false;
+
+        let label_parts_len = parts.len();
 
         for (i, stmt) in case.consequent.iter().enumerate() {
             let stmt_start = stmt.span().start;
@@ -689,8 +726,9 @@ impl<'a> Printer<'a> {
             // gap or between statements freezes the statement that follows it. Resolved
             // BEFORE the layout choice because the hug below would pull the directive onto
             // the label's line — an inert placement, so the freeze would die on pass 2.
-            // First block statement hugs the case label: `case 'a': { ... }` — the two
-            // layouts that keep something on the label's own line. Both need that line
+            // A block that is the consequent's only printed statement, with nothing of the
+            // consequent emitted ahead of it, hugs the case label: `case 'a': { ... }` — the
+            // two layouts that keep something on the label's own line. Both need that line
             // free of leading comments: a comment written ON the label's line trails the
             // label (the emitter above claimed it), so anything reaching the leading run
             // sits below and claims a line of its own, which the general path prints on
@@ -700,7 +738,8 @@ impl<'a> Printer<'a> {
             // keeps in place (`case 'b':⏎// c⏎{`, docs/conformance_prettier_ts_comments.md
             // §Comment relocation), so comment kind stops deciding the layout. A frozen statement
             // keeps its own line too: the hug would take away the directive's.
-            if i == 0
+            if parts.len() == label_parts_len
+                && printed_statements == 1
                 && matches!(&stmt.kind, StatementKind::BlockStatement(_))
                 && frozen.is_none()
                 && leading_comments.is_empty()
