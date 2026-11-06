@@ -60,10 +60,12 @@ const PLAIN_ADDON_ROWS = Object.keys(BOUNDS);
  * byte-identity reference — and check.yml's `artifacts` job builds linux-x64-gnu's, which
  * is anchored on the same host build as `BOUNDS`. The other rows are anchored on an
  * earlier full matrix run, each built in the environment that ships it (the gnu rows in
- * almalinux:8, musl in rust:alpine, win and darwin-arm64 natively, darwin-x64
- * cross-compiled on the arm64 runner), and are re-anchored from the release workflow's
- * dispatch dry run. A host build lands within a few KB of the almalinux linux-x64-gnu
- * figure, so the container is not the size variable; the TARGET is. */
+ * almalinux:8, musl in rust:alpine, win and darwin-arm64 natively) but darwin-x64's, a
+ * build cross-compiled on an arm64 mac: a target's codegen does not depend on the host
+ * rustc runs on (the image's linker aside), so it stands for the row's native build on an Intel runner until one is
+ * measured. They are re-anchored from the release workflow's dispatch dry run. A host
+ * build lands within a few KB of the almalinux linux-x64-gnu figure, so the container is
+ * not the size variable; the TARGET is. */
 const CLI_BOUNDS: Record<string, [number, number]> = {
 	'linux-x64-gnu': [3_929_000, 4_613_000], // 4,271,000
 	'linux-arm64-gnu': [3_323_000, 3_902_000], // 3,612,816
@@ -76,15 +78,17 @@ const CLI_BOUNDS: Record<string, [number, number]> = {
 /** [min, max] bytes per triple for the PGO-use `tsv_napi.node` (`--pgo`), anchored on
  * PGO-use builds.
  *
- * MEASURED rows — every linux and win32 row — are ±8% around the row's own PGO-use size:
- * linux-x64-gnu's a host PGO build of the source its plain anchor was measured on (the
- * matrix build lands within a few KB of it), the others a release-matrix build in the
- * environment that ships the row. The darwin rows are DERIVED until a matrix run prints
- * their sizes: linux-x64-gnu's measured PGO size scaled by the row's TARGET ratio — its
- * plain size over linux-x64-gnu's in the one matrix run the plain CLI anchors come from
- * (that run's plain addon sizes are noted beside the derived bands; its linux-x64-gnu
+ * MEASURED rows — every linux row, win32 and darwin-arm64 — are ±8% around the row's own
+ * PGO-use size: linux-x64-gnu's a host PGO build of the source its plain anchor was
+ * measured on (the matrix build lands within a few KB of it), the others a release-matrix
+ * build in the environment that ships the row. darwin-x64 is DERIVED until a matrix run
+ * prints its sizes: linux-x64-gnu's measured PGO size scaled by the row's TARGET ratio —
+ * its plain size over linux-x64-gnu's in the one matrix run the plain CLI anchors come
+ * from (that run's plain addon size is noted beside the derived band; its linux-x64-gnu
  * addon was 4,055,224 B, its CLI 3,923,256 B), a ratio of one vintage — ±10%, the wider
- * band for the ratio's uncertainty.
+ * band for the ratio's uncertainty. That plain build was cross-compiled on an arm64 mac,
+ * which stands for the row's native Intel build (`CLI_BOUNDS`), and the same derivation
+ * put darwin-arm64 within 2% of the sizes its matrix build then measured.
  * The band has two failures to tell apart, each measured on linux-x64-gnu against a plain
  * build of the same source: a profile that did not apply reads as a plain-sized binary
  * (PGO-use is about 1.2× plain — addon +21%, CLI +19%), and LLVM's cost-benefit inliner
@@ -101,7 +105,7 @@ const PGO_BOUNDS: Record<string, [number, number]> = {
 	'linux-x64-gnu': [4_906_000, 5_759_000], // 5,332,592
 	'linux-arm64-gnu': [4_347_000, 5_103_000], // 4,725,112
 	'linux-x64-musl': [4_908_000, 5_761_000], // 5,334,720
-	'darwin-arm64': [4_253_000, 5_198_000], // derived 4,725,265 (plain 3,593,376)
+	'darwin-arm64': [4_294_000, 5_040_000], // 4,667,056
 	'darwin-x64': [4_443_000, 5_430_000], // derived 4,936,348 (plain 3,753,896)
 	'win32-x64': [4_953_000, 5_814_000] // 5,383,168
 };
@@ -112,7 +116,7 @@ const PGO_CLI_BOUNDS: Record<string, [number, number]> = {
 	'linux-x64-gnu': [4_691_000, 5_507_000], // 5,099,096
 	'linux-arm64-gnu': [4_226_000, 4_961_000], // 4,593,384
 	'linux-x64-musl': [4_700_000, 5_517_000], // 5,108,424
-	'darwin-arm64': [3_819_000, 4_667_000], // derived 4,242,940
+	'darwin-arm64': [3_930_000, 4_614_000], // 4,272,256
 	'darwin-x64': [4_177_000, 5_105_000], // derived 4,641,328
 	'win32-x64': [4_253_000, 4_992_000] // 4,622,336
 };
