@@ -2376,7 +2376,9 @@ impl<'a> Printer<'a> {
     /// ([`Self::binary_printed_last_operand`]). A child that sits behind a grouping shell
     /// (`yield (x)`, `() => (x)`, `x = (y = …)`) ends the walk at the parent's end — whether
     /// that shell prints is its parent printer's decision, not re-derived here — so a comment
-    /// in a shell below it still defers (a known gap); a kept pair ends it at the pair's `)`.
+    /// in a shell below it still defers (a known gap); a kept pair ends it at the pair's `)`; a
+    /// child a format-ignore directive freezes ends it at the parent's end
+    /// ([`Self::right_spine_child_frozen`]).
     pub(in crate::printer) fn right_spine_printed_end(&self, expr: &ast::Expression<'_>) -> u32 {
         self.right_spine_printed_end_with(expr, false)
     }
@@ -2419,11 +2421,57 @@ impl<'a> Printer<'a> {
                 }) => argument,
                 _ => return expr.span().end,
             };
-            if next.span().end != expr.span().end {
+            if next.span().end != expr.span().end || self.right_spine_child_frozen(expr, next) {
                 return expr.span().end;
             }
             expr = next;
         }
+    }
+
+    /// Whether a format-ignore directive in the gap between `parent`'s delimiter and `child`
+    /// — the last child [`Self::right_spine_printed_end_with`] steps into — freezes `child`:
+    /// the slice prints its stripped shells and their comments verbatim, so the walk stops
+    /// ahead of it, or the gap a caller opens there prints them a second time. The gap opens
+    /// where the position's own freeze reads it — past the `=>`, the conditional's `:`, the
+    /// assignment operator, `yield` — never at `parent`'s start, where a directive freezing
+    /// an earlier child (a parameter, the consequent) would stop the walk as well. Behind the
+    /// document-level flag, so a directive-free document never locates a delimiter.
+    fn right_spine_child_frozen(
+        &self,
+        parent: &ast::Expression<'_>,
+        child: &ast::Expression<'_>,
+    ) -> bool {
+        use ast::ExpressionKind as K;
+        if !self.has_format_ignore {
+            return false;
+        }
+        let head_end = match &parent.kind {
+            K::ArrowFunctionExpression(arrow) => expressions::functions::arrow_token_end(arrow),
+            K::ConditionalExpression(conditional) => {
+                match self.find_char_outside_comments(
+                    conditional.consequent.span().end,
+                    child.span().start,
+                    b':',
+                ) {
+                    Some(colon) => colon + 1,
+                    None => return false,
+                }
+            }
+            K::AssignmentExpression(assignment) => {
+                let operator = assignment.operator.as_str();
+                match self.find_operator_in_source(
+                    assignment.left.span().end,
+                    child.span().start,
+                    operator,
+                ) {
+                    Some(op) => op + operator.len() as u32,
+                    None => return false,
+                }
+            }
+            K::YieldExpression(_) => parent.span().start + "yield".len() as u32,
+            _ => return false,
+        };
+        self.member_gap_frozen(head_end, child.span().start)
     }
 
     /// What the chain linearizer reads — the printer itself, and the region marks when the

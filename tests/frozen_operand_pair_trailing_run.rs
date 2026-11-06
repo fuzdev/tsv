@@ -7,7 +7,11 @@
 //! (`docs/comments.md` §The right-spine shell run). A FROZEN operand is the exception: a
 //! format-ignore directive ahead of it prints its slice verbatim, the stripped shell and its
 //! comment included, so the pair or gap must not claim that comment as well — claimed, it
-//! printed twice, and the copy grew by a line every pass.
+//! printed twice, and the copy grew by a line every pass. The same holds for a child the walk
+//! down the right spine reaches (an assignment's value, a conditional's alternate, an arrow's
+//! body, a `yield*` operand, a sequence's last operand): a directive in the gap past that
+//! child's delimiter freezes it, and the walk stops ahead of it; a directive anywhere else in
+//! the parent does not.
 //!
 //! Not a fixture: prettier moves the directive past the `=` and welds the two comments onto one
 //! line at every one of these, a prettier behaviour of its own, so the transitions are pinned
@@ -206,5 +210,223 @@ fn call_chain_head_frozen() {
     assert_frozen_once(
         "k = (\n// prettier-ignore\na + (b // c\n))().m;\n",
         "k =\n\t// prettier-ignore\n\t(a + (b // c\n))().m;\n",
+    );
+}
+
+/// A callee whose right spine reaches a frozen value: the assignment's value is the slice, so the
+/// callee gap opens past it.
+#[test]
+fn callee_spine_child_frozen() {
+    assert_frozen_once(
+        "k = (x =\n// prettier-ignore\na + (b // c\n))();\n",
+        "k = (x =\n\t// prettier-ignore\n\ta + (b // c\n))();\n",
+    );
+}
+
+/// A `new` callee.
+#[test]
+fn new_callee_spine_child_frozen() {
+    assert_frozen_once(
+        "k = new (x =\n// prettier-ignore\na + (b // c\n))();\n",
+        "k = new (x =\n\t// prettier-ignore\n\ta + (b // c\n))();\n",
+    );
+}
+
+/// A template tag.
+#[test]
+fn tag_spine_child_frozen() {
+    assert_frozen_once(
+        "k = (x =\n// prettier-ignore\na + (b // c\n))`t`;\n",
+        "k = (x =\n\t// prettier-ignore\n\ta + (b // c\n))`t`;\n",
+    );
+}
+
+/// A unary operand's retained pair, a block written after the slice.
+#[test]
+fn unary_operand_spine_child_frozen() {
+    assert_frozen_once(
+        "k = -(x =\n// prettier-ignore\na + (b // c\n) /* x */);\n",
+        "k = -(\n\t(x =\n\t\t// prettier-ignore\n\t\ta + (b // c\n)) /* x */\n);\n",
+    );
+}
+
+/// An `await` operand's retained pair.
+#[test]
+fn await_operand_spine_child_frozen() {
+    assert_frozen_once(
+        "k = await (x =\n// prettier-ignore\na + (b // c\n) /* x */);\n",
+        "k = await (x =\n\t// prettier-ignore\n\ta + (b // c\n) /* x */);\n",
+    );
+}
+
+/// An `as` operand's pair.
+#[test]
+fn as_operand_spine_child_frozen() {
+    assert_frozen_once(
+        "k = (x =\n// prettier-ignore\na + (b // c\n) /* x */) as T;\n",
+        "k = (x =\n\t// prettier-ignore\n\ta + (b // c\n)) /* x */ as T;\n",
+    );
+}
+
+/// A `case` test's head→`:` gap.
+#[test]
+fn case_test_spine_child_frozen() {
+    assert_frozen_once(
+        "switch (k) { case (x =\n// prettier-ignore\na + (b // c\n) /* x */): }\n",
+        "switch (k) {\n\tcase (x =\n\t\t// prettier-ignore\n\t\ta + (b // c\n)) /* x */:\n}\n",
+    );
+}
+
+/// A superclass.
+#[test]
+fn superclass_spine_child_frozen() {
+    assert_frozen_once(
+        "class A extends (x =\n// prettier-ignore\na + (b // c\n)) {}\n",
+        "class A extends (x =\n\t// prettier-ignore\n\ta + (b // c\n)) {}\n",
+    );
+}
+
+/// An `if` test.
+#[test]
+fn if_test_spine_child_frozen() {
+    assert_frozen_once(
+        "if (x =\n// prettier-ignore\na + (b // c\n)) {}\n",
+        "if (\n\t(x =\n\t\t// prettier-ignore\n\t\ta + (b // c\n))\n) {\n}\n",
+    );
+}
+
+/// A member gap.
+#[test]
+fn member_object_spine_child_frozen() {
+    assert_frozen_once(
+        "k = (x =\n// prettier-ignore\na + (b // c\n)).m;\n",
+        "k = (\n\tx =\n\t\t// prettier-ignore\n\t\ta + (b // c\n)\n).m;\n",
+    );
+}
+
+/// A retained value shell, a `//` written after the slice.
+#[test]
+fn value_shell_spine_child_frozen() {
+    assert_frozen_once(
+        "let k = (x =\n// prettier-ignore\na + (b // c\n) // d\n);\n",
+        "let k = (\n\tx =\n\t\t// prettier-ignore\n\t\ta + (b // c\n) // d\n);\n",
+    );
+}
+
+/// A conditional's alternate, frozen past its `:`.
+#[test]
+fn conditional_alternate_spine_child_frozen() {
+    assert_frozen_once(
+        "k = (q ? r :\n// prettier-ignore\na + (b // c\n))();\n",
+        "k = (q\n\t? r\n\t:\n\t\t// prettier-ignore\n\t\ta + (b // c\n))();\n",
+    );
+}
+
+/// An arrow's body, frozen past its `=>`.
+#[test]
+fn arrow_body_spine_child_frozen() {
+    assert_frozen_once(
+        "k = (() =>\n// prettier-ignore\na + (b // c\n))();\n",
+        "k = (() =>\n\t// prettier-ignore\n\ta + (b // c\n))();\n",
+    );
+}
+
+/// A `yield*` operand, frozen inside the pair its hang prints.
+#[test]
+fn yield_operand_spine_child_frozen() {
+    assert_frozen_once(
+        "function* g() { k = (yield*\n// prettier-ignore\na + (b // c\n))(); }\n",
+        "function* g() {\n\tk = (yield* (\n\t\t// prettier-ignore\n\t\ta + (b // c\n)\n\t))();\n}\n",
+    );
+}
+
+/// A block directive.
+#[test]
+fn callee_spine_child_frozen_block_directive() {
+    assert_frozen_once(
+        "k = (x =\n/* prettier-ignore */\na + (b // c\n))();\n",
+        "k = (x =\n\t/* prettier-ignore */\n\ta + (b // c\n))();\n",
+    );
+}
+
+/// Control: a directive ahead of the `=` freezes nothing, so the walk reaches the shell and
+/// the callee gap prints its comment past the `)`.
+#[test]
+fn callee_spine_directive_before_operator() {
+    assert_frozen_once(
+        "k = (x\n// prettier-ignore\n= a + (b // c\n))();\n",
+        "k = (x\n\t// prettier-ignore\n\t= a + b) // c\n\t();\n",
+    );
+}
+
+/// Control: a directive ahead of the `:` freezes nothing either.
+#[test]
+fn callee_spine_directive_before_colon() {
+    assert_frozen_once(
+        "k = (q ? r\n// prettier-ignore\n: a + (b // c\n))();\n",
+        "k = (q\n\t? r\n\t// prettier-ignore\n\t: a + b) // c\n\t();\n",
+    );
+}
+
+/// Control: a directive freezing the consequent leaves the alternate's shell to the walk.
+#[test]
+fn callee_spine_directive_on_consequent() {
+    assert_frozen_once(
+        "k = (q ?\n// prettier-ignore\nr : a + (b // c\n))();\n",
+        "k = (q\n\t?\n\t\t// prettier-ignore\n\t\tr\n\t: a + b) // c\n\t();\n",
+    );
+}
+
+/// Control: the same, a `//` written after the pair, which the shell's comment stays ahead of.
+#[test]
+fn callee_spine_directive_on_consequent_then_line() {
+    assert_frozen_once(
+        "k = (a ? (\n// prettier-ignore\nb) : c + (d // c\n)) // d\n();\n",
+        "k = (a\n\t?\n\t\t// prettier-ignore\n\t\tb\n\t: c + d) // c\n\t// d\n\t();\n",
+    );
+}
+
+/// A sequence's last operand, frozen past its comma: the callee gap opens past the slice.
+#[test]
+fn sequence_last_operand_frozen_callee() {
+    assert_frozen_once(
+        "k = (z,\n// prettier-ignore\na + (b // c\n))();\n",
+        "k =\n\t(z,\n\t// prettier-ignore\n\ta + (b // c\n))();\n",
+    );
+}
+
+/// A retained value shell around the sequence.
+#[test]
+fn sequence_last_operand_frozen_value_shell() {
+    assert_frozen_once(
+        "let k = (z,\n// prettier-ignore\na + (b // c\n));\n",
+        "let k =\n\t(z,\n\t// prettier-ignore\n\ta + (b // c\n));\n",
+    );
+}
+
+/// An expression statement's terminator gap, a block written after the sequence.
+#[test]
+fn sequence_last_operand_frozen_statement_tail() {
+    assert_frozen_once(
+        "(z,\n// prettier-ignore\na + (b // c\n)) /* x */;\n",
+        "(z,\n\t// prettier-ignore\n\ta + (b // c\n)); /* x */\n",
+    );
+}
+
+/// A nested sequence's last operand.
+#[test]
+fn nested_sequence_last_operand_frozen() {
+    assert_frozen_once(
+        "k = (z, (y,\n// prettier-ignore\na + (b // c\n)))();\n",
+        "k =\n\t(z,\n\t(y,\n\t// prettier-ignore\n\ta + (b // c\n)))();\n",
+    );
+}
+
+/// Control: a comment that is no directive leaves the walk going into the last operand.
+#[test]
+fn sequence_last_operand_comment_not_directive() {
+    assert_frozen_once(
+        "k = (z,\n// e\na + (b // c\n))();\n",
+        "k =\n\t(z,\n\t// e\n\ta + b)(); // c\n",
     );
 }

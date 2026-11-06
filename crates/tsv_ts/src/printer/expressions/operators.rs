@@ -2953,19 +2953,26 @@ impl<'a> Printer<'a> {
     /// through any nested sequence's last operand (each prints its own envelope, whose
     /// trailing run floats the same way), then down that operand's right spine
     /// ([`Printer::right_spine_printed_end`]). The stripped shells past it close at the
-    /// sequence's own end, with nothing but `)`s and trivia between.
+    /// sequence's own end, with nothing but `)`s and trivia between. The walk stops at an
+    /// operand a format-ignore directive in its comma gap freezes, whose slice prints its own
+    /// shells ([`Printer::gap_frozen_span`], the predicate the operand's own build asks).
     pub(in crate::printer) fn sequence_printed_end(
         &self,
         seq: &ast::SequenceExpression<'_>,
     ) -> u32 {
-        let mut last = seq.expressions.last().copied();
-        while let Some(ExpressionKind::SequenceExpression(inner)) = last.map(|e| &e.kind) {
-            last = inner.expressions.last().copied();
+        let mut seq = seq;
+        loop {
+            let [.., before, last] = seq.expressions else {
+                return seq.expressions.last().map_or(0, |e| e.span().end);
+            };
+            if self.member_gap_frozen(before.span().end, last.span().start) {
+                return last.span().end;
+            }
+            match &last.kind {
+                ExpressionKind::SequenceExpression(inner) => seq = inner,
+                _ => return self.right_spine_printed_end(last),
+            }
         }
-        last.map_or_else(
-            || seq.expressions.last().map_or(0, |e| e.span().end),
-            |last| self.right_spine_printed_end(last),
-        )
     }
 
     /// The trailing run a float-out sequence's envelope CLAIMS and prints after its `)`:
