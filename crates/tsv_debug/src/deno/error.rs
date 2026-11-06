@@ -68,7 +68,7 @@ impl DenoError {
             Self::DenoNotFound => "Install Deno: curl -fsSL https://deno.land/install.sh | sh",
             Self::ProcessSpawn(_) => "Check that 'deno' is in your PATH",
             Self::SidecarCrashed => "This may be a bug in the sidecar script",
-            Self::Timeout { .. } => "The sidecar may be stuck processing a request",
+            Self::Timeout { .. } => "The sidecar may be stuck starting up or processing a request",
             Self::EmptyOutput => {
                 "Transient under load — re-run; if it persists, check the sidecar (tsv_debug check)"
             }

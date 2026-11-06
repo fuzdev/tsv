@@ -21,8 +21,15 @@ use tokio::runtime::{Builder, Runtime};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::{Duration, timeout};
 
-/// Timeout for reading a response from the sidecar (30 seconds)
+/// Timeout for reading a response from a running sidecar.
 const READ_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Timeout for the sidecar's FIRST response, which also waits on deno starting
+/// and loading the sidecar's module graph (prettier, svelte, acorn) — seconds
+/// on an idle machine, far longer when it launches beside a saturated test run.
+/// Every later response is held to [`READ_TIMEOUT`], so a stuck request still
+/// fails fast.
+const STARTUP_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// Embedded sidecar script
 pub(crate) const SIDECAR_SCRIPT: &str = include_str!("sidecar.ts");
@@ -393,13 +400,20 @@ impl ActorState {
     ///
     /// Returns false on EOF (sidecar crashed)
     async fn read_response(&mut self) -> Result<bool, DenoError> {
+        // The launch files live until the first stdout line, so while they
+        // are held the sidecar has not answered yet and is still starting.
+        let limit = if self.files.is_some() {
+            STARTUP_TIMEOUT
+        } else {
+            READ_TIMEOUT
+        };
         // Receive from the dedicated reader task (cancel-safe, unlike read_line)
-        let line = match timeout(READ_TIMEOUT, self.line_rx.recv()).await {
+        let line = match timeout(limit, self.line_rx.recv()).await {
             Ok(Some(line)) => line,
             Ok(None) => return Ok(false), // EOF - reader task ended
             Err(_) => {
                 return Err(DenoError::Timeout {
-                    seconds: READ_TIMEOUT.as_secs(),
+                    seconds: limit.as_secs(),
                 });
             }
         };
@@ -512,9 +526,9 @@ async fn run_actor(mut state: ActorState, mut rx: mpsc::Receiver<ActorCommand>) 
                         state.fail_all_pending(|| DenoError::SidecarCrashed);
                         break;
                     }
-                    Err(DenoError::Timeout { .. }) => {
-                        eprintln!("deno sidecar timed out ({} requests pending)", state.pending.len());
-                        state.fail_all_pending(|| DenoError::Timeout { seconds: READ_TIMEOUT.as_secs() });
+                    Err(DenoError::Timeout { seconds }) => {
+                        eprintln!("deno sidecar timed out after {seconds}s ({} requests pending)", state.pending.len());
+                        state.fail_all_pending(|| DenoError::Timeout { seconds });
                         break;
                     }
                     Err(e) => {
