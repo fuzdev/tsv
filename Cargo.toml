@@ -303,8 +303,9 @@ overflow-checks = true
 # named profile because `panic` cannot be overridden per-package, and flipping
 # `[profile.release]` itself would perturb the size-bounded WASM bundles and the
 # FFI/CLI artifacts, which keep abort. Everything napi builds with it — bench,
-# test:napi, publish — so the measured artifact is the shipped one. Stack
-# overflow remains uncatchable under any strategy (aborts the host).
+# test:napi, publish — so what is measured and tested has the shipped panic
+# strategy; the published addon is also profile-guided (scripts/pgo/pgo.ts).
+# Stack overflow remains uncatchable under any strategy (aborts the host).
 [profile.napi]
 inherits = "release"
 panic = "unwind"

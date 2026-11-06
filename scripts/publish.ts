@@ -458,10 +458,12 @@ if (no_check) {
 } else {
 	console.log('\n=== Step 3: Check (deno task check) ===');
 	await run('deno task check', 'deno', ['task', 'check']);
-	// The depth-limit stack contract in the shipped optimization: `check`'s `test:depth`
-	// grades the `corpus` world, whose frames are not the shipped builds' (deno.json
-	// `//test:depth:napi`).
-	console.log('\n=== Step 3: Depth contract, shipped build (deno task test:depth:napi) ===');
+	// The depth-limit stack contract in the shipped binaries' optimization (the `napi`
+	// profile, without the profile guidance the published pair adds): `check`'s
+	// `test:depth` grades the `corpus` world, whose frames are further still from what
+	// ships. The profile-guided addon itself is graded by the release workflow on every
+	// row (deno.json `//test:depth:napi`).
+	console.log('\n=== Step 3: Depth contract, napi profile (deno task test:depth:napi) ===');
 	await run('deno task test:depth:napi', 'deno', ['task', 'test:depth:napi']);
 }
 

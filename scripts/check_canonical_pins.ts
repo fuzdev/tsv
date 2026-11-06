@@ -68,7 +68,11 @@
  * (`GATE_CHECKOUT_IDS`), and a move is reported. Deliberately a WARNING:
  * the count pins are the gate — this exists so that when one trips, "the corpus
  * moved" is distinguishable from "tsv regressed" at a glance instead of by
- * reverse-engineering. Absent / non-git checkouts are skipped.
+ * reverse-engineering. Absent / non-git checkouts are skipped. One check here
+ * FAILS instead: an entry that also records a `commit` (the snapshot the PGO
+ * training fetches by commit, since a tree cannot be fetched) must name a commit
+ * whose subtree is the pinned one — a disagreement between the two recorded ids,
+ * whatever the checkout's HEAD (a clone that lacks the commit is noted, not graded).
  */
 
 import { GATE_CHECKOUT_IDS } from '../benches/js/lib/gate_counts.ts';
@@ -389,7 +393,7 @@ if (run_checkouts) {
 	// Skipped wholesale rather than per-repo: without the permission every
 	// `rev_parse` returns `null`, which would read as "every checkout absent".
 	if (can_run_git === 'granted') {
-		for (const [repo, { hash, tree, pins }] of Object.entries(GATE_CHECKOUT_IDS)) {
+		for (const [repo, { hash, tree, pins, commit }] of Object.entries(GATE_CHECKOUT_IDS)) {
 			// A `tree` pin compares that subtree's id at HEAD, so a commit that touches
 			// nothing under it is not a move (the corpora snapshot's tooling commits).
 			const what = tree === undefined ? repo : `${repo}:${tree}`;
@@ -397,6 +401,19 @@ if (run_checkouts) {
 			if (current === null) {
 				checkout_notes.push(`${repo} absent — drift not checked`);
 				continue;
+			}
+			// A recorded commit is what the PGO training fetches, so its tree must BE the pin —
+			// a fact about the two recorded ids, not about this checkout, hence a failure
+			if (commit !== undefined && tree !== undefined) {
+				const commit_tree = rev_parse(repo, `${commit}:${tree}`);
+				if (commit_tree === null) {
+					checkout_notes.push(`${repo} lacks the recorded commit ${commit.slice(0, 12)}`);
+				} else if (!commit_tree.startsWith(hash)) {
+					failures.push(
+						`${what}: the recorded commit ${commit.slice(0, 12)} holds ${tree} ${commit_tree.slice(0, hash.length)}, ` +
+							`not the pinned ${hash} — re-record GATE_CHECKOUT_IDS' commit with its tree`
+					);
+				}
 			}
 			// The recorded ids are abbreviated, so compare on the prefix.
 			if (!current.startsWith(hash)) {

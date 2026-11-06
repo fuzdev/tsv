@@ -136,23 +136,27 @@ Things the published numbers measure that aren't quite what they look like.
   The harvest dedents each block by the one level it carried inside `<style>`, so
   the concats read as standalone CSS and measure the same already-formatted
   steady state the standalone `.css` files do.
-- **PGO native flagship (on hold — policy; no such row ships today).** The
-  standalone native flagship — the `tsv` binary the `@fuzdev/tsv` platform
-  packages already ship, un-PGO'd, under the one name rather than a second
-  package — could ship with profile-guided optimization, held for now over its
-  binary-size cost: native-only, a measured ~17–19% wall-time win,
-  **byte-identical** output, **Linux-only first** on that single-target build (the
-  cross-platform prebuilt `.node` binaries stay non-PGO — the `napi` profile —
-  until matrix PGO is a later step). If that row lands, the policy is: **(1) both
+- **PGO (what ships vs what is benched).** The native binaries the
+  `@fuzdev/tsv` platform packages ship — the `tsv` CLI and the N-API addon —
+  are profile-guided: each trained as itself on its target over the author's
+  own collections of the snapshot, rebuilt with the profile and LLVM's
+  cost-benefit inliner off, and gated byte-identical to a plain build
+  (`scripts/pgo/pgo.ts`). Native-only — the WASM packages are not. **Every
+  native row in the report today is a plain build** (FFI, N-API), so it
+  understates what ships. The policy for publishing PGO numbers: **(1) both
   rows** — a standard-release native row *and* a PGO one, never PGO silently
-  folded into the single native number; **(2) measure what ships** — publish PGO
-  numbers only once a shipped artifact carries the recipe, labeled with which
-  one; **(3) disjoint training corpus** — trained on a corpus disjoint from the
-  measurement corpus, so a published number is never train-on-test (the profile
-  generalizes, so disjointness costs nothing) — the author's own collections, which
-  the perf view leaves out for exactly this; **(4) byte-identical** — PGO
-  changes code layout, not output. Fairness framing: against the JS reference
-  tools PGO partly *closes a gap* (V8's JIT already does profile-guided runtime
+  folded into the single native number; **(2) measure what ships** — a PGO row
+  measures the shipped recipe, labeled as such; **(3) disjoint training
+  corpus** — trained on a corpus disjoint from the measurement corpus, so a
+  published number is never train-on-test (the profile generalizes, so
+  disjointness costs nothing) — the author's own collections, which the perf
+  view leaves out for exactly this; **(4) byte-identical** — PGO changes code
+  layout, not output. That is the contract, and the only one: the OUTPUT is
+  gated byte-identical to a plain build's, while the profile and the binary's
+  own bytes may differ from one training to the next (address-keyed and
+  per-process-seeded tables count differently each run), so two builds of one
+  commit are equivalent, not identical. Fairness framing: against the JS reference tools PGO
+  partly *closes a gap* (V8's JIT already does profile-guided runtime
   optimization for free); against native AOT competitors shipping standard
   release builds it's a build-config advantage they don't take — fair to report
   as "what tsv ships vs what they ship," disclosed so a native-vs-native read

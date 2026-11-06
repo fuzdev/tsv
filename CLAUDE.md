@@ -143,7 +143,9 @@ deno task test:deno      # deno tests over the node-modules-free bench core (div
 #                          `release/binstall_test.ts` — the binstall-table grader; `npm_api_test.ts` + `npm_api_strip_test.ts` +
 #                          `npm_api_imports_test.ts` — the npm options facade and its strip and imports halves over a fake
 #                          engine; `typecheck_packages_test.ts` — the README fence + marker grammar; `perf_ab_verdict_test.ts` —
-#                          perf:ab's verdict rule; `perf_ab_test.ts` —
+#                          perf:ab's verdict rule; `pgo/profile_test.ts` — the PGO gates' readers over captured
+#                          llvm-profdata / llvm-readobj / build-log output; `pgo/depth_stack_test.ts` — the PE
+#                          stack-reserve reader + writer the Windows depth gate uses; `perf_ab_test.ts` —
 #                          perf:ab's `git ls-tree -z` listing and strip entry-point probe over a scratch repo, its
 #                          own `deno test` invocation with `--allow-write --allow-run=git` + `--allow-env` for the three
 #                          `GIT_*` variables it clears); in `check`
@@ -156,10 +158,12 @@ deno task test:depth     # tests/depth_limit.rs optimized (`--profile corpus`): 
 #                          on nine tenths of a 2 MiB thread, its format's output
 #                          reparses and is its own format (F1), and one deeper is refused (a plain `cargo test` grades the
 #                          16 MiB debug contract over the named shapes and a stride of the sweep); in `check`
-deno task test:depth:napi # the same in the SHIPPED optimization (`--profile napi`, fat LTO) over the FULL sweep (every head,
-#                          `TSV_DEPTH_SWEEP=full`); NOT in `check` — publish Step 3 and CI's `artifacts` job (deno.json `//test:depth:napi`)
+deno task test:depth:napi # the same in the shipped binaries' optimization (`--profile napi`, fat LTO — without the profile
+#                          guidance the published pair adds) over the FULL sweep (every head, `TSV_DEPTH_SWEEP=full`); NOT in
+#                          `check` — publish Step 3 and CI's `artifacts` job. The profile-guided addon itself is graded by
+#                          `build:pgo` / the release matrix (scripts/pgo/addon_depth.ts; deno.json `//test:depth:napi`)
 deno task test:depth:wasm # the full sweep's shapes at the same depths through the staged `all` WASM package on a Node MAIN thread,
-#                          cold and tiered up — parse, format, the import records and the strip (scripts/depth_wasm.ts); NOT
+#                          cold and tiered up — parse, format + its output's reparse and F1, the import records and the strip (scripts/depth_wasm.ts); NOT
 #                          in `check` — publish Step 6 and CI's `artifacts` job (deno.json `//test:depth:wasm`)
 deno task test:audits    # cargo test -p tsv_lang --features _internal_audits — the `_internal_swallow_check` + `_internal_comment_check` seams' own tests; in `check`
 deno task lint           # cargo clippy
@@ -350,6 +354,8 @@ deno task build:ffi                  # C FFI, full → target/release/libtsv_ffi
 deno task build:ffi:format           # C FFI, format-only (size only) → target/ffi-format/release/ (also :parse; :all builds all three)
 deno task build:napi                 # N-API addon (napi profile) → target/napi/
 deno task build:napi:packages        # + staged npm packages (loader + host platform pkg) → crates/tsv_napi/pkg/
+deno task build:pgo                  # the PROFILE-GUIDED pair the platform packages ship (CLI + addon), trained, gated and
+#                                      staged where build:napi:packages stages the plain pair (scripts/pgo/pgo.ts; .pgo/)
 deno task build:wasm:deno            # deno WASM (requires wasm-pack), format-only → pkg/format/deno/
 deno task build:wasm:parse:deno      # deno WASM, parse-only → pkg/parse/deno/
 deno task build:wasm:all:deno        # deno WASM, full (benches) → pkg/all/deno/
@@ -372,7 +378,7 @@ npm is the JS package surface (each tag's GitHub Release carries only notes + th
 
 **Naming.** Every npm name tsv publishes is kebab-case (`@fuzdev/tsv`, `@fuzdev/tsv-wasm`, `@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`, `@fuzdev/tsv-<triple>`) — one spelling with the `tsv-<triple>` release assets and the `fuzdev.tsv-format` VS Code extension (vsce forbids `_`), and the `-wasm` convention of tsv's Rust-tooling peers; the rule for every `@fuzdev` WASM or native-delivery package (`@fuzdev/blake3-wasm` too). Rust crates (`tsv_wasm`, `tsv_napi`) and the rest of the `@fuzdev` libraries stay snake_case; crate-derived file names inside a package (`tsv_wasm.js`, `tsv_wasm_bg.wasm`, `tsv_napi.node`) are internal and follow the crate.
 
-**The N-API set** — tsv's native distribution under the one bare name: the `@fuzdev/tsv` loader + six `@fuzdev/tsv-<triple>` platform packages, each shipping **two binaries**: the addon (`tsv_napi.node`, `napi` profile) and the real `tsv_cli` binary (`tsv`/`tsv.exe`, plain un-PGO'd `release`, matching the benched artifact). The loader's `tsv` bin (`bin.js`) execs that binary — `npx tsv` IS the native CLI — falling back to the shared `cli.js` mirror. Staged by `deno task build:napi:packages`; publishes **only** through the tag-triggered `.github/workflows/release.yml` (6-target container-pinned matrix → idempotent platforms-then-loader publish → the tag's **GitHub Release**, whose body is `CHANGELOG.md`'s stamped section and whose assets are the native binaries pulled back from the registry + `SHA512SUMS` + the third-party `NOTICE`, each attested), **never** `scripts/publish.ts`. `workflow_dispatch` is a dry-run rehearsal by default (`dry_run=false` is the failed-tag recovery path, dispatched **on the tag**); a weekly cron force-dry-runs it. Packages, triggers, gates, auth, and the Release job: ./crates/tsv_napi/CLAUDE.md §The npm packages and §Release.
+**The N-API set** — tsv's native distribution under the one bare name: the `@fuzdev/tsv` loader + six `@fuzdev/tsv-<triple>` platform packages, each shipping **two binaries**: the addon (`tsv_napi.node`, `napi` profile) and the real `tsv_cli` binary (`tsv`/`tsv.exe`, `release` profile). Both ship **profile-guided**: each trained as itself on its target over the `../corpora` snapshot's `origin: own` collections (the corpus the bench's perf view leaves out), rebuilt with the profile and LLVM's cost-benefit inliner off, and gated on a non-empty, fully applied profile, no instrumentation in what ships, output byte-identical to a plain build, the depth limits' stack contract in the staged addon itself, and their own size bands (`deno task build:pgo`, `scripts/pgo/pgo.ts`); the bench's native rows measure plain builds. The loader's `tsv` bin (`bin.js`) execs that binary — `npx tsv` IS the native CLI — falling back to the shared `cli.js` mirror. Staged plain by `deno task build:napi:packages`, profile-guided by `deno task build:pgo`; publishes **only** through the tag-triggered `.github/workflows/release.yml` (6-target container-pinned matrix → idempotent platforms-then-loader publish → the tag's **GitHub Release**, whose body is `CHANGELOG.md`'s stamped section and whose assets are the native binaries pulled back from the registry + `SHA512SUMS` + the third-party `NOTICE`, each attested), **never** `scripts/publish.ts`. `workflow_dispatch` is a dry-run rehearsal by default (`dry_run=false` is the failed-tag recovery path, dispatched **on the tag**); a weekly cron force-dry-runs it. Packages, triggers, gates, auth, and the Release job: ./crates/tsv_napi/CLAUDE.md §The npm packages and §Release.
 
 #### crates.io
 
@@ -463,7 +469,7 @@ deno task divergence:audit         # audit divergence pattern coverage (--json)
 deno task corpus:stats             # corpus/candidate-dir sizes + language + degenerate-case stats (diagnostic; ./benches/js/CLAUDE.md)
 ```
 
-Corpus comparison builds with `--profile corpus` (optimized + `panic = "unwind"`, no LTO — panics in our code are caught and reported; also the single build world every `deno task check` audit shares, trading LTO for build time, measurably free at runtime per the profile's comment in `Cargo.toml`). Benchmarks use `--release` (panic=abort, LTO) — except the N-API artifact, built with the shipped `napi` profile (`release` + `panic = "unwind"`) so its bench rows measure what ships.
+Corpus comparison builds with `--profile corpus` (optimized + `panic = "unwind"`, no LTO — panics in our code are caught and reported; also the single build world every `deno task check` audit shares, trading LTO for build time, measurably free at runtime per the profile's comment in `Cargo.toml`). Benchmarks use `--release` (panic=abort, LTO) — except the N-API artifact, built with the shipped `napi` profile (`release` + `panic = "unwind"`) so its bench rows measure the shipped panic strategy. Every bench native row is a plain build: the shipped CLI and addon are additionally profile-guided ([Publishing](#publishing), the N-API set).
 
 Divergence detection identifies the known differences documented in the `conformance_prettier*.md` family (safety checks, pattern detection, traceability). See ./benches/js/CLAUDE.md and ./docs/divergence_detector.md.
 

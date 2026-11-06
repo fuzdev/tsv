@@ -94,3 +94,7 @@ tmp/
 # Os
 .DS_Store
 Thumbs.db
+
+# The PGO pipeline's working directory (scripts/pgo/pgo.ts): the instrumented and
+# profile-use target dirs, the training copies and profiles — outside /target on purpose.
+/.pgo

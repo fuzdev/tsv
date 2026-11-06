@@ -201,7 +201,9 @@ passes. Enumerate the suites with `find`, or diff the `--all --json` bucket list
 When a checkout moves, re-record its **id** (its HEAD commit; for `../corpora`, the
 `collections/` tree id) in `GATE_CHECKOUT_IDS` in the same change
 (`git -C ../<repo> rev-parse --short HEAD`; for the snapshot,
-`git -C ../corpora rev-parse --short HEAD:collections`) — that struct is the single
+`git -C ../corpora rev-parse --short HEAD:collections`, plus its `commit` —
+`git -C ../corpora rev-parse HEAD`, the fetchable name the release workflow's PGO training
+shallow-fetches and checks against the tree id) — that struct is the single
 provenance record for what a pin was measured against (upstream version files only bump
 at release) — and run `deno task bench:pins:suites` there too, so the suite-derived pins
 move with it. Each entry's `pins` list is graded by

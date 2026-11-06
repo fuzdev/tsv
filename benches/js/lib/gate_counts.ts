@@ -87,10 +87,17 @@ import { CORPORA_ROOT, CORPORA_TREE } from './corpora.ts';
  * (or glob-matched) by some checkout, and every name here must exist — so a new pin
  * cannot land without saying which checkout it was measured against, and a rename
  * cannot leave a ghost.
+ *
+ * `commit` (full SHA) names a commit of a `tree`-pinned checkout whose subtree IS `hash`,
+ * for a consumer that has to FETCH the checkout rather than find it beside the repo — a
+ * tree id cannot be fetched, a commit can. The PGO pipeline (`scripts/pgo/pgo.ts
+ * corpora`) shallow-fetches it in the release workflow and refuses a checkout whose
+ * `HEAD:<tree>` or `<commit>:<tree>` is any other tree, so a refresh that re-records
+ * `hash` without moving `commit` fails there and in a local `deno task build:pgo`.
  */
 export const GATE_CHECKOUT_IDS: Record<
 	string,
-	{ hash: string; tree?: string; pins: readonly string[] }
+	{ hash: string; tree?: string; commit?: string; pins: readonly string[] }
 > = {
 	// The real-code snapshot: every snapshot-tier corpus entry (`benched`, `gated`), so
 	// every corpus pin plus the styles harvest measured over the perf view. Pinned by its
@@ -98,6 +105,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	[CORPORA_ROOT]: {
 		tree: CORPORA_TREE,
 		hash: '1a14f15ac',
+		commit: 'dce40bd21d5e14fb13246db0ee730120f137cbb8',
 		pins: [
 			'corpus_format_pins.txt',
 			'corpus_parse_pins.txt',

@@ -7,9 +7,10 @@
  * memory, and its call frames on the engine's own, about 1 MiB on a V8 main thread. The
  * native gate (`deno task test:depth:napi`) grades neither, so this one runs the package
  * itself: for every shape, at its accepted `n`, the parse (the object form, with and
- * without `{locations: true}`, and the `_json` string), the format, the import records —
- * TypeScript and Svelte, whose walk descends into what the strip refuses — and — TypeScript —
- * the type strip must each return `{ok: true, …}` (a strip's refusal is a verdict too), never
+ * without `{locations: true}`, and the `_json` string), the format, the format's output
+ * parsed again and formatted to itself (F1), the import records — TypeScript and Svelte,
+ * whose walk descends into what the strip refuses — and — TypeScript — the type strip must
+ * each return `{ok: true, …}` (a strip's refusal is a verdict too), never
  * throw a trap or a `RangeError`; and at `n + 1` the parse must return the depth refusal.
  * The engine's own stack is cut to nine tenths of V8's default for the run
  * (`GATE_STACK_KIB`), the margin the native gate keeps; the shadow stack is the shipped
@@ -40,27 +41,24 @@
  * Prerequisite: deno task build:npm:all
  */
 
-import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { assert_staged_fresh, wasm_package_checks } from './check_staged_freshness.ts';
+import {
+	call_passes,
+	is_depth_refusal,
+	make_shape,
+	read_shapes,
+	type ShapeLimit,
+	shape_calls,
+	write_shape_limits
+} from './depth_shapes.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-
-/** One shape at its accepted depth, as `write_shape_limits` writes it. */
-interface ShapeLimit {
-	name: string;
-	language: 'typescript' | 'css' | 'svelte';
-	n: number;
-	pre: string;
-	unit: string;
-	mid: string;
-	close: string;
-	post: string;
-}
 
 /**
  * The engine stack every pass runs on, in KiB: nine tenths of V8's default main-thread
@@ -84,35 +82,6 @@ interface Failure {
 	detail: string;
 }
 
-const unescape = (s: string): string =>
-	s.replace(/\\(.)/g, (_, c: string) => (c === 'n' ? '\n' : c === 't' ? '\t' : c));
-
-function read_shapes(path: string): Array<ShapeLimit> {
-	return readFileSync(path, 'utf8')
-		.split('\n')
-		.filter((line) => line.length > 0)
-		.map((line) => {
-			const [name, language, n, pre, unit, mid, close, post] = line.split('\t');
-			return {
-				name: unescape(name!),
-				language: language as ShapeLimit['language'],
-				n: Number(n),
-				pre: unescape(pre!),
-				unit: unescape(unit!),
-				mid: unescape(mid!),
-				close: unescape(close!),
-				post: unescape(post!)
-			};
-		});
-}
-
-const make = (shape: ShapeLimit, n: number): string =>
-	shape.pre + shape.unit.repeat(n) + shape.mid + shape.close.repeat(n) + shape.post;
-
-/** The depth refusal's two messages (`tsv_lang::DepthLimit`). */
-const is_depth_refusal = (message: string): boolean =>
-	message.includes('depth limit of') || message.includes('length limit');
-
 /** A child: grade the shapes of one shard in this process, printing failures as JSON lines. */
 async function run_child(args: Map<string, string>): Promise<void> {
 	const pkg_dir = resolve(ROOT, process.env.PKG_DIR ?? 'crates/tsv_wasm/pkg/all/npm');
@@ -128,37 +97,21 @@ async function run_child(args: Map<string, string>): Promise<void> {
 	const fail = (shape: ShapeLimit, phase: string, detail: string): void => {
 		failures.push({ shape: shape.name, pass, phase, detail });
 	};
-	// the calls a shape makes at its depth, each `[phase, call]`
-	const calls = (shape: ShapeLimit, source: string): Array<[string, () => unknown]> => {
-		const lang = shape.language;
-		return [
-			['parse', () => tsv[`parse_${lang}`](source)],
-			['parse+locations', () => tsv[`parse_${lang}`](source, { locations: true })],
-			['parse_json', () => tsv[`parse_${lang}_json`](source)],
-			['format', () => tsv[`format_${lang}`](source)],
-			...(lang === 'css'
-				? []
-				: [['imports', () => tsv[`parse_imports_${lang}`](source)] as [string, () => unknown]]),
-			...(lang === 'typescript'
-				? [['strip', () => tsv.strip_typescript(source)] as [string, () => unknown]]
-				: [])
-		];
-	};
 	if (pass === 'warm') {
 		// every call over every shape at a shallow depth, so the functions the run makes hot
 		// are tiered up (synchronously, by the pass's flag) before any shape is graded
 		for (const shape of shapes) {
-			for (const [, call] of calls(shape, make(shape, Math.min(shape.n, 4)))) call();
+			for (const [, call] of shape_calls(tsv, shape, make_shape(shape, Math.min(shape.n, 4))))
+				call();
 		}
 	}
 	for (const shape of shapes) {
 		tsv.reinstantiate();
-		for (const [phase, call] of calls(shape, make(shape, shape.n))) {
+		for (const [phase, call] of shape_calls(tsv, shape, make_shape(shape, shape.n))) {
 			try {
 				// deno-lint-ignore no-explicit-any
 				const result: any = call();
-				const refused = result?.ok === false && result.error?.kind === 'unsupported';
-				if (result?.ok !== true && !(phase === 'strip' && refused)) {
+				if (!call_passes(phase, result)) {
 					fail(shape, phase, `returned ${JSON.stringify(result).slice(0, 300)}`);
 				}
 			} catch (error) {
@@ -167,7 +120,7 @@ async function run_child(args: Map<string, string>): Promise<void> {
 			}
 		}
 		try {
-			const over = tsv[`parse_${shape.language}_json`](make(shape, shape.n + 1));
+			const over = tsv[`parse_${shape.language}_json`](make_shape(shape, shape.n + 1));
 			if (over?.ok !== false || !is_depth_refusal(String(over.error?.message))) {
 				fail(
 					shape,
@@ -181,35 +134,6 @@ async function run_child(args: Map<string, string>): Promise<void> {
 		}
 	}
 	process.stdout.write(JSON.stringify({ graded: shapes.length, failures }) + '\n');
-}
-
-/** Write every shape's spec line at its accepted depth, from the native test. */
-function write_shape_limits(path: string): void {
-	console.log(
-		'writing the shapes and their limits (cargo test --profile napi … write_shape_limits)'
-	);
-	const result = spawnSync(
-		'cargo',
-		[
-			'test',
-			'--profile',
-			'napi',
-			'-p',
-			'tsv_tests',
-			'--test',
-			'depth_limit',
-			'--quiet',
-			'--',
-			'--ignored',
-			'--exact',
-			'write_shape_limits'
-		],
-		{ cwd: ROOT, stdio: 'inherit', env: { ...process.env, TSV_DEPTH_SHAPES: path } }
-	);
-	if (result.status !== 0) {
-		console.error('✗ write_shape_limits failed');
-		process.exit(1);
-	}
 }
 
 /** Run one child to completion, returning its report. */
@@ -264,7 +188,10 @@ if (flags.has('child')) {
 	if (shapes_path === undefined) {
 		scratch = mkdtempSync(join(tmpdir(), 'tsv-depth-wasm-'));
 		shapes_path = join(scratch, 'shapes.tsv');
-		write_shape_limits(shapes_path);
+		if (!write_shape_limits(shapes_path, { cwd: ROOT, profile: 'napi' })) {
+			console.error('✗ write_shape_limits failed');
+			process.exit(1);
+		}
 	}
 	const jobs = Number(flags.get('jobs') ?? Math.max(1, Math.min(4, availableParallelism() - 1)));
 	const passes: Array<Pass> = flags.has('pass') ? [flags.get('pass') as Pass] : ['cold', 'warm'];

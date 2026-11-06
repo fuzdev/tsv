@@ -31,7 +31,10 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
   [§Multi-File Formatting](#multi-file-formatting) — and stdio, exit codes,
   and signals forwarded) — so `npx tsv` on the native package has this CLI's
   exact contract, real `--jobs` parallelism included. When no binary is reachable the dispatcher falls back to the JS
-  mirror below.
+  mirror below. The prebuilt binary is **profile-guided**: built from the `release`
+  profile, trained on its own target over the author's own code, and rebuilt with that
+  profile — faster, larger, and gated byte-identical in output to a plain `release`
+  build (`scripts/pgo/pgo.ts`; the N-API addon beside it is built the same way).
 - **`tsv` GitHub Release asset**: the same production binary, one per platform
   package (`tsv-<triple>`, `tsv-win32-x64.exe`), attached to each
   [GitHub Release](https://github.com/fuzdev/tsv/releases) beside a
@@ -51,8 +54,8 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 - **`tsv` from crates.io (`cargo install --locked tsv_cli`)**: the same source,
   built on the installing machine. A workspace's `[profile]` tables do not travel
   with a published crate, so this build takes cargo's default `release` profile
-  rather than the workspace's: no LTO, and `panic = "unwind"`. It runs slower than
-  the prebuilt binary, and a formatter panic in path mode is caught as that file's
+  rather than the workspace's: no LTO, `panic = "unwind"`, and no profile-guided
+  pass. It runs slower than the prebuilt binary, and a formatter panic in path mode is caught as that file's
   error (exit 2) where the prebuilt binary aborts. A stack overflow aborts either
   way ([Recursion Depth](#recursion-depth)).
 - **`tsv` npm bin, WASM (`@fuzdev/tsv-wasm`)**: `crates/tsv_wasm/npm/cli.js`
@@ -552,12 +555,30 @@ binary. The tenth kept in hand is the minimum margin the gate enforces: a frame 
 fails the gate while every accepted input still fits the contract. Frame sizes move with
 every printer change, and differ between optimizations by more than that margin, so the
 gate runs in each world it speaks for: `deno task test:depth:napi` in the shipped
-optimization (the `napi` profile, gating every release in publish.ts and every push in
-CI's `artifacts` job) over the whole sweep, `deno task test:depth` in `deno task check`'s
+binaries' optimization (the `napi` profile, gating every release in publish.ts and every
+push in CI's `artifacts` job) over the whole sweep, but without the profile guidance the
+published pair is built with — no test build can carry that profile, whose functions are
+named by a build hash the test graph's other features change — `deno task test:depth` in `deno task check`'s
 `corpus` world over a smaller one — the pairs behind two of the heads, a smaller triple
 sample, every commented link, the bare prefix pairs, a sample of the rest of the prefix
 alphabet and of the decorators — and a plain `cargo test` against the debug contract, over the
-named shapes and a fixed stride of that smaller sweep. `deno task test:depth:wasm` runs the
+named shapes and a fixed stride of that smaller sweep. The profile-guided addon that ships
+is graded as the binary itself: the release workflow, on every platform row, and
+`deno task build:pgo` run the whole sweep's shapes at the same depths through the staged
+addon on a `worker_threads` worker whose stack is the contract's less the tenth
+(`scripts/pgo/addon_depth.ts`), after a control pass on a far smaller thread has
+overflowed — the setting shrinks the thread below what the deepest shape needs, so it is a
+live limit. That the gate's thread is no larger than asked is the platform's rule: pthread
+sizes it to the request (Linux, macOS); on Windows the request is the thread's commit and
+its reserve the running node.exe's own unless the commit is not smaller (then the commit
+rounded up to a MiB), so each pass runs under its own scratch copy of node.exe whose PE
+stack reserve sits just above that pass's request — each thread is that reserve, within
+64 KiB of its page-rounded request, so the gate grades at nearly the tenth margin there — and the run
+reads each reserve back to print both threads. Where that still cannot grade — a copy
+does not start, the gate's thread would exceed the contract, or the control survives on
+a thread the reserve rather than its request sized — the `win32-x64` row's profile-guided
+addon is graded by the plain-profile native gate (`test:depth:napi`'s run) instead, which
+says so in its log and as a workflow warning. A surviving control anywhere else fails the gate. `deno task test:depth:wasm` runs the
 whole sweep's shapes at the same depths through the WASM package on a Node main thread
 (below), in CI's `artifacts` job and publish's artifact validation.
 

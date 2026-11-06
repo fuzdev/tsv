@@ -84,7 +84,7 @@ into `crates/tsv_napi/pkg/` (gitignored):
 - **`pkg/<triple>/` — `@fuzdev/tsv-<triple>`**, one platform package per
   invocation: the built cdylib copied to `tsv_napi.node` (byte-identical
   rename, named for the crate it came from), the real `tsv_cli` binary copied
-  to `tsv`/`tsv.exe` beside it (plain `release` profile — what `bin.js`
+  to `tsv`/`tsv.exe` beside it (`release` profile — what `bin.js`
   execs), + a generated package.json whose `os`/`cpu`/`libc` fields drive
   install-time selection. Naming is the ecosystem-universal
   `<loader>-<dash triple>` shape (swc's). The set: `linux-x64-gnu`,
@@ -287,14 +287,58 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   a branch dispatch can only rehearse); and a weekly cron that builds and gates the whole
   matrix as a forced dry-run, so a container/runner breakage surfaces within a week.
 - **Per target**: container-pinned builds of **both** shipped binaries — the addon (`napi`
-  profile) and the `tsv_cli` binary (plain `release`: abort + LTO, un-PGO'd, the same
-  artifact the hyperfine benches measure — PGO stays a deliberate future re-baseline; a
-  standalone process owns its own crash, so the addon's unwind rationale doesn't apply).
+  profile) and the `tsv_cli` binary (`release`: abort + LTO; a standalone process owns its
+  own crash, so the addon's unwind rationale doesn't apply) — both **profile-guided**, by
+  the steps of `scripts/pgo/pgo.ts` (`deno task build:pgo` runs them all locally): the
+  `../corpora` snapshot is shallow-fetched at the commit `GATE_CHECKOUT_IDS` records and
+  refused unless its `collections/` tree is the pinned one; the instrumented pair
+  (`scripts/pgo/build.sh`, the one spelling of the PGO RUSTFLAGS) trains **on the target**,
+  each binary as itself over the snapshot's `origin: own` collections (the manifest read
+  from the pinned commit) as authored, over every surface it ships — the CLI directly, the
+  addon through the loader's `cli.js` and, for the strip and the import records, in
+  process; `parse` on every file (the CLI also with `--locations`), the type strip on every
+  TypeScript file, the import records on every TypeScript and Svelte file (the addon's
+  alone), then `format --jobs 1` — on the host for the gnu rows (their 2.28-floor binaries
+  run there), in node:alpine for musl, under Rosetta 2 for `darwin-x64` (⚠ unverified until
+  a dispatch dry run). `--jobs 1` fixes WHAT runs, not the profile's bytes: address-keyed
+  and per-process-seeded hash tables count differently run to run, so two trainings write
+  different profiles and the binaries' bytes differ. That is the contract: the
+  OUTPUT is gated byte-identical to a plain build's; the profile and the binary's bytes are
+  not reproducible, and nothing grades them.
+  The toolchain's own `llvm-profdata` merges it (refused unless its LLVM is the
+  instrumenting rustc's, which on a container row is the container's), and a merged
+  profile fails unless it counts function entries (the instrumented builds pass
+  `-pgo-instrument-entry`) and every hot function — the renderer, every parse entry, the
+  strip, the import records — was entered once for every input of its class it trained on. The use
+  builds turn LLVM's cost-benefit inliner off (`-inline-enable-cost-benefit-analysis=false`),
+  the size lever. Then the PGO gates: `-Cprofile-use` on every workspace crate's rustc
+  command line, and no profile diagnostic in the use builds' logs but the build scripts'
+  (a hash mismatch or missing function is a stale profile, silently no PGO; registry crates
+  compile with `--cap-lints allow`, which silences theirs, and are source-pinned by
+  `Cargo.lock`); instrumentation sections in the trained binaries and none in the shipped
+  ones; the PGO CLI and addon byte-identical to the plain `release` CLI over the whole
+  snapshot and every fixture (format) and over the fixture inputs plus a stride of the
+  snapshot (parse, `parse --locations`, strip), and the PGO addon's import records equal to
+  the instrumented addon's (the CLI has none); and the depth limits' stack contract in the
+  staged addon itself (`scripts/pgo/addon_depth.ts`: every shape at its accepted depth on a
+  `worker_threads` worker sized to the contract less its margin, after a control pass on a
+  far smaller thread has overflowed — the setting is a live limit — and, on Windows, where
+  libuv's worker stack size is the thread's commit rather than its reserve, run under a
+  scratch copy of node.exe per pass whose PE stack reserve sits just above that pass's
+  request, so each thread is that reserve, and the gate keeps nearly the tenth margin of
+  every other row; where that still cannot grade — a copy does not start, the gate's
+  thread would exceed the contract, or the control survives on a thread the reserve rather
+  than its request sized — `win32-x64`'s PGO addon depth is graded by the plain-profile
+  `test:depth:napi` run instead, logged as a fallback and a workflow warning, and any other
+  surviving control fails; ⚠ unverified on `win32-x64` and on `darwin-x64` under
+  Rosetta). Every PGO build goes to `.pgo/`, outside the `target/` every row caches, so no
+  profile-use build is ever restored from a cache. The bench's native rows measure plain
+  builds.
   The gnu rows build in almalinux:8 → glibc 2.28 floor (Node's own binary floor), measured
   by the workflow's floor gate over both artifacts; musl in rust:alpine with `-crt-static`
   off, both gated GLIBC-free; `darwin-x64` cross-compiles on the arm64 mac runner and is
-  tested under Rosetta 2 (above). Then per-artifact size bounds (`scripts/validate_napi_artifact.ts --triple <t>`, the script behind `deno task validate:napi`;
-  one tight anchored band per binary — also graded on
+  tested under Rosetta 2 (above). Then per-artifact size bounds (`scripts/validate_napi_artifact.ts --triple <t> --pgo`, the script behind `deno task validate:napi`;
+  one tight anchored band per binary, a PGO set for what ships and a plain set graded on
   every PR over the Linux host build by `check.yml`'s `artifacts` job) and the npm-shape
   test over the real artifacts (node:alpine for musl).
 - **Publish job**: gathers all six, stages the loader (`--loader-only`), and runs
@@ -366,7 +410,7 @@ napi-rs marshals the JS string into a Rust `String` and the returned `String` ba
 
 The npm facade's `read_failure` (`crates/tsv_wasm/npm/api.js`) checks that object and hands it back as it is — the contract `tsv_wasm`'s hand-declared `Object` binding meets too. The split exists because the in-crate tests cannot construct an `Env`: they drive the engine halves and assert the `Failure` directly; `scripts/test_napi.ts` asserts the returned object across the real boundary under Node; `deno task test:bun napi` runs the parse-failure table over the staged loader under Bun — a local gate only, chained by `test:napi:npm[:run]` on a machine with bun; no publish runs it. A format's parse reads the CR-folded text, so its engine half (`tsv_arena`'s `parse_format!`) parses through the language's `parse_folded` (`FoldedSource::parse_with`), which maps the error back onto the caller's source before its span is taken; `format_svelte`'s refusal of a lone CR inside an in-tag `//` comment (`tsv_svelte::__private::parse_folded`) is an `Error::refusal` — no syntax error, spanning the CR — so it travels as `kind: 'refused'`.
 
-**Panic contract:** a Rust panic — always a tsv bug — surfaces as a **thrown JS error**, never a host abort. Two halves, both required (unwind alone enables the catch, it does not perform it): every export carries `#[napi(catch_unwind)]`, and the addon builds with the workspace **`napi` profile** (`release` + `panic = "unwind"`; `panic` can't be set per-package, and flipping `[profile.release]` would perturb the size-bounded WASM bundles and the abort-profile FFI/CLI artifacts). Bench, `test:napi`, and publish all use the same profile, so the measured artifact is the shipped one (`target/napi/`). After a caught panic the per-thread arenas stay usable — `tsv_arena`'s take/park protocol leaves the thread-local slot empty while a call runs, so unwind and abort converge on the same state. **Stack overflow is not catchable** and still aborts the host. The contract is proven end to end by `scripts/test_napi.ts` via the test-only `panic_probe` feature's `__panic_probe` export (panics inside `with_ast_arena`; the test asserts a thrown error twice, then correct parse + format output — the arena recovery at the real boundary). Published builds never enable the feature; the test skips when the export is absent.
+**Panic contract:** a Rust panic — always a tsv bug — surfaces as a **thrown JS error**, never a host abort. Two halves, both required (unwind alone enables the catch, it does not perform it): every export carries `#[napi(catch_unwind)]`, and the addon builds with the workspace **`napi` profile** (`release` + `panic = "unwind"`; `panic` can't be set per-package, and flipping `[profile.release]` would perturb the size-bounded WASM bundles and the abort-profile FFI/CLI artifacts). Bench, `test:napi`, and publish all use the same profile, so what is measured and tested unwinds as the shipped addon does (`target/napi/`; the published addon is also profile-guided — §Release). After a caught panic the per-thread arenas stay usable — `tsv_arena`'s take/park protocol leaves the thread-local slot empty while a call runs, so unwind and abort converge on the same state. **Stack overflow is not catchable** and still aborts the host. The contract is proven end to end by `scripts/test_napi.ts` via the test-only `panic_probe` feature's `__panic_probe` export (panics inside `with_ast_arena`; the test asserts a thrown error twice, then correct parse + format output — the arena recovery at the real boundary). Published builds never enable the feature; the test skips when the export is absent.
 
 ## Threading & host residency
 

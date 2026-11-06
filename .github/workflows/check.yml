@@ -131,9 +131,11 @@ jobs:
     # Generous headroom over a cold build of both published sets: the wasm half
     # (6 wasm-pack release builds + wasm-opt; wasm-pack itself is now a prebuilt
     # download, not a source compile) plus the napi half's two host binaries
-    # (napi-profile addon + LTO'd tsv_cli) — well short of the 6h default so a
-    # hang fails fast.
-    timeout-minutes: 60
+    # (napi-profile addon + LTO'd tsv_cli), the depth gates (the napi-profile
+    # test build + full sweep, and the wasm sweep's cold and warm passes, each
+    # formatting every shape's output back) and engine parity — well short of
+    # the 6h default so a hang fails fast.
+    timeout-minutes: 75
 
     steps:
       # persist-credentials: false keeps the GITHUB_TOKEN out of .git/config (no step here pushes via git).
@@ -217,13 +219,14 @@ jobs:
       - name: Validate N-API artifact sizes (linux)
         run: deno task validate:napi
 
-      # The depth limits' stack contract in the SHIPPED optimization — the napi
-      # profile the addon above was built in (fat LTO, one codegen unit). `check`
-      # grades the same test in its `corpus` world, whose frames differ from the
-      # shipped builds' by more than the contract's margin, so only this run can
-      # say an accepted input fits 2 MiB in what ships (deno.json
-      # `//test:depth:napi`).
-      - name: Depth contract, shipped build
+      # The depth limits' stack contract in the shipped binaries' optimization —
+      # the napi profile the addon above was built in (fat LTO, one codegen
+      # unit), without the profile guidance the published pair adds. `check`
+      # grades the same test in its `corpus` world, whose frames differ from
+      # these by more than the contract's margin, so this is the push-time grade
+      # of the optimized frames; the published, profile-guided addon itself is
+      # graded by the release matrix on every row (deno.json `//test:depth:napi`).
+      - name: Depth contract, napi profile
         run: deno task test:depth:napi
 
       # ENGINE PARITY, and the only place it can run: one Rust source compiled

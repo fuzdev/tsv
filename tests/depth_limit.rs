@@ -27,14 +27,16 @@
 //! The contract's thread is **2 MiB in an optimized build** and **16 MiB in a debug build**
 //! (`cfg!(debug_assertions)` is the proxy), so the stack legs grade the shipped contract
 //! only where this file builds optimized, and only in the optimization it builds in:
-//! `deno task test:depth:napi` runs it in the shipped one (the `napi` profile) over the full
+//! `deno task test:depth:napi` runs it in the shipped binaries' (the `napi` profile, without
+//! the profile guidance the published pair adds, which no test build can carry) over the full
 //! sweep (`TSV_DEPTH_SWEEP=full`, [`Scope::Full`]), `deno task test:depth` in `check`'s
 //! `corpus` world over `check`'s scope ([`Scope::Check`]), and a plain `cargo test` grades
 //! the debug contract, over the named shapes and a stride of `check`'s sweep. Frame sizes move with
 //! every printer change, which is why the limit has a standing gate at all: a frame that
-//! grows past the margin fails here before it ships. The WASM engine's two stacks are
-//! graded apart, over the full sweep's shapes at the same depths (`write_shape_limits`, read by
-//! `deno task test:depth:wasm`).
+//! grows past the margin fails here before it ships. The WASM engine's two stacks, and the
+//! profile-guided N-API addon as it ships, are graded apart, over the full sweep's shapes at
+//! the same depths (`write_shape_limits`, read by `deno task test:depth:wasm` and by
+//! `scripts/pgo/addon_depth.ts`).
 
 #![expect(clippy::expect_used, clippy::panic)]
 
@@ -780,12 +782,13 @@ fn check_wire(shape: &'static Shape, n: usize) -> WireCounts {
 
 /// The spec line of every shape at its accepted depth, written to the path
 /// `TSV_DEPTH_SHAPES` names — what `scripts/depth_wasm.ts` (`deno task test:depth:wasm`)
-/// regenerates each shape from, to run it through the WASM packages at that depth and one
-/// past it. A tab-separated line per accepted shape: name, language, `n`, then the spec's
+/// and `scripts/pgo/addon_depth.ts` (`scripts/pgo/pgo.ts depth-shapes`, then `depth`)
+/// regenerate each shape from, to run it through the WASM package and the staged
+/// profile-guided N-API addon at that depth and one past it. A tab-separated line per accepted shape: name, language, `n`, then the spec's
 /// five parts, the name and the parts with `\\`, `\t` and `\n` escaped. Ignored by a plain
 /// run, which has no path to write to.
 #[test]
-#[ignore = "run by `deno task test:depth:wasm`, which names the output path"]
+#[ignore = "run by `deno task test:depth:wasm` and `scripts/pgo/pgo.ts depth-shapes`, which name the output path"]
 fn write_shape_limits() {
     let path = std::env::var("TSV_DEPTH_SHAPES").expect("TSV_DEPTH_SHAPES names the output");
     let limits = grade_in_parallel(shapes(Scope::Full).iter().collect(), accepted_limit);

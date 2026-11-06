@@ -8,11 +8,16 @@
 # checkouts this runner has no reason to clone, so they are NOT re-run here.
 #
 # Per target: build the napi-profile cdylib (release + panic=unwind — the
-# shipped panic contract) AND the tsv_cli binary (plain release: abort + LTO —
-# a process that owns its own crash, the same artifact the hyperfine benches
-# measure), stage the platform package (addon + CLI binary), gate it (glibc
-# floor / musl purity over BOTH binaries, size bounds, the npm-shape test over
-# the real artifacts), upload. The publish job downloads all six, stages the
+# shipped panic contract) AND the tsv_cli binary (release: abort + LTO — a
+# process that owns its own crash), both PROFILE-GUIDED and trained on the
+# target itself (scripts/pgo/pgo.ts: instrument, train each binary as itself
+# over the fuzdev/corpora snapshot's own collections, merge, rebuild with the
+# profile; gates that the profile is non-empty and applied, that nothing
+# instrumented ships, and that the output is byte-identical to a plain build's),
+# stage the platform package (addon + CLI binary), gate it (glibc floor / musl
+# purity over BOTH binaries, the depth limits' stack contract in the staged
+# addon, the PGO size bounds, the npm-shape test over the real artifacts),
+# upload. The publish job downloads all six, stages the
 # loader, re-arms the CLI binaries' executable bit (artifact transport drops
 # file modes), and publishes platforms-then-loader idempotently
 # (scripts/publish_napi.ts) — a partial matrix never publishes anything.
@@ -76,7 +81,8 @@ on:
         default: true
   schedule:
     # Weekly rot-watch: the full matrix — musl + the almalinux gnu containers
-    # + the mac/win release legs — builds and gates, then DRY-RUNS the publish,
+    # + the mac/win release legs, each with its PGO training and gates — builds
+    # and gates, then DRY-RUNS the publish,
     # so a container/runner/toolchain breakage surfaces within a week instead
     # of at release rehearsal. None of these legs is exercised by PR CI (the
     # platforms job covers glibc/mac/win via the dev build path), and a per-PR
@@ -123,8 +129,8 @@ jobs:
           # arm64 mac runner (`target` names the rust target; cargo then writes
           # under target/<target>/) and runs its npm-shape test under x64 Node
           # through Rosetta 2 (`node_arch`), where `process.arch` reads `x64` and
-          # the loader resolves the staged package. Rosetta training for a PGO
-          # leg is the same mechanism, unverified until that leg exists.
+          # the loader resolves the staged package. Its PGO training runs the
+          # same way, under Rosetta (⚠ unverified until a dispatch dry run).
           - triple: darwin-x64
             runner: macos-15
             build: native
@@ -134,7 +140,14 @@ jobs:
             runner: windows-2025
             build: native
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    env:
+      # The rust target of a cross row (empty on every other) — what the PGO
+      # steps pass as `--target` and the build steps as cargo's.
+      TARGET: ${{ matrix.target }}
+    # The fat-LTO builds (the plain CLI, the instrumented pair, the profile-use
+    # pair), the depth shapes' test build, the two training passes, and the
+    # byte-identity and depth gates.
+    timeout-minutes: 120
 
     steps:
       # A REAL publish must run on the release tag (see the trigger comment). A
@@ -156,13 +169,21 @@ jobs:
       # Toolchain for the native rows: the one pinned in rust-toolchain.toml,
       # installed by the runner's preinstalled rustup (any rustup 1.28+ reads the
       # file with no arguments, so skip self-updating it), plus the cross row's
-      # std. The container rows install the same pin themselves.
+      # std. The container rows install the same pin themselves. Every row also
+      # takes the pin's `llvm-tools-preview` on the HOST: its `llvm-profdata`
+      # merges the training profiles (it must be rustc's own LLVM —
+      # scripts/pgo/pgo.ts checks) and its `llvm-readobj` reads the binaries'
+      # sections. The container rows' host may lack rustup (the arm64 image), so
+      # it is installed there when missing.
       - name: Install Rust
-        if: matrix.build == 'native'
-        env:
-          TARGET: ${{ matrix.target }}
         run: |
+          if ! command -v rustup >/dev/null; then
+            curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
           rustup toolchain install --no-self-update
+          rustup component add llvm-tools-preview
           if [ -n "$TARGET" ]; then rustup target add "$TARGET"; fi
           rustup show active-toolchain
 
@@ -183,6 +204,10 @@ jobs:
 
       # The container rows' cache: cargo/rustup homes + target live under the
       # workspace (mounted into the container) so actions/cache can carry them.
+      # Only the plain build's `target/`: the PGO builds go to .pgo/, which no
+      # cache on any row holds — cargo fingerprints the RUSTFLAGS text, not the
+      # profile's bytes, so a restored profile-use build would ship an earlier
+      # profile's codegen.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: matrix.build != 'native'
         with:
@@ -200,31 +225,43 @@ jobs:
           # Pinned to match the check workflow / local. Bump deliberately.
           deno-version: 2.9.7
 
-      # For the npm-shape test (`node --test` executes the .ts directly via
-      # native type stripping, >= 22.18). Pinned to match check.yml. The cross
-      # row asks for the x64 build of Node (run under Rosetta); the empty
-      # default everywhere else is the runner's own architecture.
+      # For the PGO steps (scripts/pgo/pgo.ts runs under Node) and the npm-shape
+      # test (`node --test` executes the .ts directly via native type stripping,
+      # >= 22.18). Pinned to match check.yml. The cross row asks for the x64
+      # build of Node (run under Rosetta); the empty default everywhere else is
+      # the runner's own architecture.
       - name: Install Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24.14.1'
           architecture: ${{ matrix.node_arch }}
 
-      # Each leg builds BOTH shipped binaries in one environment: the addon
-      # (napi profile) and the tsv_cli binary (release profile — abort + LTO).
-      # A row with a `target` cross-compiles; cargo then writes under
-      # target/<target>/, which the stage step names.
-      - name: Build (native)
+      # The shipped binaries are profile-guided (scripts/pgo/pgo.ts, whose module
+      # doc lists the steps below in order). The training corpus is the
+      # fuzdev/corpora snapshot's `origin: own` collections, pinned by the
+      # `collections/` TREE id in benches/js/lib/gate_counts.ts — a tree cannot
+      # be fetched, so the entry also records a commit, which is shallow-fetched
+      # and refused unless its tree is the pinned one. .pgo/ is made here, on
+      # the host, so the steps that write it from the host can after a
+      # container (as root) has built into it.
+      - name: Fetch the training corpus
+        run: |
+          mkdir -p .pgo
+          node scripts/pgo/pgo.ts corpora --fetch
+
+      # Each leg builds the PLAIN `release` tsv_cli (the byte-identity reference
+      # the PGO binaries must match) and the instrumented pair (scripts/pgo/build.sh,
+      # the one spelling of the PGO RUSTFLAGS) in one environment. A row with a
+      # `target` cross-compiles; cargo then writes under <target-dir>/<target>/.
+      - name: Build plain + instrumented (native)
         if: matrix.build == 'native'
-        env:
-          TARGET: ${{ matrix.target }}
         run: |
           flags=()
           if [ -n "$TARGET" ]; then flags+=(--target "$TARGET"); fi
-          cargo build --locked -p tsv_napi --profile napi "${flags[@]}"
           cargo build --locked -p tsv_cli --release "${flags[@]}"
+          sh scripts/pgo/build.sh instrument .pgo "$TARGET"
 
-      - name: Build (almalinux:8 — glibc 2.28 floor)
+      - name: Build plain + instrumented (almalinux:8 — glibc 2.28 floor)
         if: matrix.build == 'gnu-container'
         run: |
           docker run --rm -v "$PWD:/work" -w /work \
@@ -235,10 +272,10 @@ jobs:
               curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
               export PATH="/work/.container-cargo/bin:$PATH"
               rustup toolchain install --no-self-update
-              cargo build --locked -p tsv_napi --profile napi
-              cargo build --locked -p tsv_cli --release'
+              cargo build --locked -p tsv_cli --release
+              sh scripts/pgo/build.sh instrument .pgo'
 
-      - name: Build (rust:alpine — musl)
+      - name: Build plain + instrumented (rust:alpine — musl)
         if: matrix.build == 'musl-container'
         # -crt-static off: rust's musl target defaults to a static CRT, and a
         # cdylib addon must link musl dynamically (it loads into Alpine Node).
@@ -246,7 +283,7 @@ jobs:
         # dynamically too — fine for the Alpine hosts this package selects on.
         # The image tag follows rust-toolchain.toml's pin, so the image already
         # carries that toolchain; the install adds the file's components and
-        # targets.
+        # targets. build.sh keeps the RUSTFLAGS it is handed.
         run: |
           channel=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)
           docker run --rm -v "$PWD:/work" -w /work \
@@ -255,17 +292,90 @@ jobs:
             "rust:${channel:?no channel in rust-toolchain.toml}-alpine" sh -ec '
               apk add --no-cache musl-dev
               rustup toolchain install --no-self-update
-              cargo build --locked -p tsv_napi --profile napi
-              cargo build --locked -p tsv_cli --release'
+              cargo build --locked -p tsv_cli --release
+              sh scripts/pgo/build.sh instrument .pgo'
+
+      # The instrumented pair as an installed @fuzdev/tsv loader + platform
+      # package (under .pgo/, never left in crates/tsv_napi/pkg/), so the addon
+      # trains through the loader's own cli.js.
+      - name: Stage the instrumented pair
+        run: node scripts/pgo/pgo.ts stage --phase instrument --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
+
+      # Training runs each binary AS ITSELF where it runs: the gnu rows on the
+      # host (the 2.28-floor binaries run on its newer glibc), the native rows
+      # natively. ⚠ UNVERIFIED on darwin-x64 until a dispatch dry run: the x64
+      # binaries train under Rosetta 2 (x64 Node, the x64 addon, the x64 CLI),
+      # and the profile they write is merged by the arm64 host's llvm-profdata.
+      - name: Train
+        if: matrix.build != 'musl-container'
+        run: node scripts/pgo/pgo.ts train --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
+
+      # The dynamic musl binaries cannot run on the glibc host: train in the
+      # environment the npm-shape test already uses, the corpus mounted read-only.
+      - name: Train (node:alpine)
+        if: matrix.build == 'musl-container'
+        run: |
+          docker run --rm -v "$PWD:/work" -v "$PWD/../corpora:/corpora:ro" -w /work \
+            node:24.14.1-alpine \
+            node scripts/pgo/pgo.ts train --triple ${{ matrix.triple }} --corpora /corpora
+
+      # The merge (the toolchain's own llvm-profdata) and the non-empty-profile
+      # gate: real counts on the renderer and every language's parse entries.
+      - name: Merge the profiles
+        run: node scripts/pgo/pgo.ts merge --triple ${{ matrix.triple }}
+
+      - name: Build profile-use (native)
+        if: matrix.build == 'native'
+        run: sh scripts/pgo/build.sh use .pgo "$TARGET"
+
+      - name: Build profile-use (almalinux:8 — glibc 2.28 floor)
+        if: matrix.build == 'gnu-container'
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work \
+            -e CARGO_HOME=/work/.container-cargo \
+            -e RUSTUP_HOME=/work/.container-rustup \
+            almalinux:8 bash -ec '
+              dnf install -y -q gcc
+              export PATH="/work/.container-cargo/bin:$PATH"
+              sh scripts/pgo/build.sh use .pgo'
+
+      - name: Build profile-use (rust:alpine — musl)
+        if: matrix.build == 'musl-container'
+        run: |
+          channel=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)
+          docker run --rm -v "$PWD:/work" -w /work \
+            -e CARGO_HOME=/work/.container-cargo \
+            -e RUSTFLAGS='-C target-feature=-crt-static' \
+            "rust:${channel:?no channel in rust-toolchain.toml}-alpine" sh -ec '
+              apk add --no-cache musl-dev
+              rustup toolchain install --no-self-update
+              sh scripts/pgo/build.sh use .pgo'
+
+      # The profile was APPLIED: no profile diagnostic in the use builds' logs
+      # but the build scripts' (a hash mismatch or a missing function is a stale
+      # or partly applied profile, which falls back to no PGO silently); and
+      # nothing instrumented ships — the trained binaries must show their
+      # instrumentation sections (the check's positive control) and the use
+      # binaries none.
+      - name: Profile-applied and no-instrumentation gates
+        run: |
+          node scripts/pgo/pgo.ts gate-builds --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
+          node scripts/pgo/pgo.ts gate-sections --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
+
+      # The profile-use pair is the platform package: staged into
+      # crates/tsv_napi/pkg/<triple>/ (and laid out under .pgo/ for the
+      # byte-identity gate's cli.js run).
+      - name: Stage platform package
+        run: node scripts/pgo/pgo.ts stage --phase use --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
 
       # The measured floor: the highest versioned glibc symbol each shipped
       # artifact references must not exceed 2.28 — the gate that keeps the
       # container choice honest (a build accidentally run on the host would
-      # fail here). Covers the addon AND the CLI binary.
+      # fail here). Covers the addon AND the CLI binary, as staged.
       - name: glibc floor gate (gnu, <= 2.28)
         if: matrix.build == 'gnu-container'
         run: |
-          for artifact in target/napi/libtsv_napi.so target/release/tsv; do
+          for artifact in crates/tsv_napi/pkg/${{ matrix.triple }}/tsv_napi.node crates/tsv_napi/pkg/${{ matrix.triple }}/tsv; do
             # objdump runs alone (not in the substitution pipeline) so an unreadable
             # artifact fails the step loudly instead of vanishing under pipefail; the
             # grep pipeline takes `|| true` so a no-match yields the visible "none"
@@ -288,7 +398,7 @@ jobs:
       - name: musl purity gate
         if: matrix.build == 'musl-container'
         run: |
-          for artifact in target/napi/libtsv_napi.so target/release/tsv; do
+          for artifact in crates/tsv_napi/pkg/${{ matrix.triple }}/tsv_napi.node crates/tsv_napi/pkg/${{ matrix.triple }}/tsv; do
             # objdump runs alone first: inside the `if` pipeline its failure — exactly
             # what a missing or non-dynamic artifact produces — would read as "no
             # GLIBC_ refs" and pass the gate vacuously.
@@ -299,22 +409,68 @@ jobs:
             fi
           done
 
-      # The cross row names its binaries: the staging script's defaults follow the
-      # HOST (target/napi/, target/release/), and a cross build lands under
-      # target/<target>/ instead. The `.dylib` spelling is the mac's, and the one
-      # cross row is a mac row.
-      - name: Stage platform package
-        env:
-          TARGET: ${{ matrix.target }}
-        run: |
-          flags=(--triple ${{ matrix.triple }})
-          if [ -n "$TARGET" ]; then
-            flags+=(--artifact "target/$TARGET/napi/libtsv_napi.dylib" --cli-artifact "target/$TARGET/release/tsv")
-          fi
-          deno run --allow-read --allow-write=crates/tsv_napi/pkg scripts/build_napi_packages.ts "${flags[@]}"
+      # PGO changes code layout, never output: the PGO CLI and the PGO addon
+      # (through the staged cli.js) must format the whole snapshot and every
+      # fixture to the plain CLI's bytes; over the fixture inputs and a stride of
+      # the snapshot, both must parse and strip to its bytes, and the PGO addon's
+      # import records must equal the instrumented addon's — on the target, in
+      # the environment that runs it (node:alpine for musl, Rosetta for darwin-x64).
+      - name: Byte identity (PGO vs plain)
+        if: matrix.build != 'musl-container'
+        run: node scripts/pgo/pgo.ts byteid --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
 
+      - name: Byte identity (PGO vs plain, node:alpine)
+        if: matrix.build == 'musl-container'
+        run: |
+          docker run --rm -v "$PWD:/work" -v "$PWD/../corpora:/corpora:ro" -w /work \
+            node:24.14.1-alpine \
+            node scripts/pgo/pgo.ts byteid --triple ${{ matrix.triple }} --corpora /corpora
+
+      # The depth limits' stack contract in the addon that SHIPS: every shape
+      # tests/depth_limit.rs generates, at its accepted depth, through the staged
+      # PGO addon on a worker thread sized to the contract less its margin
+      # (scripts/pgo/addon_depth.ts). The profile moves inlining, and with it
+      # frame sizes, and no test build reproduces the shipped frames (a test
+      # graph compiles the language crates with other features, so the profile
+      # matches none of their functions) — so the binary itself is graded, on
+      # every row. A native overflow kills the process; a control pass on a far
+      # smaller thread must die first (the setting is a live limit), or the gate
+      # fails as vacuous. The shapes
+      # are counts, not frames, so the host writes them (a `corpus`-profile test
+      # build, under .pgo/ beside the container rows' root-owned target/).
+      - name: Depth shapes
+        run: CARGO_TARGET_DIR=.pgo/target-shapes node scripts/pgo/pgo.ts depth-shapes
+
+      # ⚠ UNVERIFIED on win32-x64 until a dispatch dry run: libuv asks Windows for
+      # the worker's stack as its initial COMMIT, and the reserve is node.exe's own
+      # unless the commit is not smaller (then the commit rounded up to a MiB). So
+      # each pass runs under its own scratch COPY of node.exe (.pgo/depth/
+      # node-control.exe and node-gate.exe; the real one is only read) whose PE
+      # stack reserve sits just above that pass's request: each thread is that
+      # reserve, within 64 KiB of its request, so the gate keeps nearly the tenth
+      # margin of every other row. Both threads are printed. The step falls back
+      # to the plain-profile native gate (test:depth:napi's cargo test, a fat-LTO
+      # test build — its time counts against the job's timeout), logged as a
+      # FALLBACK and a ::warning::, when a copy cannot be made or does not start, when
+      # the gate's thread would still exceed the contract, or when the control
+      # survives on a thread the reserve, not its request, sized. Any other
+      # surviving control fails. Likewise unverified on darwin-x64, which runs it
+      # under Rosetta.
+      - name: Depth contract (staged PGO addon)
+        if: matrix.build != 'musl-container'
+        run: node scripts/pgo/pgo.ts depth --triple ${{ matrix.triple }} ${TARGET:+--target "$TARGET"}
+
+      - name: Depth contract (staged PGO addon, node:alpine)
+        if: matrix.build == 'musl-container'
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work \
+            node:24.14.1-alpine \
+            node scripts/pgo/pgo.ts depth --triple ${{ matrix.triple }}
+
+      # The PGO bands: a profile that did not apply reads as a plain-sized
+      # binary, and a re-enabled cost-benefit inliner as a far larger one.
       - name: Size bounds
-        run: deno run --allow-read scripts/validate_napi_artifact.ts --triple ${{ matrix.triple }}
+        run: deno run --allow-read scripts/validate_napi_artifact.ts --triple ${{ matrix.triple }} --pgo
 
       # The npm-shape test over the REAL artifacts: loader platform-resolution,
       # the wasm-parity options surface, the packaged .node, and the `tsv` bin
