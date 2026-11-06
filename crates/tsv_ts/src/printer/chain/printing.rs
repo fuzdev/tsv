@@ -141,6 +141,18 @@ pub(crate) fn print_node_inner<'a>(
                         ")",
                     );
                 }
+                // A base a `!` follows keeps the comment from its stripped parens inside the
+                // pair it requires (`(a + b /* c */)!.m`), as the unfrozen arm below prints it:
+                // the region lies past the slice, and the `!` node prints nothing of it
+                // ([`NonNullGap::InsideOperandParens`]).
+                if paren_comment_end.is_some() {
+                    return printer.build_owned_required_pair_doc(
+                        (base_start, base_start),
+                        trailing_gap(),
+                        slice,
+                        ")",
+                    );
+                }
                 // The enclosing statement's own pair rides outside the slice, for the reason
                 // [`Printer::build_left_spine_operand_doc_if`] gives: a frozen base is exactly
                 // the node an expression statement wraps so its line does not open with `{` /

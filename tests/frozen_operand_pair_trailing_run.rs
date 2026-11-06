@@ -11,11 +11,14 @@
 //! down the right spine reaches (an assignment's value, a conditional's alternate, an arrow's
 //! body, a `yield*` operand, a sequence's last operand): a directive in the gap past that
 //! child's delimiter freezes it, and the walk stops ahead of it; a directive anywhere else in
-//! the parent does not.
+//! the parent does not. The converse holds too: a comment written after the slice, inside a
+//! pair the position still prints around it (the operand pair a chain's `!` requires,
+//! `(⏎// prettier-ignore⏎a + b /* x */)!.m`), is the pair's to print, since the slice ends
+//! ahead of it.
 //!
 //! Not a fixture: prettier moves the directive past the `=` and welds the two comments onto one
-//! line at every one of these, a prettier behaviour of its own, so the transitions are pinned
-//! here directly.
+//! line at every one of these, or moves the block past the `)`, a prettier behaviour of its own,
+//! so the transitions are pinned here directly.
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
@@ -428,5 +431,93 @@ fn sequence_last_operand_comment_not_directive() {
     assert_frozen_once(
         "k = (z,\n// e\na + (b // c\n))();\n",
         "k =\n\t(z,\n\t// e\n\ta + b)(); // c\n",
+    );
+}
+
+/// Assert `source` formats to `expected` in ONE pass, `expected` is a fixed point, and `comment`
+/// prints exactly once.
+fn assert_frozen_keeps(source: &str, expected: &str, comment: &str) {
+    let pass1 = format(source);
+    assert_eq!(pass1, expected, "one-pass convergence");
+    assert_eq!(
+        format(&pass1),
+        pass1,
+        "the target form must be a fixed point"
+    );
+    assert_eq!(
+        pass1.matches(comment).count(),
+        1,
+        "the comment after the frozen slice prints once"
+    );
+}
+
+/// A frozen chain base that a `!` follows: the block written after the slice, inside the pair
+/// the `!` requires, stays inside it.
+#[test]
+fn non_null_chain_base_frozen_block_after_slice() {
+    assert_frozen_keeps(
+        "k = (\n// prettier-ignore\na + b /* x */)!.m;\n",
+        "k =\n\t// prettier-ignore\n\t(a + b /* x */)!.m;\n",
+        "/* x */",
+    );
+}
+
+/// The same block written on a line of its own.
+#[test]
+fn non_null_chain_base_frozen_own_line_block() {
+    assert_frozen_keeps(
+        "k = (\n// prettier-ignore\na + b\n/* x */\n)!.m;\n",
+        "k =\n\t// prettier-ignore\n\t(a + b /* x */)!.m;\n",
+        "/* x */",
+    );
+}
+
+/// A block directive, and a call after the `!`.
+#[test]
+fn non_null_chain_base_frozen_block_directive_call() {
+    assert_frozen_keeps(
+        "k = (\n/* format-ignore */\na + b /* x */)!();\n",
+        "k =\n\t/* format-ignore */\n\t(a + b /* x */)!();\n",
+        "/* x */",
+    );
+}
+
+/// A computed member after the `!`, over a conditional base.
+#[test]
+fn non_null_chain_base_frozen_computed_member() {
+    assert_frozen_keeps(
+        "k = (\n// format-ignore\na ? b : c /* x */)![0];\n",
+        "k =\n\t// format-ignore\n\t(a ? b : c /* x */)![0];\n",
+        "/* x */",
+    );
+}
+
+/// A slice holding a stripped shell's comment of its own, the block written after it.
+#[test]
+fn non_null_chain_base_frozen_shell_then_block() {
+    assert_frozen_keeps(
+        "k = (\n// prettier-ignore\na + (b // c\n) /* x */)!.m;\n",
+        "k =\n\t// prettier-ignore\n\t(a + (b // c\n) /* x */)!.m;\n",
+        "/* x */",
+    );
+}
+
+/// Control: with no `!`, the member gap prints the block past the pair.
+#[test]
+fn member_chain_base_frozen_block_after_slice() {
+    assert_frozen_keeps(
+        "k = (\n// prettier-ignore\na + b /* x */).m;\n",
+        "k =\n\t// prettier-ignore\n\t(a + b) /* x */.m;\n",
+        "/* x */",
+    );
+}
+
+/// Control: a `!` ending the expression keeps its operand's pair and the block inside it.
+#[test]
+fn non_null_frozen_block_after_slice() {
+    assert_frozen_keeps(
+        "k = (\n// prettier-ignore\na + b /* x */)!;\n",
+        "k = (\n\t// prettier-ignore\n\ta + b /* x */\n)!;\n",
+        "/* x */",
     );
 }
