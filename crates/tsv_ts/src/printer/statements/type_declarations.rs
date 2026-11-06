@@ -340,6 +340,32 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Whether the value's left spine — through indexed-access objects, array elements,
+    /// prefix type operators and paren shells — reaches a type literal, mapped type or tuple
+    /// whose delimiters hold every comment in the value that lays out a line of its own. A
+    /// comment outside the base that collapses inline (`keyof /* c */ {`) leaves the base's
+    /// `{` the value's first break, so it does not count; one that hangs what follows it
+    /// (`[// c⏎K]`) is a break the delimiter does not own.
+    fn delimited_base_owns_comments(&self, ty: &TSType<'_>) -> bool {
+        let mut base = ty;
+        loop {
+            base = match base {
+                TSType::IndexedAccess(i) => i.object_type,
+                TSType::Array(a) => a.element_type,
+                TSType::TypeOperator(o) => o.type_annotation,
+                TSType::Parenthesized(p) => p.type_annotation,
+                _ => break,
+            };
+        }
+        let span = ty.span();
+        let base_span = base.span();
+        matches!(
+            base,
+            TSType::TypeLiteral(_) | TSType::Mapped(_) | TSType::Tuple(_)
+        ) && !self.comments_force_own_line_between(span.start, base_span.start)
+            && !self.comments_force_own_line_between(base_span.end, span.end)
+    }
+
     fn build_type_alias_eq_value_doc(
         &self,
         decl: &ast::TSTypeAliasDeclaration<'_>,
@@ -837,10 +863,16 @@ impl<'a> Printer<'a> {
                 let hug = self.value_owns_its_comment_break(value_type)
                     || (comment_driven_break
                         && !self.comments_force_own_line_between(value_span.start, value_span.end));
+                // Every comment on the page sits inside a delimiter the value opens first
+                // (`= {⏎// c⏎}[K]`, `= keyof {…}`, `= […][number]`): the value then breaks
+                // inside that delimiter exactly as its comment-free multi-line authoring does,
+                // so it takes that authoring's `fluid` layout rather than the hang.
+                let delimited_base_owns_comments =
+                    comment_driven_break && self.delimited_base_owns_comments(value_type);
                 if hug {
                     parts.push(d.text(" "));
                     parts.push(make_rhs(type_doc));
-                } else if comment_driven_break
+                } else if (comment_driven_break && !delimited_base_owns_comments)
                     || matches!(
                         value_type,
                         TSType::Literal(ast::TSLiteralType::TemplateLiteral(_))

@@ -1,0 +1,1139 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1070,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a value whose comments all sit inside a delimiter it opens first keeps that delimiter on",
+			"start": 20,
+			"end": 111
+		},
+		{
+			"type": "Line",
+			"value": " the `=` line, as its comment-free multi-line authoring does",
+			"start": 113,
+			"end": 175
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 211,
+			"end": 216
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 245,
+			"end": 250
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 314,
+			"end": 319
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 345,
+			"end": 350
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 392,
+			"end": 397
+		},
+		{
+			"type": "Line",
+			"value": " a required paren pair, a `readonly` operator and a suffix after the access answer the same way",
+			"start": 404,
+			"end": 501
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 531,
+			"end": 536
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 577,
+			"end": 582
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 612,
+			"end": 617
+		},
+		{
+			"type": "Line",
+			"value": " a conditional value inside a mapped type, as real code writes it",
+			"start": 629,
+			"end": 696
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 747,
+			"end": 752
+		},
+		{
+			"type": "Line",
+			"value": " a block comment outside the base that stays inline does not break the value: the base's",
+			"start": 787,
+			"end": 877
+		},
+		{
+			"type": "Line",
+			"value": " delimiter is still its first break",
+			"start": 879,
+			"end": 916
+		},
+		{
+			"type": "Block",
+			"value": " c10 ",
+			"start": 933,
+			"end": 942
+		},
+		{
+			"type": "Line",
+			"value": " c11",
+			"start": 955,
+			"end": 961
+		},
+		{
+			"type": "Line",
+			"value": " c12",
+			"start": 989,
+			"end": 995
+		},
+		{
+			"type": "Block",
+			"value": " c13 ",
+			"start": 1001,
+			"end": 1010
+		},
+		{
+			"type": "Block",
+			"value": " c14 ",
+			"start": 1024,
+			"end": 1033
+		},
+		{
+			"type": "Line",
+			"value": " c15",
+			"start": 1046,
+			"end": 1052
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1069,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1060,
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 177,
+					"end": 229,
+					"id": {
+						"type": "Identifier",
+						"start": 182,
+						"end": 183,
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 186,
+						"end": 228,
+						"objectType": {
+							"type": "TSMappedType",
+							"start": 186,
+							"end": 219,
+							"typeParameter": {
+								"type": "TSTypeParameter",
+								"start": 191,
+								"end": 203,
+								"name": "K",
+								"constraint": {
+									"type": "TSTypeOperator",
+									"start": 196,
+									"end": 203,
+									"operator": "keyof",
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 202,
+										"end": 203,
+										"typeName": {
+											"type": "Identifier",
+											"start": 202,
+											"end": 203,
+											"name": "B"
+										}
+									}
+								}
+							},
+							"nameType": null,
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 206,
+								"end": 207,
+								"typeName": {
+									"type": "Identifier",
+									"start": 206,
+									"end": 207,
+									"name": "C"
+								}
+							}
+						},
+						"indexType": {
+							"type": "TSTypeOperator",
+							"start": 220,
+							"end": 227,
+							"operator": "keyof",
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 226,
+								"end": 227,
+								"typeName": {
+									"type": "Identifier",
+									"start": 226,
+									"end": 227,
+									"name": "B"
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c1",
+									"start": 211,
+									"end": 216
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a value whose comments all sit inside a delimiter it opens first keeps that delimiter on",
+							"start": 20,
+							"end": 111
+						},
+						{
+							"type": "Line",
+							"value": " the `=` line, as its comment-free multi-line authoring does",
+							"start": 113,
+							"end": 175
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 232,
+					"end": 279,
+					"id": {
+						"type": "Identifier",
+						"start": 237,
+						"end": 238,
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 241,
+						"end": 278,
+						"objectType": {
+							"type": "TSIndexedAccessType",
+							"start": 241,
+							"end": 270,
+							"objectType": {
+								"type": "TSTypeLiteral",
+								"start": 241,
+								"end": 261,
+								"members": [
+									{
+										"type": "TSPropertySignature",
+										"start": 253,
+										"end": 258,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 253,
+											"end": 254,
+											"name": "a"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 254,
+											"end": 257,
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 256,
+												"end": 257,
+												"typeName": {
+													"type": "Identifier",
+													"start": 256,
+													"end": 257,
+													"name": "B"
+												}
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 245,
+												"end": 250
+											}
+										]
+									}
+								]
+							},
+							"indexType": {
+								"type": "TSTypeOperator",
+								"start": 262,
+								"end": 269,
+								"operator": "keyof",
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 268,
+									"end": 269,
+									"typeName": {
+										"type": "Identifier",
+										"start": 268,
+										"end": 269,
+										"name": "B"
+									}
+								}
+							}
+						},
+						"indexType": {
+							"type": "TSNumberKeyword",
+							"start": 271,
+							"end": 277
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 282,
+					"end": 325,
+					"id": {
+						"type": "Identifier",
+						"start": 287,
+						"end": 288,
+						"name": "E"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 291,
+						"end": 324,
+						"elementType": {
+							"type": "TSMappedType",
+							"start": 291,
+							"end": 322,
+							"typeParameter": {
+								"type": "TSTypeParameter",
+								"start": 296,
+								"end": 308,
+								"name": "K",
+								"constraint": {
+									"type": "TSTypeOperator",
+									"start": 301,
+									"end": 308,
+									"operator": "keyof",
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 307,
+										"end": 308,
+										"typeName": {
+											"type": "Identifier",
+											"start": 307,
+											"end": 308,
+											"name": "B"
+										}
+									}
+								}
+							},
+							"nameType": null,
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 311,
+								"end": 312,
+								"typeName": {
+									"type": "Identifier",
+									"start": 311,
+									"end": 312,
+									"name": "C"
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 328,
+					"end": 362,
+					"id": {
+						"type": "Identifier",
+						"start": 333,
+						"end": 334,
+						"name": "F"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 337,
+						"end": 361,
+						"objectType": {
+							"type": "TSTupleType",
+							"start": 337,
+							"end": 353,
+							"elementTypes": [
+								{
+									"type": "TSTypeReference",
+									"start": 341,
+									"end": 342,
+									"typeName": {
+										"type": "Identifier",
+										"start": 341,
+										"end": 342,
+										"name": "B"
+									}
+								}
+							]
+						},
+						"indexType": {
+							"type": "TSNumberKeyword",
+							"start": 354,
+							"end": 360,
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c4",
+									"start": 345,
+									"end": 350
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c3",
+							"start": 314,
+							"end": 319
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 365,
+					"end": 401,
+					"id": {
+						"type": "Identifier",
+						"start": 370,
+						"end": 371,
+						"name": "G"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 374,
+						"end": 400,
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeLiteral",
+							"start": 380,
+							"end": 400,
+							"members": [
+								{
+									"type": "TSPropertySignature",
+									"start": 384,
+									"end": 389,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 384,
+										"end": 385,
+										"name": "a"
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 385,
+										"end": 388,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 387,
+											"end": 388,
+											"typeName": {
+												"type": "Identifier",
+												"start": 387,
+												"end": 388,
+												"name": "B"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 503,
+					"end": 544,
+					"id": {
+						"type": "Identifier",
+						"start": 508,
+						"end": 509,
+						"name": "H"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 512,
+						"end": 543,
+						"objectType": {
+							"type": "TSParenthesizedType",
+							"start": 512,
+							"end": 540,
+							"typeAnnotation": {
+								"type": "TSTypeOperator",
+								"start": 513,
+								"end": 539,
+								"operator": "keyof",
+								"typeAnnotation": {
+									"type": "TSTypeLiteral",
+									"start": 519,
+									"end": 539,
+									"members": [
+										{
+											"type": "TSPropertySignature",
+											"start": 523,
+											"end": 528,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 523,
+												"end": 524,
+												"name": "a"
+											},
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 524,
+												"end": 527,
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 526,
+													"end": 527,
+													"typeName": {
+														"type": "Identifier",
+														"start": 526,
+														"end": 527,
+														"name": "B"
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						},
+						"indexType": {
+							"type": "TSTypeReference",
+							"start": 541,
+							"end": 542,
+							"typeName": {
+								"type": "Identifier",
+								"start": 541,
+								"end": 542,
+								"name": "K"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c6",
+									"start": 531,
+									"end": 536
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c5",
+							"start": 392,
+							"end": 397
+						},
+						{
+							"type": "Line",
+							"value": " a required paren pair, a `readonly` operator and a suffix after the access answer the same way",
+							"start": 404,
+							"end": 501
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 547,
+					"end": 588,
+					"id": {
+						"type": "Identifier",
+						"start": 552,
+						"end": 553,
+						"name": "I"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 556,
+						"end": 587,
+						"operator": "readonly",
+						"typeAnnotation": {
+							"type": "TSArrayType",
+							"start": 565,
+							"end": 587,
+							"elementType": {
+								"type": "TSTypeLiteral",
+								"start": 565,
+								"end": 585,
+								"members": [
+									{
+										"type": "TSPropertySignature",
+										"start": 569,
+										"end": 574,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 569,
+											"end": 570,
+											"name": "a"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 570,
+											"end": 573,
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 572,
+												"end": 573,
+												"typeName": {
+													"type": "Identifier",
+													"start": 572,
+													"end": 573,
+													"name": "B"
+												}
+											}
+										}
+									}
+								]
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 591,
+					"end": 626,
+					"id": {
+						"type": "Identifier",
+						"start": 596,
+						"end": 597,
+						"name": "J"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 600,
+						"end": 625,
+						"elementType": {
+							"type": "TSIndexedAccessType",
+							"start": 600,
+							"end": 623,
+							"objectType": {
+								"type": "TSTypeLiteral",
+								"start": 600,
+								"end": 620,
+								"members": [
+									{
+										"type": "TSPropertySignature",
+										"start": 604,
+										"end": 609,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 604,
+											"end": 605,
+											"name": "a"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 605,
+											"end": 608,
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 607,
+												"end": 608,
+												"typeName": {
+													"type": "Identifier",
+													"start": 607,
+													"end": 608,
+													"name": "B"
+												}
+											}
+										}
+									}
+								]
+							},
+							"indexType": {
+								"type": "TSTypeReference",
+								"start": 621,
+								"end": 622,
+								"typeName": {
+									"type": "Identifier",
+									"start": 621,
+									"end": 622,
+									"name": "K"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c8",
+										"start": 612,
+										"end": 617
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c7",
+							"start": 577,
+							"end": 582
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 698,
+					"end": 784,
+					"id": {
+						"type": "Identifier",
+						"start": 703,
+						"end": 704,
+						"name": "K"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 704,
+						"end": 707,
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 705,
+								"end": 706,
+								"name": "T"
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 710,
+						"end": 783,
+						"objectType": {
+							"type": "TSMappedType",
+							"start": 710,
+							"end": 774,
+							"typeParameter": {
+								"type": "TSTypeParameter",
+								"start": 715,
+								"end": 727,
+								"name": "P",
+								"constraint": {
+									"type": "TSTypeOperator",
+									"start": 720,
+									"end": 727,
+									"operator": "keyof",
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 726,
+										"end": 727,
+										"typeName": {
+											"type": "Identifier",
+											"start": 726,
+											"end": 727,
+											"name": "T"
+										}
+									}
+								}
+							},
+							"nameType": null,
+							"optional": "-",
+							"typeAnnotation": {
+								"type": "TSConditionalType",
+								"start": 732,
+								"end": 770,
+								"checkType": {
+									"type": "TSIndexedAccessType",
+									"start": 732,
+									"end": 736,
+									"objectType": {
+										"type": "TSTypeReference",
+										"start": 732,
+										"end": 733,
+										"typeName": {
+											"type": "Identifier",
+											"start": 732,
+											"end": 733,
+											"name": "T"
+										}
+									},
+									"indexType": {
+										"type": "TSTypeReference",
+										"start": 734,
+										"end": 735,
+										"typeName": {
+											"type": "Identifier",
+											"start": 734,
+											"end": 735,
+											"name": "P"
+										}
+									}
+								},
+								"extendsType": {
+									"type": "TSTypeReference",
+									"start": 745,
+									"end": 746,
+									"typeName": {
+										"type": "Identifier",
+										"start": 745,
+										"end": 746,
+										"name": "B"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c9",
+											"start": 747,
+											"end": 752
+										}
+									]
+								},
+								"trueType": {
+									"type": "TSTypeReference",
+									"start": 758,
+									"end": 759,
+									"typeName": {
+										"type": "Identifier",
+										"start": 758,
+										"end": 759,
+										"name": "P"
+									}
+								},
+								"falseType": {
+									"type": "TSNeverKeyword",
+									"start": 765,
+									"end": 770
+								}
+							}
+						},
+						"indexType": {
+							"type": "TSTypeOperator",
+							"start": 775,
+							"end": 782,
+							"operator": "keyof",
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 781,
+								"end": 782,
+								"typeName": {
+									"type": "Identifier",
+									"start": 781,
+									"end": 782,
+									"name": "T"
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a conditional value inside a mapped type, as real code writes it",
+							"start": 629,
+							"end": 696
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 918,
+					"end": 965,
+					"id": {
+						"type": "Identifier",
+						"start": 923,
+						"end": 924,
+						"name": "L"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 927,
+						"end": 964,
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeLiteral",
+							"start": 943,
+							"end": 964,
+							"members": [
+								{
+									"type": "TSPropertySignature",
+									"start": 947,
+									"end": 952,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 947,
+										"end": 948,
+										"name": "a"
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 948,
+										"end": 951,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 950,
+											"end": 951,
+											"typeName": {
+												"type": "Identifier",
+												"start": 950,
+												"end": 951,
+												"name": "B"
+											}
+										}
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c10 ",
+									"start": 933,
+									"end": 942
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment outside the base that stays inline does not break the value: the base's",
+							"start": 787,
+							"end": 877
+						},
+						{
+							"type": "Line",
+							"value": " delimiter is still its first break",
+							"start": 879,
+							"end": 916
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 968,
+					"end": 1012,
+					"id": {
+						"type": "Identifier",
+						"start": 973,
+						"end": 974,
+						"name": "M"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 977,
+						"end": 1011,
+						"objectType": {
+							"type": "TSTypeLiteral",
+							"start": 977,
+							"end": 998,
+							"members": [
+								{
+									"type": "TSPropertySignature",
+									"start": 981,
+									"end": 986,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 981,
+										"end": 982,
+										"name": "a"
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 982,
+										"end": 985,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 984,
+											"end": 985,
+											"typeName": {
+												"type": "Identifier",
+												"start": 984,
+												"end": 985,
+												"name": "B"
+											}
+										}
+									}
+								}
+							]
+						},
+						"indexType": {
+							"type": "TSTypeReference",
+							"start": 999,
+							"end": 1000,
+							"typeName": {
+								"type": "Identifier",
+								"start": 999,
+								"end": 1000,
+								"name": "K"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c12",
+									"start": 989,
+									"end": 995
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c13 ",
+									"start": 1001,
+									"end": 1010
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c11",
+							"start": 955,
+							"end": 961
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1015,
+					"end": 1059,
+					"id": {
+						"type": "Identifier",
+						"start": 1020,
+						"end": 1021,
+						"name": "N"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 1034,
+						"end": 1058,
+						"objectType": {
+							"type": "TSTypeLiteral",
+							"start": 1034,
+							"end": 1055,
+							"members": [
+								{
+									"type": "TSPropertySignature",
+									"start": 1038,
+									"end": 1043,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 1038,
+										"end": 1039,
+										"name": "a"
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 1039,
+										"end": 1042,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 1041,
+											"end": 1042,
+											"typeName": {
+												"type": "Identifier",
+												"start": 1041,
+												"end": 1042,
+												"name": "B"
+											}
+										}
+									}
+								}
+							]
+						},
+						"indexType": {
+							"type": "TSTypeReference",
+							"start": 1056,
+							"end": 1057,
+							"typeName": {
+								"type": "Identifier",
+								"start": 1056,
+								"end": 1057,
+								"name": "K"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c15",
+									"start": 1046,
+									"end": 1052
+								}
+							]
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c14 ",
+								"start": 1024,
+								"end": 1033
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

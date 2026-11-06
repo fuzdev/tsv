@@ -1,0 +1,235 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 446,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " the `= {` line at the print width keeps the delimiter on the `=` line; one column more",
+			"start": 20,
+			"end": 109
+		},
+		{
+			"type": "Line",
+			"value": " breaks after the `=`, as the comment-free authoring does",
+			"start": 111,
+			"end": 170
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 281,
+			"end": 286
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 416,
+			"end": 421
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 445,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 436,
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 172,
+					"end": 299,
+					"id": {
+						"type": "Identifier",
+						"start": 177,
+						"end": 266,
+						"name": "VeryLongTypeNameAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 269,
+						"end": 298,
+						"objectType": {
+							"type": "TSTypeLiteral",
+							"start": 269,
+							"end": 289,
+							"members": [
+								{
+									"type": "TSPropertySignature",
+									"start": 273,
+									"end": 278,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 273,
+										"end": 274,
+										"name": "a"
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 274,
+										"end": 277,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 276,
+											"end": 277,
+											"typeName": {
+												"type": "Identifier",
+												"start": 276,
+												"end": 277,
+												"name": "B"
+											}
+										}
+									}
+								}
+							]
+						},
+						"indexType": {
+							"type": "TSTypeOperator",
+							"start": 290,
+							"end": 297,
+							"operator": "keyof",
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 296,
+								"end": 297,
+								"typeName": {
+									"type": "Identifier",
+									"start": 296,
+									"end": 297,
+									"name": "B"
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c1",
+									"start": 281,
+									"end": 286
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the `= {` line at the print width keeps the delimiter on the `=` line; one column more",
+							"start": 20,
+							"end": 109
+						},
+						{
+							"type": "Line",
+							"value": " breaks after the `=`, as the comment-free authoring does",
+							"start": 111,
+							"end": 170
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 302,
+					"end": 435,
+					"id": {
+						"type": "Identifier",
+						"start": 307,
+						"end": 397,
+						"name": "VeryLongTypeNameAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 402,
+						"end": 434,
+						"objectType": {
+							"type": "TSTypeLiteral",
+							"start": 402,
+							"end": 425,
+							"members": [
+								{
+									"type": "TSPropertySignature",
+									"start": 407,
+									"end": 412,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 407,
+										"end": 408,
+										"name": "a"
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 408,
+										"end": 411,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 410,
+											"end": 411,
+											"typeName": {
+												"type": "Identifier",
+												"start": 410,
+												"end": 411,
+												"name": "B"
+											}
+										}
+									}
+								}
+							]
+						},
+						"indexType": {
+							"type": "TSTypeOperator",
+							"start": 426,
+							"end": 433,
+							"operator": "keyof",
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 432,
+								"end": 433,
+								"typeName": {
+									"type": "Identifier",
+									"start": 432,
+									"end": 433,
+									"name": "B"
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c2",
+									"start": 416,
+									"end": 421
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
