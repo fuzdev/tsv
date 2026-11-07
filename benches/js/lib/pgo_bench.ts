@@ -21,6 +21,7 @@
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { relative } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
@@ -138,7 +139,11 @@ export interface NativeBuild {
 	 * names other bytes, `null` when there is no stamp to say.
 	 */
 	build: 'pgo' | 'plain' | null;
-	/** The library the native rows loaded: its binding, path and sha256. */
+	/**
+	 * The library the native rows loaded: its binding, its path relative to the tsv checkout
+	 * (never absolute — the report is published, and a home directory is no part of it) and
+	 * its sha256.
+	 */
 	loaded: { binding: PgoBenchWorld; path: string; sha256: string };
 	/** What the stamp names — each binding's gated library and its profile's training — or
 	 * `null` with no stamp. */
@@ -173,7 +178,7 @@ export function native_build_disclosure(
 	return {
 		build:
 			stamp === null ? null : stamp.artifacts[loaded.binding].sha256 === sha256 ? 'pgo' : 'plain',
-		loaded: { ...loaded, sha256 },
+		loaded: { ...loaded, path: relative(PROJECT_ROOT, loaded.path), sha256 },
 		bindings: stamp?.artifacts ?? null,
 		training: stamp?.training ?? null,
 		disjoint_from_timed_corpus: disjoint,
