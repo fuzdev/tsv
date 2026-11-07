@@ -117,7 +117,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	// `../svelte` feeds the conformance view alone (its `tests` tree); its
 	// `packages/svelte/src` is the snapshot's `svelte` collection.
 	'../svelte': {
-		hash: '23bb14630',
+		hash: 'f9cc0975c',
 		pins: ['SVELTE_FIXTURES_PINS', 'SVELTE_REJECTS_PIN', 'CSS_REJECTS_PIN']
 	},
 	'../acorn-typescript': { hash: '923b213', pins: ['TS_FIXTURES_PINS'] },
@@ -128,7 +128,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	// Both prettier suites are Svelte-language inputs in the conformance view —
 	// prettier's `tests/format/html` and the plugin's `test` are `.html` files the
 	// loader reads as Svelte — so both feed {@link SVELTE_REJECTS_PIN} as well as
-	// the CSS and corpus pins: of its 144 rejects, 40 come from ../prettier and 7
+	// the CSS and corpus pins: of its 145 rejects, 40 come from ../prettier and 7
 	// from ../prettier-plugin-svelte. A pin lists EVERY checkout it was measured
 	// over, not just the one it is named after; `gate_counts_test.ts` grades that
 	// each pin names at least one, which cannot see a missing second.
@@ -207,8 +207,20 @@ export const SVELTE_FIXTURES_PINS: GatePins = {
 	// to the next release tag, adding 41 graded inputs, all of which parse in both (the
 	// release's only compiler change is a11y warnings, past the parse). Over-acceptance
 	// unchanged.
-	scanned: 3511,
-	both_accept: 3414,
+	//
+	// 3511 → 3514 scanned, 3414 → 3416 both-accept: the checkout moved ten commits past the
+	// oracle's release tag (the declared version unchanged), adding three graded inputs. Two
+	// runtime samples (`runtime-runes/samples/{async-save-foreign-microtask-mutation-nested,
+	// error-boundary-hydrate-skip}`) parse in both; the third,
+	// `parser-modern/samples/generic-snippet-arrow-function` — an arrow function type inside
+	// a snippet's type parameters (`{#snippet f<T extends () => void>(v: T)}`) — is the
+	// suite's fixture for a parser fix the pinned oracle predates, so the oracle rejects it,
+	// and tsv rejects it too (its snippet-generic matcher mirrors the oracle's naive `<`/`>`
+	// count, which the arrow's `>` closes), so it is a parity reject. When the oracle moves to
+	// the release carrying the fix, tsv's matcher must follow it (a `>` after `=` does not
+	// close), or this input becomes an over-rejection. Over-acceptance unchanged.
+	scanned: 3514,
+	both_accept: 3416,
 	over_acceptance: 13
 };
 
@@ -429,11 +441,9 @@ export const TS_REPO_REJECTS_PIN = 519;
 export const PRETTIER_JSX_PIN = 39;
 
 /**
- * bench:harvest:svelte-rejects — exact reject count. Measured 2026-11-01: ../svelte
- * at 23bb14630, ../prettier at 1dcd0b05d, ../prettier-plugin-svelte at 7809486,
- * oracle svelte@5.57.3, 144 of 4830 conformance-view Svelte files (the count held
- * across the checkout and oracle move to that release: its new suite inputs all
- * parse, and its only compiler change is a11y warnings, past the parse).
+ * bench:harvest:svelte-rejects — exact reject count. Measured 2026-11-06: ../svelte
+ * at f9cc0975c, ../prettier at 1dcd0b05d, ../prettier-plugin-svelte at 7809486,
+ * oracle svelte@5.57.3, 145 of the conformance-view Svelte files.
  * Fewer = the svelte/compiler oracle stopped rejecting (broken import/config);
  * more = it started rejecting wholesale — either way the cache would corrupt the
  * published coverage number. Re-derived by `bench:pins:suites` (see there).
@@ -441,7 +451,7 @@ export const PRETTIER_JSX_PIN = 39;
  * Moves with THREE checkout commits in {@link GATE_CHECKOUT_IDS}, not just the
  * one it is named after: the Svelte-language conformance corpus is the svelte
  * suite plus both prettier suites' `.html` (which the loader reads as Svelte), and
- * the split of the 144 is 97 / 40 / 7. The harvest stamps all three, so a pull of
+ * the split of the 145 is 98 / 40 / 7. The harvest stamps all three, so a pull of
  * any of them re-grades this pin rather than leaving it describing the previous
  * corpus.
  *
@@ -456,8 +466,14 @@ export const PRETTIER_JSX_PIN = 39;
  * it used to overwrite the first branch. The suite's two fixtures for that error
  * (`compiler-errors/samples/each-block-duplicate-else`, `…/if-block-else-before-else-if`)
  * joined the list; the pull's other new suite inputs all parse.
+ *
+ * 144 → 145: the ../svelte checkout moved past the oracle's release tag (oracle unchanged)
+ * and gained `parser-modern/samples/generic-snippet-arrow-function`, the suite's fixture for
+ * a parser fix (arrow function types inside a snippet's type parameters) the pinned oracle
+ * predates, so the oracle rejects it. It leaves the list once the oracle moves to the release
+ * carrying the fix; the pull's other new suite inputs parse.
  */
-export const SVELTE_REJECTS_PIN = 144;
+export const SVELTE_REJECTS_PIN = 145;
 
 /**
  * The conformance CSS corpus's REJECT count — files `svelte/compiler`'s `parseCss`
@@ -482,9 +498,9 @@ export const SVELTE_REJECTS_PIN = 144;
  * consumes the list), but graded and STAMPED like the harvests: `deno task
  * css:over-acceptance:pin` is a `bench:pins:suites` leg, so it is re-derived on
  * the same cadence as its siblings; the full `css:over-acceptance` profile grades it
- * too, and stamps the same three checkout commits. Measured 2026-11-01: ../prettier at 1dcd0b05d, ../svelte at 23bb14630,
- * ../wpt at 7437c7bc7, oracle svelte@5.57.3, 207 of 22450 conformance-view CSS files (the
- * count held across the checkout and oracle move to that release, which added no CSS file).
+ * too, and stamps the same three checkout commits. Measured 2026-11-06: ../prettier at 1dcd0b05d, ../svelte at f9cc0975c,
+ * ../wpt at 7437c7bc7, oracle svelte@5.57.3, 207 of the conformance-view CSS files (the
+ * count held across the ../svelte pull past that release, which added no CSS file).
  *
  * 229 → 207 with no checkout or oracle moving: the conformance view's own filters
  * tightened. The Prettier CSS suite lost its front-matter (`css/yaml/`, all but the
