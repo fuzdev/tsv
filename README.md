@@ -7,9 +7,12 @@
 tsv is a Rust toolchain for TypeScript/JS, CSS, and Svelte (and planned HTML/JSON).
 It ships a formatter that closely follows [Prettier](https://prettier.io/) +
 [prettier-plugin-svelte](https://github.com/sveltejs/prettier-plugin-svelte),
-and a parser that can output an AST compatible with [Svelte](https://svelte.dev/)'s parser +
+a parser that can output an AST compatible with [Svelte](https://svelte.dev/)'s parser +
 [acorn](https://github.com/acornjs/acorn) +
-[acorn-typescript](https://github.com/sveltejs/acorn-typescript).
+[acorn-typescript](https://github.com/sveltejs/acorn-typescript),
+a type stripper that turns TypeScript into JS by blanking its types to whitespace,
+so every line and column stays put,
+and an import lister that reports every module a source requests.
 
 tsv aims to simplify its covered domains and stay lean, and so it makes opinionated choices.
 The formatter has a single non-configurable style, using Svelte's Prettier config.
@@ -29,7 +32,7 @@ tsv has experimental work in that direction that may never ship.
 
 tsv prioritizes, in order:
 
-1. correctness (spec conformance for HTML/CSS/JS, fidelity to Svelte and TypeScript)
+1. correctness (spec conformance for JS/CSS, planned for HTML/JSON; fidelity to Svelte and TypeScript)
 2. speed
 3. binary size and memory usage
 4. extensibility, modularity, reusability
