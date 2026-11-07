@@ -1,7 +1,7 @@
 {
-	"version": 18,
+	"version": 19,
 	"kind": "combined",
-	"generated": "2026-11-02T07:43:00.644Z",
+	"generated": "2026-11-07T07:39:29.624Z",
 	"runtimes": [
 		"deno",
 		"node",
@@ -9,12 +9,58 @@
 	],
 	"mixed_vintage": false,
 	"conformance_vintage": {
-		"git_commit": "83aa5582",
-		"timestamp": "2026-11-02T07:41:52.090Z",
-		"tsv": "0.8.0",
+		"git_commit": "872e4d3a",
+		"timestamp": "2026-11-07T07:38:20.031Z",
+		"tsv": "0.8.1",
 		"stale": false
 	},
 	"mixed_machine": false,
+	"native_build": {
+		"build": "pgo",
+		"loaded": {
+			"binding": "ffi",
+			"path": ".pgo/bench/libtsv_ffi.so",
+			"sha256": "3e608cf6b75b6f86a76288fb12e191359a80c5bfb682868c2e90b268450522a9"
+		},
+		"bindings": {
+			"ffi": {
+				"sha256": "3e608cf6b75b6f86a76288fb12e191359a80c5bfb682868c2e90b268450522a9",
+				"profile_sha256": "045d5dd0892ca54a5b0218eb3efb372bd012e01491f65b5dd66313e3bdb08075",
+				"trained_through": "the library itself, in process under Deno through the bench’s own FFI wrapper — parse, parse_internal and format on every file"
+			},
+			"napi": {
+				"sha256": "257bb0010f58219828b92d8c95f3f10e3e31e130d62e438412a49054fcab086a",
+				"profile_sha256": "ca5cb1b814e73583c5121f894dc09248aba38b71cd5de2e3567bdacd9319dfdd",
+				"trained_through": "the addon itself — parse on every file and format --jobs 1 over the tree through the @fuzdev/tsv loader’s cli.js, the type strip and import records in process — the training the published addon gets"
+			}
+		},
+		"training": {
+			"origin": "own",
+			"collections": [
+				"zzz",
+				"fuz_app",
+				"fuz_blog",
+				"fuz_code",
+				"fuz_css",
+				"docs.fuz.dev",
+				"fuz_repos",
+				"fuz_template",
+				"fuz_ui",
+				"fuz_util",
+				"mdz",
+				"gro",
+				"svelte-docinfo",
+				"tsv.fuz.dev",
+				"ryanatkn.com",
+				"earbetter",
+				"cosmicplayground"
+			],
+			"snapshot_tree": "1a14f15ac"
+		},
+		"disjoint_from_timed_corpus": true,
+		"staged": "2026-11-07T04:38:20.819Z"
+	},
+	"mixed_native_build": false,
 	"unavailable_by_runtime": [
 		{
 			"runtime": "bun",
@@ -27,73 +73,55 @@
 	"unstable_cells": [
 		{
 			"group": "parse/typescript",
-			"name": "oxc-parser-raw",
-			"runtime": "node",
-			"cv": 0.04477819342632249,
-			"cv_raw": 0.05024903868952868,
-			"drift": 0.048472763269551855,
-			"pass_spread": 0.08540042163894213,
-			"samples": 20
+			"name": "tsv-wasm",
+			"runtime": "bun",
+			"cv": 0.04044437481340539,
+			"cv_raw": 0.04044437481340539,
+			"drift": 0.004674641022176074,
+			"pass_spread": 0.09530272420274288,
+			"samples": 24
 		},
 		{
 			"group": "parse/typescript",
-			"name": "swc",
-			"runtime": "node",
-			"cv": 0.04874056982751724,
-			"cv_raw": 0.04874056982751724,
-			"drift": -0.0018123063174365628,
-			"pass_spread": 0.10497315417365538,
+			"name": "oxc-parser-wasm",
+			"runtime": "bun",
+			"cv": 0.030837683923537945,
+			"cv_raw": 0.030837683923537945,
+			"drift": 0.05581915188635045,
+			"pass_spread": 0.0050600650270653524,
 			"samples": 24
 		},
 		{
-			"group": "format/typescript",
-			"name": "oxfmt",
-			"runtime": "bun",
-			"cv": 0.019120894836470025,
-			"cv_raw": 0.019120894836470025,
-			"drift": 0.05805430481851226,
-			"pass_spread": 0.016187977775244722,
-			"samples": 24
+			"group": "parse/typescript",
+			"name": "oxc-parser-raw",
+			"runtime": "node",
+			"cv": 0.038845954706784896,
+			"cv_raw": 0.04159151960809375,
+			"drift": 0.0409716203463768,
+			"pass_spread": 0.0679951434868511,
+			"samples": 27
 		},
 		{
 			"group": "parse/css",
-			"name": "tsv-wasm+locations",
-			"runtime": "bun",
-			"cv": 0.03226483312025269,
-			"cv_raw": 0.0330572991564721,
-			"drift": -0.02663730360637606,
-			"pass_spread": 0.058888130920139004,
-			"samples": 739
+			"name": "svelte/compiler",
+			"runtime": "deno",
+			"cv": 0.030942774501887753,
+			"cv_raw": 0.03250078952173271,
+			"drift": 0.0020676820782601357,
+			"pass_spread": 0.06005874791879062,
+			"samples": 754
 		}
 	],
 	"within_noise": [
 		{
-			"group": "parse/svelte",
-			"name": "tsv-wasm",
-			"runtimes": [
-				"deno",
-				"node"
-			],
-			"delta": 0.004015040271493797,
-			"noise": 0.008289098172798746,
-			"basis": [
-				"passes",
-				"passes"
-			],
-			"samples": [
-				3,
-				3
-			]
-		},
-		{
 			"group": "format/typescript",
-			"name": "prettier",
+			"name": "oxfmt",
 			"runtimes": [
 				"deno",
-				"bun"
+				"node"
 			],
-			"delta": 0.003400166550750816,
-			"noise": 0.031989570429316196,
+			"delta": 0.004118575921067791,
+			"noise": 0.021531420753862773,
 			"basis": [
 				"passes",
 				"passes"
@@ -104,32 +132,14 @@
 			]
 		},
 		{
-			"group": "parse/css",
-			"name": "tsv-wasm",
+			"group": "format/css",
+			"name": "oxfmt",
 			"runtimes": [
 				"deno",
 				"node"
 			],
-			"delta": 0.017961164186046208,
-			"noise": 0.02026705330899495,
-			"basis": [
-				"passes",
-				"passes"
-			],
-			"samples": [
-				3,
-				3
-			]
-		},
-		{
-			"group": "parse/css",
-			"name": "postcss",
-			"runtimes": [
-				"deno",
-				"node"
-			],
-			"delta": 0.0017889163739025493,
-			"noise": 0.010771802774339121,
+			"delta": 0.013607072838948797,
+			"noise": 0.020346393814772847,
 			"basis": [
 				"passes",
 				"passes"
@@ -146,8 +156,8 @@
 				"deno",
 				"bun"
 			],
-			"delta": 0.0023744283635678265,
-			"noise": 0.007488432010542352,
+			"delta": 0.017214560644379207,
+			"noise": 0.021271394654122165,
 			"basis": [
 				"passes",
 				"passes"
@@ -161,38 +171,128 @@
 	"sources": [
 		{
 			"runtime": "deno",
-			"timestamp": "2026-11-02T04:25:40.349Z",
-			"git_commit": "83aa5582",
-			"tsv": "0.8.0",
-			"corpus_snapshot": "678f4942f92ca0fab49a73db37f61546f34b470c",
+			"timestamp": "2026-11-07T04:38:21.464Z",
+			"git_commit": "872e4d3a",
+			"tsv": "0.8.1",
+			"corpus_snapshot": "dce40bd21d5e14fb13246db0ee730120f137cbb8",
 			"machine": {
 				"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 				"os": "linux",
 				"arch": "x86_64",
 				"runtime_version": "2.9.8"
 			},
-			"unavailable": []
+			"unavailable": [],
+			"native_build": {
+				"build": "pgo",
+				"loaded": {
+					"binding": "ffi",
+					"path": ".pgo/bench/libtsv_ffi.so",
+					"sha256": "3e608cf6b75b6f86a76288fb12e191359a80c5bfb682868c2e90b268450522a9"
+				},
+				"bindings": {
+					"ffi": {
+						"sha256": "3e608cf6b75b6f86a76288fb12e191359a80c5bfb682868c2e90b268450522a9",
+						"profile_sha256": "045d5dd0892ca54a5b0218eb3efb372bd012e01491f65b5dd66313e3bdb08075",
+						"trained_through": "the library itself, in process under Deno through the bench’s own FFI wrapper — parse, parse_internal and format on every file"
+					},
+					"napi": {
+						"sha256": "257bb0010f58219828b92d8c95f3f10e3e31e130d62e438412a49054fcab086a",
+						"profile_sha256": "ca5cb1b814e73583c5121f894dc09248aba38b71cd5de2e3567bdacd9319dfdd",
+						"trained_through": "the addon itself — parse on every file and format --jobs 1 over the tree through the @fuzdev/tsv loader’s cli.js, the type strip and import records in process — the training the published addon gets"
+					}
+				},
+				"training": {
+					"origin": "own",
+					"collections": [
+						"zzz",
+						"fuz_app",
+						"fuz_blog",
+						"fuz_code",
+						"fuz_css",
+						"docs.fuz.dev",
+						"fuz_repos",
+						"fuz_template",
+						"fuz_ui",
+						"fuz_util",
+						"mdz",
+						"gro",
+						"svelte-docinfo",
+						"tsv.fuz.dev",
+						"ryanatkn.com",
+						"earbetter",
+						"cosmicplayground"
+					],
+					"snapshot_tree": "1a14f15ac"
+				},
+				"disjoint_from_timed_corpus": true,
+				"staged": "2026-11-07T04:38:20.819Z"
+			}
 		},
 		{
 			"runtime": "node",
-			"timestamp": "2026-11-02T05:32:15.271Z",
-			"git_commit": "83aa5582",
-			"tsv": "0.8.0",
-			"corpus_snapshot": "678f4942f92ca0fab49a73db37f61546f34b470c",
+			"timestamp": "2026-11-07T05:39:05.072Z",
+			"git_commit": "872e4d3a",
+			"tsv": "0.8.1",
+			"corpus_snapshot": "dce40bd21d5e14fb13246db0ee730120f137cbb8",
 			"machine": {
 				"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 				"os": "linux",
 				"arch": "x86_64",
 				"runtime_version": "24.14.1"
 			},
-			"unavailable": []
+			"unavailable": [],
+			"native_build": {
+				"build": "pgo",
+				"loaded": {
+					"binding": "napi",
+					"path": ".pgo/bench/libtsv_napi.so",
+					"sha256": "257bb0010f58219828b92d8c95f3f10e3e31e130d62e438412a49054fcab086a"
+				},
+				"bindings": {
+					"ffi": {
+						"sha256": "3e608cf6b75b6f86a76288fb12e191359a80c5bfb682868c2e90b268450522a9",
+						"profile_sha256": "045d5dd0892ca54a5b0218eb3efb372bd012e01491f65b5dd66313e3bdb08075",
+						"trained_through": "the library itself, in process under Deno through the bench’s own FFI wrapper — parse, parse_internal and format on every file"
+					},
+					"napi": {
+						"sha256": "257bb0010f58219828b92d8c95f3f10e3e31e130d62e438412a49054fcab086a",
+						"profile_sha256": "ca5cb1b814e73583c5121f894dc09248aba38b71cd5de2e3567bdacd9319dfdd",
+						"trained_through": "the addon itself — parse on every file and format --jobs 1 over the tree through the @fuzdev/tsv loader’s cli.js, the type strip and import records in process — the training the published addon gets"
+					}
+				},
+				"training": {
+					"origin": "own",
+					"collections": [
+						"zzz",
+						"fuz_app",
+						"fuz_blog",
+						"fuz_code",
+						"fuz_css",
+						"docs.fuz.dev",
+						"fuz_repos",
+						"fuz_template",
+						"fuz_ui",
+						"fuz_util",
+						"mdz",
+						"gro",
+						"svelte-docinfo",
+						"tsv.fuz.dev",
+						"ryanatkn.com",
+						"earbetter",
+						"cosmicplayground"
+					],
+					"snapshot_tree": "1a14f15ac"
+				},
+				"disjoint_from_timed_corpus": true,
+				"staged": "2026-11-07T04:38:20.819Z"
+			}
 		},
 		{
 			"runtime": "bun",
-			"timestamp": "2026-11-02T06:41:43.538Z",
-			"git_commit": "83aa5582",
-			"tsv": "0.8.0",
-			"corpus_snapshot": "678f4942f92ca0fab49a73db37f61546f34b470c",
+			"timestamp": "2026-11-07T06:43:27.964Z",
+			"git_commit": "872e4d3a",
+			"tsv": "0.8.1",
+			"corpus_snapshot": "dce40bd21d5e14fb13246db0ee730120f137cbb8",
 			"machine": {
 				"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 				"os": "linux",
@@ -207,7 +307,52 @@
 						"oxc-parser-raw"
 					]
 				}
-			]
+			],
+			"native_build": {
+				"build": "pgo",
+				"loaded": {
+					"binding": "napi",
+					"path": ".pgo/bench/libtsv_napi.so",
+					"sha256": "257bb0010f58219828b92d8c95f3f10e3e31e130d62e438412a49054fcab086a"
+				},
+				"bindings": {
+					"ffi": {
+						"sha256": "3e608cf6b75b6f86a76288fb12e191359a80c5bfb682868c2e90b268450522a9",
+						"profile_sha256": "045d5dd0892ca54a5b0218eb3efb372bd012e01491f65b5dd66313e3bdb08075",
+						"trained_through": "the library itself, in process under Deno through the bench’s own FFI wrapper — parse, parse_internal and format on every file"
+					},
+					"napi": {
+						"sha256": "257bb0010f58219828b92d8c95f3f10e3e31e130d62e438412a49054fcab086a",
+						"profile_sha256": "ca5cb1b814e73583c5121f894dc09248aba38b71cd5de2e3567bdacd9319dfdd",
+						"trained_through": "the addon itself — parse on every file and format --jobs 1 over the tree through the @fuzdev/tsv loader’s cli.js, the type strip and import records in process — the training the published addon gets"
+					}
+				},
+				"training": {
+					"origin": "own",
+					"collections": [
+						"zzz",
+						"fuz_app",
+						"fuz_blog",
+						"fuz_code",
+						"fuz_css",
+						"docs.fuz.dev",
+						"fuz_repos",
+						"fuz_template",
+						"fuz_ui",
+						"fuz_util",
+						"mdz",
+						"gro",
+						"svelte-docinfo",
+						"tsv.fuz.dev",
+						"ryanatkn.com",
+						"earbetter",
+						"cosmicplayground"
+					],
+					"snapshot_tree": "1a14f15ac"
+				},
+				"disjoint_from_timed_corpus": true,
+				"staged": "2026-11-07T04:38:20.819Z"
+			}
 		}
 	],
 	"rows": [
@@ -215,890 +360,890 @@
 			"group": "parse/svelte",
 			"name": "svelte/compiler",
 			"ops_per_second": {
-				"deno": 1.3871028535689183,
-				"node": 1.2896823693508541,
-				"bun": 1.2632698765636832
+				"deno": 1.4470167455996605,
+				"node": 1.259274801256063,
+				"bun": 1.2260006935271373
 			},
 			"mean_ns": {
-				"deno": 720927072.875,
-				"node": 775384717.7916666,
-				"bun": 791596489.8333334
+				"deno": 691077005.875,
+				"node": 794107846.0416666,
+				"bun": 815660223.75
 			},
 			"files_iterated": {
-				"deno": 1898,
-				"node": 1898,
-				"bun": 1898
+				"deno": 2331,
+				"node": 2331,
+				"bun": 2331
 			}
 		},
 		{
 			"group": "parse/svelte",
 			"name": "tsv",
 			"ops_per_second": {
-				"deno": 3.6842988485658843,
-				"node": 3.3531968346165355,
-				"bun": 5.9352512386975835
+				"deno": 3.9980811873784194,
+				"node": 3.6523258093123254,
+				"bun": 6.952058518712901
 			},
 			"mean_ns": {
-				"deno": 271422064.5779727,
-				"node": 298222874.8627451,
-				"bun": 168484864.37777779
+				"deno": 250119983.3452381,
+				"node": 273798136.3684211,
+				"bun": 143842287.47619048
 			},
 			"files_iterated": {
-				"deno": 1898,
-				"node": 1898,
-				"bun": 1898
+				"deno": 2331,
+				"node": 2331,
+				"bun": 2331
 			}
 		},
 		{
 			"group": "parse/svelte",
 			"name": "tsv-wasm",
 			"ops_per_second": {
-				"deno": 2.963877659267001,
-				"node": 2.975777747428739,
-				"bun": 4.994947220570757
+				"deno": 3.099633215035425,
+				"node": 3.1457293191052687,
+				"bun": 5.356393290834321
 			},
 			"mean_ns": {
-				"deno": 337395842.5285714,
-				"node": 336046601.8888889,
-				"bun": 200202315.6284188
+				"deno": 322618816.6875,
+				"node": 317891305.5,
+				"bun": 186692788.54320988
 			},
 			"files_iterated": {
-				"deno": 1898,
-				"node": 1898,
-				"bun": 1898
+				"deno": 2331,
+				"node": 2331,
+				"bun": 2331
 			}
 		},
 		{
 			"group": "parse/svelte",
 			"name": "tsv+locations",
 			"ops_per_second": {
-				"deno": 2.6123448359325874,
-				"node": 2.5324483418211634,
-				"bun": 3.875218302632275
+				"deno": 2.8063003448887716,
+				"node": 2.760483716342466,
+				"bun": 4.315291735202953
 			},
 			"mean_ns": {
-				"deno": 382797855.1089744,
-				"node": 394874787.17171717,
-				"bun": 258049978.58333334
+				"deno": 356341045.8974359,
+				"node": 362255351.8717949,
+				"bun": 231734042.87878788
 			},
 			"files_iterated": {
-				"deno": 1898,
-				"node": 1898,
-				"bun": 1898
+				"deno": 2331,
+				"node": 2331,
+				"bun": 2331
 			}
 		},
 		{
 			"group": "parse/svelte",
 			"name": "tsv-wasm+locations",
 			"ops_per_second": {
-				"deno": 2.204750386048285,
-				"node": 2.3086375833976724,
-				"bun": 3.4181610685654937
+				"deno": 2.2986948163048417,
+				"node": 2.43969895989879,
+				"bun": 3.664633773636683
 			},
 			"mean_ns": {
-				"deno": 453566084.5454545,
-				"node": 433155904.24040407,
-				"bun": 292554967.4052288
+				"deno": 435029475.3818181,
+				"node": 409886636.1944445,
+				"bun": 272878563.5263158
 			},
 			"files_iterated": {
-				"deno": 1898,
-				"node": 1898,
-				"bun": 1898
+				"deno": 2331,
+				"node": 2331,
+				"bun": 2331
 			}
 		},
 		{
 			"group": "parse/svelte",
 			"name": "tsv-internal",
 			"ops_per_second": {
-				"deno": 30.324088811450913,
-				"node": 29.304065591477077,
-				"bun": 32.39615676095022
+				"deno": 37.68777349210199,
+				"node": 36.83087366272885,
+				"bun": 40.6990281450323
 			},
 			"mean_ns": {
-				"deno": 32977083.209912717,
-				"node": 34124957.7427524,
-				"bun": 30867859.029666852
+				"deno": 26533804.131718323,
+				"node": 27151134.375939447,
+				"bun": 24570611.27937669
 			},
 			"files_iterated": {
-				"deno": 1898,
-				"node": 1898,
-				"bun": 1898
+				"deno": 2331,
+				"node": 2331,
+				"bun": 2331
 			}
 		},
 		{
 			"group": "parse/svelte",
 			"name": "tsv-wasm-internal",
 			"ops_per_second": {
-				"deno": 16.951174591338628,
-				"node": 19.146124905660223,
-				"bun": 20.027267645631735
+				"deno": 18.379273039515773,
+				"node": 19.8051810446065,
+				"bun": 21.75389517360241
 			},
 			"mean_ns": {
-				"deno": 58992962.08717949,
-				"node": 52229890.11757503,
-				"bun": 49931923.699941956
+				"deno": 54409116.065144785,
+				"node": 50491838.360262185,
+				"bun": 45968779.01726147
 			},
 			"files_iterated": {
-				"deno": 1898,
-				"node": 1898,
-				"bun": 1898
+				"deno": 2331,
+				"node": 2331,
+				"bun": 2331
 			}
 		},
 		{
 			"group": "parse/svelte",
 			"name": "rsvelte-parse",
 			"ops_per_second": {
-				"deno": 0.8860792858045479,
-				"node": 0.8350493290114186,
-				"bun": 1.1019929916113933
+				"deno": 0.9511629571020801,
+				"node": 0.9009069789906772,
+				"bun": 1.2325980396411542
 			},
 			"mean_ns": {
-				"deno": 1128567179.0555556,
-				"node": 1197534044.1071427,
-				"bun": 907446787.422619
+				"deno": 1051344559.3452381,
+				"node": 1109992511.236111,
+				"bun": 811294491.6666666
 			},
 			"files_iterated": {
-				"deno": 1898,
-				"node": 1898,
-				"bun": 1898
+				"deno": 2331,
+				"node": 2331,
+				"bun": 2331
 			}
 		},
 		{
 			"group": "parse/svelte",
 			"name": "rsvelte-parse-skip-expr-loc",
 			"ops_per_second": {
-				"deno": 1.4284257563240517,
-				"node": 1.3550266462783094,
-				"bun": 1.7235960538975403
+				"deno": 1.6233216837417812,
+				"node": 1.5409102875029748,
+				"bun": 2.030749506630392
 			},
 			"mean_ns": {
-				"deno": 700071386.6805555,
-				"node": 737992867.3333334,
-				"bun": 580182344.7777778
+				"deno": 616020847.8796296,
+				"node": 648967047.6666666,
+				"bun": 492429025.21212125
 			},
 			"files_iterated": {
-				"deno": 1898,
-				"node": 1898,
-				"bun": 1898
+				"deno": 2331,
+				"node": 2331,
+				"bun": 2331
 			}
 		},
 		{
 			"group": "format/svelte",
 			"name": "prettier",
 			"ops_per_second": {
-				"deno": 0.0928007960807158,
-				"node": 0.08827566976843478,
-				"bun": 0.1077207907034112
+				"deno": 0.09532337806781838,
+				"node": 0.0873937015790642,
+				"bun": 0.10878248927449202
 			},
 			"mean_ns": {
-				"deno": 10775769629.5,
-				"node": 11328149677.291666,
-				"bun": 9283259002
+				"deno": 10490605980.083334,
+				"node": 11442472191.14881,
+				"bun": 9192655974.958334
 			},
 			"files_iterated": {
-				"deno": 1891,
-				"node": 1891,
-				"bun": 1891
+				"deno": 2329,
+				"node": 2329,
+				"bun": 2329
 			}
 		},
 		{
 			"group": "format/svelte",
 			"name": "tsv",
 			"ops_per_second": {
-				"deno": 7.253237057964774,
-				"node": 7.190245377247799,
-				"bun": 7.342800511263387
+				"deno": 10.642652782453734,
+				"node": 10.778714885030135,
+				"bun": 11.115614624547772
 			},
 			"mean_ns": {
-				"deno": 137869477.03603604,
-				"node": 139077312.04338518,
-				"bun": 136187820.77302304
+				"deno": 93961535.76001973,
+				"node": 92775438.50694443,
+				"bun": 89963536.3204834
 			},
 			"files_iterated": {
-				"deno": 1891,
-				"node": 1891,
-				"bun": 1891
+				"deno": 2329,
+				"node": 2329,
+				"bun": 2329
 			}
 		},
 		{
 			"group": "format/svelte",
 			"name": "tsv-wasm",
 			"ops_per_second": {
-				"deno": 4.332359152949513,
-				"node": 4.983520264286951,
-				"bun": 5.116708537325724
+				"deno": 4.565344703756103,
+				"node": 5.157820391668165,
+				"bun": 5.304797205049718
 			},
 			"mean_ns": {
-				"deno": 230821121.86363637,
-				"node": 200661369.26666665,
-				"bun": 195438140.10611114
+				"deno": 219041510.52980897,
+				"node": 193880345.58461538,
+				"bun": 188508619.90503323
 			},
 			"files_iterated": {
-				"deno": 1891,
-				"node": 1891,
-				"bun": 1891
+				"deno": 2329,
+				"node": 2329,
+				"bun": 2329
 			}
 		},
 		{
 			"group": "format/svelte",
 			"name": "oxfmt",
 			"ops_per_second": {
-				"deno": 0.09108470105069667,
-				"node": 0.08634698331169184,
-				"bun": 0.10428530285925053
+				"deno": 0.09430527822705029,
+				"node": 0.089098017887065,
+				"bun": 0.1120450420880211
 			},
 			"mean_ns": {
-				"deno": 10978792140.333334,
-				"node": 11581180507.375,
-				"bun": 9589078926.583334
+				"deno": 10603860343.769842,
+				"node": 11223594236.041666,
+				"bun": 8924982144.363096
 			},
 			"files_iterated": {
-				"deno": 1891,
-				"node": 1891,
-				"bun": 1891
+				"deno": 2329,
+				"node": 2329,
+				"bun": 2329
 			}
 		},
 		{
 			"group": "format/svelte",
 			"name": "biome-wasm",
 			"ops_per_second": {
-				"deno": 0.5094915081632143,
-				"node": 0.4532137193942151,
-				"bun": 0.5346912855593566
+				"deno": 0.48811534608657786,
+				"node": 0.4276458232198221,
+				"bun": 0.5023212763667341
 			},
 			"mean_ns": {
-				"deno": 1962741250.7916667,
-				"node": 2206464538.047619,
-				"bun": 1870238073.8333333
+				"deno": 2048696087.9583333,
+				"node": 2338383647.642857,
+				"bun": 1990757801.925
 			},
 			"files_iterated": {
-				"deno": 1891,
-				"node": 1891,
-				"bun": 1891
+				"deno": 2329,
+				"node": 2329,
+				"bun": 2329
 			}
 		},
 		{
 			"group": "parse/typescript",
 			"name": "acorn-typescript",
 			"ops_per_second": {
-				"deno": 0.5075932347680318,
-				"node": 0.3872575272781727,
-				"bun": 0.42842628878441585
+				"deno": 0.5859254976823833,
+				"node": 0.4479882379700556,
+				"bun": 0.5189080676368244
 			},
 			"mean_ns": {
-				"deno": 1970081418.5535715,
-				"node": 2582260975.089286,
-				"bun": 2334123806.5416665
+				"deno": 1706701626.6666667,
+				"node": 2232201462.5456347,
+				"bun": 1927123632.0416667
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5698,
+				"node": 5698,
+				"bun": 5698
 			}
 		},
 		{
 			"group": "parse/typescript",
 			"name": "tsv",
 			"ops_per_second": {
-				"deno": 0.6786454420584038,
-				"node": 0.579483004232517,
-				"bun": 1.2449577046820426
+				"deno": 0.8360293182553314,
+				"node": 0.7218235212875791,
+				"bun": 1.498579208011245
 			},
 			"mean_ns": {
-				"deno": 1473523489.625,
-				"node": 1725676150.4583333,
-				"bun": 803240139.1944445
+				"deno": 1196130300.8928573,
+				"node": 1385380180.2083333,
+				"bun": 667298728.4583334
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5698,
+				"node": 5698,
+				"bun": 5698
 			}
 		},
 		{
 			"group": "parse/typescript",
 			"name": "tsv-wasm",
 			"ops_per_second": {
-				"deno": 0.5512394097885418,
-				"node": 0.5373078846473037,
-				"bun": 1.0254119550206637
+				"deno": 0.6658565392104155,
+				"node": 0.6464284460612364,
+				"bun": 1.1753313599435569
 			},
 			"mean_ns": {
-				"deno": 1814093807.9583333,
-				"node": 1861130328.7619047,
-				"bun": 975217808.9047619
+				"deno": 1501825004.5059521,
+				"node": 1546961625.9821427,
+				"bun": 850823890.25
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5698,
+				"node": 5698,
+				"bun": 5698
 			}
 		},
 		{
 			"group": "parse/typescript",
 			"name": "tsv+locations",
 			"ops_per_second": {
-				"deno": 0.5351041576365564,
-				"node": 0.47989998720140925,
-				"bun": 0.8487033278464586
+				"deno": 0.6557423915292104,
+				"node": 0.5885616968747339,
+				"bun": 1.015403871390376
 			},
 			"mean_ns": {
-				"deno": 1868795048.0833333,
-				"node": 2083767507.125,
-				"bun": 1178268032.172619
+				"deno": 1524989100.7777777,
+				"node": 1699057219.1666667,
+				"bun": 984829808.2916666
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5698,
+				"node": 5698,
+				"bun": 5698
 			}
 		},
 		{
 			"group": "parse/typescript",
 			"name": "tsv-wasm+locations",
 			"ops_per_second": {
-				"deno": 0.4524192395273983,
-				"node": 0.44679060020569367,
-				"bun": 0.7330361079245654
+				"deno": 0.5435970339286955,
+				"node": 0.5319430933209931,
+				"bun": 0.8693529757111977
 			},
 			"mean_ns": {
-				"deno": 2210339244.2916665,
-				"node": 2238184956.30754,
-				"bun": 1364189279.6130953
+				"deno": 1839597969.7916667,
+				"node": 1879900336.25,
+				"bun": 1150280758.1488094
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5698,
+				"node": 5698,
+				"bun": 5698
 			}
 		},
 		{
 			"group": "parse/typescript",
 			"name": "tsv-internal",
 			"ops_per_second": {
-				"deno": 5.775556504558562,
-				"node": 5.197913251855062,
-				"bun": 6.190919360441925
+				"deno": 7.828565944997904,
+				"node": 7.137370653647167,
+				"bun": 8.349235607193506
 			},
 			"mean_ns": {
-				"deno": 173143488.28735632,
-				"node": 192384895.9278253,
-				"bun": 161526897.9902554
+				"deno": 127737315.7518018,
+				"node": 140107617.85070026,
+				"bun": 119771443.40476191
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5698,
+				"node": 5698,
+				"bun": 5698
 			}
 		},
 		{
 			"group": "parse/typescript",
 			"name": "tsv-wasm-internal",
 			"ops_per_second": {
-				"deno": 3.1682578191543636,
-				"node": 3.5692148850190577,
-				"bun": 3.9354811970494747
+				"deno": 3.773299503078307,
+				"node": 4.3890665334437164,
+				"bun": 4.568162535853468
 			},
 			"mean_ns": {
-				"deno": 315630878.8869048,
-				"node": 280173660.65497077,
-				"bun": 254098533.30000004
+				"deno": 265020043.9122807,
+				"node": 227838879.2651515,
+				"bun": 218906396.6422925
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5698,
+				"node": 5698,
+				"bun": 5698
 			}
 		},
 		{
 			"group": "parse/typescript",
 			"name": "oxc-parser",
 			"ops_per_second": {
-				"deno": 0.4386359862035834,
-				"node": 0.3908993093997406,
-				"bun": 0.8533111202719899
+				"deno": 0.5297148797006447,
+				"node": 0.47624606430335376,
+				"bun": 1.0008194214016823
 			},
 			"mean_ns": {
-				"deno": 2279794707.8055553,
-				"node": 2558203547.4444447,
-				"bun": 1171905505.7916667
+				"deno": 1887808023.375,
+				"node": 2099754885.0357144,
+				"bun": 999181249.5
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5698,
+				"node": 5698,
+				"bun": 5698
 			}
 		},
 		{
 			"group": "parse/typescript",
 			"name": "oxc-parser-wasm",
 			"ops_per_second": {
-				"deno": 0.39151641483275457,
-				"node": 0.3732037274306528,
-				"bun": 0.5753499437244215
+				"deno": 0.4733780696878328,
+				"node": 0.4506557315371372,
+				"bun": 0.6801854964362315
 			},
 			"mean_ns": {
-				"deno": 2554171324.9166665,
-				"node": 2679501640.7916665,
-				"bun": 1738072647.625
+				"deno": 2112476398.9583333,
+				"node": 2218988753.5416665,
+				"bun": 1470187184.5833333
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5698,
+				"node": 5698,
+				"bun": 5698
 			}
 		},
 		{
 			"group": "parse/typescript",
 			"name": "oxc-parser-raw",
 			"ops_per_second": {
-				"deno": 1.6100486167382968,
-				"node": 1.534641135465217
+				"deno": 1.8638518598606026,
+				"node": 1.7501568986696991
 			},
 			"mean_ns": {
-				"deno": 621099257.2546296,
-				"node": 651618138.5277778
+				"deno": 536523326.5238096,
+				"node": 571377343.8027778
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688
+				"deno": 5698,
+				"node": 5698
 			}
 		},
 		{
 			"group": "parse/typescript",
 			"name": "yuku-parser",
 			"ops_per_second": {
-				"deno": 1.2828574376274706,
-				"node": 1.4813904840533512,
-				"bun": 1.7518146844850604
+				"deno": 1.4836029962547808,
+				"node": 1.8259575329411344,
+				"bun": 2.0731256334295005
 			},
 			"mean_ns": {
-				"deno": 779509843.1587301,
-				"node": 675041463.25,
-				"bun": 570836635.2083334
+				"deno": 674034767.0666667,
+				"node": 547657862.7703705,
+				"bun": 482363434.1666667
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5698,
+				"node": 5698,
+				"bun": 5698
 			}
 		},
 		{
 			"group": "parse/typescript",
 			"name": "yuku-parser-wasm",
 			"ops_per_second": {
-				"deno": 1.4893261173603443,
-				"node": 1.9329447353092863,
-				"bun": 2.2704564651050108
+				"deno": 1.732413423752224,
+				"node": 2.384158544266732,
+				"bun": 2.763537290590014
 			},
 			"mean_ns": {
-				"deno": 671444614.0059524,
-				"node": 517345365.2,
-				"bun": 440440068.05202013
+				"deno": 577229422.4285713,
+				"node": 419435193.35353535,
+				"bun": 361855077.3333333
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5698,
+				"node": 5698,
+				"bun": 5698
 			}
 		},
 		{
 			"group": "parse/typescript",
 			"name": "swc",
 			"ops_per_second": {
-				"deno": 0.33443287119726517,
-				"node": 0.29443508361323195,
-				"bun": 0.5196460484101045
+				"deno": 0.41183109064878937,
+				"node": 0.37432071362113545,
+				"bun": 0.634219968679005
 			},
 			"mean_ns": {
-				"deno": 2990136694.4583335,
-				"node": 3396334389.6666665,
-				"bun": 1924386807.25
+				"deno": 2428179957.0416665,
+				"node": 2671505913.5416665,
+				"bun": 1576740010.3829365
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5698,
+				"node": 5698,
+				"bun": 5698
 			}
 		},
 		{
 			"group": "format/typescript",
 			"name": "prettier",
 			"ops_per_second": {
-				"deno": 0.03877335036292795,
-				"node": 0.03660452874820028,
-				"bun": 0.03864151451396338
+				"deno": 0.04659172766223425,
+				"node": 0.04134324628419079,
+				"bun": 0.04764981554797678
 			},
 			"mean_ns": {
-				"deno": 25790910268,
-				"node": 27319024016.916668,
-				"bun": 25878902847.833332
+				"deno": 21463037542.833332,
+				"node": 24187747452.777775,
+				"bun": 20986440104.75
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5699,
+				"node": 5699,
+				"bun": 5699
 			}
 		},
 		{
 			"group": "format/typescript",
 			"name": "tsv",
 			"ops_per_second": {
-				"deno": 1.3523589006127918,
-				"node": 1.3021485473656365,
-				"bun": 1.3601551489197075
+				"deno": 2.0389651839094083,
+				"node": 1.9927414564562396,
+				"bun": 2.063503014390403
 			},
 			"mean_ns": {
-				"deno": 739448677.0833334,
-				"node": 767961537.125,
-				"bun": 735210244.797619
+				"deno": 490444862.860606,
+				"node": 501821245.68148154,
+				"bun": 484612812.7878788
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5699,
+				"node": 5699,
+				"bun": 5699
 			}
 		},
 		{
 			"group": "format/typescript",
 			"name": "tsv-wasm",
 			"ops_per_second": {
-				"deno": 0.800962024781773,
-				"node": 0.9180576675624146,
-				"bun": 0.9313326979883191
+				"deno": 0.925549111636727,
+				"node": 1.0682435550551463,
+				"bun": 1.0810683045581082
 			},
 			"mean_ns": {
-				"deno": 1248498641.7083333,
-				"node": 1089256193.0833333,
-				"bun": 1073730152.672619
+				"deno": 1080439695.125,
+				"node": 936116108.7916666,
+				"bun": 925010932.0416666
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5699,
+				"node": 5699,
+				"bun": 5699
 			}
 		},
 		{
 			"group": "format/typescript",
 			"name": "oxfmt",
 			"ops_per_second": {
-				"deno": 0.7305123976992611,
-				"node": 0.7163699583534833,
-				"bun": 0.7437229322019457
+				"deno": 0.8585629172275117,
+				"node": 0.8550268606698967,
+				"bun": 0.8852227817861774
 			},
 			"mean_ns": {
-				"deno": 1368902161.2083333,
-				"node": 1395926767.0833333,
-				"bun": 1344586749.5833333
+				"deno": 1164737004.05,
+				"node": 1169553900.5833333,
+				"bun": 1129659132.7916667
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5699,
+				"node": 5699,
+				"bun": 5699
 			}
 		},
 		{
 			"group": "format/typescript",
 			"name": "biome-wasm",
 			"ops_per_second": {
-				"deno": 0.11548719036587046,
-				"node": 0.1136330702585261,
-				"bun": 0.12849578514740148
+				"deno": 0.13215077285725516,
+				"node": 0.12958996295950442,
+				"bun": 0.14579096748593667
 			},
 			"mean_ns": {
-				"deno": 8658968988.958334,
-				"node": 8800255046.571428,
-				"bun": 7782356431.791667
+				"deno": 7567114276.964286,
+				"node": 7716647008.47619,
+				"bun": 6859135495.458333
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5699,
+				"node": 5699,
+				"bun": 5699
 			}
 		},
 		{
 			"group": "format/typescript",
 			"name": "dprint-wasm",
 			"ops_per_second": {
-				"deno": 0.14678316588522636,
-				"node": 0.16553760484963265,
-				"bun": 0.17114228025558684
+				"deno": 0.1749017025363885,
+				"node": 0.1986931342983221,
+				"bun": 0.2042911739121055
 			},
 			"mean_ns": {
-				"deno": 6812770347.125,
-				"node": 6040923456.083333,
-				"bun": 5843091482.166667
+				"deno": 5717497231.291667,
+				"node": 5032886533.958333,
+				"bun": 4894974074.75
 			},
 			"files_iterated": {
-				"deno": 5688,
-				"node": 5688,
-				"bun": 5688
+				"deno": 5699,
+				"node": 5699,
+				"bun": 5699
 			}
 		},
 		{
 			"group": "parse/css",
 			"name": "svelte/compiler",
 			"ops_per_second": {
-				"deno": 79.1094244070396,
-				"node": 76.98975254432254,
-				"bun": 40.83093880383588
+				"deno": 50.4085254309164,
+				"node": 47.510729984359706,
+				"bun": 27.19036012734285
 			},
 			"mean_ns": {
-				"deno": 12640718.94714752,
-				"node": 12988741.578618608,
-				"bun": 24491232.121903956
+				"deno": 19837914.15145588,
+				"node": 21047876.981246024,
+				"bun": 36777740.17396672
 			},
 			"files_iterated": {
-				"deno": 71,
-				"node": 71,
-				"bun": 71
+				"deno": 192,
+				"node": 192,
+				"bun": 192
 			}
 		},
 		{
 			"group": "parse/css",
 			"name": "tsv",
 			"ops_per_second": {
-				"deno": 46.72554610255688,
-				"node": 39.1070586453046,
-				"bun": 79.00403050747377
+				"deno": 31.506461619551434,
+				"node": 27.12650083487016,
+				"bun": 53.5243937195115
 			},
 			"mean_ns": {
-				"deno": 21401569.02190339,
-				"node": 25570831.31896613,
-				"bun": 12657582.069884399
+				"deno": 31739520.99335226,
+				"node": 36864319.73247855,
+				"bun": 18683070.101464134
 			},
 			"files_iterated": {
-				"deno": 71,
-				"node": 71,
-				"bun": 71
+				"deno": 192,
+				"node": 192,
+				"bun": 192
 			}
 		},
 		{
 			"group": "parse/css",
 			"name": "tsv-wasm",
 			"ops_per_second": {
-				"deno": 38.594049486470674,
-				"node": 37.90085542703978,
-				"bun": 73.16723793329058
+				"deno": 24.75121901776246,
+				"node": 24.35858686983168,
+				"bun": 46.70502473160244
 			},
 			"mean_ns": {
-				"deno": 25910730.107514497,
-				"node": 26384628.75659966,
-				"bun": 13667319.257175446
+				"deno": 40402050.47203373,
+				"node": 41053284.63197956,
+				"bun": 21410972.496999044
 			},
 			"files_iterated": {
-				"deno": 71,
-				"node": 71,
-				"bun": 71
+				"deno": 192,
+				"node": 192,
+				"bun": 192
 			}
 		},
 		{
 			"group": "parse/css",
 			"name": "tsv+locations",
 			"ops_per_second": {
-				"deno": 36.31110763527099,
-				"node": 33.74001319230694,
-				"bun": 56.00103485973274
+				"deno": 25.015102082825727,
+				"node": 22.56644944435653,
+				"bun": 36.91911026383493
 			},
 			"mean_ns": {
-				"deno": 27539782.31797712,
-				"node": 29638399.792564694,
-				"bun": 17856812.86970368
+				"deno": 39975851.25533252,
+				"node": 44313572.787148505,
+				"bun": 27086243.218043525
 			},
 			"files_iterated": {
-				"deno": 71,
-				"node": 71,
-				"bun": 71
+				"deno": 192,
+				"node": 192,
+				"bun": 192
 			}
 		},
 		{
 			"group": "parse/css",
 			"name": "tsv-wasm+locations",
 			"ops_per_second": {
-				"deno": 31.29757449255857,
-				"node": 32.52076906210112,
-				"bun": 54.08606068872592
+				"deno": 20.60599369728568,
+				"node": 20.95991790367783,
+				"bun": 33.8890452574148
 			},
 			"mean_ns": {
-				"deno": 31951357.77175844,
-				"node": 30749580.30944523,
-				"bun": 18489052.211717963
+				"deno": 48529569.34232804,
+				"node": 47710110.53552506,
+				"bun": 29508060.566598687
 			},
 			"files_iterated": {
-				"deno": 71,
-				"node": 71,
-				"bun": 71
+				"deno": 192,
+				"node": 192,
+				"bun": 192
 			}
 		},
 		{
 			"group": "parse/css",
 			"name": "tsv-internal",
 			"ops_per_second": {
-				"deno": 309.19210249066737,
-				"node": 291.9993638164279,
-				"bun": 354.20792557396095
+				"deno": 215.55162602811458,
+				"node": 200.3758176849934,
+				"bun": 234.02670295860537
 			},
 			"mean_ns": {
-				"deno": 3234235.260036061,
-				"node": 3424664.9956014045,
-				"bun": 2823200.5209358125
+				"deno": 4639259.830355301,
+				"node": 4990622.179628876,
+				"bun": 4273016.657320852
 			},
 			"files_iterated": {
-				"deno": 71,
-				"node": 71,
-				"bun": 71
+				"deno": 192,
+				"node": 192,
+				"bun": 192
 			}
 		},
 		{
 			"group": "parse/css",
 			"name": "tsv-wasm-internal",
 			"ops_per_second": {
-				"deno": 178.24975491861002,
-				"node": 202.17444415283575,
-				"bun": 248.39520732817596
+				"deno": 108.26940295383169,
+				"node": 121.57305045702152,
+				"bun": 144.43601987114894
 			},
 			"mean_ns": {
-				"deno": 5610105.890224681,
-				"node": 4946223.565447472,
-				"bun": 4025842.570620999
+				"deno": 9236219.769554107,
+				"node": 8225507.184698963,
+				"bun": 6923480.727952057
 			},
 			"files_iterated": {
-				"deno": 71,
-				"node": 71,
-				"bun": 71
+				"deno": 192,
+				"node": 192,
+				"bun": 192
 			}
 		},
 		{
 			"group": "parse/css",
 			"name": "postcss",
 			"ops_per_second": {
-				"deno": 65.28703846160954,
-				"node": 65.17024540950196,
-				"bun": 47.31845483206348
+				"deno": 46.06185708287265,
+				"node": 44.41985925770543,
+				"bun": 35.554738796224704
 			},
 			"mean_ns": {
-				"deno": 15316975.981197642,
-				"node": 15344425.875895167,
-				"bun": 21133403.521925434
+				"deno": 21709936.666271184,
+				"node": 22512453.1394487,
+				"bun": 28125646.084234
 			},
 			"files_iterated": {
-				"deno": 71,
-				"node": 71,
-				"bun": 71
+				"deno": 192,
+				"node": 192,
+				"bun": 192
 			}
 		},
 		{
 			"group": "format/css",
 			"name": "prettier",
 			"ops_per_second": {
-				"deno": 1.4551542843072887,
-				"node": 1.408037662952017,
-				"bun": 1.7501834984568267
+				"deno": 1.007098293640429,
+				"node": 0.9725084024499053,
+				"bun": 1.1782246356812671
 			},
 			"mean_ns": {
-				"deno": 687212353.2083334,
-				"node": 710208275.1845238,
-				"bun": 571368659.8472222
+				"deno": 992951737,
+				"node": 1028268750.6666666,
+				"bun": 848734587.375
 			},
 			"files_iterated": {
-				"deno": 69,
-				"node": 69,
-				"bun": 69
+				"deno": 188,
+				"node": 188,
+				"bun": 188
 			}
 		},
 		{
 			"group": "format/css",
 			"name": "tsv",
 			"ops_per_second": {
-				"deno": 173.9513786764929,
-				"node": 158.08564743950677,
-				"bun": 185.24320071479173
+				"deno": 122.11382467122772,
+				"node": 113.94686523280927,
+				"bun": 126.94631692412459
 			},
 			"mean_ns": {
-				"deno": 5748732.82182923,
-				"node": 6325684.944818669,
-				"bun": 5398308.796983282
+				"deno": 8189080.988105506,
+				"node": 8776020.278898073,
+				"bun": 7877345.512888703
 			},
 			"files_iterated": {
-				"deno": 69,
-				"node": 69,
-				"bun": 69
+				"deno": 188,
+				"node": 188,
+				"bun": 188
 			}
 		},
 		{
 			"group": "format/css",
 			"name": "tsv-wasm",
 			"ops_per_second": {
-				"deno": 99.6933857590327,
-				"node": 113.13826971404573,
-				"bun": 133.21424109071305
+				"deno": 60.924635421413385,
+				"node": 69.32251026875865,
+				"bun": 79.34419953226588
 			},
 			"mean_ns": {
-				"deno": 10030755.725531122,
-				"node": 8838742.20922307,
-				"bun": 7506704.927433726
+				"deno": 16413721.527967103,
+				"node": 14425328.744199658,
+				"bun": 12603315.754585726
 			},
 			"files_iterated": {
-				"deno": 69,
-				"node": 69,
-				"bun": 69
+				"deno": 188,
+				"node": 188,
+				"bun": 188
 			}
 		},
 		{
 			"group": "format/css",
 			"name": "oxfmt",
 			"ops_per_second": {
-				"deno": 46.159600405355064,
-				"node": 44.71724081700141,
-				"bun": 46.04999774090163
+				"deno": 29.136979201416995,
+				"node": 28.74051020311638,
+				"bun": 29.638559496873803
 			},
 			"mean_ns": {
-				"deno": 21663965.702007856,
-				"node": 22362739.331175413,
-				"bun": 21715527.666829817
+				"deno": 34320647.76129462,
+				"node": 34794093.52627179,
+				"bun": 33739831.38773925
 			},
 			"files_iterated": {
-				"deno": 69,
-				"node": 69,
-				"bun": 69
+				"deno": 188,
+				"node": 188,
+				"bun": 188
 			}
 		},
 		{
 			"group": "format/css",
 			"name": "biome-wasm",
 			"ops_per_second": {
-				"deno": 9.788075671517397,
-				"node": 10.34950255589312,
-				"bun": 11.73102176187692
+				"deno": 5.7400719728742,
+				"node": 5.547005724901612,
+				"bun": 6.683387423510565
 			},
 			"mean_ns": {
-				"deno": 102165127.60622895,
-				"node": 96623001.4050858,
-				"bun": 85244066.56969696
+				"deno": 174213843.43710145,
+				"node": 180277441.4871795,
+				"bun": 149624724.20530915
 			},
 			"files_iterated": {
-				"deno": 69,
-				"node": 69,
-				"bun": 69
+				"deno": 188,
+				"node": 188,
+				"bun": 188
 			}
 		},
 		{
 			"group": "format/css",
 			"name": "malva-wasm",
 			"ops_per_second": {
-				"deno": 15.212408166276656,
-				"node": 16.64164631849558,
-				"bun": 14.217701031253847
+				"deno": 12.459362250693765,
+				"node": 13.687214881223145,
+				"bun": 12.172455198724785
 			},
 			"mean_ns": {
-				"deno": 65735811.78401664,
-				"node": 60090208.67656565,
-				"bun": 70334859.18727402
+				"deno": 80260929.8838163,
+				"node": 73060882.63229166,
+				"bun": 82152695.05405633
 			},
 			"files_iterated": {
-				"deno": 69,
-				"node": 69,
-				"bun": 69
+				"deno": 188,
+				"node": 188,
+				"bun": 188
 			}
 		}
 	]

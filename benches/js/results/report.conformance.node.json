@@ -1,9 +1,9 @@
 {
-	"version": 22,
+	"version": 23,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-11-02T07:41:52.090Z",
-	"git_commit": "83aa5582",
+	"timestamp": "2026-11-07T07:38:20.031Z",
+	"git_commit": "872e4d3a",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -11,7 +11,7 @@
 		"runtime_version": "24.14.1"
 	},
 	"corpus": {
-		"svelte": 4686,
+		"svelte": 4689,
 		"typescript": 53323,
 		"css": 22450
 	},
@@ -93,16 +93,16 @@
 		},
 		{
 			"path": "../svelte/packages/svelte/tests",
-			"files": 4610,
+			"files": 4613,
 			"by_language": {
-				"svelte": 4286,
+				"svelte": 4289,
 				"typescript": 140,
 				"css": 184
 			},
 			"repo": {
 				"url": "https://github.com/sveltejs/svelte",
 				"slug": "sveltejs/svelte",
-				"commit": "23bb146306ff02cc5041bca0c5de9f8bd086e4a3",
+				"commit": "f9cc0975c063c669b099cd12c363973d0d956c52",
 				"subpath": "packages/svelte/tests"
 			}
 		},
@@ -153,7 +153,7 @@
 		}
 	],
 	"exclusion_caches": {
-		"canonical-reject": 144,
+		"canonical-reject": 145,
 		"prettier-jsx": 39
 	},
 	"coverage_by_source": {
@@ -220,32 +220,32 @@
 			},
 			"../svelte/packages/svelte/tests": {
 				"svelte/compiler": {
-					"processed": 4286,
-					"total": 4286
+					"processed": 4289,
+					"total": 4289
 				},
 				"tsv": {
-					"processed": 4286,
-					"total": 4286
+					"processed": 4289,
+					"total": 4289
 				},
 				"tsv-wasm": {
-					"processed": 4286,
-					"total": 4286
+					"processed": 4289,
+					"total": 4289
 				},
 				"tsv-internal": {
-					"processed": 4286,
-					"total": 4286
+					"processed": 4289,
+					"total": 4289
 				},
 				"tsv-wasm-internal": {
-					"processed": 4286,
-					"total": 4286
+					"processed": 4289,
+					"total": 4289
 				},
 				"rsvelte-parse": {
-					"processed": 4286,
-					"total": 4286
+					"processed": 4289,
+					"total": 4289
 				},
 				"rsvelte-parse-skip-expr-loc": {
-					"processed": 4286,
-					"total": 4286
+					"processed": 4289,
+					"total": 4289
 				}
 			}
 		},
@@ -579,7 +579,7 @@
 		}
 	},
 	"versions": {
-		"tsv": "0.8.0",
+		"tsv": "0.8.1",
 		"svelte": "5.57.3",
 		"acorn": "8.19.0",
 		"acorn_ts": "1.0.13",
@@ -601,48 +601,97 @@
 		"swc": "1.16.21",
 		"tsc": "6.0.3"
 	},
+	"native_build": {
+		"build": "pgo",
+		"loaded": {
+			"binding": "napi",
+			"path": ".pgo/bench/libtsv_napi.so",
+			"sha256": "257bb0010f58219828b92d8c95f3f10e3e31e130d62e438412a49054fcab086a"
+		},
+		"bindings": {
+			"ffi": {
+				"sha256": "3e608cf6b75b6f86a76288fb12e191359a80c5bfb682868c2e90b268450522a9",
+				"profile_sha256": "045d5dd0892ca54a5b0218eb3efb372bd012e01491f65b5dd66313e3bdb08075",
+				"trained_through": "the library itself, in process under Deno through the bench’s own FFI wrapper — parse, parse_internal and format on every file"
+			},
+			"napi": {
+				"sha256": "257bb0010f58219828b92d8c95f3f10e3e31e130d62e438412a49054fcab086a",
+				"profile_sha256": "ca5cb1b814e73583c5121f894dc09248aba38b71cd5de2e3567bdacd9319dfdd",
+				"trained_through": "the addon itself — parse on every file and format --jobs 1 over the tree through the @fuzdev/tsv loader’s cli.js, the type strip and import records in process — the training the published addon gets"
+			}
+		},
+		"training": {
+			"origin": "own",
+			"collections": [
+				"zzz",
+				"fuz_app",
+				"fuz_blog",
+				"fuz_code",
+				"fuz_css",
+				"docs.fuz.dev",
+				"fuz_repos",
+				"fuz_template",
+				"fuz_ui",
+				"fuz_util",
+				"mdz",
+				"gro",
+				"svelte-docinfo",
+				"tsv.fuz.dev",
+				"ryanatkn.com",
+				"earbetter",
+				"cosmicplayground"
+			],
+			"snapshot_tree": "1a14f15ac"
+		},
+		"disjoint_from_timed_corpus": null,
+		"staged": "2026-11-07T07:38:19.460Z"
+	},
 	"binary_sizes": [
 		{
 			"label": "tsv (ffi)",
-			"bytes": 3872880,
+			"bytes": 4845936,
 			"kind": "native",
-			"gzip_bytes": 1830947
+			"build": "pgo",
+			"gzip_bytes": 2371509
 		},
 		{
 			"label": "tsv format (ffi)",
-			"bytes": 3576096,
+			"bytes": 3646672,
 			"kind": "native",
-			"gzip_bytes": 1696251
+			"build": "plain",
+			"gzip_bytes": 1727788
 		},
 		{
 			"label": "tsv parse (ffi)",
-			"bytes": 1638800,
+			"bytes": 1643408,
 			"kind": "native",
-			"gzip_bytes": 739021
+			"build": "plain",
+			"gzip_bytes": 741156
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 4327488,
+			"bytes": 5333456,
 			"kind": "native",
-			"gzip_bytes": 2037799
+			"build": "pgo",
+			"gzip_bytes": 2603280
 		},
 		{
 			"label": "tsv-format-wasm",
-			"bytes": 2720580,
+			"bytes": 2795030,
 			"kind": "wasm",
-			"gzip_bytes": 1052786
+			"gzip_bytes": 1074632
 		},
 		{
 			"label": "tsv-parse-wasm",
-			"bytes": 1073743,
+			"bytes": 1077523,
 			"kind": "wasm",
-			"gzip_bytes": 424905
+			"gzip_bytes": 427072
 		},
 		{
 			"label": "tsv-wasm",
-			"bytes": 3038156,
+			"bytes": 3123442,
 			"kind": "wasm",
-			"gzip_bytes": 1166241
+			"gzip_bytes": 1193069
 		},
 		{
 			"label": "svelte + acorn-typescript parsers (js bundle)",
@@ -762,8 +811,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4686,
-			"files_total": 4686,
+			"files_processed": 4689,
+			"files_total": 4689,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -794,8 +843,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4686,
-			"files_total": 4686,
+			"files_processed": 4689,
+			"files_total": 4689,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "span_only",
@@ -826,8 +875,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4686,
-			"files_total": 4686,
+			"files_processed": 4689,
+			"files_total": 4689,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "span_only",
@@ -858,8 +907,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4686,
-			"files_total": 4686,
+			"files_processed": 4689,
+			"files_total": 4689,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "none",
@@ -890,8 +939,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4686,
-			"files_total": 4686,
+			"files_processed": 4689,
+			"files_total": 4689,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "none",
@@ -922,8 +971,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4686,
-			"files_total": 4686,
+			"files_processed": 4689,
+			"files_total": 4689,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -954,8 +1003,8 @@
 			"pass_mean_ns": null,
 			"pass_spread": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4686,
-			"files_total": 4686,
+			"files_processed": 4689,
+			"files_total": 4689,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "own_shape",
