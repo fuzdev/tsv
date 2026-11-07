@@ -923,6 +923,12 @@ rsvelte-fmt end-to-end — process spawn, discovery, IO, each tool's own
 parallelism, plus peak memory — on a third-party `.svelte` corpus. That's where its
 speed numbers live; this row answers only "what does it accept."
 
+Bun's formatter (`bun fmt`) is the same shape — a subcommand of the Bun executable
+with no in-process format entry — so it has no timed row for the same reason. No
+coverage-only row has been added for it either (one would drive its CLI per file, as
+rsvelte-fmt's does). The hyperfine comparison times it end-to-end beside tsv in that
+comparison's TypeScript, single-file and Svelte scenarios.
+
 **Svelte only.** Its `.ts`/`.js` path is `oxc_formatter` and its CSS path
 `oxc_formatter_css` — the same engine as the `oxfmt` row, by its own
 `--no-native-js` / `--no-native-css` escape-hatch docs. A ts or css row would

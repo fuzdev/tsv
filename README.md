@@ -38,8 +38,9 @@ Staying simple is an overarching goal.
 Feedback is welcome to help navigate these tradeoffs.
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for measurements.
-Compared to Oxc/Oxfmt and Biome, tsv is faster and smaller and uses less memory,
+Compared to Oxfmt and Biome, tsv formats faster with smaller artifacts and less memory,
 but lacks their features, extensibility, and broad language support.
+Parsing into JS is mixed, since Oxc's raw transfer and Yuku hand over their trees faster than tsv's JSON.
 One reason for tsv to exist is to help find the performance left on the table
 in the Web's implementations.
 
@@ -144,7 +145,8 @@ and x64; Windows x64); any other target, musl included, falls back to a source b
 From crates.io, `cargo install --locked tsv_cli` builds the same `tsv` binary from source
 (the crate is `tsv_cli`; the `tsv` crate on crates.io is an unrelated project).
 That build doesn't get the release profile the prebuilt binaries ship with
-(LTO and `panic = "abort"` - a workspace's profiles don't travel with a published crate):
+(LTO and `panic = "abort"` - a workspace's profiles don't travel with a published crate),
+nor their profile-guided optimization:
 it runs slower, and an internal panic while formatting files is reported as that file's
 error rather than aborting the run.
 

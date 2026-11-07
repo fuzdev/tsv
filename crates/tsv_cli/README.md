@@ -11,7 +11,7 @@ the prebuilt binary from the GitHub Release of the crate's version, where one sh
 (any other target builds from source).
 
 From source: `cargo install --locked tsv_cli`. A source build does not get the release profile the
-prebuilt binaries ship with (LTO, `panic = "abort"`): it runs slower, and an internal panic while
+prebuilt binaries ship with (LTO, `panic = "abort"`) or their profile-guided optimization: it runs slower, and an internal panic while
 formatting files is reported as that file's error instead of aborting the run.
 
 Usage: `tsv --help`, and the [README](https://github.com/fuzdev/tsv#readme). The library target is the
