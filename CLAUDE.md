@@ -839,7 +839,7 @@ cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/
 cargo run -p tsv_debug buffer_sizes ../corpora/collections/zzz/src ../corpora/collections/gro/src     # printer SmallVec sizing histograms (§8)
 cargo run -p tsv_debug arena_stats ../corpora/collections/zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile against the format wall (§9)
-cargo run --release -p tsv_debug -- ast_census ../corpora/collections/zzz/src        # per-node-kind population (--bytes joins the size board, --slots) (§10)
+cargo run --release -p tsv_debug -- ast_census ../corpora/collections/zzz/src        # per-node-kind population (--bytes joins the size board, --slots, --arity) (§10)
 cargo run -p tsv_debug type_sizes                                # the `size_of` board: every public AST type's width (§10)
 cargo run --profile corpus -p tsv_debug --features _internal_audits -- build_visit_census ../corpora/collections  # doc-build dispatches per language and dispatch family; a dispatch is not an edge read (also `deno task build-visit-census`)
 cargo run -p tsv_debug metrics [--json]                          # line counts by crate and phase; also `deno task metrics`

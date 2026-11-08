@@ -778,8 +778,11 @@ which is the slot-megabyte column a density lever is ranked by, plus the
 corpus's total slot bytes against its source bytes. `--slots` adds a
 `Parent.field -> Child` tally, which is what separates one struct's two
 populations — an object literal's `Property` from a destructuring pattern's, the
-same Rust type and so the same row without it. `--min` / `--top` / `--json` as
-above.
+same Rust type and so the same row without it. `--arity` adds each array field's
+list-length distribution (`Parent.field`: lengths 0, 1, 2, 3+, the 3+ tail split
+3-8 / 9-16 / 17+, the longest list, and total lists and elements; what a wire
+row can't say about the internal slice is in the command's module doc). `--min` /
+`--top` / `--json` as above.
 
 ```bash
 cargo run -p tsv_debug type_sizes --min 96              # the wide end of the board
