@@ -33,9 +33,10 @@ use crate::FxHashMap;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dead {
     /// The node was cloned out of the arena by value, and the original is now unreachable: the
-    /// cover grammar's per-leaf clones, the assignment target, the by-value expression boundary.
+    /// by-value expression boundary.
     DuplicateRoot,
-    /// A new allocation replaced the node (a field changed on a node already in the arena).
+    /// A new allocation replaced the node: a field changed on a node already in the arena, or
+    /// a cover-grammar literal converted to its pattern.
     Superseded,
     /// Duplicated, and both copies stay reachable (a shorthand property's key and value). Not
     /// waste: the parse's own tree holds both. Counted so a store row count reads honestly.

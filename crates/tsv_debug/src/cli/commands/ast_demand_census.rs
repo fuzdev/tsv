@@ -23,16 +23,17 @@
 //!   prelude and selector retries).
 //! - `dup_dead`: rows stranded by the by-value clone class whose copy was allocated again:
 //!   an expression copied out of the arena and placed elsewhere, its original then
-//!   unreachable (the assignment target, the cover grammar's leaves and lists, a computed
-//!   object key, `{@debug}`'s elements and the sequence they came from).
-//! - `superseded`: rows replaced by a re-allocation (the `<` node's lazy re-allocation),
-//!   passed through (a flattened instantiation's node), or a wrapper the parse discards
-//!   (the `function` shell around a `{#snippet}` head's parameters).
+//!   unreachable (a computed object key, `{@debug}`'s elements and the sequence they came
+//!   from).
+//! - `superseded`: rows replaced by a re-allocation (the `<` node's lazy re-allocation, a
+//!   cover-grammar literal or list converted to its pattern), passed through (a flattened
+//!   instantiation's node), or a wrapper the parse discards (the `function` shell around a
+//!   `{#snippet}` head's parameters).
 //! - `moved_inline`: rows stranded by a by-value move into a parent's own slot: the node is
 //!   alive inside its parent, the arena row is not (a class field's initializer, a
 //!   computed class or interface key, an enum initializer, `export default` / `export =`,
-//!   a decorator, a `for` head). Not waste; a by-value slot that became a store edge would
-//!   make this a row.
+//!   a decorator, a `for` head, an array pattern's unchanged element). Not waste; a by-value
+//!   slot that became a store edge would make this a row.
 //! - `built_inline`: nodes built by value in a parent's slot and never placed at all (a
 //!   non-computed class or interface key, a catch parameter). No row, counted beside
 //!   `moved_inline` so a by-value slot's demand is visible.
@@ -570,11 +571,10 @@ mod tests {
     }
 
     /// `[a] = x;`: the array parses as a literal (`a` and the array itself are expressions,
-    /// the element list a one-row id list), then the `=` converts it: the assignment target's
-    /// clone strands the array, the element's clone strands `a`, the id list is dead with
-    /// them, and `a` comes back inside a new by-value `Option<Expression>` list. The right
-    /// side and the two nodes the assignment places bring the minted total to five, three of
-    /// them live.
+    /// the element list a one-row id list), then the `=` converts it: the pattern's new row
+    /// replaces the array, a new list replaces the id list, and `a` moves into that by-value
+    /// `Option<Expression>` list, stranding its row. The right side and the assignment bring
+    /// the minted total to five, three of them live.
     #[test]
     fn a_cover_grammar_orphan_is_minted_and_not_live() {
         let census = census_of("[a] = x;", ParserType::TypeScript);
@@ -583,17 +583,40 @@ mod tests {
             expr.minted, 5,
             "a, the array, x, the pattern's row, the assignment"
         );
-        assert_eq!(expr.duplicate_dead, 2, "the array and `a`");
+        assert_eq!(expr.duplicate_dead, 0);
+        assert_eq!(expr.moved_inline, 1, "`a`");
+        assert_eq!(expr.superseded, 1, "the array");
         assert_eq!(expr.live(), 3, "x, the pattern's row, the assignment");
         let ids = row(&census, "tsv_ts", "Option<&Expression> (ids)");
         assert_eq!(
-            (ids.minted, ids.duplicate_dead),
+            (ids.minted, ids.superseded),
             (1, 1),
             "the literal's element list"
         );
         let values = row(&census, "tsv_ts", "Option<Expression>");
         assert_eq!(values.minted, 1, "`a` in the pattern's by-value elements");
         assert_eq!(row(&census, "tsv_ts", "Statement").minted, 1);
+    }
+
+    /// `x = y;`, and `({ a: b, ...c } = z);`: a target that does not convert keeps the row it
+    /// was parsed into, and so does a destructuring leaf. Only the object literal is replaced.
+    #[test]
+    fn an_unconverted_target_keeps_its_row() {
+        let census = census_of("x = y;", ParserType::TypeScript);
+        let expr = row(&census, "tsv_ts", "Expression");
+        assert_eq!(expr.minted, 3, "x, y, the assignment");
+        assert_eq!(
+            (expr.duplicate_dead, expr.superseded),
+            (0, 0),
+            "x is the target as parsed"
+        );
+
+        let census = census_of("({ a: b, ...c } = z);", ParserType::TypeScript);
+        let expr = row(&census, "tsv_ts", "Expression");
+        assert_eq!(expr.duplicate_dead, 0, "b and c are the pattern's leaves");
+        assert_eq!(expr.superseded, 1, "the object literal");
+        let properties = row(&census, "tsv_ts", "ObjectProperty");
+        assert_eq!(properties.superseded, 2, "the literal's property list");
     }
 
     /// `a ? (b): c => d;`: the consequent `(b): c => d` is tried as an annotated arrow and

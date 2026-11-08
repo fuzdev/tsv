@@ -11,7 +11,6 @@ use crate::ast::{
     UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator, YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
-use crate::parser::expression_assignable::AssignableContext;
 use crate::printer::ParenContext;
 use tsv_lang::printing::visual_width;
 use tsv_lang::source_scan;
@@ -1346,11 +1345,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })?;
         let end = self.prev_token_end() as u32;
 
-        // Convert left side to pattern if needed (cover grammar). Assignment is the
-        // one context that accepts a type-assertion target (`(x as T) = …`); as the
-        // WHOLE target it may not be an `AssignmentPattern` (`(a = b) = 1`).
-        // `refine_assignable` consumes by value; clone the arena ref (shallow — children
-        // are refs) on this cold assignment-target path.
+        // Convert left side to pattern if needed (cover grammar). An assignment accepts a
+        // type-assertion target (`(x as T) = …`), as a for-head does; as the WHOLE target it
+        // may not be an `AssignmentPattern` (`(a = b) = 1`).
         //
         // Only `=` reparses an object or array literal as a destructuring pattern
         // (ecma262 §13.15.1): a compound operator's literal left (`({ a } += x)`)
@@ -1362,9 +1359,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 left.kind,
                 ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_)
             ) {
-            left.clone()
+            left
         } else {
-            self.refine_whole_assignable(left.clone(), AssignableContext::Assignment)?
+            self.refine_assignment_target(left)?
         };
 
         // one wire level: the assignment over its target, read before the operator said it
@@ -1372,7 +1369,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // end of the target, plus one — none over a bare name, which nests nothing, the
         // wire-only tree's grouping pairs looked through so it counts no more than the
         // paren-free parse
-        let mut target = &left_pattern;
+        let mut target = left_pattern;
         while let ExpressionKind::ParenthesizedExpression(paren) = &target.kind {
             target = paren.expression;
         }
@@ -1383,16 +1380,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let span = Span::new(expr_start as u32, end);
         debug_assert_encloses(span.start, span.end, left, right);
         #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(2);
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
-            tsv_lang::ast_census_probe::Dead::DuplicateRoot,
-            1,
-        );
+        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
         let assignment = self.arena.alloc(Expression {
             span,
             kind: ExpressionKind::AssignmentExpression(AssignmentExpression {
-                left: self.arena.alloc(left_pattern),
+                left: left_pattern,
                 operator,
                 right,
             }),

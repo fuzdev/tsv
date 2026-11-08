@@ -64,8 +64,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - AssignmentExpression with a plain `=` (a default) → AssignmentPattern; a
     ///   compound operator is a syntax error (it names no default, and the pattern
     ///   node has no slot for it), and the WHOLE target of an `=` / for-head may not
-    ///   convert to one at all (`refine_whole_assignable`)
+    ///   convert to one at all (`Parser::reject_whole_assignment_pattern`)
     /// - Identifier, MemberExpression → unchanged (valid assignment targets)
+    ///
+    /// Returns `None` when `expr` is already the target (the identifier, member and
+    /// already-a-pattern arms, the accepted wrappers and the deferred non-simple targets),
+    /// and the node a conversion built otherwise. The entry points say what the unchanged
+    /// case hands back: [`Parser::refine_placed_assignable`] the arena reference it was
+    /// given, [`Parser::refine_owned_assignable`] the value it was given.
     ///
     /// `AssignableContext` selects which simple-target wrappers are legal and what a
     /// non-simple target does. `Assignment` and `ForHead` (a no-declaration for-in/of
@@ -80,11 +86,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// It takes the parser mutably because a conversion can owe the depth limit a printer
     /// pair (a default that is itself a bare assignment, [`Parser::printer_pair`]).
-    pub(super) fn refine_assignable(
+    fn refine_assignable(
         &mut self,
-        expr: Expression<'arena>,
+        expr: &Expression<'arena>,
         context: AssignableContext,
-    ) -> Result<Expression<'arena>, Error> {
+    ) -> Result<Option<Expression<'arena>>, Error> {
         // A parenthesized target is no binding target: `BindingElement` and
         // `BindingRestElement` derive a `BindingIdentifier` or a nested pattern, never a
         // parenthesized one, so `let [(a)] = x` is a syntax error (tsc TS1181, acorn
@@ -130,7 +136,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             // Identifier is already a valid assignment target
-            ExpressionKind::Identifier(_) => Ok(expr),
+            ExpressionKind::Identifier(_) => Ok(None),
 
             // A member expression is an assignment target but no binding target: the
             // binding grammar names only a `BindingIdentifier` or a nested pattern
@@ -145,13 +151,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             // Member expression is a valid assignment target
-            ExpressionKind::MemberExpression(_) => Ok(expr),
+            ExpressionKind::MemberExpression(_) => Ok(None),
 
             // Convert ObjectExpression to ObjectPattern
             ExpressionKind::ObjectExpression(obj) => {
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::dead::<ObjectProperty<'arena>>(
-                    tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                    tsv_lang::ast_census_probe::Dead::Superseded,
                     obj.properties.len(),
                 );
                 // `{...a,}` — trailing comma after the rest property.
@@ -178,10 +184,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             spread.span.start_usize(),
                         ));
                     }
-                    properties.push(self.object_property_to_pattern(prop.clone(), context)?);
+                    properties.push(self.object_property_to_pattern(prop, context)?);
                 }
 
-                Ok(Expression {
+                Ok(Some(Expression {
                     span: expr.span,
                     kind: ExpressionKind::ObjectPattern(ObjectPattern {
                         properties: properties.into_bump_slice(),
@@ -189,14 +195,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         type_annotation: None,
                         decorators: None,
                     }),
-                })
+                }))
             }
 
             // Convert ArrayExpression to ArrayPattern
             ExpressionKind::ArrayExpression(arr) => {
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::dead::<Option<&'arena Expression<'arena>>>(
-                    tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                    tsv_lang::ast_census_probe::Dead::Superseded,
                     arr.elements.len(),
                 );
                 // `[...a,]` — trailing comma after the rest element.
@@ -227,19 +233,31 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                     e.span().start_usize(),
                                 ));
                             }
-                            #[cfg(feature = "_internal_ast_census")]
-                            tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
-                                tsv_lang::ast_census_probe::Dead::DuplicateRoot,
-                                1,
-                            );
-                            Some(self.refine_assignable((*e).clone(), context)?)
+                            match self.refine_assignable(e, context)? {
+                                Some(converted) => {
+                                    #[cfg(feature = "_internal_ast_census")]
+                                    tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                                        tsv_lang::ast_census_probe::Dead::Superseded,
+                                        1,
+                                    );
+                                    Some(converted)
+                                }
+                                None => {
+                                    #[cfg(feature = "_internal_ast_census")]
+                                    tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                                        tsv_lang::ast_census_probe::Dead::MovedInline,
+                                        1,
+                                    );
+                                    Some((*e).clone())
+                                }
+                            }
                         }
                         None => None,
                     };
                     elements.push(converted);
                 }
 
-                Ok(Expression {
+                Ok(Some(Expression {
                     span: expr.span,
                     kind: ExpressionKind::ArrayPattern(ArrayPattern {
                         elements: elements.into_bump_slice(),
@@ -247,13 +265,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         type_annotation: None,
                         decorators: None,
                     }),
-                })
+                }))
             }
 
             // Convert SpreadElement to RestElement
-            ExpressionKind::SpreadElement(spread) => Ok(Expression::from_rest_element(
+            ExpressionKind::SpreadElement(spread) => Ok(Some(Expression::from_rest_element(
                 self.spread_to_rest_element(spread, context)?,
-            )),
+            ))),
 
             // AssignmentExpression in pattern context becomes AssignmentPattern
             // This handles default values like `{a = 1}` which was parsed as shorthand.
@@ -287,12 +305,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     AssignableContext::ForHead => AssignableContext::Assignment,
                     c => c,
                 };
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
-                    tsv_lang::ast_census_probe::Dead::DuplicateRoot,
-                    1,
-                );
-                let left = self.refine_assignable(assign.left.clone(), left_context)?;
+                let left = self.refine_placed_assignable(assign.left, left_context)?;
                 // the pair the printer writes around a default that is itself a bare
                 // assignment (`[a = (b = c)] = x`): parsed as an assignment's right side,
                 // the one position that takes none, it counted none — a level of the
@@ -305,21 +318,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 {
                     self.printer_pair()?;
                 }
-                Ok(Expression {
+                Ok(Some(Expression {
                     span: expr.span,
                     kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
-                        left: self.alloc(left),
+                        left,
                         right: assign.right,
                         decorators: None,
                     }),
-                })
+                }))
             }
 
             // Already a pattern (can happen with nested patterns)
             ExpressionKind::ObjectPattern(_)
             | ExpressionKind::ArrayPattern(_)
             | ExpressionKind::AssignmentPattern(_)
-            | ExpressionKind::RestElement(_) => Ok(expr),
+            | ExpressionKind::RestElement(_) => Ok(None),
 
             // A type-assertion-family expression (`as` / `satisfies` / non-null `!` /
             // `<T>`) or a JSDoc `/** @type {T} */ (expr)` cast is a valid target — as an
@@ -359,7 +372,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     ExpressionKind::Identifier(_) | ExpressionKind::MemberExpression(_)
                 ) =>
             {
-                Ok(expr)
+                Ok(None)
             }
 
             // A non-simple target in *assignment* context (a call `foo() = …`, a
@@ -375,15 +388,92 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // below, which is why `for (foo() in b)` stays a parse error (prettier
             // rejects it too).
             // TODO: the invalid-target early-error belongs in the diagnostics layer.
-            _ if matches!(context, AssignableContext::Assignment) => Ok(expr),
+            _ if matches!(context, AssignableContext::Assignment) => Ok(None),
 
             // Invalid assignment target (binding / for-head position)
             _ => Err(self.error_msg_at("Invalid assignment target", expr.span().start_usize())),
         }
     }
 
-    /// Convert the WHOLE target of an `=` or of a no-declaration for-in/of head —
-    /// the one place a converted target may not be an `AssignmentPattern`.
+    /// [`Parser::refine_assignable`] over a node already in the arena. An unchanged target
+    /// is the reference it was given, so an assignment's identifier or a destructuring
+    /// leaf places nothing; only a conversion places a node, replacing the one it read.
+    pub(super) fn refine_placed_assignable(
+        &mut self,
+        expr: &'arena Expression<'arena>,
+        context: AssignableContext,
+    ) -> Result<&'arena Expression<'arena>, Error> {
+        // the two targets nearly every call holds, answered without entering the body,
+        // whose arms for them this restates
+        let unchanged = match expr.kind {
+            ExpressionKind::Identifier(_) => {
+                !matches!(context, AssignableContext::Binding)
+                    || self.grouping_paren_around(expr.span()).is_none()
+            }
+            ExpressionKind::MemberExpression(_) => matches!(
+                context,
+                AssignableContext::Assignment | AssignableContext::SveltePattern
+            ),
+            _ => false,
+        };
+        if unchanged {
+            #[expect(
+                clippy::debug_assert_with_mut_call,
+                reason = "the arms this restates mutate nothing"
+            )]
+            {
+                debug_assert!(matches!(self.refine_assignable(expr, context), Ok(None)));
+            }
+            return Ok(expr);
+        }
+        match self.refine_assignable(expr, context)? {
+            None => Ok(expr),
+            Some(converted) => {
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                    tsv_lang::ast_census_probe::Dead::Superseded,
+                    1,
+                );
+                Ok(self.alloc(converted))
+            }
+        }
+    }
+
+    /// [`Parser::refine_assignable`] over a value, for the positions that hold their target
+    /// by value: a binding pattern read from a literal the parse never placed, a for-head,
+    /// a Svelte block pattern.
+    pub(super) fn refine_owned_assignable(
+        &mut self,
+        expr: Expression<'arena>,
+        context: AssignableContext,
+    ) -> Result<Expression<'arena>, Error> {
+        Ok(self.refine_assignable(&expr, context)?.unwrap_or(expr))
+    }
+
+    /// Convert the WHOLE target of an `=` (cover grammar), which may not be an
+    /// `AssignmentPattern` ([`Parser::reject_whole_assignment_pattern`]).
+    pub(super) fn refine_assignment_target(
+        &mut self,
+        expr: &'arena Expression<'arena>,
+    ) -> Result<&'arena Expression<'arena>, Error> {
+        let target = self.refine_placed_assignable(expr, AssignableContext::Assignment)?;
+        self.reject_whole_assignment_pattern(target)?;
+        Ok(target)
+    }
+
+    /// Convert the WHOLE target of a no-declaration for-in/of head, which may not be an
+    /// `AssignmentPattern` ([`Parser::reject_whole_assignment_pattern`]).
+    pub(super) fn refine_for_head_target(
+        &mut self,
+        expr: Expression<'arena>,
+    ) -> Result<Expression<'arena>, Error> {
+        let target = self.refine_owned_assignable(expr, AssignableContext::ForHead)?;
+        self.reject_whole_assignment_pattern(&target)?;
+        Ok(target)
+    }
+
+    /// Reject a converted WHOLE target of an `=` or of a no-declaration for-in/of head that
+    /// is an `AssignmentPattern`.
     ///
     /// An `AssignmentPattern` exists only as a pattern CHILD (an array element, a
     /// property value, a parameter): `AssignmentExpression.left` and the for-head's
@@ -397,17 +487,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// never converted, so it survives as itself and defers with the rest. Only the
     /// parenthesized spelling reaches this: an unparenthesized `a = b = 1` parses
     /// right-associative, so its left is never an assignment.
-    pub(super) fn refine_whole_assignable(
-        &mut self,
-        expr: Expression<'arena>,
-        context: AssignableContext,
-    ) -> Result<Expression<'arena>, Error> {
-        let start = expr.span().start_usize();
-        let target = self.refine_assignable(expr, context)?;
+    fn reject_whole_assignment_pattern(&self, target: &Expression<'arena>) -> Result<(), Error> {
         if matches!(target.kind, ExpressionKind::AssignmentPattern(_)) {
-            return Err(self.error_msg_at("Invalid assignment target", start));
+            return Err(self.error_msg_at("Invalid assignment target", target.span().start_usize()));
         }
-        Ok(target)
+        Ok(())
     }
 
     /// Reject an assignment left that no `LeftHandSideExpression` derives — the
@@ -503,12 +587,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         spread: &SpreadElement<'arena>,
         context: AssignableContext,
     ) -> Result<RestElement<'arena>, Error> {
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
-            tsv_lang::ast_census_probe::Dead::DuplicateRoot,
-            1,
-        );
-        let argument = self.refine_assignable(spread.argument.clone(), context)?;
+        let argument = self.refine_placed_assignable(spread.argument, context)?;
         if matches!(argument.kind, ExpressionKind::AssignmentPattern(_)) {
             return Err(self.error_msg_at(
                 "A rest element cannot have a default value",
@@ -516,7 +595,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             ));
         }
         Ok(RestElement {
-            argument: self.alloc(argument),
+            argument,
             optional: false,
             type_annotation: None,
             span: spread.span,
@@ -526,7 +605,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Convert an object property to a pattern property
     fn object_property_to_pattern(
         &mut self,
-        prop: ObjectProperty<'arena>,
+        prop: &ObjectProperty<'arena>,
         context: AssignableContext,
     ) -> Result<ObjectPatternProperty<'arena>, Error> {
         match prop {
@@ -543,16 +622,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         .error_msg_at("Invalid assignment target", p.value.span().start_usize()));
                 }
                 // Convert the value to a pattern
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
-                    tsv_lang::ast_census_probe::Dead::DuplicateRoot,
-                    1,
-                );
-                let value = self.refine_assignable(p.value.clone(), context)?;
+                let value = self.refine_placed_assignable(p.value, context)?;
 
                 Ok(ObjectPatternProperty::Property(Property {
                     key: p.key,
-                    value: self.alloc(value),
+                    value,
                     method: p.method,
                     shorthand: p.shorthand,
                     computed: p.computed,
@@ -561,7 +635,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }))
             }
             ObjectProperty::SpreadElement(spread) => Ok(ObjectPatternProperty::RestElement(
-                self.spread_to_rest_element(&spread, context)?,
+                self.spread_to_rest_element(spread, context)?,
             )),
         }
     }

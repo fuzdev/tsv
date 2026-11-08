@@ -2,7 +2,6 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use crate::parser::expression_assignable::AssignableContext;
 use tsv_lang::{Error, Span};
 
 use super::super::{Parser, RootEnd};
@@ -243,7 +242,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.printer_pair()?;
         }
         self.advance()?;
-        let left = self.refine_whole_assignable(expr, AssignableContext::ForHead)?;
+        let left = self.refine_for_head_target(expr)?;
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<ForInOfLeft<'_>>(1);
         let left = self.arena.alloc(ForInOfLeft::Pattern(left));

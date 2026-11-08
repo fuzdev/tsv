@@ -3999,7 +3999,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Svelte block and `{@const}` patterns, which Svelte reads as assignment
         // targets: a member or parenthesized target is accepted, a type-assertion
         // target still rejects (see `AssignableContext::SveltePattern`).
-        self.refine_assignable(
+        self.refine_owned_assignable(
             expr,
             expression_assignable::AssignableContext::SveltePattern,
         )

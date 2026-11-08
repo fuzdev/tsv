@@ -160,7 +160,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // target are none of them binding targets (`let [x as T] = …`, `let [a.b] = …`,
         // `function f([(x)])` all reject, matching acorn).
         let pattern =
-            literal.and_then(|expr| self.refine_assignable(expr, AssignableContext::Binding));
+            literal.and_then(|expr| self.refine_owned_assignable(expr, AssignableContext::Binding));
         self.grouping_parens.truncate(mark);
         pattern
     }
