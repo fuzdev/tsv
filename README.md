@@ -46,6 +46,7 @@ One reason for tsv to exist is to help find the performance left on the table
 in the Web's implementations.
 
 tsv's formatters are near production-ready, with a long tail of rare bugs.
+The parsers have good [conformance](https://tsv.fuz.dev/docs/conformance) on valid code, but negative cases (rejecting invalid code) are unfinished.
 Reports and opinions are appreciated.
 See the [issues](https://github.com/fuzdev/tsv/issues)
 and [discussions](https://github.com/fuzdev/tsv/discussions).
