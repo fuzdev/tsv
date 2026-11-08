@@ -168,6 +168,19 @@ median of N iterations to reduce noise from OS scheduling.
 The same aggregates (including the per-language breakdown under `langs`) are in
 the `--json` output as `*_us_per_kb` / `*_us_per_file` fields.
 
+To split the `format` column into doc build and render, build with the render
+timers compiled in:
+
+```bash
+cargo run --profile corpus -p tsv_debug --features _internal_phase_timing -- profile ../corpora/collections/zzz/src/lib
+```
+
+This adds a per-language phase table (and `doc_build_us` / `render_us` in `--json`).
+The render is the time inside the doc renderer's output entry points, and the doc
+build is the rest of the format. The timers sit inside the `format` column, so don't
+compare that column against a default build. They are a visible share of a CSS
+format, which renders per declaration, so read the CSS split as a rough one.
+
 ### 2. `tsv_debug json_profile` — parse→JSON emission timing
 
 Times the two phases of the bindings' parse path (`parse` +

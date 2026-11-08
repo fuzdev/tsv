@@ -32,6 +32,7 @@
 // - `census` - opt-in perf census counters (`_internal_census` feature)
 // - `comment_ledger` - print-once comment ledger (`_internal_comment_check` feature)
 // - `fanout_probe` - opt-in work counters for the fanout audit (`_internal_fanout_check` feature)
+// - `phase_timing` - opt-in render timing for `tsv_debug profile` (`_internal_phase_timing` feature)
 // - `doc` - document builder primitives for prettier-compatible formatting
 // - `printing` - shared printing utilities for printers
 // - `source_scan` - trivia-aware source scanning between AST nodes
@@ -66,6 +67,8 @@ mod hash;
 mod json_writer;
 mod location;
 mod output;
+#[doc(hidden)]
+pub mod phase_timing;
 #[doc(hidden)]
 // See `doc` above.
 #[expect(rustdoc::private_intra_doc_links)]

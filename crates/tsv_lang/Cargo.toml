@@ -40,6 +40,11 @@ _internal_comment_check = []
 # as `_internal_swallow_check` — every call site compiles to nothing. `tsv_debug` forwards it. See
 # src/fanout_probe.rs.
 _internal_fanout_check = []
+# Opt-in render timing for `tsv_debug profile`'s doc-build / render split (diagnostic). Off by
+# default and outside the `_internal_audits` umbrella: the timer sites are `#[cfg]`-gated, and a
+# binary carrying them pays two clock reads per render. `tsv_debug` forwards it. See
+# src/phase_timing.rs.
+_internal_phase_timing = []
 # Umbrella that turns on every diagnostic seam at once (`_internal_swallow_check` +
 # `_internal_comment_check` + `_internal_fanout_check`). The audit deno tasks build one binary under this feature
 # instead of one per seam. Off by default, same as its members — production

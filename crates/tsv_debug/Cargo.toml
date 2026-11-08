@@ -50,6 +50,10 @@ _internal_census = ["tsv_lang/_internal_census"]
 # arms them (one relaxed load per site), so the other audits sharing the build pay nothing
 # else.
 _internal_fanout_check = ["tsv_lang/_internal_fanout_check"]
+# Compiles render timers into this binary so `profile` splits its `format` column into doc build
+# and render. Off by default and outside `_internal_audits`: a timed render pays two clock reads,
+# which a default profile must not.
+_internal_phase_timing = ["tsv_lang/_internal_phase_timing"]
 # Umbrella that compiles the diagnostic seams into one binary and enables all five
 # gated subcommands: `swallow_audit` plus the ledger-driven `comment_audit` /
 # `gap_audit` / `blank_audit` / `ignore_audit`. EVERY audit deno task passes

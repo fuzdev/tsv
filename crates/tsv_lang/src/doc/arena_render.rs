@@ -611,6 +611,8 @@ pub fn arena_print_doc_with_indent_resolved_into(
     source: &str,
     output: &mut String,
 ) {
+    #[cfg(feature = "_internal_phase_timing")]
+    let _span = crate::phase_timing::render_span();
     let render = RenderConfig::default();
     let mut pos: usize = start_column;
 
@@ -646,6 +648,8 @@ pub fn arena_print_doc_with_indent_resolved_preserve_whitespace_into(
     source: &str,
     output: &mut String,
 ) {
+    #[cfg(feature = "_internal_phase_timing")]
+    let _span = crate::phase_timing::render_span();
     render_untrimmed_into(
         &RenderConfig::default(),
         arena,
@@ -675,6 +679,8 @@ pub fn arena_print_css_doc_into(
     source: &str,
     output: &mut String,
 ) {
+    #[cfg(feature = "_internal_phase_timing")]
+    let _span = crate::phase_timing::render_span();
     render_untrimmed_into(
         &RenderConfig {
             keeps_escaped_whitespace: true,

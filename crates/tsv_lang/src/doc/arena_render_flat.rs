@@ -178,6 +178,8 @@ pub fn arena_try_print_flat_into(
     source: &str,
     output: &mut String,
 ) -> bool {
+    #[cfg(feature = "_internal_phase_timing")]
+    let _span = crate::phase_timing::render_span();
     try_print_flat(
         arena,
         doc,

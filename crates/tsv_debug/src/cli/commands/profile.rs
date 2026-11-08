@@ -99,10 +99,15 @@ impl ProfileCommand {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
+        // Only a format has a doc build and a render to tell apart.
+        let phases = tsv_lang::phase_timing::ENABLED && matches!(mode, Mode::Format);
         if self.json {
-            print_json(&results, self.iterations, skipped);
+            print_json(&results, self.iterations, skipped, phases);
         } else {
             print_table(&results, self.iterations, skipped);
+            if phases {
+                print_phases(&results);
+            }
         }
 
         // Session perf counters, when built with `--features _internal_census` (no-op otherwise).
@@ -200,6 +205,9 @@ struct FileResult {
     parser_type: ParserType,
     parse_us: f64,
     format_us: f64,
+    /// The part of `format_us` spent rendering (zero unless built with
+    /// `_internal_phase_timing`, and outside format mode).
+    render_us: f64,
     total_us: f64,
     /// Flow-construction counters (`--bind` mode only; `None` in format mode).
     bind_stats: Option<BindStats>,
@@ -216,6 +224,7 @@ struct Aggregate {
     size_bytes: usize,
     parse_us: f64,
     format_us: f64,
+    render_us: f64,
 }
 
 impl Aggregate {
@@ -225,14 +234,20 @@ impl Aggregate {
             size_bytes: 0,
             parse_us: 0.0,
             format_us: 0.0,
+            render_us: 0.0,
         };
         for r in results {
             agg.files += 1;
             agg.size_bytes += r.size;
             agg.parse_us += r.parse_us;
             agg.format_us += r.format_us;
+            agg.render_us += r.render_us;
         }
         agg
+    }
+
+    fn doc_build_us(&self) -> f64 {
+        doc_build_us(self.format_us, self.render_us)
     }
 
     fn total_us(&self) -> f64 {
@@ -259,6 +274,12 @@ impl Aggregate {
         }
         us / self.files as f64
     }
+}
+
+/// The doc build's share of a format: what the render leaves. Each input is a median, so a
+/// render-dominated file can read a hair above its format; that floors at zero.
+fn doc_build_us(format_us: f64, render_us: f64) -> f64 {
+    (format_us - render_us).max(0.0)
 }
 
 #[expect(clippy::cast_precision_loss)]
@@ -306,9 +327,12 @@ fn profile_file(
 
     let mut parse_times = Vec::with_capacity(iterations);
     let mut format_times = Vec::with_capacity(iterations);
+    let mut render_times = Vec::with_capacity(iterations);
     let mut bind_stats = None;
 
     for _ in 0..iterations {
+        // Clears what a failed iteration left behind.
+        let _ = tsv_lang::phase_timing::take_render_time();
         let (parse_dur, format_dur) = match mode {
             Mode::Bind => {
                 let (parse_dur, format_dur, stats) = profile_bind_once(&source, arena)?;
@@ -320,6 +344,7 @@ fn profile_file(
         };
         parse_times.push(parse_dur);
         format_times.push(format_dur);
+        render_times.push(tsv_lang::phase_timing::take_render_time());
         // Arena teardown outside the timed regions, mirroring how arena setup is
         // excluded: the timers isolate parse/format work proper.
         arena.reset();
@@ -328,6 +353,7 @@ fn profile_file(
 
     parse_times.sort();
     format_times.sort();
+    render_times.sort();
 
     let parse_us = median_us(&parse_times);
     let format_us = median_us(&format_times);
@@ -338,6 +364,7 @@ fn profile_file(
         parser_type,
         parse_us,
         format_us,
+        render_us: median_us(&render_times),
         total_us: parse_us + format_us,
         bind_stats,
     })
@@ -647,13 +674,42 @@ fn print_table(results: &[FileResult], iterations: usize, skipped: usize) {
     eprintln!("iterations: {iterations} (median shown{skip_msg})");
 }
 
-fn print_json(results: &[FileResult], iterations: usize, skipped: usize) {
+/// The format column split into doc build and render, per language and overall (a build
+/// with `_internal_phase_timing`; the timers are inside the `format` column they split).
+fn print_phases(results: &[FileResult]) {
+    let row = |label: &str, agg: &Aggregate| {
+        let share = |us: f64| {
+            let total = agg.total_us();
+            if total > 0.0 { us / total * 100.0 } else { 0.0 }
+        };
+        eprintln!(
+            "{label:>6}  {:>10} {:>3.0}%  {:>10} {:>3.0}%  {:>10} {:>3.0}%",
+            format_duration(agg.parse_us),
+            share(agg.parse_us),
+            format_duration(agg.doc_build_us()),
+            share(agg.doc_build_us()),
+            format_duration(agg.render_us),
+            share(agg.render_us),
+        );
+    };
+    eprintln!();
+    eprintln!(
+        "{:>6}  {:>15}  {:>15}  {:>15}",
+        "phase", "parse", "doc build", "render"
+    );
+    for (label, agg) in &lang_groups(results) {
+        row(label, agg);
+    }
+    row("all", &Aggregate::from_results(results.iter()));
+}
+
+fn print_json(results: &[FileResult], iterations: usize, skipped: usize, phases: bool) {
     let total = Aggregate::from_results(results.iter());
 
     let files: Vec<serde_json::Value> = results
         .iter()
         .map(|r| {
-            serde_json::json!({
+            let mut file = serde_json::json!({
                 "path": r.path.to_string_lossy(),
                 "lang": lang_token(r.parser_type),
                 "size_bytes": r.size,
@@ -661,13 +717,18 @@ fn print_json(results: &[FileResult], iterations: usize, skipped: usize) {
                 "format_us": r.format_us,
                 "total_us": r.total_us,
                 "total_us_per_kb": us_per_kb(r.size, r.total_us),
-            })
+            });
+            if phases {
+                file["doc_build_us"] = doc_build_us(r.format_us, r.render_us).into();
+                file["render_us"] = r.render_us.into();
+            }
+            file
         })
         .collect();
 
     let langs: serde_json::Map<String, serde_json::Value> = lang_groups(results)
         .iter()
-        .map(|(label, agg)| ((*label).to_string(), aggregate_json(agg)))
+        .map(|(label, agg)| ((*label).to_string(), aggregate_json(agg, phases)))
         .collect();
 
     let output = serde_json::json!({
@@ -675,14 +736,14 @@ fn print_json(results: &[FileResult], iterations: usize, skipped: usize) {
         "skipped": skipped,
         "files": files,
         "langs": langs,
-        "totals": aggregate_json(&total),
+        "totals": aggregate_json(&total, phases),
     });
 
     super::print_json_pretty(&output);
 }
 
-fn aggregate_json(agg: &Aggregate) -> serde_json::Value {
-    serde_json::json!({
+fn aggregate_json(agg: &Aggregate, phases: bool) -> serde_json::Value {
+    let mut value = serde_json::json!({
         "files": agg.files,
         "size_bytes": agg.size_bytes,
         "parse_us": agg.parse_us,
@@ -695,7 +756,12 @@ fn aggregate_json(agg: &Aggregate) -> serde_json::Value {
         "parse_us_per_file": agg.us_per_file(agg.parse_us),
         "format_us_per_file": agg.us_per_file(agg.format_us),
         "total_us_per_file": agg.us_per_file(agg.total_us()),
-    })
+    });
+    if phases {
+        value["doc_build_us"] = agg.doc_build_us().into();
+        value["render_us"] = agg.render_us.into();
+    }
+    value
 }
 
 /// Shorten path for display (show last 3 components)
