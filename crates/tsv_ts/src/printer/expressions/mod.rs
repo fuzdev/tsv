@@ -129,10 +129,12 @@ impl<'a> Printer<'a> {
             // The full dispatch's take-and-clear of `is_expression_statement`, which a
             // leaf never re-sets (see the rule at the top of that function).
             ExpressionKind::Literal(lit) => {
+                tsv_lang::fanout_probe::leaf(&expr.kind, || (expr.span.start, expr.span.end));
                 self.is_expression_statement.set(false);
                 self.build_literal_doc(lit)
             }
             ExpressionKind::Identifier(id) => {
+                tsv_lang::fanout_probe::leaf(&expr.kind, || (expr.span.start, expr.span.end));
                 self.is_expression_statement.set(false);
                 self.build_identifier_expression_doc(id)
             }

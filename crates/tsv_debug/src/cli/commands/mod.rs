@@ -8,6 +8,7 @@ pub mod binding_audit;
 pub mod blank_audit;
 pub mod buffer_sizes;
 pub mod build_fanout_audit;
+pub mod build_visit_census;
 pub mod canonical_compile;
 pub mod canonical_parse;
 pub mod canonicalize_audit;

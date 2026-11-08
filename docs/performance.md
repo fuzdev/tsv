@@ -811,6 +811,8 @@ ranking two rungs a slot census puts close together.
 The same query answers a non-perf question: pointed at `tests/fixtures`, the
 census says which node kinds the fixture tree never exercises.
 
+What a format then dispatches on is a separate count: `cargo run --profile corpus -p tsv_debug --features _internal_audits -- build_visit_census ../corpora/collections` reports doc-build dispatches per language and dispatch family, each one a dispatch and not an edge read (its module doc states what it does not see).
+
 ### 11. `tsv_lang::census` — instrumented counters behind a cargo feature
 
 The question a board cannot answer: **how often does this loop run, how long are

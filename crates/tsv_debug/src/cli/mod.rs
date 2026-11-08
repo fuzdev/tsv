@@ -16,9 +16,10 @@ use commands::{
     arena_stats::ArenaStatsCommand, ast_census::AstCensusCommand, ast_diff::AstDiffCommand,
     authoring_audit::AuthoringAuditCommand, binding_audit::BindingAuditCommand,
     buffer_sizes::BufferSizesCommand, build_fanout_audit::BuildFanoutAuditCommand,
-    canonical_compile::CanonicalCompileCommand, canonical_parse::CanonicalParseCommand,
-    canonicalize_audit::CanonicalizeAuditCommand, census_audit::CensusAuditCommand,
-    check::CheckCommand, compare::CompareCommand, compile_compare::CompileCompareCommand,
+    build_visit_census::BuildVisitCensusCommand, canonical_compile::CanonicalCompileCommand,
+    canonical_parse::CanonicalParseCommand, canonicalize_audit::CanonicalizeAuditCommand,
+    census_audit::CensusAuditCommand, check::CheckCommand, compare::CompareCommand,
+    compile_compare::CompileCompareCommand,
     compile_conformance_audit::CompileConformanceAuditCommand,
     compile_corpus_compare::CompileCorpusCompareCommand,
     compile_fixture_init::CompileFixtureInitCommand,
@@ -93,6 +94,7 @@ pub enum Subcommand {
     BindingAudit(BindingAuditCommand),
     BufferSizes(BufferSizesCommand),
     BuildFanoutAudit(BuildFanoutAuditCommand),
+    BuildVisitCensus(BuildVisitCensusCommand),
     // Requires the `_internal_comment_check` feature so default builds keep the comment ledger's
     // registration + record hooks compiled out (production-shaped profiles); the
     // `comments:audit` deno task passes it.
@@ -187,6 +189,7 @@ impl TopLevel {
             Subcommand::BindingAudit(c) => c.run(),
             Subcommand::BufferSizes(c) => c.run(),
             Subcommand::BuildFanoutAudit(c) => c.run(),
+            Subcommand::BuildVisitCensus(c) => c.run(),
             #[cfg(feature = "_internal_comment_check")]
             Subcommand::CommentAudit(c) => c.run(),
             #[cfg(feature = "_internal_comment_check")]

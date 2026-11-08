@@ -21,6 +21,11 @@
 //! and reads them back with [`disarm`]. A [`Budget`] bounds an armed run — the call that takes
 //! a counter past its budget panics with [`BUDGET_EXCEEDED`], so a shape whose work is
 //! exponential stops while it is still small instead of taking the machine's memory.
+//!
+//! [`leaf`] is the one counter the audit does not read: the expression dispatch answers its
+//! leaf kinds ahead of the [`build`] site, so `tsv_debug build_visit_census` needs them
+//! counted apart. They land in [`Tally::leaf_builds`], never in [`Tally::builds`], and no
+//! [`Budget`] field bounds them, so what the audit grades cannot move with them.
 
 /// What a [`build`] call counts: the dispatch that built the node.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -54,6 +59,9 @@ pub struct Budget {
 pub struct Tally {
     /// Builds of each distinct node, keyed by its dispatch, kind and span.
     pub builds: Vec<(BuildKey, u32)>,
+    /// Builds of each distinct leaf expression ([`leaf`]), keyed the same way, under
+    /// [`Build::Expression`]. Apart from [`Self::builds`], which the fanout audit reads whole.
+    pub leaf_builds: Vec<(BuildKey, u32)>,
     /// Doc-walk visits.
     pub walks: u64,
     /// Source-scan steps.
@@ -100,6 +108,7 @@ mod imp {
     struct State {
         budget: Budget,
         builds: FxHashMap<BuildKey, u32>,
+        leaf_builds: FxHashMap<BuildKey, u32>,
         total_builds: u64,
         walks: u64,
         scans: u64,
@@ -167,6 +176,30 @@ mod imp {
     }
 
     #[inline]
+    pub(super) fn leaf<K>(kind: &K, span: impl FnOnce() -> (u32, u32)) {
+        if any_armed() {
+            let (start, end) = span();
+            leaf_armed(discriminant_hash(kind), start, end);
+        }
+    }
+
+    /// The armed half of [`leaf`], over scalars alone, as [`build_armed`] is.
+    #[cold]
+    #[inline(never)]
+    fn leaf_armed(kind: u64, start: u32, end: u32) {
+        let key = BuildKey {
+            dispatch: Build::Expression,
+            kind,
+            start,
+            end,
+        };
+        armed(|state| {
+            *state.leaf_builds.entry(key).or_insert(0) += 1;
+            false
+        });
+    }
+
+    #[inline]
     pub(super) fn walk() {
         if any_armed() {
             armed(|state| {
@@ -220,6 +253,7 @@ mod imp {
             *state.borrow_mut() = Some(State {
                 budget,
                 builds: FxHashMap::default(),
+                leaf_builds: FxHashMap::default(),
                 total_builds: 0,
                 walks: 0,
                 scans: 0,
@@ -238,8 +272,11 @@ mod imp {
                 .map_or_else(Tally::default, |state| {
                     let mut builds: Vec<_> = state.builds.into_iter().collect();
                     builds.sort_unstable();
+                    let mut leaf_builds: Vec<_> = state.leaf_builds.into_iter().collect();
+                    leaf_builds.sort_unstable();
                     Tally {
                         builds,
+                        leaf_builds,
                         walks: state.walks,
                         scans: state.scans,
                         predicates: state.predicates,
@@ -257,6 +294,9 @@ mod imp {
 
     #[inline]
     pub(super) fn build<K>(_dispatch: Build, _kind: &K, _span: impl FnOnce() -> (u32, u32)) {}
+
+    #[inline]
+    pub(super) fn leaf<K>(_kind: &K, _span: impl FnOnce() -> (u32, u32)) {}
 
     #[inline]
     pub(super) fn walk() {}
@@ -291,6 +331,15 @@ pub const ENABLED: bool = imp::ENABLED;
 #[inline]
 pub fn build<K>(dispatch: Build, kind: &K, span: impl FnOnce() -> (u32, u32)) {
     imp::build(dispatch, kind, span);
+}
+
+/// Count one build of a leaf expression (a literal or an identifier) of kind `kind`, the
+/// path [`build`]'s expression site never sees. Tallied in [`Tally::leaf_builds`] and bounded
+/// by no [`Budget`] field; `span` is asked only when a run is armed. A no-op without the
+/// `_internal_fanout_check` feature, which never calls `span`.
+#[inline]
+pub fn leaf<K>(kind: &K, span: impl FnOnce() -> (u32, u32)) {
+    imp::leaf(kind, span);
 }
 
 /// Count one doc-walk visit. A no-op without the `_internal_fanout_check` feature.
@@ -330,4 +379,47 @@ pub fn arm(budget: Budget) {
 #[inline]
 pub fn disarm() -> Tally {
     imp::disarm()
+}
+
+#[cfg(all(test, feature = "_internal_fanout_check"))]
+mod tests {
+    use super::*;
+
+    const UNBOUNDED: Budget = Budget {
+        builds: u64::MAX,
+        walks: u64::MAX,
+        scans: u64::MAX,
+        predicates: u64::MAX,
+        nodes: u64::MAX,
+    };
+
+    /// The fanout audit reads `builds` whole, so a leaf must never land in it.
+    #[test]
+    fn a_leaf_stays_out_of_the_builds_the_audit_reads() {
+        arm(UNBOUNDED);
+        build(Build::Expression, &Some(1), || (0, 3));
+        leaf(&Some(1), || (4, 5));
+        leaf(&Some(1), || (4, 5));
+        leaf(&Some(1), || (6, 7));
+        let tally = disarm();
+        assert_eq!(tally.total_builds(), 1);
+        assert_eq!(tally.builds.len(), 1);
+        assert_eq!(tally.leaf_builds.len(), 2);
+        assert_eq!(tally.leaf_builds[0].1, 2);
+        assert_eq!(tally.leaf_builds[1].1, 1);
+    }
+
+    /// No budget field reads a leaf: one past every other counter's limit still runs.
+    #[test]
+    fn no_budget_field_bounds_a_leaf() {
+        arm(Budget {
+            builds: 0,
+            walks: 0,
+            scans: 0,
+            predicates: 0,
+            nodes: 0,
+        });
+        leaf(&Some(1), || (0, 1));
+        assert_eq!(disarm().leaf_builds.len(), 1);
+    }
 }
