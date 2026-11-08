@@ -63,7 +63,10 @@
 //   nothing welds after a `:` either — a `colon` node is no operator for a sign to bind to
 //   (`--x: a:+b` → `a: + b`).
 
+#[cfg(feature = "_internal_ast_census")]
+use crate::parser::census_vec::BumpVec;
 use bumpalo::Bump;
+#[cfg(not(feature = "_internal_ast_census"))]
 use bumpalo::collections::Vec as BumpVec;
 
 use super::scan::{comment_end, is_comment_start, matching_close_paren};

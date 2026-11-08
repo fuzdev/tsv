@@ -108,6 +108,8 @@ fn parse_atrule_body<'arena>(
     // Raw source offset of the first prelude token — for the conditional-at-rule raw
     // fallback after the dispatch. Captured before any prelude parsing consumes tokens.
     let prelude_start_raw = parser.current_start();
+    #[cfg(feature = "_internal_ast_census")]
+    let ast_census_mark = tsv_lang::ast_census_probe::mark();
 
     // Parse prelude based on at-rule type
     let prelude = if name_lc == "import" {
@@ -198,6 +200,8 @@ fn parse_atrule_body<'arena>(
     let prelude = if matches!(name_lc, "supports" | "container")
         && (!parser.at_prelude_end() || partless_with_run)
     {
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::rewind(ast_census_mark);
         reconsume_prelude_as_raw(parser, prelude_start_raw)?
     } else {
         prelude

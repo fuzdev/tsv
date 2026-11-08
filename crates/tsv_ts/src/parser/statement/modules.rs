@@ -65,6 +65,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         export_kind: ExportKind,
     ) -> Statement<'arena> {
         let end = declaration.span().end;
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ExportNamedDeclaration<'_>>(1);
         Statement {
             span: Span::new(start as u32, end),
             kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(ExportNamedDeclaration {
@@ -100,6 +102,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?; // consume '='
                 let expression = self.parse_expression()?;
                 let end = self.semicolon_end()?;
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<TSExportAssignment<'_>>(1);
                 Ok(Statement {
                     span: Span::new(start as u32, end),
                     kind: StatementKind::TSExportAssignment(
@@ -267,6 +271,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     decorators,
                     DecoratedClassExport::BeforeOrAbsent,
                 )?;
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<ClassDeclaration<'_>>(1);
                 let class = Statement::from_class_declaration(self.arena.alloc(class));
                 Ok(self.export_named(start, class, ExportKind::Value))
             }
@@ -498,6 +504,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     } else {
                         class.span.end
                     };
+                    #[cfg(feature = "_internal_ast_census")]
+                    tsv_lang::ast_census_probe::dead::<Expression<'_>>(
+                        tsv_lang::ast_census_probe::Dead::MovedInline,
+                        1,
+                    );
+                    #[cfg(feature = "_internal_ast_census")]
+                    tsv_lang::ast_census_probe::mint::<ExportDefaultDeclaration<'_>>(1);
                     return Ok(Statement {
                         span: Span::new(start, end),
                         kind: StatementKind::ExportDefaultDeclaration(self.arena.alloc(
@@ -509,6 +522,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 let expr = self.parse_expression()?;
                 let end = self.semicolon_end()?;
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<ExportDefaultDeclaration<'_>>(1);
                 return Ok(Statement {
                     span: Span::new(start, end),
                     kind: StatementKind::ExportDefaultDeclaration(self.arena.alloc(
@@ -520,6 +535,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
         };
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ExportDefaultDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start, end),
             kind: StatementKind::ExportDefaultDeclaration(
@@ -772,6 +789,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let attributes = self.parse_import_attributes()?;
         let end = self.semicolon_end()?;
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ExportAllDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start, end),
             kind: StatementKind::ExportAllDeclaration(self.arena.alloc(ExportAllDeclaration {
@@ -868,6 +887,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ExportNamedDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start, end),
             kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(ExportNamedDeclaration {
@@ -1063,6 +1084,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let attributes = self.parse_import_attributes()?;
             let end = self.semicolon_end()?;
 
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::mint::<ImportDeclaration<'_>>(1);
             return Ok(Statement {
                 span: Span::new(start as u32, end),
                 kind: StatementKind::ImportDeclaration(self.arena.alloc(ImportDeclaration {
@@ -1289,6 +1312,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ImportDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start as u32, end),
             kind: StatementKind::ImportDeclaration(self.arena.alloc(ImportDeclaration {
@@ -1495,6 +1520,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TSImportEqualsDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start as u32, end),
             kind: StatementKind::TSImportEqualsDeclaration(self.arena.alloc(

@@ -2,8 +2,11 @@
 
 use crate::ast::{self, FragmentNode};
 use crate::lexer::{Lexer, Token, TokenKind};
+#[cfg(feature = "_internal_ast_census")]
+use crate::parser::census_vec::BumpVec;
 use crate::parser::element::tag_name_end;
 use bumpalo::Bump;
+#[cfg(not(feature = "_internal_ast_census"))]
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{Comment, DepthBudget, DepthLimit, Error, Span};
 use tsv_ts::__private::TopLevelAs;
@@ -102,6 +105,8 @@ const ISLAND_LEVELS: u32 = 2;
 pub(crate) struct EmbeddedParseMark {
     comments: usize,
     snippet_wire_parameters: usize,
+    #[cfg(feature = "_internal_ast_census")]
+    ast_census_mark: u32,
 }
 
 /// Svelte's reserved-word list (`RESERVED_WORDS`, `svelte/src/utils.js`): the JS
@@ -240,6 +245,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// into arena memory.
     #[inline]
     pub(crate) fn alloc<T>(&self, val: T) -> &'arena T {
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<T>(1);
         self.arena.alloc(val)
     }
 
@@ -772,6 +779,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             "a block pattern's `: T` is its own sub-parse (`parse_block_pattern`)"
         );
         self.expression_comments.extend_from_slice(comments);
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
         Ok(self.arena.alloc(pattern))
     }
 
@@ -788,12 +797,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         EmbeddedParseMark {
             comments: self.expression_comments.len(),
             snippet_wire_parameters: self.snippet_wire_parameters.len(),
+            #[cfg(feature = "_internal_ast_census")]
+            ast_census_mark: tsv_lang::ast_census_probe::mark(),
         }
     }
 
     /// Drop everything the embedded parses since `mark` registered, leaving the
     /// parser as if they had not run. See [`embedded_parse_mark`](Self::embedded_parse_mark).
     pub(crate) fn rewind_embedded_parses(&mut self, mark: EmbeddedParseMark) {
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::rewind(mark.ast_census_mark);
         self.expression_comments.truncate(mark.comments);
         self.snippet_wire_parameters
             .truncate(mark.snippet_wire_parameters);

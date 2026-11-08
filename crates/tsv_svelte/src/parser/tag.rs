@@ -347,8 +347,23 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // `SequenceExpression`); a single expression is a one-element list.
             match &expr.kind {
                 ExpressionKind::SequenceExpression(seq) => {
+                    #[cfg(feature = "_internal_ast_census")]
+                    tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                        tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                        1,
+                    );
+                    #[cfg(feature = "_internal_ast_census")]
+                    tsv_lang::ast_census_probe::dead::<&'arena Expression<'arena>>(
+                        tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                        seq.expressions.len(),
+                    );
                     for element in seq.expressions {
                         self.require_debug_identifier(element)?;
+                        #[cfg(feature = "_internal_ast_census")]
+                        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                            tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                            1,
+                        );
                         identifiers.push((*element).clone());
                     }
                 }
@@ -370,6 +385,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     } else {
                         self.require_debug_identifier(expr)?;
                     }
+                    #[cfg(feature = "_internal_ast_census")]
+                    tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                        tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                        1,
+                    );
                     identifiers.push(expr.clone());
                 }
             }

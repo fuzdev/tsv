@@ -96,6 +96,8 @@ struct ClassHead<'arena> {
 impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_class_declaration(&mut self) -> Result<Statement<'arena>, Error> {
         let class = self.parse_class_declaration_inner(true, false)?;
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ClassDeclaration<'_>>(1);
         Ok(Statement::from_class_declaration(self.arena.alloc(class)))
     }
 
@@ -119,6 +121,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let class =
             self.parse_class_declaration_inner_with_start(true, true, abstract_start, false)?;
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ClassDeclaration<'_>>(1);
         Ok(Statement::from_class_declaration(self.arena.alloc(class)))
     }
 
@@ -173,6 +177,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if is_export {
             if is_default {
                 let end = class.span.end;
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<ExportDefaultDeclaration<'_>>(1);
                 Ok(Statement {
                     span: Span::new(start as u32, end),
                     kind: StatementKind::ExportDefaultDeclaration(self.arena.alloc(
@@ -190,7 +196,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 } else {
                     ExportKind::Value
                 };
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<ClassDeclaration<'_>>(1);
                 let class_decl = Statement::from_class_declaration(self.arena.alloc(class));
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<ExportNamedDeclaration<'_>>(1);
                 Ok(Statement {
                     span: Span::new(start as u32, end),
                     kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(
@@ -205,6 +215,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 })
             }
         } else {
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::mint::<ClassDeclaration<'_>>(1);
             Ok(Statement::from_class_declaration(self.arena.alloc(class)))
         }
     }
@@ -227,7 +239,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn finish_decorated_class(
         &mut self,
         deco_start: usize,
-        decorators: bumpalo::collections::Vec<'arena, Decorator<'arena>>,
+        decorators: crate::parser::BumpVec<'arena, Decorator<'arena>>,
         export: DecoratedClassExport,
     ) -> Result<ClassDeclaration<'arena>, Error> {
         // `export default class {}` is the one name-optional decorated form.
@@ -354,7 +366,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn finish_decorated_class_expression(
         &mut self,
         start: usize,
-        decorators: bumpalo::collections::Vec<'arena, Decorator<'arena>>,
+        decorators: crate::parser::BumpVec<'arena, Decorator<'arena>>,
         r#abstract: bool,
     ) -> Result<&'arena Expression<'arena>, Error> {
         if r#abstract {
@@ -391,7 +403,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_decorators(
         &mut self,
         kind: DecoratorListKind,
-    ) -> Result<bumpalo::collections::Vec<'arena, Decorator<'arena>>, Error> {
+    ) -> Result<crate::parser::BumpVec<'arena, Decorator<'arena>>, Error> {
         match kind {
             DecoratorListKind::Class => self.with_strict_class_scope(Self::parse_decorator_run),
             DecoratorListKind::Parameter => self.parse_decorator_run(),
@@ -403,7 +415,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// combinator or call it bare, one spelling either way.
     fn parse_decorator_run(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, Decorator<'arena>>, Error> {
+    ) -> Result<crate::parser::BumpVec<'arena, Decorator<'arena>>, Error> {
         let mut decorators = self.bvec();
 
         while *self.current_kind() == TokenKind::At {
@@ -577,6 +589,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } = self.parse_class_head_and_body(false)?;
         let end = body.span.end;
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ClassExpression<'_>>(1);
         Ok(alloc_expr(
             self.arena,
             Expression {
@@ -1071,6 +1085,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             } else {
                 return Err(self.error_expected("class member name"));
             };
+
+        // a non-computed key is built by value in its member and never placed in the arena
+        #[cfg(feature = "_internal_ast_census")]
+        if !computed {
+            tsv_lang::ast_census_probe::built_inline::<Expression<'arena>>(1);
+        }
 
         // Optional (`?`) / definite (`!`) marker, between the key and any type
         // parameters — methods read `?` as `optional`, properties keep the full modifier.

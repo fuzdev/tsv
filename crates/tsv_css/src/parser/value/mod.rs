@@ -291,7 +291,7 @@ pub(crate) fn parse_single_value<'arena>(
     // with a number without being one dimension. It answers `None` for a single-token
     // OPERAND run, which is nearly every value, so the leaf path below is untouched.
     if let Some(tokens) = operators::split_value_run(s, colon_is_operator, head_welds, arena) {
-        let mut values = bumpalo::collections::Vec::with_capacity_in(tokens.len(), arena);
+        let mut values = crate::parser::BumpVec::with_capacity_in(tokens.len(), arena);
         for token in tokens {
             let member = &s[token.start..token.end];
             let member_span = Span {

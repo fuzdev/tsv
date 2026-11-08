@@ -149,6 +149,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             // Convert ObjectExpression to ObjectPattern
             ExpressionKind::ObjectExpression(obj) => {
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::dead::<ObjectProperty<'arena>>(
+                    tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                    obj.properties.len(),
+                );
                 // `{...a,}` — trailing comma after the rest property.
                 if obj.spread_trailing_comma {
                     let span = obj
@@ -189,6 +194,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             // Convert ArrayExpression to ArrayPattern
             ExpressionKind::ArrayExpression(arr) => {
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::dead::<Option<&'arena Expression<'arena>>>(
+                    tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                    arr.elements.len(),
+                );
                 // `[...a,]` — trailing comma after the rest element.
                 // Element-after-rest (`[...a, b]`) and rest-with-default
                 // (`[...a = 1]`) are caught in the loop below.
@@ -217,6 +227,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                     e.span().start_usize(),
                                 ));
                             }
+                            #[cfg(feature = "_internal_ast_census")]
+                            tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                                tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                                1,
+                            );
                             Some(self.refine_assignable((*e).clone(), context)?)
                         }
                         None => None,
@@ -272,6 +287,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     AssignableContext::ForHead => AssignableContext::Assignment,
                     c => c,
                 };
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                    tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                    1,
+                );
                 let left = self.refine_assignable(assign.left.clone(), left_context)?;
                 // the pair the printer writes around a default that is itself a bare
                 // assignment (`[a = (b = c)] = x`): parsed as an assignment's right side,
@@ -483,6 +503,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         spread: &SpreadElement<'arena>,
         context: AssignableContext,
     ) -> Result<RestElement<'arena>, Error> {
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+            tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+            1,
+        );
         let argument = self.refine_assignable(spread.argument.clone(), context)?;
         if matches!(argument.kind, ExpressionKind::AssignmentPattern(_)) {
             return Err(self.error_msg_at(
@@ -518,6 +543,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         .error_msg_at("Invalid assignment target", p.value.span().start_usize()));
                 }
                 // Convert the value to a pattern
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                    tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                    1,
+                );
                 let value = self.refine_assignable(p.value.clone(), context)?;
 
                 Ok(ObjectPatternProperty::Property(Property {

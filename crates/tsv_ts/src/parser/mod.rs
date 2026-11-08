@@ -6,7 +6,10 @@ use crate::lexer::escapes::{LegacyEscape, find_legacy_escape};
 use crate::lexer::{KeywordKind, Lexer, LexerCheckpoint, Token, TokenKind, is_es_line_terminator};
 use crate::printer::ParenContext;
 use bumpalo::Bump;
+#[cfg(not(feature = "_internal_ast_census"))]
 use bumpalo::collections::Vec as BumpVec;
+#[cfg(feature = "_internal_ast_census")]
+use census_vec::BumpVec;
 use std::collections::BTreeSet;
 use std::ops::ControlFlow;
 use tsv_lang::{DepthBudget, DepthLimit, Error, Span, SpineCount};
@@ -14,6 +17,10 @@ use tsv_lang::{DepthBudget, DepthLimit, Error, Span, SpineCount};
 // Import parsing implementations
 mod expression;
 mod expression_arrow; // Arrow function predicate scans and builders
+#[cfg(feature = "_internal_ast_census")]
+mod census_vec {
+    tsv_lang::ast_census_vec!();
+}
 mod expression_assignable; // Cover-grammar expression→pattern conversion (`refine_assignable`)
 mod expression_braced_operand; // Braced-operand byte-scan lookahead (`{} / 2` vs `if (c) {}⏎/re/`)
 mod expression_literals; // Object and array literal parsing
@@ -492,6 +499,8 @@ pub(super) struct Checkpoint<'arena> {
     spine: SpineCount,
     lt_regions: LtRegions,
     abandoned_type_arguments_error: Option<Error>,
+    #[cfg(feature = "_internal_ast_census")]
+    ast_census_mark: u32,
 }
 
 #[expect(clippy::struct_excessive_bools)]
@@ -862,6 +871,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// into arena memory; the mut→shared reborrow is implicit.
     #[inline]
     fn alloc<T>(&self, val: T) -> &'arena T {
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<T>(1);
         self.arena.alloc(val)
     }
 
@@ -2457,6 +2468,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             spine: self.spine,
             lt_regions: self.lt_regions,
             abandoned_type_arguments_error: self.abandoned_type_arguments_error.clone(),
+            #[cfg(feature = "_internal_ast_census")]
+            ast_census_mark: tsv_lang::ast_census_probe::mark(),
         }
     }
 
@@ -2484,7 +2497,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             spine,
             lt_regions,
             abandoned_type_arguments_error,
+            #[cfg(feature = "_internal_ast_census")]
+            ast_census_mark,
         } = checkpoint;
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::rewind(ast_census_mark);
         self.lexer.rewind(lexer);
         self.current = current;
         self.current_decoded = current_decoded;
@@ -4092,6 +4109,8 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
             .map(|()| parsed)
             .map_err(|error| (error, true))
     };
+    #[cfg(feature = "_internal_ast_census")]
+    let ast_census_mark = tsv_lang::ast_census_probe::mark();
     let mut parser = Parser::new(source, base_offset, goal, arena);
     parser.depth = DepthBudget::at(host_nesting);
     parser.prime()?;
@@ -4103,6 +4122,8 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     {
         return first.map_err(|(error, _)| error);
     }
+    #[cfg(feature = "_internal_ast_census")]
+    let ast_census_retry_mark = tsv_lang::ast_census_probe::mark();
     let mut retry = Parser::new(source, base_offset, goal, arena);
     retry.depth = DepthBudget::at(host_nesting);
     retry.tsc_followers = false;
@@ -4111,6 +4132,16 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
         .and_then(|()| f(&mut retry))
         .map_err(|error| (error, false))
         .and_then(checked);
+    // the parse kept is the second if it succeeded, else the first; the other's rows are
+    // abandoned
+    #[cfg(feature = "_internal_ast_census")]
+    match (&second, &first) {
+        (Ok(_), _) => {
+            tsv_lang::ast_census_probe::abandon_range(ast_census_mark, ast_census_retry_mark);
+        }
+        (Err(_), Ok(_)) => tsv_lang::ast_census_probe::rewind(ast_census_retry_mark),
+        (Err(_), Err(_)) => tsv_lang::ast_census_probe::rewind(ast_census_mark),
+    }
     match (second, first) {
         (Ok(parsed), _) | (Err(_), Ok(parsed)) => Ok(parsed),
         (Err((_, false)), Err((error, false))) if !embedded => Err(error),

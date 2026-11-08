@@ -74,7 +74,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// is present. Shared by type literals (`{ … }`) and interface bodies.
     pub(in crate::parser) fn parse_type_members(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, TSTypeElement<'arena>>, Error> {
+    ) -> Result<crate::parser::BumpVec<'arena, TSTypeElement<'arena>>, Error> {
         let mut members = self.bvec();
         // the members are siblings (`ListFrame`)
         let mut frame = self.list_frame();
@@ -243,6 +243,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } else {
             return Err(self.error_expected("property name"));
         };
+
+        // a non-computed key is built by value in its member and never placed in the arena
+        #[cfg(feature = "_internal_ast_census")]
+        if !computed {
+            tsv_lang::ast_census_probe::built_inline::<Expression<'arena>>(1);
+        }
 
         // Check for optional: ?
         let optional = self.eat(TokenKind::Question)?;

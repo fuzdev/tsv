@@ -32,6 +32,7 @@
 // - `census` - opt-in perf census counters (`_internal_census` feature)
 // - `comment_ledger` - print-once comment ledger (`_internal_comment_check` feature)
 // - `fanout_probe` - opt-in work counters for the fanout audit (`_internal_fanout_check` feature)
+// - `ast_census_probe` - opt-in parser allocation-demand counters (`_internal_ast_census` feature)
 // - `phase_timing` - opt-in render timing for `tsv_debug profile` (`_internal_phase_timing` feature)
 // - `doc` - document builder primitives for prettier-compatible formatting
 // - `printing` - shared printing utilities for printers
@@ -44,6 +45,9 @@
 // - `swar` - word-at-a-time byte-search kernels shared by the line scans, the
 //   wire-JSON escape prescan, and the lexers' token-body scans
 
+#[cfg(feature = "_internal_ast_census")]
+#[doc(hidden)]
+pub mod ast_census_probe;
 #[doc(hidden)]
 pub mod census;
 mod comment;

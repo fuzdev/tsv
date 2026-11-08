@@ -1,5 +1,8 @@
 // Element parsing
 
+#[cfg(feature = "_internal_ast_census")]
+use crate::parser::census_vec::BumpVec;
+#[cfg(not(feature = "_internal_ast_census"))]
 use bumpalo::collections::Vec as BumpVec;
 
 use crate::ast::*;

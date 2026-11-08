@@ -39,6 +39,11 @@ _internal_buffer_stats = []
 # verbatim seam records its range. Off in production builds.
 _internal_comment_check = ["tsv_lang/_internal_comment_check"]
 
+# Opt-in parser allocation-demand counters for `tsv_debug ast_demand_census` (diagnostic). Off by
+# default and outside the `_internal_audits` umbrella; every call site is `#[cfg]`-removed without
+# it. See `tsv_lang::ast_census_probe`.
+_internal_ast_census = ["tsv_lang/_internal_ast_census"]
+
 [dependencies]
 tsv_lang.workspace = true
 bumpalo.workspace = true

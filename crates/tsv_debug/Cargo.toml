@@ -54,6 +54,16 @@ _internal_fanout_check = ["tsv_lang/_internal_fanout_check"]
 # and render. Off by default and outside `_internal_audits`: a timed render pays two clock reads,
 # which a default profile must not.
 _internal_phase_timing = ["tsv_lang/_internal_phase_timing"]
+# Opt-in: the parser's allocation-demand counters (`tsv_lang::ast_census_probe`) and the census
+# list wrapper in each parser, so `ast_demand_census` can count what a parse builds. Off by
+# default and outside `_internal_audits`: its log allocates on every parse in a build that
+# carries it, and no audit reads it.
+_internal_ast_census = [
+	"tsv_lang/_internal_ast_census",
+	"tsv_ts/_internal_ast_census",
+	"tsv_css/_internal_ast_census",
+	"tsv_svelte/_internal_ast_census",
+]
 # Umbrella that compiles the diagnostic seams into one binary and enables all five
 # gated subcommands: `swallow_audit` plus the ledger-driven `comment_audit` /
 # `gap_audit` / `blank_audit` / `ignore_audit`. EVERY audit deno task passes

@@ -1,5 +1,8 @@
 // Attribute parsing
 
+#[cfg(feature = "_internal_ast_census")]
+use crate::parser::census_vec::BumpVec;
+#[cfg(not(feature = "_internal_ast_census"))]
 use bumpalo::collections::Vec as BumpVec;
 
 use crate::ast::*;
@@ -570,6 +573,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             start: start as u32,
             end: end as u32,
         };
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
         self.arena
             .alloc(Expression::from_identifier(Identifier::simple(
                 self.synthesized_ident_name(name, span),
@@ -927,6 +932,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let identifier =
             Identifier::simple(self.synthesized_ident_name(name, ident_span), ident_span);
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
         let expression_tag = ExpressionTag {
             expression: self.arena.alloc(Expression::from_identifier(identifier)),
             span: ident_span,

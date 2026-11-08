@@ -788,6 +788,7 @@ row can't say about the internal slice is in the command's module doc). `--min` 
 cargo run -p tsv_debug type_sizes --min 96              # the wide end of the board
 cargo run --release -p tsv_debug -- ast_census ../corpora/collections/fuz_app/src --bytes --top 20
 cargo run --release -p tsv_debug -- ast_census ../corpora/collections/fuz_app/src --slots
+cargo run --profile corpus -p tsv_debug --features _internal_ast_census -- ast_demand_census ../corpora/collections  # what the parsers allocate per store-backed type, against what the tree keeps
 ```
 
 ⚠️ **Counts come off the wire AST**, which the writer emits by walking the

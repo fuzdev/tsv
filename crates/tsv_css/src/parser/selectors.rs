@@ -1,7 +1,10 @@
 use super::CssParser;
 use crate::ast::*;
 use crate::lexer::TokenKind;
+#[cfg(feature = "_internal_ast_census")]
+use crate::parser::census_vec::BumpVec;
 use bumpalo::Bump;
+#[cfg(not(feature = "_internal_ast_census"))]
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{Error, Span};
 
@@ -147,6 +150,8 @@ pub(crate) fn parse_forgiving_selector_list<'arena>(
         let selector_start = parser.base_offset() + parser.current_start();
         let source_start = parser.current_start(); // Raw source position for extraction
 
+        #[cfg(feature = "_internal_ast_census")]
+        let ast_census_mark = tsv_lang::ast_census_probe::mark();
         // Try to parse a selector
         match parse_complex_selector(parser) {
             Ok(selector) => {
@@ -156,6 +161,8 @@ pub(crate) fn parse_forgiving_selector_list<'arena>(
             // reading chosen for the stack's sake
             Err(error) if error.kind() == tsv_lang::ErrorKind::TooDeep => return Err(error),
             Err(_) => {
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::rewind(ast_census_mark);
                 // Parse error - advance past the invalid selector and wrap as Invalid
                 // (its raw text is recovered from the span at print time).
                 extract_selector_until_comma_or_end(parser, source_start)?;

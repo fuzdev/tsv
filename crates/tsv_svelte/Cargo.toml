@@ -34,6 +34,11 @@ locations = ["json", "tsv_lang/_locations", "tsv_ts/locations", "tsv_css/locatio
 # `<script>`/`{expr}`/`<style>` islands. Off in production builds.
 _internal_comment_check = ["tsv_lang/_internal_comment_check", "tsv_ts/_internal_comment_check", "tsv_css/_internal_comment_check"]
 
+# Opt-in parser allocation-demand counters for `tsv_debug ast_demand_census` (diagnostic). Off by
+# default and outside the `_internal_audits` umbrella; every call site is `#[cfg]`-removed without
+# it. See `tsv_lang::ast_census_probe`.
+_internal_ast_census = ["tsv_lang/_internal_ast_census", "tsv_ts/_internal_ast_census", "tsv_css/_internal_ast_census"]
+
 [dependencies]
 tsv_lang.workspace = true
 tsv_html.workspace = true

@@ -206,6 +206,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             "an arrow's extent encloses its body"
         );
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ArrowFunctionExpression<'_>>(1);
         Ok(alloc_expr(
             self.arena,
             Expression {
@@ -296,6 +298,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             "an arrow's extent encloses its body"
         );
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ArrowFunctionExpression<'_>>(1);
         Ok(alloc_expr(
             self.arena,
             Expression {
@@ -351,6 +355,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             "an arrow's extent encloses its body"
         );
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ArrowFunctionExpression<'_>>(1);
         Ok(alloc_expr(
             self.arena,
             Expression {
@@ -423,6 +429,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             "an arrow's extent encloses its body"
         );
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ArrowFunctionExpression<'_>>(1);
         Ok(alloc_expr(
             self.arena,
             Expression {

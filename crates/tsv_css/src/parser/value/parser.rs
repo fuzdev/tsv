@@ -4,6 +4,8 @@
 // Tracks (start, end) ranges within that source instead of creating substrings.
 
 use crate::ast::CssValue;
+#[cfg(feature = "_internal_ast_census")]
+use crate::parser::census_vec::BumpVec;
 use crate::parser::value::cursor::ValueCursor;
 use crate::parser::value::lists::{ValueSeparator, classify_separators};
 use crate::parser::value::scan::{
@@ -11,6 +13,7 @@ use crate::parser::value::scan::{
 };
 use crate::whitespace::is_css_whitespace;
 use bumpalo::Bump;
+#[cfg(not(feature = "_internal_ast_census"))]
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 

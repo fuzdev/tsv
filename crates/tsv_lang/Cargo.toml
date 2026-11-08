@@ -63,6 +63,11 @@ _json = ["dep:zmij"]
 # turn it on through each language crate's own `locations` feature.
 _locations = ["_json"]
 
+# Opt-in parser allocation-demand counters for `tsv_debug ast_demand_census` (diagnostic). Off by
+# default and outside the `_internal_audits` umbrella; every call site is `#[cfg]`-removed without
+# it. See `tsv_lang::ast_census_probe`.
+_internal_ast_census = []
+
 [dependencies]
 smallvec.workspace = true
 # Only for the regex-vs-division rule's non-ASCII identifier arm (`source_scan`).

@@ -73,6 +73,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let type_annotation = self.parse_type()?;
         let end = self.semicolon_end()?;
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TSTypeAliasDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start as u32, end),
             kind: StatementKind::TSTypeAliasDeclaration(self.arena.alloc(TSTypeAliasDeclaration {
@@ -109,6 +111,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         declare: bool,
     ) -> Result<Statement<'arena>, Error> {
         let decl = self.parse_interface_declaration_struct(start, declare)?;
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TSInterfaceDeclaration<'_>>(1);
         Ok(Statement::from_ts_interface_declaration(
             self.arena.alloc(decl),
         ))
@@ -161,7 +165,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse interface heritage list: `Foo, Bar<T>`
     pub(in crate::parser) fn parse_interface_heritage_list(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, TSInterfaceHeritage<'arena>>, Error> {
+    ) -> Result<crate::parser::BumpVec<'arena, TSInterfaceHeritage<'arena>>, Error> {
         let mut heritages = self.bvec();
 
         // the heritages are siblings (`ListFrame`)
@@ -463,6 +467,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TSDeclareFunction<'_>>(1);
         Ok(Statement::from_ts_declare_function(self.arena.alloc(
             TSDeclareFunction {
                 id,
@@ -625,6 +631,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<Statement<'arena>, Error> {
         let class =
             self.parse_class_declaration_inner_with_start(true, is_abstract, start, true)?;
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ClassDeclaration<'_>>(1);
         Ok(Statement::from_class_declaration(self.arena.alloc(class)))
     }
 
@@ -689,6 +697,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TSEnumDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start as u32, end as u32),
             kind: StatementKind::TSEnumDeclaration(self.arena.alloc(TSEnumDeclaration {
@@ -835,6 +845,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             (Some(block), end)
         };
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TSModuleDeclaration<'_>>(1);
         Ok(Statement::from_ts_module_declaration(self.arena.alloc(
             TSModuleDeclaration {
                 id,
@@ -902,6 +914,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             (None, self.semicolon_end()?)
         };
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TSModuleDeclaration<'_>>(1);
         Ok(Statement::from_ts_module_declaration(self.arena.alloc(
             TSModuleDeclaration {
                 id,
@@ -933,6 +947,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let body = TSModuleDeclarationBody::TSModuleDeclaration(self.alloc(nested));
         let end = module_body_end(&body);
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TSModuleDeclaration<'_>>(1);
         Ok(Statement::from_ts_module_declaration(self.arena.alloc(
             TSModuleDeclaration {
                 id: TSModuleName::Identifier(outer_id),

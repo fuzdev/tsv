@@ -571,6 +571,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
         }
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TSInferType<'_>>(1);
         Ok(self.alloc(TSType::Infer(self.arena.alloc(TSInferType {
             type_parameter: TSTypeParameter {
                 name,
@@ -681,6 +683,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'import'
         let import = self.parse_import_type_body(start)?;
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TSImportType<'_>>(1);
         Ok(self.alloc(TSType::Import(self.arena.alloc(import))))
     }
 
@@ -1086,6 +1090,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let return_type = self.nested(2, |p| p.parse_return_type_inner(arrow_start))?;
         let end = return_type.span.end;
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TSConstructorType<'_>>(1);
         Ok(
             self.alloc(TSType::Constructor(self.arena.alloc(TSConstructorType {
                 abstract_: is_abstract,
@@ -1100,7 +1106,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse function type parameters, up to (not including) the closing `)`.
     fn parse_function_type_params(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, Error> {
+    ) -> Result<crate::parser::BumpVec<'arena, Expression<'arena>>, Error> {
         let mut params = self.bvec();
 
         // two wire levels each: the function type over its parameters, and the parameter

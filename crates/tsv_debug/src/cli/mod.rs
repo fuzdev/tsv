@@ -13,7 +13,8 @@ use commands::ignore_audit::IgnoreAuditCommand;
 use commands::swallow_audit::SwallowAuditCommand;
 use commands::width_audit::WidthAuditCommand;
 use commands::{
-    arena_stats::ArenaStatsCommand, ast_census::AstCensusCommand, ast_diff::AstDiffCommand,
+    arena_stats::ArenaStatsCommand, ast_census::AstCensusCommand,
+    ast_demand_census::AstDemandCensusCommand, ast_diff::AstDiffCommand,
     authoring_audit::AuthoringAuditCommand, binding_audit::BindingAuditCommand,
     buffer_sizes::BufferSizesCommand, build_fanout_audit::BuildFanoutAuditCommand,
     build_visit_census::BuildVisitCensusCommand, canonical_compile::CanonicalCompileCommand,
@@ -90,6 +91,7 @@ pub enum Subcommand {
     Check(CheckCommand),
     ArenaStats(ArenaStatsCommand),
     AstCensus(AstCensusCommand),
+    AstDemandCensus(AstDemandCensusCommand),
     AuthoringAudit(AuthoringAuditCommand),
     BindingAudit(BindingAuditCommand),
     BufferSizes(BufferSizesCommand),
@@ -185,6 +187,7 @@ impl TopLevel {
             Subcommand::Check(c) => c.run(),
             Subcommand::ArenaStats(c) => c.run(),
             Subcommand::AstCensus(c) => c.run(),
+            Subcommand::AstDemandCensus(c) => c.run(),
             Subcommand::AuthoringAudit(c) => c.run(),
             Subcommand::BindingAudit(c) => c.run(),
             Subcommand::BufferSizes(c) => c.run(),

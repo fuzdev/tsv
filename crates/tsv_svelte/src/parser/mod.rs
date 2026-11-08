@@ -4,11 +4,18 @@ use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::{ElementParent, ParsedElement, RootOnlyMetaTag};
 use crate::whitespace::{is_svelte_ws, skip_svelte_ws, svelte_ws_width_at};
+#[cfg(not(feature = "_internal_ast_census"))]
 use bumpalo::collections::Vec as BumpVec;
+#[cfg(feature = "_internal_ast_census")]
+use census_vec::BumpVec;
 use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 use tsv_lang::{Error, Span};
 
 // Module declarations
+#[cfg(feature = "_internal_ast_census")]
+mod census_vec {
+    tsv_lang::ast_census_vec!();
+}
 mod attribute;
 mod block;
 mod element;

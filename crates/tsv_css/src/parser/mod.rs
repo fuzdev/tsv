@@ -1,5 +1,9 @@
 // CSS parser - parse CSS content from <style> tags
 
+#[cfg(feature = "_internal_ast_census")]
+mod census_vec {
+    tsv_lang::ast_census_vec!();
+}
 mod atrules;
 pub(crate) use atrules::is_keyframes_atrule;
 mod attributes;
@@ -13,7 +17,10 @@ pub(crate) use value::operators::is_whole_value_block;
 use crate::ast::{Comment, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, Token, TokenKind};
 use bumpalo::Bump;
+#[cfg(not(feature = "_internal_ast_census"))]
 use bumpalo::collections::Vec as BumpVec;
+#[cfg(feature = "_internal_ast_census")]
+use census_vec::BumpVec;
 use decl_scan::{ScannedDeclaration, TerminatorKind};
 use std::cell::Cell;
 use tsv_lang::{DepthBudget, DepthLimit, Error, NESTING_LIMIT, Span};

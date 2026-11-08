@@ -114,6 +114,8 @@ pub(in crate::parser) fn alloc_expr<'arena>(
     arena: &'arena bumpalo::Bump,
     expr: Expression<'arena>,
 ) -> &'arena Expression<'arena> {
+    #[cfg(feature = "_internal_ast_census")]
+    tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
     arena.alloc(expr)
 }
 
@@ -323,6 +325,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // refs) serves the callers that store the value: the by-value `export =` /
         // `export default` fields, and the pattern path (`parse_expression_unbounded`),
         // which converts it to a binding pattern.
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+            tsv_lang::ast_census_probe::Dead::MovedInline,
+            1,
+        );
         Ok(self.parse_expression_bp(BP_COMMA)?.clone())
     }
 
@@ -342,6 +349,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// elements, property values, initializers) takes `parse_assignment_expression_ref`.
     pub(super) fn parse_assignment_expression(&mut self) -> Result<Expression<'arena>, Error> {
         // Use BP_ASSIGNMENT to skip comma handling (which only triggers at BP_COMMA)
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+            tsv_lang::ast_census_probe::Dead::MovedInline,
+            1,
+        );
         Ok(self.parse_expression_bp(BP_ASSIGNMENT)?.clone())
     }
 
@@ -573,6 +585,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }),
             }
         };
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
         *left = arena.alloc(expr);
         Ok(true)
     }
@@ -741,6 +755,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 )
                 && self.chain_owes_type_argument_pair(lt, expr_start != left.span().start as usize)
             {
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                    tsv_lang::ast_census_probe::Dead::Superseded,
+                    1,
+                );
                 left = arena.alloc(Expression {
                     span: left.span,
                     kind: ExpressionKind::BinaryExpression(BinaryExpression {
@@ -1024,7 +1045,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
     ) -> Result<
         (
-            bumpalo::collections::Vec<'arena, &'arena Expression<'arena>>,
+            crate::parser::BumpVec<'arena, &'arena Expression<'arena>>,
             usize,
         ),
         Error,
@@ -1138,6 +1159,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         self.advance()?; // consume '.'
                         let (property, prop_end) = self.parse_dot_property()?;
                         let span = Span::new(head_start as u32, prop_end as u32);
+                        #[cfg(feature = "_internal_ast_census")]
+                        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
                         expr = alloc_expr(
                             self.arena,
                             Expression {
@@ -1220,6 +1243,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Hand back an owned `Expression` (shallow clone — children are arena
         // refs), matching `parse_assignment_expression`'s by-value boundary.
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+            tsv_lang::ast_census_probe::Dead::MovedInline,
+            1,
+        );
         Ok(expr.clone())
     }
 
@@ -1354,6 +1382,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let span = Span::new(expr_start as u32, end);
         debug_assert_encloses(span.start, span.end, left, right);
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(2);
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+            tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+            1,
+        );
         let assignment = self.arena.alloc(Expression {
             span,
             kind: ExpressionKind::AssignmentExpression(AssignmentExpression {
@@ -1411,6 +1446,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let span = Span::new(expr_start as u32, self.prev_token_end() as u32);
         debug_assert_encloses(span.start, span.end, left, alternate);
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
         Ok(self.arena.alloc(Expression {
             span,
             kind: ExpressionKind::ConditionalExpression(ConditionalExpression {
@@ -1456,6 +1493,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if let (Some(first), Some(last)) = (expressions.first(), expressions.last()) {
             debug_assert_encloses(span.start, span.end, first, last);
         }
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
         Ok(self.arena.alloc(Expression {
             span,
             kind: ExpressionKind::SequenceExpression(SequenceExpression {
@@ -1535,6 +1574,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // consumed token (which includes any closing paren)
         let span = Span::new(expr_start as u32, self.prev_token_end() as u32);
         debug_assert_encloses(span.start, span.end, left, right);
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
         Ok(self.arena.alloc(Expression {
             span,
             kind: ExpressionKind::BinaryExpression(BinaryExpression {
@@ -1578,6 +1619,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let (property, prop_end) = self.parse_dot_property()?;
 
                 let span = Span::new(start, prop_end as u32);
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
                 left = alloc_expr(
                     self.arena,
                     Expression {
@@ -1727,6 +1770,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let (property, prop_end) = self.parse_dot_property()?;
 
                     let span = Span::new(start, prop_end as u32);
+                    #[cfg(feature = "_internal_ast_census")]
+                    tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
                     left = alloc_expr(
                         self.arena,
                         Expression {
@@ -2938,6 +2983,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 kind: ExpressionKind::TSInstantiationExpression(inst),
                 ..
             } if Self::is_bare_instantiation(expr, start) => {
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                    tsv_lang::ast_census_probe::Dead::Superseded,
+                    1,
+                );
                 (inst.expression, Some(inst.type_arguments.clone()))
             }
             other => (other, None),
@@ -3355,6 +3405,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let (property, prop_end) = self.parse_dot_property()?;
 
                     let span = Span::new(callee_start, prop_end as u32);
+                    #[cfg(feature = "_internal_ast_census")]
+                    tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
                     callee = alloc_expr(
                         self.arena,
                         Expression {
@@ -3534,6 +3586,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // `new` / `target`, so the names are the verbatim spans.
                 let meta_span = Span::new(start as u32, new_end as u32);
                 let prop_span = Span::new(prop_start as u32, prop_end as u32);
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<MetaProperty<'arena>>(1);
                 return Ok(alloc_expr(
                     arena,
                     Expression {
@@ -3700,6 +3754,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         quasi: TemplateLiteral<'arena>,
     ) -> &'arena Expression<'arena> {
         let end = quasi.span.end;
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TaggedTemplateExpression<'arena>>(1);
         alloc_expr(
             self.arena,
             Expression {
@@ -3755,6 +3811,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // `import` / `meta`, so the names are the verbatim spans.
                 let meta_span = Span::new(start as u32, import_end as u32);
                 let prop_span = Span::new(prop_start as u32, prop_end as u32);
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<MetaProperty<'arena>>(1);
                 return Ok(alloc_expr(
                     self.arena,
                     Expression {
@@ -3891,7 +3949,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         prologue: DirectivePrologue,
         levels: u32,
-    ) -> Result<(bumpalo::collections::Vec<'arena, Statement<'arena>>, Span), Error> {
+    ) -> Result<(crate::parser::BumpVec<'arena, Statement<'arena>>, Span), Error> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
 
@@ -3959,6 +4017,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             false,
         )?;
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
         Ok(self
             .arena
             .alloc(Expression::from_spread_element(SpreadElement {

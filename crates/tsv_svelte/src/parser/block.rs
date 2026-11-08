@@ -1540,6 +1540,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 self.island_nesting(),
                 self.arena,
             )?;
+            // the `function` shell around the parameters: only `func.params` is kept
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::dead::<tsv_ts::ast::Statement<'arena>>(
+                tsv_lang::ast_census_probe::Dead::Superseded,
+                1,
+            );
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::dead::<tsv_ts::ast::FunctionDeclaration<'arena>>(
+                tsv_lang::ast_census_probe::Dead::Superseded,
+                1,
+            );
             // The wrapper is literally a `function` declaration, so the signature is
             // there by construction — stated as an error rather than an `if let` so a head
             // whose pieces went nowhere can never reach the printer as a silently empty
@@ -1558,6 +1569,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     self.island_nesting(),
                     self.arena,
                 )?;
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::dead::<tsv_ts::ast::Statement<'arena>>(
+                    tsv_lang::ast_census_probe::Dead::Superseded,
+                    1,
+                );
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::dead::<tsv_ts::ast::FunctionDeclaration<'arena>>(
+                    tsv_lang::ast_census_probe::Dead::Superseded,
+                    1,
+                );
                 // The same comments, though not the same claims on them: `owned_by_node`
                 // binds a glued block to the node its token begins, and a pair's `(` begins
                 // a node only in the preserved tree (`/* c */ (x + y)`). The wire reads no

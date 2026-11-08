@@ -53,12 +53,16 @@ fn parse_selector_argument<'arena>(
     arg_start: usize,
     comments_len: usize,
 ) -> Result<Option<SelectorList<'arena>>, Error> {
+    #[cfg(feature = "_internal_ast_census")]
+    let ast_census_mark = tsv_lang::ast_census_probe::mark();
     match parse_complex_selector_list(parser) {
         Ok(list) if parser.check(TokenKind::RightParen) => return Ok(Some(list)),
         // a depth limit is no verdict on the argument (see `parse_forgiving_selector_list`)
         Err(error) if error.kind() == tsv_lang::ErrorKind::TooDeep => return Err(error),
         Ok(_) | Err(_) => {}
     }
+    #[cfg(feature = "_internal_ast_census")]
+    tsv_lang::ast_census_probe::rewind(ast_census_mark);
     parser.rewind_to(arg_start, comments_len)?;
     Ok(None)
 }
@@ -1192,6 +1196,8 @@ pub(super) fn parse_custom_selector_prelude<'arena>(
     // The raw offset the replay restarts from, and the registrations it discards.
     let prelude_start_raw = parser.current_start();
     let comments_len = parser.comments.len();
+    #[cfg(feature = "_internal_ast_census")]
+    let ast_census_mark = tsv_lang::ast_census_probe::mark();
     let span_start = parser.span_pos(prelude_start_raw);
 
     if let Some((name, list)) = parse_custom_selector_head_and_list(parser)? {
@@ -1208,6 +1214,8 @@ pub(super) fn parse_custom_selector_prelude<'arena>(
         }
     }
 
+    #[cfg(feature = "_internal_ast_census")]
+    tsv_lang::ast_census_probe::rewind(ast_census_mark);
     parser.rewind_to(prelude_start_raw, comments_len)?;
     let (content, span) = super::raw::parse_raw_prelude_content(parser, false, false)?;
     Ok(PreludeValue::Raw { content, span })

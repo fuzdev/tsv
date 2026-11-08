@@ -844,6 +844,7 @@ cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Sv
 cargo run --release -p tsv_debug -- ast_census ../corpora/collections/zzz/src        # per-node-kind population (--bytes joins the size board, --slots, --arity) (§10)
 cargo run -p tsv_debug type_sizes                                # the `size_of` board: every public AST type's width (§10)
 cargo run --profile corpus -p tsv_debug --features _internal_audits -- build_visit_census ../corpora/collections  # doc-build dispatches per language and dispatch family; a dispatch is not an edge read (also `deno task build-visit-census`)
+cargo run --profile corpus -p tsv_debug --features _internal_ast_census -- ast_demand_census ../corpora/collections  # the parser's allocation demand per store-backed type: minted, live, rewind / clone / re-alloc waste, scratch peak, per source byte (also `deno task ast-demand-census`)
 cargo run -p tsv_debug metrics [--json]                          # line counts by crate and phase; also `deno task metrics`
 ```
 

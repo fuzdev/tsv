@@ -1,5 +1,6 @@
 pub mod arena_stats;
 pub mod ast_census;
+pub mod ast_demand_census;
 pub mod ast_diff;
 pub mod authoring_audit;
 pub mod binding_audit;

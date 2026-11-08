@@ -350,6 +350,12 @@ pub fn parse_pattern_with_comments<'arena>(
         arena,
         |parser| {
             let expr = parser.parse_expression_unbounded()?;
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::reclassify::<Expression<'_>>(
+                tsv_lang::ast_census_probe::Dead::MovedInline,
+                tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                1,
+            );
             let pattern = parser.expression_to_svelte_pattern(expr)?;
             // The pattern must fill the whole slice the caller bounded. Without this a trailing
             // token is silently dropped, losing content. The slice is the pattern itself (a name
@@ -408,6 +414,8 @@ pub fn attach_pattern_type_annotation<'arena>(
             // Re-bind the identifier's binding extra with the parsed type
             // annotation (preserving any decorators already present).
             let decorators = id.decorators();
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::mint::<ast::IdentifierParamExtra<'_>>(1);
             id.extra = Some(arena.alloc(ast::IdentifierParamExtra {
                 type_annotation: Some(ta),
                 decorators,
@@ -581,6 +589,9 @@ pub fn parse_type_extent(
     host_nesting: u32,
     arena: &bumpalo::Bump,
 ) -> Result<usize> {
+    // the parse exists for its end offset: every row it builds is discarded
+    #[cfg(feature = "_internal_ast_census")]
+    let _ast_census_rewind = tsv_lang::ast_census_probe::RewindOnDrop::new();
     with_embedding_parser(
         source,
         base_offset,

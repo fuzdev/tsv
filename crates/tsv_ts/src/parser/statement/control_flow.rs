@@ -27,6 +27,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse consequent (can be any statement, including block)
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
         let consequent = arena.alloc(self.parse_nested_statement()?);
 
         // Check for optional else clause
@@ -35,6 +37,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?; // consume 'else'
                 let alt = self.parse_nested_statement()?;
                 let alt_end = alt.span().end;
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
                 (Some(&*arena.alloc(alt)), alt_end)
             } else {
                 (None, consequent.span().end)
@@ -112,6 +116,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             let Some(form) = self.for_in_of_separator() else {
                 // Standard for loop with a declaration as init.
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<ForInit<'_>>(1);
                 return self.parse_c_style_for(
                     start,
                     await_at,
@@ -155,6 +161,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             self.advance()?;
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::mint::<ForInOfLeft<'_>>(1);
             let left = self.arena.alloc(ForInOfLeft::VariableDeclaration(var_decl));
             return match form {
                 ForInOf::In => self.parse_for_in(start, await_at, left),
@@ -182,6 +190,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 Span::new(id_start as u32, id_end as u32),
             ));
             self.advance()?; // consume 'of'
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::built_inline::<Expression<'_>>(1);
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::mint::<ForInOfLeft<'_>>(1);
             return self.parse_for_of(
                 start,
                 self.arena.alloc(ForInOfLeft::Pattern(async_ident)),
@@ -202,6 +214,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // WHOLE head, never an `AssignmentPattern` (`for ((a = b) of xs)`).
         let Some(form) = self.for_in_of_separator() else {
             // Standard for loop with expression init.
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::mint::<ForInit<'_>>(1);
             return self.parse_c_style_for(
                 start,
                 await_at,
@@ -230,6 +244,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
         self.advance()?;
         let left = self.refine_whole_assignable(expr, AssignableContext::ForHead)?;
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ForInOfLeft<'_>>(1);
         let left = self.arena.alloc(ForInOfLeft::Pattern(left));
         match form {
             ForInOf::In => self.parse_for_in(start, await_at, left),
@@ -362,6 +378,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse body
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
         let body = self.arena.alloc(self.parse_nested_statement()?);
         let end = body.span().end;
 
@@ -390,6 +408,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let right = self.parse_expression_ref()?;
         self.expect(&TokenKind::ParenClose)?;
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
         let body = self.arena.alloc(self.parse_nested_statement()?);
         let end = body.span().end;
 
@@ -409,6 +429,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let right = self.parse_expression_ref()?;
         self.expect(&TokenKind::ParenClose)?;
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
         let body = self.arena.alloc(self.parse_nested_statement()?);
         let end = body.span().end;
 
@@ -463,6 +485,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse body
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
         let body = self.arena.alloc(self.parse_nested_statement()?);
         let end = body.span().end;
 
@@ -481,6 +505,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Parse body
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
         let body = self.arena.alloc(self.parse_nested_statement()?);
 
         // Expect 'while'
@@ -630,6 +656,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse optional catch clause
         let handler = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Catch)) {
             // one wire level: the `CatchClause` over its parameter and block
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::mint::<CatchClause<'_>>(1);
             Some(&*self.arena.alloc(self.nested(1, Self::parse_catch_clause)?))
         } else {
             None
@@ -723,6 +751,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } else {
             None
         };
+
+        #[cfg(feature = "_internal_ast_census")]
+        if param.is_some() {
+            tsv_lang::ast_census_probe::built_inline::<Expression<'arena>>(1);
+        }
 
         // Parse body
         let body = self.parse_block_statement()?;
@@ -906,6 +939,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             ));
         }
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
         let body = self.arena.alloc(body_stmt);
         let end = body.span().end;
 

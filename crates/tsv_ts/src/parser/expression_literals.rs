@@ -150,6 +150,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // valid bare shorthand (`{ [e] }` requires `: value`).
                 TokenKind::BracketOpen => {
                     self.advance()?; // consume '['
+                    #[cfg(feature = "_internal_ast_census")]
+                    tsv_lang::ast_census_probe::reclassify::<Expression<'arena>>(
+                        tsv_lang::ast_census_probe::Dead::MovedInline,
+                        tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                        1,
+                    );
                     (self.parse_computed_member_key()?, true, true)
                 }
                 // Both identifiers and keywords can be property keys: { foo: 1, object: 2, in: 3 }
@@ -220,6 +226,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // lives in the arena and the property holds a pointer to it, so the
             // 160 B element the `properties` vector moves is 32 B instead (see
             // `Property`'s field docs).
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
             let key: &'arena Expression<'arena> = arena.alloc(key);
 
             // Determine property kind, value, shorthand, and method flags
@@ -237,6 +245,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     func_expr.params,
                     true,
                 )?;
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<FunctionExpression<'arena>>(1);
                 (
                     accessor,
                     &*arena.alloc(Expression::from_function_expression(arena.alloc(func_expr))),
@@ -252,6 +264,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // one wire level: the method's `FunctionExpression` (the depth limit's count)
                 let func_expr =
                     self.nested(1, |p| p.parse_method_body(is_async_method, is_generator))?;
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<FunctionExpression<'arena>>(1);
                 (
                     PropertyKind::Init,
                     &*arena.alloc(Expression::from_function_expression(arena.alloc(func_expr))),
@@ -289,6 +305,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let default_value = self.nested(1, Self::parse_assignment_expression_ref)?;
                     // prev_token_end covers a parenthesized default's closing `)`
                     let assign_end = self.prev_token_end() as u32;
+                    #[cfg(feature = "_internal_ast_census")]
+                    tsv_lang::ast_census_probe::mint::<Expression<'arena>>(2);
+                    #[cfg(feature = "_internal_ast_census")]
+                    tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                        tsv_lang::ast_census_probe::Dead::DuplicateKept,
+                        1,
+                    );
                     (
                         PropertyKind::Init,
                         &*arena.alloc(Expression {
@@ -307,6 +330,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // distinct node, not the key's own pointer, so every consumer
                     // that keys a node on its address (`tsv_check`'s binder) still
                     // sees two.
+                    #[cfg(feature = "_internal_ast_census")]
+                    tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
+                    #[cfg(feature = "_internal_ast_census")]
+                    tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                        tsv_lang::ast_census_probe::Dead::DuplicateKept,
+                        1,
+                    );
                     (PropertyKind::Init, &*arena.alloc(key.clone()), true, false)
                 }
             };

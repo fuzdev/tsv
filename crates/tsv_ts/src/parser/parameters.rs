@@ -50,6 +50,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let default_value = self.parse_assignment_expression_ref()?;
             // prev_token_end covers a parenthesized default's closing `)`
             let assign_end = self.prev_token_end() as u32;
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
             param = Expression {
                 span: Span::new(param_start as u32, assign_end),
                 kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
@@ -84,11 +86,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // `@dec private a = 1`, an AssignmentPattern).
             ExpressionKind::TSParameterProperty(pp) => {
                 let inner = self.attach_param_decorators((*pp.parameter).clone(), decorators);
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                    tsv_lang::ast_census_probe::Dead::DuplicateRoot,
+                    1,
+                );
                 pp.parameter = arena.alloc(inner);
                 param
             }
             ExpressionKind::Identifier(id) => {
                 let type_annotation = id.type_annotation().cloned();
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<IdentifierParamExtra<'arena>>(1);
                 id.extra = Some(arena.alloc(IdentifierParamExtra {
                     type_annotation,
                     decorators: Some(decorators),
@@ -280,7 +291,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Consumes both opening and closing parentheses.
     pub(super) fn parse_parameter_list(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, Error> {
+    ) -> Result<crate::parser::BumpVec<'arena, Expression<'arena>>, Error> {
         self.parse_parameter_list_inner(true, 1)
     }
 
@@ -299,7 +310,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// normally defers a checker-raised rule.
     pub(super) fn parse_parameter_list_no_decorators(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, Error> {
+    ) -> Result<crate::parser::BumpVec<'arena, Expression<'arena>>, Error> {
         self.parse_parameter_list_inner(false, 1)
     }
 
@@ -314,7 +325,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// pattern at the rest, a parameter property's binding inside the property.
     pub(super) fn parse_signature_parameter_list(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, Error> {
+    ) -> Result<crate::parser::BumpVec<'arena, Expression<'arena>>, Error> {
         self.parse_parameter_list_inner(false, 0)
     }
 
@@ -341,7 +352,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         allow_decorators: bool,
         parameter_levels: u32,
-    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, Error> {
+    ) -> Result<crate::parser::BumpVec<'arena, Expression<'arena>>, Error> {
         self.expect(&TokenKind::ParenOpen)?;
         self.enter_grouping()?;
 

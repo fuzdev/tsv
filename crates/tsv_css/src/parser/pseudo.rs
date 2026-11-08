@@ -284,7 +284,7 @@ fn parse_part_args<'arena>(
     // One span per name: the printer emits each name verbatim from its span, finds
     // comments in the interior gaps between them, and derives the whole-run span
     // (first start .. last end); the wire projects the run from them too.
-    let mut ident_spans: bumpalo::collections::Vec<'_, Span> = parser.bvec();
+    let mut ident_spans: crate::parser::BumpVec<'_, Span> = parser.bvec();
 
     // Parse space-separated identifiers
     while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
@@ -468,12 +468,16 @@ fn parse_unknown_args<'arena>(
     // interleaves them, so this path is parser-only.
     parser.skip_boundary_whitespace_registering_comments()?;
 
+    #[cfg(feature = "_internal_ast_census")]
+    let ast_census_mark = tsv_lang::ast_census_probe::mark();
     // Try to parse as a selector list (complex selectors, strict parsing)
     match parse_complex_selector_list(parser) {
         Ok(selector_list) => finish_selector_list_args(parser, args_start, selector_list),
         // a depth limit is no verdict on the arguments (see `parse_forgiving_selector_list`)
         Err(error) if error.kind() == tsv_lang::ErrorKind::TooDeep => Err(error),
         Err(_) => {
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::rewind(ast_census_mark);
             // Parsing as selector list failed - skip arguments
             // This handles pseudo-classes with non-selector arguments
             let mut depth = 1;

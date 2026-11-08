@@ -109,6 +109,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Function overload signature - parse as TSDeclareFunction
             let end = self.semicolon_end()?;
 
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::mint::<TSDeclareFunction<'_>>(1);
             Ok(Statement::from_ts_declare_function(self.arena.alloc(
                 TSDeclareFunction {
                     id,
@@ -126,6 +128,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let body = self.with_fn_context(is_async, is_generator, Self::parse_function_body)?;
             let end = body.span.end;
 
+            #[cfg(feature = "_internal_ast_census")]
+            tsv_lang::ast_census_probe::mint::<FunctionDeclaration<'_>>(1);
             Ok(Statement::from_function_declaration(self.arena.alloc(
                 FunctionDeclaration {
                     id: Some(id),
@@ -344,6 +348,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })?;
         let end = body.span.end;
 
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<FunctionExpression<'_>>(1);
         Ok(alloc_expr(
             self.arena,
             Expression::from_function_expression(self.arena.alloc(FunctionExpression {
