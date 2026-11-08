@@ -76,9 +76,9 @@ fn write_css_f64(out: &mut String, v: f64) {
 /// Append a `ColorChannel` value.
 fn write_color_channel(out: &mut String, channel: &ColorChannel) {
     match channel {
-        ColorChannel::Number(n) => write_css_f64(out, *n),
+        ColorChannel::Number(n) => write_css_f64(out, n.get()),
         ColorChannel::Percentage(p) => {
-            write_css_f64(out, *p);
+            write_css_f64(out, p.get());
             out.push('%');
         }
         ColorChannel::None => out.push_str("none"),

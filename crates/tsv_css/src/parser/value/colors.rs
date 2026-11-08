@@ -1,4 +1,4 @@
-use crate::ast::{AngleUnit, Color, ColorChannel};
+use crate::ast::{AngleUnit, Color, ColorChannel, PackedF64};
 use crate::color::is_hex_color_body;
 use crate::escapes::trim_css;
 use crate::keyword_set::ascii_keyword_set;
@@ -60,12 +60,12 @@ fn parse_color_channel(s: &str) -> Option<ColorChannel> {
     if let Some(percent_str) = s.strip_suffix('%')
         && let Ok(value) = percent_str.parse::<f64>()
     {
-        return Some(ColorChannel::Percentage(value));
+        return Some(ColorChannel::Percentage(PackedF64::new(value)));
     }
 
     // Numeric value: 255, 0.5, etc.
     if let Ok(value) = s.parse::<f64>() {
-        return Some(ColorChannel::Number(value));
+        return Some(ColorChannel::Number(PackedF64::new(value)));
     }
 
     None
@@ -96,7 +96,7 @@ fn parse_hue(s: &str) -> Option<(ColorChannel, Option<AngleUnit>)> {
 
     // Parse numeric value
     if let Ok(value) = trim_css(value_str).parse::<f64>() {
-        return Some((ColorChannel::Number(value), unit));
+        return Some((ColorChannel::Number(PackedF64::new(value)), unit));
     }
 
     None

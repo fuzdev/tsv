@@ -944,7 +944,7 @@ pub(crate) fn parse_simple_selector<'arena>(
             let end = parser.span_pos(parser.current_end());
             parser.advance()?;
             Ok(SimpleSelector::Percentage {
-                value,
+                value: PackedF64::new(value),
                 span: Span {
                     start: start as u32,
                     end,

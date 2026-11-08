@@ -800,8 +800,9 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector<'_>, c
             w.raw("}");
         }
         ast::SimpleSelector::Percentage { value, span } => {
+            let value = value.get();
             let value_str = if value.fract() == 0.0 {
-                format!("{}%", *value as i64)
+                format!("{}%", value as i64)
             } else {
                 format!("{value}%")
             };

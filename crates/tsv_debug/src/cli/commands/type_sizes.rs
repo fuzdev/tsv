@@ -535,6 +535,7 @@ pub(crate) fn board() -> Vec<TypeRow> {
             css::CssRule<'static>,
             css::CssStyleSheet<'static>,
             css::CssValue<'static>,
+            css::PackedF64,
             css::PreludeValue<'static>,
             css::PseudoClassArgs<'static>,
             css::RelativeSelector<'static>,

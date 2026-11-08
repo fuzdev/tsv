@@ -6,6 +6,7 @@
 //! crate is not published, and `deno task build:packages` compiles it for wasm32, so a
 //! change that widens one of these fails the package build.
 
+use tsv_css::ast::{ColorChannel, CssValue, SimpleSelector};
 use tsv_lang::doc::DocContext;
 use tsv_lang::doc::arena::DocNode;
 use tsv_svelte::ast::{AttributeNode, Element, ExpressionTag, FragmentNode};
@@ -42,6 +43,11 @@ const _: () = assert!(size_of::<SwitchCase<'static>>() == 20);
 // the native pins in `tsv_ts`'s `parser/expression.rs` and `parser/types.rs`.
 const _: () = assert!(size_of::<Result<&Expression<'static>, Error>>() == 2 * size_of::<usize>());
 const _: () = assert!(size_of::<Result<&TSType<'static>, Error>>() == 2 * size_of::<usize>());
+// The CSS numeric carriers, 4-aligned through `PackedF64`. See the native `ColorChannel` and
+// `CssValue` pins in `tsv_css`'s `ast/mod.rs`.
+const _: () = assert!(size_of::<ColorChannel>() == 12);
+const _: () = assert!(size_of::<CssValue<'static>>() == 60);
+const _: () = assert!(size_of::<SimpleSelector<'static>>() == 60);
 // The Svelte nodes. See the native pins in `tsv_svelte`'s `ast/mod.rs`.
 const _: () = assert!(size_of::<Element<'static>>() == 40);
 const _: () = assert!(size_of::<FragmentNode<'static>>() == 80);

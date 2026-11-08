@@ -215,7 +215,7 @@ pub enum SimpleSelector<'arena> {
         span: Span, // & selector (CSS Nesting spec)
     },
     Percentage {
-        value: f64,
+        value: PackedF64,
         span: Span, // @keyframes percentage selectors (0%, 50%, 100%)
     },
     /// `An+B` term (`2n`, `2n + 1`, `odd`, `123`) appearing as a simple selector
@@ -611,15 +611,39 @@ impl CssValue<'_> {
     }
 }
 
+/// An `f64` aligned to 4 bytes, for a number held inside an AST enum.
+///
+/// A bare `f64` raises its enum to 8-byte alignment and pads the tag out to the same
+/// boundary. Packed, a value sits directly after its tag, and on wasm32, where a pointer
+/// is 4 bytes, the enclosing enums stay 4-aligned. The value goes in and comes out by copy,
+/// bit for bit, so `-0.0` and NaN read back as written and `==` is `f64`'s.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(C, packed(4))]
+pub struct PackedF64(f64);
+
+impl PackedF64 {
+    /// Wrap a value.
+    #[inline]
+    pub const fn new(value: f64) -> Self {
+        Self(value)
+    }
+
+    /// The wrapped value.
+    #[inline]
+    pub const fn get(self) -> f64 {
+        self.0
+    }
+}
+
 /// CSS color value
 ///
 /// Color channel value - supports numbers, percentages, and CSS Color 4 `none`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ColorChannel {
     /// Numeric value: 255, 0.5, etc.
-    Number(f64),
+    Number(PackedF64),
     /// Percentage value: 50%, 100%, etc.
-    Percentage(f64),
+    Percentage(PackedF64),
     /// CSS Color 4 `none` keyword
     None,
 }
@@ -1028,5 +1052,32 @@ impl CssBlockChild<'_> {
             CssBlockChild::Atrule(atrule) => atrule.span,
             CssBlockChild::Comment(comment) => comment.span,
         }
+    }
+}
+
+// The numeric carriers' 64-bit widths are pinned here under `cfg(test)`, where a toolchain that
+// lays a type out differently fails `cargo test`; the wasm32 widths are pinned in `tsv_wasm`.
+// On 64-bit targets `CssValue` is also a dispatch shape: its widest variant, `Color`, fits
+// behind a plain tag only while `ColorChannel`'s number is 4-aligned. A wider `Color` moves
+// the discriminant into the channel tag's niche, and every `match` on a value then decodes
+// it first.
+#[cfg(all(test, target_pointer_width = "64"))]
+const _: () = assert!(size_of::<ColorChannel>() == 12);
+#[cfg(all(test, target_pointer_width = "64"))]
+const _: () = assert!(size_of::<Color>() == 52);
+#[cfg(all(test, target_pointer_width = "64"))]
+const _: () = assert!(size_of::<CssValue<'static>>() == 64);
+
+#[cfg(test)]
+mod tests {
+    use super::PackedF64;
+
+    #[test]
+    fn packed_f64_keeps_the_bits_and_the_comparison() {
+        for value in [0.0, -0.0, 1.5, f64::NAN, -f64::NAN, f64::INFINITY] {
+            assert_eq!(PackedF64::new(value).get().to_bits(), value.to_bits());
+        }
+        assert_eq!(PackedF64::new(0.0), PackedF64::new(-0.0));
+        assert_ne!(PackedF64::new(f64::NAN), PackedF64::new(f64::NAN));
     }
 }

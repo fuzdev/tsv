@@ -1466,6 +1466,7 @@ impl<'a> Printer<'a> {
             } => self.build_pseudo_doc(*span, *name_end, args.as_ref(), is_last_in_compound),
             ast::SimpleSelector::Nesting { .. } => d.text("&"),
             ast::SimpleSelector::Percentage { value, .. } => {
+                let value = value.get();
                 let mut w = d.pool_writer();
                 // PoolTextWriter's write_str never errors; the Result exists
                 // only to satisfy `fmt::Write`.
