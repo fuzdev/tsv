@@ -24,6 +24,7 @@ import {
 	noisy_rows,
 	NOISY_SPREAD_PCT,
 	overall_passes,
+	parse_perf_stat_counter,
 	parse_perf_stat_instructions,
 	pct_delta,
 	phase_instructions,
@@ -569,4 +570,12 @@ Deno.test('strip_skip_reason: measured only when both sides have the strip', () 
 	deepStrictEqual(strip_skip_reason(false, true)?.includes('the base lacks'), true);
 	deepStrictEqual(strip_skip_reason(true, false)?.includes('the candidate lacks'), true);
 	deepStrictEqual(strip_skip_reason(false, false)?.includes('neither side has'), true);
+});
+
+Deno.test('parse_perf_stat_counter reads a named event from perf stat -x, output', () => {
+	const text = '# started\n123,,instructions:u,1000,100.00,,\n456,,cycles:u,1000,100.00,,\n';
+	deepStrictEqual(parse_perf_stat_counter(text, 'instructions'), 123);
+	deepStrictEqual(parse_perf_stat_counter(text, 'cycles'), 456);
+	deepStrictEqual(parse_perf_stat_counter('<not counted>,,cycles:u,,,\n', 'cycles'), null);
+	deepStrictEqual(parse_perf_stat_counter(text, 'branches'), null);
 });

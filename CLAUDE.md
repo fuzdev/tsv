@@ -142,6 +142,7 @@ deno task test:deno      # deno tests over the node-modules-free bench core (div
 #                          `release/plan_test.ts` — the version grammar and the fresh/resume plan; `release/crates_test.ts` —
 #                          publish:crates' order, liveness, semver baseline + release type + feature flags and rate-limit read over a
 #                          fake crates.io, plus its packaging cleanup on the real filesystem (own invocation, `--allow-write`);
+#                          `branch_report/*_test.ts` — the branch report's parsers, verdicts and wasm-board extraction;
 #                          `release/binstall_test.ts` — the binstall-table grader; `npm_api_test.ts` + `npm_api_strip_test.ts` +
 #                          `npm_api_imports_test.ts` — the npm options facade and its strip and imports halves over a fake
 #                          engine; `typecheck_packages_test.ts` — the README fence + marker grammar; `perf_ab_verdict_test.ts` —
@@ -547,6 +548,7 @@ cargo run --release -p tsv_debug -- profile --strip ../corpora/collections   # p
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile vs the format wall
 deno task perf:ab <base-ref> [<cand-ref>]  # parse/format A/B per language + the type strip: wall + instructions:u, exit 1 on a regression;
 #                                          cand defaults to the working tree. NOT in check (two release builds; ./docs/performance.md)
+deno task branch:report <base-ref> <cand-ref>  # one document comparing two refs: sizes, type widths, work counters; timing legs behind --timing; same ref twice is the A/A null (./docs/performance.md)
 ```
 
 Function-level hotspots: `perf` with the `profiling` cargo profile:

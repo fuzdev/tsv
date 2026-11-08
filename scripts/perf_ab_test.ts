@@ -3,7 +3,8 @@ import { existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { list_tree, tree_has_strip } from './perf_ab.ts';
+import { list_tree } from './git_snapshot.ts';
+import { tree_has_strip } from './perf_ab.ts';
 import { build_inputs_of } from './perf_ab_verdict.ts';
 
 /** The variables that point git at a repository other than the one its working directory is in.

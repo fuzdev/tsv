@@ -1038,7 +1038,34 @@ Wall-clock wants a quiet machine: the task prints the 1-minute load average (rea
 builds) and after the run, and names a running `cargo` / `rustc` / `tsv_debug`; the spread warning
 is the stronger signal, since a disturbance can leave the load average low. Run an A/A
 (`perf:ab HEAD HEAD`, one binary against itself) to see the wall noise the 1.5% sits on that day —
-its instruction column reads flat.
+its instruction column reads flat. The JSON output also carries each row's cycles per iteration on
+each side, which the verdict never reads.
+
+### Comparing two refs in one document — `deno task branch:report`
+
+```bash
+deno task branch:report <base-ref> <cand-ref>   # sizes, type widths, work counters: report.md + report.json
+deno task branch:report <ref> <ref>             # the A/A null: the same ref built twice, every deterministic row must be identical
+deno task branch:report <base> <cand> --timing plain,pgo,bench,build-wall,small-files --aa <aa>/report.json
+```
+
+Where `perf:ab` grades a change, `branch:report` describes one: it builds each ref from git in its
+own tree and target directory under `~/.cache/tsv/branch_report`, then compares artifact bytes
+(the three wasm packages, the N-API addon and the CLI, `.text`, per-symbol `.text`, bounds-miss
+call sites), type widths on x86-64 and wasm32, allocations, peak memory, wasm linear-memory
+high-water and the depth gate's per-shape table. Those sections need no quiet machine; a timing
+leg (`--timing`) does, and is off unless named. A timing row is measured, so the report never calls
+its difference real without a floor: pass `--aa`, repeatable, with earlier same-ref runs'
+`report.json`. A row's floor is its largest delta across those draws, a floor taken on another
+corpus, machine or timing setup does not count (the row reads `unfloored` and the run exits
+non-zero), and a row without one reads `unfloored`.
+
+The tool grades what the machine gives it: a missing tool, a failed build or a ref that lacks a
+leg's input is a row in the document and a non-zero exit (2), unless `--accept-gaps`, which also
+accepts a floor mismatch and a confounded toolchain (all stay listed under Problems), and a
+deterministic row that differs on a same-ref pair exits 1 whatever the flags. The store-rows
+section is reported as not applicable until an indexed AST exists; `store_rows_section` in
+`scripts/branch_report/branch_report.ts` is its extension point.
 
 ### A board is one cell of (entry point × corpus)
 

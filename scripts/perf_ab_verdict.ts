@@ -448,15 +448,16 @@ export interface CachedTree {
 }
 
 /** The cached snapshots to delete: everything but the `in_use` ones and the most recently used
- * others, `KEEP_TREES` kept in all. */
+ * others, `keep_trees` kept in all (default `KEEP_TREES`). */
 export function trees_to_evict(
 	trees: ReadonlyArray<CachedTree>,
-	in_use: ReadonlySet<string>
+	in_use: ReadonlySet<string>,
+	keep_trees: number = KEEP_TREES
 ): Array<string> {
 	const others = trees
 		.filter((tree) => !in_use.has(tree.name))
 		.sort((a, b) => b.mtime_ms - a.mtime_ms);
-	const keep = Math.max(0, KEEP_TREES - in_use.size);
+	const keep = Math.max(0, keep_trees - in_use.size);
 	return others.slice(keep).map((tree) => tree.name);
 }
 
@@ -466,10 +467,15 @@ export function trees_to_evict(
  * (`<not counted>` / `<not supported>`).
  */
 export function parse_perf_stat_instructions(text: string): number | null {
+	return parse_perf_stat_counter(text, 'instructions');
+}
+
+/** One event's count from `perf stat -x,` output, or null when it is absent or not counted. */
+export function parse_perf_stat_counter(text: string, event: string): number | null {
 	for (const line of text.split('\n')) {
 		if (line.startsWith('#')) continue;
 		const fields = line.split(',');
-		if (fields.length < 3 || !fields[2]!.startsWith('instructions')) continue;
+		if (fields.length < 3 || !fields[2]!.startsWith(event)) continue;
 		const value = fields[0]!.trim();
 		return /^\d+$/.test(value) ? Number(value) : null;
 	}

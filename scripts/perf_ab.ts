@@ -83,10 +83,20 @@
 import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, rename, rm, stat, utimes } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { CORPORA_COLLECTIONS } from '../benches/js/lib/corpora.ts';
 import { lines_of } from '../benches/js/lib/text_lines.ts';
+import {
+	BUILD_ENV,
+	extract_tree,
+	git,
+	HarnessError,
+	kept_build_env,
+	list_tree,
+	ROOT,
+	run,
+	sha256_hex
+} from './git_snapshot.ts';
 import {
 	ab_row,
 	type AbRow,
@@ -109,6 +119,7 @@ import {
 	noisy_rows,
 	NOISY_SPREAD_PCT,
 	overall_passes,
+	parse_perf_stat_counter,
 	parse_perf_stat_instructions,
 	phase_instructions,
 	render_table,
@@ -125,7 +136,6 @@ import {
 	wants_more_rounds
 } from './perf_ab_verdict.ts';
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url));
 /** The measuring drivers, each an example overlaid on every snapshot before it builds: `format`
  * measures every language's parse + format, `strip` the type strip (its own example, so a tree
  * older than the strip still builds the format driver — `perf_ab_strip.rs`'s module doc). */
@@ -163,11 +173,6 @@ const BUILD_INPUTS = [
 ];
 const REQUIRED_BUILD_INPUTS = ['Cargo.toml', 'crates', 'src'];
 
-/** The variables a driver build keeps from the caller; everything else is cleared. Locating
- * the toolchain needs `PATH`, `HOME` and the rustup / cargo homes; `CARGO_BUILD_JOBS` only
- * schedules the build (release codegen is one unit, so the artifact does not depend on it). */
-const BUILD_ENV = ['PATH', 'HOME', 'CARGO_HOME', 'RUSTUP_HOME', 'CARGO_BUILD_JOBS'];
-
 /** The variables a driver build sets itself, the same for every snapshot. `CARGO_TARGET_DIR` is
  * relative to the build's working directory (the snapshot's `src/`), so each snapshot builds into
  * its own `target/` beside it. Part of the build RECIPE (`build_recipe_text`). */
@@ -203,14 +208,14 @@ const LOAD_WARN_AFTER = LOAD_WARN + 1;
 /** Processes whose presence means a build or a corpus run competes for the machine. */
 const HEAVY_PROCESSES = ['rustc', 'cargo', 'tsv_debug'];
 
-class HarnessError extends Error {}
-
 interface Options {
 	base_ref: string;
 	cand_ref: string | null;
 	rounds: number;
 	iterations: number;
 	corpus: string;
+	/** The snapshot cache, or null for the default under `~/.cache/tsv/perf_ab`. */
+	cache: string | null;
 	json: boolean;
 }
 
@@ -227,6 +232,7 @@ function parse_options(args: ReadonlyArray<string>): Options {
 	let rounds = DEFAULT_ROUNDS;
 	let iterations = DEFAULT_ITERATIONS;
 	let corpus = CORPORA_COLLECTIONS;
+	let cache: string | null = null;
 	let json = false;
 	const count = (flag: string, value: string | undefined): number => {
 		const n = Number(value);
@@ -241,6 +247,12 @@ function parse_options(args: ReadonlyArray<string>): Options {
 			const value = args[++i];
 			if (!value) throw new HarnessError('--corpus takes a directory');
 			corpus = value;
+		} else if (arg === '--cache') {
+			// internal, for `branch:report`, which runs this script with its own permissions; the
+			// `perf:ab` task's `--allow-write` covers the default cache only
+			const value = args[++i];
+			if (!value) throw new HarnessError('--cache takes a directory');
+			cache = value;
 		} else if (arg === '--json') json = true;
 		else if (arg === '--help' || arg === '-h') {
 			console.log(USAGE);
@@ -262,44 +274,9 @@ function parse_options(args: ReadonlyArray<string>): Options {
 		rounds,
 		iterations,
 		corpus: resolve(ROOT, corpus),
+		cache: cache === null ? null : resolve(ROOT, cache),
 		json
 	};
-}
-
-interface RunResult {
-	success: boolean;
-	code: number;
-	stdout: string;
-	stderr: string;
-}
-
-async function run(
-	cmd: string,
-	args: ReadonlyArray<string>,
-	options: { cwd?: string; env?: Record<string, string> } = {}
-): Promise<RunResult> {
-	const output = await new Deno.Command(cmd, {
-		args: [...args],
-		cwd: options.cwd ?? ROOT,
-		env: options.env,
-		stdout: 'piped',
-		stderr: 'piped'
-	}).output();
-	const decoder = new TextDecoder();
-	return {
-		success: output.success,
-		code: output.code,
-		stdout: decoder.decode(output.stdout),
-		stderr: decoder.decode(output.stderr)
-	};
-}
-
-async function git(args: ReadonlyArray<string>, env?: Record<string, string>): Promise<string> {
-	const result = await run('git', args, { env });
-	if (!result.success) {
-		throw new HarnessError(`git ${args.join(' ')} failed:\n${result.stderr.trim()}`);
-	}
-	return result.stdout.trim();
 }
 
 /** One measured side: what it is called, the tree it builds, and that tree's build inputs. */
@@ -314,21 +291,6 @@ interface Side {
 	inputs: Array<string>;
 	/** Whether the tree has the strip driver's entry point (`STRIP_ENTRY_POINT`). */
 	has_strip: boolean;
-}
-
-/** The recursive, NUL-separated `git ls-tree -r -z` listing of `paths` in `tree`, run in `cwd`
- * (untrimmed: a raw path may end in whitespace). */
-export async function list_tree(
-	tree: string,
-	paths: ReadonlyArray<string>,
-	cwd: string = ROOT
-): Promise<string> {
-	const args = ['ls-tree', '-r', '-z', tree, '--', ...paths];
-	const result = await run('git', args, { cwd });
-	if (!result.success) {
-		throw new HarnessError(`git ${args.join(' ')} failed:\n${result.stderr.trim()}`);
-	}
-	return result.stdout;
 }
 
 /** The cache key and the present build inputs of `tree`, from one recursive `git ls-tree`
@@ -412,58 +374,10 @@ async function evict_cache(cache: string, sides: ReadonlyArray<Side>): Promise<v
 	}
 }
 
-async function sha256_hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
-	const digest = await crypto.subtle.digest('SHA-256', bytes);
-	return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-/** Extract `side`'s build inputs into `dir` with `git archive | tar -x`, via a per-process
- * partial directory so an interrupted extraction is never mistaken for a snapshot and two
- * concurrent runs never share one. */
-async function extract_tree(side: Side, dir: string): Promise<void> {
-	const { tree, inputs: paths } = side;
-	const partial = `${dir}.partial.${Deno.pid}`;
-	await rm(partial, { recursive: true, force: true });
-	await mkdir(partial, { recursive: true });
-	const archive = new Deno.Command('git', {
-		args: ['archive', '--format=tar', tree, '--', ...paths],
-		cwd: ROOT,
-		stdout: 'piped',
-		stderr: 'piped'
-	}).spawn();
-	const tar = new Deno.Command('tar', {
-		args: ['-x', '-C', partial],
-		stdin: 'piped',
-		stdout: 'null',
-		stderr: 'piped'
-	}).spawn();
-	await archive.stdout.pipeTo(tar.stdin);
-	const [archive_out, tar_out] = await Promise.all([archive.output(), tar.output()]);
-	if (!archive_out.success || !tar_out.success) {
-		await rm(partial, { recursive: true, force: true });
-		const stderr = new TextDecoder().decode(
-			archive_out.success ? tar_out.stderr : archive_out.stderr
-		);
-		throw new HarnessError(`extracting tree ${tree} failed:\n${stderr.trim()}`);
-	}
-	try {
-		await rename(partial, dir);
-	} catch (err) {
-		// a concurrent run finished the same extraction first; its copy is the same tree
-		await rm(partial, { recursive: true, force: true });
-		if (!existsSync(dir)) throw err;
-	}
-}
-
 /** `BUILD_FIXED_ENV` plus the caller's values for `BUILD_ENV`, the whole environment of a driver
  * build. */
 function build_env(): Record<string, string> {
-	const env: Record<string, string> = { ...BUILD_FIXED_ENV };
-	for (const name of BUILD_ENV) {
-		const value = Deno.env.get(name);
-		if (value !== undefined) env[name] = value;
-	}
-	return env;
+	return { ...BUILD_FIXED_ENV, ...kept_build_env() };
 }
 
 /** One driver as the run builds it: its source, the source's hash and its recipe's hash. */
@@ -491,7 +405,7 @@ async function ensure_driver(side: Side, cache: string, driver: DriverBuild): Pr
 		console.error(
 			`perf:ab: ${side.label}: snapshotting tree ${side.tree.slice(0, 12)} (build inputs ${side.key.slice(0, 12)})`
 		);
-		await extract_tree(side, src);
+		await extract_tree(side.tree, side.inputs, src);
 	}
 	const overlay = resolve(src, driver_path);
 	await mkdir(dirname(overlay), { recursive: true });
@@ -577,6 +491,8 @@ interface DriverOutput extends FileSet {
 	output_bytes: number;
 	/** Retired user instructions for the whole process, or null without `perf`. */
 	instructions: number | null;
+	/** User cycles for the whole process, or null when `perf` did not count them. */
+	cycles: number | null;
 }
 
 type DriverMode = 'full' | 'parse' | 'fixed';
@@ -601,7 +517,7 @@ async function run_driver(
 				'stat',
 				'-x,',
 				'-e',
-				'instructions:u',
+				'instructions:u,cycles:u',
 				'-o',
 				stat_file,
 				'--',
@@ -615,11 +531,13 @@ async function run_driver(
 		);
 	}
 	let instructions: number | null = null;
+	let cycles: number | null = null;
 	if (use_perf) {
 		const stat_text = await readFile(stat_file, 'utf8');
 		await rm(stat_file, { force: true });
 		instructions = parse_perf_stat_instructions(stat_text);
 		if (instructions === null) throw new HarnessError(`perf stat counted nothing:\n${stat_text}`);
+		cycles = parse_perf_stat_counter(stat_text, 'cycles');
 	}
 	let printed: Record<string, unknown>;
 	try {
@@ -642,7 +560,8 @@ async function run_driver(
 		parse_us: number_of('parse_us'),
 		work_us: number_of(lang === 'strip' ? 'strip_us' : 'format_us'),
 		output_bytes: number_of('output_bytes'),
-		instructions
+		instructions,
+		cycles
 	};
 }
 
@@ -695,6 +614,10 @@ interface SideSamples {
 	parse: RowSamples;
 	/** The second phase's samples: format, or the strip's walk + blank. */
 	work: RowSamples;
+	/** Cycles per iteration per round, fixed cost removed, for `parse` then the work (`phase_instructions`
+	 * over the cycle counts); empty when a run counted no cycles. */
+	parse_cycles: Array<number>;
+	work_cycles: Array<number>;
 	/** The first full run's file set; every later full run must match it. */
 	file_set: FileSet | null;
 	/** The first full run's formatted bytes; every later full run must match it. */
@@ -705,6 +628,8 @@ function empty_samples(): SideSamples {
 	return {
 		parse: { wall_us: [], instructions: [] },
 		work: { wall_us: [], instructions: [] },
+		parse_cycles: [],
+		work_cycles: [],
 		file_set: null,
 		output_bytes: null
 	};
@@ -757,9 +682,45 @@ async function run_round(
 				);
 				s.parse.instructions.push(parse_instructions);
 				s.work.instructions.push(work_instructions);
+				if (full.cycles !== null && parse.cycles !== null && fixed.cycles !== null) {
+					const [parse_cycles, work_cycles] = phase_instructions(
+						lang,
+						{ full: full.cycles, parse: parse.cycles, fixed: fixed.cycles },
+						options.iterations
+					);
+					s.parse_cycles.push(parse_cycles);
+					s.work_cycles.push(work_cycles);
+				}
 			}
 		}
 	}
+}
+
+/** Each row's median cycles per iteration on each side, keyed `<lang> <phase>`, for the JSON
+ * output only: the verdict reads wall and instructions, never cycles. */
+function cycles_by_row(
+	langs: ReadonlyArray<Lang>,
+	samples: ReadonlyArray<Record<Lang, SideSamples>>
+): Record<string, { base: number; cand: number }> {
+	const median = (xs: ReadonlyArray<number>): number => {
+		const sorted = [...xs].sort((a, b) => a - b);
+		const mid = Math.floor(sorted.length / 2);
+		return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+	};
+	const out: Record<string, { base: number; cand: number }> = {};
+	for (const lang of langs) {
+		const [parse_phase, work_phase] = LANG_PHASES[lang];
+		for (const [phase, key] of [
+			[parse_phase, 'parse_cycles'],
+			[work_phase, 'work_cycles']
+		] as const) {
+			const b = samples[0]![lang][key];
+			const c = samples[1]![lang][key];
+			if (b.length > 0 && c.length > 0)
+				out[`${lang} ${phase}`] = { base: median(b), cand: median(c) };
+		}
+	}
+	return out;
 }
 
 function grade(
@@ -810,7 +771,7 @@ async function main(): Promise<number> {
 
 	const home = Deno.env.get('HOME');
 	if (!home) throw new HarnessError('HOME is not set');
-	const cache = resolve(home, '.cache/tsv/perf_ab');
+	const cache = options.cache ?? resolve(home, '.cache/tsv/perf_ab');
 	await mkdir(cache, { recursive: true });
 
 	const load_before = load_1m();
@@ -987,6 +948,7 @@ async function main(): Promise<number> {
 						layout === null
 							? null
 							: { row: `${layout.lang} ${layout.phase}`, wall_pct: layout.wall_pct },
+					cycles: cycles_by_row(langs, samples),
 					rows,
 					passes
 				},
