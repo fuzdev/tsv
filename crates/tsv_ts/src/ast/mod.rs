@@ -155,9 +155,9 @@ pub use expressions::{
 // than as a silently thinner depth-limit margin and a fatter element slot. Each is rustc's
 // layout, not a guarantee, so it compiles under `cfg(test)` only: a toolchain that lays them
 // out differently fails `cargo test` here, never a consumer's build. The counts are
-// pointer-width-relative and the doc's measurements are x86-64; `Expression` and
-// `Statement` are also pinned on wasm32 (a 4 B pointer; `Expression`'s payload is 8 B
-// aligned, `Statement`'s 4 B) in `tsv_wasm`, the crate compiled for wasm32, and each one's
+// pointer-width-relative and the doc's measurements are x86-64; every width here is also
+// pinned on wasm32 (a 4 B pointer; `Expression`'s payload is 8 B aligned, `Statement`'s
+// 4 B) in `tsv_wasm`, the crate compiled for wasm32, and `Expression`'s and `Statement`'s
 // `Option` must stay niche-packed on both.
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<Expression<'static>>() == 72);

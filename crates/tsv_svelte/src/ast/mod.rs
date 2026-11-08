@@ -1497,7 +1497,7 @@ fn narrow_lang_value(value: Cow<'_, str>) -> Cow<'_, str> {
 
 /// `facts` rides in the tail padding beside `kind`, so the parse-time classification costs no
 /// extra `Element` size. Guards that property against a future field reorder that would spill it.
-/// 64-bit only — the slice fields are half-width on wasm32, a different layout.
+/// 64-bit here — the slice fields are half-width on wasm32, a different layout `tsv_wasm` pins.
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<Element<'static>>() == 56);
 
@@ -2097,8 +2097,8 @@ pub struct Style<'arena> {
 // expressions are the other story — the TS parser has already arena-allocated each one,
 // so the nodes hold them as `&'arena Expression` rather than copying 72 B out of that
 // allocation (`docs/architecture.md` §Nested AST, the second density rule). `SnippetBlock`
-// sets `FragmentNode`'s width. 64-bit only — pointers and slices are half-width on
-// wasm32, a different layout.
+// sets `FragmentNode`'s width. 64-bit here — pointers and slices are half-width on
+// wasm32, a different layout `tsv_wasm` pins.
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<FragmentNode<'static>>() == 120);
 #[cfg(all(test, target_pointer_width = "64"))]

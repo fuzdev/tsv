@@ -98,7 +98,7 @@ const BP_UNARY: u8 = 29;
 // the same rule for `TSType` (`Parser::parse_type`).
 //
 // The assert is width-relative (a reference and an `Error` are each one `usize`), so it
-// would hold on the 32-bit `wasm32` build too, where the return is a slot regardless. The
+// holds on `wasm32` too (pinned in `tsv_wasm`), where the return is a slot regardless. The
 // `Result`'s two words are rustc's layout, not a guarantee, so it is pinned in the test build.
 #[cfg(test)]
 const _: () = assert!(size_of::<Result<&Expression<'static>, Error>>() == 2 * size_of::<usize>());

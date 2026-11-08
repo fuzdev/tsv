@@ -19,7 +19,7 @@ use super::{LINK_OPERATOR, LINK_TYPE_SUFFIX, Parser};
 // `Error` needs a discriminant word, so the `Result` is two words — 16 B on 64-bit,
 // which x86-64 hands back in two registers where an 80 B `TSType` needs a stack slot.
 // wasm32 returns every `Result` through a slot either way; there the width is 8 B
-// and the slot is 8 B rather than a whole `TSType`. rustc's layout, so a test-build pin.
+// (pinned in `tsv_wasm`), not a whole `TSType`. rustc's layout, so a test-build pin.
 #[cfg(test)]
 const _: () = assert!(size_of::<Result<&TSType<'static>, Error>>() == 2 * size_of::<usize>());
 
