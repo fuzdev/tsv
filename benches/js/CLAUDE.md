@@ -133,8 +133,8 @@ delta on the same row is the detector.
   The processes it starts ([Process model](#process-model)) are the same runtime, started with its
   flags.
 - **Portable shared modules.** Shared/entry modules use `node:` builtins (Deno
-  supports them) + `@fuzdev/fuz_util` helpers (`fs_search`, `fs_exists`,
-  `spawn_out`, `to_file_path`) — **no `Deno.*`, no `@std/*`**. The only genuinely
+  supports them, so files and subprocesses go through them) + `@fuzdev/fuz_util`'s
+  pure modules (`args`, `benchmark*`, `stats`, `time`) — **no `Deno.*`, no `@std/*`**. The only genuinely
   runtime-specific files are the native loader (`ffi.ts` `Deno.dlopen` vs `napi.ts`
   `process.dlopen`) and the WASM target the loader picks. The Deno-only entry points
   (`corpus_compare_*`, `diagnostics/*` but the node/bun `biome_heap_probe.ts`) stay Deno-idiomatic. The

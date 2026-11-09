@@ -78,7 +78,7 @@ if (Deno.args.length > 0) {
  * not read as a pass.
  */
 async function run_render_audit(): Promise<void> {
-	const snapshot = await corpus_snapshot_dir(console.error);
+	const snapshot = corpus_snapshot_dir(console.error);
 	const suites = await corpus_present_dirs_for_tiers(['suite'], console.error);
 	const dirs = [...(snapshot === null ? [] : [snapshot]), ...suites];
 	if (dirs.length === 0) {

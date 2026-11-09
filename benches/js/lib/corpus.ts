@@ -41,9 +41,9 @@
  * Both support `load()` (collect all) and `stream()` (async generator for GC).
  */
 
-import { fs_exists } from '@fuzdev/fuz_util/fs.ts';
 import { Buffer } from 'node:buffer';
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
@@ -192,21 +192,21 @@ function should_exclude(path: string, prune_build_output: boolean): boolean {
  */
 const options_dir_cache = new Map<string, boolean>();
 
-async function has_companion_options(file_path: string): Promise<boolean> {
+function has_companion_options(file_path: string): boolean {
 	const dir = dirname(file_path);
 
 	// Check dir/options.json (cached per directory)
 	if (options_dir_cache.has(dir)) {
 		if (options_dir_cache.get(dir)) return true;
 	} else {
-		const dir_has_options = await fs_exists(join(dir, 'options.json'));
+		const dir_has_options = existsSync(join(dir, 'options.json'));
 		options_dir_cache.set(dir, dir_has_options);
 		if (dir_has_options) return true;
 	}
 
 	// Check name.options.json (per-file, not cached)
 	const name_without_ext = basename(file_path).replace(/\.[^.]+$/, '');
-	return fs_exists(join(dir, `${name_without_ext}.options.json`));
+	return existsSync(join(dir, `${name_without_ext}.options.json`));
 }
 
 //
@@ -690,7 +690,7 @@ async function build_catalog(): Promise<CorpusCatalog> {
 		);
 	}
 	if (read.status === 'absent') {
-		if (await fs_exists(resolve(CORPORA_ROOT))) {
+		if (existsSync(resolve(CORPORA_ROOT))) {
 			throw new Error(
 				`${CORPORA_ROOT} is checked out but has no ${basename(CORPORA_MANIFEST)} — the snapshot's ` +
 					'recipe is what says which subpaths each collection vendors, so nothing can be graded ' +
@@ -1025,7 +1025,7 @@ interface LoadedExclusionCache {
  */
 async function load_path_set(cache: string): Promise<Set<string> | null> {
 	const cache_path = resolve(cache);
-	if (!(await fs_exists(cache_path))) return null;
+	if (!existsSync(cache_path)) return null;
 	const paths = JSON.parse(await readFile(cache_path, 'utf8')) as string[];
 	return new Set(paths);
 }
@@ -1159,7 +1159,7 @@ export async function corpus_missing_entries(
 	const optional_missing: string[] = [];
 	for (const entry of entries) {
 		const entry_path = entry_source(entry);
-		if (await fs_exists(resolve(entry_path))) continue;
+		if (existsSync(resolve(entry_path))) continue;
 		(entry.optional ? optional_missing : missing).push(
 			entry_path + (entry.hint ? ` (${entry.hint})` : '')
 		);
@@ -1205,7 +1205,7 @@ export async function corpus_present_dirs_for_tiers(
 	for (const entry of (await corpus_entries()).filter((e) => tiers.includes(e.tier))) {
 		if (entry.path === undefined) continue;
 		if (outside !== undefined && is_under(entry.path, outside)) continue;
-		if (await fs_exists(resolve(entry.path))) {
+		if (existsSync(resolve(entry.path))) {
 			dirs.push(entry.path);
 		} else {
 			logger(`  ⚠ corpus entry missing, skipped: ${entry.path}`);
@@ -1225,8 +1225,8 @@ export async function corpus_present_dirs_for_tiers(
  * robustness sweeps through `corpus_robustness_seeds`. `null`, with a warning, when the
  * snapshot is not checked out.
  */
-export async function corpus_snapshot_dir(logger: Logger = console.log): Promise<string | null> {
-	if (await fs_exists(resolve(CORPORA_COLLECTIONS))) return CORPORA_COLLECTIONS;
+export function corpus_snapshot_dir(logger: Logger = console.log): string | null {
+	if (existsSync(resolve(CORPORA_COLLECTIONS))) return CORPORA_COLLECTIONS;
 	logger(
 		`  ⚠ ${CORPORA_COLLECTIONS} absent — the snapshot is not checked out (${clone_hint(CORPORA_COLLECTIONS)})`
 	);
@@ -1302,7 +1302,7 @@ export async function live_diff_files(logger: Logger = console.log): Promise<Liv
 		// subpath (`packages/kit/src`) sits.
 		const repo_root = resolve(checkout);
 		const tree = resolve(path);
-		if (!(await fs_exists(tree))) {
+		if (!existsSync(tree)) {
 			absent++;
 			continue;
 		}
@@ -1369,7 +1369,7 @@ export async function live_diff_files(logger: Logger = console.log): Promise<Liv
 export async function corpus_robustness_seeds(
 	logger: Logger = console.log
 ): Promise<{ dirs: string[]; live_files: string[] }> {
-	const root = await corpus_snapshot_dir(logger);
+	const root = corpus_snapshot_dir(logger);
 	const outside = await corpus_present_dirs_for_tiers(
 		TIERS_BY_VIEW.robustness.filter((t) => t !== 'live'),
 		logger,
@@ -1502,7 +1502,7 @@ export class CorpusLoader {
 		const missing: string[] = [];
 		for (const entry of entries) {
 			const entry_path = entry_source(entry);
-			if (await fs_exists(resolve(entry_path))) {
+			if (existsSync(resolve(entry_path))) {
 				present.push(entry);
 				continue;
 			}
@@ -1710,7 +1710,7 @@ export class DirectoryLoader {
 	async *stream(logger: Logger = console.log): AsyncGenerator<SourceFile> {
 		const resolved_path = resolve(this.#path);
 
-		if (!(await fs_exists(resolved_path))) {
+		if (!existsSync(resolved_path)) {
 			throw new Error(`Directory not found: ${this.#path}`);
 		}
 

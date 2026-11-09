@@ -212,19 +212,15 @@ if (COVERAGE_ONLY && !IS_CONFORMANCE) {
 /** Maximum length of error message to display (longer messages are truncated) */
 export const MAX_ERROR_MESSAGE_LENGTH = 200;
 
-/**
- * Baseline storage directory. Passed to `benchmark_baseline_save` /
- * `_compare`; the library calls `mkdir(path, { recursive: true })` and
- * writes `baseline.json` inside, so the file lands at
- * `./benches/js/results/baseline.json`. Moved into `results/` (from its
- * pre-0.60 location at `./benches/js/baseline.json`) so the library's
- * mkdir is covered by the existing `--allow-write=benches/js/results`
- * permission without widening write scope to the whole benches tree.
- */
-export const BASELINE_DIR = './benches/js/results';
-
 /** Results directory for comparison JSON files */
 export const RESULTS_DIR = './benches/js/results';
+
+/**
+ * The saved regression baseline. Under `results/` so writing it is covered by the
+ * existing `--allow-write=benches/js/results` permission, without widening write
+ * scope to the whole benches tree.
+ */
+export const BASELINE_PATH = `${RESULTS_DIR}/baseline.json`;
 
 /**
  * This run's task-registry options, in one place: the row-composition guards, the

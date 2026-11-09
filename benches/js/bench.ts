@@ -108,11 +108,14 @@ import {
 } from '@fuzdev/fuz_util/stats.ts';
 import type { BenchmarkResult } from '@fuzdev/fuz_util/benchmark_types.ts';
 import {
+	type BenchmarkBaseline,
 	benchmark_baseline_compare,
+	benchmark_baseline_create,
 	benchmark_baseline_format,
-	benchmark_baseline_save
+	benchmark_baseline_parse,
+	benchmark_baseline_serialize
 } from '@fuzdev/fuz_util/benchmark_baseline.ts';
-import { spawn_out } from '@fuzdev/fuz_util/process.ts';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import process, { argv, exit, pid } from 'node:process';
@@ -126,7 +129,7 @@ import {
 	run_bench_child
 } from './lib/bench_child.ts';
 import {
-	BASELINE_DIR,
+	BASELINE_PATH,
 	BENCH_DURATION,
 	BENCH_GC,
 	BENCH_PASSES,
@@ -215,7 +218,7 @@ import {
 	type ReportVersions,
 	type SourceCoverageCell
 } from './lib/report.ts';
-import { current_machine, type Machine, type Runtime } from './lib/runtime.ts';
+import { current_machine, type Machine, type Runtime, runtime_version } from './lib/runtime.ts';
 import {
 	CANONICAL_FORMATTER_ROW,
 	CANONICAL_PARSER_ROWS,
@@ -389,7 +392,7 @@ refuse_ffi_profile_override('bench');
 // long, and a checkout or commit during it would otherwise label the report with
 // the tree as it stood at the end.
 const run_started = new Date().toISOString();
-const run_commit = await get_git_commit();
+const run_commit = get_git_commit();
 const tsv_version = await get_tsv_version();
 
 //
@@ -1295,16 +1298,16 @@ async function get_tsv_version(): Promise<string> {
 }
 
 /** Get current git commit hash */
-async function get_git_commit(): Promise<string | null> {
+function get_git_commit(): string | null {
 	try {
-		const { result, stdout } = await spawn_out('git', ['rev-parse', 'HEAD']);
-		if (result.ok && stdout) {
-			return stdout.trim().slice(0, 8);
-		}
+		const stdout = execFileSync('git', ['rev-parse', 'HEAD'], {
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'ignore']
+		});
+		return stdout.trim().slice(0, 8);
 	} catch {
-		// Ignore
+		return null;
 	}
-	return null;
 }
 
 /** Null timing stats — the coverage-only entry shape (no timed run happened). */
@@ -1870,7 +1873,7 @@ function baseline_results(groups: GroupResults[]): BenchmarkResult[] {
 
 /**
  * Build the `metadata` bag persisted alongside the library's baseline.
- * Round-trips on `_load` and surfaces as `baseline_metadata` on `_compare` —
+ * Round-trips through `_parse` and surfaces as `baseline_metadata` on `_compare` —
  * the library doesn't interpret these fields, we use them ourselves to warn
  * on corpus drift (and to display the same `corpus`/`versions`/`binary_sizes`
  * context).
@@ -1896,11 +1899,30 @@ interface BaselineMeta {
 
 /** Save the current run as the regression baseline. */
 async function save_baseline(data: Baseline): Promise<void> {
-	await benchmark_baseline_save(baseline_results(all_group_results), {
-		path: BASELINE_DIR,
+	const baseline = benchmark_baseline_create(baseline_results(all_group_results), {
+		git_commit: run_commit,
+		git_branch: null,
+		runtime_version: runtime_version(),
 		metadata: build_baseline_metadata(data)
 	});
-	log(`Baseline saved to ${BASELINE_DIR}/baseline.json`);
+	await mkdir(RESULTS_DIR, { recursive: true });
+	await writeFile(BASELINE_PATH, benchmark_baseline_serialize(baseline));
+	log(`Baseline saved to ${BASELINE_PATH}`);
+}
+
+/**
+ * The saved baseline, or null when there is none or it can't be used. An unusable
+ * file stays on disk for the next `--save-baseline` to replace.
+ */
+async function load_baseline(): Promise<BenchmarkBaseline | null> {
+	const stored = await readFile(BASELINE_PATH, 'utf8').catch(() => null);
+	if (stored === null) return null;
+	const parsed = benchmark_baseline_parse(stored);
+	if (parsed.ok) return parsed.baseline;
+	console.error(
+		`\n⚠️  Ignoring the baseline at ${BASELINE_PATH} (${parsed.kind}): ${parsed.message}`
+	);
+	return null;
 }
 
 /**
@@ -1912,8 +1934,9 @@ async function save_baseline(data: Baseline): Promise<void> {
  * fairness caveats in docs/benchmarks.md.
  */
 async function compare_baseline(current: Baseline): Promise<void> {
-	const comparison = await benchmark_baseline_compare(baseline_results(all_group_results), {
-		path: BASELINE_DIR,
+	const baseline = await load_baseline();
+	const comparison = benchmark_baseline_compare(baseline_results(all_group_results), baseline, {
+		runtime_version: runtime_version(),
 		// 1.0 means "any statistically significant slowdown counts." Tune
 		// upward (e.g. 1.05) to suppress trivial regressions in CI without
 		// losing the practical-significance gate already inside the Welch
@@ -1926,7 +1949,7 @@ async function compare_baseline(current: Baseline): Promise<void> {
 
 	if (!comparison.baseline_found) {
 		console.error(
-			`\nNo baseline found at ${BASELINE_DIR}/baseline.json. Run with --save-baseline first.`
+			`\nNo baseline to compare against at ${BASELINE_PATH}. Run with --save-baseline first.`
 		);
 		return;
 	}
