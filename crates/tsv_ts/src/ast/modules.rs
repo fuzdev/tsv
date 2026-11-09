@@ -3,11 +3,10 @@
 //! Contains all import and export declaration types, specifiers,
 //! and TypeScript module reference types.
 
-use crate::ast::ExprView;
 use tsv_lang::Span;
 
 use super::{
-    ClassDeclaration, ExprSlot, FunctionDeclaration, Identifier, Literal, Statement,
+    ClassDeclaration, Expression, FunctionDeclaration, Identifier, Literal, Statement,
     TSDeclareFunction, TSEntityName, TSInterfaceDeclaration,
 };
 
@@ -64,7 +63,7 @@ pub enum ExportDefaultValue<'arena> {
     // enum (it is the largest), so inlining the declaration variants is free, avoids
     // a pointer-chase on the format read path, and matches `ExportFunctionDeclaration`
     // (which holds the same structs inline).
-    Expression(ExprSlot<'arena>),
+    Expression(Expression<'arena>),
     FunctionDeclaration(FunctionDeclaration<'arena>),
     /// A bodiless function declaration: a `declare function`, an overload
     /// signature, or a bodiless signature inside a `declare namespace`.
@@ -77,9 +76,9 @@ pub enum ExportDefaultValue<'arena> {
 impl ExportDefaultValue<'_> {
     /// The exported value's own span — where the `export default` keyword's gap ends,
     /// whichever form follows it.
-    pub fn span(&self, view: ExprView<'_>) -> Span {
+    pub fn span(&self) -> Span {
         match self {
-            ExportDefaultValue::Expression(expr) => view.slot(expr).span(),
+            ExportDefaultValue::Expression(expr) => expr.span(),
             ExportDefaultValue::FunctionDeclaration(func) => func.span,
             ExportDefaultValue::TSDeclareFunction(func) => func.span,
             ExportDefaultValue::ClassDeclaration(class) => class.span,
@@ -109,7 +108,7 @@ pub struct ExportAllDeclaration<'arena> {
 /// CommonJS-style export for TypeScript modules
 #[derive(Debug, Clone)]
 pub struct TSExportAssignment<'arena> {
-    pub expression: ExprSlot<'arena>,
+    pub expression: Expression<'arena>,
 }
 
 /// TypeScript UMD namespace export: `export as namespace Foo;`

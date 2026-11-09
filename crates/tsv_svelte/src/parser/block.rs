@@ -10,7 +10,7 @@ use bumpalo::Bump;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
 use tsv_lang::{Error, Span};
 use tsv_ts::__private::TopLevelAs;
-use tsv_ts::ast::{AstStores, Expression, ExpressionKind};
+use tsv_ts::ast::{Expression, ExpressionKind};
 
 use super::expression_tag::{scan_head_to_matching_brace, scan_to_matching_paren};
 use super::parser_impl::{EmbeddedParseMark, SvelteParser};
@@ -193,12 +193,11 @@ enum EachHeadSplit {
 /// `tsv_ts::__private::parse_type_extent`) — the caller re-reads both regions with the real
 /// iterable and binding parses, so a probe that registered anything would double it.
 /// Its type parses start at `host_nesting`, as the real ones do.
-fn each_binding_separator<'arena>(
+fn each_binding_separator(
     s: &str,
     s_offset: usize,
     host_nesting: u32,
-    arena: &'arena Bump,
-    stores: &mut AstStores<'arena>,
+    arena: &Bump,
 ) -> EachHeadSplit {
     // Every position the walk names is a subslice of `s`, so one rule converts them all
     // and no offset is ever summed from parts. Via [`subslice_offset`] rather than a
@@ -224,8 +223,7 @@ fn each_binding_separator<'arena>(
         // No type here ⇒ this item is the binding, and the keyword before it is the
         // separator — the one recorded below, or the head's first `as` when none is.
         let item_at = offset_of(item);
-        let Ok(type_end) =
-            tsv_ts::__private::parse_type_extent(item, item_at, host_nesting, arena, stores)
+        let Ok(type_end) = tsv_ts::__private::parse_type_extent(item, item_at, host_nesting, arena)
         else {
             break;
         };
@@ -488,9 +486,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // The partial parse stopped at no top-level comma, so a bare sequence here is tsc's
         // comparison reading a list the partial parse read as acorn-typescript's
         // (`f<T, U><V>(x) as A[]`) — refused inside the parse, so it is re-read the same way.
-        self.parse_ts_expression_checked(iterable, expr_offset, "'}'", |_, _, expression| {
+        self.parse_ts_expression_checked(iterable, expr_offset, "'}'", |this, expression| {
             match super::tag::bare_sequence_comma(expression, iterable) {
-                Some(comma) => Err(Self::error_expected_at("'as'", expr_offset + comma)),
+                Some(comma) => Err(this.error_expected_at("'as'", expr_offset + comma)),
                 None => Ok(()),
             }
         })
@@ -561,7 +559,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             expr_str,
             expr_offset,
             TopLevelAs::HostSeparator,
-            |this, _, expression, end_pos| {
+            |this, expression, end_pos| {
                 this.check_each_head_tail(content, content_offset, expression, end_pos)
             },
         )?;
@@ -589,15 +587,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // one rule the separator walk uses — and `content[abs - content_offset]`
                 // is how every absolute position below indexes back into the head.
                 let binding_offset = content_offset + subslice_offset(content, binding_str);
-                match self.with_island_stores(|this, stores| {
-                    each_binding_separator(
-                        binding_str,
-                        binding_offset,
-                        this.island_nesting(),
-                        this.arena,
-                        stores,
-                    )
-                }) {
+                match each_binding_separator(
+                    binding_str,
+                    binding_offset,
+                    self.island_nesting(),
+                    self.arena,
+                ) {
                     EachHeadSplit::FirstAs => Some((binding_str, binding_offset)),
                     EachHeadSplit::LaterAs { separator, binding } => {
                         let iterable = &content[..separator - content_offset];
@@ -787,10 +782,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             Some(&open @ (b'{' | b'[')) => self.matching_bracket_end(trimmed, open, adjusted)?,
             _ => {
                 let Some(name) = self.read_identifier(trimmed, adjusted)? else {
-                    return Err(Self::error_expected_at(
-                        "identifier or destructure pattern",
-                        adjusted,
-                    ));
+                    return Err(
+                        self.error_expected_at("identifier or destructure pattern", adjusted)
+                    );
                 };
                 name.len()
             }
@@ -909,7 +903,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             let key_ws = rest.len() - rest_trimmed.len();
             let paren_start = rest_offset + key_ws; // absolute offset of '('
             let close = scan_to_matching_paren(rest_trimmed.as_bytes(), 1)
-                .ok_or_else(|| Self::error_expected_at("')'", paren_start + rest_trimmed.len()))?;
+                .ok_or_else(|| self.error_expected_at("')'", paren_start + rest_trimmed.len()))?;
             let key_str = &rest_trimmed[1..close];
             let key_offset = paren_start + 1; // after '('
             // Leading whitespace only — the trailing run may be a line comment's own text
@@ -971,7 +965,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             expr_str,
             content_offset + subslice_offset(content, expr_str),
             TopLevelAs::Assertion,
-            |this, _, _, end_pos| {
+            |this, _, end_pos| {
                 let after_expr = &content[end_pos - content_offset..];
                 match await_head_clause(after_expr) {
                     Some(_) => Ok(()),
@@ -1217,10 +1211,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         if rest.is_empty() || rest.starts_with(is_svelte_ws) {
             Ok(rest)
         } else {
-            Err(Self::error_expected_at(
-                &format!("whitespace after `{keyword}`"),
-                keyword_start,
-            ))
+            Err(self.error_expected_at(&format!("whitespace after `{keyword}`"), keyword_start))
         }
     }
 
@@ -1236,7 +1227,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ) -> Result<&'a str, Error> {
         content
             .strip_prefix(keyword)
-            .ok_or_else(|| Self::error_expected_at(&format!("`{keyword}`"), keyword_start))
+            .ok_or_else(|| self.error_expected_at(&format!("`{keyword}`"), keyword_start))
     }
 
     /// Like `strip_keyword_value`, but the value is mandatory: the keyword
@@ -1250,10 +1241,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ) -> Result<&'a str, Error> {
         let rest = self.strip_keyword_value(content, keyword, keyword_start)?;
         if rest.is_empty() {
-            return Err(Self::error_expected_at(
-                &format!("whitespace after `{keyword}`"),
-                keyword_start,
-            ));
+            return Err(
+                self.error_expected_at(&format!("whitespace after `{keyword}`"), keyword_start)
+            );
         }
         Ok(rest)
     }
@@ -1268,7 +1258,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let trailing = region.trim_start_matches(is_svelte_ws);
         if !trailing.is_empty() {
             let trailing_start = region_start + subslice_offset(region, trailing);
-            return Err(Self::error_expected_at("'}'", trailing_start));
+            return Err(self.error_expected_at("'}'", trailing_start));
         }
         Ok(())
     }
@@ -1322,10 +1312,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // The keyword after `{/` must match the open block.
         if self.keyword_at(self.current_end()) != expected {
-            return Err(Self::error_expected_at(
-                &format!("{{/{expected}}}"),
-                self.current_start(),
-            ));
+            return Err(self.error_expected_at(&format!("{{/{expected}}}"), self.current_start()));
         }
 
         let close_tag_start = self.current_end();
@@ -1441,7 +1428,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Name: the leading identifier run, read the way Svelte's `read_identifier` reads
         // it. `content` is trimmed, so it starts at the name.
         let Some(name_str) = self.read_identifier(content, content_offset)? else {
-            return Err(Self::error_expected_at("snippet name", content_offset));
+            return Err(self.error_expected_at("snippet name", content_offset));
         };
         let name_len = name_str.len();
         // the slice is the name alone, so its end is the name's
@@ -1453,7 +1440,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // `SnippetBlock.expression` may hold. Stated rather than assumed, so the filter and
         // the node shape can never drift apart silently.
         if !matches!(expression.kind, ExpressionKind::Identifier(_)) {
-            return Err(Self::error_expected_at("snippet name", content_offset));
+            return Err(self.error_expected_at("snippet name", content_offset));
         }
 
         // Optional `<…>` generic. `head_start` is the `<` (or, with no generic, the `(`)
@@ -1482,7 +1469,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let paren_pos = after_generic
             + (after_generic_str.len() - after_generic_str.trim_start_matches(is_svelte_ws).len());
         if !content[paren_pos..].starts_with('(') {
-            return Err(Self::error_expected_at("'('", content_offset + paren_pos));
+            return Err(self.error_expected_at("'('", content_offset + paren_pos));
         }
 
         // Opening tag span is from start to content_start (includes the closing })
@@ -1495,7 +1482,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // (`snippet_params_close`). Svelte requires the close (`eat(')', true)`); an
         // unmatched `(` is rejected.
         let close_paren = snippet_params_close(content_bytes, paren_pos)
-            .ok_or_else(|| Self::error_expected_at("')'", content_offset + content.len()))?;
+            .ok_or_else(|| self.error_expected_at("')'", content_offset + content.len()))?;
 
         // Only whitespace may follow `)` before the closing `}` — Svelte's
         // `allow_whitespace` then `eat('}', true)`. `{#snippet fn() junk}` is rejected.
@@ -1547,15 +1534,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // The preserved parse is Svelte's own reader, so it alone decides acceptance.
             // It is also the only parse a head without a pair needs — the two trees are
             // then the same tree.
-            let (preserved, preserved_a_paren) = self.with_island_stores(|this, stores| {
-                tsv_ts::__private::parse_embedded_preserve_parens(
-                    &wrapper,
-                    base,
-                    this.island_nesting(),
-                    this.arena,
-                    stores,
-                )
-            })?;
+            let (preserved, preserved_a_paren) = tsv_ts::__private::parse_embedded_preserve_parens(
+                &wrapper,
+                base,
+                self.island_nesting(),
+                self.arena,
+            )?;
             // the `function` shell around the parameters: only `func.params` is kept
             #[cfg(feature = "_internal_ast_census")]
             tsv_lang::ast_census_probe::dead::<tsv_ts::ast::Statement<'arena>>(
@@ -1567,30 +1551,24 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 tsv_lang::ast_census_probe::Dead::Superseded,
                 1,
             );
-            // The wrapper opens with `function`, but it parses to a body-less declaration
-            // when a `//` in the head swallows its ` {}`: `snippet_params_close` counts the
-            // parens bytewise, so `(a = "(")//b)` closes past the parser's `)`. Stated as an
-            // error rather than an `if let`, so such a head can never reach the printer as
-            // a silently empty signature (the shape a raw-text fallback would produce).
-            // Svelte's reader accepts such a head and gives it no `parameters`; tsv has no
-            // signature to give, so it refuses.
+            // The wrapper is literally a `function` declaration, so the signature is
+            // there by construction — stated as an error rather than an `if let` so a head
+            // whose pieces went nowhere can never reach the printer as a silently empty
+            // signature (the shape a raw-text fallback would produce).
             let signature_error =
-                || Self::error_expected_at("snippet signature", content_offset + head_start);
+                || self.error_expected_at("snippet signature", content_offset + head_start);
             let (program, func) = if preserved_a_paren {
                 // Grouping parens change no production the grammar accepts, so a head the
                 // preserved parse read reads paren-free too. If it does not, that is a
                 // parser bug, and it surfaces as the paren-free parse's own error rather
                 // than as a silent fallback to the wire tree (which prints a pair's
                 // contents bare).
-                let plain = self.with_island_stores(|this, stores| {
-                    tsv_ts::__private::parse_embedded(
-                        &wrapper,
-                        base,
-                        this.island_nesting(),
-                        this.arena,
-                        stores,
-                    )
-                })?;
+                let plain = tsv_ts::__private::parse_embedded(
+                    &wrapper,
+                    base,
+                    self.island_nesting(),
+                    self.arena,
+                )?;
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::dead::<tsv_ts::ast::Statement<'arena>>(
                     tsv_lang::ast_census_probe::Dead::Superseded,
@@ -1686,7 +1664,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             b'>',
             TriviaProfile::JS,
         )
-        .ok_or_else(|| Self::error_expected_at("'>'", content_offset + content.len()))
+        .ok_or_else(|| self.error_expected_at("'>'", content_offset + content.len()))
     }
 
     /// Scan source from a position until we find the closing } of a block tag
@@ -1832,18 +1810,6 @@ fn snippet_params_close(bytes: &[u8], open: usize) -> Option<usize> {
 mod tests {
     use super::{EachHeadSplit, each_binding_separator, is_svelte_ws, strip_head_keyword};
     use bumpalo::Bump;
-    use tsv_ts::ast::AstStores;
-
-    /// A head whose parens the bytewise close-scan counts past the parser's own, with a `//`
-    /// swallowing the wrapper's ` {}`: its first statement is a body-less declaration.
-    #[test]
-    fn a_snippet_head_with_no_function_body_reports_its_signature() {
-        let arena = Bump::new();
-        let error = crate::__private::parse("{#snippet f(a = \"(\")//b)\n}x{/snippet}", &arena)
-            .expect_err("the head holds no function declaration");
-        assert_eq!(error.message(), "Expected snippet signature");
-        assert_eq!(error.position(), Some("{#snippet f".len()));
-    }
 
     /// A mid-head separator is its keyword wearing a whitespace RUN of any width, in
     /// canonical's own [`is_svelte_ws`](super::is_svelte_ws) class — not the single ASCII
@@ -1942,7 +1908,7 @@ mod tests {
             let EachHeadSplit::LaterAs {
                 separator,
                 binding: start,
-            } = each_binding_separator(input, 0, 0, &arena, &mut AstStores::new())
+            } = each_binding_separator(input, 0, 0, &arena)
             else {
                 panic!("expected a later `as` in {input:?}");
             };
@@ -1975,7 +1941,7 @@ mod tests {
             "A satisfies { a = 1 }",
         ] {
             assert_eq!(
-                each_binding_separator(input, 0, 0, &arena, &mut AstStores::new()),
+                each_binding_separator(input, 0, 0, &arena),
                 EachHeadSplit::FirstAs,
                 "{input:?}"
             );
@@ -1997,7 +1963,7 @@ mod tests {
             ("A satisfies B, i (i)", "A satisfies B"),
         ] {
             assert_eq!(
-                each_binding_separator(input, 0, 0, &arena, &mut AstStores::new()),
+                each_binding_separator(input, 0, 0, &arena),
                 EachHeadSplit::NoBinding { run_end: run.len() },
                 "{input:?}"
             );

@@ -93,10 +93,6 @@
 //! and the `_internal_*` features are tsv's own plumbing for its sibling crates, which pin
 //! each other exactly; they change in any release, outside semver.
 
-#![expect(
-    clippy::explicit_auto_deref,
-    reason = "an edge is spelled `view.expr(*edge)` so a read is the same call whatever an edge is"
-)]
 #![warn(missing_docs)]
 
 // The README's example compiles as a doctest, so the crates.io page cannot drift.
@@ -121,12 +117,11 @@ mod printer;
 mod test_support;
 mod whitespace;
 
-use __private::{format_folded_in, parse_folded_into};
-use ast::{ParsedRoot, Root};
+use __private::{format_folded_in, parse_folded};
+use ast::Root;
 pub use formatter::Formatter;
 pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, STACK_SIZE, WirePoint, run_with_stack};
 use tsv_lang::{LeadingBom, LineRule, WireCoordinates};
-use tsv_ts::ast::AstStores;
 pub use tsv_ts::{ByteSpan, ImportPhase, ImportRecord, ImportRecordKind, Imports, TypeOnly};
 
 // `tests/public_reexports.rs` (outside this crate) names every item above through this
@@ -208,7 +203,6 @@ pub fn format(source: &str) -> Result<String> {
     format_in(
         source,
         &bumpalo::Bump::new(),
-        &mut AstStores::new(),
         tsv_lang::doc::arena::DocArena::for_source,
     )
 }
@@ -217,23 +211,18 @@ pub fn format(source: &str) -> Result<String> {
 /// then print into the doc arena `doc_arena` hands over once the parse has succeeded (handed
 /// the folded text, so a fresh one is sized to it and a failed parse never builds one).
 /// Nothing borrowed from either arena escapes: the result is owned.
-pub(crate) fn format_in<'arena, D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
+pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
     source: &str,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
+    arena: &bumpalo::Bump,
     doc_arena: impl FnOnce(&str) -> D,
 ) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse (see
     // `tsv_lang::printing::normalize_carriage_returns`); `parse` leaves the author's bytes
     // alone so its offsets stay a drop-in contract with Svelte's.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
-    let root = parse_folded_into(&folded, arena, stores)?;
+    let root = parse_folded(&folded, arena)?;
     let doc_arena = doc_arena(folded.text());
-    Ok(format_folded_in(
-        __private::parsed_ref(&root, stores),
-        &folded,
-        doc_arena.borrow(),
-    ))
+    Ok(format_folded_in(&root, &folded, doc_arena.borrow()))
 }
 
 /// What [`parse_to_json_with`]'s wire carries. The default is [`parse_to_json`]'s: the

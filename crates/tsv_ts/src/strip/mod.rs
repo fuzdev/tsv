@@ -233,23 +233,9 @@ pub fn strip_in(
     goal: Option<crate::Goal>,
     arena: &bumpalo::Bump,
 ) -> Result<Stripped, StripError> {
-    strip_into(source, goal, arena, &mut crate::ast::AstStores::new())
-}
-
-/// [`strip_in`] into a caller's `stores`, for a warm path that keeps them across sources.
-///
-/// # Errors
-///
-/// As [`strip`].
-pub fn strip_into<'arena>(
-    source: &str,
-    goal: Option<crate::Goal>,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut crate::ast::AstStores<'arena>,
-) -> Result<Stripped, StripError> {
-    let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, arena, stores)
+    let program = crate::__private::parse_with_goal_or_fallback(source, goal, arena)
         .map_err(StripError::Parse)?;
-    let mut walk = walk::Walk::new(source, arena, walk::Mode::Strip, stores.view());
+    let mut walk = walk::Walk::new(source, arena, walk::Mode::Strip);
     walk.program(&program);
     let mut edits = walk.finish()?;
     Ok(stripped(source, &mut edits))
@@ -269,7 +255,7 @@ pub fn strip_with_imports_in(
 ) -> Result<(Stripped, Imports), StripError> {
     let program = crate::__private::parse_with_goal_or_fallback(source, goal, arena)
         .map_err(StripError::Parse)?;
-    let mut walk = walk::Walk::new(source, arena, walk::Mode::StripWithImports, program.view());
+    let mut walk = walk::Walk::new(source, arena, walk::Mode::StripWithImports);
     walk.program(&program);
     let (mut edits, imports) = walk.finish_with_imports()?;
     Ok((stripped(source, &mut edits), imports))
@@ -510,7 +496,7 @@ mod tests {
             let program = crate::__private::parse_with_goal_or_fallback(source, None, &arena)
                 .expect("the source parses");
             let code = |mode| {
-                let mut walk = super::walk::Walk::new(source, &arena, mode, program.view());
+                let mut walk = super::walk::Walk::new(source, &arena, mode);
                 walk.program(&program);
                 let mut edits = walk.finish().expect("the source strips");
                 super::blank::apply(source, &mut edits)

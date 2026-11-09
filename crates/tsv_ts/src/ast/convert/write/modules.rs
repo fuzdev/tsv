@@ -95,7 +95,7 @@ pub(super) fn write_export_default_value(
     ctx: &Ctx<'_>,
 ) {
     match value {
-        ast::ExportDefaultValue::Expression(expr) => write_expression(w, ctx.view.slot(expr), ctx),
+        ast::ExportDefaultValue::Expression(expr) => write_expression(w, expr, ctx),
         ast::ExportDefaultValue::FunctionDeclaration(func) => {
             write_function_declaration(w, func, ctx);
         }

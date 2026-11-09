@@ -3,7 +3,6 @@
 // the integration tests in `tests/` and documented by `cargo doc`.
 pub mod audit;
 pub mod cli;
-#[cfg(tsv_unported)]
 pub mod compile_fixtures;
 pub mod deno;
 pub mod depth_shapes;
@@ -16,5 +15,4 @@ pub mod render_browser;
 pub mod render_normalize;
 pub mod strip_fixtures;
 pub mod test262;
-#[cfg(tsv_unported)]
 pub mod tsc_conformance;

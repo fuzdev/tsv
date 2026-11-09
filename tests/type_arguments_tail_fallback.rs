@@ -561,9 +561,8 @@ fn an_embedded_parse_reports_the_further_error_too() {
         100,
         0,
         &arena,
-        &mut tsv_ts::ast::AstStores::new(),
         "end of input",
-        |_, _| Ok(()),
+        |_| Ok(()),
     )
     .expect_err("the island must not parse");
     // past the `)`, in the host's coordinates — not at the `+` the list stopped on

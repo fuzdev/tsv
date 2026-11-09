@@ -38,14 +38,7 @@ pub(super) fn write_template_literal(
 ) {
     node_header(w, "TemplateLiteral", template.span, ctx);
     w.raw(",\"expressions\":");
-    write_expressions(
-        w,
-        ctx.view
-            .list(template.expressions)
-            .iter()
-            .map(|e| ctx.view.expr(*e)),
-        ctx,
-    );
+    write_expressions(w, template.expressions.iter().copied(), ctx);
     w.raw(",\"quasis\":");
     write_array(w, template.quasis, |w, q| write_template_element(w, q, ctx));
     close_node(w, "TemplateLiteral", template.span, ctx);
@@ -108,7 +101,7 @@ pub(super) fn write_object_pattern(
 pub(super) fn write_rest_element(w: &mut JsonWriter, rest: &ast::RestElement<'_>, ctx: &Ctx<'_>) {
     node_header(w, "RestElement", rest.span, ctx);
     w.raw(",\"argument\":");
-    write_expression(w, ctx.view.expr(rest.argument), ctx);
+    write_expression(w, rest.argument, ctx);
     // acorn carries a rest parameter's `?` on the rest element (never on
     // `argument`), between `argument` and `typeAnnotation`, only when present.
     if rest.optional {
@@ -147,10 +140,10 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &ast::Property<'_>, ctx: 
             b",\"method\":false,\"shorthand\":false,\"computed\":false,\"key\":",
         );
     }
-    write_expression(w, ctx.view.expr(prop.key), ctx);
+    write_expression(w, prop.key, ctx);
     let getset = !matches!(prop.kind, ast::PropertyKind::Init);
     let generic_method = prop.method
-        && matches!(&ctx.view.expr(prop.value).kind, ast::ExpressionKind::FunctionExpression(f)
+        && matches!(&prop.value.kind, ast::ExpressionKind::FunctionExpression(f)
             if f.type_parameters.is_some());
     if (getset || generic_method) && !ctx.vanilla_acorn {
         w.raw(",\"kind\":\"");
@@ -184,7 +177,7 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &ast::Property<'_>, ctx: 
 /// `=` assignment it was parsed as; a pattern property already holds the pattern.
 fn write_property_value(w: &mut JsonWriter, prop: &ast::Property<'_>, ctx: &Ctx<'_>) {
     let method_value = prop.method || !matches!(prop.kind, ast::PropertyKind::Init);
-    match (ctx.view.expr(prop.value), method_value) {
+    match (&prop.value, method_value) {
         (
             ast::Expression {
                 kind: ast::ExpressionKind::FunctionExpression(f),
@@ -204,12 +197,12 @@ fn write_property_value(w: &mut JsonWriter, prop: &ast::Property<'_>, ctx: &Ctx<
             debug_assert_eq!(assign.operator, ast::AssignmentOperator::Assign);
             node_header(w, "AssignmentPattern", *span, ctx);
             w.raw(",\"left\":");
-            write_expression(w, ctx.view.expr(assign.left), ctx);
+            write_expression(w, assign.left, ctx);
             w.raw(",\"right\":");
-            write_expression(w, ctx.view.expr(assign.right), ctx);
+            write_expression(w, assign.right, ctx);
             close_node(w, "AssignmentPattern", *span, ctx);
         }
-        _ => write_expression(w, ctx.view.expr(prop.value), ctx),
+        _ => write_expression(w, prop.value, ctx),
     }
 }
 
@@ -229,9 +222,9 @@ pub(super) fn write_assignment_pattern(
     // assertion but preserves the node — same as the simple `=` left in
     // `write_expression`'s `AssignmentExpression` arm. The internal-only JSDoc cast is
     // still peeled, by `write_expression` itself.
-    write_expression(w, ctx.view.expr(pattern.left), ctx);
+    write_expression(w, pattern.left, ctx);
     w.raw(",\"right\":");
-    write_expression(w, ctx.view.expr(pattern.right), ctx);
+    write_expression(w, pattern.right, ctx);
     write_decorators_field(w, pattern.decorators, ctx);
     close_node(w, "AssignmentPattern", span, ctx);
 }

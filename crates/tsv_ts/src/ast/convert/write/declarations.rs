@@ -13,7 +13,6 @@ use super::{
     write_return_type_field, write_type_annotation_field, write_type_parameters_field,
 };
 use crate::ast;
-use crate::ast::ExprView;
 use tsv_lang::Span;
 use tsv_lang::source_scan::{self, TriviaProfile};
 
@@ -22,12 +21,12 @@ use tsv_lang::source_scan::{self, TriviaProfile};
 /// parser and keeps it. Parens are stripped from the expression, so the only
 /// signal is the span gap.
 pub(super) fn write_decorator(w: &mut JsonWriter, decorator: &ast::Decorator<'_>, ctx: &Ctx<'_>) {
-    let parenthesized = decorator.span.end > ctx.view.slot(&decorator.expression).span().end;
+    let parenthesized = decorator.span.end > decorator.expression.span().end;
     node_header(w, "Decorator", decorator.span, ctx);
     w.raw(",\"expression\":");
     write_expression_inner(
         w,
-        ctx.view.slot(&decorator.expression),
+        &decorator.expression,
         ctx,
         ExprFlags {
             // A decorator expression is a fresh chain root — nothing above it
@@ -89,7 +88,7 @@ pub(super) fn write_function_declaration(
     write_function_flags_fields(w, func_decl.generator, func_decl.r#async);
     write_type_parameters_field(w, func_decl.type_parameters.as_ref(), ctx);
     w.raw(",\"params\":");
-    write_expressions(w, ctx.view.run(func_decl.params), ctx);
+    write_expressions(w, func_decl.params, ctx);
     write_return_type_field(w, func_decl.return_type.as_ref(), ctx);
     w.raw(",\"body\":");
     write_block_statement(w, &func_decl.body, ctx);
@@ -103,7 +102,6 @@ pub(super) fn write_function_declaration(
 /// combined span to wrap with, or `None` for the plain shape. All offsets are
 /// internal byte offsets (the same-line scan byte-indexes `source`).
 fn super_class_wrap_span(
-    view: ExprView<'_>,
     type_params_span: Option<Span>,
     super_class: Option<&ast::Expression<'_>>,
     super_type_parameters_end: Option<u32>,
@@ -112,7 +110,7 @@ fn super_class_wrap_span(
     let tp_span = type_params_span?;
     // The public super-class node starts at the CommentBoundPair-unwrapped inner
     // expression.
-    let sc_start = super_class.map(|e| e.unwrap_comment_bound_pairs(view).span().start)?;
+    let sc_start = super_class.map(|e| e.unwrap_comment_bound_pairs().span().start)?;
     let stp_end = super_type_parameters_end?;
     if tsv_lang::printing::is_same_line(source, tp_span.end, sc_start) {
         return None;
@@ -130,7 +128,6 @@ fn write_super_class_fields(
     ctx: &Ctx<'_>,
 ) {
     let wrap_span = super_class_wrap_span(
-        ctx.view,
         type_params_span,
         super_class,
         super_type_parameters.map(|tp| tp.span.end),
@@ -195,7 +192,7 @@ pub(super) fn write_class_declaration(
     write_type_parameters_field(w, class_decl.type_parameters.as_ref(), ctx);
     write_super_class_fields(
         w,
-        ctx.view.opt(class_decl.super_class),
+        class_decl.super_class,
         class_decl.super_type_parameters.as_ref(),
         class_decl.type_parameters.as_ref().map(|tp| tp.span),
         ctx,
@@ -228,7 +225,7 @@ pub(super) fn write_class_expression(
     write_type_parameters_field(w, class_expr.type_parameters.as_ref(), ctx);
     write_super_class_fields(
         w,
-        ctx.view.opt(class_expr.super_class),
+        class_expr.super_class,
         class_expr.super_type_parameters.as_ref(),
         class_expr.type_parameters.as_ref().map(|tp| tp.span),
         ctx,
@@ -404,13 +401,13 @@ fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition<'_
         &mut mods,
         method.is_static,
         modifier_scan_start(method.decorators, method.span),
-        ctx.view.slot(&method.key).span().start,
+        method.key.span().start,
         ctx,
     );
     w.raw(",\"computed\":");
     w.bool(method.computed);
     w.raw(",\"key\":");
-    write_expression(w, ctx.view.slot(&method.key), ctx);
+    write_expression(w, &method.key, ctx);
     if method.optional {
         w.raw(",\"optional\":true");
     }
@@ -439,7 +436,7 @@ fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition<'_
     });
     write_function_flags_fields(w, func.generator, func.r#async);
     w.raw(",\"params\":");
-    write_expressions(w, ctx.view.run(func.params), ctx);
+    write_expressions(w, func.params, ctx);
     write_return_type_field(w, func.return_type.as_ref(), ctx);
     if let Some(body) = body {
         w.raw(",\"body\":");
@@ -490,13 +487,13 @@ fn write_property_definition(
         &mut mods,
         prop.is_static,
         modifier_scan_start(prop.decorators, prop.span),
-        ctx.view.slot(&prop.key).span().start,
+        prop.key.span().start,
         ctx,
     );
     w.raw(",\"computed\":");
     w.bool(prop.computed);
     w.raw(",\"key\":");
-    write_expression(w, ctx.view.slot(&prop.key), ctx);
+    write_expression(w, &prop.key, ctx);
     if matches!(prop.modifier, ast::PropertyModifier::Optional) {
         w.raw(",\"optional\":true");
     }
@@ -505,9 +502,7 @@ fn write_property_definition(
     }
     write_type_annotation_field(w, prop.type_annotation.as_ref(), ctx);
     w.raw(",\"value\":");
-    write_or_null(w, prop.value.as_ref(), |w, v| {
-        write_expression(w, ctx.view.slot(v), ctx);
-    });
+    write_or_null(w, prop.value.as_ref(), |w, v| write_expression(w, v, ctx));
     write_decorators_field(w, prop.decorators, ctx);
     close_node(w, "PropertyDefinition", prop.span, ctx);
 }

@@ -145,10 +145,6 @@
 //! and the `_internal_*` features are tsv's own plumbing for its sibling crates, which pin
 //! each other exactly; they change in any release, outside semver.
 
-#![expect(
-    clippy::explicit_auto_deref,
-    reason = "an edge is spelled `view.expr(*edge)` so a read is the same call whatever an edge is"
-)]
 #![warn(missing_docs)]
 
 #[doc(hidden)]
@@ -170,8 +166,8 @@ mod parser;
 mod printer;
 mod strip;
 
-use __private::{PrinterInputs, format_folded_in, parse_folded_into};
-use ast::{AstStores, ExprView, ParsedRef, Program};
+use __private::{PrinterInputs, format_folded_in, parse_folded};
+use ast::Program;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
@@ -303,24 +299,17 @@ pub fn format_with_goal(source: &str, goal: Goal) -> Result<String> {
 }
 
 fn format_with_optional_goal(source: &str, goal: Option<Goal>) -> Result<String> {
-    format_in(
-        source,
-        goal,
-        &bumpalo::Bump::new(),
-        &mut AstStores::new(),
-        DocArena::for_source,
-    )
+    format_in(source, goal, &bumpalo::Bump::new(), DocArena::for_source)
 }
 
 /// The one format path, shared by the one-shot functions and [`Formatter`]: fold, parse into
 /// `arena`, then print into the doc arena `doc_arena` hands over once the parse has
 /// succeeded (handed the folded text, so a fresh one is sized to it and a failed parse never
 /// builds one). Nothing borrowed from either arena escapes: the result is owned.
-pub(crate) fn format_in<'arena, D: std::borrow::Borrow<DocArena>>(
+pub(crate) fn format_in<D: std::borrow::Borrow<DocArena>>(
     source: &str,
     goal: Option<Goal>,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
+    arena: &bumpalo::Bump,
     doc_arena: impl FnOnce(&str) -> D,
 ) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse — see
@@ -328,31 +317,30 @@ pub(crate) fn format_in<'arena, D: std::borrow::Borrow<DocArena>>(
     // the finished string. `parse` deliberately does NOT do this: its offsets are a
     // drop-in contract over the author's own bytes.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
-    let program = parse_folded_into(&folded, goal, arena, stores)?;
+    let program = parse_folded(&folded, goal, arena)?;
     let doc_arena = doc_arena(folded.text());
-    let parsed = __private::parsed_ref(&program, stores);
-    Ok(format_folded_in(parsed, &folded, doc_arena.borrow()))
+    Ok(format_folded_in(&program, &folded, doc_arena.borrow()))
 }
 
 /// The shared body of `__private::format_ast_in` and `format_folded_in`: the one place the
 /// intent-preserving format merges its comments, registers them and hands the printer its
 /// table.
 fn format_document_in(
-    parsed: ParsedRef<'_>,
+    program: &Program<'_>,
     source: &str,
     line_breaks: LineBreaks<'_>,
     arena: &DocArena,
 ) -> String {
     // The printer's comment VIEW: a byte-adjacent indentable pair is one comment (the rule,
     // and why it is a view rather than a parse, is `tsv_lang::merge_nestled_block_comments`).
-    let comments = tsv_lang::merge_nestled_block_comments(source, parsed.program.comments);
+    let comments = tsv_lang::merge_nestled_block_comments(source, program.comments);
     // The print-once comment ledger's expectation for this document (diagnostic; see
     // `tsv_lang::comment_ledger`) — the MERGED list, which is the one the printers emit. A
     // Svelte host registers its own `Root.comments`, so an embedded `<script>` never
     // reaches here.
     #[cfg(feature = "_internal_comment_check")]
     tsv_lang::comment_ledger::register_parsed(source, &comments);
-    format_program_in(parsed, source, &comments, line_breaks, arena, false)
+    format_program_in(program, source, &comments, line_breaks, arena, false)
 }
 
 /// The shared body of every format: given the document's line verdict (the arena-parked
@@ -363,7 +351,7 @@ fn format_document_in(
 /// `set_canonical` then erases only the *layout* table, so blank-line / expansion reads
 /// collapse while classification keeps the real lines.
 fn format_program_in(
-    parsed: ParsedRef<'_>,
+    program: &Program<'_>,
     source: &str,
     comments: &[ast::Comment],
     line_breaks: LineBreaks<'_>,
@@ -376,14 +364,14 @@ fn format_program_in(
         canonical || !source.contains('\r'),
         "a format entry point takes CR-folded text (`tsv_lang::printing::normalize_carriage_returns`)"
     );
-    let inputs = PrinterInputs::for_document(source, comments, parsed.view, line_breaks.table());
+    let inputs = PrinterInputs::for_document(source, comments, line_breaks.table());
     // This printer IS the document — a break after any doc it builds is its own, so an
     // emitter may defer a `//` to the end of a line.
     let mut printer = make_printer(arena, &inputs, EmbedContext::line_owning());
     if canonical {
         printer.set_canonical();
     }
-    printer.print_program(parsed.program);
+    printer.print_program(program);
     let output = printer.into_string();
     arena.park_line_breaks_scratch(line_breaks.into_scratch());
     output
@@ -532,7 +520,7 @@ fn wire_string(bytes: Vec<u8>) -> String {
 /// type-argument list up to tsc's comparison is run once more reading acorn-typescript's
 /// lists — which is why `f` is `Fn`. A host refusal fails the parse it judged, so a
 /// head the host refuses under tsc's comparison is re-read the same way; an entry point
-/// whose host refuses nothing passes `|_, _| Ok(())`. Where both readings fail, the
+/// whose host refuses nothing passes `|_| Ok(())`. Where both readings fail, the
 /// re-read's error is the one reported: Svelte reads every embedded text as
 /// acorn-typescript does, so that error lands where Svelte's does.
 ///
@@ -545,9 +533,8 @@ fn with_embedding_parser<'arena, T>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
     f: impl Fn(&mut parser::Parser<'_, 'arena>) -> std::result::Result<T, Error>,
-    host_check: impl Fn(ExprView<'_>, &T) -> std::result::Result<(), Error>,
+    host_check: impl Fn(&T) -> std::result::Result<(), Error>,
 ) -> Result<T> {
     parser::parse_retrying_acorn_followers(
         source,
@@ -555,7 +542,6 @@ fn with_embedding_parser<'arena, T>(
         host_nesting,
         Goal::Module,
         arena,
-        stores,
         true,
         f,
         host_check,
@@ -569,14 +555,13 @@ fn with_embedding_parser<'arena, T>(
 fn with_program_printer<R>(
     arena: &DocArena,
     program: &Program<'_>,
-    view: ExprView<'_>,
     source: &str,
     line_table: LineTable<'_>,
     embed: EmbedContext,
     build: impl FnOnce(&printer::Printer<'_>) -> R,
 ) -> R {
     let comments = tsv_lang::merge_nestled_block_comments(source, program.comments);
-    let inputs = PrinterInputs::for_document(source, &comments, view, line_table);
+    let inputs = PrinterInputs::for_document(source, &comments, line_table);
     let mut printer = make_doc_printer(arena, &inputs, embed);
     printer.program_start = program.span.start;
     build(&printer)

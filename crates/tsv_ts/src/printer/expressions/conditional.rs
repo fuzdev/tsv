@@ -3,7 +3,6 @@
 // Handles: a ? b : c, nested ternaries, comments in ternaries
 
 use crate::ast;
-use crate::ast::ExprView;
 use crate::printer::comments::ConditionalBranchPlacement;
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::{Printer, template_literal_has_newlines};
@@ -104,8 +103,8 @@ fn is_multiline_template_literal(expr: &ast::Expression<'_>) -> bool {
 /// guard is not an edge case to smooth over: it is exactly why a bare
 /// `!(cond ? a : b)` keeps the hanging form in both formatters, while
 /// `!((cond ? a : b) as T)` expands.
-fn extra_indent_ternary_span(view: ExprView<'_>, value: &ast::Expression<'_>) -> Option<Span> {
-    let (span, stepped) = spine_ternary(view, value)?;
+fn extra_indent_ternary_span(value: &ast::Expression<'_>) -> Option<Span> {
+    let (span, stepped) = spine_ternary(value)?;
     stepped.then_some(span)
 }
 
@@ -114,7 +113,7 @@ fn extra_indent_ternary_span(view: ExprView<'_>, value: &ast::Expression<'_>) ->
 /// the chain-base query (which does not — a *sealed* base like `(c ? a : b)!` holds the
 /// wrapper inside its own parens, so the ternary is already one step down when the base
 /// is handed over).
-fn spine_ternary(view: ExprView<'_>, expr: &ast::Expression<'_>) -> Option<(Span, bool)> {
+fn spine_ternary(expr: &ast::Expression<'_>) -> Option<(Span, bool)> {
     let mut child = expr;
     let mut stepped = false;
     loop {
@@ -132,7 +131,7 @@ fn spine_ternary(view: ExprView<'_>, expr: &ast::Expression<'_>) -> Option<(Span
             _ => return None,
         };
         stepped = true;
-        child = view.expr(next);
+        child = next;
     }
 }
 
@@ -188,7 +187,7 @@ impl<'a> Printer<'a> {
     /// matches the recorded span, so it keeps the hanging form prettier gives it.
     pub(in crate::printer) fn mark_ternary_extra_indent(&self, value: &ast::Expression<'_>) {
         self.ternary_hang_target
-            .set(extra_indent_ternary_span(self.view, value));
+            .set(extra_indent_ternary_span(value));
     }
 
     /// Does `expr` need the expanded-paren layout its parent is about to wrap it in?
@@ -221,7 +220,7 @@ impl<'a> Printer<'a> {
         &self,
         expr: &ast::Expression<'_>,
     ) -> Option<ChainBaseTernary> {
-        let (span, stepped) = spine_ternary(self.view, expr)?;
+        let (span, stepped) = spine_ternary(expr)?;
         Some(ChainBaseTernary {
             expands: self.ternary_hang_target.get() == Some(span),
             direct: !stepped,
@@ -280,23 +279,26 @@ impl<'a> Printer<'a> {
     /// would break a ternary open for a freeze that never fires. Behind the document-level
     /// flag, so a directive-free document never pays for the two operator scans.
     fn ternary_branch_gap_frozen(&self, cond: &ast::ConditionalExpression<'_>) -> bool {
-        let alternate = self.view.expr(cond.alternate);
-        let consequent = self.view.expr(cond.consequent);
         if !self.has_format_ignore {
             return false;
         }
         let question = self.find_char_outside_comments(
-            self.view.expr(cond.test).span().end,
-            consequent.span().start,
+            cond.test.span().end,
+            cond.consequent.span().start,
             b'?',
         );
-        let colon =
-            self.find_char_outside_comments(consequent.span().end, alternate.span().start, b':');
-        self.frozen_ternary_branch_span(consequent, question)
+        let colon = self.find_char_outside_comments(
+            cond.consequent.span().end,
+            cond.alternate.span().start,
+            b':',
+        );
+        self.frozen_ternary_branch_span(cond.consequent, question)
             .is_some()
-            || self.frozen_ternary_branch_span(alternate, colon).is_some()
-            || self.chained_test_shell_holds_directive(consequent)
-            || self.chained_test_shell_holds_directive(alternate)
+            || self
+                .frozen_ternary_branch_span(cond.alternate, colon)
+                .is_some()
+            || self.chained_test_shell_holds_directive(cond.consequent)
+            || self.chained_test_shell_holds_directive(cond.alternate)
     }
 
     /// Whether a branch is a nested conditional whose stripped test shell holds an honored
@@ -311,7 +313,7 @@ impl<'a> Printer<'a> {
     fn chained_test_shell_holds_directive(&self, branch: &ast::Expression<'_>) -> bool {
         match &branch.kind {
             ast::ExpressionKind::ConditionalExpression(nested) => self
-                .left_spine_operand_frozen_span(branch.span.start, self.view.expr(nested.test))
+                .left_spine_operand_frozen_span(branch.span.start, nested.test)
                 .is_some(),
             _ => false,
         }
@@ -408,12 +410,12 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let test = self.build_left_spine_operand_doc(
             span.start,
-            self.view.expr(cond.test),
+            cond.test,
             FrozenOperandPair::Emitted,
             ordinary,
         );
-        let test = self.parenthesize_ternary_test(self.view.expr(cond.test), test);
-        self.wrap_for_init_in(self.view.expr(cond.test), test)
+        let test = self.parenthesize_ternary_test(cond.test, test);
+        self.wrap_for_init_in(cond.test, test)
     }
 
     /// Give a nested ternary's TEST the geometry its position takes ([`TernaryNesting`]).
@@ -486,9 +488,7 @@ impl<'a> Printer<'a> {
     /// comments differently from the emitter that prints them.
     fn branch_gap_end(&self, branch: &ast::Expression<'_>) -> u32 {
         match &branch.kind {
-            ast::ExpressionKind::ConditionalExpression(nested) => {
-                self.view.expr(nested.test).span().start
-            }
+            ast::ExpressionKind::ConditionalExpression(nested) => nested.test.span().start,
             _ => branch.span().start,
         }
     }
@@ -561,7 +561,6 @@ impl<'a> Printer<'a> {
         nesting: TernaryNesting,
         indent_binary_test: bool,
     ) -> DocId {
-        let test = self.view.expr(cond.test);
         // A comment in a shell below a pair the test's left spine prints leads a ROOT
         // conditional's whole doc, its `root_run` below (`Printer::left_spine_run_claim`).
         // The test prints inside the conditional's GROUP, which holds a run that takes a
@@ -570,9 +569,9 @@ impl<'a> Printer<'a> {
         // (`((⏎// c⏎a).b ? y : z)`), so such a run is claimed with no pair below it.
         let claim = (!nesting.is_chained())
             .then(|| {
-                self.left_spine_run_claim(cond_span, cond_span.start, test, || {
-                    ternary_test_needs_parens(test)
-                        || self.left_spine_shell_has_own_line_comment(test)
+                self.left_spine_run_claim(cond_span, cond_span.start, cond.test, || {
+                    ternary_test_needs_parens(cond.test)
+                        || self.left_spine_shell_has_own_line_comment(cond.test)
                 })
             })
             .flatten();
@@ -591,12 +590,12 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let is_chained = nesting.is_chained();
-        let test_end = self.view.expr(cond.test).span().end;
+        let test_end = cond.test.span().end;
         // Where each branch gap ENDS — the branch's start, or past a nested conditional's
         // stripped test shell, whose comments this gap claims ([`Self::branch_gap_end`]).
-        let consequent_start = self.branch_gap_end(self.view.expr(cond.consequent));
-        let consequent_end = self.view.expr(cond.consequent).span().end;
-        let alternate_start = self.branch_gap_end(self.view.expr(cond.alternate));
+        let consequent_start = self.branch_gap_end(cond.consequent);
+        let consequent_end = cond.consequent.span().end;
+        let alternate_start = self.branch_gap_end(cond.alternate);
 
         // Check for line comments that force breaking
         let has_line_comments = self.has_line_comments_between(test_end, consequent_start)
@@ -620,9 +619,9 @@ impl<'a> Printer<'a> {
         // Check for multiline template literals in test, consequent, or alternate
         // Template literals with embedded newlines should force the ternary to break,
         // even though those newlines don't appear in the doc structure.
-        let has_multiline_template = is_multiline_template_literal(self.view.expr(cond.test))
-            || is_multiline_template_literal(self.view.expr(cond.consequent))
-            || is_multiline_template_literal(self.view.expr(cond.alternate));
+        let has_multiline_template = is_multiline_template_literal(cond.test)
+            || is_multiline_template_literal(cond.consequent)
+            || is_multiline_template_literal(cond.alternate);
 
         // Comments the parser stripped along with the test's grouping parens
         // (`(/* c */ a ?? b) ? x : y`) live in the gap between the conditional's own start
@@ -642,11 +641,7 @@ impl<'a> Printer<'a> {
         // ([`Self::branch_gap_end`]): the parent's run prints it, and the nested emits none.
         let root_run = (!is_chained)
             .then(|| {
-                self.removed_paren_comments_opt(
-                    cond_span,
-                    cond_span.start,
-                    self.view.expr(cond.test).span().start,
-                )
+                self.removed_paren_comments_opt(cond_span, cond_span.start, cond.test.span().start)
             })
             .flatten();
 
@@ -673,17 +668,17 @@ impl<'a> Printer<'a> {
         //
         // The test's pairs and freeze are [`Self::build_ternary_test_doc`]'s; the test's
         // stripped shell run is `root_run` above.
-        let test = self.place_nested_ternary_test(nesting, self.view.expr(cond.test), || {
+        let test = self.place_nested_ternary_test(nesting, cond.test, || {
             self.build_ternary_test_doc(cond, cond_span, || {
                 if indent_binary_test {
                     // The term does not fire, so the ordinary dispatch's
                     // continuation-indent default is already the answer.
-                    self.build_expression_doc(self.view.expr(cond.test))
+                    self.build_expression_doc(cond.test)
                 } else {
                     // shouldNotIndent = true (grandparent is assignment, variable, etc.)
                     // — an explicit opt-out, through the seam that owns the owned-comment
                     // prepend so the two arms cannot disagree about it.
-                    self.build_flat_chain_expression_doc(self.view.expr(cond.test))
+                    self.build_flat_chain_expression_doc(cond.test)
                 }
             })
         });
@@ -750,66 +745,65 @@ impl<'a> Printer<'a> {
         // Prettier wraps each branch in indent() so that multiline content
         // (like arrow block bodies) gets proper nesting. Exception: nested
         // conditionals handle their own indentation, so no extra wrapper.
-        let consequent_doc = if let ast::ExpressionKind::ConditionalExpression(nested) =
-            &self.view.expr(cond.consequent).kind
-        {
-            let run = question_pos
-                .and_then(|q| self.build_branch_comment_run(q + 1, consequent_start, d.line()))
-                .map(|run| d.indent(run));
-            // The nested ternary is built ONCE, as the chain continues it (no group, no parens),
-            // and both layouts print that one doc — prettier's `printTernary` too prints the
-            // consequent once and only wraps it in `ifBreak("", "(")` / `ifBreak("", ")")`.
-            // A second, standalone build for the flat arm rebuilt the whole nested subtree
-            // per level, 2^depth for `a ? a ? … : b : b`. Flat, the chained doc prints what a
-            // standalone one would: the group it lacks and the test's indent are layout only,
-            // and its test-shell run is this gap's (`Self::branch_gap_end`). The nested
-            // ternary's own binaries have THIS ternary for a grandparent, so
-            // `indent_binary_test` stops here.
-            let nested_doc = self.build_conditional_doc_impl(
-                nested,
-                self.view.expr(cond.consequent).span,
-                TernaryNesting::Consequent,
-                false,
-            );
-            let broken_consequent = self.prepend_opt(run, nested_doc);
-            // The RUN's break counts too: a multi-line block comment in the gap is a hard
-            // break prettier's `propagateBreaks` carries to the enclosing group, but tsv's
-            // `if_break` deliberately softens a forced break in its flat arm
-            // (`DocArena::subtree_layout_memo`), so asked of the arms alone the group stayed
-            // flat around a comment that cannot print flat — parens kept, the comment's
-            // closing line at the wrong indent.
-            if d.will_break(nested_doc) || run.is_some_and(|run| d.will_break(run)) {
-                // Consequent forces breaking (e.g., line comments produce hardlines).
-                // Skip if_break and use broken layout directly — the outer group
-                // will break because broken_consequent contains hardlines.
-                // Matches Prettier's willBreak(consequentDoc) → shouldBreak check
-                // in printTernaryOld (ternary-old.js).
-                broken_consequent
+        let consequent_doc =
+            if let ast::ExpressionKind::ConditionalExpression(nested) = &cond.consequent.kind {
+                let run = question_pos
+                    .and_then(|q| self.build_branch_comment_run(q + 1, consequent_start, d.line()))
+                    .map(|run| d.indent(run));
+                // The nested ternary is built ONCE, as the chain continues it (no group, no parens),
+                // and both layouts print that one doc — prettier's `printTernary` too prints the
+                // consequent once and only wraps it in `ifBreak("", "(")` / `ifBreak("", ")")`.
+                // A second, standalone build for the flat arm rebuilt the whole nested subtree
+                // per level, 2^depth for `a ? a ? … : b : b`. Flat, the chained doc prints what a
+                // standalone one would: the group it lacks and the test's indent are layout only,
+                // and its test-shell run is this gap's (`Self::branch_gap_end`). The nested
+                // ternary's own binaries have THIS ternary for a grandparent, so
+                // `indent_binary_test` stops here.
+                let nested_doc = self.build_conditional_doc_impl(
+                    nested,
+                    cond.consequent.span,
+                    TernaryNesting::Consequent,
+                    false,
+                );
+                let broken_consequent = self.prepend_opt(run, nested_doc);
+                // The RUN's break counts too: a multi-line block comment in the gap is a hard
+                // break prettier's `propagateBreaks` carries to the enclosing group, but tsv's
+                // `if_break` deliberately softens a forced break in its flat arm
+                // (`DocArena::subtree_layout_memo`), so asked of the arms alone the group stayed
+                // flat around a comment that cannot print flat — parens kept, the comment's
+                // closing line at the wrong indent.
+                if d.will_break(nested_doc) || run.is_some_and(|run| d.will_break(run)) {
+                    // Consequent forces breaking (e.g., line comments produce hardlines).
+                    // Skip if_break and use broken layout directly — the outer group
+                    // will break because broken_consequent contains hardlines.
+                    // Matches Prettier's willBreak(consequentDoc) → shouldBreak check
+                    // in printTernaryOld (ternary-old.js).
+                    broken_consequent
+                } else {
+                    // Normal if_break: parens when flat, chain when broken
+                    let flat_consequent = self.prepend_opt(run, d.parens(nested_doc));
+                    d.if_break(broken_consequent, flat_consequent)
+                }
             } else {
-                // Normal if_break: parens when flat, chain when broken
-                let flat_consequent = self.prepend_opt(run, d.parens(nested_doc));
-                d.if_break(broken_consequent, flat_consequent)
-            }
-        } else {
-            let run = question_pos
-                .and_then(|q| self.build_branch_comment_run(q + 1, consequent_start, d.line()));
-            // Bound the consequent's own paren-comment scan at its end — the
-            // consequent-to-`:` comment is emitted by `comments_before_colon` above, so a
-            // wider boundary would double-emit it.
-            let consequent = self.build_ternary_branch_expr_doc(
-                self.view.expr(cond.consequent),
-                indent_binary_test,
-                consequent_end,
-                false,
-            );
-            let branch = self.parenthesize_ternary_branch(
-                self.view.expr(cond.consequent),
-                consequent,
-                Some(consequent_end),
-                false,
-            );
-            d.indent(self.prepend_opt(run, branch))
-        };
+                let run = question_pos
+                    .and_then(|q| self.build_branch_comment_run(q + 1, consequent_start, d.line()));
+                // Bound the consequent's own paren-comment scan at its end — the
+                // consequent-to-`:` comment is emitted by `comments_before_colon` above, so a
+                // wider boundary would double-emit it.
+                let consequent = self.build_ternary_branch_expr_doc(
+                    cond.consequent,
+                    indent_binary_test,
+                    consequent_end,
+                    false,
+                );
+                let branch = self.parenthesize_ternary_branch(
+                    cond.consequent,
+                    consequent,
+                    Some(consequent_end),
+                    false,
+                );
+                d.indent(self.prepend_opt(run, branch))
+            };
 
         // Handle nested conditional in alternate: continue the chain
         // - Nested conditional does NOT need parens: `a ? b : c ? d : e`
@@ -820,11 +814,9 @@ impl<'a> Printer<'a> {
         // commented alternate (`Printer::value_end_kept_pair`), a same-line block and a
         // nested conditional included, so the comment stays inside it: the shell builder of
         // the ordinary branch retains it.
-        let alternate_keeps_pair = self
-            .value_end_kept_pair(self.view.expr(cond.alternate))
-            .is_some();
+        let alternate_keeps_pair = self.value_end_kept_pair(cond.alternate).is_some();
         let alternate_doc = if let ast::ExpressionKind::ConditionalExpression(nested) =
-            &self.view.expr(cond.alternate).kind
+            &cond.alternate.kind
             && !alternate_keeps_pair
         {
             let run = colon_pos
@@ -844,13 +836,13 @@ impl<'a> Printer<'a> {
             // second pass lands it; a `//` retains the pair. Empty for a bare chain, whose two
             // ends coincide.
             let nested_doc = self.build_stripped_shell_tail_doc(
-                self.view.expr(cond.alternate),
-                self.view.expr(cond.alternate).span.end,
+                cond.alternate,
+                cond.alternate.span.end,
                 cond_span.end,
                 || {
                     self.build_conditional_doc_impl(
                         nested,
-                        self.view.expr(cond.alternate).span,
+                        cond.alternate.span,
                         TernaryNesting::Alternate,
                         false,
                     )
@@ -861,13 +853,13 @@ impl<'a> Printer<'a> {
             let run = colon_pos
                 .and_then(|c| self.build_branch_comment_run(c + 1, alternate_start, d.line()));
             let alternate = self.build_ternary_branch_expr_doc(
-                self.view.expr(cond.alternate),
+                cond.alternate,
                 indent_binary_test,
                 cond_span.end,
                 alternate_keeps_pair,
             );
             let branch = self.parenthesize_ternary_branch(
-                self.view.expr(cond.alternate),
+                cond.alternate,
                 alternate,
                 Some(cond_span.end),
                 alternate_keeps_pair,
@@ -927,22 +919,19 @@ impl<'a> Printer<'a> {
         cond_span: Span,
         nesting: TernaryNesting,
     ) -> DocId {
-        let alternate = self.view.expr(cond.alternate);
         let d = self.d();
-        let test_end = self.view.expr(cond.test).span().end;
-        let consequent_start = self.view.expr(cond.consequent).span().start;
-        let consequent_end = self.view.expr(cond.consequent).span().end;
-        let alternate_start = alternate.span().start;
+        let test_end = cond.test.span().end;
+        let consequent_start = cond.consequent.span().start;
+        let consequent_end = cond.consequent.span().end;
+        let alternate_start = cond.alternate.span().start;
 
         // The test's stripped shell run is the caller's (`build_conditional_doc_impl`'s
         // `root_run`, prepended outside this doc), so this layout emits none of its own.
-        let test = self.place_nested_ternary_test(nesting, self.view.expr(cond.test), || {
+        let test = self.place_nested_ternary_test(nesting, cond.test, || {
             // The same seam as the non-breaking path, so the load-bearing arrow/yield parens
             // (and the `as`/`satisfies` clarity parens) are never dropped just because a
             // branch carries a line comment.
-            self.build_ternary_test_doc(cond, cond_span, || {
-                self.build_expression_doc(self.view.expr(cond.test))
-            })
+            self.build_ternary_test_doc(cond, cond_span, || self.build_expression_doc(cond.test))
         });
 
         // Find the ? and : positions for proper comment categorization
@@ -953,24 +942,20 @@ impl<'a> Printer<'a> {
         // gap freezes the whole branch ([`Self::frozen_ternary_branch_doc`]). Resolved ahead
         // of the gap emitters because a frozen branch moves where its gap ENDS
         // ([`Self::breaking_branch_gap`]).
-        let consequent_frozen =
-            self.frozen_ternary_branch_doc(self.view.expr(cond.consequent), question_pos);
-        let consequent_gap = self.breaking_branch_gap(
-            self.view.expr(cond.consequent),
-            question_pos,
-            consequent_frozen.is_some(),
-        );
-        let alternate_frozen = self.frozen_ternary_branch_doc(alternate, colon_pos);
+        let consequent_frozen = self.frozen_ternary_branch_doc(cond.consequent, question_pos);
+        let consequent_gap =
+            self.breaking_branch_gap(cond.consequent, question_pos, consequent_frozen.is_some());
+        let alternate_frozen = self.frozen_ternary_branch_doc(cond.alternate, colon_pos);
         // A frozen alternate inside a pair the host keeps for the value's end
         // (`Printer::value_end_kept_pair`): the directive and the slice print INSIDE the
         // pair, so the `:` gap ends at its `(`.
         let alternate_frozen_pair = alternate_frozen.and_then(|_| {
-            self.frozen_ternary_branch_span(alternate, colon_pos)
-                .zip(self.value_end_kept_pair(alternate))
+            self.frozen_ternary_branch_span(cond.alternate, colon_pos)
+                .zip(self.value_end_kept_pair(cond.alternate))
         });
         let alternate_gap = match alternate_frozen_pair {
             Some((_, (open, _))) => (colon_pos.map_or(open, |p| p + 1), open),
-            None => self.breaking_branch_gap(alternate, colon_pos, alternate_frozen.is_some()),
+            None => self.breaking_branch_gap(cond.alternate, colon_pos, alternate_frozen.is_some()),
         };
 
         let mut parts = smallvec![test];
@@ -1007,12 +992,10 @@ impl<'a> Printer<'a> {
         // the break from the parent to the entire ternary chain.
         let (consequent, is_nested_cond) = if let Some(frozen) = consequent_frozen {
             (frozen, false)
-        } else if let ast::ExpressionKind::ConditionalExpression(nested) =
-            &self.view.expr(cond.consequent).kind
-        {
+        } else if let ast::ExpressionKind::ConditionalExpression(nested) = &cond.consequent.kind {
             let chained = self.build_conditional_doc_impl(
                 nested,
-                self.view.expr(cond.consequent).span,
+                cond.consequent.span,
                 TernaryNesting::Consequent,
                 false,
             );
@@ -1020,17 +1003,10 @@ impl<'a> Printer<'a> {
         } else {
             // Clarity parens (`(a ?? b)`, `(x as T)`) exactly as the inline layout
             // applies them — the line-comment path must not drop them.
-            let expr_doc = self.wrap_for_init_in(
-                self.view.expr(cond.consequent),
-                self.build_expression_doc(self.view.expr(cond.consequent)),
-            );
+            let expr_doc =
+                self.wrap_for_init_in(cond.consequent, self.build_expression_doc(cond.consequent));
             (
-                self.parenthesize_ternary_branch(
-                    self.view.expr(cond.consequent),
-                    expr_doc,
-                    None,
-                    false,
-                ),
+                self.parenthesize_ternary_branch(cond.consequent, expr_doc, None, false),
                 false,
             )
         };
@@ -1072,33 +1048,35 @@ impl<'a> Printer<'a> {
         // and prints the alternate's trailing gap inside it, which the gap emitter below then
         // leaves alone.
         let alternate_keeps_pair =
-            alternate_frozen.is_none() && self.value_end_kept_pair(alternate).is_some();
+            alternate_frozen.is_none() && self.value_end_kept_pair(cond.alternate).is_some();
         // Alternate expression - nested conditionals cascade the break without extra indent
         // The `:`→alternate value head, the consequent's mirror.
         let alternate_doc = if let Some((frozen, (open, close))) = alternate_frozen_pair {
-            d.indent(self.build_frozen_kept_pair_doc(alternate, frozen, open, close))
+            d.indent(self.build_frozen_kept_pair_doc(cond.alternate, frozen, open, close))
         } else if let Some(frozen) = alternate_frozen {
             d.indent(frozen)
         } else if alternate_keeps_pair {
-            let expr_doc = self.build_ternary_branch_expr_doc(alternate, true, cond_span.end, true);
+            let expr_doc =
+                self.build_ternary_branch_expr_doc(cond.alternate, true, cond_span.end, true);
             d.indent(self.parenthesize_ternary_branch(
-                alternate,
+                cond.alternate,
                 expr_doc,
                 Some(cond_span.end),
                 true,
             ))
-        } else if let ast::ExpressionKind::ConditionalExpression(nested) = &alternate.kind {
+        } else if let ast::ExpressionKind::ConditionalExpression(nested) = &cond.alternate.kind {
             // Recursively use breaking layout - no indent wrapper (has its own structure)
             self.build_conditional_doc_with_line_comments(
                 nested,
-                alternate.span,
+                cond.alternate.span,
                 TernaryNesting::Alternate,
             )
         } else {
             // Regular expressions get indent wrapper, plus the same clarity parens
             // the inline layout applies (`(a ?? b)`, `(x as T)`).
-            let expr_doc = self.wrap_for_init_in(alternate, self.build_expression_doc(alternate));
-            d.indent(self.parenthesize_ternary_branch(alternate, expr_doc, None, false))
+            let expr_doc =
+                self.wrap_for_init_in(cond.alternate, self.build_expression_doc(cond.alternate));
+            d.indent(self.parenthesize_ternary_branch(cond.alternate, expr_doc, None, false))
         };
 
         self.push_ternary_branch_value(&mut q_parts, alternate_placement, alternate_doc);
@@ -1119,7 +1097,11 @@ impl<'a> Printer<'a> {
         // conditional alternate emits its own tail recursively and its span ends where
         // this one does, leaving the range empty.
         if !alternate_keeps_pair && alternate_frozen_pair.is_none() {
-            self.push_trailing_comments_in_range(&mut q_parts, alternate.span().end, cond_span.end);
+            self.push_trailing_comments_in_range(
+                &mut q_parts,
+                cond.alternate.span().end,
+                cond_span.end,
+            );
         }
 
         parts.push(d.indent(d.concat(&q_parts)));

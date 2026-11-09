@@ -758,7 +758,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .strip_prefix("attach")
             .filter(|rest| rest.starts_with(is_svelte_ws))
         else {
-            return Err(Self::error_expected_at("'attach' keyword", content_start));
+            return Err(self.error_expected_at("'attach' keyword", content_start));
         };
         // Leading whitespace only — the trailing run may be a line comment's own text
         // (`SvelteParser::parse_ts_expression`) — and that is also the whitespace-only test, since
@@ -824,10 +824,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Parse: "...expr"
         let Some(after_dots) = trimmed.strip_prefix("...") else {
-            return Err(Self::error_expected_at(
-                "'...' in spread attribute",
-                content_start,
-            ));
+            return Err(self.error_expected_at("'...' in spread attribute", content_start));
         };
 
         if after_dots.trim_matches(is_svelte_ws).is_empty() {

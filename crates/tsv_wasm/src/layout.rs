@@ -9,7 +9,6 @@
 use tsv_css::ast::{ColorChannel, CssValue, SimpleSelector};
 use tsv_lang::doc::DocContext;
 use tsv_lang::doc::arena::DocNode;
-use tsv_lang::store::{Id, IdRet, ListBuf, ListMark, PoolText, Run, Store, StoreView, TextPool};
 use tsv_svelte::ast::{AttributeNode, Element, ExpressionTag, FragmentNode};
 use tsv_ts::Error;
 use tsv_ts::ast::{
@@ -54,20 +53,3 @@ const _: () = assert!(size_of::<Element<'static>>() == 40);
 const _: () = assert!(size_of::<FragmentNode<'static>>() == 80);
 const _: () = assert!(size_of::<AttributeNode<'static>>() == 52);
 const _: () = assert!(size_of::<ExpressionTag<'static>>() == 12);
-
-enum Family {}
-
-// The store handles, each niche-packed. See the native pins in `tsv_lang`'s `store.rs`.
-const _: () = assert!(size_of::<Id<Family>>() == 4);
-const _: () = assert!(size_of::<Option<Id<Family>>>() == 4);
-const _: () = assert!(size_of::<Run<Family>>() == 8);
-const _: () = assert!(size_of::<Option<Run<Family>>>() == 8);
-const _: () = assert!(size_of::<PoolText>() == 8);
-const _: () = assert!(size_of::<Option<PoolText>>() == 8);
-const _: () = assert!(size_of::<ListMark<Family>>() == 4);
-const _: () = assert!(size_of::<IdRet<Family>>() == 4);
-const _: () = assert!(size_of::<Result<IdRet<Family>, Error>>() == 8);
-const _: () = assert!(size_of::<StoreView<'static, Id<Family>>>() == 8);
-const _: () = assert!(size_of::<Store<Id<Family>>>() == 12);
-const _: () = assert!(size_of::<ListBuf<Id<Family>>>() == 12);
-const _: () = assert!(size_of::<TextPool>() == 12);

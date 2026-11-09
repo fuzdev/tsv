@@ -9,6 +9,8 @@ members = [
     "crates/tsv_ts",
     "crates/tsv_css",
     "crates/tsv_svelte",
+    "crates/tsv_svelte_compile",
+    "crates/tsv_check",
     "crates/tsv_cli",
     "crates/tsv_debug",
     "crates/tsv_wasm",
@@ -47,6 +49,14 @@ tsv_discover = { path = "crates/tsv_discover", version = "=0.8.1" }
 tsv_ts = { path = "crates/tsv_ts", version = "=0.8.1", default-features = false }
 tsv_css = { path = "crates/tsv_css", version = "=0.8.1", default-features = false }
 tsv_svelte = { path = "crates/tsv_svelte", version = "=0.8.1", default-features = false }
+# Svelte→JS compiler + JS canonicalizer. Dev-tooling consumer only (tsv_debug);
+# no shipped artifact links it yet.
+tsv_svelte_compile = { path = "crates/tsv_svelte_compile" }
+
+# Experimental TypeScript type-checking. A consumer crate of tsv_ts's concrete
+# types; referenced only by the tsv_debug harness so it never touches the
+# shipped format/parse artifacts (a crate-boundary zero-cost exclusion).
+tsv_check = { path = "crates/tsv_check" }
 
 # External dependencies
 argh = "0.1.19"
@@ -104,11 +114,6 @@ unused_lifetimes = "warn"
 elided_lifetimes_in_paths = "warn"
 unused_qualifications = "warn"
 unreachable_pub = "warn"
-# `tsv_unported` is never set: it gates the `tsv_debug` code that needs `tsv_svelte_compile` or
-# `tsv_check`, the two crates outside the workspace build. A custom cfg, not a Cargo feature:
-# an optional path dependency would still join the workspace, and the `--all-features` legs
-# would turn a feature on against a dependency that is not there.
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(tsv_unported)"] }
 
 [workspace.lints.rustdoc]
 # A doc link is the only machine-checkable claim a doc comment makes, so an unresolvable
@@ -229,6 +234,7 @@ tsv_cli = { path = "crates/tsv_cli" }
 # `FORMATTABLE_EXTENSIONS` — argh renders help from string literals, so the const cannot
 # reach it and the two spellings need a gate.
 tsv_discover.workspace = true
+tsv_svelte_compile.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 futures-util.workspace = true
 bumpalo.workspace = true

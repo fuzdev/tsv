@@ -199,13 +199,7 @@ impl<'a> Printer<'a> {
         span: Span,
         gap: TerminatorGap,
     ) -> DocId {
-        self.build_keyword_argument_doc(
-            "throw",
-            span.start,
-            span.end,
-            self.view.expr(stmt.argument),
-            gap,
-        )
+        self.build_keyword_argument_doc("throw", span.start, span.end, stmt.argument, gap)
     }
 
     pub(in crate::printer::statements) fn build_break_statement_doc(

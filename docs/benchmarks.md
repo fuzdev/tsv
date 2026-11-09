@@ -1244,7 +1244,6 @@ deno task pins:audit               # fails until LOCKED_TRANSITIVE matches the r
 git -C ../svelte fetch --tags && git -C ../svelte checkout svelte@<version>
 # 3. both fixture trees
 deno task fixtures:update          # review the churn
-# compile:* do not run while tsv_svelte_compile is outside the workspace build (CLAUDE.md §Project Structure)
 deno task compile:fixtures:validate  # an oracle-freshness failure is a stale expected_server.js:
 #   re-init it with `deno task compile:fixtures:init <dir>` (bare re-reads its input.svelte);
 #   a parity failure that survives the re-init is tsv's compiler behind the oracle

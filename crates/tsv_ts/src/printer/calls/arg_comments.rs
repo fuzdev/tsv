@@ -5,7 +5,6 @@
 // - Trailing comments on arguments
 // - Leading comments before arguments
 
-use crate::ast::ExprView;
 use smallvec::SmallVec;
 
 use super::super::{LeadingGlue, Printer};
@@ -89,10 +88,10 @@ impl<'a> Printer<'a> {
     pub(super) fn arg_paren_interior(
         &self,
         container_start: u32,
-        args: &[ast::ExprEdge<'_>],
+        args: &[&ast::Expression<'_>],
         i: usize,
     ) -> Option<Span> {
-        let interior = self.printed_paren_interior(self.view.expr(args[i]))?;
+        let interior = self.printed_paren_interior(args[i])?;
         self.args_frozen_span(container_start, args, i)
             .is_none()
             .then_some(interior)
@@ -325,24 +324,21 @@ pub(super) fn has_inter_argument_comments(
     call: &ast::CallExpression<'_>,
     printer: &Printer<'_>,
 ) -> bool {
-    has_inter_argument_comments_slice(printer.view.list(call.arguments), printer)
+    has_inter_argument_comments_slice(call.arguments, printer)
 }
 
 /// Check if there are comments between arguments in a slice
 pub(super) fn has_inter_argument_comments_slice(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[&ast::Expression<'_>],
     printer: &Printer<'_>,
 ) -> bool {
     if arguments.len() < 2 {
         return false;
     }
 
-    arguments.windows(2).any(|pair| {
-        printer.has_comments_to_emit_between(
-            printer.view.expr(pair[0]).span().end,
-            printer.view.expr(pair[1]).span().start,
-        )
-    })
+    arguments
+        .windows(2)
+        .any(|pair| printer.has_comments_to_emit_between(pair[0].span().end, pair[1].span().start))
 }
 
 /// Prettier's **`anyArgEmptyLine`** (`print/call-arguments.js`): does any inter-argument gap
@@ -367,13 +363,13 @@ pub(super) fn has_inter_argument_comments_slice(
 /// itself: a **test call** is joined by `printCallExpression` directly, so it has no
 /// `anyArgEmptyLine` at all (see `call_formatting.rs`, which asks `is_test_call` — the callee, not
 /// the layout).
-pub(super) fn any_arg_empty_line(arguments: &[ast::ExprEdge<'_>], printer: &Printer<'_>) -> bool {
-    arguments.windows(2).any(|pair| {
-        printer.is_next_line_empty(
-            printer.view.expr(pair[0]).span().end,
-            printer.view.expr(pair[1]).span().start,
-        )
-    })
+pub(super) fn any_arg_empty_line(
+    arguments: &[&ast::Expression<'_>],
+    printer: &Printer<'_>,
+) -> bool {
+    arguments
+        .windows(2)
+        .any(|pair| printer.is_next_line_empty(pair[0].span().end, pair[1].span().start))
 }
 
 /// Check if the gap between two source positions contains only whitespace and parens,
@@ -453,14 +449,13 @@ pub(super) fn should_force_expansion_for_comments(
 /// answers `false` here, which is what prettier's `hasComment(arg)` reports for it too.
 /// **On page**, since an owned annotation glued to an argument is a comment prettier sees.
 pub(super) fn any_arg_gap_has_comment_on_page(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[&ast::Expression<'_>],
     printer: &Printer<'_>,
     paren_open: u32,
     call_end: u32,
 ) -> bool {
     let mut prev_end = paren_open;
     for arg in arguments {
-        let arg = printer.view.expr(*arg);
         if printer.has_comments_on_page_between(prev_end, arg.span().start) {
             return true;
         }
@@ -479,12 +474,7 @@ pub(super) fn any_comment_forces_expansion(
     printer: &Printer<'_>,
     paren_open: u32,
 ) -> bool {
-    any_comment_forces_expansion_slice(
-        printer.view.list(call.arguments),
-        printer,
-        paren_open,
-        span.end,
-    )
+    any_comment_forces_expansion_slice(call.arguments, printer, paren_open, span.end)
 }
 
 /// [`any_comment_forces_expansion`] over an argument slice, for the builder that holds a
@@ -493,7 +483,7 @@ pub(super) fn any_comment_forces_expansion(
 /// asked [`has_inter_argument_comments_slice`] instead, which counts a same-line inline
 /// block (`new A(a /* c */, () => {…})`) and so broke out a list prettier keeps hugged.
 pub(super) fn any_comment_forces_expansion_slice(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[&ast::Expression<'_>],
     printer: &Printer<'_>,
     paren_open: u32,
     call_end: u32,
@@ -503,7 +493,7 @@ pub(super) fn any_comment_forces_expansion_slice(
     }
 
     // Check leading comments before first arg
-    let first_arg_start = printer.view.expr(arguments[0]).span().start;
+    let first_arg_start = arguments[0].span().start;
     if printer.has_comments_to_emit_between(paren_open, first_arg_start)
         && should_force_expansion_for_comments(printer, paren_open, first_arg_start)
     {
@@ -518,15 +508,13 @@ pub(super) fn any_comment_forces_expansion_slice(
         // line of its own or because its deferred `//` would otherwise flush past the
         // call's `)`. Asked per argument: a non-last spread's interior needs the expansion
         // just as much as the last one's.
-        if printer.paren_interior_forces_expansion(
-            printer.printed_paren_interior(printer.view.expr(*arg)),
-        ) {
+        if printer.paren_interior_forces_expansion(printer.printed_paren_interior(arg)) {
             return true;
         }
 
-        let arg_end = printer.view.expr(*arg).span().end;
+        let arg_end = arg.span().end;
         let next_boundary = if i < arguments.len() - 1 {
-            printer.view.expr(arguments[i + 1]).span().start
+            arguments[i + 1].span().start
         } else {
             call_end
         };
@@ -573,12 +561,12 @@ pub(super) fn any_comment_forces_expansion_slice(
 /// Used to prevent expand-last-arg layout when the last arg has comments,
 /// since prettier's shouldExpandLastArg returns false in that case.
 pub(super) fn last_arg_has_comments(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[&ast::Expression<'_>],
     printer: &Printer<'_>,
     call_end: u32,
     paren_open: u32,
 ) -> bool {
-    let Some(last) = printer.view.opt(arguments.last().copied()) else {
+    let Some(last) = arguments.last() else {
         return false;
     };
     let last_start = last.span().start;
@@ -589,7 +577,7 @@ pub(super) fn last_arg_has_comments(
     // `shouldExpandLastArg` refuses the hug for it too.
     if arguments.len() >= 2 {
         // Multi-arg: check after comma
-        let prev_end = printer.view.expr(arguments[arguments.len() - 2]).span().end;
+        let prev_end = arguments[arguments.len() - 2].span().end;
         if let Some(cp) = find_comma_pos(printer.source, prev_end, last_start)
             && printer.has_comments_on_page_between((cp + 1) as u32, last_start)
         {
@@ -626,14 +614,14 @@ pub(super) fn last_arg_has_comments(
 /// argument is on the page just like any other leading comment, so prettier's
 /// `shouldExpandFirstArg` refuses the hug for it too.
 pub(super) fn first_arg_has_any_comments(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[&ast::Expression<'_>],
     printer: &Printer<'_>,
     paren_open: u32,
 ) -> bool {
     if arguments.is_empty() {
         return false;
     }
-    let first = printer.view.expr(arguments[0]);
+    let first = &arguments[0];
 
     // Leading: comments between paren and first arg
     if printer.has_comments_on_page_between(paren_open, first.span().start) {
@@ -652,7 +640,7 @@ pub(super) fn first_arg_has_any_comments(
     // The routing step is what keeps the hugging spelling (`}, /* c */ b`) out of the run:
     // there the block leads the next argument, prettier's `hasComment(firstArg)` is false,
     // and the hug is correct.
-    if let Some(second) = printer.view.opt(arguments.get(1).copied()) {
+    if let Some(second) = arguments.get(1) {
         let gap =
             PartitionedComments::for_routed_arg_gap(printer, first.span().end, second.span().start);
         return gap.has_trailing_comments();
@@ -671,18 +659,18 @@ pub(super) fn has_trailing_comments_on_args(
     span: Span,
     printer: &Printer<'_>,
 ) -> bool {
-    has_trailing_line_comments_slice(printer.view.list(call.arguments), span.end, printer)
+    has_trailing_line_comments_slice(call.arguments, span.end, printer)
 }
 
 /// Check if there are trailing line comments on any arguments (generic version)
 ///
 /// Used by both CallExpression and NewExpression.
 pub(super) fn has_trailing_line_comments_slice(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[&ast::Expression<'_>],
     call_span_end: u32,
     printer: &Printer<'_>,
 ) -> bool {
-    has_trailing_comments_slice_impl(printer.view, arguments, call_span_end, |start, end| {
+    has_trailing_comments_slice_impl(arguments, call_span_end, |start, end| {
         printer.has_line_comments_between(start, end)
     })
 }
@@ -804,11 +792,11 @@ pub(super) fn emit_last_arg_trailing_comments(
 /// This is important for new expressions where block comments after arguments
 /// can also be lost if not handled properly.
 pub(super) fn has_trailing_comments_slice(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[&ast::Expression<'_>],
     call_span_end: u32,
     printer: &Printer<'_>,
 ) -> bool {
-    has_trailing_comments_slice_impl(printer.view, arguments, call_span_end, |start, end| {
+    has_trailing_comments_slice_impl(arguments, call_span_end, |start, end| {
         printer.has_comments_to_emit_between(start, end)
     })
 }
@@ -816,8 +804,7 @@ pub(super) fn has_trailing_comments_slice(
 /// Shared implementation for checking trailing comments on arguments.
 #[inline]
 fn has_trailing_comments_slice_impl<F>(
-    view: ExprView<'_>,
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[&ast::Expression<'_>],
     call_span_end: u32,
     has_comments: F,
 ) -> bool
@@ -829,9 +816,9 @@ where
     }
 
     for (i, arg) in arguments.iter().enumerate() {
-        let arg_end = view.expr(*arg).span().end;
+        let arg_end = arg.span().end;
         let next_boundary = if i < arguments.len() - 1 {
-            view.expr(arguments[i + 1]).span().start
+            arguments[i + 1].span().start
         } else {
             call_span_end
         };

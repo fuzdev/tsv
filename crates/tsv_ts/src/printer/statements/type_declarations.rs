@@ -1144,7 +1144,7 @@ impl<'a> Printer<'a> {
         // generic — and a long type-param list breaking above doesn't drag the params
         // open (they stay inline when `>(a, b): R` fits).
         let sig_doc = self.build_signature_params_return_group(
-            self.view.run(decl.params),
+            decl.params,
             decl.type_parameters.as_ref(),
             decl.return_type.as_ref(),
             paren_pos,
@@ -1396,8 +1396,7 @@ impl<'a> Printer<'a> {
                 // verbatim slice already printed that interior, so the anchor moves to
                 // its end instead, or the seam prints the comment a second time.
                 // `docs/comments.md` §The element-comma seam.
-                let member_end =
-                    Self::element_claim_anchor(frozen_span, member.printed_end(self.view));
+                let member_end = Self::element_claim_anchor(frozen_span, member.printed_end());
                 let upper_bound = decl
                     .members
                     .get(i + 1)
@@ -1459,7 +1458,7 @@ impl<'a> Printer<'a> {
         };
 
         // Initializer: ` = value`
-        if let Some(init) = self.view.opt_slot(&member.initializer) {
+        if let Some(init) = &member.initializer {
             // Extract comments between `=` and initializer value
             let id_end = member.id.span().end;
             let init_start = init.span().start;

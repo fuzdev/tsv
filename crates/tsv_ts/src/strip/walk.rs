@@ -33,7 +33,6 @@ use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use smallvec::SmallVec;
 
-use crate::ast::ExprView;
 use crate::ast::{
     ArrowFunctionBody, ArrowFunctionExpression, BinaryExpression, BinaryOperator, BlockStatement,
     ClassBody, ClassDeclaration, ClassExpression, ClassMember, Decorator, ExportDefaultDeclaration,
@@ -83,8 +82,6 @@ pub(crate) enum Mode {
 /// and the state the hazard substitutions read.
 pub(crate) struct Walk<'s, 'b> {
     src: Source<'s>,
-    /// Reads the expressions of the tree being walked.
-    view: ExprView<'b>,
     /// What the walk collects ([`Self::collects`]) and whether the subtrees the strip
     /// refuses are walked ([`Self::walks_refused`]).
     mode: Mode,
@@ -157,10 +154,9 @@ impl Tail {
 }
 
 impl<'s, 'b> Walk<'s, 'b> {
-    pub(crate) fn new(source: &'s str, arena: &'b Bump, mode: Mode, view: ExprView<'b>) -> Self {
+    pub(crate) fn new(source: &'s str, arena: &'b Bump, mode: Mode) -> Self {
         Self {
             src: Source::new(source),
-            view,
             mode,
             edits: BumpVec::new_in(arena),
             records: Vec::new(),
@@ -408,14 +404,14 @@ impl<'s, 'b> Walk<'s, 'b> {
         if self.collects() {
             self.record_dynamic(import, span);
         }
-        self.expr(self.view.expr(import.source));
-        if let Some(options) = self.view.opt(import.options) {
+        self.expr(import.source);
+        if let Some(options) = import.options {
             self.expr(options);
         }
     }
 
     fn record_dynamic(&mut self, import: &ImportExpression<'_>, span: Span) {
-        let specifier = match &self.view.expr(import.source).kind {
+        let specifier = match &import.source.kind {
             ExpressionKind::Literal(literal)
                 if matches!(literal.value, LiteralValue::String(_)) =>
             {
@@ -435,9 +431,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             specifier,
             TypeOnly::No,
             import.phase,
-            import
-                .options
-                .map(|options| byte_span(self.view.expr(options).span)),
+            import.options.map(|options| byte_span(options.span)),
         );
     }
 
@@ -605,7 +599,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     ) -> bool {
         match &statement.kind {
             StatementKind::ExpressionStatement(s) => {
-                self.expr(self.view.expr(s.expression));
+                self.expr(s.expression);
                 true
             }
             StatementKind::VariableDeclaration(decl) => {
@@ -652,7 +646,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 true
             }
             StatementKind::ReturnStatement(s) => {
-                if let Some(argument) = self.view.opt(s.argument) {
+                if let Some(argument) = s.argument {
                     self.expr(argument);
                 }
                 true
@@ -662,7 +656,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 true
             }
             StatementKind::FunctionDeclaration(func) => {
-                self.function(FunctionView::declaration(self.view, func));
+                self.function(FunctionView::declaration(func));
                 true
             }
             StatementKind::ClassDeclaration(class) => {
@@ -670,7 +664,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                     self.blank_statement(outer, position);
                     return false;
                 }
-                self.class(ClassView::declaration(self.view, class), outer.start);
+                self.class(ClassView::declaration(class), outer.start);
                 true
             }
             StatementKind::ExportNamedDeclaration(export) => {
@@ -690,7 +684,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             StatementKind::TSExportAssignment(assignment) => {
                 self.refuse(UnsupportedConstruct::ExportEquals, outer);
                 if self.walks_refused() {
-                    self.expr(self.view.slot(&assignment.expression));
+                    self.expr(&assignment.expression);
                 }
                 true
             }
@@ -704,7 +698,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 true
             }
             StatementKind::IfStatement(s) => {
-                self.expr(self.view.expr(s.test));
+                self.expr(s.test);
                 self.nested_statement(s.consequent);
                 if let Some(alternate) = s.alternate {
                     self.nested_statement(alternate);
@@ -715,13 +709,13 @@ impl<'s, 'b> Walk<'s, 'b> {
                 if let Some(init) = s.init {
                     match init {
                         ForInit::VariableDeclaration(decl) => self.variable_declaration(decl),
-                        ForInit::Expression(e) => self.expr(self.view.slot(e)),
+                        ForInit::Expression(e) => self.expr(e),
                     }
                 }
-                if let Some(test) = self.view.opt(s.test) {
+                if let Some(test) = s.test {
                     self.expr(test);
                 }
-                if let Some(update) = self.view.opt(s.update) {
+                if let Some(update) = s.update {
                     self.expr(update);
                 }
                 self.nested_statement(s.body);
@@ -729,7 +723,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             StatementKind::ForInStatement(s) => {
                 self.for_left(s.left);
-                self.expr(self.view.expr(s.right));
+                self.expr(s.right);
                 self.nested_statement(s.body);
                 true
             }
@@ -738,30 +732,30 @@ impl<'s, 'b> Walk<'s, 'b> {
                     self.module_syntax = true;
                 }
                 self.for_left(s.left);
-                self.expr(self.view.expr(s.right));
+                self.expr(s.right);
                 self.nested_statement(s.body);
                 true
             }
             StatementKind::WhileStatement(s) => {
-                self.expr(self.view.expr(s.test));
+                self.expr(s.test);
                 self.nested_statement(s.body);
                 true
             }
             StatementKind::DoWhileStatement(s) => {
                 self.nested_statement(s.body);
-                self.expr(self.view.expr(s.test));
+                self.expr(s.test);
                 true
             }
             StatementKind::WithStatement(s) => {
-                self.expr(self.view.expr(s.object));
+                self.expr(s.object);
                 self.nested_statement(s.body);
                 true
             }
             StatementKind::SwitchStatement(s) => {
-                self.expr(self.view.expr(s.discriminant));
+                self.expr(s.discriminant);
                 for case in s.cases {
                     if let Some(test) = case.test {
-                        self.expr(self.view.expr(test));
+                        self.expr(test);
                     }
                     self.statement_list(case.consequent, false);
                     self.mark(case.span.end);
@@ -783,7 +777,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 true
             }
             StatementKind::ThrowStatement(s) => {
-                self.expr(self.view.expr(s.argument));
+                self.expr(s.argument);
                 true
             }
             StatementKind::BreakStatement(s) => {
@@ -812,26 +806,22 @@ impl<'s, 'b> Walk<'s, 'b> {
     fn statement_tail(&self, statement: &Statement<'_>) -> Tail {
         let end = statement.span.end;
         match &statement.kind {
-            StatementKind::ExpressionStatement(s) => {
-                self.unterminated_tail(self.view.expr(s.expression), end)
-            }
-            StatementKind::ThrowStatement(s) => {
-                self.unterminated_tail(self.view.expr(s.argument), end)
-            }
+            StatementKind::ExpressionStatement(s) => self.unterminated_tail(s.expression, end),
+            StatementKind::ThrowStatement(s) => self.unterminated_tail(s.argument, end),
             StatementKind::ReturnStatement(s) => s.argument.map_or(Tail::Closed, |argument| {
-                self.unterminated_tail(self.view.expr(argument), end)
+                self.unterminated_tail(argument, end)
             }),
             StatementKind::VariableDeclaration(decl) => match decl.declarations.last() {
-                Some(declarator) if !decl.declare => declarator.init.map_or(Tail::Closed, |init| {
-                    self.unterminated_tail(self.view.expr(init), end)
-                }),
+                Some(declarator) if !decl.declare => declarator
+                    .init
+                    .map_or(Tail::Closed, |init| self.unterminated_tail(init, end)),
                 _ => Tail::Closed,
             },
             StatementKind::ExportNamedDeclaration(export) => export
                 .declaration
                 .map_or(Tail::Closed, |declaration| self.statement_tail(declaration)),
             StatementKind::ExportDefaultDeclaration(export) => match &export.declaration {
-                ExportDefaultValue::Expression(e) => self.unterminated_tail(self.view.slot(e), end),
+                ExportDefaultValue::Expression(e) => self.unterminated_tail(e, end),
                 ExportDefaultValue::FunctionDeclaration(_)
                 | ExportDefaultValue::TSDeclareFunction(_)
                 | ExportDefaultValue::ClassDeclaration(_)
@@ -875,7 +865,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         if self.src.ends_with_semicolon(end) || self.terminated_at == Some(end) {
             Tail::Closed
         } else {
-            expression_tail(self.view, e, end)
+            expression_tail(e, end)
         }
     }
 
@@ -891,20 +881,17 @@ impl<'s, 'b> Walk<'s, 'b> {
             self.module_syntax = true;
         }
         for declarator in decl.declarations {
-            self.expr(self.view.expr(declarator.id));
+            self.expr(declarator.id);
             if declarator.definite {
                 // `let a!: T` — the `!` follows the name, ahead of the annotation
                 let end = declarator
                     .init
-                    .map_or(declarator.span.end, |init| self.view.expr(init).span.start);
-                if let Some(bang) =
-                    self.src
-                        .find_char(self.view.expr(declarator.id).span.start, end, b'!')
-                {
+                    .map_or(declarator.span.end, |init| init.span.start);
+                if let Some(bang) = self.src.find_char(declarator.id.span.start, end, b'!') {
                     self.blank(bang, bang + 1);
                 }
             }
-            if let Some(init) = self.view.opt(declarator.init) {
+            if let Some(init) = declarator.init {
                 self.expr(init);
             }
         }
@@ -913,7 +900,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     fn for_left(&mut self, left: &ForInOfLeft<'_>) {
         match left {
             ForInOfLeft::VariableDeclaration(decl) => self.variable_declaration(decl),
-            ForInOfLeft::Pattern(pattern) => self.expr(self.view.slot(pattern)),
+            ForInOfLeft::Pattern(pattern) => self.expr(pattern),
         }
     }
 
@@ -960,11 +947,11 @@ impl<'s, 'b> Walk<'s, 'b> {
     ) -> bool {
         match &export.declaration {
             ExportDefaultValue::Expression(e) => {
-                self.expr(self.view.slot(e));
+                self.expr(e);
                 true
             }
             ExportDefaultValue::FunctionDeclaration(func) => {
-                self.function(FunctionView::declaration(self.view, func));
+                self.function(FunctionView::declaration(func));
                 true
             }
             ExportDefaultValue::TSDeclareFunction(func) => {
@@ -980,7 +967,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                     self.blank_statement(outer, position);
                     return false;
                 }
-                self.class(ClassView::declaration(self.view, class), outer.start);
+                self.class(ClassView::declaration(class), outer.start);
                 true
             }
             ExportDefaultValue::TSInterfaceDeclaration(_) => {
@@ -1053,11 +1040,11 @@ impl<'s, 'b> Walk<'s, 'b> {
     #[inline(never)]
     fn binary_chain(&mut self, binary: &BinaryExpression<'_>) {
         let mut rights: SmallVec<[&Expression<'_>; 8]> = SmallVec::new();
-        rights.push(self.view.expr(binary.right));
-        let mut left = self.view.expr(binary.left);
+        rights.push(binary.right);
+        let mut left = binary.left;
         while let ExpressionKind::BinaryExpression(inner) = &left.kind {
-            rights.push(self.view.expr(inner.right));
-            left = self.view.expr(inner.left);
+            rights.push(inner.right);
+            left = inner.left;
         }
         self.expr(left);
         for right in rights.iter().rev() {
@@ -1133,7 +1120,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                     let refused = self
                         .assertion_head(
                             node.span,
-                            self.view.expr(assertion.expression),
+                            assertion.expression,
                             assertion.type_annotation,
                             b"as",
                         )
@@ -1144,7 +1131,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                     let refused = self
                         .assertion_head(
                             node.span,
-                            self.view.expr(assertion.expression),
+                            assertion.expression,
                             assertion.type_annotation,
                             b"satisfies",
                         )
@@ -1159,7 +1146,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 walks_base = false;
                 break;
             }
-            node = self.view.expr(operand);
+            node = operand;
         }
         if walks_base {
             self.expr(node);
@@ -1178,22 +1165,20 @@ impl<'s, 'b> Walk<'s, 'b> {
         match &link.kind {
             ExpressionKind::CallExpression(call) => {
                 self.type_arguments(call.type_arguments.as_ref());
-                for argument in self.view.list(call.arguments) {
-                    let argument = self.view.expr(*argument);
+                for argument in call.arguments {
                     self.expr(argument);
                 }
             }
             ExpressionKind::NewExpression(new) => {
                 self.type_arguments(new.type_arguments.as_ref());
-                for argument in self.view.list(new.arguments) {
-                    self.expr(self.view.expr(*argument));
+                for argument in new.arguments {
+                    self.expr(argument);
                 }
             }
-            ExpressionKind::MemberExpression(member) => self.expr(self.view.expr(member.property)),
+            ExpressionKind::MemberExpression(member) => self.expr(member.property),
             ExpressionKind::TaggedTemplateExpression(tagged) => {
                 self.type_arguments(tagged.type_arguments.as_ref());
-                for expression in self.view.list(tagged.quasi.expressions) {
-                    let expression = self.view.expr(*expression);
+                for expression in tagged.quasi.expressions {
                     self.expr(expression);
                 }
             }
@@ -1206,7 +1191,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             ExpressionKind::TSAsExpression(assertion) => {
                 let blank_from = self.assertion_blank_start(
-                    self.view.expr(assertion.expression),
+                    assertion.expression,
                     assertion.type_annotation,
                     b"as",
                 );
@@ -1214,7 +1199,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             ExpressionKind::TSSatisfiesExpression(assertion) => {
                 let blank_from = self.assertion_blank_start(
-                    self.view.expr(assertion.expression),
+                    assertion.expression,
                     assertion.type_annotation,
                     b"satisfies",
                 );
@@ -1241,84 +1226,80 @@ impl<'s, 'b> Walk<'s, 'b> {
                 for property in object.properties {
                     match property {
                         ObjectProperty::Property(property) => self.property(property),
-                        ObjectProperty::SpreadElement(spread) => {
-                            self.expr(self.view.expr(spread.argument));
-                        }
+                        ObjectProperty::SpreadElement(spread) => self.expr(spread.argument),
                     }
                 }
             }
             ExpressionKind::ArrayExpression(array) => {
-                for element in self.view.opt_list(array.elements).iter().flatten() {
-                    let element = self.view.expr(*element);
+                for element in array.elements.iter().flatten() {
                     self.expr(element);
                 }
             }
-            ExpressionKind::UnaryExpression(unary) => self.expr(self.view.expr(unary.argument)),
-            ExpressionKind::UpdateExpression(update) => self.expr(self.view.expr(update.argument)),
+            ExpressionKind::UnaryExpression(unary) => self.expr(unary.argument),
+            ExpressionKind::UpdateExpression(update) => self.expr(update.argument),
             ExpressionKind::BinaryExpression(binary) => self.binary_chain(binary),
             ExpressionKind::CallExpression(call) => {
-                self.link_operand(self.view.expr(call.callee));
+                self.link_operand(call.callee);
                 self.type_arguments(call.type_arguments.as_ref());
-                for argument in self.view.list(call.arguments) {
-                    self.expr(self.view.expr(*argument));
+                for argument in call.arguments {
+                    self.expr(argument);
                 }
             }
             ExpressionKind::NewExpression(new) => {
-                self.link_operand(self.view.expr(new.callee));
+                self.link_operand(new.callee);
                 self.type_arguments(new.type_arguments.as_ref());
-                for argument in self.view.list(new.arguments) {
-                    self.expr(self.view.expr(*argument));
+                for argument in new.arguments {
+                    self.expr(argument);
                 }
             }
             ExpressionKind::MemberExpression(member) => {
-                self.link_operand(self.view.expr(member.object));
-                self.expr(self.view.expr(member.property));
+                self.link_operand(member.object);
+                self.expr(member.property);
             }
             ExpressionKind::ConditionalExpression(conditional) => {
-                self.expr(self.view.expr(conditional.test));
-                self.expr(self.view.expr(conditional.consequent));
-                self.expr(self.view.expr(conditional.alternate));
+                self.expr(conditional.test);
+                self.expr(conditional.consequent);
+                self.expr(conditional.alternate);
             }
             ExpressionKind::ArrowFunctionExpression(arrow) => {
-                self.function(FunctionView::arrow(self.view, arrow));
+                self.function(FunctionView::arrow(arrow));
             }
             ExpressionKind::FunctionExpression(func) => {
-                self.function(FunctionView::expression(self.view, func));
+                self.function(FunctionView::expression(func));
             }
             ExpressionKind::ClassExpression(class) => {
-                self.class(ClassView::expression(self.view, class), e.span.start);
+                self.class(ClassView::expression(class), e.span.start);
             }
-            ExpressionKind::SpreadElement(spread) => self.expr(self.view.expr(spread.argument)),
+            ExpressionKind::SpreadElement(spread) => self.expr(spread.argument),
             ExpressionKind::TemplateLiteral(template) => {
-                for expression in self.view.list(template.expressions) {
-                    let expression = self.view.expr(*expression);
+                for expression in template.expressions {
                     self.expr(expression);
                 }
             }
             ExpressionKind::TaggedTemplateExpression(tagged) => {
-                self.link_operand(self.view.expr(tagged.tag));
+                self.link_operand(tagged.tag);
                 self.type_arguments(tagged.type_arguments.as_ref());
-                for expression in self.view.list(tagged.quasi.expressions) {
-                    self.expr(self.view.expr(*expression));
+                for expression in tagged.quasi.expressions {
+                    self.expr(expression);
                 }
             }
             ExpressionKind::AwaitExpression(e) => {
                 self.module_syntax |= self.top_level_await();
-                self.expr(self.view.expr(e.argument));
+                self.expr(e.argument);
             }
             ExpressionKind::YieldExpression(e) => {
-                if let Some(argument) = self.view.opt(e.argument) {
+                if let Some(argument) = e.argument {
                     self.expr(argument);
                 }
             }
             ExpressionKind::SequenceExpression(sequence) => {
-                for expression in self.view.list(sequence.expressions) {
-                    self.expr(self.view.expr(*expression));
+                for expression in sequence.expressions {
+                    self.expr(expression);
                 }
             }
             ExpressionKind::AssignmentExpression(assignment) => {
-                self.expr(self.view.expr(assignment.left));
-                self.expr(self.view.expr(assignment.right));
+                self.expr(assignment.left);
+                self.expr(assignment.right);
             }
             ExpressionKind::ObjectPattern(pattern) => {
                 self.decorators(pattern.decorators);
@@ -1332,30 +1313,25 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             ExpressionKind::ArrayPattern(pattern) => {
                 self.decorators(pattern.decorators);
-                for element in self
-                    .view
-                    .pattern_elements(pattern.elements)
-                    .iter()
-                    .flatten()
-                {
-                    self.expr(self.view.slot(element));
+                for element in pattern.elements.iter().flatten() {
+                    self.expr(element);
                 }
                 self.pattern_tail(e.span, pattern.optional, pattern.type_annotation.as_ref());
             }
             ExpressionKind::AssignmentPattern(pattern) => {
                 self.decorators(pattern.decorators);
-                self.expr(self.view.expr(pattern.left));
-                self.expr(self.view.expr(pattern.right));
+                self.expr(pattern.left);
+                self.expr(pattern.right);
             }
             ExpressionKind::RestElement(rest) => self.rest_element(rest),
             ExpressionKind::TSTypeAssertion(assertion) => {
                 self.refuse(UnsupportedConstruct::TypeAssertion, e.span);
-                self.expr(self.view.expr(assertion.expression));
+                self.expr(assertion.expression);
             }
             ExpressionKind::TSAsExpression(assertion) => {
                 self.assertion(
                     e.span,
-                    self.view.expr(assertion.expression),
+                    assertion.expression,
                     assertion.type_annotation,
                     b"as",
                 );
@@ -1363,28 +1339,28 @@ impl<'s, 'b> Walk<'s, 'b> {
             ExpressionKind::TSSatisfiesExpression(assertion) => {
                 self.assertion(
                     e.span,
-                    self.view.expr(assertion.expression),
+                    assertion.expression,
                     assertion.type_annotation,
                     b"satisfies",
                 );
             }
             ExpressionKind::TSInstantiationExpression(instantiation) => {
-                self.link_operand(self.view.expr(instantiation.expression));
+                self.link_operand(instantiation.expression);
                 self.blank_span(instantiation.type_arguments.span);
             }
             ExpressionKind::TSNonNullExpression(non_null) => {
-                self.link_operand(self.view.expr(non_null.expression));
+                self.link_operand(non_null.expression);
                 // the `!` is the node's last byte, past any paren around the operand
                 self.blank(e.span.end - 1, e.span.end);
             }
             ExpressionKind::TSParameterProperty(property) => {
                 self.parameter_property(e.span, property);
-                self.expr(self.view.expr(property.parameter));
+                self.expr(property.parameter);
             }
             ExpressionKind::ImportExpression(import) => self.import_expression(import, e.span),
-            ExpressionKind::CommentBoundPair(cast) => self.expr(self.view.expr(cast.inner)),
+            ExpressionKind::CommentBoundPair(cast) => self.expr(cast.inner),
             ExpressionKind::ParenthesizedExpression(parens) => {
-                self.expr(parens.unreachable_contents(self.view));
+                self.expr(parens.unreachable_contents());
             }
         }
         self.mark(e.span.end);
@@ -1414,13 +1390,13 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// An object-literal or object-pattern property: a computed key and the value.
     fn property(&mut self, property: &Property<'_>) {
         if property.computed {
-            self.expr(self.view.expr(property.key));
+            self.expr(property.key);
         }
-        self.expr(self.view.expr(property.value));
+        self.expr(property.value);
     }
 
     fn rest_element(&mut self, rest: &RestElement<'_>) {
-        self.expr(self.view.expr(rest.argument));
+        self.expr(rest.argument);
         self.pattern_tail(rest.span, rest.optional, rest.type_annotation.as_ref());
     }
 
@@ -1445,7 +1421,7 @@ impl<'s, 'b> Walk<'s, 'b> {
 
     fn decorators(&mut self, decorators: Option<&[Decorator<'_>]>) {
         for decorator in decorators.unwrap_or_default() {
-            self.expr(self.view.slot(&decorator.expression));
+            self.expr(&decorator.expression);
         }
     }
 
@@ -1535,14 +1511,10 @@ impl<'s, 'b> Walk<'s, 'b> {
         let mut base = operand;
         loop {
             let (inner, ty, keyword): (&Expression<'_>, &TSType<'_>, &[u8]) = match &base.kind {
-                ExpressionKind::TSAsExpression(a) => {
-                    (self.view.expr(a.expression), a.type_annotation, b"as")
+                ExpressionKind::TSAsExpression(a) => (a.expression, a.type_annotation, b"as"),
+                ExpressionKind::TSSatisfiesExpression(s) => {
+                    (s.expression, s.type_annotation, b"satisfies")
                 }
-                ExpressionKind::TSSatisfiesExpression(s) => (
-                    self.view.expr(s.expression),
-                    s.type_annotation,
-                    b"satisfies",
-                ),
                 _ => break,
             };
             if self.assertion_blank_start(inner, ty, keyword) != inner.span.end {
@@ -1569,7 +1541,7 @@ impl<'s, 'b> Walk<'s, 'b> {
 
     /// `constructor(public x)` and its kin: refused, the span the first modifier.
     fn parameter_property(&mut self, span: Span, property: &TSParameterProperty<'_>) {
-        let end = self.view.expr(property.parameter).span.start;
+        let end = property.parameter.span.start;
         let keywords = [
             property.accessibility.map(|a| a.as_str().as_bytes()),
             property.readonly.then_some(b"readonly".as_slice()),
@@ -1692,7 +1664,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                     ClassMember::PropertyDefinition(PropertyDefinition {
                         value: Some(value),
                         ..
-                    }) => self.unterminated_tail(self.view.slot(value), span.end),
+                    }) => self.unterminated_tail(value, span.end),
                     _ => Tail::Closed,
                 };
             }
@@ -1727,7 +1699,6 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     fn property_definition(&mut self, property: &PropertyDefinition<'_>, open_field: bool) -> bool {
-        let key = self.view.slot(&property.key);
         // `declare x: T` and `abstract x: T` declare no runtime field
         if property.declare || property.r#abstract {
             self.blank_statement(property.span, Position::List);
@@ -1742,10 +1713,10 @@ impl<'s, 'b> Walk<'s, 'b> {
         // operator once a modifier ahead of it blanks (`a = x⏎private in⏎y` reads `x in y`)
         let operator_key = open_field
             && kept.iter().all(Option::is_none)
-            && self.is_operator_key(key, property.computed);
+            && self.is_operator_key(&property.key, property.computed);
         self.member_modifiers(MemberModifiers {
             from: decorators_end(property.decorators, property.span.start),
-            to: key.span.start,
+            to: property.key.span.start,
             decorated: property.decorators.is_some(),
             semicolon: property.computed || operator_key,
             removed: [
@@ -1756,7 +1727,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             kept,
         });
         if property.computed {
-            self.expr(key);
+            self.expr(&property.key);
         }
         let annotation = property.type_annotation.as_ref();
         let mark = match property.modifier {
@@ -1767,21 +1738,16 @@ impl<'s, 'b> Walk<'s, 'b> {
         if let Some(mark) = mark {
             let end = annotation
                 .map(|a| a.span.start)
-                .or_else(|| {
-                    property
-                        .value
-                        .as_ref()
-                        .map(|v| self.view.slot(v).span.start)
-                })
+                .or_else(|| property.value.as_ref().map(|v| v.span.start))
                 .unwrap_or(property.span.end);
-            if let Some(at) = self.src.find_char(key.span.end, end, mark) {
+            if let Some(at) = self.src.find_char(property.key.span.end, end, mark) {
                 self.blank(at, at + 1);
             }
         }
         if let Some(annotation) = annotation {
             self.blank_span(annotation.span);
         }
-        if let Some(value) = self.view.opt_slot(&property.value) {
+        if let Some(value) = &property.value {
             self.enter_function();
             self.expr(value);
             self.leave_function();
@@ -1790,7 +1756,6 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     fn method_definition(&mut self, method: &MethodDefinition<'_>, open_field: bool) -> bool {
-        let key = self.view.slot(&method.key);
         let func = &method.value;
         // an overload signature or an abstract method or accessor: no body
         if func.body.body.is_empty() && func.body.span.start == func.body.span.end {
@@ -1810,10 +1775,10 @@ impl<'s, 'b> Walk<'s, 'b> {
             && method.kind == MethodKind::Method
             && !func.generator
             && kept.iter().all(Option::is_none)
-            && self.is_operator_key(key, method.computed);
+            && self.is_operator_key(&method.key, method.computed);
         self.member_modifiers(MemberModifiers {
             from: decorators_end(method.decorators, method.span.start),
-            to: key.span.start,
+            to: method.key.span.start,
             decorated: method.decorators.is_some(),
             semicolon: method.computed || generator || operator_key,
             removed: [
@@ -1824,18 +1789,18 @@ impl<'s, 'b> Walk<'s, 'b> {
             kept,
         });
         if method.computed {
-            self.expr(key);
+            self.expr(&method.key);
         }
         if method.optional {
             let end = func
                 .type_parameters
                 .as_ref()
                 .map_or(func.params_start, |tp| tp.span.start);
-            if let Some(question) = self.src.find_char(key.span.end, end, b'?') {
+            if let Some(question) = self.src.find_char(method.key.span.end, end, b'?') {
                 self.blank(question, question + 1);
             }
         }
-        self.function(FunctionView::expression(self.view, func));
+        self.function(FunctionView::expression(func));
         true
     }
 
@@ -1846,7 +1811,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     fn enum_initializers(&mut self, decl: &TSEnumDeclaration<'_>) {
         self.enter_function();
         for member in decl.members {
-            if let Some(initializer) = self.view.opt_slot(&member.initializer) {
+            if let Some(initializer) = &member.initializer {
                 self.expr(initializer);
             }
         }
@@ -1999,7 +1964,7 @@ fn decorators_end(decorators: Option<&[Decorator<'_>]>, start: u32) -> u32 {
 /// The parts of a function the walk reads, from any of its node shapes.
 struct FunctionView<'n, 'a> {
     type_parameters: Option<&'n TSTypeParameterDeclaration<'a>>,
-    params: &'n [Expression<'n>],
+    params: &'n [Expression<'a>],
     /// The parameter list's `(`; `None` for a bare arrow parameter (`x => x`).
     params_open: Option<u32>,
     return_type: Option<&'n TSTypeAnnotation<'a>>,
@@ -2009,14 +1974,14 @@ struct FunctionView<'n, 'a> {
 
 enum FunctionBody<'n, 'a> {
     Block(&'n BlockStatement<'a>),
-    Expression(&'n Expression<'n>),
+    Expression(&'n Expression<'a>),
 }
 
 impl<'n, 'a> FunctionView<'n, 'a> {
-    fn declaration(view: ExprView<'n>, func: &'n FunctionDeclaration<'a>) -> Self {
+    fn declaration(func: &'n FunctionDeclaration<'a>) -> Self {
         Self {
             type_parameters: func.type_parameters.as_ref(),
-            params: view.run(func.params),
+            params: func.params,
             params_open: Some(func.params_start),
             return_type: func.return_type.as_ref(),
             body: FunctionBody::Block(&func.body),
@@ -2024,10 +1989,10 @@ impl<'n, 'a> FunctionView<'n, 'a> {
         }
     }
 
-    fn expression(view: ExprView<'n>, func: &'n FunctionExpression<'a>) -> Self {
+    fn expression(func: &'n FunctionExpression<'a>) -> Self {
         Self {
             type_parameters: func.type_parameters.as_ref(),
-            params: view.run(func.params),
+            params: func.params,
             params_open: Some(func.params_start),
             return_type: func.return_type.as_ref(),
             body: FunctionBody::Block(&func.body),
@@ -2035,14 +2000,14 @@ impl<'n, 'a> FunctionView<'n, 'a> {
         }
     }
 
-    fn arrow(view: ExprView<'n>, arrow: &'n ArrowFunctionExpression<'a>) -> Self {
+    fn arrow(arrow: &'n ArrowFunctionExpression<'a>) -> Self {
         Self {
             type_parameters: arrow.type_parameters.as_ref(),
-            params: view.run(arrow.params),
+            params: arrow.params,
             params_open: arrow.params_start,
             return_type: arrow.return_type.as_ref(),
             body: match &arrow.body {
-                ArrowFunctionBody::Expression(body) => FunctionBody::Expression(view.expr(*body)),
+                ArrowFunctionBody::Expression(body) => FunctionBody::Expression(body),
                 ArrowFunctionBody::BlockStatement(block) => FunctionBody::Block(block),
             },
             arrow: true,
@@ -2055,31 +2020,31 @@ struct ClassView<'n, 'a> {
     decorators: Option<&'a [Decorator<'a>]>,
     r#abstract: bool,
     type_parameters: Option<&'n TSTypeParameterDeclaration<'a>>,
-    super_class: Option<&'n Expression<'n>>,
+    super_class: Option<&'a Expression<'a>>,
     super_type_parameters: Option<&'n TSTypeParameterInstantiation<'a>>,
     implements: &'a [TSInterfaceHeritage<'a>],
     body: &'n ClassBody<'a>,
 }
 
 impl<'n, 'a> ClassView<'n, 'a> {
-    fn declaration(view: ExprView<'n>, class: &'n ClassDeclaration<'a>) -> Self {
+    fn declaration(class: &'n ClassDeclaration<'a>) -> Self {
         Self {
             decorators: class.decorators,
             r#abstract: class.r#abstract,
             type_parameters: class.type_parameters.as_ref(),
-            super_class: view.opt(class.super_class),
+            super_class: class.super_class,
             super_type_parameters: class.super_type_parameters.as_ref(),
             implements: class.implements,
             body: &class.body,
         }
     }
 
-    fn expression(view: ExprView<'n>, class: &'n ClassExpression<'a>) -> Self {
+    fn expression(class: &'n ClassExpression<'a>) -> Self {
         Self {
             decorators: class.decorators,
             r#abstract: class.r#abstract,
             type_parameters: class.type_parameters.as_ref(),
-            super_class: view.opt(class.super_class),
+            super_class: class.super_class,
             super_type_parameters: class.super_type_parameters.as_ref(),
             implements: class.implements,
             body: &class.body,
@@ -2090,41 +2055,31 @@ impl<'n, 'a> ClassView<'n, 'a> {
 /// How expression `e` ends when it closes a statement or field ending at `end`
 /// (`Walk::open`). Its rightmost operand decides — unless a paren the parser stripped closes
 /// it (its span ends short of `end`), which any continuation extends.
-fn expression_tail(view: ExprView<'_>, e: &Expression<'_>, end: u32) -> Tail {
+fn expression_tail(e: &Expression<'_>, end: u32) -> Tail {
     if e.span.end != end {
         return Tail::Open;
     }
     match &e.kind {
         ExpressionKind::UpdateExpression(update) if !update.prefix => Tail::Operand,
-        ExpressionKind::UpdateExpression(update) => {
-            expression_tail(view, view.expr(update.argument), end)
-        }
-        ExpressionKind::YieldExpression(e) => e.argument.map_or(Tail::Closed, |argument| {
-            expression_tail(view, view.expr(argument), end)
-        }),
+        ExpressionKind::UpdateExpression(update) => expression_tail(update.argument, end),
+        ExpressionKind::YieldExpression(e) => e
+            .argument
+            .map_or(Tail::Closed, |argument| expression_tail(argument, end)),
         ExpressionKind::ArrowFunctionExpression(arrow) => match &arrow.body {
-            ArrowFunctionBody::Expression(body) => expression_tail(view, view.expr(*body), end),
+            ArrowFunctionBody::Expression(body) => expression_tail(body, end),
             ArrowFunctionBody::BlockStatement(_) => Tail::Closed,
         },
-        ExpressionKind::BinaryExpression(binary) => {
-            expression_tail(view, view.expr(binary.right), end)
-        }
-        ExpressionKind::AssignmentExpression(assignment) => {
-            expression_tail(view, view.expr(assignment.right), end)
-        }
+        ExpressionKind::BinaryExpression(binary) => expression_tail(binary.right, end),
+        ExpressionKind::AssignmentExpression(assignment) => expression_tail(assignment.right, end),
         ExpressionKind::ConditionalExpression(conditional) => {
-            expression_tail(view, view.expr(conditional.alternate), end)
+            expression_tail(conditional.alternate, end)
         }
-        ExpressionKind::SequenceExpression(sequence) => view
-            .list(sequence.expressions)
+        ExpressionKind::SequenceExpression(sequence) => sequence
+            .expressions
             .last()
-            .map_or(Tail::Open, |last| {
-                expression_tail(view, view.expr(*last), end)
-            }),
-        ExpressionKind::UnaryExpression(unary) => {
-            expression_tail(view, view.expr(unary.argument), end)
-        }
-        ExpressionKind::AwaitExpression(e) => expression_tail(view, view.expr(e.argument), end),
+            .map_or(Tail::Open, |last| expression_tail(last, end)),
+        ExpressionKind::UnaryExpression(unary) => expression_tail(unary.argument, end),
+        ExpressionKind::AwaitExpression(e) => expression_tail(e.argument, end),
         // every other expression ends in a token a next line extends — the safe default,
         // which at worst writes a `;` the program does not need
         _ => Tail::Open,

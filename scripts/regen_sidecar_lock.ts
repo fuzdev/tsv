@@ -15,9 +15,8 @@
  *      OTHER package that moved with it is the oracle shifting under you;
  *   2. update `LOCKED_TRANSITIVE` in `scripts/check_canonical_pins.ts` if a
  *      pinned transitive version changed;
- *   3. re-run `deno task pins:audit`. `deno task compile:fixtures:validate`
- *      (oracle freshness) does not run while `tsv_svelte_compile` is outside
- *      the workspace build.
+ *   3. re-run `deno task compile:fixtures:validate` (oracle freshness) and
+ *      `deno task pins:audit`.
  *
  * Generation happens in a scratch directory rather than in place: `deno cache`
  * writes the lock next to its config, and a stray `deno.json`/`deno.lock` inside
@@ -119,8 +118,8 @@ const regenerate = (dir: string): number => {
 	}
 	Deno.writeTextFileSync(LOCK_PATH, generated);
 	console.log(
-		`wrote ${LOCK_PATH} — diff it, then re-run \`deno task pins:audit\` ` +
-			'(`compile:fixtures:validate` does not run while tsv_svelte_compile is outside the workspace build)'
+		`wrote ${LOCK_PATH} — diff it, then re-run \`deno task pins:audit\` and ` +
+			'`deno task compile:fixtures:validate`'
 	);
 	return 0;
 };

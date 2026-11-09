@@ -2,7 +2,6 @@
 //! reprinted through `tsv_ts::__private::format_canonical`, which (unlike the intent-preserving
 //! format entry points) does not require CR-folded text. A CRLF component must compile
 //! — or refuse — in a debug build, never trip the format path's CR-folded-text check.
-#![cfg(tsv_unported)]
 
 use tsv_svelte_compile::{CompileOptions, compile};
 

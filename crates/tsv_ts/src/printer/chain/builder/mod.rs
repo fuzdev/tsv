@@ -14,7 +14,6 @@ mod expansion;
 mod helpers;
 mod member_only;
 
-use crate::ast::ExprView;
 use std::iter;
 
 use expansion::{
@@ -76,10 +75,9 @@ fn call_has_breaking_single_arg(call: &CallExpression<'_>, printer: &Printer<'_>
         return false;
     }
     let d = printer.arena();
-    match &printer.view.expr(printer.view.list(call.arguments)[0]).kind {
+    match &call.arguments[0].kind {
         ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_) => {
-            let arg_doc = printer
-                .build_expression_doc(printer.view.expr(printer.view.list(call.arguments)[0]));
+            let arg_doc = printer.build_expression_doc(call.arguments[0]);
             d.will_break(arg_doc)
         }
         // Object/array-body arrows (typed or not) are expandable per prettier's
@@ -329,8 +327,7 @@ fn should_force_chain_expand<'a>(
 
     has_blank_lines_between
         || has_forcing_comments
-        || (call_nodes().count() > 2
-            && call_nodes().any(|node| call_has_complex_args(printer.view, node)))
+        || (call_nodes().count() > 2 && call_nodes().any(call_has_complex_args))
 }
 
 /// Build doc for short chains (groups.len() <= cutoff)
@@ -718,13 +715,7 @@ pub(crate) fn call_prints_as_member_chain(
     printer: &Printer<'_>,
 ) -> bool {
     let mut nodes = ChainNodeVec::new();
-    let _ = linearize_chain_from_call_into(
-        printer.view,
-        call,
-        span,
-        printer.linearize_input(),
-        &mut nodes,
-    );
+    let _ = linearize_chain_from_call_into(call, span, printer.linearize_input(), &mut nodes);
     let groups = group_chain_nodes(&nodes, printer);
     groups_exceed_cutoff(&groups, false, printer)
 }
@@ -768,7 +759,7 @@ pub(super) fn mark_long_curried_calls(nodes: &mut [ChainNode<'_>], printer: &Pri
                 },
                 ChainNode::Call { call: outer, .. },
             ) if !outer.arguments.is_empty() && call.arguments.len() > outer.arguments.len() => {
-                !(facts.own_call_layout && is_memberish(printer.view.expr(call.callee)))
+                !(facts.own_call_layout && is_memberish(call.callee))
                     || curried_callee_chain_is_short(&nodes[..i], span.end, printer)
             }
             _ => continue,
@@ -947,8 +938,8 @@ fn build_long_chain_doc<'a>(
         .and_then(|g| g.nodes.last())
         .is_some_and(ChainNode::is_call)
         && on_line.last().is_some_and(|&doc| d.will_break(doc));
-    let force_expand_from_refusal = last_group_breaking_call
-        && other_calls_have_function_arguments(printer.view, first_groups, rest_groups);
+    let force_expand_from_refusal =
+        last_group_breaking_call && other_calls_have_function_arguments(first_groups, rest_groups);
 
     // Build expanded variant
     let expanded = build_expanded_doc(groups, should_merge, printer);
@@ -1044,15 +1035,14 @@ fn build_return_hug_state<'a>(
         .iter()
         .rev()
         .find_map(ChainNode::as_call_expression)?;
-    let [_, .., last] = printer.view.list(call.arguments) else {
+    let [_, .., last] = call.arguments else {
         return None;
     };
-    function_return_hug_break(printer, printer.view.expr(*last))?;
+    function_return_hug_break(printer, last)?;
     let (last_group, prefix) = rest_groups.split_last()?;
-    let outer = printer.force_assumed_param_hug.replace(Some((
-        printer.view.expr(*last).span.start,
-        AssumedHugKind::ReturnType,
-    )));
+    let outer = printer
+        .force_assumed_param_hug
+        .replace(Some((last.span.start, AssumedHugKind::ReturnType)));
     let last_doc = print_group(last_group, printer);
     let taken = printer.force_assumed_param_hug.replace(outer).is_none();
     if !taken {
@@ -1128,20 +1118,19 @@ fn build_breaking_object_chain_doc<'a>(
     // would accumulate the properties' width and overflow before ever reaching the
     // break. This state's `group_break`-wrapped last group restores exactly that
     // truncation. Other callbacks (block bodies, non-object bodies) stay excluded.
-    let last_group_will_break_object = last_group_single_argument(printer.view, rest_groups)
-        .is_some_and(|arg| {
-            (matches!(
-                arg.kind,
-                ExpressionKind::ObjectExpression(_)
-                    | ExpressionKind::ArrayExpression(_)
-                    | ExpressionKind::NewExpression(_)
-                    | ExpressionKind::CallExpression(_)
-            ) || is_arrow_with_paren_object_body(printer.view, arg))
-                && d.will_break(printer.chain_shared_doc(
-                    printer.chain_share_key(arg, ShareTag::ChainBreakProbe),
-                    || printer.build_expression_doc(arg),
-                ))
-        });
+    let last_group_will_break_object = last_group_single_argument(rest_groups).is_some_and(|arg| {
+        (matches!(
+            arg.kind,
+            ExpressionKind::ObjectExpression(_)
+                | ExpressionKind::ArrayExpression(_)
+                | ExpressionKind::NewExpression(_)
+                | ExpressionKind::CallExpression(_)
+        ) || is_arrow_with_paren_object_body(arg))
+            && d.will_break(printer.chain_shared_doc(
+                printer.chain_share_key(arg, ShareTag::ChainBreakProbe),
+                || printer.build_expression_doc(arg),
+            ))
+    });
 
     if !last_group_will_break_object {
         return None;
@@ -1233,16 +1222,16 @@ fn build_flat_object_hug_state<'a>(
     if d.will_break(probe) {
         return None;
     }
-    let arg = last_group_single_argument(printer.view, rest_groups)?;
+    let arg = last_group_single_argument(rest_groups)?;
     // TODO: widen to a `new`/call wrapper whose own last argument is an object —
     // the settled form there is the args-expanded shape, not this hug state, so it
     // needs a second state rather than a wider kind test (`last_arg_wrapped_object`).
     let object_rooted = matches!(arg.kind, ExpressionKind::ObjectExpression(_))
-        || is_arrow_with_paren_object_body(printer.view, arg);
+        || is_arrow_with_paren_object_body(arg);
     if !object_rooted {
         return None;
     }
-    if other_calls_have_function_arguments(printer.view, first_groups, rest_groups) {
+    if other_calls_have_function_arguments(first_groups, rest_groups) {
         return None;
     }
     let contents = build_prefix_flat_last_expanded_doc(first_groups, rest_groups, printer);
@@ -1285,19 +1274,16 @@ fn build_assumed_param_hug_state<'a>(
         .iter()
         .rev()
         .find_map(ChainNode::as_call_expression)?;
-    let callback = |arg: &crate::ast::ExprEdge<'_>| {
-        flat_sole_param_literal(printer, printer.view.expr(*arg)).is_some()
-    };
-    let (arg, separator) = match printer.view.list(call.arguments) {
+    let callback = |arg: &&Expression<'_>| flat_sole_param_literal(printer, arg).is_some();
+    let (arg, separator) = match call.arguments {
         [.., last] if callback(last) => (*last, None),
         [first, _] if callback(first) => (*first, Some(d.text(","))),
         _ => return None,
     };
     let (last, prefix) = rest_groups.split_last()?;
-    let outer = printer.force_assumed_param_hug.replace(Some((
-        printer.view.expr(arg).span.start,
-        AssumedHugKind::ParamLiteral,
-    )));
+    let outer = printer
+        .force_assumed_param_hug
+        .replace(Some((arg.span.start, AssumedHugKind::ParamLiteral)));
     let last_doc = print_group(last, printer);
     let taken = printer.force_assumed_param_hug.replace(outer).is_none();
     if !taken {
@@ -1311,16 +1297,13 @@ fn build_assumed_param_hug_state<'a>(
     // to its `{`. The body is a chain-share hit.
     let flattens_params = separator.is_none() && call.arguments.len() > 1;
     let ends_at_return_type = flattens_params
-        && flat_sole_param_literal(printer, printer.view.expr(arg))
-            .is_some_and(|flat| flat.return_break.is_some());
+        && flat_sole_param_literal(printer, arg).is_some_and(|flat| flat.return_break.is_some());
     let printed = match ends_at_return_type
-        .then(|| AssumedParamHug::new(printer, printer.view.expr(arg)))
+        .then(|| AssumedParamHug::new(printer, arg))
         .flatten()
     {
-        Some(hug) => hug.gate_line(printer, true, || {
-            printer.build_arg_expression_doc(printer.view.expr(arg))
-        }),
-        None => printer.build_arg_expression_doc(printer.view.expr(arg)),
+        Some(hug) => hug.gate_line(printer, true, || printer.build_arg_expression_doc(arg)),
+        None => printer.build_arg_expression_doc(arg),
     };
     let line = match separator {
         Some(separator) => d.concat(&[printed, separator]),
@@ -1371,9 +1354,7 @@ fn build_arrow_comment_line_state<'a>(
         ChainNode::Call { call, span, .. } => Some((*call, *span)),
         _ => None,
     })?;
-    let arg = printer
-        .view
-        .expr(*printer.view.list(call.arguments).last()?);
+    let arg = *call.arguments.last()?;
     let ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind else {
         return None;
     };
@@ -1381,22 +1362,22 @@ fn build_arrow_comment_line_state<'a>(
         return None;
     };
     if matches!(
-        printer.view.expr(*body).kind,
+        body.kind,
         ExpressionKind::ObjectExpression(_)
             | ExpressionKind::ArrayExpression(_)
             | ExpressionKind::ArrowFunctionExpression(_)
     ) {
         return None;
     }
-    let comment = printer.arrow_gap_glued_block_comment(arrow, printer.view.expr(*body))?;
+    let comment = printer.arrow_gap_glued_block_comment(arrow, body)?;
     // The gap's comment is the only one the last call's arguments hold — from its callee's
     // end to its `)`, so a comment ahead of the first argument or trailing the body counts
     // too — and no other comment rule decides the layout beside it.
     if printer
-        .comments_on_page_between(printer.view.expr(call.callee).span().end, call_span.end)
+        .comments_on_page_between(call.callee.span().end, call_span.end)
         .nth(1)
         .is_some()
-        || other_calls_have_function_arguments(printer.view, first_groups, rest_groups)
+        || other_calls_have_function_arguments(first_groups, rest_groups)
     {
         return None;
     }
@@ -1405,7 +1386,7 @@ fn build_arrow_comment_line_state<'a>(
     });
     let mut parts: DocBuf = prefix_flat.iter().copied().collect();
     parts.push(last_assumed);
-    let probe = if arrow_body_hugs_call_parens(printer.view, printer.view.expr(*body)) {
+    let probe = if arrow_body_hugs_call_parens(body) {
         last_flat
     } else {
         d.line_probe(1, printer.build_arg_expression_doc(arg))
@@ -1471,7 +1452,7 @@ fn build_type_arg_hug_state<'a>(
                 _ => None,
             })?;
     let assumed = printer.sole_type_arg_hug_break(type_args)?;
-    if other_calls_have_function_arguments(printer.view, first_groups, rest_groups) {
+    if other_calls_have_function_arguments(first_groups, rest_groups) {
         return None;
     }
     let last_assumed = printer.with_assumed_break(assumed, || print_group(last, printer));
@@ -1512,18 +1493,15 @@ fn build_type_arg_hug_state<'a>(
 /// once because the two hug-state builders ask it of the same group and must not
 /// drift: one reading the last call and the other the last node would let a shape
 /// into one state that the other's gate had already refused.
-fn last_group_single_argument<'a>(
-    view: ExprView<'a>,
-    rest_groups: &[ChainGroup<'a>],
-) -> Option<&'a Expression<'a>> {
+fn last_group_single_argument<'a>(rest_groups: &[ChainGroup<'a>]) -> Option<&'a Expression<'a>> {
     let call = rest_groups
         .last()?
         .nodes
         .iter()
         .rev()
         .find_map(ChainNode::as_call_expression)?;
-    match view.list(call.arguments) {
-        [arg] => Some(view.expr(*arg)),
+    match call.arguments {
+        [arg] => Some(arg),
         _ => None,
     }
 }
@@ -1531,13 +1509,13 @@ fn last_group_single_argument<'a>(
 /// An arrow whose grammar-parenthesized expression body is an object literal —
 /// the `.map((item) => ({ … }))` shape, the arrow spelling of the object-rooted
 /// kind set.
-fn is_arrow_with_paren_object_body(view: ExprView<'_>, arg: &Expression<'_>) -> bool {
+fn is_arrow_with_paren_object_body(arg: &Expression<'_>) -> bool {
     matches!(
         &arg.kind,
         ExpressionKind::ArrowFunctionExpression(arrow) if matches!(
             &arrow.body,
             ArrowFunctionBody::Expression(body)
-                if matches!(view.expr(*body).kind, ExpressionKind::ObjectExpression(_))
+                if matches!(body.kind, ExpressionKind::ObjectExpression(_))
         )
     )
 }
@@ -1550,14 +1528,13 @@ fn is_arrow_with_paren_object_body(view: ExprView<'_>, arg: &Expression<'_>) -> 
 /// chain's hot path — the same reason `should_force_chain_expand` iterates its call
 /// nodes in place.
 fn other_calls_have_function_arguments<'a>(
-    view: ExprView<'_>,
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
 ) -> bool {
     let takes_function_argument = |call: &CallExpression<'_>| {
-        view.list(call.arguments).iter().any(|a| {
+        call.arguments.iter().any(|a| {
             matches!(
-                view.expr(*a).kind,
+                a.kind,
                 ExpressionKind::FunctionExpression(_) | ExpressionKind::ArrowFunctionExpression(_)
             )
         })

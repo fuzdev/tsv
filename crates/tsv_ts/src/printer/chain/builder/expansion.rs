@@ -5,7 +5,6 @@
 // - Comment-forced expansion
 // - Complex argument detection
 
-use crate::ast::ExprView;
 use crate::printer::calls::arg_predicates::is_simple_call_argument;
 
 use super::super::printing::{chain_gap_share_any, node_comment_gap};
@@ -211,14 +210,14 @@ fn trailing_member_gap_line_comment<'a>(
 ///
 /// Uses Prettier's `isSimpleCallArgument` logic (inverted) to determine
 /// if a 3+ call chain should force break.
-pub(super) fn call_has_complex_args<'a>(view: ExprView<'_>, node: &ChainNode<'a>) -> bool {
+pub(super) fn call_has_complex_args<'a>(node: &ChainNode<'a>) -> bool {
     let Some(call) = node.as_call_expression() else {
         return false;
     };
     // Check if any argument is NOT simple (using Prettier's depth-limited check)
-    view.list(call.arguments)
+    call.arguments
         .iter()
-        .any(|arg| !is_simple_call_argument(view, view.expr(*arg), 2))
+        .any(|arg| !is_simple_call_argument(arg, 2))
 }
 
 /// Check if chain ends with member access (not a call)

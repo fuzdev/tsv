@@ -3,10 +3,9 @@
 //! Contains object patterns, array patterns, assignment patterns,
 //! and rest elements for destructuring declarations and assignments.
 
-use crate::ast::ExprView;
 use tsv_lang::Span;
 
-use super::{Decorator, ExprEdge, PatternElements, Property, TSTypeAnnotation};
+use super::{Decorator, Expression, Property, TSTypeAnnotation};
 
 /// Object pattern for destructuring: `{a, b}`, `{a: x, b: y}`, `{...rest}`
 ///
@@ -59,9 +58,9 @@ impl<'arena> ObjectPatternProperty<'arena> {
     /// own only in the *valid* spelling, and the permissively parsed `{ a = 1 }` — the
     /// literal shape of this very binding — is exactly where the key anchor cost it that
     /// comment.
-    pub fn value_end(&self, view: ExprView<'_>) -> u32 {
+    pub fn value_end(&self) -> u32 {
         match self {
-            ObjectPatternProperty::Property(p) => view.expr(p.value).printed_end(view),
+            ObjectPatternProperty::Property(p) => p.value.printed_end(),
             // The rest element's own end: its stripped-paren interior is its doc's share.
             ObjectPatternProperty::RestElement(r) => r.span.end,
         }
@@ -70,9 +69,9 @@ impl<'arena> ObjectPatternProperty<'arena> {
     /// The rest element's stripped-paren interior ([`RestElement::paren_interior`]), if this
     /// property is the rest — the pattern counterpart of
     /// [`super::ObjectProperty::paren_interior`].
-    pub fn paren_interior(&self, view: ExprView<'_>) -> Option<Span> {
+    pub fn paren_interior(&self) -> Option<Span> {
         match self {
-            ObjectPatternProperty::RestElement(r) => Some(r.paren_interior(view)),
+            ObjectPatternProperty::RestElement(r) => Some(r.paren_interior()),
             ObjectPatternProperty::Property(_) => None,
         }
     }
@@ -93,7 +92,7 @@ impl<'arena> ObjectPatternProperty<'arena> {
 #[derive(Debug, Clone)]
 pub struct ArrayPattern<'arena> {
     /// Elements are Option to support holes like `[a, , b]`
-    pub elements: PatternElements<'arena>,
+    pub elements: &'arena [Option<Expression<'arena>>],
     /// Optional destructuring-pattern parameter (`[a]?`). Only ever set in a
     /// parameter position; the `?` extends the expression's span and precedes `type_annotation`.
     pub optional: bool,
@@ -114,9 +113,9 @@ pub struct ArrayPattern<'arena> {
 #[derive(Debug, Clone)]
 pub struct AssignmentPattern<'arena> {
     /// The binding (identifier or nested pattern)
-    pub left: ExprEdge<'arena>,
+    pub left: &'arena Expression<'arena>,
     /// The default value expression
-    pub right: ExprEdge<'arena>,
+    pub right: &'arena Expression<'arena>,
     /// Parameter decorators (`@dec a = 1`, `@dec { a } = {}`). Only set in a
     /// parameter position; emitted last in the wire — acorn attaches a decorated
     /// default parameter's decorators to the `AssignmentPattern`, not its `left`.
@@ -131,7 +130,7 @@ pub struct AssignmentPattern<'arena> {
 #[derive(Debug, Clone)]
 pub struct RestElement<'arena> {
     /// The binding for the rest (typically an identifier)
-    pub argument: ExprEdge<'arena>,
+    pub argument: &'arena Expression<'arena>,
     /// Optional rest parameter (`...a?`). Only ever set in a parameter position;
     /// the `?` extends `span` and precedes `type_annotation`. `...a?` is invalid
     /// TypeScript (tsc TS1047, a *deferred* grammar-check like TS1051 `set x(a?)`),
@@ -154,8 +153,8 @@ impl RestElement<'_> {
     ///
     /// Empty for a rest carrying a `?` marker or a `: T` annotation: that tail is what
     /// extends its span there, and its gaps are the tail emitter's, never an interior.
-    pub fn paren_interior(&self, view: ExprView<'_>) -> Span {
-        let arg_end = view.expr(self.argument).span().end;
+    pub fn paren_interior(&self) -> Span {
+        let arg_end = self.argument.span().end;
         if self.optional || self.type_annotation.is_some() {
             Span::new(arg_end, arg_end)
         } else {

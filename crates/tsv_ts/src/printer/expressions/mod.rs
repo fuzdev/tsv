@@ -464,13 +464,13 @@ impl<'a> Printer<'a> {
                 self.build_ts_type_assertion_doc(type_assert, expr.span)
             }
             ExpressionKind::TSAsExpression(as_expr) => self.build_binary_cast_doc(
-                self.view.expr(as_expr.expression),
+                as_expr.expression,
                 as_expr.type_annotation,
                 "as",
                 expr.span.start,
             ),
             ExpressionKind::TSSatisfiesExpression(sat_expr) => self.build_binary_cast_doc(
-                self.view.expr(sat_expr.expression),
+                sat_expr.expression,
                 sat_expr.type_annotation,
                 "satisfies",
                 expr.span.start,
@@ -500,7 +500,7 @@ impl<'a> Printer<'a> {
             // pair printed through here drops every paren its position needed.
             ExpressionKind::ParenthesizedExpression(paren) => {
                 self.is_expression_statement.set(was_expr_stmt);
-                self.build_expression_doc(paren.unreachable_contents(self.view))
+                self.build_expression_doc(paren.unreachable_contents())
             }
         }
     }
@@ -621,7 +621,6 @@ impl<'a> Printer<'a> {
         cast: &crate::ast::CommentBoundPair<'_>,
         cast_span: Span,
     ) -> DocId {
-        let inner = self.view.expr(cast.inner);
         let d = self.d();
         let open = cast_span.start; // the `(`
         // Built BEFORE the inner, and that ordering is the reason it is a call and not a
@@ -638,7 +637,7 @@ impl<'a> Printer<'a> {
         // (`paren_interior_routed_inner`), and it is what keeps the shell's own comments
         // with the shell's emitters below. Prettier agrees on both the scope and the
         // preserved parens here.
-        let frozen_inner = self.gap_frozen_span(open + 1, inner.span());
+        let frozen_inner = self.gap_frozen_span(open + 1, cast.inner.span());
         // A sequence inner rides this pair BARE (below), and the bare builder scans neither
         // edge of its operand run: the leading edge — the `(` the parser stripped from the
         // first operand and any comment inside it — and the gap past the last operand are
@@ -648,14 +647,14 @@ impl<'a> Printer<'a> {
         // ⚠️ Only for the UNFROZEN sequence: a frozen slice is the inner's whole span,
         // shells and their comments included, so the edges there are the span's own —
         // scanned from the operand run, a shell comment printed twice.
-        let (lead_end, trail_start) = match (inner, frozen_inner) {
+        let (lead_end, trail_start) = match (cast.inner, frozen_inner) {
             (
                 Expression {
                     kind: ExpressionKind::SequenceExpression(seq),
                     ..
                 },
                 None,
-            ) => operators::sequence_operand_run(self.view, seq),
+            ) => operators::sequence_operand_run(seq),
             // Any other unfrozen inner: the interior run opens where the inner's PRINTED
             // content ends ([`Printer::pair_trailing_gap_start`]), so a comment written last in
             // a stripped shell down its right spine prints inside this pair, ahead of a run
@@ -663,11 +662,14 @@ impl<'a> Printer<'a> {
             // claimed from the inner's own trailing emitters, which deferred it past the `)`.
             // The pair always prints, so a lone such comment stays inside it too — where the
             // bare spelling and prettier's own fixed point keep it.
-            (_, None) => (inner.span().start, self.pair_trailing_gap_start(inner)),
-            (_, Some(_)) => (inner.span().start, inner.span().end),
+            (_, None) => (
+                cast.inner.span().start,
+                self.pair_trailing_gap_start(cast.inner),
+            ),
+            (_, Some(_)) => (cast.inner.span().start, cast.inner.span().end),
         };
         let inner_doc = frozen_inner.map_or_else(
-            || match &inner.kind {
+            || match &cast.inner.kind {
                 // A sequence self-parenthesizes at every other position; here the cast's
                 // pair IS its required pair, so it rides that one bare — the same rule the
                 // restricted productions' hanging pair takes (`build_sequence_doc_bare`).
@@ -675,16 +677,16 @@ impl<'a> Printer<'a> {
                 // reparse then read a cast around a redundant shell
                 // (`jsdoc_type_cast_sequence`).
                 ExpressionKind::SequenceExpression(seq) => {
-                    self.build_sequence_doc_bare(seq, inner.span, trail_start)
+                    self.build_sequence_doc_bare(seq, cast.inner.span, trail_start)
                 }
-                _ => self.with_claimed_right_spine_run(trail_start, inner.span().end, || {
-                    self.build_expression_doc(inner)
+                _ => self.with_claimed_right_spine_run(trail_start, cast.inner.span().end, || {
+                    self.build_expression_doc(cast.inner)
                 }),
             },
             // Built bare, like the ordinary arm: the cast's parens already group it. The
             // owned-comment claim still applies — a block glued before the inner rides
             // inside its doc, which the slice replaces.
-            |frozen| self.build_frozen_expression_doc(inner, frozen),
+            |frozen| self.build_frozen_expression_doc(cast.inner, frozen),
         );
 
         let with_lead = |paren_doc: DocId| d.concat(&[lead, paren_doc]);
@@ -758,7 +760,7 @@ impl<'a> Printer<'a> {
 
         // Object/array literals hug the parens; the inner's own group breaks it.
         if matches!(
-            inner.kind,
+            cast.inner.kind,
             ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_)
         ) {
             with_lead(d.concat(&[d.text("("), body, d.text(")")]))
@@ -916,10 +918,11 @@ impl<'a> Printer<'a> {
         type_assert: &crate::ast::TSTypeAssertion<'_>,
         type_assert_span: Span,
     ) -> DocId {
-        let expression = self.view.expr(type_assert.expression);
         let d = self.d();
-        let expr_needs_parens =
-            self.needs_parens_at_operand_end(expression, ParenContext::AngleBracketAssertion);
+        let expr_needs_parens = self.needs_parens_at_operand_end(
+            type_assert.expression,
+            ParenContext::AngleBracketAssertion,
+        );
         // Cast boundary positions: `<` … type … `>` … expression. The `>` is found
         // past any comment that itself contains a `>` (`<T /* > */>`).
         let open_pos = type_assert_span.start; // the `<`
@@ -938,7 +941,7 @@ impl<'a> Printer<'a> {
         let head = self.keyword_value_head(angle_end, type_assert.type_annotation);
         let type_start = head.value_start;
         let type_end = type_assert.type_annotation.span().end;
-        let expr_start = expression.span().start;
+        let expr_start = type_assert.expression.span().start;
         let close_angle = self.find_assertion_close_angle(type_end, expr_start);
         let type_doc = self.build_keyword_value_doc_with(&head, TrailingBlock::Inline, |value| {
             self.build_type_doc(value)
@@ -1013,7 +1016,7 @@ impl<'a> Printer<'a> {
         // retention is the comment's doing (`build_paren_operand_comment_doc` → `None`).
         // See conformance_prettier_ts_comments.md §Comment relocation
         // (Angle-bracket assertion operand shell).
-        let operand_gap_start = expression.span().end;
+        let operand_gap_start = type_assert.expression.span().end;
         let operand_gap_end = type_assert_span.end;
         let retains_shell = self.has_comments_to_emit_between(operand_gap_start, operand_gap_end);
 
@@ -1023,9 +1026,9 @@ impl<'a> Printer<'a> {
         // now being printed around them.
         let build_inner = || {
             if retains_shell {
-                self.build_expression_doc_with_indent_on_break(expression)
+                self.build_expression_doc_with_indent_on_break(type_assert.expression)
             } else {
-                self.build_expression_doc(expression)
+                self.build_expression_doc(type_assert.expression)
             }
         };
         // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
@@ -1035,12 +1038,12 @@ impl<'a> Printer<'a> {
         // `retains_shell` branch prints, so a claim taken only for `expr_needs_parens`
         // would miss `<T>(/* c⏎d */ b + c + d /* t */)`.
         let inner_expr = if retains_shell || expr_needs_parens {
-            self.build_value_with_outermost_owned_comment(expression, build_inner)
+            self.build_value_with_outermost_owned_comment(type_assert.expression, build_inner)
         } else {
             build_inner()
         };
         let expr_doc = if expr_needs_parens {
-            self.build_operand_pair_doc(expression, inner_expr)
+            self.build_operand_pair_doc(type_assert.expression, inner_expr)
         } else {
             inner_expr
         };
@@ -1115,7 +1118,7 @@ impl<'a> Printer<'a> {
         // (they expand themselves), everything else may break the expression into
         // its own parenthesized block before the cast group itself breaks.
         let should_break_after_cast = !matches!(
-            expression.kind,
+            type_assert.expression.kind,
             ExpressionKind::ArrayExpression(_) | ExpressionKind::ObjectExpression(_)
         );
 
@@ -1561,7 +1564,6 @@ impl<'a> Printer<'a> {
         inst_expr: &crate::ast::TSInstantiationExpression<'_>,
         span: Span,
     ) -> DocId {
-        let expression = self.view.expr(inst_expr.expression);
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
         // The shared operand-shell seam also emits the `^`→expression gap — the
@@ -1569,17 +1571,17 @@ impl<'a> Printer<'a> {
         // sealed chain (`(a?.b)!<T>`) is the sealed shell's own builder; every other
         // operand asks the position, through the context the left-spine walk reads too
         // ([`Self::instantiation_operand_prints_pair`]).
-        let operand_doc = match self.build_sealed_non_null_paren_doc(expression) {
+        let operand_doc = match self.build_sealed_non_null_paren_doc(inst_expr.expression) {
             Some(sealed_doc) => sealed_doc,
             None => self.build_shell_operand_doc(
                 span.start,
-                expression,
+                inst_expr.expression,
                 self.instantiation_operand_context(inst_expr, span),
             ),
         };
         parts.push(operand_doc);
         // Preserve comments between expression and type args: `fn/* c */ <string>`
-        let expr_end = expression.span().end;
+        let expr_end = inst_expr.expression.span().end;
         let ta_start = inst_expr.type_arguments.span.start;
         if let Some(doc) = self.build_name_to_type_params_comments_opt(
             expr_end,
@@ -1606,7 +1608,7 @@ impl<'a> Printer<'a> {
         span: Span,
     ) -> bool {
         self.needs_parens(
-            self.view.expr(inst_expr.expression),
+            inst_expr.expression,
             self.instantiation_operand_context(inst_expr, span),
         )
     }
@@ -1621,15 +1623,9 @@ impl<'a> Printer<'a> {
         inst_expr: &crate::ast::TSInstantiationExpression<'_>,
         span: Span,
     ) -> ParenContext {
-        let second_list_pair = self.instantiation_keeps_pair(
-            self.view.expr(inst_expr.expression),
-            SecondTypeArgs::Expression,
-        );
-        let sealed = instantiation_operand_is_sealed_chain(
-            self.view,
-            span.start,
-            self.view.expr(inst_expr.expression),
-        );
+        let second_list_pair =
+            self.instantiation_keeps_pair(inst_expr.expression, SecondTypeArgs::Expression);
+        let sealed = instantiation_operand_is_sealed_chain(span.start, inst_expr.expression);
         ParenContext::InstantiationExpression {
             source_pair: second_list_pair || sealed,
         }
@@ -1648,7 +1644,6 @@ impl<'a> Printer<'a> {
         non_null_expr: &crate::ast::TSNonNullExpression<'_>,
         span: Span,
     ) -> DocId {
-        let expression = self.view.expr(non_null_expr.expression);
         let d = self.d();
         // A comment that SPANS A LINE in the operand→`!` gap RETAINS the shell, even where
         // the parens are otherwise redundant. A `//` deferred instead is carried out of its
@@ -1660,8 +1655,11 @@ impl<'a> Printer<'a> {
         // `[no LineTerminator here]` (`(x /* a⏎b */)!` → `x /* a⏎b */!`, output that
         // does not reparse — the same dead form prettier emits, cataloged). Only a
         // single-line block needs no shell: it trails inline without ending the line.
-        let needs_parens = self.needs_parens(expression, ParenContext::NonNull)
-            || self.has_line_spanning_comments_to_emit_between(expression.span().end, span.end);
+        let needs_parens = self.needs_parens(non_null_expr.expression, ParenContext::NonNull)
+            || self.has_line_spanning_comments_to_emit_between(
+                non_null_expr.expression.span().end,
+                span.end,
+            );
 
         // The leading run from the operand's authored grouping parens. Where the
         // parens are STRIPPED (`(/* b */ x)!`) it is prepended before the operand,
@@ -1675,7 +1673,7 @@ impl<'a> Printer<'a> {
         // declines the claimed region ([`Printer::removed_paren_comments_opt`]), which the
         // claimer prints ahead of the pair it found the run below
         // (`((/* c */ (x).a())! + 1).b` prints `/* c */ (x.a()! + 1).b`).
-        let argument_start = expression.span().start;
+        let argument_start = non_null_expr.expression.span().start;
         let leading = self.removed_paren_comments_opt(span, span.start, argument_start);
 
         let core = if needs_parens {
@@ -1685,7 +1683,7 @@ impl<'a> Printer<'a> {
             // value position expands these parens rather than hanging its arms. Without
             // it `(t)!` and `(t)!.prop` disagree about the very same base. Asked BEFORE
             // the operand is built, for the re-marking reason given at the cast site.
-            let expands = self.ternary_takes_extra_indent(expression);
+            let expands = self.ternary_takes_extra_indent(non_null_expr.expression);
             // The pair's trailing run opens where the operand's PRINTED content ends when the
             // gap past the operand holds a comment ([`Printer::pair_trailing_gap_start_guarded`]):
             // a comment written last in a stripped shell down its right spine then prints
@@ -1695,12 +1693,12 @@ impl<'a> Printer<'a> {
             // FROZEN operand's slice prints its shells and their comments verbatim, so it
             // widens nothing: claimed, the comment printed twice.
             let argument_end = if self
-                .left_spine_operand_frozen_span(span.start, expression)
+                .left_spine_operand_frozen_span(span.start, non_null_expr.expression)
                 .is_some()
             {
-                expression.span().end
+                non_null_expr.expression.span().end
             } else {
-                self.pair_trailing_gap_start_guarded(expression, span.end)
+                self.pair_trailing_gap_start_guarded(non_null_expr.expression, span.end)
             };
             // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
             // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]).
@@ -1710,27 +1708,39 @@ impl<'a> Printer<'a> {
             let build_operand = || {
                 self.build_left_spine_operand_doc(
                     span.start,
-                    expression,
+                    non_null_expr.expression,
                     FrozenOperandPair::Emitted,
                     || {
-                        self.build_value_with_outermost_owned_comment(expression, || {
-                            // The `!` follows the operand inside the pair too, unless the pair
-                            // holds a comment behind the operand, which follows it instead
-                            // ([`Printer::with_tight_follower_operand`]).
-                            let build =
-                                || self.build_expression_doc_with_indent_on_break(expression);
-                            if self.has_comments_to_emit_between(expression.span().end, span.end) {
-                                build()
-                            } else {
-                                self.with_tight_follower_operand(expression.span(), build)
-                            }
-                        })
+                        self.build_value_with_outermost_owned_comment(
+                            non_null_expr.expression,
+                            || {
+                                // The `!` follows the operand inside the pair too, unless the pair
+                                // holds a comment behind the operand, which follows it instead
+                                // ([`Printer::with_tight_follower_operand`]).
+                                let build = || {
+                                    self.build_expression_doc_with_indent_on_break(
+                                        non_null_expr.expression,
+                                    )
+                                };
+                                if self.has_comments_to_emit_between(
+                                    non_null_expr.expression.span().end,
+                                    span.end,
+                                ) {
+                                    build()
+                                } else {
+                                    self.with_tight_follower_operand(
+                                        non_null_expr.expression.span(),
+                                        build,
+                                    )
+                                }
+                            },
+                        )
                     },
                 )
             };
             let inner_doc = self.with_claimed_right_spine_run(
                 argument_end,
-                expression.span().end,
+                non_null_expr.expression.span().end,
                 build_operand,
             );
             // A leading run that occupies a line — a `//`, an own-line block — takes
@@ -1759,7 +1769,7 @@ impl<'a> Printer<'a> {
                 },
                 ")!",
             )
-        } else if self.has_comments_to_emit_between(expression.span().end, span.end) {
+        } else if self.has_comments_to_emit_between(non_null_expr.expression.span().end, span.end) {
             // A comment between the operand and `!` (`p?.q /* c */!`, or from stripped
             // grouping parens `(x /* c */)!`) trails the operand — preserve it rather
             // than dropping it. The redundant grouping parens are stripped per tsv's
@@ -1774,25 +1784,24 @@ impl<'a> Printer<'a> {
             // retains the shell as a parenthesized base (the same multiline operand
             // layout the required-paren case above uses) rather than flattening the
             // operand into a region whose emitter is block-only.
-            let inner_doc = self.build_commented_non_null_operand_doc(expression);
+            let inner_doc = self.build_commented_non_null_operand_doc(non_null_expr.expression);
             self.close_commented_non_null_doc(inner_doc, non_null_expr, span)
-        } else if let Some(operand_doc) =
-            self.build_with_inline_member_call_tail_forwarded(span, expression, || {
-                self.build_whole_call_operand_doc(expression, span, false)
-            })
-        {
+        } else if let Some(operand_doc) = self.build_with_inline_member_call_tail_forwarded(
+            span,
+            non_null_expr.expression,
+            || self.build_whole_call_operand_doc(non_null_expr.expression, span, false),
+        ) {
             // Over a call prettier prints whole, its `[print(expression), "!"]` rather than a
             // linearized chain (`Printer::spine_first_call_prints_whole`). The
             // declaration / assignment mark on this `!` belongs to the member under it
             // (`Printer::build_with_inline_member_call_tail_forwarded`).
             d.concat(&[operand_doc, d.text("!")])
-        } else if Self::is_chain_expression(expression) {
+        } else if Self::is_chain_expression(non_null_expr.expression) {
             // When inner expression is a chain (member or call), use chain architecture
             // to properly handle breaking. This ensures the outer `!` is included
             // in the linearized chain for proper segment grouping.
             let mut nodes = chain::ChainNodeVec::new();
             let long_curried = chain::linearize_chain_from_non_null_into(
-                self.view,
                 non_null_expr,
                 span,
                 self.linearize_input(),
@@ -1812,7 +1821,7 @@ impl<'a> Printer<'a> {
             chain::build_linearized_chain_doc(
                 &mut nodes,
                 long_curried,
-                expression,
+                non_null_expr.expression,
                 argument_start,
                 span,
                 self,
@@ -1825,11 +1834,11 @@ impl<'a> Printer<'a> {
             // The `!` follows the operand ([`Printer::with_tight_follower_operand`]).
             let inner_doc = self.build_left_spine_operand_doc(
                 span.start,
-                expression,
+                non_null_expr.expression,
                 FrozenOperandPair::position(ParenContext::NonNull),
                 || {
-                    self.with_tight_follower_operand(expression.span(), || {
-                        self.build_expression_doc(expression)
+                    self.with_tight_follower_operand(non_null_expr.expression.span(), || {
+                        self.build_expression_doc(non_null_expr.expression)
                     })
                 },
             );
@@ -1865,8 +1874,8 @@ impl<'a> Printer<'a> {
         let mut levels: SmallVec<[CommentedNonNullLevel<'_, '_>; 4]> = SmallVec::new();
         let mut inner = operand;
         while let ExpressionKind::TSNonNullExpression(non_null) = &inner.kind {
-            let argument_end = self.view.expr(non_null.expression).span().end;
-            if self.needs_parens(self.view.expr(non_null.expression), ParenContext::NonNull)
+            let argument_end = non_null.expression.span().end;
+            if self.needs_parens(non_null.expression, ParenContext::NonNull)
                 || self.has_line_spanning_comments_to_emit_between(argument_end, inner.span.end)
                 || !self.has_comments_to_emit_between(argument_end, inner.span.end)
             {
@@ -1875,10 +1884,10 @@ impl<'a> Printer<'a> {
             let leading = self.removed_paren_comments_opt(
                 inner.span,
                 inner.span.start,
-                self.view.expr(non_null.expression).span().start,
+                non_null.expression.span().start,
             );
             levels.push((inner, non_null, leading));
-            inner = self.view.expr(non_null.expression);
+            inner = non_null.expression;
         }
         // The innermost operand's last token is a `!`'s neighbor, a single-line block between
         // them at most ([`Printer::with_tight_follower_operand`]).
@@ -1937,11 +1946,7 @@ impl<'a> Printer<'a> {
         non_null: &crate::ast::TSNonNullExpression<'_>,
         end: u32,
     ) {
-        self.append_trailing_paren_comments(
-            parts,
-            self.view.expr(non_null.expression).span().end,
-            end,
-        );
+        self.append_trailing_paren_comments(parts, non_null.expression.span().end, end);
         parts.push(self.d().text("!"));
     }
 
@@ -1973,11 +1978,10 @@ impl<'a> Printer<'a> {
         let ExpressionKind::TSNonNullExpression(non_null) = &expr.kind else {
             return None;
         };
-        if non_null.seals_optional_chain(self.view, expr.span) {
-            let inner_doc =
-                self.build_expression_doc_with_indent_on_break(self.view.expr(non_null.expression));
-            let expr_start = self.view.expr(non_null.expression).span().start;
-            let inner_start = self.view.expr(non_null.expression).span().end;
+        if non_null.seals_optional_chain(expr.span) {
+            let inner_doc = self.build_expression_doc_with_indent_on_break(non_null.expression);
+            let expr_start = non_null.expression.span().start;
+            let inner_start = non_null.expression.span().end;
             // The shell's LEADING gap — the seal's span covers the `(`, so the
             // comments between it and the chain (`new ( // c⏎a?.b)!()`) are this
             // doc's to print too; nothing else can reach them. A run that occupies
@@ -2060,11 +2064,11 @@ impl<'a> Printer<'a> {
         // When shouldGroup is false (operands are same AST type category, e.g.,
         // `(BinaryExpr) * 100`), all continuations break together with the outer
         // group. This matches Prettier's behavior for same-type chains.
-        let should_group = Self::should_group_binary_continuation(self.view, binary);
+        let should_group = Self::should_group_binary_continuation(binary);
         // shouldInlineLogicalExpression: when the outermost logical has a non-empty
         // object/array on the right, keep operator and RHS on the same line.
         // Prettier ref: `printBinaryishExpressions` + `shouldInlineLogicalExpression` (`print/binaryish.js`)
-        let should_inline_last = assignment::should_inline_logical_expression(self.view, binary);
+        let should_inline_last = assignment::should_inline_logical_expression(binary);
         let mut parts = d.pooled_docbuf();
 
         for (i, operand) in operands.iter().enumerate() {
@@ -2206,11 +2210,7 @@ impl<'a> Printer<'a> {
             spine.push(left_binary);
             node = left_binary;
         }
-        operands.push(self.build_binary_operand_doc(
-            self.view.expr(node.left),
-            node.operator,
-            false,
-        ));
+        operands.push(self.build_binary_operand_doc(node.left, node.operator, false));
         for &expr in spine.iter().rev() {
             // Add current operator
             operators.push(ChainOperator::of(expr));
@@ -2218,7 +2218,7 @@ impl<'a> Printer<'a> {
             // Also flatten the right side where prettier REBALANCES it, removing the
             // redundant parens ([`BinaryOperator::rebalances_with`] — logical operators
             // only; arithmetic preserves right-side parens).
-            if let ExpressionKind::BinaryExpression(right_binary) = &self.view.expr(expr.right).kind
+            if let ExpressionKind::BinaryExpression(right_binary) = &expr.right.kind
                 && expr.operator.rebalances_with(right_binary.operator)
             {
                 self.collect_binary_operands_for_indent(right_binary, operands, operators);
@@ -2226,11 +2226,7 @@ impl<'a> Printer<'a> {
             }
 
             // Right operand can't be flattened - add as-is
-            operands.push(self.build_binary_operand_doc(
-                self.view.expr(expr.right),
-                expr.operator,
-                true,
-            ));
+            operands.push(self.build_binary_operand_doc(expr.right, expr.operator, true));
         }
     }
 
@@ -2307,7 +2303,7 @@ impl<'a> Printer<'a> {
 
         // The binding name (past any decorators — acorn stores those on the inner
         // binding, and its span starts at the name). Bounds the modifier scans.
-        let name_start = self.view.expr(param_prop.parameter).span().start;
+        let name_start = param_prop.parameter.span().start;
 
         // Print modifiers in canonical TS order (accessibility → override →
         // readonly), preserving comments between them and before the binding name
@@ -2333,7 +2329,7 @@ impl<'a> Printer<'a> {
         // but the source order is `@dec` before the modifiers — so render the
         // inner binding WITHOUT its decorators here, then prefix the whole
         // property with them below.
-        let parameter = self.view.expr(param_prop.parameter);
+        let parameter = param_prop.parameter;
         let (inner_doc, decorators) = match &parameter.kind {
             ExpressionKind::Identifier(id) => {
                 (self.build_identifier_doc_no_decorators(id), id.decorators())

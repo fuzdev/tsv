@@ -11,8 +11,8 @@ use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{Comment, DepthBudget, DepthLimit, Error, Span};
 use tsv_ts::__private::TopLevelAs;
 use tsv_ts::__private::{is_id_continue, is_id_start};
+use tsv_ts::ast::Expression;
 use tsv_ts::ast::TSTypeAnnotation;
-use tsv_ts::ast::{AstStores, ExprView, Expression};
 
 /// Build an expression `Comment` from its already-shifted `span` / `content_span`.
 /// `content` is the comment body, read only to compute the `multiline` flag (whether
@@ -47,11 +47,6 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// local (`let arena = self.arena;`) only when several allocations in one method
     /// share it.
     pub(crate) arena: &'arena Bump,
-    /// The document's expression stores, one instance across the template and every
-    /// embedded island. Empty only inside [`Self::with_island_stores`], the one reader:
-    /// a host check runs during the embedded parse and borrows the whole parser, so the
-    /// `&mut` the parse takes has to be out of the parser first.
-    stores: Option<&'a mut AstStores<'arena>>,
     pub(crate) source: &'a str, // Full original source
     pub(crate) lexer: Lexer<'a>,
     /// The current token, in document coordinates. The lexer writes it in place
@@ -188,11 +183,7 @@ fn is_reserved_word(name: &str) -> bool {
 }
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
-    pub(crate) fn new(
-        source: &'a str,
-        arena: &'arena Bump,
-        stores: &'a mut AstStores<'arena>,
-    ) -> Result<Self, Error> {
+    pub(crate) fn new(source: &'a str, arena: &'arena Bump) -> Result<Self, Error> {
         let mut lexer = Lexer::new(source);
         let mut current = Token {
             kind: TokenKind::Eof,
@@ -202,7 +193,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         lexer.next_token_into(&mut current)?;
         Ok(Self {
             arena,
-            stores: Some(stores),
             source,
             lexer,
             current,
@@ -216,26 +206,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             nested_raw_text_nesting: 0,
             depth: DepthBudget::at(0),
         })
-    }
-
-    /// Run `parse` with the document's stores in hand and the parser read-only: the seam
-    /// every embedded parse goes through.
-    ///
-    /// The stores come back on every path out, so a host check's refusal and a failed parse
-    /// leave the parser as they found it. `parse` holds `&Self`, which cannot reach this
-    /// seam again, so the stores are taken only once at a time.
-    #[expect(clippy::expect_used)]
-    pub(crate) fn with_island_stores<T>(
-        &mut self,
-        parse: impl FnOnce(&Self, &mut AstStores<'arena>) -> T,
-    ) -> T {
-        let stores = self
-            .stores
-            .take()
-            .expect("the island stores are out only while a `&Self` is held");
-        let parsed = parse(self, stores);
-        self.stores = Some(stores);
-        parsed
     }
 
     /// Run `f` `units` wire levels deeper — the depth limit's count ([`DepthBudget`]),
@@ -555,7 +525,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Create "Expected X" error at specified position
-    pub(crate) fn error_expected_at(what: &str, position: usize) -> Error {
+    pub(crate) fn error_expected_at(&self, what: &str, position: usize) -> Error {
         Error::invalid_syntax(format!("Expected {what}"), position)
     }
 
@@ -688,7 +658,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         base_offset: usize,
         end: &str,
     ) -> Result<&'arena Expression<'arena>, Error> {
-        self.parse_ts_expression_checked(source, base_offset, end, |_, _, _| Ok(()))
+        self.parse_ts_expression_checked(source, base_offset, end, |_, _| Ok(()))
     }
 
     /// [`Self::parse_ts_expression`] for a head whose grammar refuses some expressions
@@ -706,19 +676,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
         end: &str,
-        host_check: impl Fn(&Self, ExprView<'_>, &'arena Expression<'arena>) -> Result<(), Error>,
+        host_check: impl Fn(&Self, &'arena Expression<'arena>) -> Result<(), Error>,
     ) -> Result<&'arena Expression<'arena>, Error> {
-        let (expr, comments) = self.with_island_stores(|this, stores| {
-            tsv_ts::__private::parse_expression_with_comments(
-                source,
-                base_offset,
-                this.island_nesting(),
-                this.arena,
-                stores,
-                end,
-                |view, expr| host_check(this, view, expr),
-            )
-        })?;
+        let this = &*self;
+        let (expr, comments) = tsv_ts::__private::parse_expression_with_comments(
+            source,
+            base_offset,
+            self.island_nesting(),
+            self.arena,
+            end,
+            |expr| host_check(this, expr),
+        )?;
         self.expression_comments.extend_from_slice(comments);
         Ok(expr)
     }
@@ -745,19 +713,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
         top_level_as: TopLevelAs,
-        host_check: impl Fn(&Self, ExprView<'_>, &'arena Expression<'arena>, usize) -> Result<(), Error>,
+        host_check: impl Fn(&Self, &'arena Expression<'arena>, usize) -> Result<(), Error>,
     ) -> Result<(&'arena Expression<'arena>, usize), Error> {
-        let (expr, end_pos, comments) = self.with_island_stores(|this, stores| {
-            tsv_ts::__private::parse_expression_partial_with_comments(
-                source,
-                base_offset,
-                this.island_nesting(),
-                this.arena,
-                stores,
-                top_level_as,
-                |view, expr, end_pos| host_check(this, view, expr, end_pos),
-            )
-        })?;
+        let this = &*self;
+        let (expr, end_pos, comments) = tsv_ts::__private::parse_expression_partial_with_comments(
+            source,
+            base_offset,
+            self.island_nesting(),
+            self.arena,
+            top_level_as,
+            |expr, end_pos| host_check(this, expr, end_pos),
+        )?;
         self.expression_comments.extend_from_slice(comments);
         Ok((expr, end_pos))
     }
@@ -778,15 +744,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<TSTypeAnnotation<'arena>, Error> {
-        let (ta, comments) = self.with_island_stores(|this, stores| {
-            tsv_ts::__private::parse_type_annotation_partial(
-                source,
-                base_offset,
-                this.island_nesting(),
-                this.arena,
-                stores,
-            )
-        })?;
+        let (ta, comments) = tsv_ts::__private::parse_type_annotation_partial(
+            source,
+            base_offset,
+            self.island_nesting(),
+            self.arena,
+        )?;
         self.expression_comments.extend_from_slice(comments);
         Ok(ta)
     }
@@ -805,15 +768,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<&'arena mut Expression<'arena>, Error> {
-        let (pattern, comments) = self.with_island_stores(|this, stores| {
-            tsv_ts::__private::parse_pattern_with_comments(
-                source,
-                base_offset,
-                this.island_nesting(),
-                this.arena,
-                stores,
-            )
-        })?;
+        let (pattern, comments) = tsv_ts::__private::parse_pattern_with_comments(
+            source,
+            base_offset,
+            self.island_nesting(),
+            self.arena,
+        )?;
         debug_assert!(
             tsv_ts::__private::pattern_type_annotation(&pattern).is_none(),
             "a block pattern's `: T` is its own sub-parse (`parse_block_pattern`)"
@@ -860,18 +820,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-        host_check: impl Fn(&Self, ExprView<'_>, &tsv_ts::ast::Statement<'arena>) -> Result<(), Error>,
+        host_check: impl Fn(&Self, &tsv_ts::ast::Statement<'arena>) -> Result<(), Error>,
     ) -> Result<tsv_ts::ast::Statement<'arena>, Error> {
-        let (stmt, comments) = self.with_island_stores(|this, stores| {
-            tsv_ts::__private::parse_statement_with_comments(
-                source,
-                base_offset,
-                this.island_nesting(),
-                this.arena,
-                stores,
-                |view, stmt| host_check(this, view, stmt),
-            )
-        })?;
+        let this = &*self;
+        let (stmt, comments) = tsv_ts::__private::parse_statement_with_comments(
+            source,
+            base_offset,
+            self.island_nesting(),
+            self.arena,
+            |stmt| host_check(this, stmt),
+        )?;
         self.expression_comments.extend_from_slice(comments);
         Ok(stmt)
     }

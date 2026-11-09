@@ -3,7 +3,6 @@
 // Builds docs for template literals (quasi/interpolation layout, alignment,
 // interpolation comments) and tagged template expressions.
 
-use crate::ast::ExprView;
 use crate::ast::{Expression, ExpressionKind};
 use crate::printer::chain::tag_paren_leading_start;
 use crate::printer::comments::{CommentSpacing, LeftSpineStep, left_spine_shell_is_comment_free};
@@ -64,7 +63,7 @@ impl<'a> Printer<'a> {
 
             // Interpolation
             if i < template.expressions.len() {
-                let expr = self.view.expr(self.view.list(template.expressions)[i]);
+                let expr = &template.expressions[i];
                 let next_quasi = &template.quasis[i + 1];
 
                 // Calculate indent size from quasi text (Prettier's getIndentSize)
@@ -145,7 +144,6 @@ impl<'a> Printer<'a> {
                 // closing one is a line end a deferred run can take (below).
                 let use_softline_wrap = has_trailing_line_comment
                     || Self::is_template_softline_expression(
-                        self.view,
                         expr,
                         interpolation_has_comment_on_page,
                     );
@@ -386,11 +384,7 @@ impl<'a> Printer<'a> {
     /// below decides this layout only for an interpolation holding NO comment, so the
     /// question is whether one OCCUPIES the page here — an owned (glued) comment included,
     /// which no emitter's collect reports. See `docs/comments.md` §The three axes.
-    fn is_template_softline_expression(
-        view: ExprView<'_>,
-        expr: &Expression<'_>,
-        has_comment_on_page: bool,
-    ) -> bool {
+    fn is_template_softline_expression(expr: &Expression<'_>, has_comment_on_page: bool) -> bool {
         if has_comment_on_page {
             return true;
         }
@@ -409,7 +403,7 @@ impl<'a> Printer<'a> {
         // mid-chain. Member-only: `foo()!` / `x!` stay non-qualifying, and
         // `(obj.a as T)` already qualifies via TSAsExpression below.
         matches!(
-            strip_non_null_wrappers(view, expr).kind,
+            strip_non_null_wrappers(expr).kind,
             ExpressionKind::MemberExpression(_)
         ) || matches!(
             expr.kind,
@@ -509,7 +503,6 @@ impl<'a> Printer<'a> {
         tagged: &crate::ast::TaggedTemplateExpression<'_>,
         span: Span,
     ) -> DocId {
-        let tag = self.view.expr(tagged.tag);
         let d = self.d();
 
         // Two tag positions print a required pair that keeps BOTH its gaps inside it: a
@@ -520,39 +513,41 @@ impl<'a> Printer<'a> {
         // is exactly what a tag-kind test paired with a position-keyed gap produced. The
         // pair must be the author's own for a trailing gap to exist at all
         // (`paren_shell_close_after`).
-        let pair_open = tag_paren_leading_start(self.view, tagged, span);
-        let trailing_gap = self.owned_pair_printed_trailing_gap(tag, pair_open.is_some());
+        let pair_open = tag_paren_leading_start(tagged, span);
+        let trailing_gap = self.owned_pair_printed_trailing_gap(tagged.tag, pair_open.is_some());
         // Every window downstream — the type-argument gap, the tag→`` ` `` gap — opens
         // PAST the pair's `)`, so a comment this doc emitted inside the parens is not
         // emitted a second time outside them.
-        let tag_gap_start = Printer::gap_start_after_owned_pair(tag.span().end, trailing_gap);
+        let tag_gap_start =
+            Printer::gap_start_after_owned_pair(tagged.tag.span().end, trailing_gap);
         // A pair the PRINTER emits around the tag opens the tag→`` ` `` gap (and the
         // type-argument gap) at the tag's printed end ([`Printer::required_pair_gap_start`]),
         // so a comment written last in a stripped shell down the tag's right edge prints
         // ahead of the comments written after that shell; the arm below claims the region from
         // the tag's own doc. Not for a FROZEN tag, whose slice prints its shells verbatim, nor
         // a sealed chain, whose pair prints its interior itself.
-        let tag_gap_start =
-            if pair_open.is_none() && !matches!(tag.kind, ExpressionKind::TSNonNullExpression(_)) {
-                self.required_pair_gap_start(tag, || {
-                    self.needs_parens(tag, ParenContext::TaggedTemplateTag)
-                        && self
-                            .left_spine_operand_frozen_span(span.start, tag)
-                            .is_none()
-                })
-            } else {
-                tag_gap_start
-            };
+        let tag_gap_start = if pair_open.is_none()
+            && !matches!(tagged.tag.kind, ExpressionKind::TSNonNullExpression(_))
+        {
+            self.required_pair_gap_start(tagged.tag, || {
+                self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
+                    && self
+                        .left_spine_operand_frozen_span(span.start, tagged.tag)
+                        .is_none()
+            })
+        } else {
+            tag_gap_start
+        };
 
         let tag_doc = if let Some(pair_open) = pair_open {
             // The tag has one rendering, so every arm takes the same body.
             let inner = self.with_claimed_right_spine_run(
-                trailing_gap.map_or_else(|| tag.span().end, |(start, _)| start),
-                tag.span().end,
-                || self.build_expression_doc(tag),
+                trailing_gap.map_or_else(|| tagged.tag.span().end, |(start, _)| start),
+                tagged.tag.span().end,
+                || self.build_expression_doc(tagged.tag),
             );
             self.build_owned_required_pair_doc(
-                (pair_open, tag.span().start),
+                (pair_open, tagged.tag.span().start),
                 trailing_gap,
                 inner,
                 ")",
@@ -568,32 +563,40 @@ impl<'a> Printer<'a> {
             // ([`Printer::build_left_spine_operand_doc`]).
             // A comment in a shell below a pair the tag's left spine prints leads the
             // whole tagged template (`Printer::left_spine_run_claim`).
-            let claim = self.left_spine_run_claim(span, span.start, tag, || {
-                self.needs_parens(tag, ParenContext::TaggedTemplateTag)
+            let claim = self.left_spine_run_claim(span, span.start, tagged.tag, || {
+                self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
             });
-            self.with_claimed_right_spine_run(tag_gap_start, tag.span().end, || {
+            self.with_claimed_right_spine_run(tag_gap_start, tagged.tag.span().end, || {
                 self.with_left_spine_claim(claim, || {
                     let tag_doc = self.build_left_spine_operand_doc(
                         span.start,
-                        tag,
+                        tagged.tag,
                         FrozenOperandPair::position(ParenContext::TaggedTemplateTag),
                         || {
-                            if let Some(sealed) = self.build_sealed_non_null_paren_doc(tag) {
+                            if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
                                 sealed
-                            } else if self.needs_parens(tag, ParenContext::TaggedTemplateTag)
+                            } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
                                 || tagged.type_arguments.as_ref().is_some_and(|_| {
-                                    self.instantiation_keeps_pair(tag, SecondTypeArgs::Expression)
+                                    self.instantiation_keeps_pair(
+                                        tagged.tag,
+                                        SecondTypeArgs::Expression,
+                                    )
                                 })
                             {
-                                d.parens(self.build_expression_doc(tag))
+                                d.parens(self.build_expression_doc(tagged.tag))
                             } else {
-                                self.build_expression_doc(tag)
+                                self.build_expression_doc(tagged.tag)
                             }
                         },
                     );
                     // Check for comments between removed parentheses and tag
                     // e.g., (/* comment */ tag)`template` has span.start at '(' and tag.span.start at 'tag'
-                    self.prepend_removed_paren_comments(span, span.start, tag.span().start, tag_doc)
+                    self.prepend_removed_paren_comments(
+                        span,
+                        span.start,
+                        tagged.tag.span().start,
+                        tag_doc,
+                    )
                 })
             })
         };

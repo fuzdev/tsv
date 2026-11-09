@@ -5,7 +5,6 @@
 // special handling, wrapping, or expansion.
 
 use crate::ast;
-use crate::ast::ExprView;
 use crate::printer::Printer;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -105,18 +104,13 @@ pub(crate) fn statement_gap_floor(body: &[ast::Statement<'_>], index: usize) -> 
 /// Patterns:
 /// - `require.resolve(stringLiteral)`
 /// - `await import(stringLiteral)`
-pub(crate) fn is_module_path_fluid_call(
-    view: ExprView<'_>,
-    expr: &ast::Expression<'_>,
-    source: &str,
-) -> bool {
+pub(crate) fn is_module_path_fluid_call(expr: &ast::Expression<'_>, source: &str) -> bool {
     // Check for `await import(string)` — single-arg only (no options)
     if let ast::ExpressionKind::AwaitExpression(await_expr) = &expr.kind
-        && let ast::ExpressionKind::ImportExpression(import_expr) =
-            &view.expr(await_expr.argument).kind
+        && let ast::ExpressionKind::ImportExpression(import_expr) = &await_expr.argument.kind
         && import_expr.options.is_none()
     {
-        return is_string_literal(view.expr(import_expr.source));
+        return is_string_literal(import_expr.source);
     }
 
     let ast::ExpressionKind::CallExpression(call) = &expr.kind else {
@@ -124,17 +118,17 @@ pub(crate) fn is_module_path_fluid_call(
     };
 
     // Must have exactly 1 argument that is a string literal
-    if call.arguments.len() != 1 || !is_string_literal(view.expr(view.list(call.arguments)[0])) {
+    if call.arguments.len() != 1 || !is_string_literal(call.arguments[0]) {
         return false;
     }
 
     // Check for `require.resolve()`
-    if let ast::ExpressionKind::MemberExpression(member) = &view.expr(call.callee).kind
+    if let ast::ExpressionKind::MemberExpression(member) = &call.callee.kind
         && !member.computed
         && !member.optional
-        && let ast::ExpressionKind::Identifier(resolve_id) = &view.expr(member.property).kind
+        && let ast::ExpressionKind::Identifier(resolve_id) = &member.property.kind
         && resolve_id.name(source) == "resolve"
-        && let ast::ExpressionKind::Identifier(require_id) = &view.expr(member.object).kind
+        && let ast::ExpressionKind::Identifier(require_id) = &member.object.kind
         && require_id.name(source) == "require"
     {
         return true;
@@ -163,14 +157,14 @@ pub(crate) fn is_string_literal(expr: &ast::Expression<'_>) -> bool {
 /// ```
 ///
 /// Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`)
-pub fn conditional_should_break_after_op(view: ExprView<'_>, expr: &ast::Expression<'_>) -> bool {
+pub fn conditional_should_break_after_op(expr: &ast::Expression<'_>) -> bool {
     if let ast::ExpressionKind::ConditionalExpression(cond) = &expr.kind {
         // Check if test is binaryish (BinaryExpression includes logical operators like &&, ||),
         // but exclude logical expressions with inline-able RHS (non-empty object/array).
         // Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`)
         // `isBinaryish(test) && !shouldInlineLogicalExpression(test)`
-        if let ast::ExpressionKind::BinaryExpression(binary) = &view.expr(cond.test).kind {
-            !super::expressions::assignment::should_inline_logical_expression(view, binary)
+        if let ast::ExpressionKind::BinaryExpression(binary) = &cond.test.kind {
+            !super::expressions::assignment::should_inline_logical_expression(binary)
         } else {
             false
         }
@@ -233,11 +227,10 @@ pub(crate) enum PatternContext {
 /// - In function parameters: depth 3+ expands (e.g., {a: {b}} stays, {a: {b: {c}}} expands)
 /// - In standalone contexts: depth 2+ expands (e.g., {a: {b}} expands)
 pub(crate) fn object_pattern_should_expand(
-    view: ExprView<'_>,
     obj: &ast::ObjectPattern<'_>,
     context: PatternContext,
 ) -> bool {
-    let depth = pattern_nesting_depth(view, obj);
+    let depth = pattern_nesting_depth(obj);
     match context {
         PatternContext::FunctionParameter => depth >= 3,
         PatternContext::Standalone => depth >= 2,
@@ -251,18 +244,18 @@ pub(crate) fn object_pattern_should_expand(
 /// Depth 1 = simple pattern like {a}
 /// Depth 2 = one level of nesting like {a: {b}}
 /// Depth 3 = two levels of nesting like {a: {b: {c}}}
-fn pattern_nesting_depth(view: ExprView<'_>, obj: &ast::ObjectPattern<'_>) -> usize {
+fn pattern_nesting_depth(obj: &ast::ObjectPattern<'_>) -> usize {
     let mut max_depth = 1;
 
     for prop in obj.properties {
         match prop {
             ast::ObjectPatternProperty::Property(p) => {
-                let nested_depth = match &view.expr(p.value).kind {
+                let nested_depth = match &p.value.kind {
                     ast::ExpressionKind::ObjectPattern(nested_obj) => {
-                        1 + pattern_nesting_depth(view, nested_obj)
+                        1 + pattern_nesting_depth(nested_obj)
                     }
                     ast::ExpressionKind::ArrayPattern(nested_arr) => {
-                        1 + array_pattern_nesting_depth(view, nested_arr)
+                        1 + array_pattern_nesting_depth(nested_arr)
                     }
                     // A property with a DEFAULT (`x: { y } = …`) does NOT count its
                     // nested pattern toward the expansion depth — prettier's shouldBreak
@@ -284,16 +277,14 @@ fn pattern_nesting_depth(view: ExprView<'_>, obj: &ast::ObjectPattern<'_>) -> us
 }
 
 /// Calculate the maximum nesting depth of an array pattern
-fn array_pattern_nesting_depth(view: ExprView<'_>, arr: &ast::ArrayPattern<'_>) -> usize {
+fn array_pattern_nesting_depth(arr: &ast::ArrayPattern<'_>) -> usize {
     let mut max_depth = 1;
 
-    for elem in view.pattern_elements(arr.elements).iter().flatten() {
-        let nested_depth = match &view.slot(elem).kind {
-            ast::ExpressionKind::ObjectPattern(nested_obj) => {
-                1 + pattern_nesting_depth(view, nested_obj)
-            }
+    for elem in arr.elements.iter().flatten() {
+        let nested_depth = match &elem.kind {
+            ast::ExpressionKind::ObjectPattern(nested_obj) => 1 + pattern_nesting_depth(nested_obj),
             ast::ExpressionKind::ArrayPattern(nested_arr) => {
-                1 + array_pattern_nesting_depth(view, nested_arr)
+                1 + array_pattern_nesting_depth(nested_arr)
             }
             // A defaulted element (`[{ y } = …]`) doesn't count its nested pattern
             // toward the expansion depth — see the object-pattern counterpart above

@@ -2,8 +2,6 @@
 
 > An **experimental** from-scratch TypeScript binder + checker (`tsv_check`) and the pure-Rust harness that grades it against tsgo's committed error baselines. Everything here is in development and **may never ship** — nothing in tsv's published artifacts depends on it, and none of its gates run at release cadence.
 
-**Not run at present:** `tsv_check` is outside the workspace build ([CLAUDE.md §Project Structure](../CLAUDE.md#project-structure)), so `tsc_conformance`, `profile --bind`, the `conformance:tsc-*` tasks and the `cargo tree -i tsv_check` below do not work.
-
 ## Status
 
 `tsv_check` is a research crate: a

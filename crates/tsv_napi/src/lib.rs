@@ -75,7 +75,7 @@ use tsv_ts::{ErrorReport, WirePoint};
 /// What an unset one means is the caller's: the parse exports read it as `Module`
 /// (their wire's `Program.sourceType` is a claim one settled grammar has to
 /// produce), the format exports, the strip and the imports parse as "none named", which
-/// `tsv_ts::__private::parse_with_goal_or_fallback_into` answers with the module grammar retried as
+/// `tsv_ts::__private::parse_with_goal_or_fallback` answers with the module grammar retried as
 /// a script.
 #[cfg(feature = "_internal_exports")]
 fn napi_source_type(
@@ -248,7 +248,6 @@ fn plain_error(env: Env, message: &str) -> napi::Error {
 macro_rules! lang_bindings {
     (
         $goalness:ident,
-        $storeness:ident,
         $lang:ident,
         $engine:ident,
         $parse_json_fn:ident, $parse_json_js:literal,
@@ -270,7 +269,6 @@ macro_rules! lang_bindings {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
                 parse_convert!(
                     $goalness,
-                    $storeness,
                     $lang,
                     convert_ast_json_string,
                     source,
@@ -286,9 +284,7 @@ macro_rules! lang_bindings {
                 source_type: Option<String>,
             ) -> Result<(), Failure> {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
-                parse_internal!($goalness, $storeness, $lang, source, goal, |e| {
-                    Failure::parse(&e)
-                })
+                parse_internal!($goalness, $lang, source, goal, |e| Failure::parse(&e))
             }
 
             /// The formatted source.
@@ -298,9 +294,7 @@ macro_rules! lang_bindings {
                 source_type: Option<String>,
             ) -> Result<String, Failure> {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Format)?;
-                parse_format!($goalness, $storeness, $lang, source, goal, |e| {
-                    Failure::parse(&e)
-                })
+                parse_format!($goalness, $lang, source, goal, |e| Failure::parse(&e))
             }
         }
 
@@ -357,7 +351,6 @@ macro_rules! lang_bindings {
 
 lang_bindings!(
     nogoal,
-    stores,
     tsv_svelte,
     svelte_engine,
     parse_svelte_json,
@@ -369,7 +362,6 @@ lang_bindings!(
 );
 lang_bindings!(
     goal,
-    stores,
     tsv_ts,
     typescript_engine,
     parse_typescript_json,
@@ -381,7 +373,6 @@ lang_bindings!(
 );
 lang_bindings!(
     nogoal,
-    nostores,
     tsv_css,
     css_engine,
     parse_css_json,
@@ -398,31 +389,29 @@ lang_bindings!(
 #[cfg(feature = "strip")]
 fn strip_typescript_engine(source: &str, source_type: Option<String>) -> Result<String, Failure> {
     let goal = napi_source_type(source_type, true, Family::Strip)?;
-    with_ast_arena(|arena| {
-        tsv_ts::__private::with_stores(|stores| {
-            match tsv_ts::__private::strip_into(source, goal, arena, stores) {
-                Ok(stripped) => Ok(stripped.code),
-                Err(tsv_ts::StripError::Parse(e)) => Err(Failure::parse(&e)),
-                // a refusal always reports; the `None` arm is unreachable, thrown with its message
-                Err(tsv_ts::StripError::Unsupported {
-                    construct, error, ..
-                }) => match error.to_report() {
-                    Some(report) => Err(Failure::Returned {
-                        kind: "unsupported",
-                        construct: Some(construct.as_str()),
-                        report,
-                    }),
-                    None => Err(Failure::Plain(format!("{error:#}"))),
-                },
-                // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
-                // thrown with its message rather than given a `kind` the facade does not declare
-                Err(other) => Err(Failure::Plain(format!("{other:#}"))),
-            }
-        })
-    })
+    with_ast_arena(
+        |arena| match tsv_ts::__private::strip_in(source, goal, arena) {
+            Ok(stripped) => Ok(stripped.code),
+            Err(tsv_ts::StripError::Parse(e)) => Err(Failure::parse(&e)),
+            // a refusal always reports; the `None` arm is unreachable, thrown with its message
+            Err(tsv_ts::StripError::Unsupported {
+                construct, error, ..
+            }) => match error.to_report() {
+                Some(report) => Err(Failure::Returned {
+                    kind: "unsupported",
+                    construct: Some(construct.as_str()),
+                    report,
+                }),
+                None => Err(Failure::Plain(format!("{error:#}"))),
+            },
+            // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
+            // thrown with its message rather than given a `kind` the facade does not declare
+            Err(other) => Err(Failure::Plain(format!("{other:#}"))),
+        },
+    )
 }
 
-/// Strip the types from TypeScript `source` (`tsv_ts::__private::strip_into`): the JS, every
+/// Strip the types from TypeScript `source` (`tsv_ts::__private::strip_in`): the JS, every
 /// type-only range blanked to whitespace so every surviving character keeps its line and UTF-16
 /// column. The source type is read as `format_typescript` reads it: omitted, the module grammar
 /// retried as a script; set, exact. A parse failure is returned as the parse exports return one;

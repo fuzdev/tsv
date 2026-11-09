@@ -124,8 +124,7 @@ const SIDECAR_LOCK_PATH = 'crates/tsv_debug/src/deno/deno.lock';
  * Bumping one of these is a deliberate oracle move: regenerate the lockfile
  * (`deno task pins:lock`), re-validate the compile fixtures
  * (`deno task compile:fixtures:validate` — the only check that grades the
- * committed expectations against a LIVE oracle, not runnable while
- * `tsv_svelte_compile` is outside the workspace build), and update the version here in
+ * committed expectations against a LIVE oracle), and update the version here in
  * the same change.
  */
 const LOCKED_TRANSITIVE: Record<string, string> = {

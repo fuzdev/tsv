@@ -7,7 +7,6 @@
 // Note: Block statements are in blocks.rs as a reusable utility
 
 use crate::ast;
-use crate::ast::ExprView;
 use crate::printer::ArrowChainContext;
 use crate::printer::AssumedBreak;
 use crate::printer::LeadingGlue;
@@ -93,14 +92,14 @@ fn arrow_body_always_hugs(expr: &ast::Expression<'_>, source: &str) -> bool {
 /// Returns the node's span so the printer wraps exactly it (keyed by span, robust to a
 /// chain rebuilding its base across conditional-group variants) and never a same-shaped
 /// node nested deeper.
-fn leftmost_arrow_body_parens_span(view: ExprView<'_>, expr: &ast::Expression<'_>) -> Option<Span> {
+fn leftmost_arrow_body_parens_span(expr: &ast::Expression<'_>) -> Option<Span> {
     if matches!(
         expr.kind,
         ast::ExpressionKind::AssignmentExpression(_) | ast::ExpressionKind::SequenceExpression(_)
     ) {
         return None;
     }
-    let leftmost = leftmost_no_lookahead(view, expr);
+    let leftmost = leftmost_no_lookahead(expr);
     match &leftmost.kind {
         ast::ExpressionKind::ObjectExpression(_) => Some(leftmost.span),
         ast::ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c) => {
@@ -206,12 +205,11 @@ fn ternary_body_parens_group_spaced(d: &DocArena, body: DocId) -> DocId {
 /// prints. The predicate's region list is an **assertion about the builder**, so the two
 /// must visit the same heads and the same gaps — a copied traversal that stopped one head
 /// short would leave a region unclaimed by either, which is a DROPPED comment.
-fn walk_arrow_chain<'a>(
-    view: ExprView<'a>,
-    head: &'a ast::ArrowFunctionExpression<'a>,
+fn walk_arrow_chain<'a, 'arena>(
+    head: &'a ast::ArrowFunctionExpression<'arena>,
     head_span: Span,
-    mut visit: impl FnMut(&'a ast::ArrowFunctionExpression<'a>, Span, Option<u32>),
-) -> &'a ast::ArrowFunctionBody<'a> {
+    mut visit: impl FnMut(&'a ast::ArrowFunctionExpression<'arena>, Span, Option<u32>),
+) -> &'a ast::ArrowFunctionBody<'arena> {
     let mut current = head;
     let mut current_span = head_span;
     let mut gap_start = None;
@@ -219,10 +217,10 @@ fn walk_arrow_chain<'a>(
         visit(current, current_span, gap_start);
         gap_start = Some(arrow_token_end(current));
         match &current.body {
-            ast::ArrowFunctionBody::Expression(b) => match &view.expr(*b).kind {
+            ast::ArrowFunctionBody::Expression(b) => match &b.kind {
                 ast::ExpressionKind::ArrowFunctionExpression(inner) => {
                     current = inner;
-                    current_span = view.expr(*b).span;
+                    current_span = b.span;
                 }
                 _ => break &current.body,
             },
@@ -233,17 +231,14 @@ fn walk_arrow_chain<'a>(
 
 /// Whether an expression's leftmost position holds a node an arrow body must
 /// parenthesize. See [`leftmost_arrow_body_parens_span`].
-pub(in crate::printer) fn has_leftmost_arrow_body_parens(
-    view: ExprView<'_>,
-    expr: &ast::Expression<'_>,
-) -> bool {
-    leftmost_arrow_body_parens_span(view, expr).is_some()
+pub(in crate::printer) fn has_leftmost_arrow_body_parens(expr: &ast::Expression<'_>) -> bool {
+    leftmost_arrow_body_parens_span(expr).is_some()
 }
 
 /// Whether the node at an arrow body's leftmost position that takes a pair is the body
 /// itself (a bare object, a bare decorated class) rather than a node inside it.
-fn arrow_body_is_its_own_leftmost_pair(view: ExprView<'_>, expr: &ast::Expression<'_>) -> bool {
-    leftmost_arrow_body_parens_span(view, expr) == Some(expr.span())
+fn arrow_body_is_its_own_leftmost_pair(expr: &ast::Expression<'_>) -> bool {
+    leftmost_arrow_body_parens_span(expr) == Some(expr.span())
 }
 
 /// Check if an expression is a huggable pattern for function parameters.
@@ -259,14 +254,14 @@ fn arrow_body_is_its_own_leftmost_pair(view: ExprView<'_>, expr: &ast::Expressio
 /// Shared with the signature-param path (`build_signature_params_doc`) so bodyless
 /// declarations (declare / overload) and type-member signatures (method / call /
 /// construct) hug the lone param exactly like value-param functions do.
-fn is_huggable_pattern(view: ExprView<'_>, expr: &ast::Expression<'_>) -> bool {
+fn is_huggable_pattern(expr: &ast::Expression<'_>) -> bool {
     match &expr.kind {
         ast::ExpressionKind::ObjectPattern(_) | ast::ExpressionKind::ArrayPattern(_) => true,
         ast::ExpressionKind::AssignmentPattern(ap) => {
             matches!(
-                view.expr(ap.left).kind,
+                ap.left.kind,
                 ast::ExpressionKind::ObjectPattern(_) | ast::ExpressionKind::ArrayPattern(_)
-            ) && match &view.expr(ap.right).kind {
+            ) && match &ap.right.kind {
                 ast::ExpressionKind::Identifier(_) => true,
                 ast::ExpressionKind::ObjectExpression(obj) => obj.properties.is_empty(),
                 ast::ExpressionKind::ArrayExpression(arr) => arr.elements.is_empty(),
@@ -298,14 +293,13 @@ pub(in crate::printer) fn arrow_token_end(arrow: &ast::ArrowFunctionExpression<'
 /// Read only by [`Printer::build_arrow_params_doc_ungrouped`], to suppress the parameter's
 /// duplicate owned-comment claim; see the ⚠️ there.
 fn bare_param_sharing_arrow_start(
-    view: ExprView<'_>,
     arrow: &ast::ArrowFunctionExpression<'_>,
     span: Span,
 ) -> Option<u32> {
     if arrow.params_start.is_some() {
         return None;
     }
-    let start = view.run(arrow.params).first()?.span().start;
+    let start = arrow.params.first()?.span().start;
     (start == span.start).then_some(start)
 }
 
@@ -377,7 +371,7 @@ pub(in crate::printer) fn arrow_signature_has_breaking_comments(
     // inside the list, its end found by a scan bounded by the body's start. A comment yielded
     // by either walk lies inside the window, and the window's walk meets it or an earlier one;
     // the trailing walk is to-emit, a subset of on-page, which counts an owned comment too.
-    if !printer.has_comments_on_page_between(signature_start, arrow.body.span(printer.view).start) {
+    if !printer.has_comments_on_page_between(signature_start, arrow.body.span().start) {
         return false;
     }
     let start = if arrow.params.is_empty() {
@@ -486,23 +480,15 @@ fn arrow_signature_will_break(
         return true;
     }
     let window_start = arrow.params_start.unwrap_or(span.start);
-    if params_cannot_force_break(
-        printer,
-        printer.view.run(arrow.params),
-        window_start,
-        arrow.arrow_token,
-    ) {
+    if params_cannot_force_break(printer, arrow.params, window_start, arrow.arrow_token) {
         return false;
     }
     let unforced = if arrow.body.is_expression() {
         None
     } else {
-        sole_param_object_type_start(
-            printer,
-            printer.view.run(arrow.params),
-            arrow.params_start,
-            || printer.arrow_params_end(arrow),
-        )
+        sole_param_object_type_start(printer, arrow.params, arrow.params_start, || {
+            printer.arrow_params_end(arrow)
+        })
     };
     printer.ask_signature_params(unforced, || {
         d.will_break(printer.build_arrow_params_doc_ungrouped(arrow, span))
@@ -538,9 +524,7 @@ fn params_cannot_force_break(
     start: u32,
     end: u32,
 ) -> bool {
-    params
-        .iter()
-        .all(|param| param_is_flat(printer.view, param))
+    params.iter().all(param_is_flat)
         && !printer.comment_has_newline_between(start, end)
         && !printer.has_comments_on_page_between(start, end)
 }
@@ -556,7 +540,7 @@ fn params_cannot_force_break(
 /// - a rest element `...a` over a bare identifier, with a flat annotation or none;
 /// - a default `a = x` whose binding is such an identifier and whose value is a single
 ///   literal or identifier token.
-fn param_is_flat(view: ExprView<'_>, param: &ast::Expression<'_>) -> bool {
+fn param_is_flat(param: &ast::Expression<'_>) -> bool {
     match &param.kind {
         ast::ExpressionKind::Identifier(id) => {
             id.decorators().unwrap_or_default().is_empty()
@@ -569,47 +553,39 @@ fn param_is_flat(view: ExprView<'_>, param: &ast::Expression<'_>) -> bool {
                     ast::ObjectPatternProperty::Property(property) => {
                         !property.computed
                             && !property.method
-                            && is_bare_identifier(view.expr(property.key))
-                            && is_bare_identifier(view.expr(property.value))
+                            && is_bare_identifier(property.key)
+                            && is_bare_identifier(property.value)
                     }
                     ast::ObjectPatternProperty::RestElement(rest) => {
-                        rest.type_annotation.is_none()
-                            && is_bare_identifier(view.expr(rest.argument))
+                        rest.type_annotation.is_none() && is_bare_identifier(rest.argument)
                     }
                 })
         }
         ast::ExpressionKind::ArrayPattern(pattern) => {
             pattern.decorators.unwrap_or_default().is_empty()
                 && annotation_is_flat(pattern.type_annotation.as_ref())
-                && view
-                    .pattern_elements(pattern.elements)
-                    .iter()
-                    .all(|element| {
-                        element
-                            .as_ref()
-                            .is_none_or(|element| match &view.slot(element).kind {
-                                ast::ExpressionKind::RestElement(rest) => {
-                                    rest.type_annotation.is_none()
-                                        && is_bare_identifier(view.expr(rest.argument))
-                                }
-                                _ => is_bare_identifier(view.slot(element)),
-                            })
+                && pattern.elements.iter().all(|element| {
+                    element.as_ref().is_none_or(|element| match &element.kind {
+                        ast::ExpressionKind::RestElement(rest) => {
+                            rest.type_annotation.is_none() && is_bare_identifier(rest.argument)
+                        }
+                        _ => is_bare_identifier(element),
                     })
+                })
         }
         ast::ExpressionKind::RestElement(rest) => {
-            is_bare_identifier(view.expr(rest.argument))
-                && annotation_is_flat(rest.type_annotation.as_ref())
+            is_bare_identifier(rest.argument) && annotation_is_flat(rest.type_annotation.as_ref())
         }
         ast::ExpressionKind::AssignmentPattern(default) => {
             default.decorators.unwrap_or_default().is_empty()
                 && matches!(
-                    &view.expr(default.left).kind,
+                    &default.left.kind,
                     ast::ExpressionKind::Identifier(id)
                         if id.decorators().unwrap_or_default().is_empty()
                             && annotation_is_flat(id.type_annotation())
                 )
                 && matches!(
-                    view.expr(default.right).kind,
+                    default.right.kind,
                     ast::ExpressionKind::Literal(_) | ast::ExpressionKind::Identifier(_)
                 )
         }
@@ -787,25 +763,19 @@ pub(in crate::printer) fn flat_sole_param_literal<'a>(
             let ast::ArrowFunctionBody::BlockStatement(body) = &arrow.body else {
                 return None;
             };
-            let literal = sole_param_object_type(
-                printer,
-                printer.view.run(arrow.params),
-                arrow.params_start,
-                || printer.arrow_params_end(arrow),
-            )?;
+            let literal =
+                sole_param_object_type(printer, arrow.params, arrow.params_start, || {
+                    printer.arrow_params_end(arrow)
+                })?;
             (literal, body, true, None)
         }
         ast::ExpressionKind::FunctionExpression(func) => {
-            let literal = sole_param_object_type(
-                printer,
-                printer.view.run(func.params),
-                Some(func.params_start),
-                || {
+            let literal =
+                sole_param_object_type(printer, func.params, Some(func.params_start), || {
                     printer
                         .find_closing_paren(func.params_start, func.body.span.start)
                         .map(|after_paren| after_paren - 1)
-                },
-            )?;
+                })?;
             (literal, &func.body, false, function_return_type_break(func))
         }
         _ => return None,
@@ -816,7 +786,7 @@ pub(in crate::printer) fn flat_sole_param_literal<'a>(
     // out for the same reason: its own width break in the hug reads back as authored, which
     // the hug keeps refusing, as prettier does.
     if printer.literal_authored_expanded(literal)
-        || type_literal_members_hold_brace_type(printer.view, literal)
+        || type_literal_members_hold_brace_type(literal)
         || printer.type_literal_members_hold_blank_line(literal)
         || printer.has_comments_on_page_between(arg.span.start, body.span.start)
     {
@@ -968,27 +938,27 @@ fn function_signature_refuses_hug(
     func: &ast::FunctionExpression<'_>,
     arg_count: usize,
 ) -> bool {
-    let params = printer.view.run(func.params);
     if function_signature_has_breaking_comments(printer, func) {
         return true;
     }
     if func.params.is_empty()
-        || !(arg_count > 1
-            || printer
-                .view
-                .run(func.params)
-                .iter()
-                .all(is_untyped_identifier_param))
+        || !(arg_count > 1 || func.params.iter().all(is_untyped_identifier_param))
     {
         return false;
     }
-    if params_cannot_force_break(printer, params, func.params_start, func.body.span.start) {
+    if params_cannot_force_break(
+        printer,
+        func.params,
+        func.params_start,
+        func.body.span.start,
+    ) {
         return false;
     }
     let close = printer
         .find_closing_paren(func.params_start, func.body.span.start)
         .map(|after_paren| after_paren - 1);
-    let unforced = sole_param_object_type_start(printer, params, Some(func.params_start), || close);
+    let unforced =
+        sole_param_object_type_start(printer, func.params, Some(func.params_start), || close);
     // The list is built only to be asked, and every layout candidate of a member chain asks
     // it again, so the build is shared across them ([`ShareTag::SignatureParamsProbe`]).
     let key = printer.chain_share_key_of(
@@ -998,7 +968,7 @@ fn function_signature_refuses_hug(
     );
     printer.ask_signature_params(unforced, || {
         printer.d().will_break(printer.chain_shared_doc(key, || {
-            printer.build_params_doc_with_comments(params, Some(func.params_start), close)
+            printer.build_params_doc_with_comments(func.params, Some(func.params_start), close)
         }))
     })
 }
@@ -1172,8 +1142,7 @@ impl<'a> Printer<'a> {
         comments_present: bool,
     ) -> bool {
         params.len() == 1
-            && (is_huggable_pattern(self.view, &params[0])
-                || has_huggable_type_annotation(&params[0]))
+            && (is_huggable_pattern(&params[0]) || has_huggable_type_annotation(&params[0]))
             && self.param_delimiter_gaps_empty(&params[0], open, close, comments_present)
             && !self.param_has_decorators(&params[0])
             && !self.param_annotation_holds_own_line_directive(&params[0])
@@ -1289,7 +1258,7 @@ impl<'a> Printer<'a> {
         value: &ast::Expression<'_>,
         gap_start: u32,
     ) -> bool {
-        if !is_curried_arrow_chain(self.view, value) {
+        if !is_curried_arrow_chain(value) {
             return false;
         }
         let value_start = value.span().start;
@@ -1373,9 +1342,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         self.mark_assignment_value(expression);
         let build = || self.build_root_expression_doc(expression);
-        let Some(gap_start) =
-            value_gap_start.filter(|_| is_curried_arrow_chain(self.view, expression))
-        else {
+        let Some(gap_start) = value_gap_start.filter(|_| is_curried_arrow_chain(expression)) else {
             return build();
         };
         let value_start = expression.span().start;
@@ -1388,7 +1355,7 @@ impl<'a> Printer<'a> {
                 CommentFilter::BlockOnly,
             )
         };
-        if is_curried_arrow_chain_that_breaks(self.view, expression) {
+        if is_curried_arrow_chain_that_breaks(expression) {
             // The host breaks after its operator for such a chain, so the gap's run leads the
             // first head below that break — the declarator's own answer, where the arrow
             // prints the one comment glued to its `(` and the gap prints the rest. The
@@ -1587,7 +1554,7 @@ impl<'a> Printer<'a> {
         let body_is_arrow = matches!(
             &arrow.body,
             ast::ArrowFunctionBody::Expression(expr)
-                if matches!(self.view.expr(*expr).kind, ast::ExpressionKind::ArrowFunctionExpression(_))
+                if matches!(expr.kind, ast::ExpressionKind::ArrowFunctionExpression(_))
         );
         let restore_flat = flat_params && !body_is_arrow;
         if restore_flat {
@@ -1595,13 +1562,7 @@ impl<'a> Printer<'a> {
         }
         match &arrow.body {
             ast::ArrowFunctionBody::Expression(expr) => {
-                self.build_arrow_expression_body(
-                    &mut parts,
-                    self.view.expr(*expr),
-                    arrow,
-                    span,
-                    arrow_end,
-                );
+                self.build_arrow_expression_body(&mut parts, expr, arrow, span, arrow_end);
             }
             ast::ArrowFunctionBody::BlockStatement(block) => {
                 self.build_arrow_block_body(&mut parts, block, arrow_end);
@@ -1776,7 +1737,7 @@ impl<'a> Printer<'a> {
         let chain_should_break = is_arrow_body
             && !self.skip_arrow_chain.get()
             && (self.in_stacked_arrow_chain.get()
-                || crate::printer::arrow_chain_should_break(self.view, arrow));
+                || crate::printer::arrow_chain_should_break(arrow));
 
         // Check if body arrow has trailing param comments (forces break)
         let body_arrow_param_comment_forces_break = matches!(
@@ -2255,7 +2216,7 @@ impl<'a> Printer<'a> {
         let body_is_arrow = matches!(
             &arrow.body,
             ast::ArrowFunctionBody::Expression(b)
-                if matches!(self.view.expr(*b).kind, ast::ExpressionKind::ArrowFunctionExpression(_))
+                if matches!(b.kind, ast::ExpressionKind::ArrowFunctionExpression(_))
         );
         if !body_is_arrow || self.chain_holds_region_kept_body(arrow) {
             return false;
@@ -2263,7 +2224,7 @@ impl<'a> Printer<'a> {
         if matches!(
             context,
             ArrowChainContext::AssignmentRhs { .. } | ArrowChainContext::AssignmentRhsHung
-        ) && crate::printer::arrow_chain_should_break(self.view, arrow)
+        ) && crate::printer::arrow_chain_should_break(arrow)
         {
             return false;
         }
@@ -2283,9 +2244,9 @@ impl<'a> Printer<'a> {
         }
         let mut current = arrow;
         while let ast::ArrowFunctionBody::Expression(body) = &current.body
-            && let ast::ExpressionKind::ArrowFunctionExpression(inner) = &self.view.expr(*body).kind
+            && let ast::ExpressionKind::ArrowFunctionExpression(inner) = &body.kind
         {
-            if self.relational_sibling_pair_is_kept(self.view.expr(*body)) {
+            if self.relational_sibling_pair_is_kept(body) {
                 return true;
             }
             current = inner;
@@ -2333,22 +2294,17 @@ impl<'a> Printer<'a> {
         }
         let mut emitted: SmallVec<[(u32, u32); 8]> = SmallVec::new();
         let mut terminal_gap_start = head_span.start;
-        let terminal = walk_arrow_chain(
-            self.view,
-            head,
-            head_span,
-            |current, current_span, gap_start| {
-                emitted.push((
-                    current_span.start,
-                    self.arrow_signature_end(current, current_span),
-                ));
-                if let Some(gap_start) = gap_start {
-                    emitted.push((gap_start, current_span.start));
-                }
-                terminal_gap_start = arrow_token_end(current);
-            },
-        );
-        let body = terminal.span(self.view);
+        let terminal = walk_arrow_chain(head, head_span, |current, current_span, gap_start| {
+            emitted.push((
+                current_span.start,
+                self.arrow_signature_end(current, current_span),
+            ));
+            if let Some(gap_start) = gap_start {
+                emitted.push((gap_start, current_span.start));
+            }
+            terminal_gap_start = arrow_token_end(current);
+        });
+        let body = terminal.span();
         if self.terminal_arrow_gap_emitted(terminal_gap_start, body) {
             emitted.push((terminal_gap_start, body.start));
         }
@@ -2362,7 +2318,7 @@ impl<'a> Printer<'a> {
         // body→chain-end region above it is unemitted, one node's span inward.
         let printed_end = match terminal {
             ast::ArrowFunctionBody::Expression(expr) => {
-                self.shell_trailing_gap_start(self.view.expr(*expr), head_span.end, None, false)
+                self.shell_trailing_gap_start(expr, head_span.end, None, false)
             }
             ast::ArrowFunctionBody::BlockStatement(_) => body.end,
         };
@@ -2590,62 +2546,58 @@ impl<'a> Printer<'a> {
         // ([`Self::arrow_gap_broke_after_run`]: the hug test, the retained-paren gate and the
         // `=>`→body freeze) of exactly the arrow whose `=>` opens the terminal gap.
         let mut terminal_arrow = (head, span);
-        let terminal =
-            walk_arrow_chain(self.view, head, span, |current, current_span, gap_start| {
-                // Each signature is its own group so its params break independently of
-                // the chain (prettier wraps each `printArrowFunctionSignature` in a
-                // group): when the heads break onto separate lines, the params stay
-                // flat unless a single signature genuinely overflows.
-                let sig = d.group(self.build_arrow_signature_doc(current, current_span));
-                // An INNER arrow is built from its signature here and never routed through
-                // `build_expression_doc`, so this is the only place its owned leading comment
-                // can be claimed — otherwise it is dropped. The head is not: this whole chain
-                // doc is what `build_expression_doc` wraps, and it claims the head's comment
-                // there, so claiming it again here would print it twice. The head's leading
-                // gap is the enclosing site's for the same reason, which is what `gap_start`
-                // being `None` there says.
-                let sig = match gap_start {
-                    None => sig,
-                    Some(gap_start) => {
-                        let sig = self.prepend_owned_leading_comment_at(current_span.start, sig);
-                        // The head gap answers the `=>`-glued question exactly as the body gap
-                        // does; what differs is only where the run can go. Here the `=>` lives
-                        // in the SEPARATOR between two heads, so a glued run rides the gap tail
-                        // rather than the following signature — and takes the separator's line
-                        // with it, since a `//` is a `line_suffix` and the head behind it must
-                        // not render flat onto the comment's line.
-                        let mut glued: DocBuf = DocBuf::new();
-                        let head = self.push_arrow_gap_glued_head(
-                            &mut glued,
-                            gap_start,
-                            current_span.start,
-                        );
-                        let resume = head.as_ref().map_or(gap_start, |h| h.resume);
-                        gap_tails.push(match head {
-                            Some(head) => {
-                                glued.push(self.arrow_glued_head_break(&head));
-                                d.concat(&glued)
-                            }
-                            None => d.line(),
-                        });
-                        prepend_leading(
-                            d,
-                            self.arrow_gap_leading_run(resume, current_span.start),
-                            sig,
-                        )
-                    }
-                };
-                sig_docs.push(sig);
-                terminal_gap_start = arrow_token_end(current);
-                terminal_arrow = (current, current_span);
-            });
+        let terminal = walk_arrow_chain(head, span, |current, current_span, gap_start| {
+            // Each signature is its own group so its params break independently of
+            // the chain (prettier wraps each `printArrowFunctionSignature` in a
+            // group): when the heads break onto separate lines, the params stay
+            // flat unless a single signature genuinely overflows.
+            let sig = d.group(self.build_arrow_signature_doc(current, current_span));
+            // An INNER arrow is built from its signature here and never routed through
+            // `build_expression_doc`, so this is the only place its owned leading comment
+            // can be claimed — otherwise it is dropped. The head is not: this whole chain
+            // doc is what `build_expression_doc` wraps, and it claims the head's comment
+            // there, so claiming it again here would print it twice. The head's leading
+            // gap is the enclosing site's for the same reason, which is what `gap_start`
+            // being `None` there says.
+            let sig = match gap_start {
+                None => sig,
+                Some(gap_start) => {
+                    let sig = self.prepend_owned_leading_comment_at(current_span.start, sig);
+                    // The head gap answers the `=>`-glued question exactly as the body gap
+                    // does; what differs is only where the run can go. Here the `=>` lives
+                    // in the SEPARATOR between two heads, so a glued run rides the gap tail
+                    // rather than the following signature — and takes the separator's line
+                    // with it, since a `//` is a `line_suffix` and the head behind it must
+                    // not render flat onto the comment's line.
+                    let mut glued: DocBuf = DocBuf::new();
+                    let head =
+                        self.push_arrow_gap_glued_head(&mut glued, gap_start, current_span.start);
+                    let resume = head.as_ref().map_or(gap_start, |h| h.resume);
+                    gap_tails.push(match head {
+                        Some(head) => {
+                            glued.push(self.arrow_glued_head_break(&head));
+                            d.concat(&glued)
+                        }
+                        None => d.line(),
+                    });
+                    prepend_leading(
+                        d,
+                        self.arrow_gap_leading_run(resume, current_span.start),
+                        sig,
+                    )
+                }
+            };
+            sig_docs.push(sig);
+            terminal_gap_start = arrow_token_end(current);
+            terminal_arrow = (current, current_span);
+        });
 
         // Prettier's `shouldBreakChain` — a head carrying a return type with params, type
         // parameters, or a non-identifier parameter puts every head on its own line however
         // short the chain is, and (below) denies the ternary terminal its same-line parens.
         // Provably `false` under `AssignmentRhs`, where such a chain never reaches this
         // builder at all — see `should_use_arrow_chain_layout`.
-        let should_break_chain = crate::printer::arrow_chain_should_break(self.view, head);
+        let should_break_chain = crate::printer::arrow_chain_should_break(head);
 
         // The heads group is keyed — its own instance, so a chain nested in a parameter
         // default or in the body never answers for this one; its shape depends on
@@ -2790,12 +2742,12 @@ impl<'a> Printer<'a> {
                 let hoisted_run = self
                     .arrow_body_inject
                     .get()
-                    .is_none_or(|(span, _)| span != self.view.expr(*expr).span().start)
+                    .is_none_or(|(span, _)| span != expr.span().start)
                     .then(|| {
                         self.hoisted_owned_value_gap_run_opt(
                             terminal_gap_start,
-                            self.view.expr(*expr),
-                            self.needs_parens(self.view.expr(*expr), ParenContext::ArrowBody),
+                            expr,
+                            self.needs_parens(expr, ParenContext::ArrowBody),
                         )
                     })
                     .flatten();
@@ -2804,15 +2756,10 @@ impl<'a> Printer<'a> {
                 // only on a run glued through to the body, this one only on a run that is
                 // not.
                 let glued_run = hoisted_run.or_else(|| {
-                    self.build_rhs_comments_glued_opt(
-                        terminal_gap_start,
-                        self.view.expr(*expr).span().start,
-                    )
+                    self.build_rhs_comments_glued_opt(terminal_gap_start, expr.span().start)
                 });
-                let broke_run: Option<CommentVec<'a>> = self.value_gap_soft_broke_after_run(
-                    terminal_gap_start,
-                    self.view.expr(*expr).span().start,
-                );
+                let broke_run: Option<CommentVec<'a>> =
+                    self.value_gap_soft_broke_after_run(terminal_gap_start, expr.span().start);
                 // The run as the reassembling arms take it: the SOFT broke-after form when
                 // the author broke after it — the run plus its newline-after `line`, which
                 // collapses to the glued bytes flat and holds its own line when this layout's
@@ -2832,12 +2779,9 @@ impl<'a> Printer<'a> {
                 // suppression, or the hoisted comment is printed twice — the emit and the
                 // suppression are one call (`docs/comments.md` §Owned comments).
                 let build_body = |build: &dyn Fn() -> DocId| -> DocId {
-                    self.build_value_under_hoist(hoisted_run, self.view.expr(*expr), build)
+                    self.build_value_under_hoist(hoisted_run, expr, build)
                 };
-                if self.has_own_line_post_arrow_comment(
-                    terminal_gap_start,
-                    self.view.expr(*expr).span().start,
-                ) {
+                if self.has_own_line_post_arrow_comment(terminal_gap_start, expr.span().start) {
                     // A `//`, or a block the author gave a line of its own: the gap breaks,
                     // and it breaks through the default layout's own-line arm — the run the
                     // author GLUED to `=>` keeps that line, the rest resumes below
@@ -2848,20 +2792,20 @@ impl<'a> Printer<'a> {
                     self.push_arrow_gap_tail(
                         &mut gap_parts,
                         terminal_gap_start,
-                        self.view.expr(*expr).span().start,
+                        expr.span().start,
                         |resume| {
                             build_body(&|| {
                                 self.build_arrow_body_with_comments_doc(
-                                    self.view.expr(*expr),
+                                    expr,
                                     resume,
-                                    self.view.expr(*expr).span().start,
+                                    expr.span().start,
                                     None,
                                 )
                             })
                         },
                     );
                     d.concat(&gap_parts)
-                } else if self.arrow_body_hugs(self.view.expr(*expr)) {
+                } else if self.arrow_body_hugs(expr) {
                     // Object/array/template/sequence body: hugs the last head, supplies its
                     // own internal indent, and does so however the chain broke — through the
                     // single arrow's own hug arm, so the two cannot part on it. The arrow it
@@ -2871,13 +2815,11 @@ impl<'a> Printer<'a> {
                         arrow,
                         arrow_span,
                         terminal_gap_start,
-                        self.view.expr(*expr),
+                        expr,
                         hoisted_run,
                         glued_run,
                     )
-                } else if self.arrow_body_takes_ternary_pair(self.view.expr(*expr))
-                    && !should_break_chain
-                {
+                } else if self.arrow_body_takes_ternary_pair(expr) && !should_break_chain {
                     // Ternary body: parens when inline, none when broken
                     // (prettier's shouldAddParensIfNotBreak). ⚠️ Prettier gates this
                     // disjunct of `shouldPutBodyOnSameLine` on `!shouldBreakChain`, and
@@ -2899,18 +2841,15 @@ impl<'a> Printer<'a> {
                     // multi-line comment the body owns prints OUTSIDE the ternary's own
                     // group, or its hard break explodes a ternary prettier keeps flat
                     // ([`Printer::build_value_with_outermost_owned_comment`]).
-                    let raw_body = build_body(&|| {
-                        self.build_expression_doc_claiming_outermost(self.view.expr(*expr))
-                    });
+                    let raw_body =
+                        build_body(&|| self.build_expression_doc_claiming_outermost(expr));
                     match broke_run
                         .as_ref()
                         .filter(|run| self.broke_after_run_break_is_forced(run, raw_body))
                     {
-                        Some(run) => self.break_after_operator_run_doc(
-                            run,
-                            self.view.expr(*expr).span().start,
-                            raw_body,
-                        ),
+                        Some(run) => {
+                            self.break_after_operator_run_doc(run, expr.span().start, raw_body)
+                        }
                         None => {
                             let body_doc = prepend_leading(d, terminal_run, raw_body);
                             if d.will_break(body_doc) {
@@ -2934,24 +2873,16 @@ impl<'a> Printer<'a> {
                     // hardline, so it carries the break rather than reading this layout's
                     // group.
                     let forced = broke_run.as_ref().and_then(|run| {
-                        let body_doc =
-                            build_body(&|| self.build_arrow_body_doc(self.view.expr(*expr)));
+                        let body_doc = build_body(&|| self.build_arrow_body_doc(expr));
                         self.broke_after_run_break_is_forced(run, body_doc)
                             .then(|| {
-                                self.break_after_operator_run_doc(
-                                    run,
-                                    self.view.expr(*expr).span().start,
-                                    body_doc,
-                                )
+                                self.break_after_operator_run_doc(run, expr.span().start, body_doc)
                             })
                     });
                     match forced {
                         Some(doc) => doc,
                         None => d.indent_line(build_body(&|| {
-                            self.build_arrow_body_doc_with_leading(
-                                self.view.expr(*expr),
-                                terminal_run,
-                            )
+                            self.build_arrow_body_doc_with_leading(expr, terminal_run)
                         })),
                     }
                 }
@@ -3001,22 +2932,22 @@ impl<'a> Printer<'a> {
         terminal_gap_start: u32,
         should_break_chain: bool,
     ) -> bool {
-        let body_start = terminal.span(self.view).start;
+        let body_start = terminal.span().start;
         if self.has_own_line_post_arrow_comment(terminal_gap_start, body_start) {
             return false;
         }
         match terminal {
             ast::ArrowFunctionBody::BlockStatement(_) => true,
             ast::ArrowFunctionBody::Expression(expr) => {
-                self.arrow_body_hugs(self.view.expr(*expr))
+                self.arrow_body_hugs(expr)
                     // A conditional body a comma-list region leaves bare stays on the
                     // head line too: the line is the one the pair would have held it on.
                     || (!should_break_chain
                         && matches!(
-                            self.view.expr(*expr).kind,
+                            expr.kind,
                             ast::ExpressionKind::ConditionalExpression(_)
                         )
-                        && !has_leftmost_arrow_body_parens(self.view, self.view.expr(*expr)))
+                        && !has_leftmost_arrow_body_parens(expr))
             }
         }
     }
@@ -3108,18 +3039,18 @@ impl<'a> Printer<'a> {
             // and every comment around it is the arrow's: before it the arrow's own, after
             // it the pre-`=>` gap's.
             if self.region_param_is_bare(arrow, span)
-                && let [param] = self.view.run(arrow.params)
+                && let [param] = arrow.params
             {
                 self.test_call_flat_params.set(false);
                 return self.build_function_parameter_doc(param);
             }
             self.build_params_doc_with_comments(
-                self.view.run(arrow.params),
+                arrow.params,
                 arrow.params_start,
                 self.arrow_params_end(arrow),
             )
         };
-        match bare_param_sharing_arrow_start(self.view, arrow, span) {
+        match bare_param_sharing_arrow_start(arrow, span) {
             Some(start) => self.with_owned_comment_claimed_above(start, build),
             None => build(),
         }
@@ -3162,8 +3093,8 @@ impl<'a> Printer<'a> {
             .as_ref()
             .map(|tp| tp.span.start)
             .or(arrow.params_start)
-            .or_else(|| self.view.run(arrow.params).first().map(|p| p.span().start))
-            .unwrap_or_else(|| arrow.body.span(self.view).start);
+            .or_else(|| arrow.params.first().map(|p| p.span().start))
+            .unwrap_or_else(|| arrow.body.span().start);
         parts.push(self.build_keyword_to_name_comments(span.start, head_start));
     }
 
@@ -3188,11 +3119,11 @@ impl<'a> Printer<'a> {
             // Find closing `)` to get accurate boundary
             Some(params_start) => self.close_paren_after_params(
                 params_start,
-                self.view.run(arrow.params).last().map(|p| p.span().end),
-                arrow.body.span(self.view).start,
+                arrow.params.last().map(|p| p.span().end),
+                arrow.body.span().start,
             ),
             // No parens (single param arrow like `x => x`) - use param end
-            None => self.view.run(arrow.params).last().map(|p| p.span().end),
+            None => arrow.params.last().map(|p| p.span().end),
         }
     }
 
@@ -3208,7 +3139,7 @@ impl<'a> Printer<'a> {
         self.arrow_params_end(arrow).unwrap_or_else(|| {
             arrow
                 .params_start
-                .map_or(span.start, |_| arrow.body.span(self.view).start)
+                .map_or(span.start, |_| arrow.body.span().start)
         })
     }
 
@@ -3263,10 +3194,7 @@ impl<'a> Printer<'a> {
         &self,
         arrow: &ast::ArrowFunctionExpression<'_>,
     ) -> bool {
-        self.trailing_param_comment_forces_break(
-            self.view.run(arrow.params),
-            self.arrow_params_end(arrow),
-        )
+        self.trailing_param_comment_forces_break(arrow.params, self.arrow_params_end(arrow))
     }
 
     /// [`Self::arrow_trailing_param_comment_forces_break`] for a `function` expression — the
@@ -3299,7 +3227,7 @@ impl<'a> Printer<'a> {
         func: &ast::FunctionExpression<'_>,
     ) -> bool {
         self.trailing_param_comment_forces_break(
-            self.view.run(func.params),
+            func.params,
             self.find_closing_paren(func.params_start, func.body.span.start),
         )
     }
@@ -3451,7 +3379,7 @@ impl<'a> Printer<'a> {
             // inside a stripped-paren shell (`a = (1 // c⏎)`) is in the gap they emit, so a
             // gate that starts past the shell lets that comment defer out of a list that
             // never breaks — past the `)` and the body, swallowing whatever follows.
-            let param_end = param.printed_end(self.view);
+            let param_end = param.printed_end();
             let trailing_end = self.param_trailing_end(params, i, trailing_comments_end);
             if self.has_line_comments_between(param_end, trailing_end) {
                 return true;
@@ -3513,7 +3441,7 @@ impl<'a> Printer<'a> {
         &self,
         expr: &ast::Expression<'_>,
     ) -> Option<DocId> {
-        let leftmost_span = leftmost_arrow_body_parens_span(self.view, expr)?;
+        let leftmost_span = leftmost_arrow_body_parens_span(expr)?;
         let prev = self.leftmost_pair_target.replace(Some(leftmost_span));
         let doc = self.build_flat_chain_expression_doc(expr);
         self.leftmost_pair_target.set(prev);
@@ -3528,7 +3456,7 @@ impl<'a> Printer<'a> {
         &self,
         expr: &ast::Expression<'_>,
     ) -> Option<DocId> {
-        if arrow_body_is_its_own_leftmost_pair(self.view, expr) {
+        if arrow_body_is_its_own_leftmost_pair(expr) {
             return None;
         }
         self.build_leftmost_parens_arrow_body_doc(expr)
@@ -3811,7 +3739,7 @@ impl<'a> Printer<'a> {
         let ast::ArrowFunctionBody::Expression(body) = &arrow.body else {
             return None;
         };
-        if !self.arrow_body_hugs(self.view.expr(*body)) {
+        if !self.arrow_body_hugs(body) {
             return None;
         }
         // The retained-paren arm's own gate, asked through the shared predicate so the two
@@ -3819,8 +3747,8 @@ impl<'a> Printer<'a> {
         // the widened reading is currently unreachable from here). The freeze is resolved the
         // same way the body arm resolves it, over the same `=>`→body gap; asked behind the hug
         // so the scan is paid only where an arm could still be taken.
-        let frozen = self.value_head_frozen_span(sig_end, self.view.expr(*body).span());
-        if self.arrow_body_shell_holds_comments(self.view.expr(*body), span.end, frozen) {
+        let frozen = self.value_head_frozen_span(sig_end, body.span());
+        if self.arrow_body_shell_holds_comments(body, span.end, frozen) {
             return None;
         }
         self.broke_after_value_leading_run(sig_end, body_start)
@@ -3867,7 +3795,7 @@ impl<'a> Printer<'a> {
         // parameter list along with it (`function <⏎// c⏎T>(⏎x: T⏎)`), which the declaration
         // and class-method paths — the same signature, through the same helper — never did.
         let (sig_doc, sig_end) = self.build_callable_signature_doc(
-            self.view.run(func.params),
+            func.params,
             func.type_parameters.as_ref(),
             func.return_type.as_ref(),
             func.params_start,
@@ -4249,7 +4177,7 @@ impl<'a> Printer<'a> {
             // partition one gap from one anchor.
             let param_end = Self::element_claim_anchor(
                 list_frozen.or_else(|| self.param_binding_frozen_span(param)),
-                param.printed_end(self.view),
+                param.printed_end(),
             );
 
             // Handle trailing same-line comments. One spelling for both arms
@@ -4409,7 +4337,7 @@ impl<'a> Printer<'a> {
             let search_start = if i == 0 {
                 params_start.map_or_else(|| param.span().start, |pos| pos + 1)
             } else {
-                params[i - 1].printed_end(self.view)
+                params[i - 1].printed_end()
             };
 
             // Check if there's a line comment on its own line before this param
@@ -4664,7 +4592,6 @@ impl<'a> Printer<'a> {
         class_expr: &ast::ClassExpression<'_>,
         class_expr_span: Span,
     ) -> DocId {
-        let super_class = self.view.opt(class_expr.super_class);
         let d = self.d();
 
         // With a decorated class expression (`@dec class {}`), span.start points
@@ -4693,7 +4620,7 @@ impl<'a> Printer<'a> {
             class_keyword_start,
             class_expr.id.as_ref(),
             class_expr.type_parameters.as_ref(),
-            super_class,
+            class_expr.super_class,
             class_expr.super_type_parameters.as_ref(),
             class_expr.implements,
         );
@@ -4701,7 +4628,7 @@ impl<'a> Printer<'a> {
         // Heritage layout (shared with the class-declaration printer).
         let layout = self.class_header_layout(
             &positions,
-            super_class,
+            class_expr.super_class,
             class_expr.super_type_parameters.as_ref(),
             class_expr.implements,
         );
@@ -4754,7 +4681,7 @@ impl<'a> Printer<'a> {
 
         // Build heritage docs (shared with the class-declaration printer).
         let extends_doc = self.build_class_extends_doc(
-            super_class,
+            class_expr.super_class,
             class_expr.super_type_parameters.as_ref(),
             positions.extends_keyword_start,
         );

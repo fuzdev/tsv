@@ -50,10 +50,6 @@ _internal_census = ["tsv_lang/_internal_census"]
 # arms them (one relaxed load per site), so the other audits sharing the build pay nothing
 # else.
 _internal_fanout_check = ["tsv_lang/_internal_fanout_check"]
-# Opt-in: the stores' instance + generation stamps (`tsv_lang::store`), in every audit build so a
-# stale or foreign handle fails an audit run even in bounds. Widens the handles, so a binary
-# carrying it supplies no performance number.
-_internal_store_check = ["tsv_lang/_internal_store_check"]
 # Compiles render timers into this binary so `profile` splits its `format` column into doc build
 # and render. Off by default and outside `_internal_audits`: a timed render pays two clock reads,
 # which a default profile must not.
@@ -78,16 +74,17 @@ _internal_ast_census = [
 # The instrumentation is inert unless armed (both seams are `AtomicBool` false by
 # default), so carrying it costs those commands nothing but the compile it saves.
 # Forwards to each member's fan-out (no need to also name `tsv_lang/_internal_audits` —
-# `_internal_swallow_check`+`_internal_comment_check`+`_internal_fanout_check`+`_internal_store_check`
-# already cover its members).
-_internal_audits = ["_internal_swallow_check", "_internal_comment_check", "_internal_fanout_check", "_internal_store_check"]
+# `_internal_swallow_check`+`_internal_comment_check`+`_internal_fanout_check` already cover its members).
+_internal_audits = ["_internal_swallow_check", "_internal_comment_check", "_internal_fanout_check"]
 
 [dependencies]
 tsv_cli = { path = "../tsv_cli" }
+tsv_check = { workspace = true }
 tsv_lang = { workspace = true }
 tsv_svelte = { workspace = true, features = ["json", "locations"] }
 tsv_ts = { workspace = true, features = ["json", "locations", "_internal_debug_lex"] }
 tsv_css = { workspace = true, features = ["json", "locations", "_internal_debug_lex"] }
+tsv_svelte_compile = { workspace = true }
 tsv_ignore = { workspace = true }
 tsv_discover = { workspace = true }
 argh.workspace = true

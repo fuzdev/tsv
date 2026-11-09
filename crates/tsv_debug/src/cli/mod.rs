@@ -18,10 +18,17 @@ use commands::{
     authoring_audit::AuthoringAuditCommand, binding_audit::BindingAuditCommand,
     buffer_sizes::BufferSizesCommand, build_fanout_audit::BuildFanoutAuditCommand,
     build_visit_census::BuildVisitCensusCommand, canonical_compile::CanonicalCompileCommand,
-    canonical_parse::CanonicalParseCommand, census_audit::CensusAuditCommand, check::CheckCommand,
-    compare::CompareCommand, conformance_audit::ConformanceAuditCommand,
-    fabrication_audit::FabricationAuditCommand, fixture_init::FixtureInitCommand,
-    fixtures_audit::FixturesAuditCommand, fixtures_update::FixturesUpdateCommand,
+    canonical_parse::CanonicalParseCommand, canonicalize_audit::CanonicalizeAuditCommand,
+    census_audit::CensusAuditCommand, check::CheckCommand, compare::CompareCommand,
+    compile_compare::CompileCompareCommand,
+    compile_conformance_audit::CompileConformanceAuditCommand,
+    compile_corpus_compare::CompileCorpusCompareCommand,
+    compile_fixture_init::CompileFixtureInitCommand,
+    compile_fixtures_validate::CompileFixturesValidateCommand, compile_fuzz::CompileFuzzCommand,
+    compile_profile::CompileProfileCommand, conformance_audit::ConformanceAuditCommand,
+    erase_comment_census::EraseCommentCensusCommand, fabrication_audit::FabricationAuditCommand,
+    fixture_init::FixtureInitCommand, fixtures_audit::FixturesAuditCommand,
+    fixtures_update::FixturesUpdateCommand,
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
@@ -34,18 +41,8 @@ use commands::{
     render_audit::RenderAuditCommand, render_compare::RenderCompareCommand,
     roundtrip_audit::RoundtripAuditCommand, scan_audit::ScanAuditCommand, strip::StripCommand,
     strip_fixtures_validate::StripFixturesValidateCommand, test262::Test262Command,
-    ts_fixture_audit::TsFixtureAuditCommand, type_sizes::TypeSizesCommand,
-    variant_audit::VariantAuditCommand,
-};
-#[cfg(tsv_unported)]
-use commands::{
-    canonicalize_audit::CanonicalizeAuditCommand, compile_compare::CompileCompareCommand,
-    compile_conformance_audit::CompileConformanceAuditCommand,
-    compile_corpus_compare::CompileCorpusCompareCommand,
-    compile_fixture_init::CompileFixtureInitCommand,
-    compile_fixtures_validate::CompileFixturesValidateCommand, compile_fuzz::CompileFuzzCommand,
-    compile_profile::CompileProfileCommand, erase_comment_census::EraseCommentCensusCommand,
-    tsc_conformance::TscConformanceCommand,
+    ts_fixture_audit::TsFixtureAuditCommand, tsc_conformance::TscConformanceCommand,
+    type_sizes::TypeSizesCommand, variant_audit::VariantAuditCommand,
 };
 
 /// A command failure, carrying the process exit code up to the single exit
@@ -132,23 +129,14 @@ pub enum Subcommand {
     LocWires(LocWiresCommand),
     CanonicalParse(CanonicalParseCommand),
     CanonicalCompile(CanonicalCompileCommand),
-    #[cfg(tsv_unported)]
     CanonicalizeAudit(CanonicalizeAuditCommand),
-    #[cfg(tsv_unported)]
     CompileCompare(CompileCompareCommand),
-    #[cfg(tsv_unported)]
     CompileConformanceAudit(CompileConformanceAuditCommand),
-    #[cfg(tsv_unported)]
     CompileCorpusCompare(CompileCorpusCompareCommand),
-    #[cfg(tsv_unported)]
     CompileFixtureInit(CompileFixtureInitCommand),
-    #[cfg(tsv_unported)]
     CompileFuzz(CompileFuzzCommand),
-    #[cfg(tsv_unported)]
     CompileFixturesValidate(CompileFixturesValidateCommand),
-    #[cfg(tsv_unported)]
     CompileProfile(CompileProfileCommand),
-    #[cfg(tsv_unported)]
     EraseCommentCensus(EraseCommentCensusCommand),
     FormatPrettier(FormatPrettierCommand),
     Fuzz(FuzzCommand),
@@ -180,7 +168,6 @@ pub enum Subcommand {
     #[cfg(feature = "_internal_swallow_check")]
     SwallowAudit(SwallowAuditCommand),
     Test262(Test262Command),
-    #[cfg(tsv_unported)]
     TscConformance(TscConformanceCommand),
     TsFixtureAudit(TsFixtureAuditCommand),
     TypeSizes(TypeSizesCommand),
@@ -223,23 +210,14 @@ impl TopLevel {
             Subcommand::LocWires(c) => c.run(),
             Subcommand::CanonicalParse(c) => c.run(),
             Subcommand::CanonicalCompile(c) => c.run(),
-            #[cfg(tsv_unported)]
             Subcommand::CanonicalizeAudit(c) => c.run(),
-            #[cfg(tsv_unported)]
             Subcommand::CompileCompare(c) => c.run(),
-            #[cfg(tsv_unported)]
             Subcommand::CompileConformanceAudit(c) => c.run(),
-            #[cfg(tsv_unported)]
             Subcommand::CompileCorpusCompare(c) => c.run(),
-            #[cfg(tsv_unported)]
             Subcommand::CompileFixtureInit(c) => c.run(),
-            #[cfg(tsv_unported)]
             Subcommand::CompileFuzz(c) => c.run(),
-            #[cfg(tsv_unported)]
             Subcommand::CompileFixturesValidate(c) => c.run(),
-            #[cfg(tsv_unported)]
             Subcommand::CompileProfile(c) => c.run(),
-            #[cfg(tsv_unported)]
             Subcommand::EraseCommentCensus(c) => c.run(),
             Subcommand::FormatPrettier(c) => c.run(),
             Subcommand::Fuzz(c) => c.run(),
@@ -268,7 +246,6 @@ impl TopLevel {
             #[cfg(feature = "_internal_swallow_check")]
             Subcommand::SwallowAudit(c) => c.run(),
             Subcommand::Test262(c) => c.run(),
-            #[cfg(tsv_unported)]
             Subcommand::TscConformance(c) => c.run(),
             Subcommand::TsFixtureAudit(c) => c.run(),
             Subcommand::TypeSizes(c) => c.run(),

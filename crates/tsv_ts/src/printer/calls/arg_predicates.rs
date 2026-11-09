@@ -1,7 +1,5 @@
 //! Call-argument and arrow shape predicates shared by the call, new, and chain printers.
 
-use crate::ast::ExprEdge;
-use crate::ast::ExprView;
 use crate::ast::{self, Expression, ExpressionKind, TSType};
 use crate::printer::Printer;
 use crate::printer::expressions::functions::{arrow_token_end, has_leftmost_arrow_body_parens};
@@ -30,7 +28,7 @@ fn is_boolean_type_coercion(call: &ast::CallExpression<'_>, printer: &Printer<'_
     if call.optional || call.arguments.len() != 1 {
         return false;
     }
-    let ExpressionKind::Identifier(id) = &printer.view.expr(call.callee).kind else {
+    let ExpressionKind::Identifier(id) = &call.callee.kind else {
         return false;
     };
     printer.with_ident_name(id, |s| s == "Boolean")
@@ -55,7 +53,7 @@ pub(super) fn mark_boolean_coercion_argument(
     call: &ast::CallExpression<'_>,
 ) {
     if is_boolean_type_coercion(call, printer) {
-        printer.mark_flat_chain(printer.view.expr(printer.view.list(call.arguments)[0]));
+        printer.mark_flat_chain(call.arguments[0]);
     }
 }
 
@@ -72,7 +70,7 @@ pub(super) fn mark_boolean_coercion_argument(
 ///   case, which is what keeps the transparency one level deep)
 ///
 /// Used to determine if tail args can stay inline after a function callback.
-fn is_hopefully_short_arg(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+fn is_hopefully_short_arg(expr: &Expression<'_>) -> bool {
     match &expr.kind {
         // Prettier: if (node.type === "ParenthesizedExpression") recurse into node.expression.
         // A JSDoc cast is prettier's retained `ParenthesizedExpression` — its annotation
@@ -80,17 +78,15 @@ fn is_hopefully_short_arg(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
         // shortness question is asked of what it wraps. The recursion is one level deep on
         // purpose: `is_simple_call_argument` has no paren case, so a cast nested inside
         // another argument stays opaque, matching prettier.
-        ExpressionKind::CommentBoundPair(cast) => {
-            is_hopefully_short_arg(view, view.expr(cast.inner))
-        }
+        ExpressionKind::CommentBoundPair(cast) => is_hopefully_short_arg(cast.inner),
 
         // Prettier: `isBinaryCastExpression(node) || node.type === "TypeCastExpression"` —
         // the `as` / `satisfies` pair (the Flow spellings have no tsv equivalent).
         ExpressionKind::TSAsExpression(cast) => {
-            cast_is_hopefully_short(view, cast.type_annotation, view.expr(cast.expression))
+            cast_is_hopefully_short(cast.type_annotation, cast.expression)
         }
         ExpressionKind::TSSatisfiesExpression(cast) => {
-            cast_is_hopefully_short(view, cast.type_annotation, view.expr(cast.expression))
+            cast_is_hopefully_short(cast.type_annotation, cast.expression)
         }
 
         // An angle-bracket assertion (`<T>x`) is NEVER short: prettier's
@@ -102,22 +98,19 @@ fn is_hopefully_short_arg(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
         ExpressionKind::TSTypeAssertion(_) => false,
 
         // Prettier: if (isCallLikeExpression(node) && getCallArguments(node).length > 1) return false
-        _ if CallLikeArguments::of(view, expr).is_some_and(|arguments| arguments.len() > 1) => {
-            false
-        }
+        _ if CallLikeArguments::of(expr).is_some_and(|arguments| arguments.len() > 1) => false,
 
         // Prettier: if (isBinaryish(node)) check both sides with depth=1
         // Note: Our AST uses BinaryExpression for logical ops (&&, ||, ??) too
         ExpressionKind::BinaryExpression(bin) => {
-            is_simple_call_argument(view, view.expr(bin.left), 1)
-                && is_simple_call_argument(view, view.expr(bin.right), 1)
+            is_simple_call_argument(bin.left, 1) && is_simple_call_argument(bin.right, 1)
         }
 
         // Prettier: return isRegExpLiteral(node) || isSimpleCallArgument(node)
         // All regex is "hopefully short" regardless of pattern length — the pattern
         // length check in is_simple_call_argument only matters for chain 3+ calls.
         ExpressionKind::RegexLiteral(_) => true,
-        _ => is_simple_call_argument(view, expr, 2),
+        _ => is_simple_call_argument(expr, 2),
     }
 }
 
@@ -137,11 +130,7 @@ fn is_hopefully_short_arg(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
 ///
 /// Parens are unwrapped at each step because prettier's TS AST has no
 /// `TSParenthesizedType` node — `(T)[]` reaches its check already as `T[]`.
-fn cast_is_hopefully_short(
-    view: ExprView<'_>,
-    type_annotation: &TSType<'_>,
-    expression: &Expression<'_>,
-) -> bool {
+fn cast_is_hopefully_short(type_annotation: &TSType<'_>, expression: &Expression<'_>) -> bool {
     let mut ty = unwrap_parenthesized(type_annotation);
     for _ in 0..2 {
         let TSType::Array(array) = ty else { break };
@@ -154,7 +143,7 @@ fn cast_is_hopefully_short(
         ty = lone;
     }
 
-    is_simple_type(ty) && is_simple_call_argument(view, expression, 1)
+    is_simple_type(ty) && is_simple_call_argument(expression, 1)
 }
 
 /// The **call-like family** prettier's `isCallLikeExpression` names — a call, a `new`, or a
@@ -169,7 +158,7 @@ enum CallLikeArguments<'a> {
     /// A call's or `new`'s callee and argument list.
     Called {
         callee: &'a Expression<'a>,
-        arguments: &'a [ExprEdge<'a>],
+        arguments: &'a [&'a Expression<'a>],
     },
     /// A dynamic import's specifier and optional options object. It has **no callee**, and
     /// prettier's simplicity test skips the callee arm for it rather than failing on it.
@@ -181,19 +170,19 @@ enum CallLikeArguments<'a> {
 
 impl<'a> CallLikeArguments<'a> {
     /// The call-like reading of `expr`, or `None` when it is not call-like.
-    fn of(view: ExprView<'a>, expr: &'a Expression<'a>) -> Option<Self> {
+    fn of(expr: &'a Expression<'a>) -> Option<Self> {
         match &expr.kind {
             ExpressionKind::CallExpression(call) => Some(Self::Called {
-                callee: view.expr(call.callee),
-                arguments: view.list(call.arguments),
+                callee: call.callee,
+                arguments: call.arguments,
             }),
             ExpressionKind::NewExpression(new_expr) => Some(Self::Called {
-                callee: view.expr(new_expr.callee),
-                arguments: view.list(new_expr.arguments),
+                callee: new_expr.callee,
+                arguments: new_expr.arguments,
             }),
             ExpressionKind::ImportExpression(import_expr) => Some(Self::Imported {
-                source: view.expr(import_expr.source),
-                options: view.opt(import_expr.options),
+                source: import_expr.source,
+                options: import_expr.options,
             }),
             _ => None,
         }
@@ -216,15 +205,9 @@ impl<'a> CallLikeArguments<'a> {
     }
 
     /// Whether every argument satisfies `predicate`.
-    fn all(
-        self,
-        view: ExprView<'a>,
-        mut predicate: impl FnMut(&'a Expression<'a>) -> bool,
-    ) -> bool {
+    fn all(self, mut predicate: impl FnMut(&'a Expression<'a>) -> bool) -> bool {
         match self {
-            Self::Called { arguments, .. } => {
-                arguments.iter().all(|arg| predicate(view.expr(*arg)))
-            }
+            Self::Called { arguments, .. } => arguments.iter().copied().all(predicate),
             Self::Imported { source, options } => {
                 predicate(source) && options.is_none_or(predicate)
             }
@@ -244,7 +227,6 @@ impl<'a> CallLikeArguments<'a> {
 /// on-page axis, since `hasComment` is a pure layout question that an owned annotation
 /// satisfies. Callers pass `printer.has_comments_on_page_between`.
 pub(super) fn is_short_second_arg_for_expand_first<F>(
-    view: ExprView<'_>,
     arg: &Expression<'_>,
     leading_gap_start: u32,
     has_comments: F,
@@ -260,11 +242,11 @@ where
         | ExpressionKind::FunctionExpression(_)
         | ExpressionKind::ConditionalExpression(_) => false,
         // `!couldExpandArg(secondArg)`
-        _ if could_expand_collection_arg(view, arg, leading_gap_start, &has_comments) => false,
+        _ if could_expand_collection_arg(arg, leading_gap_start, &has_comments) => false,
         // `isHopefullyShortCallArgument(secondArg)`. A truly empty, uncommented `{}` / `[]`
         // reaches this arm and is simple by the vacuous `all` over its members — as it is in
         // prettier, which likewise gives an empty collection no arm of its own.
-        _ => is_hopefully_short_arg(view, arg),
+        _ => is_hopefully_short_arg(arg),
     }
 }
 
@@ -284,7 +266,6 @@ where
 /// non-empty one. The transparency a cast does get is in [`is_hopefully_short_arg`] —
 /// pinned by `calls/expand_first_jsdoc_cast_second_arg`.
 fn could_expand_collection_arg<F>(
-    view: ExprView<'_>,
     arg: &Expression<'_>,
     leading_gap_start: u32,
     has_comments: &F,
@@ -298,7 +279,7 @@ where
         }
         ExpressionKind::TSAsExpression(_)
         | ExpressionKind::TSSatisfiesExpression(_)
-        | ExpressionKind::TSTypeAssertion(_) => unwrap_ts_type_wrappers(view, arg),
+        | ExpressionKind::TSTypeAssertion(_) => unwrap_ts_type_wrappers(arg),
         _ => return false,
     };
 
@@ -318,12 +299,9 @@ where
 /// Matches prettier's `isCallExpression(stripChainElementWrappers(body))` in
 /// `couldExpandArg`: `(x) => fn()` and `(x) => fn()!` are both call bodies, so the
 /// arrow hugs the call's open paren rather than breaking at it.
-pub(super) fn arrow_body_is_call_through_non_null(
-    view: ExprView<'_>,
-    body: &Expression<'_>,
-) -> bool {
+pub(super) fn arrow_body_is_call_through_non_null(body: &Expression<'_>) -> bool {
     matches!(
-        strip_non_null_wrappers(view, body).kind,
+        strip_non_null_wrappers(body).kind,
         ExpressionKind::CallExpression(_)
     )
 }
@@ -354,7 +332,7 @@ pub(super) fn arrow_body_breaks_after_space(
     body: &Expression<'_>,
 ) -> bool {
     is_ternary_arrow_body(body)
-        && !has_leftmost_arrow_body_parens(printer.view, body)
+        && !has_leftmost_arrow_body_parens(body)
         && !arrow_body_has_leading_own_line_comment(printer, arrow, body)
 }
 
@@ -385,12 +363,12 @@ pub(super) fn is_expandable_object(expr: &Expression<'_>) -> bool {
 /// Check if the last argument is an array or object expression (unwrapping type assertions)
 #[inline]
 pub(super) fn last_arg_is_array_or_object(
-    arguments: &[ExprEdge<'_>],
+    arguments: &[&Expression<'_>],
     printer: &Printer<'_>,
 ) -> bool {
     arguments
         .last()
-        .is_some_and(|arg| is_array_or_object_unwrapped(printer.view.expr(*arg), printer))
+        .is_some_and(|arg| is_array_or_object_unwrapped(arg, printer))
 }
 
 /// The container half of prettier's `couldExpandArg`: an object or array literal — read
@@ -415,7 +393,7 @@ pub(super) fn last_arg_is_array_or_object(
 /// where the same comment does decide, takes that gap as a parameter
 /// ([`could_expand_collection_arg`]).
 pub(super) fn is_array_or_object_unwrapped(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
-    let (inner, leading_from) = unwrap_ts_type_wrappers(printer.view, expr);
+    let (inner, leading_from) = unwrap_ts_type_wrappers(expr);
     let non_empty = match &inner.kind {
         ExpressionKind::ArrayExpression(arr) => !arr.elements.is_empty(),
         ExpressionKind::ObjectExpression(obj) => !obj.properties.is_empty(),
@@ -445,18 +423,15 @@ pub(super) fn is_array_or_object_unwrapped(expr: &Expression<'_>, printer: &Prin
 /// What leads the whole ARGUMENT is the caller's question, since only the caller knows where
 /// that gap opens — see [`could_expand_collection_arg`] and
 /// [`is_array_or_object_unwrapped`], which answer it differently and say why.
-fn unwrap_ts_type_wrappers<'a>(
-    view: ExprView<'a>,
-    mut expr: &'a Expression<'a>,
-) -> (&'a Expression<'a>, u32) {
+fn unwrap_ts_type_wrappers<'a>(mut expr: &'a Expression<'a>) -> (&'a Expression<'a>, u32) {
     let mut leading_from = expr.span().start;
     loop {
         expr = match &expr.kind {
-            ExpressionKind::TSAsExpression(cast) => view.expr(cast.expression),
-            ExpressionKind::TSSatisfiesExpression(cast) => view.expr(cast.expression),
+            ExpressionKind::TSAsExpression(cast) => cast.expression,
+            ExpressionKind::TSSatisfiesExpression(cast) => cast.expression,
             ExpressionKind::TSTypeAssertion(cast) => {
                 leading_from = cast.type_annotation.span().end;
-                view.expr(cast.expression)
+                cast.expression
             }
             _ => return (expr, leading_from),
         };
@@ -496,8 +471,7 @@ pub(super) fn is_block_function(expr: &Expression<'_>) -> bool {
 /// ON-PAGE axis, since an owned annotation glued to an argument is a comment prettier's
 /// `hasComment` sees.
 pub(super) fn is_react_hook_call_with_deps_array<F>(
-    view: ExprView<'_>,
-    args: &[ExprEdge<'_>],
+    args: &[&Expression<'_>],
     arg_gap_has_comment: F,
 ) -> bool
 where
@@ -505,12 +479,11 @@ where
 {
     let base = match args.len() {
         2 => 0,
-        3 if matches!(view.expr(args[0]).kind, ExpressionKind::Identifier(_)) => 1,
+        3 if matches!(args[0].kind, ExpressionKind::Identifier(_)) => 1,
         _ => return false,
     };
 
-    is_hook_callback_with_deps(view.expr(args[base]), view.expr(args[base + 1]))
-        && !arg_gap_has_comment()
+    is_hook_callback_with_deps(args[base], args[base + 1]) && !arg_gap_has_comment()
 }
 
 /// The shape half of [`is_react_hook_call_with_deps_array`] — prettier's
@@ -547,11 +520,7 @@ pub(super) fn is_hook_callback_with_deps(callback: &Expression<'_>, deps: &Expre
 /// `delete`, each of which prettier leaves to its own closing `return false`.
 ///
 /// Reference: prettier's `isSimpleCallArgument` (`utilities/is-simple-call-argument.js`)
-pub(crate) fn is_simple_call_argument(
-    view: ExprView<'_>,
-    expr: &Expression<'_>,
-    depth: usize,
-) -> bool {
+pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bool {
     if depth == 0 {
         return false;
     }
@@ -570,7 +539,7 @@ pub(crate) fn is_simple_call_argument(
     // pure, so asking them before the rest of the spine answers what the recursion answered.
     let mut expr = expr;
     let expr = loop {
-        expr = strip_non_null_wrappers(view, expr);
+        expr = strip_non_null_wrappers(expr);
 
         // Call-like nodes: the callee must be simple at THIS depth, the arguments must fit
         // within the remaining depth, and each must be simple one level shallower. Prettier
@@ -578,11 +547,9 @@ pub(crate) fn is_simple_call_argument(
         // (`node.type === "ImportExpression" || isSimpleCallArgument(node.callee, depth)`)
         // rather than failing on it — it has no callee. Answered ahead of the match because a
         // match guard cannot bind; the family is disjoint from every arm below.
-        if let Some(arguments) = CallLikeArguments::of(view, expr) {
+        if let Some(arguments) = CallLikeArguments::of(expr) {
             if !(arguments.len() <= depth
-                && arguments.all(view, |argument| {
-                    is_simple_call_argument(view, argument, depth - 1)
-                }))
+                && arguments.all(|argument| is_simple_call_argument(argument, depth - 1)))
             {
                 return false;
             }
@@ -600,11 +567,10 @@ pub(crate) fn is_simple_call_argument(
         if let ExpressionKind::MemberExpression(member) = &expr.kind {
             // Non-computed properties (identifiers) are always simple; computed properties
             // must have a simple expression
-            if member.computed && !is_simple_call_argument(view, view.expr(member.property), depth)
-            {
+            if member.computed && !is_simple_call_argument(member.property, depth) {
                 return false;
             }
-            expr = view.expr(member.object);
+            expr = member.object;
             continue;
         }
         break expr;
@@ -643,25 +609,25 @@ pub(crate) fn is_simple_call_argument(
                 return false;
             }
             // Check all expressions are simple at reduced depth
-            view.list(template.expressions)
+            template
+                .expressions
                 .iter()
-                .all(|e| is_simple_call_argument(view, view.expr(*e), depth - 1))
+                .all(|e| is_simple_call_argument(e, depth - 1))
         }
 
         // Objects: simple if all properties are non-computed and values are simple
         ExpressionKind::ObjectExpression(obj) => obj.properties.iter().all(|prop| match prop {
             ast::ObjectProperty::Property(p) => {
-                !p.computed
-                    && (p.shorthand || is_simple_call_argument(view, view.expr(p.value), depth - 1))
+                !p.computed && (p.shorthand || is_simple_call_argument(p.value, depth - 1))
             }
             // Spread properties are not simple
             ast::ObjectProperty::SpreadElement(_) => false,
         }),
 
         // Arrays: simple if all elements are simple (None = hole, which is simple)
-        ExpressionKind::ArrayExpression(arr) => view.opt_list(arr.elements).iter().all(|elem| {
+        ExpressionKind::ArrayExpression(arr) => arr.elements.iter().all(|elem| {
             elem.as_ref()
-                .is_none_or(|e| is_simple_call_argument(view, view.expr(*e), depth - 1))
+                .is_none_or(|e| is_simple_call_argument(e, depth - 1))
         }),
 
         // Unary expressions with simple operands. Prettier's
@@ -674,13 +640,11 @@ pub(crate) fn is_simple_call_argument(
                     | ast::UnaryOperator::Plus
                     | ast::UnaryOperator::Bang
                     | ast::UnaryOperator::Tilde
-            ) && is_simple_call_argument(view, view.expr(unary.argument), depth)
+            ) && is_simple_call_argument(unary.argument, depth)
         }
 
         // Update expressions (++x, x++)
-        ExpressionKind::UpdateExpression(update) => {
-            is_simple_call_argument(view, view.expr(update.argument), depth)
-        }
+        ExpressionKind::UpdateExpression(update) => is_simple_call_argument(update.argument, depth),
 
         // Everything else is not simple: arrow functions, function expressions, and
         // spread elements (matches prettier — no SpreadElement case), etc.
@@ -705,8 +669,8 @@ pub(crate) fn is_simple_call_argument(
 /// argument can be asked about. The other half of its gate is `isCallExpression(parent)`,
 /// which a `new` is not — so the `new` printer passes `false` to
 /// [`super::arg_wrapping::ArgOpener::lone_hug_ladder`] rather than asking this.
-pub(super) fn lone_arg_params_render_flat(view: ExprView<'_>, arg: &Expression<'_>) -> bool {
-    matches!(&arg.kind, ExpressionKind::FunctionExpression(func) if view.run(func.params).iter().all(|param| {
+pub(super) fn lone_arg_params_render_flat(arg: &Expression<'_>) -> bool {
+    matches!(&arg.kind, ExpressionKind::FunctionExpression(func) if func.params.iter().all(|param| {
         matches!(&param.kind, ExpressionKind::Identifier(id) if id.type_annotation().is_none())
     }))
 }
@@ -719,7 +683,7 @@ pub(super) fn lone_arg_params_render_flat(view: ExprView<'_>, arg: &Expression<'
 ///   any argument is a call expression containing a function/arrow argument
 ///
 /// This triggers `allArgsBrokenOut()` in Prettier to expand all arguments.
-pub(super) fn is_function_composition_args(view: ExprView<'_>, arguments: &[ExprEdge<'_>]) -> bool {
+pub(super) fn is_function_composition_args(arguments: &[&Expression<'_>]) -> bool {
     if arguments.len() <= 1 {
         return false;
     }
@@ -727,7 +691,6 @@ pub(super) fn is_function_composition_args(view: ExprView<'_>, arguments: &[Expr
     let mut function_count = 0;
 
     for arg in arguments {
-        let arg = view.expr(*arg);
         if matches!(
             arg.kind,
             ExpressionKind::ArrowFunctionExpression(_) | ExpressionKind::FunctionExpression(_)
@@ -738,9 +701,9 @@ pub(super) fn is_function_composition_args(view: ExprView<'_>, arguments: &[Expr
             }
         } else if let ExpressionKind::CallExpression(call) = &arg.kind {
             // Check if this call has any function/arrow arguments
-            if view.list(call.arguments).iter().any(|child_arg| {
+            if call.arguments.iter().any(|child_arg| {
                 matches!(
-                    view.expr(*child_arg).kind,
+                    child_arg.kind,
                     ExpressionKind::ArrowFunctionExpression(_)
                         | ExpressionKind::FunctionExpression(_)
                 )
@@ -761,26 +724,20 @@ mod tests {
     /// Parse a bare expression to its internal AST node (spans index into `src`),
     /// allocated in the caller-supplied `arena`.
     fn parse_expr<'a>(arena: &'a Bump, src: &str) -> &'a Expression<'a> {
-        crate::__private::parse_expression_with_comments(
-            src,
-            0,
-            0,
-            arena,
-            &mut ast::AstStores::new(),
-            "end of input",
-            |_, _| Ok(()),
-        )
+        crate::__private::parse_expression_with_comments(src, 0, 0, arena, "end of input", |_| {
+            Ok(())
+        })
         .expect("expression should parse")
         .0
     }
 
     /// Parse a call expression and return its argument list.
-    fn args_of<'a>(view: ExprView<'a>, arena: &'a Bump, src: &str) -> &'a [ExprEdge<'a>] {
+    fn args_of<'a>(arena: &'a Bump, src: &str) -> &'a [&'a Expression<'a>] {
         match parse_expr(arena, src) {
             Expression {
                 kind: ExpressionKind::CallExpression(call),
                 ..
-            } => view.list(call.arguments),
+            } => call.arguments,
             other => panic!("expected a call expression, got: {other:?}"),
         }
     }
@@ -789,10 +746,8 @@ mod tests {
     /// but a function expression whose parameters are all plain, unannotated identifiers.
     #[test]
     fn lone_arg_params_render_flat_only_for_plain_identifiers() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
         let arena = Bump::new();
-        let flat = |src| lone_arg_params_render_flat(view, parse_expr(&arena, src));
+        let flat = |src| lone_arg_params_render_flat(parse_expr(&arena, src));
 
         // Plain identifiers — including none at all.
         assert!(flat("(function () {})"));
@@ -816,46 +771,26 @@ mod tests {
 
     #[test]
     fn simple_call_argument_depth_and_shape() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
         let arena = Bump::new();
         // Depth 0 is always "not simple".
-        assert!(!is_simple_call_argument(view, parse_expr(&arena, "x"), 0));
+        assert!(!is_simple_call_argument(parse_expr(&arena, "x"), 0));
         // Literals / identifiers are simple at any positive depth.
-        assert!(is_simple_call_argument(view, parse_expr(&arena, "42"), 1));
-        assert!(is_simple_call_argument(view, parse_expr(&arena, "foo"), 1));
+        assert!(is_simple_call_argument(parse_expr(&arena, "42"), 1));
+        assert!(is_simple_call_argument(parse_expr(&arena, "foo"), 1));
         // Regex is simple only if the pattern width is <= 5.
-        assert!(is_simple_call_argument(
-            view,
-            parse_expr(&arena, "/abcde/"),
-            2
-        ));
-        assert!(!is_simple_call_argument(
-            view,
-            parse_expr(&arena, "/abcdef/"),
-            2
-        ));
+        assert!(is_simple_call_argument(parse_expr(&arena, "/abcde/"), 2));
+        assert!(!is_simple_call_argument(parse_expr(&arena, "/abcdef/"), 2));
         // A call's args must fit within the remaining depth: `f(a)` needs depth >= 2.
-        assert!(!is_simple_call_argument(
-            view,
-            parse_expr(&arena, "f(a)"),
-            1
-        ));
-        assert!(is_simple_call_argument(view, parse_expr(&arena, "f(a)"), 2));
+        assert!(!is_simple_call_argument(parse_expr(&arena, "f(a)"), 1));
+        assert!(is_simple_call_argument(parse_expr(&arena, "f(a)"), 2));
         // Spread elements are never simple.
-        assert!(!is_simple_call_argument(
-            view,
-            parse_expr(&arena, "[...x]"),
-            2
-        ));
+        assert!(!is_simple_call_argument(parse_expr(&arena, "[...x]"), 2));
     }
 
     #[test]
     fn simple_call_argument_looks_through_only_the_chain_wrappers() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
         let arena = Bump::new();
-        let simple = |src: &str| is_simple_call_argument(view, parse_expr(&arena, src), 2);
+        let simple = |src: &str| is_simple_call_argument(parse_expr(&arena, src), 2);
         // `!` is prettier's `stripChainElementWrappers`, so `x!` is as simple as `x`.
         assert!(simple("x!"));
         // A TS cast is not looked through — prettier has no case for one.
@@ -874,7 +809,6 @@ mod tests {
         assert!(simple("import(a, b)"));
         // …and the argument count is still held to the depth.
         assert!(!is_simple_call_argument(
-            view,
             parse_expr(&arena, "import(a, b)"),
             1
         ));
@@ -882,10 +816,8 @@ mod tests {
 
     #[test]
     fn hopefully_short_reads_a_cast_through_its_type() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
         let arena = Bump::new();
-        let short = |src: &str| is_hopefully_short_arg(view, parse_expr(&arena, src));
+        let short = |src: &str| is_hopefully_short_arg(parse_expr(&arena, src));
         // A bare type reference is simple, so the cast-wrapped seed stays short.
         assert!(short("{} as T"));
         assert!(short("{} satisfies T"));
@@ -910,40 +842,28 @@ mod tests {
 
     #[test]
     fn function_composition_args_detection() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
         let arena = Bump::new();
         // Two arrow args ⇒ composition.
-        assert!(is_function_composition_args(
-            view,
-            args_of(view, &arena, "compose(a => a, b => b)")
-        ));
+        assert!(is_function_composition_args(args_of(
+            &arena,
+            "compose(a => a, b => b)"
+        )));
         // A single arg is never composition.
-        assert!(!is_function_composition_args(
-            view,
-            args_of(view, &arena, "f(a => a)")
-        ));
+        assert!(!is_function_composition_args(args_of(&arena, "f(a => a)")));
         // A call argument that itself wraps a callback ⇒ composition.
-        assert!(is_function_composition_args(
-            view,
-            args_of(view, &arena, "compose(x, g(() => {}))")
-        ));
+        assert!(is_function_composition_args(args_of(
+            &arena,
+            "compose(x, g(() => {}))"
+        )));
         // Two non-function args ⇒ not composition.
-        assert!(!is_function_composition_args(
-            view,
-            args_of(view, &arena, "f(a, b)")
-        ));
+        assert!(!is_function_composition_args(args_of(&arena, "f(a, b)")));
     }
 
     #[test]
     fn react_hook_deps_array_shape() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
         let arena = Bump::new();
         // The gap-comment conjunct is the caller's; these cases isolate the shape.
-        let shape = |src: &str| {
-            is_react_hook_call_with_deps_array(view, args_of(view, &arena, src), || false)
-        };
+        let shape = |src: &str| is_react_hook_call_with_deps_array(args_of(&arena, src), || false);
 
         // Two-argument form: zero-parameter block arrow, then an array literal.
         assert!(shape("useEffect(() => {}, [a, b])"));
@@ -974,8 +894,7 @@ mod tests {
 
         // A comment attached to an argument refuses it, whatever the shape says.
         assert!(!is_react_hook_call_with_deps_array(
-            view,
-            args_of(view, &arena, "fn(() => {}, [a])"),
+            args_of(&arena, "fn(() => {}, [a])"),
             || true
         ));
     }

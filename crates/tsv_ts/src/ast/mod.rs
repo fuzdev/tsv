@@ -26,16 +26,9 @@ mod expressions;
 mod modules;
 mod patterns;
 mod statements;
-mod stores;
 mod types;
-mod view;
 
-pub use stores::{AstStores, Expr, ExprId, Parsed, with_stores};
 pub use tsv_lang::{Comment, Span};
-pub use view::{
-    ExprEdge, ExprList, ExprRun, ExprSlot, ExprView, ListElement, OptExprEdge, OptExprList,
-    ParsedRef, PatternElements,
-};
 
 //
 // Re-exports from submodules
@@ -218,7 +211,7 @@ pub struct Program<'arena> {
 #[derive(Debug, Clone)]
 pub struct Decorator<'arena> {
     /// The decorator expression (identifier, call, or member expression)
-    pub expression: ExprSlot<'arena>,
+    pub expression: Expression<'arena>,
     pub span: Span,
 }
 

@@ -139,12 +139,7 @@ use super::special::{bool_option, component_is_typescript, find_option_values, t
 /// it writes the span-only wire every binding ships — only `start`/`end` offsets, no
 /// `loc` and no `name_loc`; on `Wire::Loc` it adds every line/column object, the
 /// loc-bearing wire `tsv parse --locations` prints.
-pub(crate) fn write_root_bytes(
-    parsed: ast::ParsedRootRef<'_>,
-    source: &str,
-    wire: Wire,
-) -> Vec<u8> {
-    let root = parsed.root;
+pub(crate) fn write_root_bytes(root: &ast::Root<'_>, source: &str, wire: Wire) -> Vec<u8> {
     // One set of tables for the whole document — template, every acorn island,
     // `<script>` bodies, root comments and `<style>` — in the coordinates
     // `crate::WIRE_COORDINATES` states.
@@ -162,7 +157,6 @@ pub(crate) fn write_root_bytes(
     let ctx = Ctx {
         source,
         positions: tables.positions(),
-        view: parsed.view,
         snippet_wire_parameters: root.snippet_wire_parameters,
         comments: &template_comments,
         // Component-global: `lang="ts"` on any script makes *every* script emit the
@@ -179,8 +173,6 @@ pub(crate) fn write_root_bytes(
 #[derive(Clone, Copy)]
 struct Ctx<'a> {
     source: &'a str,
-    /// Reads the expressions of the tree being written.
-    view: tsv_ts::ast::ExprView<'a>,
     /// The document's positions: the byte→UTF-16 map, and — on the wire that carries
     /// `loc` — its one line table, which every node, `name_loc`, root comment,
     /// embedded island and `<style>` node reads.
@@ -216,7 +208,7 @@ impl<'a> Ctx<'a> {
         let wire = self.snippet_wire_parameters;
         wire.binary_search_by_key(&snippet_start, |entry| entry.snippet_start)
             .ok()
-            .map(|i| self.view.run(wire[i].parameters))
+            .map(|i| wire[i].parameters)
     }
 
     /// The shared inputs for an embedded `tsv_ts` writer — this document's `source`,
@@ -232,7 +224,6 @@ impl<'a> Ctx<'a> {
         EmbedWriter {
             source: self.source,
             positions: self.positions,
-            view: self.view,
             comments: mode,
             vanilla_acorn: !self.component_is_ts,
             // Only `embed_pattern` fills this: a block pattern is the one island that
@@ -691,7 +682,7 @@ fn write_special_element(w: &mut JsonWriter, elem: &ast::SpecialElement<'_>, ctx
     // `<svelte:component this={…}>` expression — a generic island.
     if let Some(tag) = elem.kind.expression() {
         w.raw(",\"expression\":");
-        write_braced_island(w, ctx.view.expr(tag.expression), tag.span, ctx);
+        write_braced_island(w, tag.expression, tag.span, ctx);
     }
     w.raw("}");
 }
@@ -724,7 +715,7 @@ fn write_special_tag(w: &mut JsonWriter, this: &ast::SpecialThis<'_>, ctx: &Ctx<
             w.raw("}");
         }
         ast::SpecialThis::Braced(tag) => {
-            write_braced_island(w, ctx.view.expr(tag.expression), tag.span, ctx);
+            write_braced_island(w, tag.expression, tag.span, ctx);
         }
     }
 }
@@ -734,7 +725,7 @@ fn write_expression_tag(w: &mut JsonWriter, tag: &ast::ExpressionTag<'_>, ctx: &
     w.raw("{\"type\":\"ExpressionTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
-    write_braced_island(w, ctx.view.expr(tag.expression), tag.span, ctx);
+    write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
 }
 
@@ -746,11 +737,7 @@ fn write_shorthand_expression_tag(w: &mut JsonWriter, tag: &ast::ExpressionTag<'
     w.raw("{\"type\":\"ExpressionTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
-    write_identifier_expression_with_character(
-        w,
-        ctx.view.expr(tag.expression),
-        ctx.embed(CommentMode::Off),
-    );
+    write_identifier_expression_with_character(w, tag.expression, ctx.embed(CommentMode::Off));
     w.raw("}");
 }
 
@@ -876,13 +863,7 @@ fn write_if_block(w: &mut JsonWriter, block: &ast::IfBlock<'_>, ctx: &Ctx<'_>) {
     }
     let range_end = fragment_first_start(&block.consequent).unwrap_or(block.span.end);
     w.raw(",\"test\":");
-    write_generic_island(
-        w,
-        ctx.view.expr(block.test),
-        block.span.start,
-        range_end,
-        ctx,
-    );
+    write_generic_island(w, block.test, block.span.start, range_end, ctx);
     w.raw(",\"consequent\":");
     write_fragment(w, &block.consequent, ctx);
     w.raw(",\"alternate\":");
@@ -898,18 +879,12 @@ fn write_each_block(w: &mut JsonWriter, block: &ast::EachBlock<'_>, ctx: &Ctx<'_
     w.span_start_end(ctx.positions, block.span.start, block.span.end);
     let range_end = fragment_first_start(&block.body).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
-    write_generic_island(
-        w,
-        ctx.view.expr(block.expression),
-        block.span.start,
-        range_end,
-        ctx,
-    );
+    write_generic_island(w, block.expression, block.span.start, range_end, ctx);
     w.raw(",\"body\":");
     write_fragment(w, &block.body, ctx);
     w.raw(",\"context\":");
     write_or_null(w, block.context.as_ref(), |w, c| {
-        write_pattern_island(w, ctx.view.expr(*c), ctx);
+        write_pattern_island(w, c, ctx);
     });
     if let Some(index) = block.index {
         w.raw(",\"index\":");
@@ -924,13 +899,7 @@ fn write_each_block(w: &mut JsonWriter, block: &ast::EachBlock<'_>, ctx: &Ctx<'_
         // claims a comment written inside it, which the pattern island also attaches. The
         // key's own `(`…`)` are block syntax, not a grouping pair around the root, so the
         // window stops short of both (no comment can follow the `)` before the `}`).
-        write_generic_island(
-            w,
-            ctx.view.expr(key.expression),
-            key.span.start + 1,
-            key.span.end - 1,
-            ctx,
-        );
+        write_generic_island(w, key.expression, key.span.start + 1, key.span.end - 1, ctx);
     }
     if let Some(fallback) = &block.fallback {
         w.raw(",\"fallback\":");
@@ -955,20 +924,14 @@ fn write_await_block(w: &mut JsonWriter, block: &ast::AwaitBlock<'_>, ctx: &Ctx<
     .min()
     .unwrap_or(block.span.end);
     w.raw(",\"expression\":");
-    write_generic_island(
-        w,
-        ctx.view.expr(block.expression),
-        block.span.start,
-        range_end,
-        ctx,
-    );
+    write_generic_island(w, block.expression, block.span.start, range_end, ctx);
     w.raw(",\"value\":");
     write_or_null(w, block.value.as_ref(), |w, v| {
-        write_pattern_island(w, ctx.view.expr(*v), ctx);
+        write_pattern_island(w, v, ctx);
     });
     w.raw(",\"error\":");
     write_or_null(w, block.error.as_ref(), |w, e| {
-        write_pattern_island(w, ctx.view.expr(*e), ctx);
+        write_pattern_island(w, e, ctx);
     });
     w.raw(",\"pending\":");
     // Svelte's block form always has a pending Fragment (empty or not); the inline
@@ -993,13 +956,7 @@ fn write_key_block(w: &mut JsonWriter, block: &ast::KeyBlock<'_>, ctx: &Ctx<'_>)
     w.span_start_end(ctx.positions, block.span.start, block.span.end);
     let range_end = fragment_first_start(&block.fragment).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
-    write_generic_island(
-        w,
-        ctx.view.expr(block.expression),
-        block.span.start,
-        range_end,
-        ctx,
-    );
+    write_generic_island(w, block.expression, block.span.start, range_end, ctx);
     w.raw(",\"fragment\":");
     write_fragment(w, &block.fragment, ctx);
     w.raw("}");
@@ -1013,13 +970,7 @@ fn write_snippet_block(w: &mut JsonWriter, block: &ast::SnippetBlock<'_>, ctx: &
     w.span_start_end(ctx.positions, block.span.start, block.span.end);
     let range_end = fragment_first_start(&block.body).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
-    write_snippet_name(
-        w,
-        ctx.view.expr(block.expression),
-        block.span.start,
-        range_end,
-        ctx,
-    );
+    write_snippet_name(w, block.expression, block.span.start, range_end, ctx);
     if let Some(type_params) = block.type_params_raw {
         w.raw(",\"typeParams\":");
         w.string(type_params);
@@ -1028,7 +979,7 @@ fn write_snippet_block(w: &mut JsonWriter, block: &ast::SnippetBlock<'_>, ctx: &
     write_snippet_parameters(
         w,
         ctx.snippet_wire_parameters(block.span.start)
-            .unwrap_or_else(|| ctx.view.run(block.parameters)),
+            .unwrap_or(block.parameters),
         block.span.start,
         range_end,
         ctx,
@@ -1093,7 +1044,7 @@ fn write_html_tag(w: &mut JsonWriter, tag: &ast::HtmlTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"HtmlTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
-    write_braced_island(w, ctx.view.expr(tag.expression), tag.span, ctx);
+    write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
 }
 
@@ -1102,7 +1053,7 @@ fn write_render_tag(w: &mut JsonWriter, tag: &ast::RenderTag<'_>, ctx: &Ctx<'_>)
     w.raw("{\"type\":\"RenderTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
-    write_braced_island(w, ctx.view.expr(tag.expression), tag.span, ctx);
+    write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
 }
 
@@ -1126,22 +1077,17 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &ast::DebugTag<'_>, ctx: &Ctx<'_>) {
     // paren-inclusive spans are what give the discarded-wrapper bounds below
     // canonical's own values. The cast-free common case borrows the parsed
     // slice untouched.
-    let spliced = if ctx.view.run(tag.identifiers).iter().any(|entry| {
+    let spliced = if tag.identifiers.iter().any(|entry| {
         matches!(
-            entry.unwrap_comment_bound_pairs(ctx.view).kind,
+            entry.unwrap_comment_bound_pairs().kind,
             tsv_ts::ast::ExpressionKind::SequenceExpression(_)
         )
     }) {
         let mut flat = Vec::with_capacity(tag.identifiers.len() + 1);
-        for entry in ctx.view.run(tag.identifiers) {
-            match &entry.unwrap_comment_bound_pairs(ctx.view).kind {
+        for entry in tag.identifiers {
+            match &entry.unwrap_comment_bound_pairs().kind {
                 tsv_ts::ast::ExpressionKind::SequenceExpression(seq) => {
-                    flat.extend(
-                        ctx.view
-                            .list(seq.expressions)
-                            .iter()
-                            .map(|e| ctx.view.expr(*e).clone()),
-                    );
+                    flat.extend(seq.expressions.iter().map(|e| (*e).clone()));
                 }
                 _ => flat.push(entry.clone()),
             }
@@ -1150,9 +1096,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &ast::DebugTag<'_>, ctx: &Ctx<'_>) {
     } else {
         None
     };
-    let identifiers = spliced
-        .as_deref()
-        .unwrap_or_else(|| ctx.view.run(tag.identifiers));
+    let identifiers = spliced.as_deref().unwrap_or(tag.identifiers);
     // `[_, _, ..]` is the multi-identifier case: a single identifier (which the pattern
     // excludes) has no wrapper at all.
     if let [_, _, ..] = identifiers
@@ -1239,8 +1183,8 @@ fn write_const_tag(w: &mut JsonWriter, tag: &ast::ConstTag<'_>, ctx: &Ctx<'_>) {
         // The document has template comments: each of the tag's acorn parses takes its
         // own attach — the id's (pattern, annotation) pair, then the init, split at the
         // end of the binding (see `attach_const_tag_init`).
-        let id_attach = attach_binding_pattern(ctx.view.expr(tag.id), ctx.attach_inputs());
-        let init_attach = attach_const_tag_init(ctx.view, tag, ctx.attach_inputs());
+        let id_attach = attach_binding_pattern(tag.id, ctx.attach_inputs());
+        let init_attach = attach_const_tag_init(tag, ctx.attach_inputs());
         write_const_declaration(
             w,
             tag,
@@ -1266,7 +1210,7 @@ fn write_const_tag(w: &mut JsonWriter, tag: &ast::ConstTag<'_>, ctx: &Ctx<'_>) {
 /// (positions come from the parsed comment list, never a substring scan).
 fn const_declarator_end(tag: &ast::ConstTag<'_>, ctx: &Ctx<'_>) -> u32 {
     let close = (tag.span.end - 1) as usize; // the closing `}`
-    let mut end = ctx.view.expr(tag.init).span().end;
+    let mut end = tag.init.span().end;
     let mut i = end as usize;
     loop {
         while let Some(ch) = ctx.source[i..close].chars().next() {
@@ -1316,18 +1260,10 @@ fn write_const_declaration(
     w.raw(
         "{\"type\":\"VariableDeclaration\",\"kind\":\"const\",\"declarations\":[{\"type\":\"VariableDeclarator\",\"id\":",
     );
-    write_pattern_embedded(
-        w,
-        ctx.view.expr(tag.id),
-        ctx.embed_pattern(id_mode, id_annotation_mode),
-    );
+    write_pattern_embedded(w, tag.id, ctx.embed_pattern(id_mode, id_annotation_mode));
     w.raw(",\"init\":");
-    write_expression_embedded(w, ctx.view.expr(tag.init), ctx.embed(init_mode));
-    w.span_start_end_field(
-        ctx.positions,
-        ctx.view.expr(tag.id).span().start,
-        declarator_end,
-    );
+    write_expression_embedded(w, tag.init, ctx.embed(init_mode));
+    w.span_start_end_field(ctx.positions, tag.id.span().start, declarator_end);
     w.raw("}],\"start\":");
     w.span_start_end(ctx.positions, tag.span.start + 2, decl_end);
     w.raw("}");
@@ -1431,7 +1367,7 @@ fn write_attribute_value_field(
         // and its identifier share a span) injects `character`.
         match &values[0] {
             ast::AttributeValue::ExpressionTag(tag)
-                if matches!(&ctx.view.expr(tag.expression).kind, tsv_ts::ast::ExpressionKind::Identifier(id)
+                if matches!(&tag.expression.kind, tsv_ts::ast::ExpressionKind::Identifier(id)
                     if tag.span == id.span) =>
             {
                 write_shorthand_expression_tag(w, tag, ctx);
@@ -1456,7 +1392,7 @@ fn write_spread_attribute(w: &mut JsonWriter, spread: &ast::SpreadAttribute<'_>,
     w.raw("{\"type\":\"SpreadAttribute\",\"start\":");
     w.span_start_end(ctx.positions, spread.span.start, spread.span.end);
     w.raw(",\"expression\":");
-    write_braced_island(w, ctx.view.expr(spread.expression), spread.span, ctx);
+    write_braced_island(w, spread.expression, spread.span, ctx);
     w.raw("}");
 }
 
@@ -1465,7 +1401,7 @@ fn write_attach_tag(w: &mut JsonWriter, tag: &ast::AttachTag<'_>, ctx: &Ctx<'_>)
     w.raw("{\"type\":\"AttachTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
-    write_braced_island(w, ctx.view.expr(tag.expression), tag.span, ctx);
+    write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
 }
 
@@ -1518,7 +1454,7 @@ macro_rules! expression_directive_writer {
         fn $fn_name(w: &mut JsonWriter, d: &ast::$ty<'_>, ctx: &Ctx<'_>) {
             write_directive_head(w, stringify!($ty), d.span, d.name_span, d.head_span, ctx);
             w.raw(",\"expression\":");
-            write_optional_directive_expression(w, ctx.view.opt(d.expression), d.span, ctx);
+            write_optional_directive_expression(w, d.expression, d.span, ctx);
             w.raw(",\"modifiers\":");
             write_modifiers(w, d.modifiers);
             w.raw("}");
@@ -1541,7 +1477,7 @@ fn write_transition_directive(w: &mut JsonWriter, d: &ast::TransitionDirective<'
         ctx,
     );
     w.raw(",\"expression\":");
-    write_optional_directive_expression(w, ctx.view.opt(d.expression), d.span, ctx);
+    write_optional_directive_expression(w, d.expression, d.span, ctx);
     w.raw(",\"modifiers\":");
     write_modifiers(w, d.modifiers);
     w.raw(",\"intro\":");
@@ -1583,7 +1519,7 @@ fn write_bind_directive(w: &mut JsonWriter, d: &ast::BindDirective<'_>, ctx: &Ct
     w.raw(",\"expression\":");
     write_directive_value_expression(
         w,
-        ctx.view.expr(d.expression),
+        d.expression,
         d.expression_tag_span.is_some(),
         d.span,
         ctx,
@@ -1598,7 +1534,7 @@ fn write_class_directive(w: &mut JsonWriter, d: &ast::ClassDirective<'_>, ctx: &
     w.raw(",\"expression\":");
     write_directive_value_expression(
         w,
-        ctx.view.expr(d.expression),
+        d.expression,
         d.expression_tag_span.is_some(),
         d.span,
         ctx,
@@ -1728,11 +1664,11 @@ fn write_svelte_options(w: &mut JsonWriter, options: &ast::SvelteOptions<'_>, ct
     w.span_start_end_object(ctx.positions, options.span.start, options.span.end);
     w.raw(",\"attributes\":");
     write_value_attributes(w, attrs, ctx);
-    if let Some(runes) = bool_option(ctx.view, attrs, "runes", ctx.source) {
+    if let Some(runes) = bool_option(attrs, "runes", ctx.source) {
         w.raw(",\"runes\":");
         w.bool(runes);
     }
-    if let Some(immutable) = bool_option(ctx.view, attrs, "immutable", ctx.source) {
+    if let Some(immutable) = bool_option(attrs, "immutable", ctx.source) {
         w.raw(",\"immutable\":");
         w.bool(immutable);
     }
@@ -1742,13 +1678,11 @@ fn write_svelte_options(w: &mut JsonWriter, options: &ast::SvelteOptions<'_>, ct
         w.raw(",\"css\":");
         w.string(&css);
     }
-    if let Some(accessors) = bool_option(ctx.view, attrs, "accessors", ctx.source) {
+    if let Some(accessors) = bool_option(attrs, "accessors", ctx.source) {
         w.raw(",\"accessors\":");
         w.bool(accessors);
     }
-    if let Some(preserve_whitespace) =
-        bool_option(ctx.view, attrs, "preserveWhitespace", ctx.source)
-    {
+    if let Some(preserve_whitespace) = bool_option(attrs, "preserveWhitespace", ctx.source) {
         w.raw(",\"preserveWhitespace\":");
         w.bool(preserve_whitespace);
     }
@@ -1797,7 +1731,7 @@ fn write_custom_element_props(
                 kind: ExpressionKind::ObjectExpression(inner),
                 ..
             },
-        ) = (ctx.view.expr(p.key), ctx.view.expr(p.value))
+        ) = (&p.key, &p.value)
         else {
             continue;
         };
@@ -1818,7 +1752,7 @@ fn write_custom_element_props(
                     kind: ExpressionKind::Literal(lit),
                     ..
                 },
-            ) = (ctx.view.expr(ip.key), ctx.view.expr(ip.value))
+            ) = (&ip.key, &ip.value)
             else {
                 continue;
             };
@@ -1861,7 +1795,7 @@ fn write_custom_element_field(w: &mut JsonWriter, attrs: &[ast::AttributeNode<'_
     for v in values {
         // `customElement={{ tag: '…', props: {…}, shadow: …, extend: … }}`
         if let ast::AttributeValue::ExpressionTag(expr) = v
-            && let ExpressionKind::ObjectExpression(obj) = &ctx.view.expr(expr.expression).kind
+            && let ExpressionKind::ObjectExpression(obj) = &expr.expression.kind
         {
             let mut tag: Option<&Expression<'_>> = None;
             let mut props: Option<&Expression<'_>> = None;
@@ -1869,7 +1803,7 @@ fn write_custom_element_field(w: &mut JsonWriter, attrs: &[ast::AttributeNode<'_
             let mut extend: Option<&Expression<'_>> = None;
             for prop in obj.properties {
                 if let ObjectProperty::Property(p) = prop
-                    && let ExpressionKind::Identifier(key) = &ctx.view.expr(p.key).kind
+                    && let ExpressionKind::Identifier(key) = &p.key.kind
                 {
                     let slot = match key.name(ctx.source) {
                         "tag" => &mut tag,
@@ -1879,7 +1813,7 @@ fn write_custom_element_field(w: &mut JsonWriter, attrs: &[ast::AttributeNode<'_
                         _ => continue,
                     };
                     if slot.is_none() {
-                        *slot = Some(ctx.view.expr(p.value));
+                        *slot = Some(p.value);
                     }
                 }
             }
@@ -1944,7 +1878,7 @@ fn write_custom_element_field(w: &mut JsonWriter, attrs: &[ast::AttributeNode<'_
         let tag_str = match v {
             ast::AttributeValue::Text(text) => Some(text.data(ctx.source)),
             ast::AttributeValue::ExpressionTag(expr) => {
-                if let ExpressionKind::Literal(lit) = &ctx.view.expr(expr.expression).kind
+                if let ExpressionKind::Literal(lit) = &expr.expression.kind
                     && let LiteralValue::String(cooked) = &lit.value
                 {
                     Some(Cow::Borrowed(cooked.resolve(lit.span, ctx.source)))

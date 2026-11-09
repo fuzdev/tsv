@@ -503,10 +503,7 @@ impl<'a> Printer<'a> {
         mut chain_root: Option<&'e Expression<'e>>,
         mut group: Option<&'e Expression<'e>>,
         gaps: &mut SmallVec<[u32; 2]>,
-    ) -> bool
-    where
-        'a: 'e,
-    {
+    ) -> bool {
         // A loop down the left spine, not a recursion: a chain is as long as the spine limit
         // lets it be, and a frame per link is what the stack contract prices
         loop {
@@ -520,8 +517,8 @@ impl<'a> Printer<'a> {
                 // breaks the brackets, not the line after the keyword — the lookup keeps its
                 // `[` on the object's line (`return x[⏎// c⏎y.p⏎];`), so no pair is owed.
                 // The whole gap is asked first, so only a hit pays the `[` scan.
-                let obj_end = self.member_gap_start(self.view.expr(member.object));
-                let prop_start = self.view.expr(member.property).span().start;
+                let obj_end = self.member_gap_start(member.object);
+                let prop_start = member.property.span().start;
                 if self.has_leading_own_line_comment_in_range(GapStart::Node(obj_end), prop_start) {
                     if !member.computed {
                         // A plain member's gap is printed by the chain, which glues an
@@ -537,14 +534,14 @@ impl<'a> Printer<'a> {
                 }
             }
             if let ExpressionKind::CallExpression(call) = &expr.kind
-                && let ExpressionKind::MemberExpression(member) = &self.view.expr(call.callee).kind
+                && let ExpressionKind::MemberExpression(member) = &call.callee.kind
                 && !range_too_narrow_for_a_comment(
-                    self.view.expr(member.object).span().end,
-                    self.view.expr(member.property).span().start,
+                    member.object.span().end,
+                    member.property.span().start,
                 )
                 && self.callee_gap_ends_line_after_multiline_block(
-                    self.member_gap_start(self.view.expr(member.object)),
-                    self.view.expr(member.property).span().start,
+                    self.member_gap_start(member.object),
+                    member.property.span().start,
                 )
             {
                 // Whether the chain does break before the call's member is the arm's doc to
@@ -593,7 +590,7 @@ impl<'a> Printer<'a> {
                     |c| self.comment_takes_line_in_group(c) || !in_group(),
                 )
                 && (!chain_root.is_some_and(|root| {
-                    chain_mid_chain_paren_gaps(self.view, root, self.linearize_input())
+                    chain_mid_chain_paren_gaps(root, self.linearize_input())
                         .contains(&(shell_start, left_start))
                 }) || self.mid_chain_shell_gap_hangs(shell_start, left_start))
             {
@@ -609,7 +606,7 @@ impl<'a> Printer<'a> {
     /// The token a member gap ends at, for [`Self::argument_gap_hangs`]: the property's
     /// first printed byte — past a private name's `#`, which prints with the `.`.
     fn member_gap_token(&self, member: &ast::MemberExpression<'_>) -> u32 {
-        let prop_start = self.view.expr(member.property).span().start;
+        let prop_start = member.property.span().start;
         prop_start + u32::from(self.source.as_bytes().get(prop_start as usize) == Some(&b'#'))
     }
 
@@ -826,7 +823,7 @@ impl<'a> Printer<'a> {
         // where the run keeps the line the hang gave it.
         let (arg_start, claim) = match &arg.kind {
             ExpressionKind::SequenceExpression(seq) => {
-                let head = self.view.expr(self.view.list(seq.expressions)[0]);
+                let head = seq.expressions[0];
                 // Keyed on the empty span at the keyword's end, which is no node's.
                 let claim = self.left_spine_run_claim(
                     Span::new(keyword_end, keyword_end),

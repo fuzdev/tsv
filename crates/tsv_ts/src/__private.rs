@@ -4,17 +4,16 @@
 
 use super::*;
 use crate::ast::{
-    AstStores, ExprView, Expression, ExpressionKind, Parsed, ParsedRef, Statement,
-    TSTypeAnnotation, TSTypeParameterDeclaration, VariableDeclaration,
+    Expression, ExpressionKind, Statement, TSTypeAnnotation, TSTypeParameterDeclaration,
+    VariableDeclaration,
 };
 use tsv_lang::Span;
 
-pub use crate::ast::with_stores;
-pub use crate::imports::{collect_imports, parse_imports_in, parse_imports_into};
+pub use crate::imports::{collect_imports, parse_imports_in};
 #[cfg(feature = "json")]
 pub use crate::imports::{write_imports_json, write_imports_json_string};
 pub use crate::parser::TopLevelAs;
-pub use crate::strip::{strip_in, strip_into, strip_with_imports_in};
+pub use crate::strip::{strip_in, strip_with_imports_in};
 
 /// The per-document environment shared by every formatting entry point: the
 /// source the AST's spans index into, the comment buffer, the precomputed
@@ -28,8 +27,6 @@ pub struct PrinterInputs<'a> {
     pub source: &'a str,
     /// Detached comment buffer for the document.
     pub comments: &'a [ast::Comment],
-    /// Reads the expressions of the tree being printed.
-    pub view: ExprView<'a>,
     /// The document's line-break table with its verdict (`tsv_lang::printing::LineBreaks`):
     /// when every line terminator is a `\n` the printer's three line questions
     /// (`is_same_line` and siblings) read the source bytes and the table is never built;
@@ -84,13 +81,11 @@ impl<'a> PrinterInputs<'a> {
     pub fn for_document(
         source: &'a str,
         comments: &'a [ast::Comment],
-        view: ExprView<'a>,
         line_table: LineTable<'a>,
     ) -> Self {
         PrinterInputs {
             source,
             comments,
-            view,
             line_table,
             has_owned_comments: comments.iter().any(|c| c.owned_by_node),
             has_format_ignore: comments
@@ -111,52 +106,21 @@ pub fn parse_folded<'arena>(
     folded: &FoldedSource<'_>,
     goal: Option<Goal>,
     arena: &'arena bumpalo::Bump,
-) -> Result<Parsed<'arena>> {
-    parsed(|stores| parse_folded_into(folded, goal, arena, stores))
-}
-
-/// [`parse_folded`] into a caller's `stores`.
-pub fn parse_folded_into<'arena>(
-    folded: &FoldedSource<'_>,
-    goal: Option<Goal>,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>> {
-    folded.parse_with(|text| parse_with_goal_or_fallback_into(text, goal, arena, stores))
-}
-
-/// A warm parse's tree as a reading entry point takes it, read through `stores`.
-#[inline]
-pub fn parsed_ref<'a, 'arena: 'a>(
-    program: &'a Program<'arena>,
-    stores: &'a AstStores<'arena>,
-) -> ParsedRef<'a> {
-    ParsedRef {
-        program,
-        view: stores.view(),
-    }
-}
-
-/// A one-shot parse: `parse` over fresh stores, bundled with the tree it built.
-fn parsed<'arena>(
-    parse: impl FnOnce(&mut AstStores<'arena>) -> Result<Program<'arena>>,
-) -> Result<Parsed<'arena>> {
-    let mut stores = AstStores::new();
-    let program = parse(&mut stores)?;
-    Ok(Parsed { program, stores })
+    folded.parse_with(|text| parse_with_goal_or_fallback(text, goal, arena))
 }
 
 /// [`format_ast_in`] over a document the caller folded ahead of the parse
 /// (`tsv_lang::printing::normalize_carriage_returns`) — the format entry points that fold
 /// (the CLI, the bindings, [`format()`]). Identical output; the document's line verdict
 /// comes from the fold's own pass instead of a second walk of the source.
-pub fn format_folded_in<'a>(
-    parsed: impl Into<ParsedRef<'a>>,
+pub fn format_folded_in(
+    program: &Program<'_>,
     folded: &FoldedSource<'_>,
     arena: &DocArena,
 ) -> String {
     let line_breaks = LineBreaks::of_folded(folded, arena.take_line_breaks_scratch());
-    format_document_in(parsed.into(), folded.text(), line_breaks, arena)
+    format_document_in(program, folded.text(), line_breaks, arena)
 }
 
 /// Format a program with newline-derived authoring intent **erased** — the
@@ -194,31 +158,19 @@ pub fn format_folded_in<'a>(
 /// This is a cold path used by tooling that needs a canonical form for comparison
 /// (e.g. diffing two compilers' output); the [`fn@format_ast`] path is untouched and
 /// byte-identical.
-pub fn format_canonical<'a>(parsed: impl Into<ParsedRef<'a>>, source: &str) -> String {
+pub fn format_canonical(program: &Program<'_>, source: &str) -> String {
     let arena = DocArena::for_source(source);
-    format_canonical_in(parsed, source, &arena)
+    format_canonical_in(program, source, &arena)
 }
 
 /// [`format_canonical`] into a caller-provided doc arena (see [`format_ast_in`] for
 /// the arena-reuse contract).
-pub fn format_canonical_in<'a>(
-    parsed: impl Into<ParsedRef<'a>>,
-    source: &str,
-    arena: &DocArena,
-) -> String {
-    let parsed = parsed.into();
+pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
     let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
     // Deliberately the parser's own list: the nestled-pair merge is prettier's rule, read
     // through prettier's oracle, and this reprint answers to neither — its contract above
     // is that comments are never merged, only relocated.
-    format_program_in(
-        parsed,
-        source,
-        parsed.program.comments,
-        line_breaks,
-        arena,
-        true,
-    )
+    format_program_in(program, source, program.comments, line_breaks, arena, true)
 }
 
 /// Parse embedded TypeScript at a base offset into the full source
@@ -233,8 +185,6 @@ pub fn format_canonical_in<'a>(
 ///   wire levels (`0` for a top-level island). The parse counts its own on top of it
 ///   against `tsv_lang::NESTING_LIMIT`, so the document's depth budget is shared with the
 ///   markup that holds the island. Every embedded entry point here takes it.
-/// * `stores` - The host document's stores, one instance across its islands, which every
-///   embedded entry point here appends to
 ///
 /// # Returns
 ///
@@ -263,16 +213,14 @@ pub fn parse_embedded<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>> {
     with_embedding_parser(
         source,
         base_offset,
         host_nesting,
         arena,
-        stores,
         |parser| parser.parse(),
-        |_, _| Ok(()),
+        |_| Ok(()),
     )
 }
 
@@ -303,20 +251,18 @@ pub fn parse_embedded_preserve_parens<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
 ) -> Result<(Program<'arena>, bool)> {
     with_embedding_parser(
         source,
         base_offset,
         host_nesting,
         arena,
-        stores,
         |parser| {
             parser.preserve_parens = true;
             let program = parser.parse()?;
             Ok((program, parser.preserved_a_paren))
         },
-        |_, _| Ok(()),
+        |_| Ok(()),
     )
 }
 
@@ -328,7 +274,7 @@ pub fn parse_embedded_preserve_parens<'arena>(
 /// `host_check` is the host grammar's refusal of the parsed expression (`{@render}`
 /// takes only a call, `{@const}` no bare second declarator), run as part of the parse so
 /// a refusal of tsc's reading of a type-argument follower re-reads the text as
-/// acorn-typescript does — see `with_embedding_parser`. `|_, _| Ok(())` refuses nothing.
+/// acorn-typescript does — see `with_embedding_parser`. `|_| Ok(())` refuses nothing.
 ///
 /// The expression must fill `source`. `end` names where `source` ends, for the error a
 /// token left after the expression gets (`Expected {end}, found …`): the host's delimiter
@@ -346,18 +292,16 @@ pub fn parse_expression_with_comments<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
     end: &str,
-    host_check: impl Fn(ExprView<'_>, &'arena Expression<'arena>) -> Result<()>,
+    host_check: impl Fn(&'arena Expression<'arena>) -> Result<()>,
 ) -> Result<(&'arena Expression<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
         host_nesting,
         arena,
-        stores,
         |parser| parser.parse_expression_with_comments(end),
-        |view, &(expr, _)| host_check(view, expr),
+        |&(expr, _)| host_check(expr),
     )
 }
 
@@ -398,14 +342,12 @@ pub fn parse_pattern_with_comments<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
 ) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
         host_nesting,
         arena,
-        stores,
         |parser| {
             let expr = parser.parse_expression_unbounded()?;
             #[cfg(feature = "_internal_ast_census")]
@@ -421,7 +363,7 @@ pub fn parse_pattern_with_comments<'arena>(
             parser.expect_end_of_input("end of pattern")?;
             Ok((pattern, parser.take_comments()))
         },
-        |_, _| Ok(()),
+        |_| Ok(()),
     )
 }
 
@@ -562,19 +504,17 @@ pub fn parse_type_annotation_partial<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
 ) -> Result<(TSTypeAnnotation<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
         host_nesting,
         arena,
-        stores,
         |parser| {
             let ta = parser.parse_type_annotation()?;
             Ok((ta, parser.take_comments()))
         },
-        |_, _| Ok(()),
+        |_| Ok(()),
     )
 }
 
@@ -607,21 +547,19 @@ pub fn parse_expression_partial_with_comments<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
     top_level_as: TopLevelAs,
-    host_check: impl Fn(ExprView<'_>, &'arena Expression<'arena>, usize) -> Result<()>,
+    host_check: impl Fn(&'arena Expression<'arena>, usize) -> Result<()>,
 ) -> Result<(&'arena Expression<'arena>, usize, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
         host_nesting,
         arena,
-        stores,
         |parser| {
             let (expr, end_pos) = parser.parse_assignment_expression_partial(top_level_as)?;
             Ok((expr, end_pos, parser.take_comments()))
         },
-        |view, &(expr, end_pos, _)| host_check(view, expr, end_pos),
+        |&(expr, end_pos, _)| host_check(expr, end_pos),
     )
 }
 
@@ -645,12 +583,11 @@ pub fn parse_expression_partial_with_comments<'arena>(
 // The method-path form clippy suggests fails the higher-ranked lifetime check on
 // `with_embedding_parser`'s `f` bound — same reason as [`parse_embedded`]'s closure.
 #[expect(clippy::redundant_closure_for_method_calls)]
-pub fn parse_type_extent<'arena>(
+pub fn parse_type_extent(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
+    arena: &bumpalo::Bump,
 ) -> Result<usize> {
     // the parse exists for its end offset: every row it builds is discarded
     #[cfg(feature = "_internal_ast_census")]
@@ -660,9 +597,8 @@ pub fn parse_type_extent<'arena>(
         base_offset,
         host_nesting,
         arena,
-        stores,
         |parser| parser.type_extent(),
-        |_, _| Ok(()),
+        |_| Ok(()),
     )
 }
 
@@ -687,20 +623,18 @@ pub fn parse_statement_with_comments<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
-    host_check: impl Fn(ExprView<'_>, &Statement<'arena>) -> Result<()>,
+    host_check: impl Fn(&Statement<'arena>) -> Result<()>,
 ) -> Result<(Statement<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
         host_nesting,
         arena,
-        stores,
         |parser| {
             let stmt = parser.parse_statement()?;
             Ok((stmt, parser.take_comments()))
         },
-        |view, (stmt, _)| host_check(view, stmt),
+        |(stmt, _)| host_check(stmt),
     )
 }
 
@@ -784,7 +718,6 @@ pub fn build_expression_doc(
 /// as its own source bytes). The marks read only the tree and the source, so an operand
 /// the host builds is still counted in the list.
 pub fn build_bare_sequence_operand_docs(
-    view: ExprView<'_>,
     arena: &DocArena,
     sequence: &ast::SequenceExpression<'_>,
     inputs: &PrinterInputs<'_>,
@@ -792,16 +725,16 @@ pub fn build_bare_sequence_operand_docs(
     mut build: impl FnMut(usize) -> bool,
 ) -> Vec<Option<DocId>> {
     with_doc_printer(arena, inputs, embed, |printer| {
-        printer.mark_relational_sibling_authored_pairs(
-            view.list(sequence.expressions).iter().copied().map(Some),
-        );
-        view.list(sequence.expressions)
+        printer
+            .mark_relational_sibling_authored_pairs(sequence.expressions.iter().copied().map(Some));
+        sequence
+            .expressions
             .iter()
             .enumerate()
             .map(|(i, expr)| {
                 build(i).then(|| {
-                    let doc = printer.build_root_expression_doc(view.expr(*expr));
-                    printer.wrap_bare_list_operand(view.expr(*expr), doc)
+                    let doc = printer.build_root_expression_doc(expr);
+                    printer.wrap_bare_list_operand(expr, doc)
                 })
             })
             .collect()
@@ -972,8 +905,8 @@ pub fn build_broke_after_operator_rhs_doc(
 /// its operator ([`build_assignment_value_expression_doc`]'s `value_gap_start`), whether
 /// the chain owns that break or its heads force it
 /// ([`curried_chain_breaks_after_operator`]).
-pub fn is_curried_arrow_chain(view: ExprView<'_>, expression: &Expression<'_>) -> bool {
-    printer::is_curried_arrow_chain(view, expression)
+pub fn is_curried_arrow_chain(expression: &Expression<'_>) -> bool {
+    printer::is_curried_arrow_chain(expression)
 }
 
 /// Whether `expression` is a curried arrow chain whose heads force the break after the
@@ -981,11 +914,8 @@ pub fn is_curried_arrow_chain(view: ExprView<'_>, expression: &Expression<'_>) -
 /// its `chooseLayout` site (`chain-tail-arrow-chain`): a head with type parameters, a
 /// return type over parameters, or a non-identifier parameter. The host owes such a value a
 /// mandatory break after its operator; the heads then stack under it.
-pub fn curried_chain_breaks_after_operator(
-    view: ExprView<'_>,
-    expression: &Expression<'_>,
-) -> bool {
-    printer::is_curried_arrow_chain_that_breaks(view, expression)
+pub fn curried_chain_breaks_after_operator(expression: &Expression<'_>) -> bool {
+    printer::is_curried_arrow_chain_that_breaks(expression)
 }
 
 /// Build a DocId for a single comment (`/* … */` / `// …`) in the caller's arena,
@@ -1089,12 +1019,11 @@ pub fn build_type_annotation_doc(
 pub fn build_program_doc(
     arena: &DocArena,
     program: &Program<'_>,
-    view: ExprView<'_>,
     source: &str,
     line_table: LineTable<'_>,
     embed: EmbedContext,
 ) -> DocId {
-    with_program_printer(arena, program, view, source, line_table, embed, |printer| {
+    with_program_printer(arena, program, source, line_table, embed, |printer| {
         printer.build_program_doc(program)
     })
 }
@@ -1113,13 +1042,12 @@ pub fn build_program_doc(
 pub fn build_program_body_doc(
     arena: &DocArena,
     program: &Program<'_>,
-    view: ExprView<'_>,
     source: &str,
     line_table: LineTable<'_>,
     embed: EmbedContext,
 ) -> Option<DocId> {
     let (body, has_output) =
-        with_program_printer(arena, program, view, source, line_table, embed, |printer| {
+        with_program_printer(arena, program, source, line_table, embed, |printer| {
             printer.build_program_body_doc(program)
         });
     has_output.then_some(body)
@@ -1142,11 +1070,8 @@ pub use crate::printer::{conditional_should_break_after_op, should_inline_logica
 /// wraps an `{#each}` head and a shorthand `{#await}` head in a pair when this answers
 /// `true`, the block-head twin of the pair the left of `as` / `satisfies` keeps.
 #[must_use]
-pub fn prints_ending_on_instantiation_close(
-    view: ExprView<'_>,
-    expression: &Expression<'_>,
-) -> bool {
-    printer::ends_with_instantiation_close(view, expression, false)
+pub fn prints_ending_on_instantiation_close(expression: &Expression<'_>) -> bool {
+    printer::ends_with_instantiation_close(expression, false)
 }
 
 /// Where the regex literal `expression` PRINTS FIRST begins — when its first printed byte,
@@ -1159,8 +1084,8 @@ pub fn prints_ending_on_instantiation_close(
 /// wraps such a tag's expression in a pair, the text-position twin of the pair
 /// [`prints_ending_on_instantiation_close`] answers for a block head.
 #[must_use]
-pub fn leading_regex_start(view: ExprView<'_>, expression: &Expression<'_>) -> Option<u32> {
-    printer::leading_regex_start(view, expression)
+pub fn leading_regex_start(expression: &Expression<'_>) -> Option<u32> {
+    printer::leading_regex_start(expression)
 }
 
 /// The TypeScript grammar's answers to the operand ends a raw byte scan cannot read
@@ -1246,9 +1171,9 @@ pub use crate::ast::convert::{
 /// # Ok(())
 /// # }
 /// ```
-pub fn format_ast<'a>(parsed: impl Into<ParsedRef<'a>>, source: &str) -> String {
+pub fn format_ast(program: &Program<'_>, source: &str) -> String {
     let arena = DocArena::for_source(source);
-    format_ast_in(parsed, source, &arena)
+    format_ast_in(program, source, &arena)
 }
 
 /// Format into a caller-provided doc arena.
@@ -1260,13 +1185,9 @@ pub fn format_ast<'a>(parsed: impl Into<ParsedRef<'a>>, source: &str) -> String 
 /// arena across them (`arena.reset()` between files retains the buffers). Nothing
 /// borrowed from `arena` escapes — the result is an owned `String` — so the
 /// caller may reset and reuse it the moment this returns.
-pub fn format_ast_in<'a>(
-    parsed: impl Into<ParsedRef<'a>>,
-    source: &str,
-    arena: &DocArena,
-) -> String {
+pub fn format_ast_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
     let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
-    format_document_in(parsed.into(), source, line_breaks, arena)
+    format_document_in(program, source, line_breaks, arena)
 }
 
 /// Parse TypeScript source code into an internal AST
@@ -1277,7 +1198,7 @@ pub fn format_ast_in<'a>(
 ///
 /// # Returns
 ///
-/// * `Ok(Parsed)` - The parsed AST and its stores
+/// * `Ok(Program)` - The parsed AST
 /// * `Err(Error)` - If parsing fails
 ///
 /// # Example
@@ -1289,19 +1210,9 @@ pub fn format_ast_in<'a>(
 /// # Ok(())
 /// # }
 /// ```
-pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Parsed<'arena>> {
-    parsed(|stores| parse_into(source, arena, stores))
-}
-
-/// [`parse`] into a caller's `stores`, for a warm path that keeps them across documents.
-pub fn parse_into<'arena>(
-    source: &str,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
-) -> Result<Program<'arena>> {
+pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Program<'arena>> {
     Error::ensure_source_fits(source)?;
-    parser::parse_typescript(source, arena, stores)
-        .map_err(|e| e.with_context(source, WIRE_COORDINATES))
+    parser::parse_typescript(source, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
 /// Parse TypeScript source against an explicit [`Goal`] (`Script` vs `Module`).
@@ -1321,19 +1232,9 @@ pub fn parse_with_goal<'arena>(
     source: &str,
     goal: Goal,
     arena: &'arena bumpalo::Bump,
-) -> Result<Parsed<'arena>> {
-    parsed(|stores| parse_with_goal_into(source, goal, arena, stores))
-}
-
-/// [`parse_with_goal`] into a caller's `stores`.
-pub fn parse_with_goal_into<'arena>(
-    source: &str,
-    goal: Goal,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>> {
     Error::ensure_source_fits(source)?;
-    parser::parse_typescript_with_goal(source, goal, arena, stores)
+    parser::parse_typescript_with_goal(source, goal, arena)
         .map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
@@ -1366,26 +1267,15 @@ pub fn parse_with_goal_or_fallback<'arena>(
     source: &str,
     goal: Option<Goal>,
     arena: &'arena bumpalo::Bump,
-) -> Result<Parsed<'arena>> {
-    parsed(|stores| parse_with_goal_or_fallback_into(source, goal, arena, stores))
-}
-
-/// [`parse_with_goal_or_fallback`] into a caller's `stores`. A script retry appends after
-/// the failed module attempt's rows, which nothing names.
-pub fn parse_with_goal_or_fallback_into<'arena>(
-    source: &str,
-    goal: Option<Goal>,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>> {
     if let Some(goal) = goal {
-        return parse_with_goal_into(source, goal, arena, stores);
+        return parse_with_goal(source, goal, arena);
     }
-    parse_with_goal_into(source, Goal::Module, arena, stores).or_else(|module_error| {
+    parse_with_goal(source, Goal::Module, arena).or_else(|module_error| {
         if module_error.kind() == ErrorKind::TooDeep {
             return Err(module_error);
         }
-        parse_with_goal_into(source, Goal::Script, arena, stores).map_err(|script_error| {
+        parse_with_goal(source, Goal::Script, arena).map_err(|script_error| {
             // A goal gate proves the source a module; past that, the further error is
             // the file's own and a tie keeps the module's. The one positionless error a
             // TypeScript parse raises (`FileTooLarge`) is raised by both attempts alike, so
@@ -1417,8 +1307,8 @@ pub fn parse_with_goal_or_fallback_into<'arena>(
 /// O(output) UTF-8 validation `convert_ast_json_string` pays (the output is several times
 /// the source).
 #[cfg(feature = "json")]
-pub fn convert_ast_json_bytes<'a>(parsed: impl Into<ParsedRef<'a>>, source: &str) -> Vec<u8> {
-    ast::convert::write_program_bytes(parsed.into(), source, tsv_lang::Wire::Span)
+pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str) -> Vec<u8> {
+    ast::convert::write_program_bytes(program, source, tsv_lang::Wire::Span)
 }
 
 /// Convert internal AST to compact JSON wire bytes **with** per-node `loc`.
@@ -1427,11 +1317,8 @@ pub fn convert_ast_json_bytes<'a>(parsed: impl Into<ParsedRef<'a>>, source: &str
 /// column (0-based, UTF-16 code units) of its own `start` / `end` under ECMAScript's line
 /// terminators (CR, LF, CRLF, LS, PS), which is acorn's. `tsv parse --locations` writes it.
 #[cfg(feature = "locations")]
-pub fn convert_ast_json_bytes_with_locations<'a>(
-    parsed: impl Into<ParsedRef<'a>>,
-    source: &str,
-) -> Vec<u8> {
-    ast::convert::write_program_bytes(parsed.into(), source, tsv_lang::Wire::Loc)
+pub fn convert_ast_json_bytes_with_locations(program: &Program<'_>, source: &str) -> Vec<u8> {
+    ast::convert::write_program_bytes(program, source, tsv_lang::Wire::Loc)
 }
 
 /// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM
@@ -1442,8 +1329,8 @@ pub fn convert_ast_json_bytes_with_locations<'a>(
 /// span-only wire alone, and `parse_to_json_with` validates the loc-bearing bytes itself.
 #[cfg(feature = "json")]
 #[expect(clippy::expect_used)]
-pub fn convert_ast_json_string<'a>(parsed: impl Into<ParsedRef<'a>>, source: &str) -> String {
-    String::from_utf8(convert_ast_json_bytes(parsed, source))
+pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
+    String::from_utf8(convert_ast_json_bytes(program, source))
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 
@@ -1463,12 +1350,10 @@ pub fn convert_ast_json_string<'a>(parsed: impl Into<ParsedRef<'a>>, source: &st
 pub fn parse_preserve_parens<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
-) -> Result<Parsed<'arena>> {
-    parsed(|stores| {
-        Error::ensure_source_fits(source)?;
-        parser::parse_typescript_preserve_parens(source, arena, stores)
-            .map_err(|e| e.with_context(source, WIRE_COORDINATES))
-    })
+) -> Result<Program<'arena>> {
+    Error::ensure_source_fits(source)?;
+    parser::parse_typescript_preserve_parens(source, arena)
+        .map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
 /// Whether a block comment's content (delimiters excluded) is a JSDoc type cast —

@@ -6,8 +6,8 @@
 use tsv_lang::Span;
 
 use super::{
-    ExprRun, ExprSlot, ExprView, Identifier, Literal, Statement, TSEntityName, TSTypeAnnotation,
-    TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
+    Expression, Identifier, Literal, Statement, TSEntityName, TSTypeAnnotation, TSTypeElement,
+    TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 
 /// Interface declaration: `interface Foo { ... }` or `interface Foo extends Bar { ... }`
@@ -44,7 +44,7 @@ pub struct TSInterfaceBody<'arena> {
 pub struct TSDeclareFunction<'arena> {
     pub id: Identifier<'arena>,
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
-    pub params: ExprRun<'arena>,
+    pub params: &'arena [Expression<'arena>],
     pub return_type: Option<TSTypeAnnotation<'arena>>,
     /// Whether to print the `declare` keyword.
     /// True for top-level `declare function`, false inside `declare namespace`.
@@ -83,7 +83,7 @@ pub struct TSEnumMember<'arena> {
     /// Member name (identifier or computed)
     pub id: TSEnumMemberId<'arena>,
     /// Optional initializer expression
-    pub initializer: Option<ExprSlot<'arena>>,
+    pub initializer: Option<Expression<'arena>>,
     /// The member's full source extent, running through a grouping paren the
     /// initializer's own span stops inside (`A = (a, b)`) — acorn's shape, and
     /// what `prettier-ignore` must reproduce verbatim. Ask
@@ -103,9 +103,10 @@ impl<'arena> TSEnumMember<'arena> {
     /// seam anchored at `span.end` therefore starts past the shell's interior,
     /// where nothing else emits — a DROPPED comment
     /// (`docs/comments.md` §The element-comma seam).
-    pub fn printed_end(&self, view: ExprView<'_>) -> u32 {
-        view.opt_slot(&self.initializer)
-            .map_or_else(|| self.id.span().end, |e| e.printed_end(view))
+    pub fn printed_end(&self) -> u32 {
+        self.initializer
+            .as_ref()
+            .map_or_else(|| self.id.span().end, Expression::printed_end)
     }
 }
 

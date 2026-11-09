@@ -127,9 +127,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // carries any expression). A parenthesized chain is sealed: `(a?.b).c` is
             // an ordinary member target.
             _ if matches!(context, AssignableContext::ForHead)
-                && expr
-                    .skip_type_assertions(self.stores.view())
-                    .has_optional_in_chain(self.stores.view()) =>
+                && expr.skip_type_assertions().has_optional_in_chain() =>
             {
                 Err(self.error_msg_at(
                     "Optional chaining cannot appear in left-hand side",
@@ -370,7 +368,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     context,
                     AssignableContext::Assignment | AssignableContext::ForHead
                 ) && matches!(
-                    expr.skip_type_assertions(self.stores.view()).kind,
+                    expr.skip_type_assertions().kind,
                     ExpressionKind::Identifier(_) | ExpressionKind::MemberExpression(_)
                 ) =>
             {

@@ -8,10 +8,10 @@ use tsv_lang::Span;
 
 use super::{
     ClassDeclaration, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration,
-    ExprEdge, ExprRun, ExprSlot, Expression, Identifier, ImportDeclaration, OptExprEdge,
-    TSDeclareFunction, TSEnumDeclaration, TSExportAssignment, TSImportEqualsDeclaration,
-    TSInterfaceDeclaration, TSModuleDeclaration, TSNamespaceExportDeclaration,
-    TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration,
+    Expression, Identifier, ImportDeclaration, TSDeclareFunction, TSEnumDeclaration,
+    TSExportAssignment, TSImportEqualsDeclaration, TSInterfaceDeclaration, TSModuleDeclaration,
+    TSNamespaceExportDeclaration, TSTypeAliasDeclaration, TSTypeAnnotation,
+    TSTypeParameterDeclaration,
 };
 
 /// Statement node: the span every variant shares, beside the variant itself.
@@ -202,7 +202,7 @@ impl<'arena> Statement<'arena> {
 /// (`parse_expression_ref`).
 #[derive(Debug, Clone)]
 pub struct ExpressionStatement<'arena> {
-    pub expression: ExprEdge<'arena>,
+    pub expression: &'arena Expression<'arena>,
     /// True when this is a directive prologue entry — an unparenthesized
     /// string-literal statement in the leading run of a `Program` or function
     /// body (e.g. `"use strict";`). Directives are printed verbatim from source
@@ -227,7 +227,7 @@ pub struct BlockStatement<'arena> {
 /// The argument is optional for void returns.
 #[derive(Debug, Clone)]
 pub struct ReturnStatement<'arena> {
-    pub argument: OptExprEdge<'arena>,
+    pub argument: Option<&'arena Expression<'arena>>,
 }
 
 //
@@ -237,7 +237,7 @@ pub struct ReturnStatement<'arena> {
 /// If statement: `if (test) consequent` or `if (test) consequent else alternate`
 #[derive(Debug, Clone)]
 pub struct IfStatement<'arena> {
-    pub test: ExprEdge<'arena>,
+    pub test: &'arena Expression<'arena>,
     pub consequent: &'arena Statement<'arena>,
     pub alternate: Option<&'arena Statement<'arena>>,
 }
@@ -258,9 +258,9 @@ pub struct ForStatement<'arena> {
     /// Initialization: variable declaration or expression (or None)
     pub init: Option<&'arena ForInit<'arena>>,
     /// Test condition (or None for infinite loop)
-    pub test: OptExprEdge<'arena>,
+    pub test: Option<&'arena Expression<'arena>>,
     /// Update expression (or None)
-    pub update: OptExprEdge<'arena>,
+    pub update: Option<&'arena Expression<'arena>>,
     pub body: &'arena Statement<'arena>,
 }
 
@@ -276,7 +276,7 @@ pub struct ForStatement<'arena> {
 #[derive(Debug, Clone)]
 pub enum ForInit<'arena> {
     VariableDeclaration(VariableDeclaration<'arena>),
-    Expression(ExprSlot<'arena>),
+    Expression(Expression<'arena>),
 }
 
 /// For-in statement: `for (left in right) body`
@@ -286,7 +286,7 @@ pub enum ForInit<'arena> {
 pub struct ForInStatement<'arena> {
     /// Left side: variable declaration or expression pattern
     pub left: &'arena ForInOfLeft<'arena>,
-    pub right: ExprEdge<'arena>,
+    pub right: &'arena Expression<'arena>,
     pub body: &'arena Statement<'arena>,
 }
 
@@ -297,7 +297,7 @@ pub struct ForInStatement<'arena> {
 pub struct ForOfStatement<'arena> {
     /// Left side: variable declaration or expression pattern
     pub left: &'arena ForInOfLeft<'arena>,
-    pub right: ExprEdge<'arena>,
+    pub right: &'arena Expression<'arena>,
     /// Whether this is `for await (... of ...)`
     pub r#await: bool,
     pub body: &'arena Statement<'arena>,
@@ -310,13 +310,13 @@ pub struct ForOfStatement<'arena> {
 #[derive(Debug, Clone)]
 pub enum ForInOfLeft<'arena> {
     VariableDeclaration(VariableDeclaration<'arena>),
-    Pattern(ExprSlot<'arena>),
+    Pattern(Expression<'arena>),
 }
 
 /// While statement: `while (test) body`
 #[derive(Debug, Clone)]
 pub struct WhileStatement<'arena> {
-    pub test: ExprEdge<'arena>,
+    pub test: &'arena Expression<'arena>,
     pub body: &'arena Statement<'arena>,
 }
 
@@ -324,20 +324,20 @@ pub struct WhileStatement<'arena> {
 #[derive(Debug, Clone)]
 pub struct DoWhileStatement<'arena> {
     pub body: &'arena Statement<'arena>,
-    pub test: ExprEdge<'arena>,
+    pub test: &'arena Expression<'arena>,
 }
 
 /// With statement: `with (object) body` — sloppy-mode Script code only.
 #[derive(Debug, Clone)]
 pub struct WithStatement<'arena> {
-    pub object: ExprEdge<'arena>,
+    pub object: &'arena Expression<'arena>,
     pub body: &'arena Statement<'arena>,
 }
 
 /// Switch statement: `switch (discriminant) { cases }`
 #[derive(Debug, Clone)]
 pub struct SwitchStatement<'arena> {
-    pub discriminant: ExprEdge<'arena>,
+    pub discriminant: &'arena Expression<'arena>,
     pub cases: &'arena [SwitchCase<'arena>],
 }
 
@@ -345,7 +345,7 @@ pub struct SwitchStatement<'arena> {
 #[derive(Debug, Clone)]
 pub struct SwitchCase<'arena> {
     /// Test expression, or None for `default:`
-    pub test: OptExprEdge<'arena>,
+    pub test: Option<&'arena Expression<'arena>>,
     pub consequent: &'arena [Statement<'arena>],
     pub span: Span,
 }
@@ -377,7 +377,7 @@ pub struct CatchClause<'arena> {
 /// Throw statement: `throw argument`
 #[derive(Debug, Clone)]
 pub struct ThrowStatement<'arena> {
-    pub argument: ExprEdge<'arena>,
+    pub argument: &'arena Expression<'arena>,
 }
 
 /// Break statement: `break` or `break label`
@@ -423,7 +423,7 @@ pub struct FunctionDeclaration<'arena> {
     /// Type parameters (TypeScript generics): `function fn<T>() {}`
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
-    pub params: ExprRun<'arena>,
+    pub params: &'arena [Expression<'arena>],
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
     pub return_type: Option<TSTypeAnnotation<'arena>>,
     /// Function body (block statement with statements)
@@ -498,8 +498,8 @@ pub struct VariableDeclaration<'arena> {
 #[derive(Debug, Clone)]
 pub struct VariableDeclarator<'arena> {
     /// The binding pattern (Identifier, ArrayPattern, or ObjectPattern)
-    pub id: ExprEdge<'arena>,
-    pub init: OptExprEdge<'arena>,
+    pub id: &'arena Expression<'arena>,
+    pub init: Option<&'arena Expression<'arena>>,
     /// Definite assignment assertion (`!` after identifier, e.g., `let x!: string;`)
     pub definite: bool,
     pub span: Span,

@@ -28,58 +28,7 @@ use std::borrow::Cow;
 
 use tsv_css::ast::CssStyleSheet;
 pub use tsv_lang::{Comment, Span};
-use tsv_ts::ast::{
-    AstStores, ExprEdge, ExprRun, ExprView, OptExprEdge, Program, TSTypeParameterDeclaration,
-    VariableDeclaration,
-};
-
-/// A parsed Svelte document and the stores its handles index.
-///
-/// Derefs to the [`Root`] for the tree's own fields. A reading entry point takes `&parsed`,
-/// which is also where it gets the view the tree's edges resolve through.
-#[derive(Debug)]
-pub struct ParsedRoot<'arena> {
-    /// The tree.
-    pub root: Root<'arena>,
-    /// The stores the tree's handles index, one instance across the document's islands.
-    pub stores: AstStores<'arena>,
-}
-
-impl<'arena> ParsedRoot<'arena> {
-    /// The view reading this tree's expressions.
-    #[inline]
-    pub fn view(&self) -> ExprView<'_> {
-        self.stores.view()
-    }
-}
-
-/// A document as a reading entry point takes it: the tree and the view its edges resolve
-/// through.
-#[derive(Clone, Copy)]
-pub struct ParsedRootRef<'a> {
-    /// The tree.
-    pub root: &'a Root<'a>,
-    /// The view over the stores the tree's edges index.
-    pub view: ExprView<'a>,
-}
-
-impl<'a, 'arena: 'a> From<&'a ParsedRoot<'arena>> for ParsedRootRef<'a> {
-    #[inline]
-    fn from(parsed: &'a ParsedRoot<'arena>) -> Self {
-        ParsedRootRef {
-            root: &parsed.root,
-            view: parsed.view(),
-        }
-    }
-}
-
-impl<'arena> std::ops::Deref for ParsedRoot<'arena> {
-    type Target = Root<'arena>;
-
-    fn deref(&self) -> &Root<'arena> {
-        &self.root
-    }
-}
+use tsv_ts::ast::{Expression, Program, TSTypeParameterDeclaration, VariableDeclaration};
 
 /// Svelte Root - top-level AST node
 ///
@@ -125,7 +74,7 @@ pub struct Root<'arena> {
 pub struct SnippetWireParameters<'arena> {
     /// The snippet block's `span.start` — the key the writer finds the list by.
     pub snippet_start: u32,
-    pub parameters: ExprRun<'arena>,
+    pub parameters: &'arena [Expression<'arena>],
 }
 
 /// Svelte Fragment - container for template nodes
@@ -195,7 +144,7 @@ impl HtmlComment {
 #[derive(Debug, Clone)]
 pub struct IfBlock<'arena> {
     pub elseif: bool,
-    pub test: ExprEdge<'arena>,
+    pub test: &'arena Expression<'arena>,
     pub consequent: Fragment<'arena>,
     pub alternate: Option<Fragment<'arena>>,
     pub span: Span,
@@ -209,8 +158,8 @@ pub struct IfBlock<'arena> {
 /// Also supports {#each expression} and {#each expression, index} without `as`.
 #[derive(Debug, Clone)]
 pub struct EachBlock<'arena> {
-    pub expression: ExprEdge<'arena>,
-    pub context: OptExprEdge<'arena>, // Pattern (identifier or destructuring), None if no `as`
+    pub expression: &'arena Expression<'arena>,
+    pub context: Option<&'arena Expression<'arena>>, // Pattern (identifier or destructuring), None if no `as`
     pub index: Option<&'arena str>,
     pub key: Option<EachKey<'arena>>,
     pub body: Fragment<'arena>,
@@ -231,7 +180,7 @@ pub struct EachBlock<'arena> {
 /// pattern.
 #[derive(Debug, Clone)]
 pub struct EachKey<'arena> {
-    pub expression: ExprEdge<'arena>,
+    pub expression: &'arena Expression<'arena>,
     /// Span of the key INCLUDING its parentheses — `(` through past `)`.
     pub span: Span,
 }
@@ -242,9 +191,9 @@ pub struct EachKey<'arena> {
 /// Also supports shorthand: {#await expression then value}...{/await}
 #[derive(Debug, Clone)]
 pub struct AwaitBlock<'arena> {
-    pub expression: ExprEdge<'arena>,
-    pub value: OptExprEdge<'arena>, // Pattern for :then binding
-    pub error: OptExprEdge<'arena>, // Pattern for :catch binding
+    pub expression: &'arena Expression<'arena>,
+    pub value: Option<&'arena Expression<'arena>>, // Pattern for :then binding
+    pub error: Option<&'arena Expression<'arena>>, // Pattern for :catch binding
     /// The pending-phase **content** (`{#await x}<here>{:then}…`), or `None` when
     /// empty. Distinct from `pending_block`: an empty block-form pending is `None`
     /// here but `pending_block == true`. The printer reads this (an empty pending
@@ -271,7 +220,7 @@ pub struct AwaitBlock<'arena> {
 /// Forces re-creation of contents when expression changes.
 #[derive(Debug, Clone)]
 pub struct KeyBlock<'arena> {
-    pub expression: ExprEdge<'arena>,
+    pub expression: &'arena Expression<'arena>,
     pub fragment: Fragment<'arena>,
     pub span: Span,
     /// Span of the opening tag `{#key ... }` for comment lookup
@@ -284,7 +233,7 @@ pub struct KeyBlock<'arena> {
 /// Defines a reusable chunk of markup that can be rendered with {@render}.
 #[derive(Debug, Clone)]
 pub struct SnippetBlock<'arena> {
-    pub expression: ExprEdge<'arena>, // Snippet name (Identifier)
+    pub expression: &'arena Expression<'arena>, // Snippet name (Identifier)
     /// Parsed generic type parameters (`<T extends X = Y>`), routed through
     /// `tsv_ts`'s type-parameter printer for constraint/default/modifier
     /// handling and width-based wrapping. `Some` whenever `type_params_raw` is
@@ -298,7 +247,7 @@ pub struct SnippetBlock<'arena> {
     /// with the same text parses to, so the printer and the compiler read the head exactly
     /// as they read that signature, re-deriving every grouping pair from precedence. The
     /// wire's own shape of a head that holds a pair is [`Root::snippet_wire_parameters`].
-    pub parameters: ExprRun<'arena>,
+    pub parameters: &'arena [Expression<'arena>],
     /// Source span of the parameter parens: `start` is the `(`, `end` is the `)`
     /// (for leading / dangling / trailing comment lookup when printing parameters).
     /// `None` only if no `(` was found (malformed).
@@ -315,7 +264,7 @@ pub struct SnippetBlock<'arena> {
 /// Injects raw HTML content without escaping.
 #[derive(Debug, Clone)]
 pub struct HtmlTag<'arena> {
-    pub expression: ExprEdge<'arena>,
+    pub expression: &'arena Expression<'arena>,
     pub span: Span,
 }
 
@@ -326,8 +275,8 @@ pub struct HtmlTag<'arena> {
 /// The `id` is the pattern (identifier or destructuring) and `init` is the value.
 #[derive(Debug, Clone)]
 pub struct ConstTag<'arena> {
-    pub id: ExprEdge<'arena>,   // Pattern (identifier or destructuring)
-    pub init: ExprEdge<'arena>, // Initializer expression
+    pub id: &'arena Expression<'arena>, // Pattern (identifier or destructuring)
+    pub init: &'arena Expression<'arena>, // Initializer expression
     pub span: Span,
 }
 
@@ -354,7 +303,7 @@ pub struct DeclarationTag<'arena> {
 /// up by span during formatting. This is an intentional divergence.
 #[derive(Debug, Clone)]
 pub struct DebugTag<'arena> {
-    pub identifiers: ExprRun<'arena>, // List of identifiers to debug
+    pub identifiers: &'arena [Expression<'arena>], // List of identifiers to debug
     pub span: Span,
 }
 
@@ -364,7 +313,7 @@ pub struct DebugTag<'arena> {
 /// Renders a snippet, optionally with arguments.
 #[derive(Debug, Clone)]
 pub struct RenderTag<'arena> {
-    pub expression: ExprEdge<'arena>, // CallExpression or ChainExpression
+    pub expression: &'arena Expression<'arena>, // CallExpression or ChainExpression
     pub span: Span,
 }
 
@@ -374,7 +323,7 @@ pub struct RenderTag<'arena> {
 /// Attaches reactive functions to elements (Svelte 5.29+).
 #[derive(Debug, Clone)]
 pub struct AttachTag<'arena> {
-    pub expression: ExprEdge<'arena>,
+    pub expression: &'arena Expression<'arena>,
     pub span: Span,
 }
 
@@ -393,8 +342,8 @@ pub struct OnDirective<'arena> {
     /// `name_span.extract(source)`. Distinct from `head_span` below, which is the whole
     /// directive head token ("on:click|preventDefault", prefix + name + modifiers).
     pub name_span: Span,
-    pub expression: OptExprEdge<'arena>,  // Handler function
-    pub modifiers: &'arena [&'arena str], // "preventDefault", "stopPropagation", etc.
+    pub expression: Option<&'arena Expression<'arena>>, // Handler function
+    pub modifiers: &'arena [&'arena str],               // "preventDefault", "stopPropagation", etc.
     pub span: Span,
     /// Span of the whole directive head (`on:click|preventDefault`); used as `name_loc`.
     pub head_span: Span,
@@ -410,7 +359,7 @@ pub struct OnDirective<'arena> {
 pub struct BindDirective<'arena> {
     /// Span of the property name only (e.g. "value") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: ExprEdge<'arena>, // Binding target (always present - auto-generated for shorthand)
+    pub expression: &'arena Expression<'arena>, // Binding target (always present - auto-generated for shorthand)
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -426,7 +375,7 @@ pub struct BindDirective<'arena> {
 pub struct ClassDirective<'arena> {
     /// Span of the class name only (e.g. "class1") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: ExprEdge<'arena>, // Condition (always present - auto-generated for shorthand)
+    pub expression: &'arena Expression<'arena>, // Condition (always present - auto-generated for shorthand)
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -468,7 +417,7 @@ pub enum StyleDirectiveValue<'arena> {
 pub struct UseDirective<'arena> {
     /// Span of the action name only (e.g. "action") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: OptExprEdge<'arena>, // Parameters passed to the action
+    pub expression: Option<&'arena Expression<'arena>>, // Parameters passed to the action
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -529,9 +478,9 @@ impl TransitionDirection {
 pub struct TransitionDirective<'arena> {
     /// Span of the transition name only (e.g. "fade") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: OptExprEdge<'arena>,  // Transition parameters
-    pub modifiers: &'arena [&'arena str], // "local", "global"
-    pub direction: TransitionDirection,   // Which animations to run
+    pub expression: Option<&'arena Expression<'arena>>, // Transition parameters
+    pub modifiers: &'arena [&'arena str],               // "local", "global"
+    pub direction: TransitionDirection,                 // Which animations to run
     pub span: Span,
     pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
@@ -545,7 +494,7 @@ pub struct TransitionDirective<'arena> {
 pub struct AnimateDirective<'arena> {
     /// Span of the animation name only (e.g. "flip") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: OptExprEdge<'arena>,  // Animation parameters
+    pub expression: Option<&'arena Expression<'arena>>, // Animation parameters
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -560,7 +509,7 @@ pub struct AnimateDirective<'arena> {
 pub struct LetDirective<'arena> {
     /// Span of the slot-prop name only (e.g. "item") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: OptExprEdge<'arena>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
+    pub expression: Option<&'arena Expression<'arena>>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -699,9 +648,9 @@ impl<'arena> SpecialThis<'arena> {
     /// Span of the bound value: the braced form's expression, or the plain form's text.
     /// Both sit hard against whatever delimits them, so this is the region a comment can
     /// be adjacent to.
-    pub fn span(&self, view: ExprView<'_>) -> Span {
+    pub fn span(&self) -> Span {
         match self {
-            Self::Braced(tag) => view.expr(tag.expression).span(),
+            Self::Braced(tag) => tag.expression.span(),
             Self::Plain { span, .. } => *span,
         }
     }
@@ -1584,7 +1533,7 @@ impl Attribute<'_> {
 /// The expression can be any valid expression: identifier, call, member access, etc.
 #[derive(Debug, Clone)]
 pub struct SpreadAttribute<'arena> {
-    pub expression: ExprEdge<'arena>,
+    pub expression: &'arena Expression<'arena>,
     pub span: Span,
 }
 
@@ -2092,7 +2041,7 @@ fn decode_text_data(raw: &str, context: crate::html::ReferenceContext) -> String
 /// The expression is evaluated and its result is rendered.
 #[derive(Debug, Clone)]
 pub struct ExpressionTag<'arena> {
-    pub expression: ExprEdge<'arena>,
+    pub expression: &'arena Expression<'arena>,
     pub span: Span,
 }
 

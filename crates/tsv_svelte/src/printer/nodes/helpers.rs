@@ -8,11 +8,11 @@ use super::blocks_doc::AwaitShorthand;
 use crate::ast::{EachBlock, EachKey, Fragment, FragmentNode};
 use crate::printer::{CommentRun, HeadExpr, Printer};
 use smallvec::{SmallVec, smallvec};
+use std::borrow::Borrow;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, Span};
-use tsv_ts::ast::ExprView;
 use tsv_ts::ast::{Expression, ExpressionKind};
 
 /// What a block head's own syntax prints right after its expression — the question the
@@ -81,10 +81,10 @@ impl HeadTail {
 /// author wrote past the body — and both answer the one question this seam asks: how far into
 /// the head does the expression's comment range reach, without spanning text someone else
 /// prints.
-pub(super) fn each_expr_comment_end(view: ExprView<'_>, block: &EachBlock<'_>) -> u32 {
+pub(super) fn each_expr_comment_end(block: &EachBlock<'_>) -> u32 {
     match block.context {
-        Some(context) => view.expr(context).span().start,
-        None => view.expr(block.expression).span().end,
+        Some(context) => context.span().start,
+        None => block.expression.span().end,
     }
 }
 
@@ -552,12 +552,12 @@ impl<'a> Printer<'a> {
             tsv_ts::ast::ObjectPatternProperty::Property(p) => self.build_pattern_property_kv(
                 p.shorthand,
                 p.computed,
-                self.view.expr(p.key),
-                self.view.expr(p.value),
+                p.key,
+                p.value,
                 p.span.start,
             ),
             tsv_ts::ast::ObjectPatternProperty::RestElement(r) => {
-                self.build_rest_pattern_doc(r.span.start, self.view.expr(r.argument))
+                self.build_rest_pattern_doc(r.span.start, r.argument)
             }
         }
     }
@@ -570,12 +570,12 @@ impl<'a> Printer<'a> {
             tsv_ts::ast::ObjectProperty::Property(p) => self.build_pattern_property_kv(
                 p.shorthand,
                 p.computed,
-                self.view.expr(p.key),
-                self.view.expr(p.value),
+                p.key,
+                p.value,
                 p.span.start,
             ),
             tsv_ts::ast::ObjectProperty::SpreadElement(s) => {
-                self.build_rest_pattern_doc(s.span.start, self.view.expr(s.argument))
+                self.build_rest_pattern_doc(s.span.start, s.argument)
             }
         }
     }
@@ -627,7 +627,7 @@ impl<'a> Printer<'a> {
     /// (default-value) arms — generic over the slot's element, since the pattern holds
     /// `Option<Expression>` and the literal `Option<&Expression>`.
     /// Claims the owned leading comment for the same reason its object twin does.
-    fn build_array_brackets<E: tsv_ts::ast::ListElement>(
+    fn build_array_brackets<'e, E: Borrow<Expression<'e>>>(
         &self,
         elements: &[Option<E>],
         span_start: u32,
@@ -637,7 +637,7 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = smallvec![d.text("[")];
         let mut prev_end = span_start + 1; // past `[`
         for (i, elem) in elements.iter().enumerate() {
-            let elem = elem.as_ref().map(|e| e.element(self.view));
+            let elem = elem.as_ref().map(Borrow::borrow);
             if i == 0 {
                 if let Some(e) = elem {
                     parts.push(self.build_pattern_leading_comments(prev_end, e.span().start));
@@ -651,8 +651,7 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_pattern_doc(e));
                 // The element's PRINTED end: a rest's or a default value's stripped parens
                 // (`[b, ...(a /* c */)]`, `[a = (1 /* c */), b]`) are this gap's.
-                prev_end =
-                    element_printed_end(e.paren_interior(self.view), e.printed_end(self.view));
+                prev_end = element_printed_end(e.paren_interior(), e.printed_end());
             }
         }
         parts.push(self.build_pattern_trailing_comments(prev_end, span_end - 1));
@@ -773,10 +772,7 @@ impl<'a> Printer<'a> {
                         let s = p.span();
                         // The property's PRINTED end: a value's or a rest's stripped parens
                         // (`{ b: (a /* c */) }`, `{ ...(a /* c */) }`) are the next gap's.
-                        let end = element_printed_end(
-                            p.paren_interior(self.view),
-                            p.value_end(self.view),
-                        );
+                        let end = element_printed_end(p.paren_interior(), p.value_end());
                         (s.start, end, self.build_object_pattern_property_doc(p))
                     })
                     .collect();
@@ -789,42 +785,32 @@ impl<'a> Printer<'a> {
                     .iter()
                     .map(|p| {
                         let s = p.span();
-                        let end = element_printed_end(
-                            p.paren_interior(self.view),
-                            p.value_end(self.view),
-                        );
+                        let end = element_printed_end(p.paren_interior(), p.value_end());
                         (s.start, end, self.build_object_expr_property_doc(p))
                     })
                     .collect();
                 self.build_object_braces(expr.span.start, expr.span.end, &entries)
             }
             ExpressionKind::ArrayPattern(arr) => {
-                let brackets = self.build_array_brackets(
-                    self.view.pattern_elements(arr.elements),
-                    expr.span.start,
-                    expr.span.end,
-                );
+                let brackets =
+                    self.build_array_brackets(arr.elements, expr.span.start, expr.span.end);
                 self.append_pattern_type_annotation(brackets, arr.type_annotation.as_ref())
             }
-            ExpressionKind::ArrayExpression(arr) => self.build_array_brackets(
-                self.view.opt_list(arr.elements),
-                expr.span.start,
-                expr.span.end,
-            ),
+            ExpressionKind::ArrayExpression(arr) => {
+                self.build_array_brackets(arr.elements, expr.span.start, expr.span.end)
+            }
             ExpressionKind::RestElement(rest) => {
-                self.build_rest_pattern_doc(rest.span.start, self.view.expr(rest.argument))
+                self.build_rest_pattern_doc(rest.span.start, rest.argument)
             }
             // Comments around the `=` stay on the side the author wrote them
             // (`a /* c */ = 1` vs `a = /* c */ 1`). The `Expression` variant is the
             // default-value form of the same `=`.
-            ExpressionKind::AssignmentPattern(assign) => self.build_pattern_assignment(
-                self.view.expr(assign.left),
-                self.view.expr(assign.right),
-            ),
-            ExpressionKind::AssignmentExpression(assign) => self.build_pattern_assignment(
-                self.view.expr(assign.left),
-                self.view.expr(assign.right),
-            ),
+            ExpressionKind::AssignmentPattern(assign) => {
+                self.build_pattern_assignment(assign.left, assign.right)
+            }
+            ExpressionKind::AssignmentExpression(assign) => {
+                self.build_pattern_assignment(assign.left, assign.right)
+            }
             // Default: build doc through the comment-aware TS builder. Literals route
             // here too, so string and numeric defaults normalize through the TS printer
             // (single quotes + escaping, lowercase hex/exponent, leading/trailing zeros) —
@@ -990,7 +976,7 @@ impl<'a> Printer<'a> {
         // The instantiation pair and the assignment clarity pair are exclusive: the walk
         // never descends into an assignment, so at most one of the two wraps the head.
         let expr_doc = if tail == HeadTail::Keyword
-            && tsv_ts::__private::prints_ending_on_instantiation_close(self.view, expr)
+            && tsv_ts::__private::prints_ending_on_instantiation_close(expr)
         {
             d.parens(inner_doc)
         } else {
@@ -1044,7 +1030,7 @@ impl<'a> Printer<'a> {
     /// the whitespace-sensitive element's inline form).
     pub(super) fn build_each_key_expr(&self, key: &EachKey<'_>, wrapping: bool) -> HeadExpr {
         self.build_expression_doc_for_block(
-            self.view.expr(key.expression),
+            key.expression,
             key.span.start + 1, // after "("
             key.span.end - 1,   // before ")"
             wrapping,

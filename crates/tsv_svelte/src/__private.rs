@@ -4,14 +4,9 @@
 
 use super::*;
 
-use crate::ast::ParsedRootRef;
 /// The Svelte-shaped HTML answers `tsv_svelte_compile` and `tsv_debug` read — the crate's own
 /// `html` module, where each item's doc says where it departs from the spec.
 pub use crate::html::{is_mathml_element, is_svg_element, preserves_whitespace};
-/// [`tsv_ts`]'s per-thread parked stores: a Svelte document's stores are TypeScript's, one
-/// instance across its islands.
-pub use tsv_ts::__private::with_stores;
-use tsv_ts::ast::AstStores;
 
 /// Parse a document the format path folded (`tsv_lang::printing::normalize_carriage_returns`)
 /// — the parse every Svelte format entry point runs: the CLI, the bindings' `parse_format!`
@@ -34,53 +29,23 @@ use tsv_ts::ast::AstStores;
 pub fn parse_folded<'arena>(
     folded: &tsv_lang::printing::FoldedSource<'_>,
     arena: &'arena bumpalo::Bump,
-) -> Result<ParsedRoot<'arena>> {
-    parsed(|stores| parse_folded_into(folded, arena, stores))
-}
-
-/// [`parse_folded`] into a caller's `stores`.
-pub fn parse_folded_into<'arena>(
-    folded: &tsv_lang::printing::FoldedSource<'_>,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
 ) -> Result<Root<'arena>> {
     if folded.folded_lone_cr() {
         refuse_lone_cr_in_tag_line_comment(folded.original(), arena)?;
     }
-    folded.parse_with(|text| parse_into(text, arena, stores))
-}
-
-/// A warm parse's tree as a reading entry point takes it, read through `stores`.
-#[inline]
-pub fn parsed_ref<'a, 'arena: 'a>(
-    root: &'a Root<'arena>,
-    stores: &'a AstStores<'arena>,
-) -> ParsedRootRef<'a> {
-    ParsedRootRef {
-        root,
-        view: stores.view(),
-    }
-}
-
-/// A one-shot parse: `parse` over fresh stores, bundled with the tree it built.
-fn parsed<'arena>(
-    parse: impl FnOnce(&mut AstStores<'arena>) -> Result<Root<'arena>>,
-) -> Result<ParsedRoot<'arena>> {
-    let mut stores = AstStores::new();
-    let root = parse(&mut stores)?;
-    Ok(ParsedRoot { root, stores })
+    folded.parse_with(|text| parse(text, arena))
 }
 
 /// [`format_ast_in`] over a document the caller folded ahead of the parse
 /// (`tsv_lang::printing::normalize_carriage_returns`) — the format entry points that fold
 /// (the CLI, the bindings, [`format()`]). Identical output; the document's line verdict
 /// comes from the fold's own pass instead of a second walk of the source.
-pub fn format_folded_in<'a>(
-    parsed: impl Into<ParsedRootRef<'a>>,
+pub fn format_folded_in(
+    root: &Root<'_>,
     folded: &tsv_lang::printing::FoldedSource<'_>,
     arena: &tsv_lang::doc::arena::DocArena,
 ) -> String {
-    printer::format_svelte_folded_in(parsed.into(), folded, arena)
+    printer::format_svelte_folded_in(root, folded, arena)
 }
 
 /// Format a Svelte AST back to source code — the hidden, AST-taking primitive beneath [`format()`], which
@@ -112,8 +77,8 @@ pub fn format_folded_in<'a>(
 /// # Ok(())
 /// # }
 /// ```
-pub fn format_ast<'a>(parsed: impl Into<ParsedRootRef<'a>>, source: &str) -> String {
-    printer::format_svelte(parsed.into(), source)
+pub fn format_ast(root: &Root<'_>, source: &str) -> String {
+    printer::format_svelte(root, source)
 }
 
 /// Format into a caller-provided doc arena.
@@ -126,12 +91,12 @@ pub fn format_ast<'a>(parsed: impl Into<ParsedRootRef<'a>>, source: &str) -> Str
 /// borrowed from `arena` escapes — the result is an owned `String`. Embedded
 /// `<style>` blocks share this same arena (the CSS renders to its own string but
 /// builds its doc nodes into the host arena, not a second per-block one).
-pub fn format_ast_in<'a>(
-    parsed: impl Into<ParsedRootRef<'a>>,
+pub fn format_ast_in(
+    root: &Root<'_>,
     source: &str,
     arena: &tsv_lang::doc::arena::DocArena,
 ) -> String {
-    printer::format_svelte_in(parsed.into(), source, arena)
+    printer::format_svelte_in(root, source, arena)
 }
 
 /// Parse Svelte source code into an internal AST
@@ -145,7 +110,7 @@ pub fn format_ast_in<'a>(
 ///
 /// # Returns
 ///
-/// * `Ok(ParsedRoot)` - The parsed AST and its stores
+/// * `Ok(Root)` - The parsed AST
 /// * `Err(Error)` - If parsing fails
 ///
 /// # Example
@@ -157,19 +122,9 @@ pub fn format_ast_in<'a>(
 /// # Ok(())
 /// # }
 /// ```
-pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<ParsedRoot<'arena>> {
-    parsed(|stores| parse_into(source, arena, stores))
-}
-
-/// [`parse`] into a caller's `stores`, for a warm path that keeps them across documents.
-pub fn parse_into<'arena>(
-    source: &str,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
-) -> Result<Root<'arena>> {
+pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Root<'arena>> {
     Error::ensure_source_fits(source)?;
-    parser::parse_svelte(source, arena, stores)
-        .map_err(|e| e.with_context(source, WIRE_COORDINATES))
+    parser::parse_svelte(source, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
 /// [`crate::parse_imports`] over a caller-owned `arena` — the hidden primitive beneath it,
@@ -180,21 +135,7 @@ pub fn parse_into<'arena>(
 ///
 /// As [`crate::parse_imports`].
 pub fn parse_imports_in(source: &str, arena: &bumpalo::Bump) -> Result<Imports> {
-    parse_imports_into(source, arena, &mut AstStores::new())
-}
-
-/// [`parse_imports_in`] into a caller's `stores`, for a warm path that keeps them across
-/// documents.
-///
-/// # Errors
-///
-/// As [`crate::parse_imports`].
-pub fn parse_imports_into<'arena>(
-    source: &str,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
-) -> Result<Imports> {
-    let root = parse_into(source, arena, stores)?;
+    let root = parse(source, arena)?;
     let mut scripts = [root.instance, root.module];
     scripts.sort_by_key(|script| script.map(|script| script.span.start));
     let programs: smallvec::SmallVec<[&tsv_ts::ast::Program<'_>; 2]> = scripts
@@ -202,12 +143,7 @@ pub fn parse_imports_into<'arena>(
         .flatten()
         .map(|script| &script.content)
         .collect();
-    Ok(tsv_ts::__private::collect_imports(
-        &programs,
-        stores.view(),
-        source,
-        arena,
-    ))
+    Ok(tsv_ts::__private::collect_imports(&programs, source, arena))
 }
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions
@@ -246,8 +182,8 @@ pub fn parse_imports_into<'arena>(
 /// # }
 /// ```
 #[cfg(feature = "json")]
-pub fn convert_ast_json_bytes<'a>(parsed: impl Into<ParsedRootRef<'a>>, source: &str) -> Vec<u8> {
-    ast::convert::write_root_bytes(parsed.into(), source, tsv_lang::Wire::Span)
+pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
+    ast::convert::write_root_bytes(root, source, tsv_lang::Wire::Span)
 }
 
 /// The `convert_ast_json_bytes` wire plus a `loc` on every object carrying `start`/`end`
@@ -256,11 +192,8 @@ pub fn convert_ast_json_bytes<'a>(parsed: impl Into<ParsedRootRef<'a>>, source: 
 /// UTF-16 code units) under `\n` alone, the one line rule for a Svelte document and
 /// everything embedded in it. `tsv parse --locations` writes it.
 #[cfg(feature = "locations")]
-pub fn convert_ast_json_bytes_with_locations<'a>(
-    parsed: impl Into<ParsedRootRef<'a>>,
-    source: &str,
-) -> Vec<u8> {
-    ast::convert::write_root_bytes(parsed.into(), source, tsv_lang::Wire::Loc)
+pub fn convert_ast_json_bytes_with_locations(root: &Root<'_>, source: &str) -> Vec<u8> {
+    ast::convert::write_root_bytes(root, source, tsv_lang::Wire::Loc)
 }
 
 /// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM
@@ -271,7 +204,7 @@ pub fn convert_ast_json_bytes_with_locations<'a>(
 /// span-only wire alone, and `parse_to_json_with` validates the loc-bearing bytes itself.
 #[cfg(feature = "json")]
 #[expect(clippy::expect_used)]
-pub fn convert_ast_json_string<'a>(parsed: impl Into<ParsedRootRef<'a>>, source: &str) -> String {
-    String::from_utf8(convert_ast_json_bytes(parsed, source))
+pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
+    String::from_utf8(convert_ast_json_bytes(root, source))
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }

@@ -5,7 +5,6 @@
 // - ChainNodeVec: Stack-friendly buffer for a linearized chain
 // - ChainGroup: Groups of nodes that stay together on the same line
 
-use crate::ast::ExprView;
 use crate::ast::{self, IdentName, LiteralValue};
 use smallvec::SmallVec;
 use tsv_lang::Span;
@@ -303,14 +302,10 @@ impl<'a> ChainNode<'a> {
     ///
     /// The bounds are derived here rather than at the call sites, so the two
     /// linearization entry points cannot hand the node different ones.
-    pub(crate) fn non_null(
-        view: ExprView<'_>,
-        non_null: &ast::TSNonNullExpression<'_>,
-        span: Span,
-    ) -> Self {
+    pub(crate) fn non_null(non_null: &ast::TSNonNullExpression<'_>, span: Span) -> Self {
         Self::NonNull {
             gap: NonNullGap::Bang {
-                operand_end: view.expr(non_null.expression).span().end,
+                operand_end: non_null.expression.span().end,
                 bang_end: span.end,
             },
         }

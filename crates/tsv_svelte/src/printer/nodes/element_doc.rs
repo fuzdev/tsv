@@ -18,7 +18,6 @@ use crate::printer::classification::element::has_raw_content;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
-use tsv_ts::ast::AstStores;
 
 /// How content relates to an element boundary (opening or closing tag)
 ///
@@ -1255,20 +1254,9 @@ impl<'a> Printer<'a> {
         let host_nesting = self.nested_raw_text_nesting.get();
         let body = match kind {
             RawTextKind::Script => {
-                // Its own stores, as its own arena: nothing it mints reaches past the doc
-                // built from it.
-                let mut stores = AstStores::new();
-                let parsed = tsv_ts::__private::parse_embedded(
-                    &content,
-                    base_offset,
-                    host_nesting,
-                    &arena,
-                    &mut stores,
-                );
-                let view = stores.view();
-                parsed
+                tsv_ts::__private::parse_embedded(&content, base_offset, host_nesting, &arena)
                     .ok()
-                    .and_then(|program| self.build_nested_script_body_doc(&program, view))
+                    .and_then(|program| self.build_nested_script_body_doc(&program))
             }
             RawTextKind::Style => {
                 tsv_css::__private::parse_embedded(&content, base_offset, host_nesting, &arena)
@@ -1311,11 +1299,7 @@ impl<'a> Printer<'a> {
     /// The embed is [`tsv_lang::EmbedContext::line_owning`], the top-level `<script>`'s: a
     /// nested body's statements end their own lines too, and its closing tag takes a fresh
     /// one, so a `//` deferred to a line end still lands in JS.
-    fn build_nested_script_body_doc(
-        &self,
-        program: &tsv_ts::ast::Program<'_>,
-        view: tsv_ts::ast::ExprView<'_>,
-    ) -> Option<DocId> {
+    fn build_nested_script_body_doc(&self, program: &tsv_ts::ast::Program<'_>) -> Option<DocId> {
         // The body is raw text to the canonical parser, so the host's `Root.comments` holds
         // none of its comments: they are this island's, registered here under the host
         // source they are spanned against (the MERGED view, the one the TS printer emits).
@@ -1327,7 +1311,6 @@ impl<'a> Printer<'a> {
         tsv_ts::__private::build_program_body_doc(
             self.d(),
             program,
-            view,
             self.source,
             self.line_table(),
             tsv_lang::EmbedContext::line_owning(),

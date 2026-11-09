@@ -16,7 +16,6 @@ use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::printing::next_width_relevant_in;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, Span};
-use tsv_ts::ast::ExprView;
 use tsv_ts::ast::{Expression, ExpressionKind};
 
 /// How a directive prints its expression value — the only axis the expression-valued
@@ -666,8 +665,7 @@ impl<'a> Printer<'a> {
                 let whole = attr.span;
                 let fuses = whole.start + 1 == name.start
                     && whole.end == name.end + 1
-                    && super::plain_path_span(self.view, self.view.expr(tag.expression))
-                        == Some(name)
+                    && super::plain_path_span(tag.expression) == Some(name)
                     && self.is_shorthand_attribute(attr, value);
                 debug_assert!(
                     !fuses || (bytes[whole.start as usize] == b'{' && bytes[name_end] == b'}'),
@@ -675,9 +673,7 @@ impl<'a> Printer<'a> {
                 );
                 fuses.then_some(whole)
             }
-            [ast::AttributeValue::ExpressionTag(tag)]
-                if Self::tag_is_plain_path(self.view, tag) =>
-            {
+            [ast::AttributeValue::ExpressionTag(tag)] if Self::tag_is_plain_path(tag) => {
                 let tag = tag.span;
                 let fuses = tag.start as usize == name_end + 1
                     && bytes[name_end] == b'='
@@ -906,7 +902,7 @@ impl<'a> Printer<'a> {
     fn build_spread_attribute_doc(&self, spread: &ast::SpreadAttribute<'_>) -> DocId {
         self.build_braced_expression_doc(
             SPREAD_OPEN,
-            self.view.expr(spread.expression),
+            spread.expression,
             spread.span.start,
             spread.span.end,
         )
@@ -916,7 +912,7 @@ impl<'a> Printer<'a> {
     fn build_attach_tag_doc(&self, tag: &ast::AttachTag<'_>) -> DocId {
         self.build_braced_expression_doc(
             ATTACH_TAG_OPEN,
-            self.view.expr(tag.expression),
+            tag.expression,
             tag.span.start,
             tag.span.end,
         )
@@ -1013,7 +1009,7 @@ impl<'a> Printer<'a> {
             self.d().text("on:"),
             dir.name_span,
             dir.modifiers,
-            self.view.opt(dir.expression),
+            dir.expression,
             dir.expression_tag_span,
             DirectiveValue::Always,
         )
@@ -1025,7 +1021,7 @@ impl<'a> Printer<'a> {
             self.d().text("bind:"),
             dir.name_span,
             dir.modifiers,
-            Some(self.view.expr(dir.expression)),
+            Some(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::ShorthandBind,
         )
@@ -1037,7 +1033,7 @@ impl<'a> Printer<'a> {
             self.d().text("class:"),
             dir.name_span,
             dir.modifiers,
-            Some(self.view.expr(dir.expression)),
+            Some(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::Shorthand,
         )
@@ -1052,11 +1048,7 @@ impl<'a> Printer<'a> {
             ast::StyleDirectiveValue::True => {}
             ast::StyleDirectiveValue::ExpressionTag(tag) => {
                 // Only include expression if not shorthand (style:color={color} → style:color)
-                if !self.value_collapses_to_shorthand(
-                    self.view.expr(tag.expression),
-                    name,
-                    Some(tag.span),
-                ) {
+                if !self.value_collapses_to_shorthand(tag.expression, name, Some(tag.span)) {
                     parts.push(d.text("="));
                     parts.push(self.build_expression_tag_doc(tag));
                 }
@@ -1081,7 +1073,7 @@ impl<'a> Printer<'a> {
             self.d().text("use:"),
             dir.name_span,
             dir.modifiers,
-            self.view.opt(dir.expression),
+            dir.expression,
             dir.expression_tag_span,
             DirectiveValue::Always,
         )
@@ -1093,7 +1085,7 @@ impl<'a> Printer<'a> {
             self.d().text(dir.direction.prefix_with_colon()),
             dir.name_span,
             dir.modifiers,
-            self.view.opt(dir.expression),
+            dir.expression,
             dir.expression_tag_span,
             DirectiveValue::Always,
         )
@@ -1105,7 +1097,7 @@ impl<'a> Printer<'a> {
             self.d().text("animate:"),
             dir.name_span,
             dir.modifiers,
-            self.view.opt(dir.expression),
+            dir.expression,
             dir.expression_tag_span,
             DirectiveValue::Always,
         )
@@ -1117,7 +1109,7 @@ impl<'a> Printer<'a> {
             self.d().text("let:"),
             dir.name_span,
             dir.modifiers,
-            self.view.opt(dir.expression),
+            dir.expression,
             dir.expression_tag_span,
             DirectiveValue::Shorthand,
         )
@@ -1495,11 +1487,7 @@ impl<'a> Printer<'a> {
         // the operands sit in their own group below, so they only break when *they*
         // overflow or carry their own forced break (matching prettier, which keeps
         // `() => a, (v) => (a = v)` on one line under a leading comment).
-        let first_start = self
-            .view
-            .expr(self.view.list(seq.expressions)[0])
-            .span()
-            .start;
+        let first_start = seq.expressions[0].span().start;
         // An honored directive in the `{`→value gap leads the SEQUENCE node, not its first
         // operand, so the whole pair rides inside one verbatim slice — the value-head rule.
         // It stays bare: `bind:value={(get, set)}` is a grouped expression to Svelte, not a
@@ -1522,11 +1510,7 @@ impl<'a> Printer<'a> {
         let (sequence, tail_from) = if head_frozen {
             (self.build_frozen_node_doc(span), span.end)
         } else {
-            let last_end = self
-                .view
-                .expr(self.view.list(seq.expressions)[seq.expressions.len() - 1])
-                .span()
-                .end;
+            let last_end = seq.expressions[seq.expressions.len() - 1].span().end;
             (self.build_bind_sequence_operands_doc(seq), last_end)
         };
         content.push(sequence);
@@ -1550,7 +1534,6 @@ impl<'a> Printer<'a> {
     /// break only when they overflow or carry an interior forced break (a mid line comment,
     /// a block-body arrow). Matches prettier.
     fn build_bind_sequence_operands_doc(&self, seq: &tsv_ts::ast::SequenceExpression<'_>) -> DocId {
-        let expressions = self.view.list(seq.expressions);
         let d = self.d();
         let bytes = self.source.as_bytes();
         // Rule A: an honored directive in the comma gap freezes the operand after it. The
@@ -1559,22 +1542,16 @@ impl<'a> Printer<'a> {
         let operands = self.build_bind_operand_docs(seq, |i| {
             i > 0
                 && self.honored_directive_in_gap(
-                    self.view.expr(expressions[i - 1]).span().end,
-                    self.view.expr(expressions[i]).span().start,
+                    seq.expressions[i - 1].span().end,
+                    seq.expressions[i].span().start,
                 )
         });
         let mut items: DocBuf = DocBuf::new();
         let mut prev_doc = None;
-        for (i, (sub_expr, doc)) in self
-            .view
-            .list(seq.expressions)
-            .iter()
-            .zip(operands)
-            .enumerate()
-        {
+        for (i, (sub_expr, doc)) in seq.expressions.iter().zip(operands).enumerate() {
             if i > 0 {
-                let prev_end = self.view.expr(expressions[i - 1]).span().end;
-                let cur_start = self.view.expr(*sub_expr).span().start;
+                let prev_end = seq.expressions[i - 1].span().end;
+                let cur_start = sub_expr.span().start;
                 // The separator comma, located in source so a comment on either side
                 // is attributed to the right operand (a comment's `,` can't fool it).
                 let comma_pos =
@@ -1618,27 +1595,18 @@ impl<'a> Printer<'a> {
         frozen_at: impl Fn(usize) -> bool,
     ) -> Vec<DocId> {
         let built = tsv_ts::__private::build_bare_sequence_operand_docs(
-            self.view,
             self.d(),
             seq,
             &self.ts_inputs(),
             self.embed,
-            |i| {
-                !frozen_at(i)
-                    && self
-                        .fused_plain_path(self.view.expr(self.view.list(seq.expressions)[i]))
-                        .is_none()
-            },
+            |i| !frozen_at(i) && self.fused_plain_path(seq.expressions[i]).is_none(),
         );
-        self.view
-            .list(seq.expressions)
+        seq.expressions
             .iter()
             .zip(built)
             .enumerate()
             .map(|(i, (expr, doc))| {
-                doc.unwrap_or_else(|| {
-                    self.build_head_value_doc(self.view.expr(*expr), frozen_at(i), &self.embed)
-                })
+                doc.unwrap_or_else(|| self.build_head_value_doc(expr, frozen_at(i), &self.embed))
             })
             .collect()
     }
@@ -1705,15 +1673,14 @@ impl<'a> Printer<'a> {
     /// the path is the `{`, so it owns no comment either. What the general builder adds
     /// around a value never applies: the clarity pair is an assignment's, and the regex
     /// pair a regex-led value's. Every byte of the tag is then plain ASCII.
-    fn tag_is_plain_path(view: ExprView<'_>, tag: &ast::ExpressionTag<'_>) -> bool {
-        super::plain_path_span(view, view.expr(tag.expression))
+    fn tag_is_plain_path(tag: &ast::ExpressionTag<'_>) -> bool {
+        super::plain_path_span(tag.expression)
             .is_some_and(|path| path.start == tag.span.start + 1 && path.end + 1 == tag.span.end)
     }
 
     fn build_expression_tag_doc_at(&self, tag: &ast::ExpressionTag<'_>, site: TagSite) -> DocId {
-        let expression = self.view.expr(tag.expression);
         let d = self.d();
-        if Self::tag_is_plain_path(self.view, tag) && super::fuses_source_spans() {
+        if Self::tag_is_plain_path(tag) && super::fuses_source_spans() {
             debug_assert!(
                 tag.span.extract(self.source).starts_with('{')
                     && tag.span.extract(self.source).ends_with('}'),
@@ -1726,14 +1693,14 @@ impl<'a> Printer<'a> {
         // hugs its braces where an attribute value chooses between hug and block — which is
         // why a leading cast cannot hang here (`UnprefixedHost::Tag`, the reflow).
         let mut head = self.build_expression_content_with_comments(
-            expression,
+            tag.expression,
             Some(tag.span),
             UnprefixedHost::Tag,
         );
         // A value that takes the host's clarity pair already opens on its `(`.
         if site == TagSite::Text
-            && !Self::value_takes_clarity_parens(expression)
-            && tsv_ts::__private::leading_regex_start(self.view, expression)
+            && !Self::value_takes_clarity_parens(tag.expression)
+            && tsv_ts::__private::leading_regex_start(tag.expression)
                 .is_some_and(|start| !self.has_comments_on_page_between(tag.span.start + 1, start))
         {
             head.doc = d.concat(&[d.text("("), head.doc, d.text(")")]);
@@ -1765,7 +1732,7 @@ impl<'a> Printer<'a> {
         };
 
         self.value_collapses_to_shorthand(
-            self.view.expr(expr_tag.expression),
+            expr_tag.expression,
             attr.name(self.source),
             Some(expr_tag.span),
         )

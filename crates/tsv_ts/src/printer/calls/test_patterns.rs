@@ -6,7 +6,6 @@
 use super::super::Printer;
 use super::arg_comments::has_inter_argument_comments_slice;
 use super::call_paren_open;
-use crate::ast::ExprView;
 use crate::ast::{self, IdentName};
 use smallvec::SmallVec;
 use tsv_lang::Span;
@@ -85,7 +84,7 @@ pub(super) fn build_test_callee_flat_doc(
     expr: &ast::Expression<'_>,
     printer: &Printer<'_>,
 ) -> Option<DocId> {
-    let parts = get_member_chain_parts(printer.view, expr)?;
+    let parts = get_member_chain_parts(expr)?;
     // Parts come out leaf→root; reverse to root→leaf (`test.describe.only`), which is
     // also the AST's own association — each pair's left is everything before its dot.
     let mut iter = parts.iter().rev();
@@ -112,7 +111,6 @@ pub(super) fn build_test_callee_flat_doc(
 /// stack contract prices per link.
 #[inline(never)]
 fn get_member_chain_parts<'a>(
-    view: ExprView<'a>,
     expr: &ast::Expression<'a>,
 ) -> Option<SmallVec<[(IdentName<'a>, u32, u32); 8]>> {
     let mut parts: SmallVec<[(IdentName<'a>, u32, u32); 8]> = SmallVec::new();
@@ -131,8 +129,8 @@ fn get_member_chain_parts<'a>(
                 if member.computed || member.optional {
                     return None;
                 }
-                parts.push(get_identifier_name(view.expr(member.property))?);
-                expr = view.expr(member.object);
+                parts.push(get_identifier_name(member.property)?);
+                expr = member.object;
             }
             _ => return None,
         }
@@ -187,12 +185,7 @@ pub(super) fn test_call_flat_gaps_clear(
     // last argument of a test call is its callback body, which is where a test file's
     // comments overwhelmingly live, so a gate spanning it fires on nearly every call and
     // gates nothing. Canonical reference: `build_params_doc_with_comments`.
-    let Some(last_start) = printer
-        .view
-        .list(call.arguments)
-        .last()
-        .map(|a| printer.view.expr(*a).span().start)
-    else {
+    let Some(last_start) = call.arguments.last().map(|a| a.span().start) else {
         return true;
     };
     !(printer.has_comments_to_emit_between(paren_open, last_start)
@@ -208,19 +201,14 @@ fn test_call_gaps_have_comments(
     printer: &Printer<'_>,
     paren_open: u32,
 ) -> bool {
-    printer
-        .view
-        .list(call.arguments)
+    call.arguments
         .first()
-        .is_some_and(|first| {
-            printer.has_comments_to_emit_between(paren_open, printer.view.expr(*first).span().start)
-        })
-        || has_inter_argument_comments_slice(printer.view.list(call.arguments), printer)
+        .is_some_and(|first| printer.has_comments_to_emit_between(paren_open, first.span().start))
+        || has_inter_argument_comments_slice(call.arguments, printer)
 }
 
 /// Check if a call expression is a test function call that should stay on one line
 pub(super) fn is_test_call(call: &ast::CallExpression<'_>, printer: &Printer<'_>) -> bool {
-    let arguments = printer.view.list(call.arguments);
     // Optional calls (`describe?.(...)`) are never test calls — they format like
     // a normal call (wrap when long), preserving the `?.`. Mirrors prettier's
     // isTestCall guard (`utilities/test-libraries.js`: `node.optional` → false).
@@ -235,7 +223,7 @@ pub(super) fn is_test_call(call: &ast::CallExpression<'_>, printer: &Printer<'_>
     }
 
     // First argument must be a string or template literal
-    let first_is_string = match &printer.view.expr(arguments[0]).kind {
+    let first_is_string = match &call.arguments[0].kind {
         ast::ExpressionKind::Literal(lit) => {
             matches!(lit.value, ast::LiteralValue::String { .. })
         }
@@ -248,7 +236,7 @@ pub(super) fn is_test_call(call: &ast::CallExpression<'_>, printer: &Printer<'_>
 
     // Third argument (if present) must be a number (timeout)
     if arg_count == 3 {
-        let third_is_number = match &printer.view.expr(arguments[2]).kind {
+        let third_is_number = match &call.arguments[2].kind {
             ast::ExpressionKind::Literal(lit) => {
                 matches!(lit.value, ast::LiteralValue::Number(_))
             }
@@ -271,7 +259,7 @@ pub(super) fn is_test_call(call: &ast::CallExpression<'_>, printer: &Printer<'_>
     // runs past print width in a position where prettier breaks every argument out and holds
     // 100 — tsv over-width exactly where prettier is not. Pinned by
     // `tests/fixtures/typescript/expressions/calls/test_functions_timeout`.
-    let callback_ok = match &printer.view.expr(arguments[1]).kind {
+    let callback_ok = match &call.arguments[1].kind {
         ast::ExpressionKind::FunctionExpression(func) => arg_count == 2 || func.params.len() <= 1,
         ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
             arg_count == 2 || (!arrow.body.is_expression() && arrow.params.len() <= 1)
@@ -282,7 +270,7 @@ pub(super) fn is_test_call(call: &ast::CallExpression<'_>, printer: &Printer<'_>
         return false;
     }
 
-    callee_is_test_pattern(printer.view, printer.view.expr(call.callee), printer.source)
+    callee_is_test_pattern(call.callee, printer.source)
 }
 
 /// Whether `callee` is a simple identifier or a non-computed, non-optional member chain of
@@ -294,7 +282,7 @@ pub(super) fn is_test_call(call: &ast::CallExpression<'_>, printer: &Printer<'_>
 /// (an escaped `te\u0073t` is `test`). The same callees qualify as for the flat callee doc
 /// ([`build_test_callee_flat_doc`], over [`get_member_chain_parts`]): an identifier root and
 /// identifier properties only.
-fn callee_is_test_pattern(view: ExprView<'_>, callee: &ast::Expression<'_>, source: &str) -> bool {
+fn callee_is_test_pattern(callee: &ast::Expression<'_>, source: &str) -> bool {
     let mut names = [""; TEST_PATTERN_MAX_DEPTH];
     let mut depth = 0;
     let mut expr = callee;
@@ -305,8 +293,7 @@ fn callee_is_test_pattern(view: ExprView<'_>, callee: &ast::Expression<'_>, sour
                 if member.computed || member.optional {
                     return false;
                 }
-                let ast::ExpressionKind::Identifier(property) = &view.expr(member.property).kind
-                else {
+                let ast::ExpressionKind::Identifier(property) = &member.property.kind else {
                     return false;
                 };
                 (property, Some(member.object))
@@ -319,7 +306,7 @@ fn callee_is_test_pattern(view: ExprView<'_>, callee: &ast::Expression<'_>, sour
         *slot = id.ident_name().resolve(id.span.start, source);
         depth += 1;
         match object {
-            Some(object) => expr = view.expr(object),
+            Some(object) => expr = object,
             None => break,
         }
     }

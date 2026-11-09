@@ -6,8 +6,8 @@
 use tsv_lang::Span;
 
 use super::{
-    Decorator, ExprEdge, ExprSlot, FunctionExpression, Identifier, OptExprEdge, Statement,
-    TSIndexSignature, TSInterfaceHeritage, TSTypeAnnotation, TSTypeParameterDeclaration,
+    Decorator, Expression, FunctionExpression, Identifier, Statement, TSIndexSignature,
+    TSInterfaceHeritage, TSTypeAnnotation, TSTypeParameterDeclaration,
     TSTypeParameterInstantiation,
 };
 
@@ -22,7 +22,7 @@ pub struct ClassDeclaration<'arena> {
     /// Class name (required for declarations, optional for export default)
     pub id: Option<Identifier<'arena>>,
     /// Optional superclass expression (for `extends`)
-    pub super_class: OptExprEdge<'arena>,
+    pub super_class: Option<&'arena Expression<'arena>>,
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
     pub super_type_parameters: Option<TSTypeParameterInstantiation<'arena>>,
     /// Implements clause for declare class: `implements Foo, Bar`
@@ -49,7 +49,7 @@ pub struct ClassExpression<'arena> {
     /// Class name (always optional for expressions)
     pub id: Option<Identifier<'arena>>,
     /// Optional superclass expression (for `extends`)
-    pub super_class: OptExprEdge<'arena>,
+    pub super_class: Option<&'arena Expression<'arena>>,
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
     pub super_type_parameters: Option<TSTypeParameterInstantiation<'arena>>,
     /// Implements clause: `implements Foo, Bar`
@@ -162,7 +162,7 @@ pub struct TSParameterProperty<'arena> {
     /// Whether the parameter property carries the `override` modifier
     pub r#override: bool,
     /// The actual parameter - can be Identifier or AssignmentPattern (with default value)
-    pub parameter: ExprEdge<'arena>,
+    pub parameter: &'arena Expression<'arena>,
 }
 
 /// Method definition in a class body: `method() { ... }` or `get x() { ... }`
@@ -172,7 +172,7 @@ pub struct MethodDefinition<'arena> {
     /// Decorators applied to this method
     pub decorators: Option<&'arena [Decorator<'arena>]>,
     /// Method name (key)
-    pub key: ExprSlot<'arena>,
+    pub key: Expression<'arena>,
     /// Method implementation (value)
     pub value: FunctionExpression<'arena>,
     /// Method kind (constructor, method, get, set)
@@ -217,11 +217,11 @@ pub struct PropertyDefinition<'arena> {
     /// Decorators applied to this property
     pub decorators: Option<&'arena [Decorator<'arena>]>,
     /// Property name (key)
-    pub key: ExprSlot<'arena>,
+    pub key: Expression<'arena>,
     /// Type annotation (e.g., `: number` in `a: number = 0;`)
     pub type_annotation: Option<TSTypeAnnotation<'arena>>,
     /// Optional initial value
-    pub value: Option<ExprSlot<'arena>>,
+    pub value: Option<Expression<'arena>>,
     /// Accessibility modifier (public, private, protected)
     pub accessibility: Option<Accessibility>,
     /// Whether this is a static property

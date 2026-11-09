@@ -21,20 +21,17 @@ pub(super) fn is_module_path_no_break(
     printer: &Printer<'_>,
 ) -> bool {
     // Must have exactly 1 argument that is a string literal
-    if call.arguments.len() != 1
-        || !is_string_literal(printer.view.expr(printer.view.list(call.arguments)[0]))
-    {
+    if call.arguments.len() != 1 || !is_string_literal(call.arguments[0]) {
         return false;
     }
 
     // Check for `require.resolve()`
-    if let ast::ExpressionKind::MemberExpression(member) = &printer.view.expr(call.callee).kind
+    if let ast::ExpressionKind::MemberExpression(member) = &call.callee.kind
         && !member.computed
         && !member.optional
-        && let ast::ExpressionKind::Identifier(resolve_id) =
-            &printer.view.expr(member.property).kind
+        && let ast::ExpressionKind::Identifier(resolve_id) = &member.property.kind
         && printer.with_ident_name(resolve_id, |s| s == "resolve")
-        && let ast::ExpressionKind::Identifier(require_id) = &printer.view.expr(member.object).kind
+        && let ast::ExpressionKind::Identifier(require_id) = &member.object.kind
         && printer.with_ident_name(require_id, |s| s == "require")
     {
         return true;
@@ -51,17 +48,15 @@ pub(super) fn is_module_path_no_break(
 /// - `import.meta.resolve(string)` → break before `.resolve`
 pub(super) fn get_module_path_chain_break<'a>(
     call: &'a ast::CallExpression<'a>,
-    printer: &Printer<'a>,
+    printer: &Printer<'_>,
 ) -> Option<(&'a ast::Expression<'a>, &'a ast::Identifier<'a>)> {
     // Must have exactly 1 argument that is a string literal
-    if call.arguments.len() != 1
-        || !is_string_literal(printer.view.expr(printer.view.list(call.arguments)[0]))
-    {
+    if call.arguments.len() != 1 || !is_string_literal(call.arguments[0]) {
         return None;
     }
 
     // Callee must be a member expression (not computed, not optional)
-    let ast::ExpressionKind::MemberExpression(member) = &printer.view.expr(call.callee).kind else {
+    let ast::ExpressionKind::MemberExpression(member) = &call.callee.kind else {
         return None;
     };
     if member.computed || member.optional {
@@ -69,8 +64,7 @@ pub(super) fn get_module_path_chain_break<'a>(
     }
 
     // Property must be an identifier
-    let ast::ExpressionKind::Identifier(method_name) = &printer.view.expr(member.property).kind
-    else {
+    let ast::ExpressionKind::Identifier(method_name) = &member.property.kind else {
         return None;
     };
 
@@ -80,29 +74,24 @@ pub(super) fn get_module_path_chain_break<'a>(
     // Check for `require.resolve.paths()`
     if is_paths {
         // Object should be `require.resolve`
-        if let ast::ExpressionKind::MemberExpression(obj_member) =
-            &printer.view.expr(member.object).kind
+        if let ast::ExpressionKind::MemberExpression(obj_member) = &member.object.kind
             && !obj_member.computed
             && !obj_member.optional
-            && let ast::ExpressionKind::Identifier(resolve_id) =
-                &printer.view.expr(obj_member.property).kind
+            && let ast::ExpressionKind::Identifier(resolve_id) = &obj_member.property.kind
             && printer.with_ident_name(resolve_id, |s| s == "resolve")
-            && let ast::ExpressionKind::Identifier(require_id) =
-                &printer.view.expr(obj_member.object).kind
+            && let ast::ExpressionKind::Identifier(require_id) = &obj_member.object.kind
             && printer.with_ident_name(require_id, |s| s == "require")
         {
-            return Some((printer.view.expr(member.object), method_name));
+            return Some((member.object, method_name));
         }
     }
 
     // Check for `import.meta.resolve()`
-    if is_resolve
-        && let ast::ExpressionKind::MetaProperty(meta) = &printer.view.expr(member.object).kind
-    {
+    if is_resolve && let ast::ExpressionKind::MetaProperty(meta) = &member.object.kind {
         let is_import_meta = printer.with_ident_name(&meta.meta, |m| m == "import")
             && printer.with_ident_name(&meta.property, |p| p == "meta");
         if is_import_meta {
-            return Some((printer.view.expr(member.object), method_name));
+            return Some((member.object, method_name));
         }
     }
 

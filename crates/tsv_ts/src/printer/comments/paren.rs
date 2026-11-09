@@ -8,7 +8,6 @@
 
 use super::{CommentSpacing, CommentVec, LeadingGlue, Printer, RunLeadingBlank, ShareSite};
 use crate::ast;
-use crate::ast::ExprView;
 use crate::printer::ParenContext;
 use crate::printer::chain::{
     chain_mid_chain_paren_gaps, chain_paren_leading_gap, tag_paren_leading_start,
@@ -112,20 +111,17 @@ pub(crate) struct ParenLeadingValue {
 /// the operand, [`AsiOperandShell::Bare`]) and never hoist it, so the hoisting walk takes
 /// their operand only where it prints first and bare — a question about the printed form,
 /// answered by `Printer::bare_cast_operand`, not by this structural table.
-fn left_side_child<'e>(
-    view: ExprView<'e>,
-    expr: &'e ast::Expression<'e>,
-) -> Option<&'e ast::Expression<'e>> {
+fn left_side_child<'e>(expr: &'e ast::Expression<'e>) -> Option<&'e ast::Expression<'e>> {
     use ast::ExpressionKind;
     Some(match &expr.kind {
-        ExpressionKind::CallExpression(call) => view.expr(call.callee),
-        ExpressionKind::MemberExpression(member) => view.expr(member.object),
-        ExpressionKind::TSNonNullExpression(non_null) => view.expr(non_null.expression),
-        ExpressionKind::TaggedTemplateExpression(tagged) => view.expr(tagged.tag),
-        ExpressionKind::ConditionalExpression(cond) => view.expr(cond.test),
-        ExpressionKind::BinaryExpression(binary) => view.expr(binary.left),
-        ExpressionKind::AssignmentExpression(assign) => view.expr(assign.left),
-        ExpressionKind::SequenceExpression(seq) => view.expr(*view.list(seq.expressions).first()?),
+        ExpressionKind::CallExpression(call) => call.callee,
+        ExpressionKind::MemberExpression(member) => member.object,
+        ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+        ExpressionKind::TaggedTemplateExpression(tagged) => tagged.tag,
+        ExpressionKind::ConditionalExpression(cond) => cond.test,
+        ExpressionKind::BinaryExpression(binary) => binary.left,
+        ExpressionKind::AssignmentExpression(assign) => assign.left,
+        ExpressionKind::SequenceExpression(seq) => seq.expressions.first()?,
         _ => return None,
     })
 }
@@ -149,7 +145,6 @@ fn left_side_child<'e>(
 /// A sequence answers `false`: its operands ride the sequence's OWN envelope, so an operand
 /// never prints a pair of its own — the sequence's envelope is the CALLER's to notice.
 fn left_side_child_is_parenthesized(
-    view: ExprView<'_>,
     expr: &ast::Expression<'_>,
     child: &ast::Expression<'_>,
     in_for_init: bool,
@@ -169,7 +164,7 @@ fn left_side_child_is_parenthesized(
         ExpressionKind::ConditionalExpression(_) => return ternary_test_needs_parens(child),
         _ => return false,
     };
-    needs_parens(view, child, ctx, in_for_init)
+    needs_parens(child, ctx, in_for_init)
 }
 
 /// The regex literal `expr` PRINTS FIRST, at a position that adds no pair of its own — the
@@ -183,7 +178,7 @@ fn left_side_child_is_parenthesized(
 ///
 /// An embedder asks it where its own syntax gives a leading `/` another meaning: a Svelte
 /// `{…}` tag in text position reads `{/` as a block close, so `{/a/.test(s)}` does not parse.
-pub(crate) fn leading_regex_start(view: ExprView<'_>, expr: &ast::Expression<'_>) -> Option<u32> {
+pub(crate) fn leading_regex_start(expr: &ast::Expression<'_>) -> Option<u32> {
     use ast::ExpressionKind;
     let mut node = expr;
     loop {
@@ -194,7 +189,7 @@ pub(crate) fn leading_regex_start(view: ExprView<'_>, expr: &ast::Expression<'_>
             ExpressionKind::SequenceExpression(_) => return None,
             _ => {}
         }
-        let (child, parenthesized) = printed_left_spine_step(view, node, false)?;
+        let (child, parenthesized) = printed_left_spine_step(node, false)?;
         if parenthesized {
             return None;
         }
@@ -213,7 +208,6 @@ pub(crate) fn leading_regex_start(view: ExprView<'_>, expr: &ast::Expression<'_>
 /// ([`Printer::yield_operand_class_pair_target`]): a pair the operand prints anyway ahead of
 /// the `@` already guards it, so the class takes none of its own there.
 pub(in crate::printer) fn leading_decorated_class<'e>(
-    view: ExprView<'e>,
     expr: &'e ast::Expression<'e>,
 ) -> Option<&'e ast::Expression<'e>> {
     use ast::ExpressionKind;
@@ -226,7 +220,7 @@ pub(in crate::printer) fn leading_decorated_class<'e>(
             ExpressionKind::SequenceExpression(_) => return None,
             _ => {}
         }
-        let (child, parenthesized) = printed_left_spine_step(view, node, false)?;
+        let (child, parenthesized) = printed_left_spine_step(node, false)?;
         if parenthesized {
             return None;
         }
@@ -248,53 +242,40 @@ pub(in crate::printer) fn leading_decorated_class<'e>(
 /// [`leading_regex_start`], and the relational-chain rule's search for a kept shell
 /// (`needs_parens`'s `relational_region_opens_on_a_kept_shell`).
 pub(in crate::printer) fn printed_left_spine_step<'e>(
-    view: ExprView<'e>,
     node: &'e ast::Expression<'e>,
     in_for_init: bool,
 ) -> Option<(&'e ast::Expression<'e>, bool)> {
     use ast::ExpressionKind;
     Some(match &node.kind {
         ExpressionKind::TSAsExpression(cast) => (
-            view.expr(cast.expression),
-            needs_parens(
-                view,
-                view.expr(cast.expression),
-                ParenContext::TypeAssertion,
-                in_for_init,
-            ),
+            cast.expression,
+            needs_parens(cast.expression, ParenContext::TypeAssertion, in_for_init),
         ),
         ExpressionKind::TSSatisfiesExpression(cast) => (
-            view.expr(cast.expression),
-            needs_parens(
-                view,
-                view.expr(cast.expression),
-                ParenContext::TypeAssertion,
-                in_for_init,
-            ),
+            cast.expression,
+            needs_parens(cast.expression, ParenContext::TypeAssertion, in_for_init),
         ),
         ExpressionKind::TSInstantiationExpression(inst) => (
-            view.expr(inst.expression),
+            inst.expression,
             needs_parens(
-                view,
-                view.expr(inst.expression),
+                inst.expression,
                 ParenContext::InstantiationExpression { source_pair: false },
                 in_for_init,
             ),
         ),
         ExpressionKind::UpdateExpression(update) if !update.prefix => (
-            view.expr(update.argument),
+            update.argument,
             needs_parens(
-                view,
-                view.expr(update.argument),
+                update.argument,
                 ParenContext::UpdateArgument { postfix: true },
                 in_for_init,
             ),
         ),
         _ => {
-            let child = left_side_child(view, node)?;
+            let child = left_side_child(node)?;
             (
                 child,
-                left_side_child_is_parenthesized(view, node, child, in_for_init),
+                left_side_child_is_parenthesized(node, child, in_for_init),
             )
         }
     })
@@ -323,12 +304,12 @@ pub(in crate::printer) fn printed_left_spine_step<'e>(
 /// an object value or a call argument whose value is a sequence has no emitter for the shell
 /// erased from its LAST operand, so the comment written there floats out of the pair
 /// (`[(x, (y /* t */))]` → `[(x, y) /* t */]`).
-fn shell_content_end(view: ExprView<'_>, expr: &ast::Expression<'_>) -> u32 {
+fn shell_content_end(expr: &ast::Expression<'_>) -> u32 {
     match &expr.kind {
-        ast::ExpressionKind::SequenceExpression(seq) => view
-            .list(seq.expressions)
+        ast::ExpressionKind::SequenceExpression(seq) => seq
+            .expressions
             .last()
-            .map_or_else(|| expr.span().end, |last| view.expr(*last).span().end),
+            .map_or_else(|| expr.span().end, |last| last.span().end),
         _ => expr.span().end,
     }
 }
@@ -455,7 +436,7 @@ pub(crate) struct LeftSpineClaim {
 /// (`(/*c*/ (a).b).m()` prints `a /*c*/.b.m()`).
 pub(crate) struct HoistedLeftSpine<'p, 'a, 'e>(Option<LeftSpineSteps<'p, 'a, 'e>>);
 
-impl<'a: 'e, 'e> Iterator for HoistedLeftSpine<'_, 'a, 'e> {
+impl<'e> Iterator for HoistedLeftSpine<'_, '_, 'e> {
     type Item = (&'e ast::Expression<'e>, &'e ast::Expression<'e>);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -496,7 +477,7 @@ pub(crate) struct LeftSpineSteps<'p, 'a, 'e> {
     mid_chain_gaps: Option<SmallVec<[(u32, u32); 2]>>,
 }
 
-impl<'a: 'e, 'e> Iterator for LeftSpineSteps<'_, 'a, 'e> {
+impl<'e> Iterator for LeftSpineSteps<'_, '_, 'e> {
     type Item = LeftSpineStep<'e>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -518,11 +499,7 @@ impl<'a: 'e, 'e> Iterator for LeftSpineSteps<'_, 'a, 'e> {
                 && self
                     .mid_chain_gaps
                     .get_or_insert_with(|| {
-                        chain_mid_chain_paren_gaps(
-                            self.printer.view,
-                            root,
-                            self.printer.linearize_input(),
-                        )
+                        chain_mid_chain_paren_gaps(root, self.printer.linearize_input())
                     })
                     .contains(&(shell_start, child_start));
         } else if !(self.chain_root.is_some()
@@ -624,10 +601,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn hoisted_left_side_child<'e>(
         &self,
         expr: &'e ast::Expression<'e>,
-    ) -> Option<&'e ast::Expression<'e>>
-    where
-        'a: 'e,
-    {
+    ) -> Option<&'e ast::Expression<'e>> {
         use ast::ExpressionKind;
         if let Some(operand) = self.bare_cast_operand(expr) {
             return Some(operand);
@@ -636,9 +610,9 @@ impl<'a> Printer<'a> {
         // the operand ([`Printer::build_shell_operand_doc`]), unless a pair stands there.
         if let ExpressionKind::TSInstantiationExpression(inst) = &expr.kind {
             return (!self.instantiation_operand_prints_pair(inst, expr.span))
-                .then_some(self.view.expr(inst.expression));
+                .then_some(inst.expression);
         }
-        let child = left_side_child(self.view, expr)?;
+        let child = left_side_child(expr)?;
         // A chain link's step lands past a non-null the chain flattens.
         let link_step = || {
             self.chain_flattened_non_null_operand(child)
@@ -646,7 +620,7 @@ impl<'a> Printer<'a> {
         };
         match &expr.kind {
             ExpressionKind::MemberExpression(_) | ExpressionKind::CallExpression(_) => {
-                chain_paren_leading_gap(self.view, expr, self.comments)
+                chain_paren_leading_gap(expr, self.comments)
                     .is_none()
                     .then(link_step)
             }
@@ -656,20 +630,19 @@ impl<'a> Printer<'a> {
             // needs its parens (`( // c⏎x + y⏎)!`), and that pair the linearizer never
             // sees.
             ExpressionKind::TSNonNullExpression(non_null) => {
-                (chain_paren_leading_gap(self.view, expr, self.comments).is_none()
-                    && !self
-                        .needs_parens(self.view.expr(non_null.expression), ParenContext::NonNull))
+                (chain_paren_leading_gap(expr, self.comments).is_none()
+                    && !self.needs_parens(non_null.expression, ParenContext::NonNull))
                 .then(link_step)
             }
             // The tag's required pair keeps its run at the call's two shapes — a function
             // tag and a sealed optional chain (`` ( // c⏎a?.b())`x` ``).
             ExpressionKind::TaggedTemplateExpression(tagged) => {
-                tag_paren_leading_start(self.view, tagged, expr.span)
+                tag_paren_leading_start(tagged, expr.span)
                     .is_none()
                     .then_some(child)
             }
             ExpressionKind::AssignmentExpression(assign) => (!self.needs_parens(
-                self.view.expr(assign.left),
+                assign.left,
                 ParenContext::AssignmentTarget {
                     operator: assign.operator,
                 },
@@ -691,16 +664,13 @@ impl<'a> Printer<'a> {
     fn chain_flattened_non_null_operand<'e>(
         &self,
         child: &'e ast::Expression<'e>,
-    ) -> Option<&'e ast::Expression<'e>>
-    where
-        'a: 'e,
-    {
+    ) -> Option<&'e ast::Expression<'e>> {
         let ast::ExpressionKind::TSNonNullExpression(non_null) = &child.kind else {
             return None;
         };
-        (chain_paren_leading_gap(self.view, child, self.comments).is_none()
-            && self.needs_parens(self.view.expr(non_null.expression), ParenContext::NonNull))
-        .then_some(self.view.expr(non_null.expression))
+        (chain_paren_leading_gap(child, self.comments).is_none()
+            && self.needs_parens(non_null.expression, ParenContext::NonNull))
+        .then_some(non_null.expression)
     }
 
     /// The operand of a cast (`as` / `satisfies`) or a postfix update when it prints
@@ -715,10 +685,7 @@ impl<'a> Printer<'a> {
     fn bare_cast_operand<'e>(
         &self,
         expr: &'e ast::Expression<'e>,
-    ) -> Option<&'e ast::Expression<'e>>
-    where
-        'a: 'e,
-    {
+    ) -> Option<&'e ast::Expression<'e>> {
         use ast::ExpressionKind;
         let (operand, boundary) = match &expr.kind {
             ExpressionKind::TSAsExpression(cast) => {
@@ -732,14 +699,14 @@ impl<'a> Printer<'a> {
             }
             _ => return None,
         };
-        let (_, parenthesized) = printed_left_spine_step(self.view, expr, self.in_for_init.get())?;
+        let (_, parenthesized) = printed_left_spine_step(expr, self.in_for_init.get())?;
         let shell_free = |start: u32, end: u32| {
             start >= end || self.comments_in_source_between(start, end).next().is_none()
         };
         (!parenthesized
-            && shell_free(expr.span().start, self.view.expr(operand).span().start)
-            && shell_free(self.view.expr(operand).span().end, boundary))
-        .then_some(self.view.expr(operand))
+            && shell_free(expr.span().start, operand.span().start)
+            && shell_free(operand.span().end, boundary))
+        .then_some(operand)
     }
 
     /// Whether the grouping shell the parser erased between `expr` and its left-spine
@@ -770,7 +737,7 @@ impl<'a> Printer<'a> {
         // exactly where the printer SYNTHESIZES a pair the author never wrote, and this
         // caller wants only the re-emitted ones.
         expr.span().start != child.span().start
-            && left_side_child_is_parenthesized(self.view, expr, child, self.in_for_init.get())
+            && left_side_child_is_parenthesized(expr, child, self.in_for_init.get())
     }
 
     /// The walk down `expr`'s left spine through every shell whose run the printer hoists
@@ -822,7 +789,7 @@ impl<'a> Printer<'a> {
                 while let Some(left) = self.flattenable_left(link) {
                     link = left;
                 }
-                Some(self.view.expr(link.left).span().start)
+                Some(link.left.span().start)
             }
             _ => None,
         }
@@ -845,10 +812,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn stripped_left_side_child<'e>(
         &self,
         expr: &'e ast::Expression<'e>,
-    ) -> Option<&'e ast::Expression<'e>>
-    where
-        'a: 'e,
-    {
+    ) -> Option<&'e ast::Expression<'e>> {
         let child = self.hoisted_left_side_child(expr)?;
         (!self.left_shell_paren_is_emitted(expr, child)).then_some(child)
     }
@@ -866,10 +830,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn stripped_left_spine_leaf<'e>(
         &self,
         expr: &'e ast::Expression<'e>,
-    ) -> &'e ast::Expression<'e>
-    where
-        'a: 'e,
-    {
+    ) -> &'e ast::Expression<'e> {
         let mut node = expr;
         while let Some(child) = self.stripped_left_side_child(node) {
             node = child;
@@ -1085,7 +1046,7 @@ impl<'a> Printer<'a> {
                 break;
             }
             if below_pair.is_none()
-                && left_side_child_is_parenthesized(self.view, node, next, self.in_for_init.get())
+                && left_side_child_is_parenthesized(node, next, self.in_for_init.get())
             {
                 below_pair = Some(next.span().start);
             }
@@ -1823,11 +1784,11 @@ impl<'a> Printer<'a> {
     /// (the same reach `any_comment_forces_expansion` already has per argument).
     pub(crate) fn any_paren_interior_forces_expansion(
         &self,
-        elements: &[ast::ExprEdge<'_>],
+        elements: &[&ast::Expression<'_>],
     ) -> bool {
-        elements.iter().any(|e| {
-            self.paren_interior_forces_expansion(self.printed_paren_interior(self.view.expr(*e)))
-        })
+        elements
+            .iter()
+            .any(|e| self.paren_interior_forces_expansion(self.printed_paren_interior(e)))
     }
 
     /// Whether an element's own doc ends in a DEFERRED line comment — a spread or rest
@@ -2166,7 +2127,7 @@ impl<'a> Printer<'a> {
         let expr_start = expr.span().start;
         // The trailing gap opens where the operand's doc stops printing, which for a
         // sequence is its last operand ([`shell_content_end`]).
-        let expr_end = shell_content_end(self.view, expr);
+        let expr_end = shell_content_end(expr);
         let open = find_char_skipping_comments(
             self.source.as_bytes(),
             node_start as usize,

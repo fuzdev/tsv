@@ -196,12 +196,11 @@ deno task fixtures:update:parsed     # expected.json only (when the parser chang
 deno task fixtures:update:formatted  # output_prettier.svelte only
 deno task fixtures:audit             # audit _prettier_divergence fixtures (diagnostic; --all for every fixture)
 deno task fixtures:ts-audit          # which input.ts fixtures need .ts vs could be .svelte (= `ts_fixture_audit`)
-# compile:* do not run while tsv_svelte_compile is outside the workspace build (Project Structure)
 deno task compile:fixtures:init      # create/reinit a compile fixture (oracle-compiles + canonicalizes; tests/fixtures_compile)
 deno task compile:fixtures:validate  # compile fixtures: oracle freshness + expected idempotence + ours parity, all gating.
-#                                      The ONLY place oracle freshness is graded (the sidecar-free slice in cargo test
-#                                      compares to the COMMITTED file, so it stays green when tsv and the file drift from
-#                                      the oracle together); out of `deno task conformance` while the crate is out of the build
+#                                      Preflights `deno task conformance` — the ONLY place oracle freshness is graded (the
+#                                      sidecar-free slice in cargo test compares to the COMMITTED file, so it stays green
+#                                      when tsv and the file drift from the oracle together)
 deno task strip:fixtures:validate    # tsv_ts::strip vs tests/fixtures_strip (= `cargo test --test strip_fixtures_tests`):
 #                                      output, position identity, terminators, idempotence, refusals — known failures pinned
 #                                      in a ratchet (`strip:fixtures:validate:update` re-pins). See tests/fixtures_strip/README.md
@@ -228,11 +227,11 @@ deno task imports:corpus             # parse_imports vs oxc-parser's module reco
 
 ```bash
 deno task conformance:audit          # doc/fixture integrity: divergences cataloged, every Markdown link resolves, divergence READMEs back-link, no catalog-family drift
-deno task conformance:audit:compiler # compile-fixture divergence integrity + checklist ↔ `Refusal` drift. NOT run: outside the workspace build (Project Structure)
+deno task conformance:audit:compiler # compile-fixture divergence integrity + checklist ↔ `Refusal` drift
 deno task variants:audit             # `_compact`/`_spaces` variant DIRECTION: a `_compact` may never widen a whitespace gap,
 #                                      a `_spaces` never empty one (bare suffixes only — a qualified name like
 #                                      `unformatted_ours_hug_spaced` is the escape hatch for a deliberately bidirectional variant)
-deno task canonicalize:audit         # canonicalize_js idempotence + output validity + comment preservation. NOT run: outside the workspace build (Project Structure)
+deno task canonicalize:audit         # canonicalize_js idempotence + output validity + comment preservation
 deno task pins:audit                 # canonical-oracle PIN AGREEMENT (a repo fact): sidecar.ts VERSIONS + npm: imports,
 #                                      benches/js/package.json, actor.rs acorn import-map and the sidecar deno.lock must be
 #                                      identical, as must the prettier OPTIONS (`benches/js/lib/canonical.ts` `PRETTIER_OPTIONS`
@@ -454,7 +453,7 @@ deno task conformance:ts-repo          # tsv's TS parser vs ALL of ../typescript
 deno task conformance                  # pre-release aggregate, in order:
 #   1. pins:audit:checkouts + bench:pins:suites — PIN-FRESHNESS: re-derives the conformance-view count pins no other
 #      cadence grades (seconds when nothing moved; each stamped leg warn-skips an absent checkout; benches/js/CLAUDE.md §Harvests)
-#   2. fixtures:validate — ORACLE-FRESHNESS: `check` runs only the tree's sidecar-free slice,
+#   2. fixtures:validate + compile:fixtures:validate — ORACLE-FRESHNESS: `check` runs only each tree's sidecar-free slice,
 #      which grades tsv against the committed file and can't see the oracle moving; only a prettier re-format can (~17 s)
 #   3. bench:harvest:svelte-styles — re-extracts the CSS the `gates` view grades; then strip:corpus:run — the type strip
 #      vs ts-blank-space over the snapshot's TypeScript — and imports:corpus:run — the import records vs oxc-parser's
@@ -623,8 +622,6 @@ tsv/
 └── docs/            # Documentation (fixtures, cli, architecture, etc.)
 ```
 
-**Outside the workspace build:** `tsv_svelte_compile` and `tsv_check` stay on disk but are currently not workspace members, so nothing builds or tests them. The `tsv_debug` code that needs them is compiled out behind the never-set `tsv_unported` cfg: `compile_compare`, `compile_conformance_audit`, `compile_corpus_compare`, `compile_fixture_init`, `compile_fixtures_validate`, `compile_fuzz`, `compile_profile`, `canonicalize_audit`, `erase_comment_census` and `tsc_conformance` exit as an unrecognized argument, `profile --bind` exits with an error, and the `deno task` entries that call them (`compile:*`, `conformance:tsc-*`, `conformance:audit:compiler`, `canonicalize:audit`) do not run. `deno task check` and `deno task conformance` leave those legs out. `canonical_compile` and `render_compare` need only the sidecar and still run, and `tests/fixtures_compile` stays as format input for `engines:audit` and the npm tests.
-
 **Crate pattern** (tsv_ts, tsv_css, tsv_svelte): `lib.rs` (public API: `parse_to_json()` / `parse_to_json_with(JsonOptions)`, `format()`, `Formatter` (`format()` over warm arenas, for many sources on one thread), and the re-exported `run_with_stack` / `STACK_SIZE`; the AST-taking `__private::parse()` / `__private::convert_ast_json_bytes()` beneath them), `ast/` (internal AST + the wire-JSON writer), `lexer/`, `parser/`, `printer/` (uses the tsv_lang doc builder), and escapes (tsv_ts's `lexer/escapes.rs`, tsv_css's `escapes.rs`; Svelte delegates to TS/CSS). `tsv_ts` and `tsv_css` also export embedding APIs for `tsv_svelte` (`parse_embedded` + embedded-formatting variants); `tsv_ts` additionally exports the `build_*_doc` functions. That plumbing, and each language crate's `parse_folded` / `format_folded_in` (the format path `tsv_arena`'s macros call), lives in a `#[doc(hidden)] pub mod __private` — reachable by the sibling crates, not public API.
 
 ### Conformance
@@ -746,7 +743,6 @@ cargo run -p tsv_debug ast_diff --render input.svelte                # render-aw
 cargo run -p tsv_debug canonical_parse file.svelte
 
 # compiler tools (Svelte→JS vs the canonical compiler; detail, flags and exit codes: ./docs/compile_tooling.md)
-# compile_* do not run while tsv_svelte_compile is outside the workspace build (Project Structure); canonical_compile and render_compare do
 cargo run -p tsv_debug canonical_compile file.svelte      # canonical compile, deterministic oracle (--target, --css, --dev, --json)
 cargo run -p tsv_debug render_compare a.svelte b.svelte   # do two sources render the same page? identical / cosmetic / visible
 cargo run -p tsv_debug compile_compare file.svelte        # tsv's compile vs the oracle, canonicalized-JS diff (--json)
@@ -827,7 +823,7 @@ cargo run -p tsv_debug test262 [path-pattern]
 #           benches/js/diagnostics/test262_compare.ts)
 ```
 
-**Typechecker conformance (`tsc_conformance`) — EXPERIMENTAL, may never ship, and currently outside the workspace build ([Project Structure](#project-structure)), so these tasks do not run.** `tsv_check` is a from-scratch TypeScript binder + checker; no shipped artifact links it (`cargo tree -i tsv_check` → `tsv_debug`, plus the workspace root's dev-dependency), and the parser and formatter are never modified in service of it. `tsv_debug tsc_conformance` grades it against tsgo's committed `.errors.txt` baselines (`../typescript-go`, pinned in ./docs/typechecker.md) via **on-demand** tasks — none in `check`, `conformance`, or release gating, and `../typescript-go` is not a release-required oracle. ./docs/typechecker.md.
+**Typechecker conformance (`tsc_conformance`) — EXPERIMENTAL, may never ship.** `tsv_check` is a from-scratch TypeScript binder + checker; no shipped artifact links it (`cargo tree -i tsv_check` → `tsv_debug`, plus the workspace root's dev-dependency), and the parser and formatter are never modified in service of it. `tsv_debug tsc_conformance` grades it against tsgo's committed `.errors.txt` baselines (`../typescript-go`, pinned in ./docs/typechecker.md) via **on-demand** tasks — none in `check`, `conformance`, or release gating, and `../typescript-go` is not a release-required oracle. ./docs/typechecker.md.
 
 ```bash
 deno task conformance:tsc-roundtrip     # baseline parse → re-render → byte-compare (zero checker code)

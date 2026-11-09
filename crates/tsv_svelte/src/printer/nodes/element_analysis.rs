@@ -9,7 +9,6 @@
 use crate::ast::{FragmentNode, trim_end_collapsible_ws, trim_start_collapsible_ws};
 use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
-use tsv_ts::ast::ExprView;
 use tsv_ts::ast::{Expression, ExpressionKind};
 
 use super::element_doc::{
@@ -90,7 +89,7 @@ impl<'a> Printer<'a> {
     /// child is a single expression tag WITHOUT break points takes the
     /// `>`-dangle hug, while break-capable content uses normal flow so the
     /// expression breaks internally first.
-    pub(super) fn expression_has_break_points(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+    pub(super) fn expression_has_break_points(expr: &Expression<'_>) -> bool {
         match &expr.kind {
             // Ternary always has break points
             ExpressionKind::ConditionalExpression(_) => true,
@@ -110,31 +109,23 @@ impl<'a> Printer<'a> {
             // Assignment expressions have break points
             ExpressionKind::AssignmentExpression(_) => true,
             // Wrapping expressions: check inner
-            ExpressionKind::CommentBoundPair(cast) => {
-                Self::expression_has_break_points(view, view.expr(cast.inner))
-            }
+            ExpressionKind::CommentBoundPair(cast) => Self::expression_has_break_points(cast.inner),
             ExpressionKind::ParenthesizedExpression(paren) => {
-                Self::expression_has_break_points(view, view.expr(paren.expression))
+                Self::expression_has_break_points(paren.expression)
             }
-            ExpressionKind::TSAsExpression(e) => {
-                Self::expression_has_break_points(view, view.expr(e.expression))
-            }
+            ExpressionKind::TSAsExpression(e) => Self::expression_has_break_points(e.expression),
             ExpressionKind::TSSatisfiesExpression(e) => {
-                Self::expression_has_break_points(view, view.expr(e.expression))
+                Self::expression_has_break_points(e.expression)
             }
             ExpressionKind::TSNonNullExpression(e) => {
-                Self::expression_has_break_points(view, view.expr(e.expression))
+                Self::expression_has_break_points(e.expression)
             }
-            ExpressionKind::TSTypeAssertion(e) => {
-                Self::expression_has_break_points(view, view.expr(e.expression))
-            }
-            ExpressionKind::AwaitExpression(e) => {
-                Self::expression_has_break_points(view, view.expr(e.argument))
-            }
+            ExpressionKind::TSTypeAssertion(e) => Self::expression_has_break_points(e.expression),
+            ExpressionKind::AwaitExpression(e) => Self::expression_has_break_points(e.argument),
             ExpressionKind::YieldExpression(e) => e
                 .argument
                 .as_ref()
-                .is_some_and(|a| Self::expression_has_break_points(view, view.expr(*a))),
+                .is_some_and(|a| Self::expression_has_break_points(a)),
             // Simple expressions without break points
             ExpressionKind::Literal(_)
             | ExpressionKind::Identifier(_)
