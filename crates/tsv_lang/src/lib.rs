@@ -42,6 +42,7 @@
 // - `JsonWriter` - shared wire-JSON emission substrate (`_json` feature)
 // - `FxHasher` / `FxHashMap` / `FxHashSet` - dep-free multiply-xor hasher for the
 //   side tables
+// - `store` - contiguous typed stores, their handles and the list-building scratch stack
 // - `swar` - word-at-a-time byte-search kernels shared by the line scans, the
 //   wire-JSON escape prescan, and the lexers' token-body scans
 
@@ -84,6 +85,8 @@ mod sizing;
 pub mod source_scan;
 mod span;
 mod stack;
+#[doc(hidden)]
+pub mod store;
 #[doc(hidden)]
 // See `doc` above.
 #[expect(rustdoc::private_intra_doc_links)]
