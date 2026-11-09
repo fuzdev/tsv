@@ -724,9 +724,15 @@ mod tests {
     /// Parse a bare expression to its internal AST node (spans index into `src`),
     /// allocated in the caller-supplied `arena`.
     fn parse_expr<'a>(arena: &'a Bump, src: &str) -> &'a Expression<'a> {
-        crate::__private::parse_expression_with_comments(src, 0, 0, arena, "end of input", |_| {
-            Ok(())
-        })
+        crate::__private::parse_expression_with_comments(
+            src,
+            0,
+            0,
+            arena,
+            &mut ast::AstStores::new(),
+            "end of input",
+            |_| Ok(()),
+        )
         .expect("expression should parse")
         .0
     }

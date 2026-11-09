@@ -294,6 +294,7 @@ fn ffi_source_type(
 macro_rules! lang_bindings {
     (
         $goalness:ident,
+        $storeness:ident,
         $parse_fn:ident,
         $parse_internal_fn:ident,
         $format_fn:ident,
@@ -323,6 +324,7 @@ macro_rules! lang_bindings {
                         ffi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
                     parse_convert!(
                         $goalness,
+                        $storeness,
                         $lang,
                         convert_ast_json_bytes,
                         source,
@@ -353,8 +355,10 @@ macro_rules! lang_bindings {
                     let goal =
                         ffi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
                     // success renders as an empty payload
-                    parse_internal!($goalness, $lang, source, goal, |e| format!("{e:#}"))
-                        .map(|()| Vec::<u8>::new())
+                    parse_internal!($goalness, $storeness, $lang, source, goal, |e| format!(
+                        "{e:#}"
+                    ))
+                    .map(|()| Vec::<u8>::new())
                 })
             }
         }
@@ -379,7 +383,9 @@ macro_rules! lang_bindings {
                     // grammar retried as a script
                     let goal =
                         ffi_source_type(source_type, goal_allowed!($goalness), Family::Format)?;
-                    parse_format!($goalness, $lang, source, goal, |e| format!("{e:#}"))
+                    parse_format!($goalness, $storeness, $lang, source, goal, |e| format!(
+                        "{e:#}"
+                    ))
                 })
             }
         }
@@ -388,6 +394,7 @@ macro_rules! lang_bindings {
 
 lang_bindings!(
     nogoal,
+    stores,
     tsv_parse_svelte,
     tsv_parse_internal_svelte,
     tsv_format_svelte,
@@ -395,6 +402,7 @@ lang_bindings!(
 );
 lang_bindings!(
     goal,
+    stores,
     tsv_parse_typescript,
     tsv_parse_internal_typescript,
     tsv_format_typescript,
@@ -402,6 +410,7 @@ lang_bindings!(
 );
 lang_bindings!(
     nogoal,
+    nostores,
     tsv_parse_css,
     tsv_parse_internal_css,
     tsv_format_css,

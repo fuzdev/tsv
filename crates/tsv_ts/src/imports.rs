@@ -380,7 +380,22 @@ pub fn parse_imports_in(
     goal: Option<Goal>,
     arena: &bumpalo::Bump,
 ) -> Result<Imports, Error> {
-    let program = crate::__private::parse_with_goal_or_fallback(source, goal, arena)?;
+    parse_imports_into(source, goal, arena, &mut crate::ast::AstStores::new())
+}
+
+/// [`parse_imports_in`] into a caller's `stores`, for a warm path that keeps them across
+/// sources.
+///
+/// # Errors
+///
+/// As [`parse_imports`].
+pub fn parse_imports_into<'arena>(
+    source: &str,
+    goal: Option<Goal>,
+    arena: &'arena bumpalo::Bump,
+    stores: &mut crate::ast::AstStores<'arena>,
+) -> Result<Imports, Error> {
+    let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, arena, stores)?;
     Ok(collect_imports(&[&program], source, arena))
 }
 

@@ -4,16 +4,17 @@
 
 use super::*;
 use crate::ast::{
-    Expression, ExpressionKind, Statement, TSTypeAnnotation, TSTypeParameterDeclaration,
-    VariableDeclaration,
+    AstStores, Expression, ExpressionKind, Parsed, Statement, TSTypeAnnotation,
+    TSTypeParameterDeclaration, VariableDeclaration,
 };
 use tsv_lang::Span;
 
-pub use crate::imports::{collect_imports, parse_imports_in};
+pub use crate::ast::with_stores;
+pub use crate::imports::{collect_imports, parse_imports_in, parse_imports_into};
 #[cfg(feature = "json")]
 pub use crate::imports::{write_imports_json, write_imports_json_string};
 pub use crate::parser::TopLevelAs;
-pub use crate::strip::{strip_in, strip_with_imports_in};
+pub use crate::strip::{strip_in, strip_into, strip_with_imports_in};
 
 /// The per-document environment shared by every formatting entry point: the
 /// source the AST's spans index into, the comment buffer, the precomputed
@@ -106,8 +107,27 @@ pub fn parse_folded<'arena>(
     folded: &FoldedSource<'_>,
     goal: Option<Goal>,
     arena: &'arena bumpalo::Bump,
+) -> Result<Parsed<'arena>> {
+    parsed(|stores| parse_folded_into(folded, goal, arena, stores))
+}
+
+/// [`parse_folded`] into a caller's `stores`.
+pub fn parse_folded_into<'arena>(
+    folded: &FoldedSource<'_>,
+    goal: Option<Goal>,
+    arena: &'arena bumpalo::Bump,
+    stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>> {
-    folded.parse_with(|text| parse_with_goal_or_fallback(text, goal, arena))
+    folded.parse_with(|text| parse_with_goal_or_fallback_into(text, goal, arena, stores))
+}
+
+/// A one-shot parse: `parse` over fresh stores, bundled with the tree it built.
+fn parsed<'arena>(
+    parse: impl FnOnce(&mut AstStores<'arena>) -> Result<Program<'arena>>,
+) -> Result<Parsed<'arena>> {
+    let mut stores = AstStores::new();
+    let program = parse(&mut stores)?;
+    Ok(Parsed { program, stores })
 }
 
 /// [`format_ast_in`] over a document the caller folded ahead of the parse
@@ -185,6 +205,8 @@ pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena
 ///   wire levels (`0` for a top-level island). The parse counts its own on top of it
 ///   against `tsv_lang::NESTING_LIMIT`, so the document's depth budget is shared with the
 ///   markup that holds the island. Every embedded entry point here takes it.
+/// * `stores` - The host document's stores, one instance across its islands, which every
+///   embedded entry point here appends to
 ///
 /// # Returns
 ///
@@ -213,12 +235,14 @@ pub fn parse_embedded<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
+    stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>> {
     with_embedding_parser(
         source,
         base_offset,
         host_nesting,
         arena,
+        stores,
         |parser| parser.parse(),
         |_| Ok(()),
     )
@@ -251,12 +275,14 @@ pub fn parse_embedded_preserve_parens<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
+    stores: &mut AstStores<'arena>,
 ) -> Result<(Program<'arena>, bool)> {
     with_embedding_parser(
         source,
         base_offset,
         host_nesting,
         arena,
+        stores,
         |parser| {
             parser.preserve_parens = true;
             let program = parser.parse()?;
@@ -292,6 +318,7 @@ pub fn parse_expression_with_comments<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
+    stores: &mut AstStores<'arena>,
     end: &str,
     host_check: impl Fn(&'arena Expression<'arena>) -> Result<()>,
 ) -> Result<(&'arena Expression<'arena>, &'arena [ast::Comment])> {
@@ -300,6 +327,7 @@ pub fn parse_expression_with_comments<'arena>(
         base_offset,
         host_nesting,
         arena,
+        stores,
         |parser| parser.parse_expression_with_comments(end),
         |&(expr, _)| host_check(expr),
     )
@@ -342,12 +370,14 @@ pub fn parse_pattern_with_comments<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
+    stores: &mut AstStores<'arena>,
 ) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
         host_nesting,
         arena,
+        stores,
         |parser| {
             let expr = parser.parse_expression_unbounded()?;
             #[cfg(feature = "_internal_ast_census")]
@@ -504,12 +534,14 @@ pub fn parse_type_annotation_partial<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
+    stores: &mut AstStores<'arena>,
 ) -> Result<(TSTypeAnnotation<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
         host_nesting,
         arena,
+        stores,
         |parser| {
             let ta = parser.parse_type_annotation()?;
             Ok((ta, parser.take_comments()))
@@ -547,6 +579,7 @@ pub fn parse_expression_partial_with_comments<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
+    stores: &mut AstStores<'arena>,
     top_level_as: TopLevelAs,
     host_check: impl Fn(&'arena Expression<'arena>, usize) -> Result<()>,
 ) -> Result<(&'arena Expression<'arena>, usize, &'arena [ast::Comment])> {
@@ -555,6 +588,7 @@ pub fn parse_expression_partial_with_comments<'arena>(
         base_offset,
         host_nesting,
         arena,
+        stores,
         |parser| {
             let (expr, end_pos) = parser.parse_assignment_expression_partial(top_level_as)?;
             Ok((expr, end_pos, parser.take_comments()))
@@ -583,11 +617,12 @@ pub fn parse_expression_partial_with_comments<'arena>(
 // The method-path form clippy suggests fails the higher-ranked lifetime check on
 // `with_embedding_parser`'s `f` bound — same reason as [`parse_embedded`]'s closure.
 #[expect(clippy::redundant_closure_for_method_calls)]
-pub fn parse_type_extent(
+pub fn parse_type_extent<'arena>(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    arena: &bumpalo::Bump,
+    arena: &'arena bumpalo::Bump,
+    stores: &mut AstStores<'arena>,
 ) -> Result<usize> {
     // the parse exists for its end offset: every row it builds is discarded
     #[cfg(feature = "_internal_ast_census")]
@@ -597,6 +632,7 @@ pub fn parse_type_extent(
         base_offset,
         host_nesting,
         arena,
+        stores,
         |parser| parser.type_extent(),
         |_| Ok(()),
     )
@@ -623,6 +659,7 @@ pub fn parse_statement_with_comments<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
+    stores: &mut AstStores<'arena>,
     host_check: impl Fn(&Statement<'arena>) -> Result<()>,
 ) -> Result<(Statement<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(
@@ -630,6 +667,7 @@ pub fn parse_statement_with_comments<'arena>(
         base_offset,
         host_nesting,
         arena,
+        stores,
         |parser| {
             let stmt = parser.parse_statement()?;
             Ok((stmt, parser.take_comments()))
@@ -1198,7 +1236,7 @@ pub fn format_ast_in(program: &Program<'_>, source: &str, arena: &DocArena) -> S
 ///
 /// # Returns
 ///
-/// * `Ok(Program)` - The parsed AST
+/// * `Ok(Parsed)` - The parsed AST and its stores
 /// * `Err(Error)` - If parsing fails
 ///
 /// # Example
@@ -1210,9 +1248,19 @@ pub fn format_ast_in(program: &Program<'_>, source: &str, arena: &DocArena) -> S
 /// # Ok(())
 /// # }
 /// ```
-pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Program<'arena>> {
+pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Parsed<'arena>> {
+    parsed(|stores| parse_into(source, arena, stores))
+}
+
+/// [`parse`] into a caller's `stores`, for a warm path that keeps them across documents.
+pub fn parse_into<'arena>(
+    source: &str,
+    arena: &'arena bumpalo::Bump,
+    stores: &mut AstStores<'arena>,
+) -> Result<Program<'arena>> {
     Error::ensure_source_fits(source)?;
-    parser::parse_typescript(source, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
+    parser::parse_typescript(source, arena, stores)
+        .map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
 /// Parse TypeScript source against an explicit [`Goal`] (`Script` vs `Module`).
@@ -1232,9 +1280,19 @@ pub fn parse_with_goal<'arena>(
     source: &str,
     goal: Goal,
     arena: &'arena bumpalo::Bump,
+) -> Result<Parsed<'arena>> {
+    parsed(|stores| parse_with_goal_into(source, goal, arena, stores))
+}
+
+/// [`parse_with_goal`] into a caller's `stores`.
+pub fn parse_with_goal_into<'arena>(
+    source: &str,
+    goal: Goal,
+    arena: &'arena bumpalo::Bump,
+    stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>> {
     Error::ensure_source_fits(source)?;
-    parser::parse_typescript_with_goal(source, goal, arena)
+    parser::parse_typescript_with_goal(source, goal, arena, stores)
         .map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
@@ -1267,15 +1325,26 @@ pub fn parse_with_goal_or_fallback<'arena>(
     source: &str,
     goal: Option<Goal>,
     arena: &'arena bumpalo::Bump,
+) -> Result<Parsed<'arena>> {
+    parsed(|stores| parse_with_goal_or_fallback_into(source, goal, arena, stores))
+}
+
+/// [`parse_with_goal_or_fallback`] into a caller's `stores`. A script retry appends after
+/// the failed module attempt's rows, which nothing names.
+pub fn parse_with_goal_or_fallback_into<'arena>(
+    source: &str,
+    goal: Option<Goal>,
+    arena: &'arena bumpalo::Bump,
+    stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>> {
     if let Some(goal) = goal {
-        return parse_with_goal(source, goal, arena);
+        return parse_with_goal_into(source, goal, arena, stores);
     }
-    parse_with_goal(source, Goal::Module, arena).or_else(|module_error| {
+    parse_with_goal_into(source, Goal::Module, arena, stores).or_else(|module_error| {
         if module_error.kind() == ErrorKind::TooDeep {
             return Err(module_error);
         }
-        parse_with_goal(source, Goal::Script, arena).map_err(|script_error| {
+        parse_with_goal_into(source, Goal::Script, arena, stores).map_err(|script_error| {
             // A goal gate proves the source a module; past that, the further error is
             // the file's own and a tie keeps the module's. The one positionless error a
             // TypeScript parse raises (`FileTooLarge`) is raised by both attempts alike, so
@@ -1350,10 +1419,12 @@ pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
 pub fn parse_preserve_parens<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
-) -> Result<Program<'arena>> {
-    Error::ensure_source_fits(source)?;
-    parser::parse_typescript_preserve_parens(source, arena)
-        .map_err(|e| e.with_context(source, WIRE_COORDINATES))
+) -> Result<Parsed<'arena>> {
+    parsed(|stores| {
+        Error::ensure_source_fits(source)?;
+        parser::parse_typescript_preserve_parens(source, arena, stores)
+            .map_err(|e| e.with_context(source, WIRE_COORDINATES))
+    })
 }
 
 /// Whether a block comment's content (delimiters excluded) is a JSDoc type cast —

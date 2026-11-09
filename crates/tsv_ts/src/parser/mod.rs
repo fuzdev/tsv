@@ -513,6 +513,10 @@ pub(crate) struct Parser<'a, 'arena> {
     /// local (`let arena = self.arena;`) only when several allocations in one method
     /// share it.
     arena: &'arena Bump,
+    /// The document's expression stores, shared by every parser of the document. `'a` is
+    /// the source's lifetime, which the `&mut` takes as covariantly as the `&str`.
+    #[expect(dead_code, reason = "nothing in the parser reads the stores")]
+    stores: &'a mut AstStores<'arena>,
     source: &'a str,
     lexer: Lexer<'a>,
     /// The current token's classification + span as the lexer's 16-byte POD,
@@ -949,9 +953,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// into — one per parse entry point, each calling it twice — carries its own copy of
     /// those stores.
     #[inline(never)]
-    fn new(source: &'a str, base_offset: usize, goal: Goal, arena: &'arena Bump) -> Self {
+    fn new(
+        source: &'a str,
+        base_offset: usize,
+        goal: Goal,
+        arena: &'arena Bump,
+        stores: &'a mut AstStores<'arena>,
+    ) -> Self {
         Self {
             arena,
+            stores,
             source,
             // The lexer scans `source` (the island) but reports errors against the document
             // it sits in, so it carries the same `base_offset` the spans are shifted by.
@@ -4033,8 +4044,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 pub(crate) fn parse_typescript<'arena>(
     source: &str,
     arena: &'arena Bump,
+    stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>, Error> {
-    parse_typescript_with_goal(source, Goal::Module, arena)
+    parse_typescript_with_goal(source, Goal::Module, arena, stores)
 }
 
 /// Build a parser of `source` at `base_offset` against `goal`, prime it and run `f` — the
@@ -4099,6 +4111,7 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     host_nesting: u32,
     goal: Goal,
     arena: &'arena Bump,
+    stores: &mut AstStores<'arena>,
     embedded: bool,
     f: impl Fn(&mut Parser<'_, 'arena>) -> Result<T, Error>,
     host_check: impl Fn(&T) -> Result<(), Error>,
@@ -4111,7 +4124,7 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     };
     #[cfg(feature = "_internal_ast_census")]
     let ast_census_mark = tsv_lang::ast_census_probe::mark();
-    let mut parser = Parser::new(source, base_offset, goal, arena);
+    let mut parser = Parser::new(source, base_offset, goal, arena, stores);
     parser.depth = DepthBudget::at(host_nesting);
     parser.prime()?;
     let first = f(&mut parser)
@@ -4124,7 +4137,9 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     }
     #[cfg(feature = "_internal_ast_census")]
     let ast_census_retry_mark = tsv_lang::ast_census_probe::mark();
-    let mut retry = Parser::new(source, base_offset, goal, arena);
+    // No rewind of the stores between the two parses: the first's rows stay valid, since
+    // its result is kept when the second one fails.
+    let mut retry = Parser::new(source, base_offset, goal, arena, stores);
     retry.depth = DepthBudget::at(host_nesting);
     retry.tsc_followers = false;
     let second = retry
@@ -4158,6 +4173,7 @@ pub(crate) fn parse_typescript_with_goal<'arena>(
     source: &str,
     goal: Goal,
     arena: &'arena Bump,
+    stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>, Error> {
     parse_retrying_acorn_followers(
         source,
@@ -4165,6 +4181,7 @@ pub(crate) fn parse_typescript_with_goal<'arena>(
         0,
         goal,
         arena,
+        stores,
         false,
         |parser| parser.parse(),
         |_| Ok(()),
@@ -4179,6 +4196,7 @@ pub(crate) fn parse_typescript_with_goal<'arena>(
 pub(crate) fn parse_typescript_preserve_parens<'arena>(
     source: &str,
     arena: &'arena Bump,
+    stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>, Error> {
     parse_retrying_acorn_followers(
         source,
@@ -4186,6 +4204,7 @@ pub(crate) fn parse_typescript_preserve_parens<'arena>(
         0,
         Goal::Module,
         arena,
+        stores,
         false,
         |parser| {
             parser.preserve_parens = true;

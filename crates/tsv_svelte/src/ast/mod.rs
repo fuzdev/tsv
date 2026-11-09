@@ -28,7 +28,28 @@ use std::borrow::Cow;
 
 use tsv_css::ast::CssStyleSheet;
 pub use tsv_lang::{Comment, Span};
-use tsv_ts::ast::{Expression, Program, TSTypeParameterDeclaration, VariableDeclaration};
+use tsv_ts::ast::{
+    AstStores, Expression, Program, TSTypeParameterDeclaration, VariableDeclaration,
+};
+
+/// A parsed Svelte document and the stores its handles index.
+///
+/// Derefs to the [`Root`], so a tree-reading call takes `&parsed` as it takes `&root`.
+#[derive(Debug)]
+pub struct ParsedRoot<'arena> {
+    /// The tree.
+    pub root: Root<'arena>,
+    /// The stores the tree's handles index, one instance across the document's islands.
+    pub stores: AstStores<'arena>,
+}
+
+impl<'arena> std::ops::Deref for ParsedRoot<'arena> {
+    type Target = Root<'arena>;
+
+    fn deref(&self) -> &Root<'arena> {
+        &self.root
+    }
+}
 
 /// Svelte Root - top-level AST node
 ///

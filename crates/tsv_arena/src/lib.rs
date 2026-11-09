@@ -239,22 +239,47 @@ pub fn decode_source_type<G>(
 /// already rejected by the binding's own goal decoder, which reads the same tag
 /// through [`goal_allowed!`].
 ///
+/// The `$storeness` tag is the language's store axis: `stores` (TypeScript, Svelte) calls
+/// the `*_into` form with `$stores`, the one [`with_lang_stores!`] hands over; `nostores`
+/// (CSS, which has no store) calls the arena-only `parse`.
+///
 /// `$lang` and `$arena` resolve in the caller's scope, so this crate needs no
 /// dependency on the language crates.
 ///
 /// ```ignore
-/// let ast = parse_ast!(goal, tsv_ts, source, goal, arena)?;
+/// let ast = parse_ast!(goal, stores, tsv_ts, source, goal, arena, stores)?;
 /// ```
 #[macro_export]
 macro_rules! parse_ast {
-    (goal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {
-        $lang::__private::parse_with_goal($source, $goal, $arena)
+    (goal, stores, $lang:ident, $source:expr, $goal:expr, $arena:expr, $stores:expr) => {
+        $lang::__private::parse_with_goal_into($source, $goal, $arena, $stores)
     };
-    (nogoal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {{
+    (nogoal, stores, $lang:ident, $source:expr, $goal:expr, $arena:expr, $stores:expr) => {{
         // Consume the (always-`Module`) goal so the binding stays used in every
         // expansion.
         let _ = $goal;
+        $lang::__private::parse_into($source, $arena, $stores)
+    }};
+    (nogoal, nostores, $lang:ident, $source:expr, $goal:expr, $arena:expr, $stores:expr) => {{
+        let _ = ($goal, $stores);
         $lang::__private::parse($source, $arena)
+    }};
+}
+
+/// Run `$body` with `$stores` bound for the `$storeness` tag: a language with stores
+/// (`stores`, TypeScript and Svelte) gets this thread's parked ones through its own
+/// `__private::with_stores`, the language with none (`nostores`, CSS) a `()` the
+/// expansion consumes. `tsv_arena` cannot park them itself, since it names no language
+/// crate's types.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! with_lang_stores {
+    (stores, $lang:ident, |$stores:ident| $body:expr) => {
+        $lang::__private::with_stores(|$stores| $body)
+    };
+    (nostores, $lang:ident, |$stores:ident| $body:expr) => {{
+        let $stores = ();
+        $body
     }};
 }
 
@@ -262,6 +287,8 @@ macro_rules! parse_ast {
 /// per-thread AST arena and convert it with the language's `__private::$convert` writer
 /// (`convert_ast_json_bytes` for the C FFI, `convert_ast_json_string` for the two JS
 /// bindings), a parse error mapped through `$map_err`, the binding's own error type.
+///
+/// `$storeness` is the language's store axis ([`with_lang_stores!`]).
 ///
 /// `$goal` is the binding's decoded `Option` goal, and an unset one is read here as the
 /// grammar's default, `Module` (`Goal::default()`): a parse has no fallback to run, since
@@ -273,17 +300,20 @@ macro_rules! parse_ast {
 /// rules apply; `$lang` resolves in the caller's scope, as in [`parse_ast!`].
 ///
 /// ```ignore
-/// parse_convert!(goal, tsv_ts, convert_ast_json_string, source, goal, |e| format!("{e:#}"))
+/// parse_convert!(goal, stores, tsv_ts, convert_ast_json_string, source, goal, |e| format!("{e:#}"))
 /// ```
 #[macro_export]
 macro_rules! parse_convert {
-    ($goalness:ident, $lang:ident, $convert:ident, $source:expr, $goal:expr, $map_err:expr) => {{
+    ($goalness:ident, $storeness:ident, $lang:ident, $convert:ident, $source:expr, $goal:expr, $map_err:expr) => {{
         let source = $source;
         let goal = $goal.unwrap_or_default();
         $crate::with_ast_arena(|arena| {
-            let ast =
-                $crate::parse_ast!($goalness, $lang, source, goal, arena).map_err($map_err)?;
-            Ok($lang::__private::$convert(&ast, source))
+            $crate::with_lang_stores!($storeness, $lang, |stores| {
+                let ast =
+                    $crate::parse_ast!($goalness, $storeness, $lang, source, goal, arena, stores)
+                        .map_err($map_err)?;
+                Ok($lang::__private::$convert(&ast, source))
+            })
         })
     }};
 }
@@ -299,18 +329,21 @@ macro_rules! parse_convert {
 /// got faster by measuring nothing.
 ///
 /// ```ignore
-/// parse_internal!(goal, tsv_ts, source, goal, |e| format!("{e:#}"))
+/// parse_internal!(goal, stores, tsv_ts, source, goal, |e| format!("{e:#}"))
 /// ```
 #[macro_export]
 macro_rules! parse_internal {
-    ($goalness:ident, $lang:ident, $source:expr, $goal:expr, $map_err:expr) => {{
+    ($goalness:ident, $storeness:ident, $lang:ident, $source:expr, $goal:expr, $map_err:expr) => {{
         let source = $source;
         let goal = $goal.unwrap_or_default();
         $crate::with_ast_arena(|arena| {
-            let ast =
-                $crate::parse_ast!($goalness, $lang, source, goal, arena).map_err($map_err)?;
-            ::std::hint::black_box(&ast);
-            Ok(())
+            $crate::with_lang_stores!($storeness, $lang, |stores| {
+                let ast =
+                    $crate::parse_ast!($goalness, $storeness, $lang, source, goal, arena, stores)
+                        .map_err($map_err)?;
+                ::std::hint::black_box(&ast);
+                Ok(())
+            })
         })
     }};
 }
@@ -324,7 +357,7 @@ macro_rules! parse_internal {
 ///
 /// Every binding's format export reads its source type the same way — a caller
 /// that names one gets exactly that grammar, a caller that names none gets
-/// `tsv_ts::__private::parse_with_goal_or_fallback`'s module-then-script retry, which is what
+/// `tsv_ts::__private::parse_with_goal_or_fallback_into`'s module-then-script retry, which is what
 /// lets `tsv format <path>` and an editor's bare `format_typescript(source)` format
 /// a legacy sloppy script. The parse exports keep [`parse_ast!`], whose goal is a
 /// settled `Goal`: their product is a wire carrying `Program.sourceType`, a claim
@@ -334,17 +367,21 @@ macro_rules! parse_internal {
 /// hard-wires `Module` and CSS has no goal axis, so neither has a fallback to run.
 ///
 /// ```ignore
-/// let ast = parse_ast_for_format!(goal, tsv_ts, &folded, source_type, arena)?;
+/// let ast = parse_ast_for_format!(goal, stores, tsv_ts, &folded, source_type, arena, stores)?;
 /// ```
 #[macro_export]
 macro_rules! parse_ast_for_format {
-    (goal, $lang:ident, $folded:expr, $goal:expr, $arena:expr) => {
-        $lang::__private::parse_folded($folded, $goal, $arena)
+    (goal, stores, $lang:ident, $folded:expr, $goal:expr, $arena:expr, $stores:expr) => {
+        $lang::__private::parse_folded_into($folded, $goal, $arena, $stores)
     };
-    (nogoal, $lang:ident, $folded:expr, $goal:expr, $arena:expr) => {{
+    (nogoal, stores, $lang:ident, $folded:expr, $goal:expr, $arena:expr, $stores:expr) => {{
         // Consume the (always-unset) goal so the binding stays used in every
         // expansion.
         let _ = $goal;
+        $lang::__private::parse_folded_into($folded, $arena, $stores)
+    }};
+    (nogoal, nostores, $lang:ident, $folded:expr, $goal:expr, $arena:expr, $stores:expr) => {{
+        let _ = ($goal, $stores);
         $lang::__private::parse_folded($folded, $arena)
     }};
 }
@@ -365,25 +402,29 @@ macro_rules! parse_ast_for_format {
 /// a drop-in contract over the author's own bytes.
 ///
 /// ```ignore
-/// parse_format!(goal, tsv_ts, source, source_type, |e| format!("{e:#}"))
+/// parse_format!(goal, stores, tsv_ts, source, source_type, |e| format!("{e:#}"))
 /// ```
 #[cfg(feature = "format")]
 #[macro_export]
 macro_rules! parse_format {
-    ($goalness:ident, $lang:ident, $source:expr, $goal:expr, $map_err:expr) => {{
+    ($goalness:ident, $storeness:ident, $lang:ident, $source:expr, $goal:expr, $map_err:expr) => {{
         let folded = $crate::__tsv_lang::printing::normalize_carriage_returns($source);
         $crate::with_ast_arena(|arena| {
-            let ast = $crate::parse_ast_for_format!($goalness, $lang, &folded, $goal, arena)
+            $crate::with_lang_stores!($storeness, $lang, |stores| {
+                let ast = $crate::parse_ast_for_format!(
+                    $goalness, $storeness, $lang, &folded, $goal, arena, stores
+                )
                 .map_err($map_err)?;
-            Ok($crate::with_doc_arena(|doc_arena| {
-                $lang::__private::format_folded_in(&ast, &folded, doc_arena)
-            }))
+                Ok($crate::with_doc_arena(|doc_arena| {
+                    $lang::__private::format_folded_in(&ast, &folded, doc_arena)
+                }))
+            })
         })
     }};
 }
 
 /// A binding's whole **imports** export body: collect the import records of `$source` in the
-/// per-thread AST arena through the language's `__private::parse_imports_in`, and write them
+/// per-thread AST arena through the language's `__private::parse_imports_into`, and write them
 /// as the JSON every binding returns — `tsv_ts::__private::write_imports_json_string`, the
 /// one writer every language's records go through, in the language's own
 /// `WIRE_COORDINATES` — a parse error mapped through `$map_err`, the binding's own error
@@ -396,7 +437,8 @@ macro_rules! parse_format {
 /// line-terminator fold, as a parse export's: the records' offsets index them.
 ///
 /// Expands to `Result<String, _>`, the error `$map_err`'s; `$lang` and `tsv_ts` resolve in
-/// the caller's scope, as in [`parse_ast!`].
+/// the caller's scope, as in [`parse_ast!`]. Every language with records has stores, so
+/// there is no store axis here.
 ///
 /// ```ignore
 /// parse_imports_json!(goal, tsv_ts, source, goal, |e| Failure::parse(&e))
@@ -407,24 +449,26 @@ macro_rules! parse_imports_json {
         let source = $source;
         let goal = $goal;
         $crate::with_ast_arena(|arena| {
-            $crate::parse_imports_json!(@collect $goalness, $lang, source, goal, arena)
-                .map(|imports| {
-                    tsv_ts::__private::write_imports_json_string(
-                        &imports,
-                        source,
-                        $lang::WIRE_COORDINATES,
-                    )
-                })
-                .map_err($map_err)
+            $lang::__private::with_stores(|stores| {
+                $crate::parse_imports_json!(@collect $goalness, $lang, source, goal, arena, stores)
+                    .map(|imports| {
+                        tsv_ts::__private::write_imports_json_string(
+                            &imports,
+                            source,
+                            $lang::WIRE_COORDINATES,
+                        )
+                    })
+                    .map_err($map_err)
+            })
         })
     }};
-    (@collect goal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {
-        $lang::__private::parse_imports_in($source, $goal, $arena)
+    (@collect goal, $lang:ident, $source:expr, $goal:expr, $arena:expr, $stores:expr) => {
+        $lang::__private::parse_imports_into($source, $goal, $arena, $stores)
     };
-    (@collect nogoal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {{
+    (@collect nogoal, $lang:ident, $source:expr, $goal:expr, $arena:expr, $stores:expr) => {{
         // Consume the (always-unset) goal so the binding stays used in every expansion.
         let _ = $goal;
-        $lang::__private::parse_imports_in($source, $arena)
+        $lang::__private::parse_imports_into($source, $arena, $stores)
     }};
 }
 
@@ -595,14 +639,27 @@ mod tests {
             pub(crate) fn parse(source: &str, arena: &str) -> String {
                 format!("parse({source}, {arena})")
             }
-            pub(crate) fn parse_with_goal(source: &str, goal: &str, arena: &str) -> String {
-                format!("parse_with_goal({source}, {goal}, {arena})")
+            pub(crate) fn parse_into(source: &str, arena: &str, stores: &str) -> String {
+                format!("parse_into({source}, {arena}, {stores})")
+            }
+            pub(crate) fn parse_with_goal_into(
+                source: &str,
+                goal: &str,
+                arena: &str,
+                stores: &str,
+            ) -> String {
+                format!("parse_with_goal_into({source}, {goal}, {arena}, {stores})")
             }
             /// The goal-axis language's format-path parse (`tsv_ts::__private::parse_folded`).
-            pub(crate) fn parse_folded(folded: &str, goal: Option<&str>, arena: &str) -> String {
+            pub(crate) fn parse_folded_into(
+                folded: &str,
+                goal: Option<&str>,
+                arena: &str,
+                stores: &str,
+            ) -> String {
                 match goal {
-                    Some(goal) => format!("exact({folded}, {goal}, {arena})"),
-                    None => format!("fallback({folded}, {arena})"),
+                    Some(goal) => format!("exact({folded}, {goal}, {arena}, {stores})"),
+                    None => format!("fallback({folded}, {arena}, {stores})"),
                 }
             }
         }
@@ -614,39 +671,78 @@ mod tests {
             pub(crate) fn parse_folded(folded: &str, arena: &str) -> String {
                 format!("parse_folded({folded}, {arena})")
             }
+            pub(crate) fn parse_folded_into(folded: &str, arena: &str, stores: &str) -> String {
+                format!("parse_folded_into({folded}, {arena}, {stores})")
+            }
         }
     }
 
     #[test]
     fn parse_ast_dispatches_on_the_goalness_tag() {
         assert_eq!(
-            parse_ast!(goal, fake_lang, "src", "script", "arena"),
-            "parse_with_goal(src, script, arena)",
-            "`goal` must thread the goal into `parse_with_goal`"
+            parse_ast!(goal, stores, fake_lang, "src", "script", "arena", "stores"),
+            "parse_with_goal_into(src, script, arena, stores)",
+            "`goal` must thread the goal into `parse_with_goal_into`"
         );
         assert_eq!(
-            parse_ast!(nogoal, fake_lang, "src", "script", "arena"),
-            "parse(src, arena)",
+            parse_ast!(
+                nogoal, stores, fake_lang, "src", "script", "arena", "stores"
+            ),
+            "parse_into(src, arena, stores)",
             "`nogoal` must drop the goal and take the goalless entry point"
+        );
+        assert_eq!(
+            parse_ast!(nogoal, nostores, fake_lang, "src", "script", "arena", ()),
+            "parse(src, arena)",
+            "`nostores` must take the store-free entry point"
         );
     }
 
     #[test]
     fn parse_ast_for_format_dispatches_on_the_goalness_tag() {
         assert_eq!(
-            parse_ast_for_format!(goal, fake_lang, "folded", Some("script"), "arena"),
-            "exact(folded, script, arena)",
+            parse_ast_for_format!(
+                goal,
+                stores,
+                fake_lang,
+                "folded",
+                Some("script"),
+                "arena",
+                "stores"
+            ),
+            "exact(folded, script, arena, stores)",
             "a NAMED source type must be exact — the same grammar `parse_ast!` runs"
         );
         assert_eq!(
-            parse_ast_for_format!(goal, fake_lang, "folded", None, "arena"),
-            "fallback(folded, arena)",
+            parse_ast_for_format!(goal, stores, fake_lang, "folded", None, "arena", "stores"),
+            "fallback(folded, arena, stores)",
             "an unset source type must take the module-then-script fallback"
         );
         assert_eq!(
-            parse_ast_for_format!(nogoal, fake_goalless_lang, "folded", None::<&str>, "arena"),
-            "parse_folded(folded, arena)",
+            parse_ast_for_format!(
+                nogoal,
+                stores,
+                fake_goalless_lang,
+                "folded",
+                None::<&str>,
+                "arena",
+                "stores"
+            ),
+            "parse_folded_into(folded, arena, stores)",
             "`nogoal` must drop the option and take the goalless entry point"
+        );
+        assert_eq!(
+            parse_ast_for_format!(
+                nogoal,
+                nostores,
+                fake_goalless_lang,
+                "folded",
+                None::<&str>,
+                "arena",
+                ()
+            ),
+            "parse_folded(folded, arena)",
+            "`nostores` must take the store-free entry point"
         );
     }
 
@@ -654,14 +750,20 @@ mod tests {
     /// whose `Default` (`""`) stands in for `Goal::Module`.
     mod fake_fallible_lang {
         pub(super) mod __private {
-            pub(crate) fn parse(source: &str, arena: &bumpalo::Bump) -> Result<String, String> {
-                parse_with_goal(source, "goalless", arena)
+            /// What `with_lang_stores!`'s `stores` arm calls: hands over one marker.
+            pub(crate) fn with_stores<R>(f: impl FnOnce(&str) -> R) -> R {
+                f("marker")
             }
-            pub(crate) fn parse_with_goal(
+            pub(crate) fn parse(source: &str, arena: &bumpalo::Bump) -> Result<String, String> {
+                parse_with_goal_into(source, "goalless", arena, "marker")
+            }
+            pub(crate) fn parse_with_goal_into(
                 source: &str,
                 goal: &str,
                 _arena: &bumpalo::Bump,
+                stores: &str,
             ) -> Result<String, String> {
+                debug_assert_eq!(stores, "marker");
                 if source == "bad" {
                     Err(format!("bad source at {goal:?}"))
                 } else {
@@ -679,6 +781,7 @@ mod tests {
         let run = |source: &str, goal: Option<&str>| -> Result<String, String> {
             parse_convert!(
                 goal,
+                stores,
                 fake_fallible_lang,
                 convert,
                 source,
@@ -703,6 +806,7 @@ mod tests {
         );
         let goalless: Result<String, String> = parse_convert!(
             nogoal,
+            nostores,
             fake_fallible_lang,
             convert,
             "src",
@@ -719,7 +823,14 @@ mod tests {
     #[test]
     fn parse_internal_parses_and_returns_nothing() {
         let run = |source: &str| -> Result<(), String> {
-            parse_internal!(goal, fake_fallible_lang, source, None::<&str>, |e| e)
+            parse_internal!(
+                goal,
+                stores,
+                fake_fallible_lang,
+                source,
+                None::<&str>,
+                |e| e
+            )
         };
         assert_eq!(run("src"), Ok(()));
         assert_eq!(run("bad"), Err(r#"bad source at """#.to_owned()));

@@ -26,8 +26,10 @@ mod expressions;
 mod modules;
 mod patterns;
 mod statements;
+mod stores;
 mod types;
 
+pub use stores::{AstStores, Expr, ExprId, Parsed, with_stores};
 pub use tsv_lang::{Comment, Span};
 
 //

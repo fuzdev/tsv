@@ -18,6 +18,7 @@ use crate::printer::classification::element::has_raw_content;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
+use tsv_ts::ast::AstStores;
 
 /// How content relates to an element boundary (opening or closing tag)
 ///
@@ -1254,9 +1255,18 @@ impl<'a> Printer<'a> {
         let host_nesting = self.nested_raw_text_nesting.get();
         let body = match kind {
             RawTextKind::Script => {
-                tsv_ts::__private::parse_embedded(&content, base_offset, host_nesting, &arena)
-                    .ok()
-                    .and_then(|program| self.build_nested_script_body_doc(&program))
+                // Its own stores, as its own arena: nothing it mints reaches past the doc
+                // built from it.
+                let mut stores = AstStores::new();
+                tsv_ts::__private::parse_embedded(
+                    &content,
+                    base_offset,
+                    host_nesting,
+                    &arena,
+                    &mut stores,
+                )
+                .ok()
+                .and_then(|program| self.build_nested_script_body_doc(&program))
             }
             RawTextKind::Style => {
                 tsv_css::__private::parse_embedded(&content, base_offset, host_nesting, &arena)

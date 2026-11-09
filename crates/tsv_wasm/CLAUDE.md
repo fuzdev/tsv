@@ -300,8 +300,8 @@ because formatting itself is non-configurable. Everything else is the parse sema
 
 **An unset `sourceType` is the one key whose default differs between the two
 families.** The facade forwards it unset, and the raw format exports hand that to
-`parse_format!` → `parse_ast_for_format!` → `tsv_ts::__private::parse_folded` →
-`tsv_ts::__private::parse_with_goal_or_fallback`:
+`parse_format!` → `parse_ast_for_format!` → `tsv_ts::__private::parse_folded_into` →
+`tsv_ts::__private::parse_with_goal_or_fallback_into`:
 the module grammar, retried as a script only if that parse *fails* (which error is reported
 when both fail: [../../CLAUDE.md §Strictness](../../CLAUDE.md#strictness-module-strict-script-by-directive)).
 That is what lets `format_typescript(source)` with no bag
@@ -309,7 +309,7 @@ That is what lets `format_typescript(source)` with no bag
 script (`with`, a leading-zero literal or escape, `await` as a name). A **set** value
 is exact, so `{sourceType: 'module'}` refuses one; nothing the module grammar
 accepts is ever reinterpreted, and the printer reads no goal, so no output moves. The
-strip reads an unset value the same way (`tsv_ts::__private::strip_in`, whose walk reads no goal
+strip reads an unset value the same way (`tsv_ts::__private::strip_into`, whose walk reads no goal
 either). The parse exports unwrap the same unset value to `Module` (see
 [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)).
 

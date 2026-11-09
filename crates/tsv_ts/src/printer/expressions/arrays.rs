@@ -1430,6 +1430,7 @@ mod tests {
             0,
             0,
             arena,
+            &mut ast::AstStores::new(),
             "end of input",
             |_| Ok(()),
         )
