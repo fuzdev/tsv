@@ -488,7 +488,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // The partial parse stopped at no top-level comma, so a bare sequence here is tsc's
         // comparison reading a list the partial parse read as acorn-typescript's
         // (`f<T, U><V>(x) as A[]`) — refused inside the parse, so it is re-read the same way.
-        self.parse_ts_expression_checked(iterable, expr_offset, "'}'", |_, expression| {
+        self.parse_ts_expression_checked(iterable, expr_offset, "'}'", |_, _, expression| {
             match super::tag::bare_sequence_comma(expression, iterable) {
                 Some(comma) => Err(Self::error_expected_at("'as'", expr_offset + comma)),
                 None => Ok(()),
@@ -561,7 +561,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             expr_str,
             expr_offset,
             TopLevelAs::HostSeparator,
-            |this, expression, end_pos| {
+            |this, _, expression, end_pos| {
                 this.check_each_head_tail(content, content_offset, expression, end_pos)
             },
         )?;
@@ -971,7 +971,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             expr_str,
             content_offset + subslice_offset(content, expr_str),
             TopLevelAs::Assertion,
-            |this, _, end_pos| {
+            |this, _, _, end_pos| {
                 let after_expr = &content[end_pos - content_offset..];
                 match await_head_clause(after_expr) {
                     Some(_) => Ok(()),

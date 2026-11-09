@@ -515,7 +515,6 @@ pub(crate) struct Parser<'a, 'arena> {
     arena: &'arena Bump,
     /// The document's expression stores, shared by every parser of the document. `'a` is
     /// the source's lifetime, which the `&mut` takes as covariantly as the `&str`.
-    #[expect(dead_code, reason = "nothing in the parser reads the stores")]
     stores: &'a mut AstStores<'arena>,
     source: &'a str,
     lexer: Lexer<'a>,
@@ -1340,7 +1339,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         right: Option<(&Expression<'_>, ParenContext)>,
     ) -> Result<(), Error> {
         for (operand, ctx) in [left, right].into_iter().flatten() {
-            if crate::printer::printer_adds_operand_pair(operand, ctx, self.in_for_header) {
+            if crate::printer::printer_adds_operand_pair(
+                self.stores.view(),
+                operand,
+                ctx,
+                self.in_for_header,
+            ) {
                 self.printer_pair()?;
             }
         }
@@ -1484,7 +1488,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 operand.kind,
                 ExpressionKind::AssignmentExpression(_) | ExpressionKind::SequenceExpression(_)
             ))
-            || crate::printer::printer_adds_operand_pair(operand, ctx, self.in_for_header);
+            || crate::printer::printer_adds_operand_pair(
+                self.stores.view(),
+                operand,
+                ctx,
+                self.in_for_header,
+            );
         let written = u32::from(position_pair) + u32::from(commented) + u32::from(shell);
         if written == 0 {
             return Ok(());
@@ -1601,7 +1610,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             head.kind,
             ExpressionKind::FunctionExpression(_) | ExpressionKind::ClassExpression(_)
         ) && head.span().start == start
-            && crate::printer::printer_adds_operand_pair(head, ctx, self.in_for_header)
+            && crate::printer::printer_adds_operand_pair(
+                self.stores.view(),
+                head,
+                ctx,
+                self.in_for_header,
+            )
         {
             self.printer_pair()
         } else {
@@ -1645,7 +1659,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<(), Error> {
         if matches!(object.kind, ExpressionKind::Literal(_))
             && object.span().start == start
-            && crate::printer::printer_parenthesizes_chain_base(object)
+            && crate::printer::printer_parenthesizes_chain_base(self.stores.view(), object)
         {
             self.printer_pair()
         } else {
@@ -1739,9 +1753,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[expect(clippy::inline_always)]
     #[inline(always)]
     pub(super) fn member_link_units(&mut self, object: &Expression<'_>) -> u32 {
+        let view = ExprView::of_parse();
         let whole = matches!(object.kind, ExpressionKind::TaggedTemplateExpression(_))
-            || match crate::printer::spine_first_call_within(object, SPINE_WALK_LINKS) {
-                Ok(call) => call.is_some_and(crate::printer::call_may_print_whole),
+            || match crate::printer::spine_first_call_within(view, object, SPINE_WALK_LINKS) {
+                Ok(call) => {
+                    call.is_some_and(|call| crate::printer::call_may_print_whole(view, call))
+                }
                 Err(cut) => self.spine_whole_past(cut),
             };
         if whole { LINK_REENTRY } else { LINK_SUBSCRIPT }
@@ -1754,13 +1771,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// over it.
     #[inline(never)]
     fn spine_whole_past(&mut self, cut: &Expression<'_>) -> bool {
+        let view = ExprView::of_parse();
         let mut node = cut;
         let whole = loop {
             if std::ptr::from_ref(node).addr() == self.spine_memo.whole_at {
                 break self.spine_memo.whole;
             }
-            match crate::printer::spine_first_call_within(node, 1) {
-                Ok(call) => break call.is_some_and(crate::printer::call_may_print_whole),
+            match crate::printer::spine_first_call_within(view, node, 1) {
+                Ok(call) => {
+                    break call
+                        .is_some_and(|call| crate::printer::call_may_print_whole(view, call));
+                }
                 Err(next) => node = next,
             }
         };
@@ -1786,7 +1807,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         ExpressionKind::TemplateLiteral(_)
                             | ExpressionKind::TaggedTemplateExpression(_)
                     )
-                )) && crate::printer::call_may_print_whole(c)
+                )) && crate::printer::call_may_print_whole(ExprView::of_parse(), c)
             }
             _ => false,
         }
@@ -1841,7 +1862,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ) {
             return LINK_OPERATOR;
         }
-        if crate::printer::binary_left_operand_reenters(operator, left, self.in_for_header) {
+        if crate::printer::binary_left_operand_reenters(
+            self.stores.view(),
+            operator,
+            left,
+            self.in_for_header,
+        ) {
             LINK_REENTRY
         } else {
             LINK_OPERATOR
@@ -4114,11 +4140,11 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     stores: &mut AstStores<'arena>,
     embedded: bool,
     f: impl Fn(&mut Parser<'_, 'arena>) -> Result<T, Error>,
-    host_check: impl Fn(&T) -> Result<(), Error>,
+    host_check: impl Fn(ExprView<'_>, &T) -> Result<(), Error>,
 ) -> Result<T, Error> {
     // Each failure carries whether the host refused it (`true`) or the parse itself did.
-    let checked = |parsed: T| {
-        host_check(&parsed)
+    let checked = |view: ExprView<'_>, parsed: T| {
+        host_check(view, &parsed)
             .map(|()| parsed)
             .map_err(|error| (error, true))
     };
@@ -4129,7 +4155,7 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     parser.prime()?;
     let first = f(&mut parser)
         .map_err(|error| (parser.prefer_abandoned_type_arguments_error(error), false))
-        .and_then(checked);
+        .and_then(|parsed| checked(parser.stores.view(), parsed));
     if !parser.gave_up_list_to_tsc_follower
         || (first.is_ok() && !parser.kept_list_past_tsc_follower)
     {
@@ -4146,7 +4172,7 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
         .prime()
         .and_then(|()| f(&mut retry))
         .map_err(|error| (error, false))
-        .and_then(checked);
+        .and_then(|parsed| checked(retry.stores.view(), parsed));
     // the parse kept is the second if it succeeded, else the first; the other's rows are
     // abandoned
     #[cfg(feature = "_internal_ast_census")]
@@ -4184,7 +4210,7 @@ pub(crate) fn parse_typescript_with_goal<'arena>(
         stores,
         false,
         |parser| parser.parse(),
-        |_| Ok(()),
+        |_, _| Ok(()),
     )
 }
 
@@ -4210,6 +4236,6 @@ pub(crate) fn parse_typescript_preserve_parens<'arena>(
             parser.preserve_parens = true;
             parser.parse()
         },
-        |_| Ok(()),
+        |_, _| Ok(()),
     )
 }

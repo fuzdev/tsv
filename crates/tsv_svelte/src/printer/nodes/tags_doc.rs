@@ -10,6 +10,7 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::after_operator::fluid_after_operator;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::TriviaProfile;
+use tsv_ts::ast::ExprView;
 use tsv_ts::ast::{Expression, ExpressionKind};
 
 // Opening-tag literals whose `.len()` locates the embedded expression past the
@@ -37,7 +38,7 @@ impl<'a> Printer<'a> {
         // Build expression doc with surrounding comments
         // Span range: after "{@html " to before "}"
         let head = self.build_expression_with_comments_doc(
-            tag.expression,
+            self.view.expr(tag.expression),
             tag.span.start + HTML_TAG_OPEN.len() as u32,
             tag.span.end - 1,
         );
@@ -47,7 +48,12 @@ impl<'a> Printer<'a> {
 
     /// Build a doc for {@const declaration}
     pub(super) fn build_const_tag_doc(&self, tag: &ast::ConstTag<'_>) -> DocId {
-        self.build_assignment_tag_doc(AT_CONST_TAG_OPEN, tag.id, tag.init, tag.span)
+        self.build_assignment_tag_doc(
+            AT_CONST_TAG_OPEN,
+            self.view.expr(tag.id),
+            self.view.expr(tag.init),
+            tag.span,
+        )
     }
 
     /// Build a doc for `{const …}` / `{let …}` — the body is a TS variable
@@ -153,7 +159,7 @@ impl<'a> Printer<'a> {
         // left-spine shell (`{@const y = ( // c⏎a).b}`) is hoisted ahead of the init and hangs
         // the value exactly as one written before it does.
         let gap_end = self.head_gap_end(init);
-        let break_after_op = Self::const_should_break_after_op(init)
+        let break_after_op = Self::const_should_break_after_op(self.view, init)
             || self.gap_comment_hangs_value(binding_end, gap_end);
         // An own-line directive anywhere in the binding→value gap freezes the whole value.
         // The window is the whole gap rather than the part past the `=`, because this tag has
@@ -228,12 +234,12 @@ impl<'a> Printer<'a> {
             .comments_on_page_between(binding_end, gap_end)
             .peekable();
         let chain_takes_gap = gap_comments.peek().is_none()
-            || tsv_ts::__private::is_curried_arrow_chain(init)
+            || tsv_ts::__private::is_curried_arrow_chain(self.view, init)
                 && !gap_comments.any(|c| c.is_block && c.multiline);
         let value_gap_start =
             (!break_after_op && !frozen && chain_takes_gap).then_some(binding_end);
         let chain_breaks_after_op = value_gap_start.is_some()
-            && tsv_ts::__private::curried_chain_breaks_after_operator(init);
+            && tsv_ts::__private::curried_chain_breaks_after_operator(self.view, init);
 
         // Build init with LayoutMode::Standalone so a ROOT binary init is NOT forced onto
         // ContinuationIndent by the embedded-root question. The init is an assignment
@@ -338,7 +344,7 @@ impl<'a> Printer<'a> {
     /// that appear in @const tags, delegating to tsv_ts's predicates so the
     /// rules can't drift from our own assignment printer.
     /// Prettier ref: `shouldBreakAfterOperator` (assignment.js)
-    fn const_should_break_after_op(expr: &Expression<'_>) -> bool {
+    fn const_should_break_after_op(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
         match &expr.kind {
             // Binary expressions break after `=`, UNLESS it's a logical expression
             // with an inlinable RHS (non-empty object/array). In that case, the
@@ -346,14 +352,14 @@ impl<'a> Printer<'a> {
             // Prettier ref: `shouldBreakAfterOperator`'s
             // `isBinaryish && !shouldInlineLogicalExpression`
             ExpressionKind::BinaryExpression(bin) => {
-                !tsv_ts::__private::should_inline_logical_expression(bin)
+                !tsv_ts::__private::should_inline_logical_expression(view, bin)
             }
             ExpressionKind::SequenceExpression(_) => true,
             // Conditionals break only when the test is binary (and not inline
             // logical); simple identifier tests (e.g., `cond ? a : b`) use fluid
             // layout. False for every other expression type.
             // Prettier ref: `shouldBreakAfterOperator`'s conditional arm (assignment.js)
-            _ => tsv_ts::__private::conditional_should_break_after_op(expr),
+            _ => tsv_ts::__private::conditional_should_break_after_op(view, expr),
         }
     }
 
@@ -450,6 +456,7 @@ impl<'a> Printer<'a> {
     /// pre-comma comment (`{@debug x /* c */, y}`) falls through both
     /// per-identifier buckets and is dropped.
     pub(super) fn build_debug_tag_doc(&self, tag: &ast::DebugTag<'_>) -> DocId {
+        let identifiers = self.view.run(tag.identifiers);
         let d = self.d();
 
         // Every gap below is read with `comments_in_source_between` — the **in-source** axis
@@ -477,7 +484,7 @@ impl<'a> Printer<'a> {
         // POSITIONAL emitter of every comment in its content (the in-source axis its doc
         // comment above explains), so the head-gap run — an owned glued block included — is
         // already printed below. A second claim inside the slice would double-print it.
-        if let (Some(first), Some(last)) = (tag.identifiers.first(), tag.identifiers.last())
+        if let (Some(first), Some(last)) = (identifiers.first(), identifiers.last())
             && self.honored_directive_in_gap(last_end, first.span().start)
         {
             let list = Span::new(first.span().start, last.span().end);
@@ -513,15 +520,19 @@ impl<'a> Printer<'a> {
         // `indents_content` is also the dedent the trailing run below owes —
         // `trailing_comment_docs`' `closer_owns_break`, spelled out by hand here since this
         // builder emits its own run.
-        let mut layout = tag.identifiers.first().map_or(HeadLayout::Inline, |first| {
-            self.head_layout(last_end, first.span().start, false)
-        });
+        let mut layout = self
+            .view
+            .run(tag.identifiers)
+            .first()
+            .map_or(HeadLayout::Inline, |first| {
+                self.head_layout(last_end, first.span().start, false)
+            });
         // A `//` in a COMMA gap breaks the list the same way one in the head gap does: the
         // identifiers below it hang one level in and the `}` drops to the tag's column —
         // the geometry every braced head a `//` breaks already has. Only the inline
         // verdict moves; a head-gap run that already hangs the content keeps its layout.
         if !layout.indents_content()
-            && let (Some(first), Some(last)) = (tag.identifiers.first(), tag.identifiers.last())
+            && let (Some(first), Some(last)) = (identifiers.first(), identifiers.last())
             && self
                 .comments_in_source_between(first.span().start, last.span().end)
                 .any(|c| !c.is_block)
@@ -534,7 +545,7 @@ impl<'a> Printer<'a> {
         // frozen arm above, and `Printer::build_prefixed_head_doc` on every other tag).
         let mut parts = DocBuf::new();
 
-        for (i, id) in tag.identifiers.iter().enumerate() {
+        for (i, id) in identifiers.iter().enumerate() {
             let id_start = id.span().start;
             if i > 0 {
                 // Locate the separator comma at bracket depth 0 in the gap between
@@ -618,7 +629,7 @@ impl<'a> Printer<'a> {
         // Build expression doc with surrounding comments
         // Span range: after "{@render " to before "}"
         let head = self.build_expression_with_comments_doc(
-            tag.expression,
+            self.view.expr(tag.expression),
             tag.span.start + RENDER_TAG_OPEN.len() as u32,
             tag.span.end - 1,
         );

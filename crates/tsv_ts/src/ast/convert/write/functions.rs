@@ -39,7 +39,7 @@ pub(super) fn write_arrow_function_expression(
     if generic_async {
         write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
         w.raw(",\"params\":");
-        write_expressions(w, arrow.params, ctx);
+        write_expressions(w, ctx.view.run(arrow.params), ctx);
         write_return_type_field(w, arrow.return_type.as_ref(), ctx);
         w.raw_pick(
             arrow.body.is_expression(),
@@ -55,7 +55,7 @@ pub(super) fn write_arrow_function_expression(
             b",\"id\":null,\"expression\":false,\"generator\":false,\"async\":",
         );
         w.raw_pick(arrow.r#async, b"true,\"params\":", b"false,\"params\":");
-        write_expressions(w, arrow.params, ctx);
+        write_expressions(w, ctx.view.run(arrow.params), ctx);
         w.raw(",\"body\":");
         write_arrow_body(w, &arrow.body, ctx);
         write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
@@ -65,7 +65,7 @@ pub(super) fn write_arrow_function_expression(
 
 fn write_arrow_body(w: &mut JsonWriter, body: &ast::ArrowFunctionBody<'_>, ctx: &Ctx<'_>) {
     match body {
-        ast::ArrowFunctionBody::Expression(expr) => write_expression(w, expr, ctx),
+        ast::ArrowFunctionBody::Expression(expr) => write_expression(w, ctx.view.expr(*expr), ctx),
         ast::ArrowFunctionBody::BlockStatement(block) => write_block_statement(w, block, ctx),
     }
 }
@@ -91,7 +91,7 @@ pub(super) fn write_function_expression(
         write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
     }
     w.raw(",\"params\":");
-    write_expressions(w, func.params, ctx);
+    write_expressions(w, ctx.view.run(func.params), ctx);
     write_return_type_field(w, func.return_type.as_ref(), ctx);
     w.raw(",\"body\":");
     write_block_statement(w, &func.body, ctx);
@@ -112,10 +112,17 @@ pub(super) fn write_new_expression(
 ) {
     node_header(w, "NewExpression", span, ctx);
     w.raw(",\"callee\":");
-    write_expression(w, new_expr.callee, ctx);
+    write_expression(w, ctx.view.expr(new_expr.callee), ctx);
     write_type_arguments_field(w, new_expr.type_arguments.as_ref(), ctx);
     w.raw(",\"arguments\":");
-    write_expressions(w, new_expr.arguments.iter().copied(), ctx);
+    write_expressions(
+        w,
+        ctx.view
+            .list(new_expr.arguments)
+            .iter()
+            .map(|e| ctx.view.expr(*e)),
+        ctx,
+    );
     close_node(w, "NewExpression", span, ctx);
 }
 
@@ -151,7 +158,14 @@ pub(super) fn write_call_expression_tail(
     strip_optional: bool,
 ) {
     w.raw(",\"arguments\":");
-    write_expressions(w, call.arguments.iter().copied(), ctx);
+    write_expressions(
+        w,
+        ctx.view
+            .list(call.arguments)
+            .iter()
+            .map(|e| ctx.view.expr(*e)),
+        ctx,
+    );
     write_type_arguments_field(w, call.type_arguments.as_ref(), ctx);
     if strip_optional {
         // Omitted along an unparenthesized decorator's call/member spine.
@@ -170,8 +184,8 @@ pub(super) fn write_call_expression_tail(
         if call.type_arguments.is_none()
             || call.optional
             || (callee_chain != ChainState::KnownFree
-                && span.start >= call.callee.span().start
-                && call.callee.has_optional_in_chain())
+                && span.start >= ctx.view.expr(call.callee).span().start
+                && ctx.view.expr(call.callee).has_optional_in_chain(ctx.view))
         {
             w.raw_pick(call.optional, b",\"optional\":true", b",\"optional\":false");
         }
@@ -192,7 +206,7 @@ pub(super) fn write_member_expression_tail(
     strip_optional: bool,
 ) {
     w.raw(",\"property\":");
-    write_expression(w, member.property, ctx);
+    write_expression(w, ctx.view.expr(member.property), ctx);
     // One literal per value, `optional` folded in where it is written: both
     // flags are nearly always `false`, so each branch predicts at its site.
     if strip_optional {
@@ -228,11 +242,11 @@ pub(super) fn write_conditional_expression(
 ) {
     node_header(w, "ConditionalExpression", span, ctx);
     w.raw(",\"test\":");
-    write_expression(w, cond.test, ctx);
+    write_expression(w, ctx.view.expr(cond.test), ctx);
     w.raw(",\"consequent\":");
-    write_expression(w, cond.consequent, ctx);
+    write_expression(w, ctx.view.expr(cond.consequent), ctx);
     w.raw(",\"alternate\":");
-    write_expression(w, cond.alternate, ctx);
+    write_expression(w, ctx.view.expr(cond.alternate), ctx);
     close_node(w, "ConditionalExpression", span, ctx);
 }
 
@@ -245,7 +259,7 @@ pub(super) fn write_await_expression(
 ) {
     node_header(w, "AwaitExpression", span, ctx);
     w.raw(",\"argument\":");
-    write_expression(w, await_expr.argument, ctx);
+    write_expression(w, ctx.view.expr(await_expr.argument), ctx);
     close_node(w, "AwaitExpression", span, ctx);
 }
 
@@ -262,7 +276,7 @@ pub(super) fn write_yield_expression(
     w.bool(yield_expr.delegate);
     w.raw(",\"argument\":");
     write_or_null(w, yield_expr.argument.as_ref(), |w, e| {
-        write_expression(w, e, ctx);
+        write_expression(w, ctx.view.expr(*e), ctx);
     });
     close_node(w, "YieldExpression", span, ctx);
 }

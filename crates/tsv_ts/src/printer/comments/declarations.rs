@@ -825,7 +825,7 @@ impl<'a> Printer<'a> {
         rest: &ast::RestElement<'_>,
         wrap: bool,
     ) {
-        let binding_end = rest.argument.span().end;
+        let binding_end = self.view.expr(rest.argument).span().end;
         let after_modifier = if rest.optional {
             self.push_modifier_marker_doc(parts, binding_end, b'?')
         } else {

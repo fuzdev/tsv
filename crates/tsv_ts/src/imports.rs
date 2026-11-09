@@ -39,7 +39,7 @@ use std::borrow::Cow;
 use tsv_lang::Error;
 
 use crate::Goal;
-use crate::ast::Program;
+use crate::ast::{ExprView, Program};
 use crate::strip::walk::{Mode, Walk};
 
 /// A byte range in the source a record was collected from: `start..end`, UTF-8 byte
@@ -396,7 +396,7 @@ pub fn parse_imports_into<'arena>(
     stores: &mut crate::ast::AstStores<'arena>,
 ) -> Result<Imports, Error> {
     let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, arena, stores)?;
-    Ok(collect_imports(&[&program], source, arena))
+    Ok(collect_imports(&[&program], stores.view(), source, arena))
 }
 
 /// The import records of parsed `programs`, which index `source` — the hidden seam an
@@ -404,8 +404,13 @@ pub fn parse_imports_into<'arena>(
 /// whose spans are document offsets). The programs must come in source order, which is
 /// then the records' order; `has_module_syntax` answers for all of them. `arena` holds
 /// the walk's scratch, which is never read.
-pub fn collect_imports(programs: &[&Program<'_>], source: &str, arena: &bumpalo::Bump) -> Imports {
-    let mut walk = Walk::new(source, arena, Mode::Imports);
+pub fn collect_imports(
+    programs: &[&Program<'_>],
+    view: ExprView<'_>,
+    source: &str,
+    arena: &bumpalo::Bump,
+) -> Imports {
+    let mut walk = Walk::new(source, arena, Mode::Imports, view);
     for program in programs {
         walk.program(program);
     }

@@ -9,6 +9,7 @@
 
 use super::CommentSpacing;
 use super::Printer;
+use crate::ast::ExprView;
 use crate::ast::{self, TSTypeElement};
 use crate::printer::LeadingGlue;
 use crate::printer::analysis::skip_identifier_at;
@@ -44,7 +45,7 @@ impl<'a> Printer<'a> {
             // Preserve comments after the keyword (e.g., `readonly /* c */ a`);
             // bounded at `[` for computed keys (inner comments are the
             // bracket builder's)
-            let key_start = prop.key.span().start;
+            let key_start = self.view.slot(&prop.key).span().start;
             let mut cursor = prop.span.start;
             self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, key_start);
             let bound = if prop.computed {
@@ -60,8 +61,11 @@ impl<'a> Printer<'a> {
             };
             self.push_pre_name_comments_doc(&mut parts, cursor, bound);
         }
-        let (key_doc, key_region_end) =
-            self.build_type_member_key_doc(prop.span.start, &prop.key, prop.computed);
+        let (key_doc, key_region_end) = self.build_type_member_key_doc(
+            prop.span.start,
+            self.view.slot(&prop.key),
+            prop.computed,
+        );
         parts.push(key_doc);
 
         // Where the trailing (pre-`;`) comment gap begins: after the type annotation
@@ -191,7 +195,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
-        let key_start = method.key.span().start;
+        let key_start = self.view.slot(&method.key).span().start;
         // The `readonly` modifier, then the accessor keyword for get/set signatures, each
         // preserving the comments between it and what follows (`readonly /* c */ x()`,
         // `readonly /* c */ get /* d */ x()`).
@@ -220,10 +224,15 @@ impl<'a> Printer<'a> {
             ),
             _ => {}
         }
-        let (key_doc, key_region_end) = match method_signature_new_key(method, self.source) {
-            Some(lit) => (self.build_string_literal_doc(lit), lit.span.end),
-            None => self.build_type_member_key_doc(method.span.start, &method.key, method.computed),
-        };
+        let (key_doc, key_region_end) =
+            match method_signature_new_key(self.view, method, self.source) {
+                Some(lit) => (self.build_string_literal_doc(lit), lit.span.end),
+                None => self.build_type_member_key_doc(
+                    method.span.start,
+                    self.view.slot(&method.key),
+                    method.computed,
+                ),
+            };
         parts.push(key_doc);
 
         // Find `(` in source (skip comments so a `(` inside one isn't matched).
@@ -265,7 +274,7 @@ impl<'a> Printer<'a> {
         self.push_member_type_params_and_signature(
             &mut parts,
             method.type_parameters.as_ref(),
-            method.params,
+            self.view.run(method.params),
             method.return_type.as_ref(),
             paren_pos,
         );
@@ -291,7 +300,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         self.build_call_or_construct_signature_doc(
             call.type_parameters.as_ref(),
-            call.params,
+            self.view.run(call.params),
             call.return_type.as_ref(),
             call.span,
             None,
@@ -309,7 +318,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         self.build_call_or_construct_signature_doc(
             ctor.type_parameters.as_ref(),
-            ctor.params,
+            self.view.run(ctor.params),
             ctor.return_type.as_ref(),
             ctor.span,
             Some(ctor.span.start + "new".len() as u32),
@@ -775,14 +784,15 @@ impl<'a> Printer<'a> {
 /// this path; an escaped one (`'ne\u0077'`) would keep its quotes and escapes either way
 /// (`Printer::string_key_unquotes` refuses it). A property signature, a class or object
 /// method and every other key unquote through `Printer::build_type_member_key_doc` as usual.
-fn method_signature_new_key<'m, 'arena>(
-    method: &'m ast::TSMethodSignature<'arena>,
+fn method_signature_new_key<'m>(
+    view: ExprView<'m>,
+    method: &'m ast::TSMethodSignature<'m>,
     source: &str,
-) -> Option<&'m ast::Literal<'arena>> {
+) -> Option<&'m ast::Literal<'m>> {
     if method.computed {
         return None;
     }
-    match &method.key.kind {
+    match &view.slot(&method.key).kind {
         ast::ExpressionKind::Literal(
             lit @ ast::Literal {
                 value: ast::LiteralValue::String(cooked),

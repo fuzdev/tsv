@@ -8,6 +8,7 @@ use super::helpers::{TypeParenRule, is_simple_type_arg, unwrap_parenthesized};
 use super::{
     BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, ShiftRescan, TrailingBlock,
 };
+use crate::ast::ExprView;
 use crate::ast::{
     self, TSType, TSTypeParameter, TSTypeParameterDeclaration, TSTypeParameterModifier,
 };
@@ -863,7 +864,10 @@ impl<'a> Printer<'a> {
         if self.nullable_union_type_args.borrow().is_empty() {
             return None;
         }
-        self.after_operator_nullable_union_doc(value_doc, Self::value_type_arguments(value))
+        self.after_operator_nullable_union_doc(
+            value_doc,
+            Self::value_type_arguments(self.view, value),
+        )
     }
 
     /// The type arguments of a value whose `<…>` an assignment's `=` meets as the value's
@@ -877,6 +881,7 @@ impl<'a> Printer<'a> {
     /// than two calls) keeps its caller's layout
     /// ([`Self::value_with_nullable_union_broken`]).
     pub(in crate::printer) fn value_type_arguments<'v>(
+        view: ExprView<'v>,
         value: &'v ast::Expression<'v>,
     ) -> Option<&'v ast::TSTypeParameterInstantiation<'v>> {
         use ast::ExpressionKind as Kind;
@@ -893,32 +898,32 @@ impl<'a> Printer<'a> {
             let head = match &value.kind {
                 Kind::CallExpression(call) => {
                     found = call.type_arguments.as_ref().or(found);
-                    value = call.callee;
+                    value = view.expr(call.callee);
                     chain_head = true;
                     continue;
                 }
                 Kind::MemberExpression(member) => {
-                    value = member.object;
+                    value = view.expr(member.object);
                     chain_head = true;
                     continue;
                 }
                 Kind::TSNonNullExpression(non_null) => {
-                    value = non_null.expression;
+                    value = view.expr(non_null.expression);
                     chain_head = false;
                     continue;
                 }
                 Kind::NewExpression(new) => new.type_arguments.as_ref(),
                 _ if chain_head => None,
                 Kind::AwaitExpression(await_expr) => {
-                    value = await_expr.argument;
+                    value = view.expr(await_expr.argument);
                     continue;
                 }
                 Kind::TSAsExpression(cast) => {
-                    value = cast.expression;
+                    value = view.expr(cast.expression);
                     continue;
                 }
                 Kind::TSSatisfiesExpression(cast) => {
-                    value = cast.expression;
+                    value = view.expr(cast.expression);
                     continue;
                 }
                 Kind::ArrowFunctionExpression(arrow) => match arrow.return_type.as_ref() {

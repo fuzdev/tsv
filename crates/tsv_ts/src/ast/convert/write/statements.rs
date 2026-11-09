@@ -76,12 +76,16 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
         ast::StatementKind::ExpressionStatement(expr_stmt) => {
             node_header(w, "ExpressionStatement", stmt.span, ctx);
             w.raw(",\"expression\":");
-            write_expression(w, expr_stmt.expression, ctx);
+            write_expression(w, ctx.view.expr(expr_stmt.expression), ctx);
             if expr_stmt.is_directive {
                 // acorn stores the raw string contents without quotes. A
                 // directive is a string-literal expression, so its slice
                 // includes both quotes (≥2 bytes).
-                let raw = expr_stmt.expression.span().extract(ctx.source);
+                let raw = ctx
+                    .view
+                    .expr(expr_stmt.expression)
+                    .span()
+                    .extract(ctx.source);
                 w.raw(",\"directive\":");
                 w.string(&raw[1..raw.len() - 1]);
             }
@@ -96,7 +100,9 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
         ast::StatementKind::ReturnStatement(ret) => {
             node_header(w, "ReturnStatement", stmt.span, ctx);
             w.raw(",\"argument\":");
-            write_or_null(w, ret.argument.as_ref(), |w, e| write_expression(w, e, ctx));
+            write_or_null(w, ret.argument.as_ref(), |w, e| {
+                write_expression(w, ctx.view.expr(*e), ctx);
+            });
             close_node(w, "ReturnStatement", stmt.span, ctx);
         }
         ast::StatementKind::BlockStatement(block) => {
@@ -166,7 +172,7 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
         ast::StatementKind::TSExportAssignment(export_assign) => {
             node_header(w, "TSExportAssignment", stmt.span, ctx);
             w.raw(",\"expression\":");
-            write_expression(w, &export_assign.expression, ctx);
+            write_expression(w, ctx.view.slot(&export_assign.expression), ctx);
             close_node(w, "TSExportAssignment", stmt.span, ctx);
         }
         ast::StatementKind::TSNamespaceExportDeclaration(ns_export) => {
@@ -382,12 +388,14 @@ pub(super) fn write_variable_declaration(
     write_array(w, var_decl.declarations, |w, d| {
         node_header(w, "VariableDeclarator", d.span, ctx);
         w.raw(",\"id\":");
-        write_expression(w, d.id, ctx);
+        write_expression(w, ctx.view.expr(d.id), ctx);
         if d.definite {
             w.raw(",\"definite\":true");
         }
         w.raw(",\"init\":");
-        write_or_null(w, d.init.as_ref(), |w, e| write_expression(w, e, ctx));
+        write_or_null(w, d.init.as_ref(), |w, e| {
+            write_expression(w, ctx.view.expr(*e), ctx);
+        });
         close_node(w, "VariableDeclarator", d.span, ctx);
     });
     // One literal per kind, so each appends the whole field at once rather

@@ -46,6 +46,7 @@ use tsv_lang::{
     is_region_end_marker,
 };
 use tsv_lang::{FxHashMap, FxHashSet};
+use tsv_ts::ast::ExprView;
 use tsv_ts::ast::{Expression, ExpressionKind};
 
 /// A buffered run of comments from one gap — collected rather than iterated because the
@@ -436,6 +437,8 @@ pub(crate) struct Printer<'a> {
     pub(crate) source: &'a str,
     /// Comments from scripts and template expressions
     comments: &'a [Comment],
+    /// Reads the expressions of the tree being printed.
+    pub(crate) view: ExprView<'a>,
     /// Whether any of `comments` is owned by a node (`owned_by_node`). Computed once
     /// per document at construction and handed to `tsv_ts` via `ts_inputs()`, so the
     /// embedded owned-comment path short-circuits per `{expr}` without an O(comments)
@@ -602,13 +605,17 @@ fn plain_reference_span(id: &tsv_ts::ast::Identifier<'_>) -> Option<Span> {
 /// outside the span is a block comment the path **owns** (`docs/comments.md` §Owned
 /// comments), which sits glued ahead of it — a caller that prints the span instead of
 /// building the doc owes the proof that none does.
-pub(in crate::printer) fn plain_path_span(expr: &Expression<'_>) -> Option<Span> {
+pub(in crate::printer) fn plain_path_span(
+    view: ExprView<'_>,
+    expr: &Expression<'_>,
+) -> Option<Span> {
     let path = match &expr.kind {
         ExpressionKind::Identifier(id) => plain_reference_span(id)?,
         ExpressionKind::MemberExpression(member) if !member.computed && !member.optional => {
-            let (ExpressionKind::Identifier(object), ExpressionKind::Identifier(property)) =
-                (&member.object.kind, &member.property.kind)
-            else {
+            let (ExpressionKind::Identifier(object), ExpressionKind::Identifier(property)) = (
+                &view.expr(member.object).kind,
+                &view.expr(member.property).kind,
+            ) else {
                 return None;
             };
             let object = plain_reference_span(object)?;
@@ -629,12 +636,18 @@ impl<'a> Printer<'a> {
     /// tests' constructor; the format entry points hand [`Self::with_line_breaks`] a
     /// table they took.
     #[cfg(test)]
-    pub(crate) fn new(arena: &'a DocArena, source: &'a str, comments: &'a [Comment]) -> Self {
+    pub(crate) fn new(
+        arena: &'a DocArena,
+        source: &'a str,
+        comments: &'a [Comment],
+        view: ExprView<'a>,
+    ) -> Self {
         let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
         Self::with_line_breaks(
             arena,
             source,
             comments,
+            view,
             EmbedContext::default(),
             line_breaks,
         )
@@ -654,6 +667,7 @@ impl<'a> Printer<'a> {
         arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
+        view: ExprView<'a>,
         embed: EmbedContext,
         line_breaks: LineBreaks<'a>,
     ) -> Self {
@@ -663,7 +677,12 @@ impl<'a> Printer<'a> {
             has_owned_comments,
             has_format_ignore,
             ..
-        } = tsv_ts::__private::PrinterInputs::for_document(source, comments, line_breaks.table());
+        } = tsv_ts::__private::PrinterInputs::for_document(
+            source,
+            comments,
+            view,
+            line_breaks.table(),
+        );
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
@@ -671,6 +690,7 @@ impl<'a> Printer<'a> {
             arena,
             source,
             comments,
+            view,
             has_owned_comments,
             has_format_ignore,
             line_breaks,
@@ -934,7 +954,7 @@ impl<'a> Printer<'a> {
     /// and may print as its own bytes ([`fuses_source_spans`]) — the fast arm of
     /// [`Self::build_head_value_doc`].
     pub(in crate::printer) fn fused_plain_path(&self, expr: &Expression<'_>) -> Option<Span> {
-        plain_path_span(expr)
+        plain_path_span(self.view, expr)
             .filter(|path| !self.owns_leading_comment_at(path.start) && fuses_source_spans())
     }
 
@@ -1376,6 +1396,7 @@ impl<'a> Printer<'a> {
         tsv_ts::__private::PrinterInputs {
             source: self.source,
             comments: self.comments,
+            view: self.view,
             line_table: self.line_table(),
             // The document-level owned-comment flag, computed once at construction
             // (never here — this is called per `{expr}`; see the field's doc).
@@ -1574,16 +1595,20 @@ impl<'a> Printer<'a> {
 }
 
 /// Format a Svelte AST back to source code
-pub(crate) fn format_svelte(root: &ast::Root<'_>, source: &str) -> String {
+pub(crate) fn format_svelte(parsed: ast::ParsedRootRef<'_>, source: &str) -> String {
     let arena = DocArena::for_source(source);
-    format_svelte_in(root, source, &arena)
+    format_svelte_in(parsed, source, &arena)
 }
 
 /// Format a Svelte AST into a caller-provided doc arena (the reuse path).
-pub(crate) fn format_svelte_in(root: &ast::Root<'_>, source: &str, arena: &DocArena) -> String {
+pub(crate) fn format_svelte_in(
+    parsed: ast::ParsedRootRef<'_>,
+    source: &str,
+    arena: &DocArena,
+) -> String {
     let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
     format_root(
-        root,
+        parsed,
         source,
         line_breaks,
         arena,
@@ -1596,13 +1621,13 @@ pub(crate) fn format_svelte_in(root: &ast::Root<'_>, source: &str, arena: &DocAr
 /// [`format_svelte_in`] over a document the caller folded ahead of the parse: the line
 /// verdict comes from the fold's own pass (`LineBreaks::of_folded`), not a second walk.
 pub(crate) fn format_svelte_folded_in(
-    root: &ast::Root<'_>,
+    parsed: ast::ParsedRootRef<'_>,
     folded: &tsv_lang::printing::FoldedSource<'_>,
     arena: &DocArena,
 ) -> String {
     let line_breaks = LineBreaks::of_folded(folded, arena.take_line_breaks_scratch());
     format_root(
-        root,
+        parsed,
         folded.text(),
         line_breaks,
         arena,
@@ -1662,7 +1687,7 @@ impl Known {
 /// ([`format_lifted_runs`]); or, for a document whose template tail the reorder would expose
 /// to the parse's end-of-document trim, the respelled source ([`format_respelled_tail`]).
 fn format_root<'a>(
-    root: &ast::Root<'_>,
+    parsed: ast::ParsedRootRef<'a>,
     source: &'a str,
     line_breaks: LineBreaks<'a>,
     arena: &'a DocArena,
@@ -1681,6 +1706,7 @@ fn format_root<'a>(
     // and it also holds Svelte's in-tag comments, which the merge declines, since prettier's
     // rule is a JS-parse postprocess and its own Svelte printer drops those outright, so
     // there is no oracle for them either way.
+    let root = parsed.root;
     let comments = tsv_lang::merge_nestled_block_comments(source, &root.comments);
 
     // The template printer deliberately leaves `EmbedContext::printer_owns_line` at its
@@ -1694,6 +1720,7 @@ fn format_root<'a>(
         arena,
         source,
         &comments,
+        parsed.view,
         EmbedContext::default(),
         line_breaks,
     );
@@ -1723,7 +1750,7 @@ fn format_root<'a>(
         LiftRuns::Allow => {
             if let Some(lifted) = printer.lifted_runs_source(root, &sections) {
                 drop(printer.into_string()); // parks the line-break scratch
-                return format_lifted_runs(root, source, &lifted, arena, tail, sections, frozen);
+                return format_lifted_runs(parsed, source, &lifted, arena, tail, sections, frozen);
             }
         }
         LiftRuns::Lifted => debug_assert!(
@@ -1743,7 +1770,7 @@ fn format_root<'a>(
                     LiftRuns::Declined => LiftRuns::Declined,
                     LiftRuns::Allow | LiftRuns::Lifted => LiftRuns::Lifted,
                 };
-                return format_respelled_tail(root, source, at, ch, arena, lift, frozen);
+                return format_respelled_tail(parsed, source, at, ch, arena, lift, frozen);
             }
         }
         TailRespell::Respelled => debug_assert!(
@@ -1800,7 +1827,7 @@ fn print_document(
 /// `FileTooLarge`), which the few added bytes can cross — nothing proves that. Whatever the
 /// failure, the original is then printed unrespelled.
 fn format_respelled_tail(
-    root: &ast::Root<'_>,
+    parsed: ast::ParsedRootRef<'_>,
     source: &str,
     at: usize,
     ch: char,
@@ -1818,7 +1845,7 @@ fn format_respelled_tail(
         Ok(respelled_root) => {
             let line_breaks = LineBreaks::new(&respelled, arena.take_line_breaks_scratch());
             format_root(
-                &respelled_root,
+                (&respelled_root).into(),
                 &respelled,
                 line_breaks,
                 arena,
@@ -1830,7 +1857,7 @@ fn format_respelled_tail(
         Err(_) => {
             let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
             format_root(
-                root,
+                parsed,
                 source,
                 line_breaks,
                 arena,
@@ -1855,7 +1882,7 @@ fn format_respelled_tail(
 /// proves that. Whatever the failure, the original is then printed with its runs where they
 /// stand (`sections` is its classification).
 fn format_lifted_runs(
-    root: &ast::Root<'_>,
+    parsed: ast::ParsedRootRef<'_>,
     source: &str,
     lifted: &str,
     arena: &DocArena,
@@ -1868,7 +1895,7 @@ fn format_lifted_runs(
         Ok(lifted_root) => {
             let line_breaks = LineBreaks::new(lifted, arena.take_line_breaks_scratch());
             format_root(
-                &lifted_root,
+                (&lifted_root).into(),
                 lifted,
                 line_breaks,
                 arena,
@@ -1880,7 +1907,7 @@ fn format_lifted_runs(
         Err(_) => {
             let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
             format_root(
-                root,
+                parsed,
                 source,
                 line_breaks,
                 arena,

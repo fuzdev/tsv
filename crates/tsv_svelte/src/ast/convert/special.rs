@@ -9,6 +9,7 @@
 
 use crate::ast;
 use std::borrow::Cow;
+use tsv_ts::ast::ExprView;
 
 /// A script tag's `lang` attribute value, if it carries one (`<script lang="ts">` → `Some("ts")`,
 /// plain `<script>` → `None`).
@@ -99,6 +100,7 @@ pub(super) fn text_value<'src>(
 ///
 /// `pub(super)` — shared with the wire-JSON writer's fused `<svelte:options>`.
 pub(super) fn bool_option(
+    view: ExprView<'_>,
     attrs: &[ast::AttributeNode<'_>],
     name: &str,
     source: &str,
@@ -111,7 +113,8 @@ pub(super) fn bool_option(
                 None => Some(true),
                 Some(values) => values.iter().find_map(|v| {
                     if let ast::AttributeValue::ExpressionTag(expr) = v
-                        && let tsv_ts::ast::ExpressionKind::Literal(lit) = &expr.expression.kind
+                        && let tsv_ts::ast::ExpressionKind::Literal(lit) =
+                            &view.expr(expr.expression).kind
                         && let tsv_ts::ast::LiteralValue::Boolean(b) = lit.value
                     {
                         Some(b)

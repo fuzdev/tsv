@@ -12,7 +12,7 @@ use tsv_lang::{Comment, DepthBudget, DepthLimit, Error, Span};
 use tsv_ts::__private::TopLevelAs;
 use tsv_ts::__private::{is_id_continue, is_id_start};
 use tsv_ts::ast::TSTypeAnnotation;
-use tsv_ts::ast::{AstStores, Expression};
+use tsv_ts::ast::{AstStores, ExprView, Expression};
 
 /// Build an expression `Comment` from its already-shifted `span` / `content_span`.
 /// `content` is the comment body, read only to compute the `multiline` flag (whether
@@ -688,7 +688,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         base_offset: usize,
         end: &str,
     ) -> Result<&'arena Expression<'arena>, Error> {
-        self.parse_ts_expression_checked(source, base_offset, end, |_, _| Ok(()))
+        self.parse_ts_expression_checked(source, base_offset, end, |_, _, _| Ok(()))
     }
 
     /// [`Self::parse_ts_expression`] for a head whose grammar refuses some expressions
@@ -706,7 +706,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
         end: &str,
-        host_check: impl Fn(&Self, &'arena Expression<'arena>) -> Result<(), Error>,
+        host_check: impl Fn(&Self, ExprView<'_>, &'arena Expression<'arena>) -> Result<(), Error>,
     ) -> Result<&'arena Expression<'arena>, Error> {
         let (expr, comments) = self.with_island_stores(|this, stores| {
             tsv_ts::__private::parse_expression_with_comments(
@@ -716,7 +716,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 this.arena,
                 stores,
                 end,
-                |expr| host_check(this, expr),
+                |view, expr| host_check(this, view, expr),
             )
         })?;
         self.expression_comments.extend_from_slice(comments);
@@ -745,7 +745,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
         top_level_as: TopLevelAs,
-        host_check: impl Fn(&Self, &'arena Expression<'arena>, usize) -> Result<(), Error>,
+        host_check: impl Fn(&Self, ExprView<'_>, &'arena Expression<'arena>, usize) -> Result<(), Error>,
     ) -> Result<(&'arena Expression<'arena>, usize), Error> {
         let (expr, end_pos, comments) = self.with_island_stores(|this, stores| {
             tsv_ts::__private::parse_expression_partial_with_comments(
@@ -755,7 +755,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 this.arena,
                 stores,
                 top_level_as,
-                |expr, end_pos| host_check(this, expr, end_pos),
+                |view, expr, end_pos| host_check(this, view, expr, end_pos),
             )
         })?;
         self.expression_comments.extend_from_slice(comments);
@@ -860,7 +860,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-        host_check: impl Fn(&Self, &tsv_ts::ast::Statement<'arena>) -> Result<(), Error>,
+        host_check: impl Fn(&Self, ExprView<'_>, &tsv_ts::ast::Statement<'arena>) -> Result<(), Error>,
     ) -> Result<tsv_ts::ast::Statement<'arena>, Error> {
         let (stmt, comments) = self.with_island_stores(|this, stores| {
             tsv_ts::__private::parse_statement_with_comments(
@@ -869,7 +869,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 this.island_nesting(),
                 this.arena,
                 stores,
-                |stmt| host_check(this, stmt),
+                |view, stmt| host_check(this, view, stmt),
             )
         })?;
         self.expression_comments.extend_from_slice(comments);

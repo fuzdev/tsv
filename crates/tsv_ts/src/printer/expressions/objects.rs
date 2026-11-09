@@ -7,6 +7,7 @@
 // - String key normalization (unquote valid identifiers)
 // - Blank line preservation between properties
 
+use crate::ast::ExprView;
 use crate::ast::{self, Expression, ExpressionKind, Literal, LiteralValue};
 use crate::printer::comments::ValueGap;
 use crate::printer::expressions::assignment::{AssignmentLeft, RhsCommentInfo};
@@ -55,12 +56,12 @@ impl LiteralRole {
     /// leaves the shell's comments to nobody, and anchoring inside in the other prints them
     /// twice. A frozen element or value is read through its slice instead
     /// ([`Printer::element_claim_anchor`]): the slice prints the shell itself.
-    pub(in crate::printer) fn printed_end(self, expr: &Expression<'_>) -> u32 {
+    pub(in crate::printer) fn printed_end(self, view: ExprView<'_>, expr: &Expression<'_>) -> u32 {
         match (self, &expr.kind) {
             (Self::CompoundTarget, ExpressionKind::AssignmentExpression(assign))
                 if assign.operator == ast::AssignmentOperator::Assign =>
             {
-                assign.right.printed_end()
+                view.expr(assign.right).printed_end(view)
             }
             _ => expr.span().end,
         }
@@ -68,10 +69,14 @@ impl LiteralRole {
 
     /// [`Self::printed_end`] for an object property: [`ast::ObjectProperty::value_end`],
     /// with the value read in this role.
-    pub(in crate::printer) fn property_printed_end(self, prop: &ast::ObjectProperty<'_>) -> u32 {
+    pub(in crate::printer) fn property_printed_end(
+        self,
+        view: ExprView<'_>,
+        prop: &ast::ObjectProperty<'_>,
+    ) -> u32 {
         match prop {
-            ast::ObjectProperty::Property(p) => self.printed_end(p.value),
-            ast::ObjectProperty::SpreadElement(_) => prop.value_end(),
+            ast::ObjectProperty::Property(p) => self.printed_end(view, view.expr(p.value)),
+            ast::ObjectProperty::SpreadElement(_) => prop.value_end(view),
         }
     }
 }
@@ -94,13 +99,13 @@ pub(in crate::printer) fn is_compound_target_value(expr: &Expression<'_>) -> boo
 /// Whether a [`LiteralRole::CompoundTarget`] object breaks for a nested pattern —
 /// prettier's `shouldBreak` for an `ObjectPattern` (`print/object.js`): some property's
 /// value is directly an object or array pattern. A default (`a: [b] = c`) is not one.
-fn compound_target_object_breaks(obj: &ast::ObjectExpression<'_>) -> bool {
+fn compound_target_object_breaks(view: ExprView<'_>, obj: &ast::ObjectExpression<'_>) -> bool {
     obj.properties.iter().any(|prop| {
         matches!(
             prop,
             ast::ObjectProperty::Property(p)
                 if matches!(
-                    p.value.kind,
+                    view.expr(p.value).kind,
                     ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_)
                 )
         )
@@ -197,7 +202,7 @@ impl<'a> Printer<'a> {
             LiteralRole::Expression => {
                 self.has_newline_between(obj_span.start + 1, first_prop_start)
             }
-            LiteralRole::CompoundTarget => compound_target_object_breaks(obj),
+            LiteralRole::CompoundTarget => compound_target_object_breaks(self.view, obj),
         };
 
         // Decide the formatting strategy
@@ -407,7 +412,9 @@ impl<'a> Printer<'a> {
             let gap_blank: SmallVec<[bool; 8]> = obj
                 .properties
                 .windows(2)
-                .map(|pair| self.item_gap_has_blank_line(pair[0].value_end(), pair[1].span().start))
+                .map(|pair| {
+                    self.item_gap_has_blank_line(pair[0].value_end(self.view), pair[1].span().start)
+                })
                 .collect();
 
             for (i, prop) in obj.properties.iter().enumerate() {
@@ -569,16 +576,16 @@ impl<'a> Printer<'a> {
     /// value's verbatim slice prints its whole span, the value shell included, so the trailing
     /// run starts past it ([`Self::property_value_frozen_span`]).
     fn property_printed_end(&self, prop: &ast::ObjectProperty<'_>, role: LiteralRole) -> u32 {
-        let printed_end = role.property_printed_end(prop);
+        let printed_end = role.property_printed_end(self.view, prop);
         match prop {
             ast::ObjectProperty::Property(p)
                 if !p.shorthand
-                    && printed_end != prop.value_end()
+                    && printed_end != prop.value_end(self.view)
                     && self
                         .property_value_frozen_span(p, self.property_key_region_end(p))
                         .is_some() =>
             {
-                prop.value_end()
+                prop.value_end(self.view)
             }
             _ => printed_end,
         }
@@ -603,9 +610,9 @@ impl<'a> Printer<'a> {
     /// the key's own end — the `key_region_end` [`Self::build_property_doc`] scans from.
     fn property_key_region_end(&self, prop: &ast::Property<'_>) -> u32 {
         if prop.computed {
-            self.find_closing_bracket_after(prop.key.span().end) + 1
+            self.find_closing_bracket_after(self.view.expr(prop.key).span().end) + 1
         } else {
-            prop.key.span().end
+            self.view.expr(prop.key).span().end
         }
     }
 
@@ -626,7 +633,7 @@ impl<'a> Printer<'a> {
         if self.comments_force_own_line_between(key_region_end, colon_pos) {
             return None;
         }
-        self.value_head_frozen_span(colon_pos + 1, prop.value.span())
+        self.value_head_frozen_span(colon_pos + 1, self.view.expr(prop.value).span())
     }
 
     /// Build a Doc for a single property
@@ -641,6 +648,8 @@ impl<'a> Printer<'a> {
         has_comments: bool,
         role: LiteralRole,
     ) -> DocId {
+        let key = self.view.expr(prop.key);
+        let value = self.view.expr(prop.value);
         let d = self.d();
         // For computed keys, use expression doc (preserves string quotes)
         // For regular keys, use property key doc (converts strings to bare identifiers when valid)
@@ -650,15 +659,15 @@ impl<'a> Printer<'a> {
             // Assignment expressions need parens in computed keys: {[(a = b)]: c}
             let (doc, end) = self.build_computed_key_bracket_doc(
                 prop.span.start,
-                prop.key,
+                key,
                 Some(super::ParenContext::ComputedPropertyKey),
-                || self.build_computed_key_expr_doc(prop.key),
+                || self.build_computed_key_expr_doc(key),
             );
             key_region_end = end;
             doc
         } else {
-            key_region_end = prop.key.span().end;
-            self.build_property_key_doc(prop.key)
+            key_region_end = key.span().end;
+            self.build_property_key_doc(key)
         };
 
         // Add getter/setter prefix if applicable, preserving comments between
@@ -675,7 +684,7 @@ impl<'a> Printer<'a> {
                     &mut kw_parts,
                     kind_text,
                     prop.span.start,
-                    prop.key.span().start,
+                    key.span().start,
                     prop.computed,
                 );
                 kw_parts.push(key_doc);
@@ -687,7 +696,7 @@ impl<'a> Printer<'a> {
         // Handle getter/setter vs method vs regular property
         if matches!(prop.kind, ast::PropertyKind::Get | ast::PropertyKind::Set) {
             // Getter/setter: `get x() {}` or `set x(v) {}`
-            if let ExpressionKind::FunctionExpression(func) = &prop.value.kind {
+            if let ExpressionKind::FunctionExpression(func) = &value.kind {
                 let func_doc = self.build_function_doc_body(func);
                 // Comments between key and type params/parens: `get [x] /* c */() {}`
                 // or `get x/* c */ <T>() {}`
@@ -704,11 +713,11 @@ impl<'a> Printer<'a> {
             }
         } else if prop.method {
             // Method shorthand: `foo() {}`, `async foo() {}`, `*gen() {}`, or `async *gen() {}`
-            if let ExpressionKind::FunctionExpression(func) = &prop.value.kind {
+            if let ExpressionKind::FunctionExpression(func) = &value.kind {
                 let func_doc = self.build_function_doc_body(func);
                 // Build prefix: async? + *?, preserving comments after `async`
                 // (e.g., `async /* c */ m()`)
-                let key_start = prop.key.span().start;
+                let key_start = key.span().start;
                 let mut parts = DocBuf::new();
                 let mut cursor = prop.span.start;
                 if func.r#async {
@@ -737,7 +746,7 @@ impl<'a> Printer<'a> {
                 d.concat(&parts)
             } else {
                 // Fallback for malformed AST
-                let value_doc = self.build_object_property_value_doc(prop.value, None);
+                let value_doc = self.build_object_property_value_doc(value, None);
                 d.concat(&[key_doc, d.text(": "), value_doc])
             }
         } else if prop.shorthand {
@@ -752,12 +761,12 @@ impl<'a> Printer<'a> {
             // the initializer — a relocation across the binding, and a DROP the moment the
             // anchor was corrected. The value's doc prints the key and that gap alike, and
             // is not parenthesized here: the shorthand form is the syntax.
-            match &prop.value.kind {
+            match &value.kind {
                 ExpressionKind::AssignmentExpression(_) if role == LiteralRole::CompoundTarget => {
-                    self.build_compound_target_doc(prop.value)
+                    self.build_compound_target_doc(value)
                 }
                 ExpressionKind::AssignmentExpression(_) | ExpressionKind::AssignmentPattern(_) => {
-                    self.build_expression_doc(prop.value)
+                    self.build_expression_doc(value)
                 }
                 _ => key_doc,
             }
@@ -768,8 +777,7 @@ impl<'a> Printer<'a> {
             // pattern it reads there — no pair around the default, the nested literal under
             // the target's own rules — on a plain `key: value` line: a pattern value has no
             // layout of its own to choose.
-            let target =
-                role == LiteralRole::CompoundTarget && is_compound_target_value(prop.value);
+            let target = role == LiteralRole::CompoundTarget && is_compound_target_value(value);
 
             // Zero-comment fast gate: when the object has no comments at all, none
             // can lie between this key and its value, so skip the colon scan and the
@@ -777,25 +785,25 @@ impl<'a> Printer<'a> {
             // (canonical reference: build_params_doc_with_comments).
             if !has_comments {
                 if target {
-                    let value_doc = self.build_property_value_doc_as(prop.value, None, true);
+                    let value_doc = self.build_property_value_doc_as(value, None, true);
                     return d.concat(&[key_doc, d.text(": "), value_doc]);
                 }
                 let needs_parens =
-                    self.needs_parens(prop.value, super::ParenContext::ObjectPropertyValue);
+                    self.needs_parens(value, super::ParenContext::ObjectPropertyValue);
                 return if needs_parens {
                     let value_doc = d.concat(&[
                         d.text("("),
-                        self.build_object_property_value_doc(prop.value, None),
+                        self.build_object_property_value_doc(value, None),
                         d.text(")"),
                     ]);
                     d.concat(&[key_doc, d.text(": "), value_doc])
                 } else {
-                    let is_short_key = self.is_short_property_key(prop.key, prop.computed);
+                    let is_short_key = self.is_short_property_key(key, prop.computed);
                     // A comment-free object provably holds no directive either.
                     self.build_assignment_layout(
                         key_doc,
                         d.text(":"),
-                        prop.value,
+                        value,
                         AssignmentLeft::short_key(is_short_key),
                         RhsCommentInfo::frozen_only(None),
                     )
@@ -806,7 +814,7 @@ impl<'a> Printer<'a> {
             // Use key_region_end (after `]` for computed, after key for normal)
             // to avoid double-counting comments already inside brackets
             let colon_pos = self.find_colon_after(key_region_end);
-            let value_start = prop.value.span().start;
+            let value_start = value.span().start;
 
             // A line comment — or a multiline block the author broke after — between
             // the key and `:` keeps the comment after the key and drops `: value` to
@@ -815,9 +823,9 @@ impl<'a> Printer<'a> {
             // layout below; a glued block stays inline via the ordinary path.
             if self.comments_force_own_line_between(key_region_end, colon_pos) {
                 let value_doc = {
-                    let v = self.build_property_value_doc_as(prop.value, None, target);
+                    let v = self.build_property_value_doc_as(value, None, target);
                     let v = if !target
-                        && self.needs_parens(prop.value, super::ParenContext::ObjectPropertyValue)
+                        && self.needs_parens(value, super::ParenContext::ObjectPropertyValue)
                     {
                         d.parens(v)
                     } else {
@@ -843,7 +851,7 @@ impl<'a> Printer<'a> {
 
             // Check if value needs parens (e.g., assignment expressions)
             let needs_parens =
-                !target && self.needs_parens(prop.value, super::ParenContext::ObjectPropertyValue);
+                !target && self.needs_parens(value, super::ParenContext::ObjectPropertyValue);
 
             // A post-colon comment forces break-after-operator when it's a line
             // comment (extends to end of line), an *indentable* block (its reprint is
@@ -882,23 +890,23 @@ impl<'a> Printer<'a> {
                 && !has_own_line_comment_post_colon
             {
                 if target {
-                    let value_doc = self.build_property_value_doc_as(prop.value, None, true);
+                    let value_doc = self.build_property_value_doc_as(value, None, true);
                     d.concat(&[key_doc, d.text(": "), value_doc])
                 } else if needs_parens {
                     // Build manually with parens
                     let value_doc = d.concat(&[
                         d.text("("),
-                        self.build_object_property_value_doc(prop.value, None),
+                        self.build_object_property_value_doc(value, None),
                         d.text(")"),
                     ]);
                     d.concat(&[key_doc, d.text(": "), value_doc])
                 } else {
                     // No parens needed: use unified assignment layout
-                    let is_short_key = self.is_short_property_key(prop.key, prop.computed);
+                    let is_short_key = self.is_short_property_key(key, prop.computed);
                     self.build_assignment_layout(
                         key_doc,
                         d.text(":"),
-                        prop.value,
+                        value,
                         AssignmentLeft::short_key(is_short_key),
                         RhsCommentInfo {
                             comments: None,
@@ -945,17 +953,14 @@ impl<'a> Printer<'a> {
                     // …and the assignment-value mark for the same reason: a `:`→value
                     // gap is an `isObjectProperty` value gap whichever arm prints it, so
                     // the chain here is FLAT like its sibling arms', not indented.
-                    self.mark_jsdoc_cast_value_gap(prop.value);
+                    self.mark_jsdoc_cast_value_gap(value);
                     // A MULTI-LINE block's run is hoisted OUT of the value's doc when the
                     // value OWNS it, so the comment's hard break cannot reach the value's
                     // own group ([`Printer::hoist_owned_value_gap_run`]). This arm builds
                     // its own hang, so it takes the run-only form and owes the paired
                     // suppression below — exactly the debt that function's ⚠️ names.
-                    let hoisted_run = self.hoisted_owned_value_gap_run_opt(
-                        colon_pos + 1,
-                        prop.value,
-                        needs_parens,
-                    );
+                    let hoisted_run =
+                        self.hoisted_owned_value_gap_run_opt(colon_pos + 1, value, needs_parens);
                     // A LINE comment forces the break, and the declarator `=`'s partition
                     // places it ([`Printer::build_operator_line_comment_hang`]): a comment on
                     // the `:` line stays there, trailing the `:`, and an own-line one keeps
@@ -967,16 +972,11 @@ impl<'a> Printer<'a> {
                     if hoisted_run.is_none()
                         && self.has_line_comments_between(colon_pos + 1, value_start)
                     {
-                        let value_doc =
-                            self.build_hung_value_doc(prop.value, colon_pos + 1, || {
-                                self.build_gap_value_doc(None, prop.value, || {
-                                    self.build_property_value_doc_as(
-                                        prop.value,
-                                        value_frozen,
-                                        target,
-                                    )
-                                })
-                            });
+                        let value_doc = self.build_hung_value_doc(value, colon_pos + 1, || {
+                            self.build_gap_value_doc(None, value, || {
+                                self.build_property_value_doc_as(value, value_frozen, target)
+                            })
+                        });
                         let value_doc = if needs_parens {
                             d.parens(value_doc)
                         } else {
@@ -999,9 +999,9 @@ impl<'a> Printer<'a> {
                     if needs_parens {
                         value_parts.push(d.text("("));
                     }
-                    value_parts.push(self.build_hung_value_doc(prop.value, colon_pos + 1, || {
-                        self.build_gap_value_doc(hoisted_run, prop.value, || {
-                            self.build_property_value_doc_as(prop.value, value_frozen, target)
+                    value_parts.push(self.build_hung_value_doc(value, colon_pos + 1, || {
+                        self.build_gap_value_doc(hoisted_run, value, || {
+                            self.build_property_value_doc_as(value, value_frozen, target)
                         })
                     }));
                     if needs_parens {
@@ -1052,20 +1052,20 @@ impl<'a> Printer<'a> {
                         if needs_parens {
                             parts.push(d.text("("));
                         }
-                        parts.push(self.build_property_value_doc_as(prop.value, None, target));
+                        parts.push(self.build_property_value_doc_as(value, None, target));
                         if needs_parens {
                             parts.push(d.text(")"));
                         }
                         d.concat(&parts)
                     } else {
-                        let is_short_key = self.is_short_property_key(prop.key, prop.computed);
+                        let is_short_key = self.is_short_property_key(key, prop.computed);
                         // `value_frozen` is provably `None` on this arm (an own-line
                         // directive is an own-line comment, which took the arm above);
                         // threaded rather than hardcoded so the two can't drift.
                         self.build_assignment_layout(
                             lhs_doc,
                             d.text(":"),
-                            prop.value,
+                            value,
                             AssignmentLeft::short_key(is_short_key),
                             RhsCommentInfo {
                                 comments: rhs_comments,

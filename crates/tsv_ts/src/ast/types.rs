@@ -7,8 +7,8 @@ use crate::lexer::KeywordKind;
 use tsv_lang::Span;
 
 use super::{
-    Decorator, Expression, IdentName, Identifier, Literal, MethodKind, TemplateElement,
-    UnaryExpression,
+    Decorator, ExprRun, ExprSlot, IdentName, Identifier, Literal, MethodKind, OptExprEdge,
+    TemplateElement, UnaryExpression,
 };
 
 /// TypeScript type annotation node (e.g., `: number` in `const a: number = 5`)
@@ -546,7 +546,7 @@ impl<'arena> TSTypeElement<'arena> {
 /// Property signature: `prop: T` or `prop?: T` or `readonly prop: T`
 #[derive(Debug, Clone)]
 pub struct TSPropertySignature<'arena> {
-    pub key: Expression<'arena>,
+    pub key: ExprSlot<'arena>,
     pub computed: bool,
     pub optional: bool,
     pub readonly: bool,
@@ -557,7 +557,7 @@ pub struct TSPropertySignature<'arena> {
 /// Method signature: `method(): T` or `method<T>(x: T): T` or `get x(): T` or `set x(v: T)`
 #[derive(Debug, Clone)]
 pub struct TSMethodSignature<'arena> {
-    pub key: Expression<'arena>,
+    pub key: ExprSlot<'arena>,
     pub computed: bool,
     pub optional: bool,
     /// A `readonly` modifier (`readonly x(): void`): tsc's parser accepts it on a method
@@ -566,7 +566,7 @@ pub struct TSMethodSignature<'arena> {
     /// Method kind: method, get, or set (for accessor signatures in type literals)
     pub kind: MethodKind,
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
-    pub params: &'arena [Expression<'arena>],
+    pub params: ExprRun<'arena>,
     pub return_type: Option<TSTypeAnnotation<'arena>>,
     pub span: Span,
 }
@@ -575,7 +575,7 @@ pub struct TSMethodSignature<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSCallSignatureDeclaration<'arena> {
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
-    pub params: &'arena [Expression<'arena>],
+    pub params: ExprRun<'arena>,
     pub return_type: Option<TSTypeAnnotation<'arena>>,
     pub span: Span,
 }
@@ -584,7 +584,7 @@ pub struct TSCallSignatureDeclaration<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSConstructSignatureDeclaration<'arena> {
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
-    pub params: &'arena [Expression<'arena>],
+    pub params: ExprRun<'arena>,
     pub return_type: Option<TSTypeAnnotation<'arena>>,
     pub span: Span,
 }
@@ -609,7 +609,7 @@ pub struct TSIndexSignature<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSFunctionType<'arena> {
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
-    pub params: &'arena [Expression<'arena>],
+    pub params: ExprRun<'arena>,
     // Inline by value (16 B) rather than `&'arena`: `TSTypeAnnotation` is a small
     // `Copy` wrapper, held inline everywhere else (`Option<TSTypeAnnotation>`), and
     // it already indirects its own `&'arena TSType` — so a `&'arena` here would be a
@@ -623,7 +623,7 @@ pub struct TSFunctionType<'arena> {
 pub struct TSConstructorType<'arena> {
     pub abstract_: bool,
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
-    pub params: &'arena [Expression<'arena>],
+    pub params: ExprRun<'arena>,
     // Inline by value — see `TSFunctionType.return_type`.
     pub return_type: TSTypeAnnotation<'arena>,
     pub span: Span,
@@ -789,7 +789,7 @@ pub struct TSImportType<'arena> {
     /// The module specifier (string literal)
     pub argument: Literal<'arena>,
     /// Optional options object: `{with: {type: 'json'}}`
-    pub options: Option<&'arena Expression<'arena>>,
+    pub options: OptExprEdge<'arena>,
     /// Optional qualifier: `.Foo` or `.Foo.Bar` after the import
     pub qualifier: Option<TSEntityName<'arena>>,
     /// Optional type arguments: `<T, U>`

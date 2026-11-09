@@ -93,6 +93,10 @@
 //! and the `_internal_*` features are tsv's own plumbing for its sibling crates, which pin
 //! each other exactly; they change in any release, outside semver.
 
+#![expect(
+    clippy::explicit_auto_deref,
+    reason = "an edge is spelled `view.expr(*edge)` so a read is the same call whatever an edge is"
+)]
 #![warn(missing_docs)]
 
 // The README's example compiles as a doctest, so the crates.io page cannot drift.
@@ -225,7 +229,11 @@ pub(crate) fn format_in<'arena, D: std::borrow::Borrow<tsv_lang::doc::arena::Doc
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let root = parse_folded_into(&folded, arena, stores)?;
     let doc_arena = doc_arena(folded.text());
-    Ok(format_folded_in(&root, &folded, doc_arena.borrow()))
+    Ok(format_folded_in(
+        __private::parsed_ref(&root, stores),
+        &folded,
+        doc_arena.borrow(),
+    ))
 }
 
 /// What [`parse_to_json_with`]'s wire carries. The default is [`parse_to_json`]'s: the

@@ -81,6 +81,7 @@ impl<'a> Printer<'a> {
         decl: &ast::ClassDeclaration<'_>,
         include_decorators: bool,
     ) -> DocId {
+        let super_class = self.view.opt(decl.super_class);
         let d = self.d();
 
         // The first keyword after any decorators (declare/abstract/class) is where this
@@ -97,7 +98,7 @@ impl<'a> Printer<'a> {
             class_keyword_start,
             decl.id.as_ref(),
             decl.type_parameters.as_ref(),
-            decl.super_class,
+            super_class,
             decl.super_type_parameters.as_ref(),
             decl.implements,
         );
@@ -105,7 +106,7 @@ impl<'a> Printer<'a> {
         // Heritage layout (shared with the class-expression printer).
         let layout = self.class_header_layout(
             &positions,
-            decl.super_class,
+            super_class,
             decl.super_type_parameters.as_ref(),
             decl.implements,
         );
@@ -154,7 +155,7 @@ impl<'a> Printer<'a> {
 
         // Build heritage docs (shared with the class-expression printer).
         let extends_doc = self.build_class_extends_doc(
-            decl.super_class,
+            super_class,
             decl.super_type_parameters.as_ref(),
             positions.extends_keyword_start,
         );
@@ -410,6 +411,7 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a property definition
     fn build_property_definition_doc(&self, prop: &ast::PropertyDefinition<'_>) -> DocId {
+        let key = self.view.slot(&prop.key);
         let d = self.d();
         let mut parts = smallvec![];
 
@@ -424,7 +426,7 @@ impl<'a> Printer<'a> {
         // Modifier keywords, preserving comments between them and before the
         // name (e.g., `static /* c */ readonly p`). `cursor` tracks the scan
         // position so each comment is emitted at the user's placement.
-        let key_start = prop.key.span().start;
+        let key_start = key.span().start;
         let mut cursor = next_token_start;
 
         // Declare modifier (property-only, and first — ahead of accessibility)
@@ -473,16 +475,16 @@ impl<'a> Printer<'a> {
             // computed-key path (shared helper).
             let (doc, end) = self.build_computed_key_bracket_doc(
                 cursor,
-                &prop.key,
+                key,
                 Some(super::ParenContext::ComputedPropertyKey),
-                || self.build_computed_key_expr_doc(&prop.key),
+                || self.build_computed_key_expr_doc(key),
             );
             key_region_end = end;
             parts.push(doc);
         } else {
             self.push_pre_name_comments_doc(&mut parts, cursor, key_start);
-            key_region_end = prop.key.span().end;
-            parts.push(self.build_field_key_doc(&prop.key));
+            key_region_end = key.span().end;
+            parts.push(self.build_field_key_doc(key));
         }
 
         // The modifier's marker byte, derived once so the freeze below and the emission
@@ -523,7 +525,7 @@ impl<'a> Printer<'a> {
         };
 
         // Value if present - use assignment layout (matches prettier's printAssignment)
-        if let Some(value) = &prop.value {
+        if let Some(value) = self.view.opt_slot(&prop.value) {
             let before_eq = prop
                 .type_annotation
                 .as_ref()
@@ -563,7 +565,7 @@ impl<'a> Printer<'a> {
         let content_end = prop
             .value
             .as_ref()
-            .map(|v| v.span().end)
+            .map(|v| self.view.slot(v).span().end)
             .or_else(|| prop.type_annotation.as_ref().map(|ta| ta.span.end))
             .unwrap_or(after_modifier);
         self.push_semicolon_with_gap_comments(&mut parts, content_end, prop.span.end, true, None);
@@ -737,6 +739,7 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a method definition
     fn build_method_definition_doc(&self, method: &ast::MethodDefinition<'_>) -> DocId {
+        let key = self.view.slot(&method.key);
         let d = self.d();
         let mut parts = smallvec![];
 
@@ -751,7 +754,7 @@ impl<'a> Printer<'a> {
         // Modifier keywords, preserving comments between them and before the
         // name (e.g., `static /* c */ async m()`). `cursor` tracks the scan
         // position so each comment is emitted at the user's placement.
-        let key_start = method.key.span().start;
+        let key_start = key.span().start;
         let mut cursor = next_token_start;
 
         // Accessibility → static → abstract → override, the run shared with properties
@@ -809,9 +812,9 @@ impl<'a> Printer<'a> {
             // computed-key helper.
             let (doc, end) = self.build_computed_key_bracket_doc(
                 cursor,
-                &method.key,
+                key,
                 Some(super::ParenContext::ComputedPropertyKey),
-                || self.build_computed_key_expr_doc(&method.key),
+                || self.build_computed_key_expr_doc(key),
             );
             key_region_end = end;
             parts.push(doc);
@@ -819,12 +822,12 @@ impl<'a> Printer<'a> {
             if !method.value.generator {
                 self.push_pre_name_comments_doc(&mut parts, cursor, key_start);
             }
-            key_region_end = method.key.span().end;
+            key_region_end = key.span().end;
             // A non-computed method / accessor key is unquoted when it is a valid
             // identifier, the same rule as an object property key (`'foo'() {}` →
             // `foo() {}`). This matches prettier for methods/accessors; a string-keyed
             // `'constructor'` unquotes to the real `constructor` with identical meaning.
-            parts.push(self.build_property_key_doc(&method.key));
+            parts.push(self.build_property_key_doc(key));
         }
 
         // Optional marker: `m?()` (abstract / ambient / interface methods),
@@ -853,7 +856,7 @@ impl<'a> Printer<'a> {
         // Parameters and return type - shared callable-signature builder (same path
         // as function declarations; MethodDefinition.value is field-identical).
         let (sig_doc, sig_end) = self.build_callable_signature_doc(
-            method.value.params,
+            self.view.run(method.value.params),
             method.value.type_parameters.as_ref(),
             method.value.return_type.as_ref(),
             method.value.params_start,

@@ -56,6 +56,7 @@ impl<'a> Printer<'a> {
         let script_doc_id = tsv_ts::__private::build_program_doc(
             self.d(),
             &script.content,
+            self.view,
             self.source(),
             self.line_table(),
             embed,

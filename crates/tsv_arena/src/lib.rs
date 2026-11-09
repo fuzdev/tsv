@@ -283,6 +283,21 @@ macro_rules! with_lang_stores {
     }};
 }
 
+/// What a language's reading entry points take for a tree `$ast` a warm parse left in
+/// `$stores`: the tree and its stores for a language with them (`stores`), the tree alone
+/// for the one without (`nostores`).
+#[macro_export]
+#[doc(hidden)]
+macro_rules! read_ast {
+    (stores, $lang:ident, $ast:ident, $stores:ident) => {
+        $lang::__private::parsed_ref(&$ast, $stores)
+    };
+    (nostores, $lang:ident, $ast:ident, $stores:ident) => {{
+        let _ = $stores;
+        &$ast
+    }};
+}
+
 /// A binding's whole **parse** export body: parse `$source` through [`parse_ast!`] into the
 /// per-thread AST arena and convert it with the language's `__private::$convert` writer
 /// (`convert_ast_json_bytes` for the C FFI, `convert_ast_json_string` for the two JS
@@ -312,7 +327,8 @@ macro_rules! parse_convert {
                 let ast =
                     $crate::parse_ast!($goalness, $storeness, $lang, source, goal, arena, stores)
                         .map_err($map_err)?;
-                Ok($lang::__private::$convert(&ast, source))
+                let parsed = $crate::read_ast!($storeness, $lang, ast, stores);
+                Ok($lang::__private::$convert(parsed, source))
             })
         })
     }};
@@ -415,8 +431,9 @@ macro_rules! parse_format {
                     $goalness, $storeness, $lang, &folded, $goal, arena, stores
                 )
                 .map_err($map_err)?;
+                let parsed = $crate::read_ast!($storeness, $lang, ast, stores);
                 Ok($crate::with_doc_arena(|doc_arena| {
-                    $lang::__private::format_folded_in(&ast, &folded, doc_arena)
+                    $lang::__private::format_folded_in(parsed, &folded, doc_arena)
                 }))
             })
         })
@@ -769,6 +786,10 @@ mod tests {
                 } else {
                     Ok(format!("ast({source}, {goal:?})"))
                 }
+            }
+            /// What `read_ast!`'s `stores` arm calls: the tree, the stores spent.
+            pub(crate) fn parsed_ref<'a>(ast: &'a String, _stores: &str) -> &'a String {
+                ast
             }
             pub(crate) fn convert(ast: &String, source: &str) -> String {
                 format!("convert({ast}, {source})")

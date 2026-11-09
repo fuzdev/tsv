@@ -25,9 +25,8 @@
 // comment is not relocated across it.
 
 use super::{CommentVec, Printer, ShareSite};
-use crate::ast::Expression;
+use crate::ast::ExprView;
 use smallvec::SmallVec;
-use std::borrow::Borrow;
 use tsv_lang::Comment;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -82,13 +81,14 @@ pub(in crate::printer) fn run_defers_line(run: &[&Comment]) -> bool {
 ///
 /// Generic over the slot's element so the array literal (`Option<&Expression>`) and the
 /// array pattern (`Option<Expression>`) share it.
-pub(in crate::printer) fn next_real_element_start<'a, E: Borrow<Expression<'a>>>(
+pub(in crate::printer) fn next_real_element_start<E: crate::ast::ListElement>(
+    view: ExprView<'_>,
     elements: &[Option<E>],
     idx: usize,
 ) -> Option<u32> {
     elements[idx + 1..]
         .iter()
-        .find_map(|e| e.as_ref().map(|e| e.borrow().span().start))
+        .find_map(|e| e.as_ref().map(|e| e.element(view).span().start))
 }
 
 /// Trailing comments collected for a list element (property or array element)

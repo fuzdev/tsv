@@ -4,6 +4,7 @@
 
 use super::*;
 
+use crate::ast::ParsedRootRef;
 /// The Svelte-shaped HTML answers `tsv_svelte_compile` and `tsv_debug` read — the crate's own
 /// `html` module, where each item's doc says where it departs from the spec.
 pub use crate::html::{is_mathml_element, is_svg_element, preserves_whitespace};
@@ -49,6 +50,18 @@ pub fn parse_folded_into<'arena>(
     folded.parse_with(|text| parse_into(text, arena, stores))
 }
 
+/// A warm parse's tree as a reading entry point takes it, read through `stores`.
+#[inline]
+pub fn parsed_ref<'a, 'arena: 'a>(
+    root: &'a Root<'arena>,
+    stores: &'a AstStores<'arena>,
+) -> ParsedRootRef<'a> {
+    ParsedRootRef {
+        root,
+        view: stores.view(),
+    }
+}
+
 /// A one-shot parse: `parse` over fresh stores, bundled with the tree it built.
 fn parsed<'arena>(
     parse: impl FnOnce(&mut AstStores<'arena>) -> Result<Root<'arena>>,
@@ -62,12 +75,12 @@ fn parsed<'arena>(
 /// (`tsv_lang::printing::normalize_carriage_returns`) — the format entry points that fold
 /// (the CLI, the bindings, [`format()`]). Identical output; the document's line verdict
 /// comes from the fold's own pass instead of a second walk of the source.
-pub fn format_folded_in(
-    root: &Root<'_>,
+pub fn format_folded_in<'a>(
+    parsed: impl Into<ParsedRootRef<'a>>,
     folded: &tsv_lang::printing::FoldedSource<'_>,
     arena: &tsv_lang::doc::arena::DocArena,
 ) -> String {
-    printer::format_svelte_folded_in(root, folded, arena)
+    printer::format_svelte_folded_in(parsed.into(), folded, arena)
 }
 
 /// Format a Svelte AST back to source code — the hidden, AST-taking primitive beneath [`format()`], which
@@ -99,8 +112,8 @@ pub fn format_folded_in(
 /// # Ok(())
 /// # }
 /// ```
-pub fn format_ast(root: &Root<'_>, source: &str) -> String {
-    printer::format_svelte(root, source)
+pub fn format_ast<'a>(parsed: impl Into<ParsedRootRef<'a>>, source: &str) -> String {
+    printer::format_svelte(parsed.into(), source)
 }
 
 /// Format into a caller-provided doc arena.
@@ -113,12 +126,12 @@ pub fn format_ast(root: &Root<'_>, source: &str) -> String {
 /// borrowed from `arena` escapes — the result is an owned `String`. Embedded
 /// `<style>` blocks share this same arena (the CSS renders to its own string but
 /// builds its doc nodes into the host arena, not a second per-block one).
-pub fn format_ast_in(
-    root: &Root<'_>,
+pub fn format_ast_in<'a>(
+    parsed: impl Into<ParsedRootRef<'a>>,
     source: &str,
     arena: &tsv_lang::doc::arena::DocArena,
 ) -> String {
-    printer::format_svelte_in(root, source, arena)
+    printer::format_svelte_in(parsed.into(), source, arena)
 }
 
 /// Parse Svelte source code into an internal AST
@@ -189,7 +202,12 @@ pub fn parse_imports_into<'arena>(
         .flatten()
         .map(|script| &script.content)
         .collect();
-    Ok(tsv_ts::__private::collect_imports(&programs, source, arena))
+    Ok(tsv_ts::__private::collect_imports(
+        &programs,
+        stores.view(),
+        source,
+        arena,
+    ))
 }
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions
@@ -228,8 +246,8 @@ pub fn parse_imports_into<'arena>(
 /// # }
 /// ```
 #[cfg(feature = "json")]
-pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_root_bytes(root, source, tsv_lang::Wire::Span)
+pub fn convert_ast_json_bytes<'a>(parsed: impl Into<ParsedRootRef<'a>>, source: &str) -> Vec<u8> {
+    ast::convert::write_root_bytes(parsed.into(), source, tsv_lang::Wire::Span)
 }
 
 /// The `convert_ast_json_bytes` wire plus a `loc` on every object carrying `start`/`end`
@@ -238,8 +256,11 @@ pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
 /// UTF-16 code units) under `\n` alone, the one line rule for a Svelte document and
 /// everything embedded in it. `tsv parse --locations` writes it.
 #[cfg(feature = "locations")]
-pub fn convert_ast_json_bytes_with_locations(root: &Root<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_root_bytes(root, source, tsv_lang::Wire::Loc)
+pub fn convert_ast_json_bytes_with_locations<'a>(
+    parsed: impl Into<ParsedRootRef<'a>>,
+    source: &str,
+) -> Vec<u8> {
+    ast::convert::write_root_bytes(parsed.into(), source, tsv_lang::Wire::Loc)
 }
 
 /// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM
@@ -250,7 +271,7 @@ pub fn convert_ast_json_bytes_with_locations(root: &Root<'_>, source: &str) -> V
 /// span-only wire alone, and `parse_to_json_with` validates the loc-bearing bytes itself.
 #[cfg(feature = "json")]
 #[expect(clippy::expect_used)]
-pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
-    String::from_utf8(convert_ast_json_bytes(root, source))
+pub fn convert_ast_json_string<'a>(parsed: impl Into<ParsedRootRef<'a>>, source: &str) -> String {
+    String::from_utf8(convert_ast_json_bytes(parsed, source))
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }

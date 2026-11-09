@@ -283,8 +283,8 @@ impl<'a> Printer<'a> {
             || {
                 stmt.update
                     .as_ref()
-                    .map(|u| u.span().end)
-                    .or_else(|| stmt.test.as_ref().map(|t| t.span().end))
+                    .map(|u| self.view.expr(*u).span().end)
+                    .or_else(|| stmt.test.as_ref().map(|t| self.view.expr(*t).span().end))
                     .or_else(|| stmt.init.as_ref().map(|i| self.get_for_init_span_end(i)))
                     .unwrap_or(span.start + "for ".len() as u32)
             },
@@ -475,7 +475,7 @@ impl<'a> Printer<'a> {
 
         // Determine spans for each part
         let (init_end, test_end) = self.for_clause_ends(stmt);
-        let update_end = stmt.update.as_ref().map(|u| u.span().end);
+        let update_end = stmt.update.as_ref().map(|u| self.view.expr(*u).span().end);
 
         // Find semicolon positions for proper comment boundary detection.
         // The semicolons in `for (init; test; update)` are at specific positions in
@@ -490,12 +490,15 @@ impl<'a> Printer<'a> {
             open_paren,
             init_start: stmt.init.as_ref().map(|i| match i {
                 ast::ForInit::VariableDeclaration(d) => d.span.start,
-                ast::ForInit::Expression(e) => e.span().start,
+                ast::ForInit::Expression(e) => self.view.slot(e).span().start,
             }),
             init_end,
-            test_start: stmt.test.as_ref().map(|t| t.span().start),
+            test_start: stmt.test.as_ref().map(|t| self.view.expr(*t).span().start),
             test_end,
-            update_start: stmt.update.as_ref().map(|u| u.span().start),
+            update_start: stmt
+                .update
+                .as_ref()
+                .map(|u| self.view.expr(*u).span().start),
             update_end,
             first_semi,
             second_semi,
@@ -541,7 +544,7 @@ impl<'a> Printer<'a> {
         // them in its own slice.
         let update_gap = match &stmt.update {
             Some(update) if update_frozen.is_none() => {
-                Some(self.for_update_trailing_gap_start(update))
+                Some(self.for_update_trailing_gap_start(self.view.expr(*update)))
             }
             _ => update_end,
         };
@@ -670,7 +673,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        if let Some(test) = &stmt.test {
+        if let Some(test) = self.view.opt(stmt.test) {
             // Wrap in group so binary chains (Ungrouped mode) have a tight parent
             // to evaluate fit against — matching how if/while use build_condition_group.
             // Without this, logical operators break with the for-header group (too wide)
@@ -720,7 +723,7 @@ impl<'a> Printer<'a> {
             );
         }
 
-        if let Some(update) = &stmt.update {
+        if let Some(update) = self.view.opt(stmt.update) {
             // The stripped shells' run is the trailing emitter's below: claimed, so the
             // clause's own trailing emitters decline it.
             let gap = update_gap.unwrap_or_else(|| update.span().end);
@@ -764,7 +767,7 @@ impl<'a> Printer<'a> {
                 start,
                 close,
                 update_gap,
-                stmt.update.as_ref().map(|u| u.span()),
+                stmt.update.as_ref().map(|u| self.view.expr(*u).span()),
             );
         }
 
@@ -788,15 +791,21 @@ impl<'a> Printer<'a> {
     fn for_update_trailing_gap_start(&self, update: &Expression<'_>) -> u32 {
         let end = update.span().end;
         let spine = match &update.kind {
-            ExpressionKind::SequenceExpression(seq) => match seq.expressions {
+            ExpressionKind::SequenceExpression(seq) => match self.view.list(seq.expressions) {
                 // Only a last operand with nothing but its own stripped shells behind it:
                 // a comment between it and the sequence's end is the sequence's. A last
                 // operand a comma-gap directive freezes prints its shells in its own slice.
                 [.., prev, last]
-                    if !self.has_comments_to_emit_between(last.span().end, end)
-                        && self.gap_frozen_span(prev.span().end, last.span()).is_none() =>
+                    if !self
+                        .has_comments_to_emit_between(self.view.expr(*last).span().end, end)
+                        && self
+                            .gap_frozen_span(
+                                self.view.expr(*prev).span().end,
+                                self.view.expr(*last).span(),
+                            )
+                            .is_none() =>
                 {
-                    *last
+                    self.view.expr(*last)
                 }
                 _ => return end,
             },
@@ -917,7 +926,7 @@ impl<'a> Printer<'a> {
     fn for_clause_ends(&self, stmt: &ast::ForStatement<'_>) -> (Option<u32>, Option<u32>) {
         (
             stmt.init.as_ref().map(|i| self.get_for_init_span_end(i)),
-            stmt.test.as_ref().map(|t| t.span().end),
+            stmt.test.as_ref().map(|t| self.view.expr(*t).span().end),
         )
     }
 
@@ -1148,7 +1157,8 @@ impl<'a> Printer<'a> {
         seq_span: Span,
         build_elem: impl Fn(&Expression<'_>) -> DocId,
     ) -> DocId {
-        self.mark_relational_sibling_authored_pairs(seq.expressions.iter().copied().map(Some));
+        let expressions = self.view.list(seq.expressions);
+        self.mark_relational_sibling_authored_pairs(expressions.iter().copied().map(Some));
         // A MULTI-LINE block the FIRST operand OWNS prints ahead of the run, outside the
         // layout's group ([`Printer::build_doc_with_outermost_owned_comment_at`]) — the
         // general sequence printer's rule, at the clause that keeps its own copy of the
@@ -1157,11 +1167,11 @@ impl<'a> Printer<'a> {
         // prints it too. Only the BREAK differs, and the two agree once it is gone.
         self.build_doc_with_outermost_owned_comment_at(
             seq_span.start,
-            seq.expressions.first().copied(),
+            self.view.opt(expressions.first().copied()),
             || {
                 let d = self.d();
                 let last = seq.expressions.len() - 1;
-                let first_start = seq.expressions[0].span().start;
+                let first_start = self.view.expr(expressions[0]).span().start;
                 let mut parts = DocBuf::new();
                 // The LEADING EDGE: the grouping `(` the parser erased ahead of the first
                 // operand, and any comment inside it — a region that lies INSIDE the
@@ -1202,10 +1212,14 @@ impl<'a> Printer<'a> {
                 // `a + b, // c`), which the operand's own emitters would defer past every
                 // later operand. The gap prints them as the bare spelling's (`a + b // c⏎, d`).
                 let mut prev_gap = 0;
-                for (i, e) in seq.expressions.iter().enumerate() {
+                for (i, e) in expressions.iter().enumerate() {
                     let frozen = if i > 0 {
-                        let prev_end = seq.expressions[i - 1].span().end;
-                        self.push_for_clause_comma_gap(&mut docs, prev_gap, e.span().start);
+                        let prev_end = self.view.expr(expressions[i - 1]).span().end;
+                        self.push_for_clause_comma_gap(
+                            &mut docs,
+                            prev_gap,
+                            self.view.expr(*e).span().start,
+                        );
                         // Rule A, the same as the general sequence printer's: an own-line
                         // directive in the comma gap freezes the FOLLOWING operand. The `[~In]`
                         // wrap `build_elem` would apply is owed by the frozen arm too — the
@@ -1214,13 +1228,13 @@ impl<'a> Printer<'a> {
                         // itself, below, over the SLICE
                         // ([`Printer::wrap_frozen_for_init_in`]). Nothing else parenthesizes
                         // an operand, so `already_parenthesized` is false.
-                        self.gap_frozen_span(prev_end, e.span())
+                        self.gap_frozen_span(prev_end, self.view.expr(*e).span())
                     } else {
                         // The leading edge's own freeze, the same rule the general sequence
                         // printer applies to its first operand
                         // ([`Printer::left_spine_operand_frozen_span`]): an own-line directive
                         // inside the erased shell freezes THAT operand, Rule A's child scope.
-                        self.left_spine_operand_frozen_span(seq_span.start, e)
+                        self.left_spine_operand_frozen_span(seq_span.start, self.view.expr(*e))
                     };
                     docs.push(if i == last {
                         // The TRAILING EDGE: the last operand's own erased shell closes at the
@@ -1236,7 +1250,7 @@ impl<'a> Printer<'a> {
                         // update clause does not — and places it INSIDE the trailing comment
                         // (`(aaa in bbb) /* c */`), which is why the operand is built there
                         // rather than wrapped here.
-                        self.build_for_clause_operand_doc(e, seq_span.end, frozen)
+                        self.build_for_clause_operand_doc(self.view.expr(*e), seq_span.end, frozen)
                     } else {
                         // The authored pair the clause keeps around a comparison
                         // ([`Printer::mark_relational_sibling_authored_pairs`]) is asked
@@ -1244,30 +1258,33 @@ impl<'a> Printer<'a> {
                         // otherwise add: the frozen arm is told so and adds none, and the
                         // unfrozen arm's `build_elem` adds its own only around an `in`
                         // binary, which then supplies the kept pair.
-                        let kept = self.relational_sibling_pair_is_kept(e);
+                        let kept = self.relational_sibling_pair_is_kept(self.view.expr(*e));
                         // A frozen operand prints its stripped shells in its own slice.
                         prev_gap = if frozen.is_some() {
-                            e.span().end
+                            self.view.expr(*e).span().end
                         } else {
-                            self.pair_trailing_gap_start(e)
+                            self.pair_trailing_gap_start(self.view.expr(*e))
                         };
                         let core = frozen.map_or_else(
                             || {
-                                self.with_claimed_right_spine_run(prev_gap, e.span().end, || {
-                                    build_elem(e)
-                                })
+                                self.with_claimed_right_spine_run(
+                                    prev_gap,
+                                    self.view.expr(*e).span().end,
+                                    || build_elem(self.view.expr(*e)),
+                                )
                             },
                             |frozen| {
                                 self.wrap_frozen_for_init_in(
-                                    e,
+                                    self.view.expr(*e),
                                     frozen,
                                     kept,
-                                    self.build_frozen_expression_doc(e, frozen),
+                                    self.build_frozen_expression_doc(self.view.expr(*e), frozen),
                                 )
                             },
                         );
-                        let in_pair_printed = frozen.is_none() && self.for_init_in_needs_parens(e);
-                        self.wrap_relational_sibling_pair(e, in_pair_printed, core)
+                        let in_pair_printed =
+                            frozen.is_none() && self.for_init_in_needs_parens(self.view.expr(*e));
+                        self.wrap_relational_sibling_pair(self.view.expr(*e), in_pair_printed, core)
                     });
                     if i == 0 {
                         first_end = docs.len();
@@ -1327,7 +1344,13 @@ impl<'a> Printer<'a> {
         ctx: StatementContext,
     ) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
-            stmt.left, stmt.right, stmt.body, span.start, "in", false, ctx,
+            stmt.left,
+            self.view.expr(stmt.right),
+            stmt.body,
+            span.start,
+            "in",
+            false,
+            ctx,
         )
     }
 
@@ -1340,7 +1363,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
             stmt.left,
-            stmt.right,
+            self.view.expr(stmt.right),
             stmt.body,
             span.start,
             "of",
@@ -1487,7 +1510,12 @@ impl<'a> Printer<'a> {
         // (`node !== parent.body && parent.type === "ForStatement"`, which a
         // ForOf/ForIn statement is not).
         let doc = self.build_expression_doc_claiming_outermost(right);
-        if needs_parens(right, ParenContext::ForInOfRight, self.in_for_init.get()) {
+        if needs_parens(
+            self.view,
+            right,
+            ParenContext::ForInOfRight,
+            self.in_for_init.get(),
+        ) {
             self.d().parens(doc)
         } else {
             doc
@@ -1797,7 +1825,7 @@ impl<'a> Printer<'a> {
     fn get_for_in_of_left_end(&self, left: &ast::ForInOfLeft<'_>) -> u32 {
         match left {
             ast::ForInOfLeft::VariableDeclaration(decl) => decl.span.end,
-            ast::ForInOfLeft::Pattern(expr) => expr.span().end,
+            ast::ForInOfLeft::Pattern(expr) => self.view.slot(expr).span().end,
         }
     }
 
@@ -1805,7 +1833,7 @@ impl<'a> Printer<'a> {
     fn get_for_in_of_left_start(&self, left: &ast::ForInOfLeft<'_>) -> u32 {
         match left {
             ast::ForInOfLeft::VariableDeclaration(decl) => decl.span.start,
-            ast::ForInOfLeft::Pattern(expr) => expr.span().start,
+            ast::ForInOfLeft::Pattern(expr) => self.view.slot(expr).span().start,
         }
     }
 
@@ -1821,8 +1849,10 @@ impl<'a> Printer<'a> {
             ast::ForInOfLeft::VariableDeclaration(decl) => decl
                 .declarations
                 .first()
-                .map_or(decl.span.start, |declarator| declarator.id.span().start),
-            ast::ForInOfLeft::Pattern(expr) => expr.span().start,
+                .map_or(decl.span.start, |declarator| {
+                    self.view.expr(declarator.id).span().start
+                }),
+            ast::ForInOfLeft::Pattern(expr) => self.view.slot(expr).span().start,
         }
     }
 
@@ -2064,7 +2094,7 @@ impl<'a> Printer<'a> {
         match init {
             // This clause IS the init; it needs no ambient flag to know it.
             ast::ForInit::Expression(expr)
-                if self.frozen_slice_hands_header_a_bare_in(expr, frozen.end) =>
+                if self.frozen_slice_hands_header_a_bare_in(self.view.slot(expr), frozen.end) =>
             {
                 self.d().parens(doc)
             }
@@ -2126,9 +2156,9 @@ impl<'a> Printer<'a> {
                         decl_docs.push(self.build_frozen_node_doc(declarator.span));
                         continue;
                     }
-                    let id_doc = self.build_expression_doc(declarator.id);
-                    let one = if let Some(init) = &declarator.init {
-                        let id_end = declarator.id.span().end;
+                    let id_doc = self.build_expression_doc(self.view.expr(declarator.id));
+                    let one = if let Some(init) = self.view.opt(declarator.init) {
+                        let id_end = self.view.expr(declarator.id).span().end;
                         let init_start = init.span().start;
                         let eq_pos = self.find_equals_position(id_end, init_start);
                         // Every branch below builds this declarator's value the SAME way —
@@ -2153,7 +2183,8 @@ impl<'a> Printer<'a> {
                         // spell that one wrap twice and double the pair
                         // (`for (let k = (a in b); ;)` → `((a in b))`). This flag answers
                         // only "does the declarator POSITION parenthesize its value?".
-                        let position_parens = needs_parens(init, ParenContext::VariableInit, false);
+                        let position_parens =
+                            needs_parens(self.view, init, ParenContext::VariableInit, false);
                         // The `=`→value head, resolved exactly as the statement-level
                         // declarator resolves it ([`Printer::value_head_frozen_span`]): an
                         // own-line directive in the gap freezes the whole value. Handed to
@@ -2312,11 +2343,14 @@ impl<'a> Printer<'a> {
                 // source). A header DECLARATOR answers the same shell inside the construct
                 // ([`Printer::build_for_init_value_doc`]), as does a sequence clause's last
                 // operand; the bare clause and the update clause want that routing too.
-                self.with_expr_stmt_paren_target(self.for_init_head_target(expr), || {
-                    self.build_for_expr_clause(expr, |e| {
-                        self.wrap_for_init_in(e, self.build_expression_doc(e))
-                    })
-                })
+                self.with_expr_stmt_paren_target(
+                    self.for_init_head_target(self.view.slot(expr)),
+                    || {
+                        self.build_for_expr_clause(self.view.slot(expr), |e| {
+                            self.wrap_for_init_in(e, self.build_expression_doc(e))
+                        })
+                    },
+                )
             }
         };
         self.in_for_init.set(saved_in_for_init);
@@ -2349,7 +2383,7 @@ impl<'a> Printer<'a> {
         // for-in/of. Unlike `(async)`, the paren can belong to a node *inside* the clause
         // (`for ((let).a of x)`), so it is handed to that node rather than wrapped here.
         let let_target = match left {
-            ast::ForInOfLeft::Pattern(expr) => self.for_in_of_let_head_target(expr),
+            ast::ForInOfLeft::Pattern(expr) => self.for_in_of_let_head_target(self.view.slot(expr)),
             ast::ForInOfLeft::VariableDeclaration(_) => None,
         };
         if let Some(open) = spans.open_paren
@@ -2391,15 +2425,16 @@ impl<'a> Printer<'a> {
                 // The keyword→binding gap carries a comment (`for (const /* c */ x of y)`)
                 // that must not be dropped — see `build_for_decl_keyword_gap`. Covers
                 // `const`/`let`/`var`/`using`/`await using` uniformly.
-                let id_doc = self.build_expression_doc(declarator.id);
+                let id_doc = self.build_expression_doc(self.view.expr(declarator.id));
                 self.build_for_decl_keyword_gap(decl, declarator.span.start, id_doc)
             }
             // `for ((async) of x)` keeps parens around the bare `async` identifier
             // (the caller decides via `wrap_async_paren` — a non-await for-of, where
             // bare `for (async of x)` is a syntax error).
             ast::ForInOfLeft::Pattern(expr) => {
-                let doc = self
-                    .with_expr_stmt_paren_target(let_target, || self.build_expression_doc(expr));
+                let doc = self.with_expr_stmt_paren_target(let_target, || {
+                    self.build_expression_doc(self.view.slot(expr))
+                });
                 if wrap_async_paren { d.parens(doc) } else { doc }
             }
         }
@@ -2420,8 +2455,11 @@ impl<'a> Printer<'a> {
             && !is_await
             && matches!(
                 left,
-                ast::ForInOfLeft::Pattern(Expression { kind: ExpressionKind::Identifier(id), .. })
-                    if self.with_ident_name(id, |s| s == "async")
+                ast::ForInOfLeft::Pattern(pattern)
+                    if matches!(
+                        &self.view.slot(pattern).kind,
+                        ExpressionKind::Identifier(id) if self.with_ident_name(id, |s| s == "async")
+                    )
             )
     }
 
@@ -2429,7 +2467,7 @@ impl<'a> Printer<'a> {
     fn get_for_init_span_end(&self, init: &ast::ForInit<'_>) -> u32 {
         match init {
             ast::ForInit::VariableDeclaration(decl) => decl.span.end,
-            ast::ForInit::Expression(expr) => expr.span().end,
+            ast::ForInit::Expression(expr) => self.view.slot(expr).span().end,
         }
     }
 }

@@ -4,6 +4,7 @@
 // - Operator precedence and parenthesization
 // - Clarity-based parens (mixing logical operators, etc.)
 
+use crate::ast::ExprView;
 use crate::ast::{self, BinaryOperator, Expression, ExpressionKind};
 use crate::printer::comments::{
     AsiOperandShell, CommentSpacing, leading_decorated_class, left_spine_shell_is_comment_free,
@@ -209,11 +210,14 @@ pub(in crate::printer) enum SeqLayout {
 ///
 /// Both ends were re-derived at three sites apiece, in two parallel builders and their shared
 /// envelope. That is the shape such a pair drifts through, so the ends are named here once.
-pub(super) fn sequence_operand_run(seq: &ast::SequenceExpression<'_>) -> (u32, u32) {
-    let operands = &seq.expressions;
+pub(super) fn sequence_operand_run(
+    view: ExprView<'_>,
+    seq: &ast::SequenceExpression<'_>,
+) -> (u32, u32) {
+    let operands = view.list(seq.expressions);
     (
-        operands[0].span().start,
-        operands[operands.len() - 1].span().end,
+        view.expr(operands[0]).span().start,
+        view.expr(operands[operands.len() - 1]).span().end,
     )
 }
 
@@ -244,6 +248,7 @@ impl<'a> Printer<'a> {
         update: &ast::UpdateExpression<'_>,
         update_span: Span,
     ) -> DocId {
+        let argument = self.view.expr(update.argument);
         let d = self.d();
         let operator_doc = d.text(update.operator.as_str());
         let operator_len = update.operator.as_str().len() as u32;
@@ -266,7 +271,7 @@ impl<'a> Printer<'a> {
         } else {
             match self.build_asi_operand_shell_doc(
                 update_span.start,
-                update.argument,
+                argument,
                 update_span.end - operator_len,
                 ParenContext::UpdateArgument { postfix: true },
             ) {
@@ -280,7 +285,7 @@ impl<'a> Printer<'a> {
         // keeps its pair, and `postfix` decides the instantiation case alone (the ASI
         // shell above takes the ctx on its postfix-only branch).
         let argument_needs_parens = self.needs_parens(
-            update.argument,
+            argument,
             ParenContext::UpdateArgument {
                 postfix: !update.prefix,
             },
@@ -288,10 +293,10 @@ impl<'a> Printer<'a> {
         // A postfix operator follows its operand, pair or not
         // ([`Printer::with_tight_follower_operand`]).
         let inner_doc = if update.prefix {
-            self.build_expression_doc(update.argument)
+            self.build_expression_doc(argument)
         } else {
-            self.with_tight_follower_operand(update.argument.span(), || {
-                self.build_expression_doc(update.argument)
+            self.with_tight_follower_operand(argument.span(), || {
+                self.build_expression_doc(argument)
             })
         };
         // The stripped shell's glued block leads the operand inside whatever pair the
@@ -319,8 +324,7 @@ impl<'a> Printer<'a> {
             // operand up to `++/* c */ x` instead.
             let operator_end = update_span.start + operator_len;
             let mut parts: DocBuf = smallvec![operator_doc];
-            if let Some(comments) =
-                self.build_rhs_comments_opt(operator_end, update.argument.span().start)
+            if let Some(comments) = self.build_rhs_comments_opt(operator_end, argument.span().start)
             {
                 parts.push(comments);
             }
@@ -335,7 +339,7 @@ impl<'a> Printer<'a> {
             // inside the node and its own emitter covers it.
             parts.push(
                 self.build_paren_operand_comment_doc(
-                    update.argument.span().end,
+                    argument.span().end,
                     update_span.end,
                     inner_doc,
                     ")",
@@ -349,9 +353,7 @@ impl<'a> Printer<'a> {
             // rewrite the program. Only a single-line block reaches here (`x /* c */++`);
             // anything spanning lines took the shell.
             let operator_start = update_span.end - operator_len;
-            match self
-                .build_inline_comments_between_doc_opt(update.argument.span().end, operator_start)
-            {
+            match self.build_inline_comments_between_doc_opt(argument.span().end, operator_start) {
                 Some(comments) => d.concat(&[argument_doc, comments, operator_doc]),
                 None => d.concat(&[argument_doc, operator_doc]),
             }
@@ -367,8 +369,13 @@ impl<'a> Printer<'a> {
     /// it (`!((/* d */⏎ a.b) + 1).c` prints `!(/* d */ (a.b + 1).c)`).
     pub(in crate::printer) fn build_unary_doc(&self, unary: &ast::UnaryExpression<'_>) -> DocId {
         let operator_end = unary.span.start + unary.operator.as_str().len() as u32;
-        let argument_start = unary.argument.span().start;
-        let claim = self.left_spine_run_claim(unary.span, operator_end, unary.argument, || true);
+        let argument_start = self.view.expr(unary.argument).span().start;
+        let claim = self.left_spine_run_claim(
+            unary.span,
+            operator_end,
+            self.view.expr(unary.argument),
+            || true,
+        );
         let gap_end = claim.map_or(argument_start, |claim| claim.region.end.max(argument_start));
         self.with_left_spine_claim(claim, || self.build_unary_doc_gap(unary, gap_end))
     }
@@ -376,6 +383,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_unary_doc`] under its claim, the operator→operand gap ending at
     /// `argument_start`.
     fn build_unary_doc_gap(&self, unary: &ast::UnaryExpression<'_>, argument_start: u32) -> DocId {
+        let argument = self.view.expr(unary.argument);
         let d = self.d();
 
         // Check for comments between operator and argument.
@@ -383,11 +391,11 @@ impl<'a> Printer<'a> {
         // the comment ends up in the gap between operator and argument span.
         // Re-add parens to preserve the comment: `!(/** @type {T} */ expr.prop)`
         let operator_end = unary.span.start + unary.operator.as_str().len() as u32;
-        let argument_end = unary.argument.span().end;
+        let argument_end = argument.span().end;
         // Unary argument — an `ancestorNameMap` value position. A BARE ternary operand
         // records nothing (prettier's `child === node` guard), which is why `!(c ? a : b)`
         // keeps the hanging form while `!((c ? a : b) as T)` expands.
-        self.mark_ternary_extra_indent(unary.argument);
+        self.mark_ternary_extra_indent(argument);
         // The shared leading-comment emitter, in its plain `Adjacent` mode — prettier's
         // `printLeadingComment` exactly. Its third separator is what makes the shell below
         // a width decision rather than a comment one: a single-line block glued to the
@@ -441,16 +449,16 @@ impl<'a> Printer<'a> {
         // Asked three times below (the exception here, the comment-holder inner wrap,
         // and the plain path), always with the same operand + context — compute once.
         let arg_needs_parens = self.needs_parens_at_operand_end(
-            unary.argument,
+            argument,
             ParenContext::UnaryArgument {
                 parent_op: unary.operator,
             },
         );
         let operand_encloses_owned_comment =
-            matches!(unary.argument.kind, ExpressionKind::SequenceExpression(_))
+            matches!(argument.kind, ExpressionKind::SequenceExpression(_))
                 || (arg_needs_parens
-                    && !self.is_dividend_tail(unary.argument)
-                    && !matches!(unary.argument.kind, ExpressionKind::BinaryExpression(_)));
+                    && !self.is_dividend_tail(argument)
+                    && !matches!(argument.kind, ExpressionKind::BinaryExpression(_)));
         // Anchored at `leading_run_start`, not `operator_end`: the glued `//` above already
         // left the run, and counting it here would make the name a lie (it is never owned —
         // `owned ⇒ is_block`). Inert for the wrap, which ORs the two, but this flag is the
@@ -468,7 +476,7 @@ impl<'a> Printer<'a> {
         let owned_leading_comment = leading_comments_opt.is_none()
             && !operand_encloses_owned_comment
             && (self.has_comments_on_page_between(leading_run_start, argument_start)
-                || self.owned_comment_leads_operand(unary.argument, argument_start));
+                || self.owned_comment_leads_operand(argument, argument_start));
         let has_leading_comments =
             paren_glued.is_some() || leading_comments_opt.is_some() || owned_leading_comment;
 
@@ -486,7 +494,7 @@ impl<'a> Printer<'a> {
         // Unlike `await` / `new` this gap needs no placement rule of its own: the shell's
         // leading run already gives an own-line comment its own line, which is where the
         // floor reads the directive, so the frozen and unfrozen layouts agree.
-        let frozen = self.value_head_frozen_span(operator_end, unary.argument.span());
+        let frozen = self.value_head_frozen_span(operator_end, argument.span());
         // A resolved freeze reaches the comment-holder arm and no other: the directive is a
         // LINE comment alone on its line, so it can neither be owned nor be claimed by the
         // glued split, and `leading_comments_opt` therefore holds it. Every other arm emits
@@ -516,14 +524,14 @@ impl<'a> Printer<'a> {
             // after that shell, claimed from the operand's own trailing emitters, which deferred
             // it behind the run. A FROZEN operand's slice prints its shells verbatim.
             let trailing_start = if has_trailing_comments && frozen.is_none() {
-                self.pair_trailing_gap_start(unary.argument)
+                self.pair_trailing_gap_start(argument)
             } else {
                 argument_end
             };
             let inner = self.with_claimed_right_spine_run(trailing_start, argument_end, || {
-                self.build_value_with_outermost_owned_comment(unary.argument, || match frozen {
-                    Some(frozen) => self.build_frozen_expression_doc(unary.argument, frozen),
-                    None => self.build_flat_chain_expression_doc(unary.argument),
+                self.build_value_with_outermost_owned_comment(argument, || match frozen {
+                    Some(frozen) => self.build_frozen_expression_doc(argument, frozen),
+                    None => self.build_flat_chain_expression_doc(argument),
                 })
             });
             // The outer comment-holder parens already group the operand, so the inner
@@ -533,8 +541,8 @@ impl<'a> Printer<'a> {
             // Nor does a dividend tail's pair nest inside it: that pair exists to put a `)`
             // between the body's `}` and the `/`, which the shell's own does.
             let needs_paren_wrap = arg_needs_parens
-                && !matches!(unary.argument.kind, ExpressionKind::BinaryExpression(_))
-                && !self.is_dividend_tail(unary.argument);
+                && !matches!(argument.kind, ExpressionKind::BinaryExpression(_))
+                && !self.is_dividend_tail(argument);
             let inner = if needs_paren_wrap {
                 d.parens(inner)
             } else {
@@ -612,13 +620,13 @@ impl<'a> Printer<'a> {
             } else {
                 d.group(shell)
             }
-        } else if arg_needs_parens || self.region_keeps_shell(unary.argument) {
+        } else if arg_needs_parens || self.region_keeps_shell(argument) {
             // The author's shell a comma-list region keeps takes the pair the position's own
             // answer would: a non-binary operand's ([`Printer::mark_region_source_pairs`]).
             // The comment-holder arm above needs no such test, its shell being the pair.
             //
             // Binary expressions need parens - grouping lets the parens expand when the arg is long
-            if let ExpressionKind::BinaryExpression(binary) = &unary.argument.kind {
+            if let ExpressionKind::BinaryExpression(binary) = &argument.kind {
                 // Wrap any binaryish arg (logical or not) in a single paren group.
                 // Matches Prettier's `parent.type === "UnaryExpression"` path
                 // (`printBinaryishExpression`, `print/binaryish.js`): `group([indent([softline, ...parts]), softline])`,
@@ -628,14 +636,11 @@ impl<'a> Printer<'a> {
                 // get a sub-group (can stay flat at inner indent when paren group
                 // breaks), 3+ chained operands break together with the paren group.
                 self.build_expanding_parens_doc(
-                    self.build_binary_chain_doc_ungrouped(binary, unary.argument.span),
+                    self.build_binary_chain_doc_ungrouped(binary, argument.span),
                 )
             } else {
                 // Non-binary that needs parens (e.g., ternary or assignment in unary/assertion)
-                self.build_operand_pair_doc(
-                    unary.argument,
-                    self.build_expression_doc(unary.argument),
-                )
+                self.build_operand_pair_doc(argument, self.build_expression_doc(argument))
             }
         } else {
             // No binary reaches here: `needs_parens_unary_arg_common` matches every
@@ -644,11 +649,11 @@ impl<'a> Printer<'a> {
             // A bare operand ends where the unary does, so a follower of the unary's is the
             // operand's too ([`Printer::with_tight_follower_operand`]).
             if self.is_tight_follower_operand(unary.span) {
-                self.with_tight_follower_operand(unary.argument.span(), || {
-                    self.build_expression_doc(unary.argument)
+                self.with_tight_follower_operand(argument.span(), || {
+                    self.build_expression_doc(argument)
                 })
             } else {
-                self.build_expression_doc(unary.argument)
+                self.build_expression_doc(argument)
             }
         };
 
@@ -866,6 +871,7 @@ impl<'a> Printer<'a> {
         span: Span,
         style: BinaryChainStyle,
     ) -> DocId {
+        let left = self.view.expr(binary.left);
         // A comment in a shell below a pair this chain's left spine prints leads the whole
         // chain: the claim hands it to `wrap_chain_with_paren_comments` here
         // (`Printer::left_spine_run_claim`).
@@ -873,13 +879,13 @@ impl<'a> Printer<'a> {
         // hoisted from below with no pair between (through a call, a member, a tag or a
         // binary of its own) must print outside this chain's group too, where its reparse,
         // which reads the run ahead of the whole chain, prints it.
-        let claim = self.left_spine_run_claim(span, span.start, binary.left, || {
+        let claim = self.left_spine_run_claim(span, span.start, left, || {
             self.needs_parens(
-                binary.left,
+                left,
                 ParenContext::BinaryLeft {
                     parent_op: binary.operator,
                 },
-            ) || self.left_spine_run_breaks_its_line(binary.left)
+            ) || self.left_spine_run_breaks_its_line(left)
         });
         self.with_left_spine_claim(claim, || {
             self.build_binary_chain_doc_claimed(binary, span, style)
@@ -906,13 +912,14 @@ impl<'a> Printer<'a> {
 
         if operands.len() <= 1 {
             // Single operand, shouldn't happen but handle gracefully
-            return self.build_expression_doc(binary.left);
+            return self.build_expression_doc(self.view.expr(binary.left));
         }
 
         // shouldInlineLogicalExpression: when the outermost logical has a non-empty
         // object/array on the right, keep operator and RHS on the same line.
         // Prettier ref: `printBinaryishExpressions` + `shouldInlineLogicalExpression` (`print/binaryish.js`)
-        let should_inline_last = super::assignment::should_inline_logical_expression(binary);
+        let should_inline_last =
+            super::assignment::should_inline_logical_expression(self.view, binary);
 
         // Resolve the assignment-value layout, the one style keyed on a *property of the
         // chain* rather than on the position alone. An inlining chain there is flat: the
@@ -963,7 +970,7 @@ impl<'a> Printer<'a> {
         {
             false
         } else {
-            Self::should_group_binary_continuation(binary)
+            Self::should_group_binary_continuation(self.view, binary)
         };
 
         // The continuation-indent styles separate the first operand from the rest; the
@@ -1063,19 +1070,20 @@ impl<'a> Printer<'a> {
     /// operand prettier would rebalance away is same-category by definition, and the
     /// rebalanced tree's LEFT is then same-category too — so both trees answer false.
     pub(in crate::printer) fn should_group_binary_continuation(
+        view: ExprView<'_>,
         binary: &ast::BinaryExpression<'_>,
     ) -> bool {
         let current_is_logical = binary.operator.is_logical();
 
         // Check if left operand is same AST type category
         let left_is_same_category = matches!(
-            &binary.left.kind,
+            &view.expr(binary.left).kind,
             ExpressionKind::BinaryExpression(inner) if inner.operator.is_logical() == current_is_logical
         );
 
         // Check if right operand is same AST type category
         let right_is_same_category = matches!(
-            &binary.right.kind,
+            &view.expr(binary.right).kind,
             ExpressionKind::BinaryExpression(inner) if inner.operator.is_logical() == current_is_logical
         );
 
@@ -1606,7 +1614,7 @@ impl<'a> Printer<'a> {
             spine.push(left_binary);
             node = left_binary;
         }
-        let left = node.left;
+        let left = self.view.expr(node.left);
         // The LEFTMOST operand — the first one the collector pushes — takes the erased-paren
         // freeze over the chain's leading region, which the chain itself emits
         // ([`Self::wrap_chain_with_paren_comments`]). A later operand's shell keeps the
@@ -1663,6 +1671,7 @@ impl<'a> Printer<'a> {
         chain_start: u32,
         ends_chain: bool,
     ) {
+        let right = self.view.expr(expr.right);
         // Add current operator
         operators.push(ChainOperator::of(expr));
 
@@ -1680,14 +1689,14 @@ impl<'a> Printer<'a> {
 
         // Right operand can't be flattened - add as-is
         operands.push(if ends_chain {
-            self.build_chain_end_operand(expr.right, expr.operator)
+            self.build_chain_end_operand(right, expr.operator)
         } else {
-            let gap = self.operand_operator_gap_start(expr.right);
+            let gap = self.operand_operator_gap_start(right);
             ChainOperand {
-                doc: self.with_claimed_right_spine_run(gap, expr.right.span().end, || {
-                    self.build_binary_operand_doc(expr.right, expr.operator, true)
+                doc: self.with_claimed_right_spine_run(gap, right.span().end, || {
+                    self.build_binary_operand_doc(right, expr.operator, true)
                 }),
-                span: Span::new(expr.right.span().start, gap),
+                span: Span::new(right.span().start, gap),
             }
         });
     }
@@ -1813,10 +1822,16 @@ impl<'a> Printer<'a> {
         &self,
         expr: &'e ast::BinaryExpression<'e>,
         ends_chain: bool,
-    ) -> Option<&'e ast::BinaryExpression<'e>> {
-        if let ExpressionKind::BinaryExpression(right_binary) = &expr.right.kind
+    ) -> Option<&'e ast::BinaryExpression<'e>>
+    where
+        'a: 'e,
+    {
+        if let ExpressionKind::BinaryExpression(right_binary) = &self.view.expr(expr.right).kind
             && expr.operator.rebalances_with(right_binary.operator)
-            && !(ends_chain && self.value_end_kept_pair(expr.right).is_some())
+            && !(ends_chain
+                && self
+                    .value_end_kept_pair(self.view.expr(expr.right))
+                    .is_some())
         {
             return Some(right_binary);
         }
@@ -1831,13 +1846,16 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn binary_printed_last_operand<'e>(
         &self,
         binary: &'e ast::BinaryExpression<'e>,
-    ) -> Result<&'e Expression<'e>, u32> {
+    ) -> Result<&'e Expression<'e>, u32>
+    where
+        'a: 'e,
+    {
         let mut node = binary;
         while let Some(right) = self.rebalanced_right(node, true) {
             node = right;
         }
-        match self.chain_end_operand_shape(node.right, node.operator) {
-            ChainEndShape::Bare => Ok(node.right),
+        match self.chain_end_operand_shape(self.view.expr(node.right), node.operator) {
+            ChainEndShape::Bare => Ok(self.view.expr(node.right)),
             ChainEndShape::Inline { close, .. } | ChainEndShape::Opened { close, .. } => Err(close),
         }
     }
@@ -1903,8 +1921,11 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn flattenable_left<'e>(
         &self,
         expr: &'e ast::BinaryExpression<'e>,
-    ) -> Option<&'e ast::BinaryExpression<'e>> {
-        flattened_left_operand(expr.operator, expr.left, |left, ctx| {
+    ) -> Option<&'e ast::BinaryExpression<'e>>
+    where
+        'a: 'e,
+    {
+        flattened_left_operand(expr.operator, self.view.expr(expr.left), |left, ctx| {
             self.needs_parens(left, ctx)
         })
     }
@@ -1929,7 +1950,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn mark_dividend_tail(&self, expr: &ast::BinaryExpression<'_>) {
         if expr.operator == BinaryOperator::Slash {
-            self.mark_tail_of_dividend(expr.left);
+            self.mark_tail_of_dividend(self.view.expr(expr.left));
         }
     }
 
@@ -1958,20 +1979,21 @@ impl<'a> Printer<'a> {
                     return;
                 }
                 ExpressionKind::UnaryExpression(unary) => (
-                    unary.argument,
+                    self.view.expr(unary.argument),
                     ParenContext::UnaryArgument {
                         parent_op: unary.operator,
                     },
                 ),
                 ExpressionKind::BinaryExpression(binary) => (
-                    binary.rebalanced_right(),
+                    binary.rebalanced_right(self.view),
                     ParenContext::BinaryRight {
                         parent_op: binary.operator,
                     },
                 ),
-                ExpressionKind::TSTypeAssertion(assertion) => {
-                    (assertion.expression, ParenContext::AngleBracketAssertion)
-                }
+                ExpressionKind::TSTypeAssertion(assertion) => (
+                    self.view.expr(assertion.expression),
+                    ParenContext::AngleBracketAssertion,
+                ),
                 _ => return,
             };
         }
@@ -2159,7 +2181,7 @@ impl<'a> Printer<'a> {
     /// a region the chain doc emits, so an operand whose comment lands in a gap that layout
     /// has no emitter for falls through to the default path.
     fn build_chain_aware_operand_doc(&self, operand: &Expression<'_>) -> DocId {
-        if crate::printer::is_curried_arrow_chain(operand) {
+        if crate::printer::is_curried_arrow_chain(self.view, operand) {
             self.build_with_arrow_chain_context(
                 crate::printer::ArrowChainContext::CallArgOrBinaryish,
                 || self.build_expression_doc(operand),
@@ -2235,26 +2257,27 @@ impl<'a> Printer<'a> {
         await_expr: &ast::AwaitExpression<'_>,
         await_expr_span: Span,
     ) -> DocId {
+        let argument = self.view.expr(await_expr.argument);
         let d = self.d();
 
         // Preserve comments from stripped grouping parens: `await (/** @type {T} */ expr)`
         let keyword_end = await_expr_span.start + "await".len() as u32;
         // `await` argument — an `ancestorNameMap` value position.
-        self.mark_ternary_extra_indent(await_expr.argument);
-        let argument_start = await_expr.argument.span().start;
+        self.mark_ternary_extra_indent(argument);
+        let argument_start = argument.span().start;
         // The `await`→operand value head ([`Printer::value_head_frozen_span`]): an own-line
         // directive in the gap freezes the whole operand. Resolved ONCE, above the arms, so
         // every route to the operand's doc carries it — the grouping parens `await` needs are
         // the PRINTER's and stay outside the slice, exactly as at every other value head.
-        let frozen = self.value_head_frozen_span(keyword_end, await_expr.argument.span());
+        let frozen = self.value_head_frozen_span(keyword_end, argument.span());
         // The ordinary dispatch, so a binary operand takes the continuation-indent default
         // (`AwaitExpression` is in neither of prettier's exempt lists). The grouping parens
         // the operand needs are the PRINTER's and stay outside this doc. A FROZEN operand
         // emits the author's bytes, where no layout rule applies.
         let operand_doc = || {
             frozen.map_or_else(
-                || self.build_expression_doc(await_expr.argument),
-                |frozen| self.build_frozen_expression_doc(await_expr.argument, frozen),
+                || self.build_expression_doc(argument),
+                |frozen| self.build_frozen_expression_doc(argument, frozen),
             )
         };
 
@@ -2264,18 +2287,17 @@ impl<'a> Printer<'a> {
         // does a run the operand's doc would OPEN with on a line of its own, pair or no
         // pair: printed by the operand, it lands below `await` flush, where the reparse
         // reads it as the keyword gap's and hangs the operand (`await ((// c⏎(a) || d).e)`).
-        let claim =
-            self.left_spine_run_claim(await_expr_span, keyword_end, await_expr.argument, || {
-                self.needs_parens(await_expr.argument, ParenContext::AwaitArgument)
-                    || self.left_spine_shell_has_own_line_comment(await_expr.argument)
-            });
+        let claim = self.left_spine_run_claim(await_expr_span, keyword_end, argument, || {
+            self.needs_parens(argument, ParenContext::AwaitArgument)
+                || self.left_spine_shell_has_own_line_comment(argument)
+        });
         let gap_end = claim.map_or(argument_start, |claim| claim.region.end.max(argument_start));
         self.with_left_spine_claim(claim, || {
             // `await` binds tighter than a binary / ternary operand (`await x + y` is
             // `(await x) + y`), so those take the precedence pair; a trailing comment retains a
             // redundant one. Mirrors `build_spread_doc`.
             let argument_doc = self.build_keyword_operand_pair_doc(
-                await_expr.argument,
+                argument,
                 ParenContext::AwaitArgument,
                 await_expr_span.end,
                 frozen.is_some(),
@@ -2364,11 +2386,13 @@ impl<'a> Printer<'a> {
         yield_expr: &ast::YieldExpression<'_>,
         yield_expr_span: Span,
     ) -> Option<Span> {
-        let arg = yield_expr.argument.filter(|_| !yield_expr.delegate)?;
+        let arg = self
+            .view
+            .expr(yield_expr.argument.filter(|_| !yield_expr.delegate)?);
         if self.needs_parens(arg, ParenContext::YieldArgument) {
             return None;
         }
-        let class = leading_decorated_class(arg)?;
+        let class = leading_decorated_class(self.view, arg)?;
         if self.prev_significant_byte(class.span.start) != Some(b'(')
             || self.has_comments_on_page_between(arg.span().end, yield_expr_span.end)
         {
@@ -2404,7 +2428,7 @@ impl<'a> Printer<'a> {
         } else {
             "yield"
         };
-        let Some(arg) = yield_expr.argument else {
+        let Some(arg) = self.view.opt(yield_expr.argument) else {
             return d.text(keyword);
         };
 
@@ -2664,9 +2688,15 @@ impl<'a> Printer<'a> {
         i: usize,
     ) -> DocId {
         let d = self.d();
-        let expr = &seq.expressions[i];
+        let expr = self.view.expr(self.view.list(seq.expressions)[i]);
         let frozen = if i > 0 {
-            self.gap_frozen_span(seq.expressions[i - 1].span().end, expr.span())
+            self.gap_frozen_span(
+                self.view
+                    .expr(self.view.list(seq.expressions)[i - 1])
+                    .span()
+                    .end,
+                expr.span(),
+            )
         } else {
             self.left_spine_operand_frozen_span(span.start, expr)
         };
@@ -2758,7 +2788,7 @@ impl<'a> Printer<'a> {
             return body;
         }
         let d = self.d();
-        let (run_start, run_end) = sequence_operand_run(seq);
+        let (run_start, run_end) = sequence_operand_run(self.view, seq);
         let mut parts = DocBuf::with_capacity(4);
         // Under its own left-spine claim the envelope floats the whole claimed region;
         // under an enclosing one it floats only what lies past that region, which the
@@ -2819,9 +2849,11 @@ impl<'a> Printer<'a> {
         // on that operand's left spine leads the whole sequence, floated out ahead of the
         // `(` with the edge (`Printer::left_spine_run_claim`). `Bare` prints no envelope:
         // the enclosing construct owns the edge.
-        let claim = match (parens, seq.expressions.first()) {
+        let claim = match (parens, self.view.list(seq.expressions).first()) {
             (SeqParens::Bare, _) | (_, None) => None,
-            (_, Some(first)) => self.left_spine_run_claim(seq_span, seq_span.start, first, || true),
+            (_, Some(first)) => {
+                self.left_spine_run_claim(seq_span, seq_span.start, self.view.expr(*first), || true)
+            }
         };
         self.with_left_spine_claim(claim, || {
             self.build_sequence_doc_claimed(seq, seq_span, trailing_end, parens, layout)
@@ -2837,7 +2869,9 @@ impl<'a> Printer<'a> {
         parens: SeqParens,
         layout: SeqLayout,
     ) -> DocId {
-        self.mark_relational_sibling_authored_pairs(seq.expressions.iter().copied().map(Some));
+        self.mark_relational_sibling_authored_pairs(
+            self.view.list(seq.expressions).iter().copied().map(Some),
+        );
         // Where this builder's comment scans open: the FIRST OPERAND, never `seq_span.start`.
         // The leading edge between the two — the grouping `(` the parser stripped from that
         // operand, and any comment inside it — is emitted by someone else in every mode:
@@ -2849,7 +2883,7 @@ impl<'a> Printer<'a> {
         // `(⏎// c⏎a), b;` floated the comment out and still broke the operands, which the
         // reparse — the comment now ahead of the statement — printed flat (F1);
         // `return (⏎// c⏎a), b` settles on `a, b` the same way.
-        let (interior_start, last_operand_end) = sequence_operand_run(seq);
+        let (interior_start, last_operand_end) = sequence_operand_run(self.view, seq);
         // A claimed left-spine region is the envelope's to float — or the enclosing
         // claimer's to print — so it no more breaks the operands than the edge does.
         let scan_start = match self.claimed_left_spine_run.get() {
@@ -2962,9 +2996,14 @@ impl<'a> Printer<'a> {
     ) -> u32 {
         let mut seq = seq;
         loop {
-            let [.., before, last] = seq.expressions else {
-                return seq.expressions.last().map_or(0, |e| e.span().end);
+            let [.., before, last] = self.view.list(seq.expressions) else {
+                return self
+                    .view
+                    .list(seq.expressions)
+                    .last()
+                    .map_or(0, |e| self.view.expr(*e).span().end);
             };
+            let (before, last) = (self.view.expr(*before), self.view.expr(*last));
             if self.member_gap_frozen(before.span().end, last.span().start) {
                 return last.span().end;
             }
@@ -3045,7 +3084,7 @@ impl<'a> Printer<'a> {
         if !self.is_tight_follower_operand(span) {
             return None;
         }
-        let (_, last_operand_end) = sequence_operand_run(seq);
+        let (_, last_operand_end) = sequence_operand_run(self.view, seq);
         // No enclosing claim reaches a marked sequence's region: the right-spine walks stop at
         // every follower, and the one pair that claims past its operand (the cast's) never
         // holds a sequence, whose own pair prints first; a unary it holds (`(-f<T>) as T`)
@@ -3144,7 +3183,8 @@ impl<'a> Printer<'a> {
         // run this closure never assembles.
         let body = self.build_doc_with_outermost_owned_comment_at(
             seq_span.start,
-            seq.expressions.first().copied(),
+            self.view
+                .opt(self.view.list(seq.expressions).first().copied()),
             || {
                 self.build_sequence_operand_run_doc(
                     seq,
@@ -3194,10 +3234,10 @@ impl<'a> Printer<'a> {
         // Where the first operand's docs end — the continuation indent starts here, never
         // at the run's own start (see `build_sequence_layout_doc`).
         let mut first_end = 0;
-        for (i, expr) in seq.expressions.iter().enumerate() {
+        for (i, expr) in self.view.list(seq.expressions).iter().enumerate() {
             let is_last = i + 1 == n;
-            let expr_start = expr.span().start;
-            let expr_end = expr.span().end;
+            let expr_start = self.view.expr(*expr).span().start;
+            let expr_end = self.view.expr(*expr).span().end;
 
             if i > 0 {
                 if i == 1 {
@@ -3212,7 +3252,11 @@ impl<'a> Printer<'a> {
                 // Redundant operand parens are stripped, so a comment the user wrote
                 // inside them (`(/* c */ b)`) is preserved inline before the operand.
                 if seq_has_comments {
-                    let prev_end = seq.expressions[i - 1].span().end;
+                    let prev_end = self
+                        .view
+                        .expr(self.view.list(seq.expressions)[i - 1])
+                        .span()
+                        .end;
                     if let Some(comma) = self.find_comma_after(prev_end) {
                         inner.push(self.build_comments_between(
                             comma + 1,
@@ -3363,7 +3407,8 @@ impl<'a> Printer<'a> {
         } else {
             self.build_doc_with_outermost_owned_comment_at(
                 span.start,
-                seq.expressions.first().copied(),
+                self.view
+                    .opt(self.view.list(seq.expressions).first().copied()),
                 || {
                     self.build_sequence_line_comment_run_doc(
                         seq,
@@ -3398,6 +3443,7 @@ impl<'a> Printer<'a> {
         layout: SeqLayout,
         run_end: u32,
     ) -> DocId {
+        let expressions = self.view.list(seq.expressions);
         let keep_trailing_inside = matches!(parens, SeqParens::KeepInside);
         let d = self.d();
         let n = seq.expressions.len();
@@ -3421,7 +3467,7 @@ impl<'a> Printer<'a> {
         // no read on, so the one answer costs a first-pass match on the bare spelling
         // (`conformance_prettier_ts.md` §TypeScript, Sequence trailing line-comment
         // convergence). The separators stay `line`s either way, so width still breaks the run.
-        let (run_start, _) = sequence_operand_run(seq);
+        let (run_start, _) = sequence_operand_run(self.view, seq);
         let trailing_run_only = keep_trailing_inside
             && !self.has_line_comments_between(run_start, run_end)
             && self.has_line_comments_between(run_end, trailing_end);
@@ -3436,10 +3482,10 @@ impl<'a> Printer<'a> {
             smallvec![d.break_parent()]
         };
         let mut first_end = 0;
-        for (i, expr) in seq.expressions.iter().enumerate() {
+        for (i, expr) in expressions.iter().enumerate() {
             let is_last = i + 1 == n;
-            let expr_start = expr.span().start;
-            let expr_end = expr.span().end;
+            let expr_start = self.view.expr(*expr).span().start;
+            let expr_end = self.view.expr(*expr).span().end;
             let mut od = DocBuf::new();
 
             // The previous comma gap, split at the one position both of its emitters read
@@ -3447,7 +3493,7 @@ impl<'a> Printer<'a> {
             // previous operand and was emitted there, and everything from the first
             // own-line comment on leads THIS operand.
             let prev_gap = (i > 0).then(|| {
-                let prev_end = seq.expressions[i - 1].span().end;
+                let prev_end = self.view.expr(expressions[i - 1]).span().end;
                 (
                     prev_end,
                     self.sequence_gap_trailing_end(prev_end, expr_start),
@@ -3467,7 +3513,7 @@ impl<'a> Printer<'a> {
             // so it renders after the comma at end-of-line. The rest of that gap leads
             // the next operand, which claims it from the same split position.
             if !is_last {
-                let next_start = seq.expressions[i + 1].span().start;
+                let next_start = self.view.expr(expressions[i + 1]).span().start;
                 let own_line_start = self.sequence_gap_trailing_end(expr_end, next_start);
                 for comment in self.comments_to_emit_between(expr_end, own_line_start) {
                     od.push(self.build_trailing_comment_doc(comment));
@@ -3522,7 +3568,7 @@ mod tests {
     use super::*;
 
     /// Run `should_group_binary_continuation` on a parsed binary expression.
-    fn group(src: &str) -> bool {
+    fn group(view: ExprView<'_>, src: &str) -> bool {
         let arena = bumpalo::Bump::new();
         let expr = crate::__private::parse_expression_with_comments(
             src,
@@ -3531,7 +3577,7 @@ mod tests {
             &arena,
             &mut ast::AstStores::new(),
             "end of input",
-            |_| Ok(()),
+            |_, _| Ok(()),
         )
         .expect("expression should parse")
         .0;
@@ -3539,19 +3585,21 @@ mod tests {
             Expression {
                 kind: ExpressionKind::BinaryExpression(b),
                 ..
-            } => Printer::should_group_binary_continuation(b),
+            } => Printer::should_group_binary_continuation(view, b),
             other => panic!("expected a binary expression, got: {other:?}"),
         }
     }
 
     #[test]
     fn should_group_binary_continuation_by_category() {
+        let stores = ast::AstStores::new();
+        let view = stores.view();
         // A logical operand under an arithmetic parent — categories differ, so the
         // continuation gets its own group.
-        assert!(group("(a && b) + c"));
-        assert!(group("(a && b) * c"));
+        assert!(group(view, "(a && b) + c"));
+        assert!(group(view, "(a && b) * c"));
         // Flattened same-category chains do NOT group (the left is the same category).
-        assert!(!group("a && b && c"));
-        assert!(!group("a * b * c"));
+        assert!(!group(view, "a && b && c"));
+        assert!(!group(view, "a * b * c"));
     }
 }

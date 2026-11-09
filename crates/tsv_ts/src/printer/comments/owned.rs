@@ -13,6 +13,7 @@
 // against — inert for an annotation the next token was carrying (`/* @__PURE__ */`).
 
 use super::paren::left_spine_has_no_shell;
+use crate::ast::ExprView;
 use crate::ast::{self, Expression, ExpressionKind};
 use crate::printer::Printer;
 use crate::printer::expressions::assignment::is_curried_arrow_chain_owning_break;
@@ -33,26 +34,29 @@ use tsv_lang::source_scan;
 /// recurses to the leaf and stops at IIFE callees/tags; this one takes a single step and
 /// asks only whether the child *starts where the parent does*. Merging them would be a
 /// behavior change, not a cleanup.
-fn left_spine_child<'x>(expr: &'x Expression<'x>) -> Option<&'x Expression<'x>> {
+fn left_spine_child<'x>(
+    view: ExprView<'x>,
+    expr: &'x Expression<'x>,
+) -> Option<&'x Expression<'x>> {
     Some(match &expr.kind {
-        ExpressionKind::MemberExpression(m) => m.object,
-        ExpressionKind::CallExpression(c) => c.callee,
-        ExpressionKind::BinaryExpression(b) => b.left,
-        ExpressionKind::ConditionalExpression(c) => c.test,
-        ExpressionKind::AssignmentExpression(a) => a.left,
+        ExpressionKind::MemberExpression(m) => view.expr(m.object),
+        ExpressionKind::CallExpression(c) => view.expr(c.callee),
+        ExpressionKind::BinaryExpression(b) => view.expr(b.left),
+        ExpressionKind::ConditionalExpression(c) => view.expr(c.test),
+        ExpressionKind::AssignmentExpression(a) => view.expr(a.left),
         // A destructuring default's binding (`[/* c */ a = 1]`). Its `left` starts where
         // the pattern does, so without this arm the seam claims the comment here AND again
         // when the left's own `build_expression_doc` runs — printing it TWICE. The object
         // pattern's twin never showed it: its property builder prints a shorthand key
         // directly instead of routing the `AssignmentPattern` through the seam.
-        ExpressionKind::AssignmentPattern(a) => a.left,
-        ExpressionKind::TaggedTemplateExpression(t) => t.tag,
-        ExpressionKind::SequenceExpression(s) => s.expressions.first()?,
-        ExpressionKind::TSNonNullExpression(n) => n.expression,
-        ExpressionKind::TSAsExpression(a) => a.expression,
-        ExpressionKind::TSSatisfiesExpression(s) => s.expression,
-        ExpressionKind::TSInstantiationExpression(i) => i.expression,
-        ExpressionKind::UpdateExpression(u) if !u.prefix => u.argument,
+        ExpressionKind::AssignmentPattern(a) => view.expr(a.left),
+        ExpressionKind::TaggedTemplateExpression(t) => view.expr(t.tag),
+        ExpressionKind::SequenceExpression(s) => view.expr(*view.list(s.expressions).first()?),
+        ExpressionKind::TSNonNullExpression(n) => view.expr(n.expression),
+        ExpressionKind::TSAsExpression(a) => view.expr(a.expression),
+        ExpressionKind::TSSatisfiesExpression(s) => view.expr(s.expression),
+        ExpressionKind::TSInstantiationExpression(i) => view.expr(i.expression),
+        ExpressionKind::UpdateExpression(u) if !u.prefix => view.expr(u.argument),
         _ => return None,
     })
 }
@@ -65,10 +69,13 @@ fn left_spine_child<'x>(expr: &'x Expression<'x>) -> Option<&'x Expression<'x>> 
 /// multi-line `@type` block hoisted in front of a `(` becomes a JSDoc cast. The value-gap
 /// hoist declines at the same pair ([`Printer::hoisted_owned_value_gap_run_opt`]), so the
 /// two readings of one seam agree.
-fn outermost_claim_child<'x>(value: &'x Expression<'x>) -> Option<&'x Expression<'x>> {
+fn outermost_claim_child<'x>(
+    view: ExprView<'x>,
+    value: &'x Expression<'x>,
+) -> Option<&'x Expression<'x>> {
     match &value.kind {
         ExpressionKind::SequenceExpression(_) => None,
-        _ => left_spine_child(value),
+        _ => left_spine_child(view, value),
     }
 }
 
@@ -94,6 +101,7 @@ fn outermost_claim_child<'x>(value: &'x Expression<'x>) -> Option<&'x Expression
 /// which carries the document-level short-circuit; this half exists only so that
 /// short-circuit has exactly one spelling.
 fn leading_comment_bound_pair_walk<'x>(
+    view: ExprView<'x>,
     expr: &'x Expression<'x>,
 ) -> Option<(&'x ast::CommentBoundPair<'x>, Span)> {
     let start = expr.span().start;
@@ -102,7 +110,7 @@ fn leading_comment_bound_pair_walk<'x>(
         if let ExpressionKind::CommentBoundPair(cast) = &node.kind {
             return Some((cast, node.span));
         }
-        let child = left_spine_child(node)?;
+        let child = left_spine_child(view, node)?;
         if child.span().start != start {
             return None;
         }
@@ -144,11 +152,14 @@ impl<'a> Printer<'a> {
     fn leading_comment_bound_pair<'x>(
         &self,
         value: &'x Expression<'x>,
-    ) -> Option<(&'x ast::CommentBoundPair<'x>, Span)> {
+    ) -> Option<(&'x ast::CommentBoundPair<'x>, Span)>
+    where
+        'a: 'x,
+    {
         if !self.has_owned_comments {
             return None;
         }
-        leading_comment_bound_pair_walk(value)
+        leading_comment_bound_pair_walk(self.view, value)
     }
 
     /// Whether `comment` is the comment of a JSDoc cast the parser BUILT on `value`'s left
@@ -169,10 +180,10 @@ impl<'a> Printer<'a> {
                 if pair.kind == ast::CommentBoundPairKind::Cast && pair.comment.span == comment {
                     return true;
                 }
-                node = pair.inner;
+                node = self.view.expr(pair.inner);
                 continue;
             }
-            match left_spine_child(node) {
+            match left_spine_child(self.view, node) {
                 Some(child) => node = child,
                 None => return false,
             }
@@ -444,7 +455,7 @@ impl<'a> Printer<'a> {
         // printed ahead of the value the bytes are the ones the claim printed.
         if !self.has_owned_comments
             || !(self.has_multiline_block_comments_on_page_between(gap_start, value.span().start)
-                || is_curried_arrow_chain_owning_break(value))
+                || is_curried_arrow_chain_owning_break(self.view, value))
         {
             return None;
         }
@@ -545,7 +556,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         self.build_doc_with_outermost_owned_comment_at(
             value.span().start,
-            outermost_claim_child(value),
+            outermost_claim_child(self.view, value),
             build_value,
         )
     }
@@ -630,7 +641,10 @@ impl<'a> Printer<'a> {
         &self,
         value: &Expression<'_>,
     ) -> bool {
-        self.outermost_owned_claim_applies(value.span().start, outermost_claim_child(value))
+        self.outermost_owned_claim_applies(
+            value.span().start,
+            outermost_claim_child(self.view, value),
+        )
     }
 
     /// The four gates of the outermost-owned claim, in one place so the claim forms above,
@@ -715,7 +729,7 @@ impl<'a> Printer<'a> {
         }
         // A node whose left-spine child starts here is not the innermost — that child is
         // (or something below it). Let the recursion reach it.
-        if left_spine_child(expr).is_some_and(|c| c.span().start == start) {
+        if left_spine_child(self.view, expr).is_some_and(|c| c.span().start == start) {
             return None;
         }
         // The enclosing-claim check is `prepend_owned_leading_comment_at`'s, so the

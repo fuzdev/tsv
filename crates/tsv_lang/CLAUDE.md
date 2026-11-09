@@ -133,6 +133,7 @@ let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
 let inputs = PrinterInputs {
 	source,
 	comments,
+	view: stores.view(),
 	line_table: line_breaks.table(),
 	has_owned_comments,
 	has_format_ignore,

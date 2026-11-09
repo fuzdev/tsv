@@ -2520,7 +2520,7 @@ impl<'a> Printer<'a> {
         let after_args = i
             .options
             .as_ref()
-            .map_or(i.argument.span.end, |o| o.span().end);
+            .map_or(i.argument.span.end, |o| self.view.expr(*o).span().end);
         let paren_close = self
             .find_char_outside_comments(after_args, i.span.end, b')')
             .unwrap_or(after_args);
@@ -2598,12 +2598,14 @@ impl<'a> Printer<'a> {
         // freezes the argument that follows it. The specifier itself needs no such route —
         // it is a string literal, which prints verbatim frozen or not.
         let options_arg = i.options.as_ref().map(|options| ImportOptionsArg {
-            doc: self.gap_frozen_span(arg_end, options.span()).map_or_else(
-                || self.build_expression_doc(options),
-                |frozen| self.build_frozen_arg_doc(options, frozen),
-            ),
-            start: options.span().start,
-            end: options.span().end,
+            doc: self
+                .gap_frozen_span(arg_end, self.view.expr(*options).span())
+                .map_or_else(
+                    || self.build_expression_doc(self.view.expr(*options)),
+                    |frozen| self.build_frozen_arg_doc(self.view.expr(*options), frozen),
+                ),
+            start: self.view.expr(*options).span().start,
+            end: self.view.expr(*options).span().end,
         });
 
         if let Some(doc) = build_import_args_comment_layout(

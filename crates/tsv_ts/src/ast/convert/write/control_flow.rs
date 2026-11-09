@@ -17,7 +17,7 @@ pub(super) fn write_if_statement(
 ) {
     node_header(w, "IfStatement", span, ctx);
     w.raw(",\"test\":");
-    write_expression(w, if_stmt.test, ctx);
+    write_expression(w, ctx.view.expr(if_stmt.test), ctx);
     w.raw(",\"consequent\":");
     write_statement(w, if_stmt.consequent, ctx);
     w.raw(",\"alternate\":");
@@ -40,16 +40,16 @@ pub(super) fn write_for_statement(
         Some(ast::ForInit::VariableDeclaration(decl)) => {
             write_variable_declaration(w, decl, ctx, false);
         }
-        Some(ast::ForInit::Expression(expr)) => write_expression(w, expr, ctx),
+        Some(ast::ForInit::Expression(expr)) => write_expression(w, ctx.view.slot(expr), ctx),
         None => w.null(),
     }
     w.raw(",\"test\":");
     write_or_null(w, for_stmt.test.as_ref(), |w, test| {
-        write_expression(w, test, ctx);
+        write_expression(w, ctx.view.expr(*test), ctx);
     });
     w.raw(",\"update\":");
     write_or_null(w, for_stmt.update.as_ref(), |w, update| {
-        write_expression(w, update, ctx);
+        write_expression(w, ctx.view.expr(*update), ctx);
     });
     w.raw(",\"body\":");
     write_statement(w, for_stmt.body, ctx);
@@ -62,7 +62,7 @@ fn write_for_in_of_left(w: &mut JsonWriter, left: &ast::ForInOfLeft<'_>, ctx: &C
         ast::ForInOfLeft::VariableDeclaration(decl) => {
             write_variable_declaration(w, decl, ctx, false);
         }
-        ast::ForInOfLeft::Pattern(expr) => write_expression(w, expr, ctx),
+        ast::ForInOfLeft::Pattern(expr) => write_expression(w, ctx.view.slot(expr), ctx),
     }
 }
 
@@ -77,7 +77,7 @@ pub(super) fn write_for_in_statement(
     w.raw(",\"left\":");
     write_for_in_of_left(w, for_in.left, ctx);
     w.raw(",\"right\":");
-    write_expression(w, for_in.right, ctx);
+    write_expression(w, ctx.view.expr(for_in.right), ctx);
     w.raw(",\"body\":");
     write_statement(w, for_in.body, ctx);
     close_node(w, "ForInStatement", span, ctx);
@@ -97,7 +97,7 @@ pub(super) fn write_for_of_statement(
     w.raw(",\"left\":");
     write_for_in_of_left(w, for_of.left, ctx);
     w.raw(",\"right\":");
-    write_expression(w, for_of.right, ctx);
+    write_expression(w, ctx.view.expr(for_of.right), ctx);
     w.raw(",\"body\":");
     write_statement(w, for_of.body, ctx);
     close_node(w, "ForOfStatement", span, ctx);
@@ -112,7 +112,7 @@ pub(super) fn write_while_statement(
 ) {
     node_header(w, "WhileStatement", span, ctx);
     w.raw(",\"test\":");
-    write_expression(w, while_stmt.test, ctx);
+    write_expression(w, ctx.view.expr(while_stmt.test), ctx);
     w.raw(",\"body\":");
     write_statement(w, while_stmt.body, ctx);
     close_node(w, "WhileStatement", span, ctx);
@@ -127,7 +127,7 @@ pub(super) fn write_with_statement(
 ) {
     node_header(w, "WithStatement", span, ctx);
     w.raw(",\"object\":");
-    write_expression(w, with_stmt.object, ctx);
+    write_expression(w, ctx.view.expr(with_stmt.object), ctx);
     w.raw(",\"body\":");
     write_statement(w, with_stmt.body, ctx);
     close_node(w, "WithStatement", span, ctx);
@@ -144,7 +144,7 @@ pub(super) fn write_do_while_statement(
     w.raw(",\"body\":");
     write_statement(w, do_while.body, ctx);
     w.raw(",\"test\":");
-    write_expression(w, do_while.test, ctx);
+    write_expression(w, ctx.view.expr(do_while.test), ctx);
     close_node(w, "DoWhileStatement", span, ctx);
 }
 
@@ -157,7 +157,7 @@ pub(super) fn write_switch_statement(
 ) {
     node_header(w, "SwitchStatement", span, ctx);
     w.raw(",\"discriminant\":");
-    write_expression(w, switch_stmt.discriminant, ctx);
+    write_expression(w, ctx.view.expr(switch_stmt.discriminant), ctx);
     w.raw(",\"cases\":");
     // acorn initializes `consequent` before parsing `test`, so it serializes first.
     write_array(w, switch_stmt.cases, |w, case| {
@@ -167,7 +167,9 @@ pub(super) fn write_switch_statement(
             write_statement(w, s, ctx);
         });
         w.raw(",\"test\":");
-        write_or_null(w, case.test.as_ref(), |w, t| write_expression(w, t, ctx));
+        write_or_null(w, case.test.as_ref(), |w, t| {
+            write_expression(w, ctx.view.expr(*t), ctx);
+        });
         close_node(w, "SwitchCase", case.span, ctx);
     });
     close_node(w, "SwitchStatement", span, ctx);
@@ -209,7 +211,7 @@ pub(super) fn write_throw_statement(
 ) {
     node_header(w, "ThrowStatement", span, ctx);
     w.raw(",\"argument\":");
-    write_expression(w, throw_stmt.argument, ctx);
+    write_expression(w, ctx.view.expr(throw_stmt.argument), ctx);
     close_node(w, "ThrowStatement", span, ctx);
 }
 

@@ -454,7 +454,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // ends before the decorator does; a pair around a callee alone (`@(a!)(…)`) holds
         // less than the printer's would
         // (a wire-only parse keeps that pair as a node, `parse_preserve_parens`)
-        if crate::printer::decorator_takes_pair(&expression)
+        if crate::printer::decorator_takes_pair(self.stores.view(), &expression)
             && expression.span().end as usize == end
             && !matches!(expression.kind, ExpressionKind::ParenthesizedExpression(_))
         {

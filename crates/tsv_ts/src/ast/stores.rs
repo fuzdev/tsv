@@ -107,8 +107,8 @@ impl fmt::Debug for AstStores<'_> {
 
 /// A parsed program and the stores its handles index.
 ///
-/// Derefs to the [`Program`], so a tree-reading call takes `&parsed` as it takes
-/// `&program`.
+/// Derefs to the [`Program`] for the tree's own fields. A reading entry point takes `&parsed`,
+/// which is also where it gets the view the tree's edges resolve through.
 #[derive(Debug)]
 pub struct Parsed<'arena> {
     /// The tree.

@@ -90,7 +90,8 @@ mod tests {
         let arena = bumpalo::Bump::new();
         let root = crate::__private::parse(src, &arena).expect("template should parse");
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
-        let printer = Printer::new(&doc_arena, src, &[]);
+        let stores = tsv_ts::ast::AstStores::new();
+        let printer = Printer::new(&doc_arena, src, &[], stores.view());
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),
@@ -115,7 +116,8 @@ mod tests {
         let arena = bumpalo::Bump::new();
         let root = crate::__private::parse(src, &arena).expect("template should parse");
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
-        let printer = Printer::new(&doc_arena, src, &[]);
+        let stores = tsv_ts::ast::AstStores::new();
+        let printer = Printer::new(&doc_arena, src, &[], stores.view());
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),
@@ -135,7 +137,8 @@ mod tests {
         let arena = bumpalo::Bump::new();
         let root = crate::__private::parse(src, &arena).expect("template should parse");
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
-        let printer = Printer::new(&doc_arena, src, &[]);
+        let stores = tsv_ts::ast::AstStores::new();
+        let printer = Printer::new(&doc_arena, src, &[], stores.view());
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),
