@@ -356,8 +356,8 @@ tsv/
 │   ├── tsv_ts/        # TypeScript parser/formatter (standalone)
 │   ├── tsv_css/       # CSS parser/formatter (standalone)
 │   ├── tsv_svelte/    # Svelte parser/formatter (uses tsv_ts + tsv_css)
-│   ├── tsv_svelte_compile/ # experimental Svelte→JS compiler + JS canonicalizer (may never ship; not in any shipped artifact)
-│   ├── tsv_check/     # experimental TypeScript binder/checker (may never ship; not in any shipped artifact)
+│   ├── tsv_svelte_compile/ # experimental Svelte→JS compiler + JS canonicalizer (may never ship; currently outside the workspace build)
+│   ├── tsv_check/     # experimental TypeScript binder/checker (may never ship; currently outside the workspace build)
 │   ├── tsv_cli/       # unified CLI (binary: `tsv`)
 │   ├── tsv_debug/     # dev utilities (binary: `tsv_debug`, uses Deno)
 │   ├── tsv_ffi/       # C FFI bindings

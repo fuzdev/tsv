@@ -375,6 +375,8 @@ if (corpora_head === null) {
 
 section('Optional — experimental typechecker oracle (on-demand tsc_conformance only)');
 
+info('tsv_check is outside the workspace build — the conformance:tsc-* tasks do not run');
+
 if (exists('../typescript-go/testdata/baselines/reference/submodule')) {
 	ok('../typescript-go checkout (tsgo baselines present)');
 } else if (exists('../typescript-go')) {
