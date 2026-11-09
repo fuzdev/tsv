@@ -60,7 +60,7 @@ pub(super) struct ChainOperator {
 }
 
 impl ChainOperator {
-    pub(super) fn of(expr: &ast::BinaryExpression<'_>) -> Self {
+    pub(super) fn of(expr: &ast::BinaryExpression) -> Self {
         Self {
             op: expr.operator,
             leads_line: expr.may_close_type_arguments,
@@ -212,7 +212,7 @@ pub(in crate::printer) enum SeqLayout {
 /// envelope. That is the shape such a pair drifts through, so the ends are named here once.
 pub(super) fn sequence_operand_run(
     view: ExprView<'_>,
-    seq: &ast::SequenceExpression<'_>,
+    seq: &ast::SequenceExpression,
 ) -> (u32, u32) {
     let operands = view.list(seq.expressions);
     (
@@ -245,7 +245,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an update expression
     pub(in crate::printer) fn build_update_doc(
         &self,
-        update: &ast::UpdateExpression<'_>,
+        update: &ast::UpdateExpression,
         update_span: Span,
     ) -> DocId {
         let argument = self.view.expr(update.argument);
@@ -367,7 +367,7 @@ impl<'a> Printer<'a> {
     /// operator→operand gap, which runs to the region's end — inside the comment-holder
     /// pair the comment earns, ahead of the operand's own pairs, where the reparse reads
     /// it (`!((/* d */⏎ a.b) + 1).c` prints `!(/* d */ (a.b + 1).c)`).
-    pub(in crate::printer) fn build_unary_doc(&self, unary: &ast::UnaryExpression<'_>) -> DocId {
+    pub(in crate::printer) fn build_unary_doc(&self, unary: &ast::UnaryExpression) -> DocId {
         let operator_end = unary.span.start + unary.operator.as_str().len() as u32;
         let argument_start = self.view.expr(unary.argument).span().start;
         let claim = self.left_spine_run_claim(
@@ -382,7 +382,7 @@ impl<'a> Printer<'a> {
 
     /// [`Self::build_unary_doc`] under its claim, the operator→operand gap ending at
     /// `argument_start`.
-    fn build_unary_doc_gap(&self, unary: &ast::UnaryExpression<'_>, argument_start: u32) -> DocId {
+    fn build_unary_doc_gap(&self, unary: &ast::UnaryExpression, argument_start: u32) -> DocId {
         let argument = self.view.expr(unary.argument);
         let d = self.d();
 
@@ -754,7 +754,7 @@ impl<'a> Printer<'a> {
     /// - Block comments are printed inline
     pub(in crate::printer) fn build_binary_chain_doc(
         &self,
-        binary: &ast::BinaryExpression<'_>,
+        binary: &ast::BinaryExpression,
         span: Span,
     ) -> DocId {
         // Read the marks BEFORE any operand is built: an operand's own marking positions
@@ -802,7 +802,7 @@ impl<'a> Printer<'a> {
     /// take the ungrouped twins below.)
     pub(in crate::printer) fn build_binary_chain_doc_flat(
         &self,
-        binary: &ast::BinaryExpression<'_>,
+        binary: &ast::BinaryExpression,
         span: Span,
     ) -> DocId {
         self.build_binary_chain_doc_core(binary, span, BinaryChainStyle::Flat)
@@ -816,7 +816,7 @@ impl<'a> Printer<'a> {
     /// is computed normally — 2-operand chains get a sub-group.
     pub(in crate::printer) fn build_binary_chain_doc_ungrouped(
         &self,
-        binary: &ast::BinaryExpression<'_>,
+        binary: &ast::BinaryExpression,
         span: Span,
     ) -> DocId {
         self.build_binary_chain_doc_core(binary, span, BinaryChainStyle::Ungrouped)
@@ -829,7 +829,7 @@ impl<'a> Printer<'a> {
     /// Matches Prettier's `isInsideParenthesis` behavior (`printBinaryishExpressions`, `print/binaryish.js`).
     pub(in crate::printer) fn build_binary_chain_doc_ungrouped_condition(
         &self,
-        binary: &ast::BinaryExpression<'_>,
+        binary: &ast::BinaryExpression,
         span: Span,
     ) -> DocId {
         self.build_binary_chain_doc_core(binary, span, BinaryChainStyle::UngroupedCondition)
@@ -853,7 +853,7 @@ impl<'a> Printer<'a> {
     /// inside the chain's stripped-shell run.
     pub(in crate::printer) fn build_binary_chain_doc_with_continuation_indent(
         &self,
-        binary: &ast::BinaryExpression<'_>,
+        binary: &ast::BinaryExpression,
         span: Span,
     ) -> DocId {
         self.build_binary_chain_doc_core(binary, span, BinaryChainStyle::ContinuationIndent)
@@ -867,7 +867,7 @@ impl<'a> Printer<'a> {
     /// `build_binary_chain_continuation_indent{,_parts}`.
     fn build_binary_chain_doc_core(
         &self,
-        binary: &ast::BinaryExpression<'_>,
+        binary: &ast::BinaryExpression,
         span: Span,
         style: BinaryChainStyle,
     ) -> DocId {
@@ -895,7 +895,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_binary_chain_doc_core`] under its left-spine claim.
     fn build_binary_chain_doc_claimed(
         &self,
-        binary: &ast::BinaryExpression<'_>,
+        binary: &ast::BinaryExpression,
         span: Span,
         style: BinaryChainStyle,
     ) -> DocId {
@@ -1071,7 +1071,7 @@ impl<'a> Printer<'a> {
     /// rebalanced tree's LEFT is then same-category too — so both trees answer false.
     pub(in crate::printer) fn should_group_binary_continuation(
         view: ExprView<'_>,
-        binary: &ast::BinaryExpression<'_>,
+        binary: &ast::BinaryExpression,
     ) -> bool {
         let current_is_logical = binary.operator.is_logical();
 
@@ -1586,7 +1586,7 @@ impl<'a> Printer<'a> {
     /// chain can end ([`Self::build_chain_end_operand`]).
     fn collect_binary_chain_with_spans(
         &self,
-        expr: &ast::BinaryExpression<'_>,
+        expr: &ast::BinaryExpression,
         operands: &mut OperandBuf,
         operators: &mut OperatorBuf,
         chain_start: u32,
@@ -1597,7 +1597,7 @@ impl<'a> Printer<'a> {
         // operator: each binary's own marks in spine order, outermost first, then the
         // leftmost operand, then each binary's operator and right side, innermost first —
         // the order a recursion down the left visits them in.
-        let mut spine: SmallVec<[&ast::BinaryExpression<'_>; 8]> = smallvec![expr];
+        let mut spine: SmallVec<[&ast::BinaryExpression; 8]> = smallvec![expr];
         let mut node = expr;
         // Whether a link above has walked the chain's region, which covers every link
         // below it ([`Self::mark_relational_chain_region`]).
@@ -1665,7 +1665,7 @@ impl<'a> Printer<'a> {
     /// rebalances it. `ends_chain` as there.
     fn collect_binary_chain_link(
         &self,
-        expr: &ast::BinaryExpression<'_>,
+        expr: &ast::BinaryExpression,
         operands: &mut OperandBuf,
         operators: &mut OperatorBuf,
         chain_start: u32,
@@ -1820,9 +1820,9 @@ impl<'a> Printer<'a> {
     /// chain's last operand and its pair is kept for the value's end.
     fn rebalanced_right<'e>(
         &self,
-        expr: &'e ast::BinaryExpression<'e>,
+        expr: &'e ast::BinaryExpression,
         ends_chain: bool,
-    ) -> Option<&'e ast::BinaryExpression<'e>>
+    ) -> Option<&'e ast::BinaryExpression>
     where
         'a: 'e,
     {
@@ -1845,7 +1845,7 @@ impl<'a> Printer<'a> {
     /// `Err(close)` when a kept pair prints them, ending at its `)`.
     pub(in crate::printer) fn binary_printed_last_operand<'e>(
         &self,
-        binary: &'e ast::BinaryExpression<'e>,
+        binary: &'e ast::BinaryExpression,
     ) -> Result<&'e Expression<'e>, u32>
     where
         'a: 'e,
@@ -1920,8 +1920,8 @@ impl<'a> Printer<'a> {
     /// parser's depth limit prices the walk with.
     pub(in crate::printer) fn flattenable_left<'e>(
         &self,
-        expr: &'e ast::BinaryExpression<'e>,
-    ) -> Option<&'e ast::BinaryExpression<'e>>
+        expr: &'e ast::BinaryExpression,
+    ) -> Option<&'e ast::BinaryExpression>
     where
         'a: 'e,
     {
@@ -1948,7 +1948,7 @@ impl<'a> Printer<'a> {
     /// Called by both chain collectors on every binary they visit, ahead of any operand's
     /// build — a flattened chain's inner division is visited, never built as a node.
     #[inline]
-    pub(in crate::printer) fn mark_dividend_tail(&self, expr: &ast::BinaryExpression<'_>) {
+    pub(in crate::printer) fn mark_dividend_tail(&self, expr: &ast::BinaryExpression) {
         if expr.operator == BinaryOperator::Slash {
             self.mark_tail_of_dividend(self.view.expr(expr.left));
         }
@@ -2254,7 +2254,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an await expression
     pub(in crate::printer) fn build_await_doc(
         &self,
-        await_expr: &ast::AwaitExpression<'_>,
+        await_expr: &ast::AwaitExpression,
         await_expr_span: Span,
     ) -> DocId {
         let argument = self.view.expr(await_expr.argument);
@@ -2333,7 +2333,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a yield expression
     pub(in crate::printer) fn build_yield_doc(
         &self,
-        yield_expr: &ast::YieldExpression<'_>,
+        yield_expr: &ast::YieldExpression,
         yield_expr_span: Span,
     ) -> DocId {
         let Some(target) = self.yield_operand_class_pair_target(yield_expr, yield_expr_span) else {
@@ -2383,7 +2383,7 @@ impl<'a> Printer<'a> {
     // every one of those followers reads.
     fn yield_operand_class_pair_target(
         &self,
-        yield_expr: &ast::YieldExpression<'_>,
+        yield_expr: &ast::YieldExpression,
         yield_expr_span: Span,
     ) -> Option<Span> {
         let arg = self
@@ -2419,7 +2419,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_yield_doc`] once its leftmost-class target is set.
     fn build_yield_doc_inner(
         &self,
-        yield_expr: &ast::YieldExpression<'_>,
+        yield_expr: &ast::YieldExpression,
         yield_expr_span: Span,
     ) -> DocId {
         let d = self.d();
@@ -2602,7 +2602,7 @@ impl<'a> Printer<'a> {
     /// since tsv has no parent pointer to read it from.
     pub(in crate::printer) fn build_sequence_doc(
         &self,
-        seq: &ast::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression,
         span: Span,
         layout: SeqLayout,
     ) -> DocId {
@@ -2635,7 +2635,7 @@ impl<'a> Printer<'a> {
     /// pass either way, so counting it here costs the first pass its fixed point).
     pub(in crate::printer) fn build_sequence_doc_bare(
         &self,
-        seq: &ast::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression,
         span: Span,
         trailing_end: u32,
     ) -> DocId {
@@ -2655,7 +2655,7 @@ impl<'a> Printer<'a> {
     /// it falls *outside* `seq.span` (the grouping parens aren't part of the node).
     pub(in crate::printer) fn build_sequence_doc_value(
         &self,
-        seq: &ast::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression,
         span: Span,
         trailing_end: u32,
         layout: SeqLayout,
@@ -2683,7 +2683,7 @@ impl<'a> Printer<'a> {
     /// node span alone would drop them and change what the operand means.
     fn build_sequence_operand_doc(
         &self,
-        seq: &ast::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression,
         span: Span,
         i: usize,
     ) -> DocId {
@@ -2778,7 +2778,7 @@ impl<'a> Printer<'a> {
     /// holds that gap prints it.
     fn build_sequence_envelope_doc(
         &self,
-        seq: &ast::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression,
         span: Span,
         body: DocId,
         parens: SeqParens,
@@ -2839,7 +2839,7 @@ impl<'a> Printer<'a> {
 
     fn build_sequence_doc_inner(
         &self,
-        seq: &ast::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression,
         seq_span: Span,
         trailing_end: u32,
         parens: SeqParens,
@@ -2863,7 +2863,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_sequence_doc_inner`] under its left-spine claim.
     fn build_sequence_doc_claimed(
         &self,
-        seq: &ast::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression,
         seq_span: Span,
         trailing_end: u32,
         parens: SeqParens,
@@ -2990,10 +2990,7 @@ impl<'a> Printer<'a> {
     /// sequence's own end, with nothing but `)`s and trivia between. The walk stops at an
     /// operand a format-ignore directive in its comma gap freezes, whose slice prints its own
     /// shells ([`Printer::gap_frozen_span`], the predicate the operand's own build asks).
-    pub(in crate::printer) fn sequence_printed_end(
-        &self,
-        seq: &ast::SequenceExpression<'_>,
-    ) -> u32 {
+    pub(in crate::printer) fn sequence_printed_end(&self, seq: &ast::SequenceExpression) -> u32 {
         let mut seq = seq;
         loop {
             let [.., before, last] = self.view.list(seq.expressions) else {
@@ -3080,7 +3077,7 @@ impl<'a> Printer<'a> {
     // second pass reads the block in this region and adds the shell. Taking the nested
     // region here instead moves the cast and update spellings to two passes: their second
     // puts the block back inside the pair.
-    fn sequence_tight_run(&self, seq: &ast::SequenceExpression<'_>, span: Span) -> Option<Span> {
+    fn sequence_tight_run(&self, seq: &ast::SequenceExpression, span: Span) -> Option<Span> {
         if !self.is_tight_follower_operand(span) {
             return None;
         }
@@ -3158,7 +3155,7 @@ impl<'a> Printer<'a> {
     #[expect(clippy::too_many_arguments)] // the run's source bounds travel beside its span
     fn build_sequence_doc_block_path(
         &self,
-        seq: &ast::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression,
         seq_span: Span,
         interior_start: u32,
         last_operand_end: u32,
@@ -3210,7 +3207,7 @@ impl<'a> Printer<'a> {
     #[expect(clippy::too_many_arguments)] // the run's four source bounds travel beside its span
     fn build_sequence_operand_run_doc(
         &self,
-        seq: &ast::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression,
         span: Span,
         interior_start: u32,
         last_operand_end: u32,
@@ -3373,7 +3370,7 @@ impl<'a> Printer<'a> {
 
     fn build_sequence_doc_with_line_comments(
         &self,
-        seq: &ast::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression,
         span: Span,
         trailing_end: u32,
         parens: SeqParens,
@@ -3436,7 +3433,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::sequence_inside_run`]), from which the claimed shells print as the gap.
     fn build_sequence_line_comment_run_doc(
         &self,
-        seq: &ast::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression,
         span: Span,
         trailing_end: u32,
         parens: SeqParens,
@@ -3568,20 +3565,22 @@ mod tests {
     use super::*;
 
     /// Run `should_group_binary_continuation` on a parsed binary expression.
-    fn group(view: ExprView<'_>, src: &str) -> bool {
+    fn group(src: &str) -> bool {
         let arena = bumpalo::Bump::new();
-        let expr = crate::__private::parse_expression_with_comments(
+        let mut stores = ast::AstStores::new();
+        let id = crate::__private::parse_expression_with_comments(
             src,
             0,
             0,
             &arena,
-            &mut ast::AstStores::new(),
+            &mut stores,
             "end of input",
             |_, _| Ok(()),
         )
         .expect("expression should parse")
         .0;
-        match expr {
+        let view = stores.view();
+        match view.expr(id) {
             Expression {
                 kind: ExpressionKind::BinaryExpression(b),
                 ..
@@ -3592,14 +3591,12 @@ mod tests {
 
     #[test]
     fn should_group_binary_continuation_by_category() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
         // A logical operand under an arithmetic parent — categories differ, so the
         // continuation gets its own group.
-        assert!(group(view, "(a && b) + c"));
-        assert!(group(view, "(a && b) * c"));
+        assert!(group("(a && b) + c"));
+        assert!(group("(a && b) * c"));
         // Flattened same-category chains do NOT group (the left is the same category).
-        assert!(!group(view, "a && b && c"));
-        assert!(!group(view, "a * b * c"));
+        assert!(!group("a && b && c"));
+        assert!(!group("a * b * c"));
     }
 }

@@ -399,7 +399,7 @@ impl<'a> Printer<'a> {
     /// rather than being skipped. Rebuilding those gaps here instead would fork the
     /// leading-comment rule at yet another site — and skipping them drops every comment
     /// in its expression.
-    fn build_this_braced_doc(&self, tag: &ast::ExpressionTag<'_>) -> DocId {
+    fn build_this_braced_doc(&self, tag: &ast::ExpressionTag) -> DocId {
         let d = self.d();
         d.concat(&[d.text("this="), self.build_expression_tag_doc(tag)])
     }

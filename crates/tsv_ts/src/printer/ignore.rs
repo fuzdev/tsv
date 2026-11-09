@@ -1060,7 +1060,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn args_frozen_span(
         &self,
         container_start: u32,
-        args: &[ast::ExprEdge<'_>],
+        args: &[ast::ExprId],
         i: usize,
     ) -> Option<Span> {
         if !self.has_format_ignore {
@@ -1082,22 +1082,22 @@ impl<'a> Printer<'a> {
     /// element's end — or at `container_start` when every earlier slot is a hole. That
     /// anchor rule is why this is spelled here beside [`Self::list_item_frozen`], the
     /// other home of the gap-anchor convention, rather than at the element loops.
-    pub(in crate::printer) fn element_frozen_span<E: ast::ListElement>(
+    pub(in crate::printer) fn element_frozen_span(
         &self,
         container_start: u32,
-        elements: &[Option<E>],
+        elements: &[Option<ast::ExprId>],
         i: usize,
     ) -> Option<Span> {
         if !self.has_format_ignore {
             return None;
         }
-        let elem = elements[i].as_ref()?.element(self.view);
+        let elem = self.view.expr(elements[i]?);
         let prev_end = elements[..i]
             .iter()
             .rev()
             .flatten()
             .next()
-            .map_or(container_start, |e| e.element(self.view).span().end);
+            .map_or(container_start, |e| self.view.expr(*e).span().end);
         self.gap_frozen_span(prev_end, elem.span())
     }
 
@@ -1421,7 +1421,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_arg_item_doc(
         &self,
         container_start: u32,
-        args: &[ast::ExprEdge<'_>],
+        args: &[ast::ExprId],
         i: usize,
     ) -> DocId {
         if !self.has_format_ignore {

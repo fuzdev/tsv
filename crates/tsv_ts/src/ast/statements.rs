@@ -7,11 +7,11 @@
 use tsv_lang::Span;
 
 use super::{
-    ClassDeclaration, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration,
-    ExprEdge, ExprRun, ExprSlot, Expression, Identifier, ImportDeclaration, OptExprEdge,
-    TSDeclareFunction, TSEnumDeclaration, TSExportAssignment, TSImportEqualsDeclaration,
-    TSInterfaceDeclaration, TSModuleDeclaration, TSNamespaceExportDeclaration,
-    TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration,
+    ClassDeclaration, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration, Expr,
+    ExprId, Expression, Identifier, ImportDeclaration, Run, TSDeclareFunction, TSEnumDeclaration,
+    TSExportAssignment, TSImportEqualsDeclaration, TSInterfaceDeclaration, TSModuleDeclaration,
+    TSNamespaceExportDeclaration, TSTypeAliasDeclaration, TSTypeAnnotation,
+    TSTypeParameterDeclaration,
 };
 
 /// Statement node: the span every variant shares, beside the variant itself.
@@ -29,7 +29,7 @@ pub struct Statement<'arena> {
 /// The variant half of a [`Statement`].
 #[derive(Debug, Clone)]
 pub enum StatementKind<'arena> {
-    ExpressionStatement(ExpressionStatement<'arena>),
+    ExpressionStatement(ExpressionStatement),
     VariableDeclaration(VariableDeclaration<'arena>),
     // Arena-boxed, unlike every inline variant here: these are the widest
     // declaration heads, and their width would otherwise be paid on every
@@ -63,14 +63,14 @@ pub enum StatementKind<'arena> {
     TSDeclareFunction(&'arena TSDeclareFunction<'arena>),
     TSEnumDeclaration(&'arena TSEnumDeclaration<'arena>),
     TSModuleDeclaration(&'arena TSModuleDeclaration<'arena>),
-    ReturnStatement(ReturnStatement<'arena>),
+    ReturnStatement(ReturnStatement),
     BlockStatement(BlockStatement<'arena>),
     FunctionDeclaration(&'arena FunctionDeclaration<'arena>),
     ClassDeclaration(&'arena ClassDeclaration<'arena>),
     ExportNamedDeclaration(&'arena ExportNamedDeclaration<'arena>),
     ExportDefaultDeclaration(&'arena ExportDefaultDeclaration<'arena>),
     ExportAllDeclaration(&'arena ExportAllDeclaration<'arena>),
-    TSExportAssignment(&'arena TSExportAssignment<'arena>),
+    TSExportAssignment(&'arena TSExportAssignment),
     TSNamespaceExportDeclaration(TSNamespaceExportDeclaration<'arena>),
     ImportDeclaration(&'arena ImportDeclaration<'arena>),
     TSImportEqualsDeclaration(&'arena TSImportEqualsDeclaration<'arena>),
@@ -84,7 +84,7 @@ pub enum StatementKind<'arena> {
     WithStatement(WithStatement<'arena>),
     SwitchStatement(SwitchStatement<'arena>),
     TryStatement(TryStatement<'arena>),
-    ThrowStatement(ThrowStatement<'arena>),
+    ThrowStatement(ThrowStatement),
     BreakStatement(BreakStatement<'arena>),
     ContinueStatement(ContinueStatement<'arena>),
     LabeledStatement(LabeledStatement<'arena>),
@@ -193,16 +193,14 @@ impl<'arena> Statement<'arena> {
 
 /// Expression statement: an expression used as a statement
 ///
-/// The expression is an arena reference, not an inline value, and this is where
-/// every `Expression`-holding statement head takes the same shape. The expression
-/// parser's recursion already returns an `&'arena Expression` — so
-/// an inline slot is a 72-byte copy OUT of that allocation, leaving the arena copy
-/// dead. Naming the slot by reference removes the copy and adds nothing; it is not
-/// the rare-variant boxing trade above, and needs no rarity argument
-/// (`parse_expression_ref`).
+/// The expression is an id, not an inline value, and this is where every
+/// `Expression`-holding statement head takes the same shape. The expression parser's
+/// recursion already returns the row it pushed, so an inline slot would be a copy OUT of
+/// that row, leaving the stored one dead. Naming the slot by id removes the copy and adds
+/// nothing; it is not the rare-variant boxing trade above, and needs no rarity argument.
 #[derive(Debug, Clone)]
-pub struct ExpressionStatement<'arena> {
-    pub expression: ExprEdge<'arena>,
+pub struct ExpressionStatement {
+    pub expression: ExprId,
     /// True when this is a directive prologue entry — an unparenthesized
     /// string-literal statement in the leading run of a `Program` or function
     /// body (e.g. `"use strict";`). Directives are printed verbatim from source
@@ -226,8 +224,8 @@ pub struct BlockStatement<'arena> {
 ///
 /// The argument is optional for void returns.
 #[derive(Debug, Clone)]
-pub struct ReturnStatement<'arena> {
-    pub argument: OptExprEdge<'arena>,
+pub struct ReturnStatement {
+    pub argument: Option<ExprId>,
 }
 
 //
@@ -237,14 +235,14 @@ pub struct ReturnStatement<'arena> {
 /// If statement: `if (test) consequent` or `if (test) consequent else alternate`
 #[derive(Debug, Clone)]
 pub struct IfStatement<'arena> {
-    pub test: ExprEdge<'arena>,
+    pub test: ExprId,
     pub consequent: &'arena Statement<'arena>,
     pub alternate: Option<&'arena Statement<'arena>>,
 }
 
 /// For statement: `for (init; test; update) body`
 ///
-/// The three head slots are arena references, not inline values. `Statement` is a
+/// The three head slots are ids, not inline values. `Statement` is a
 /// by-value enum stored inline in `&'arena [Statement]`, so every variant pays its
 /// widest sibling's size on **every** element of **every** statement slice and on
 /// every `?`-propagation copy out of the parser — while a pointer chase is paid only
@@ -258,46 +256,41 @@ pub struct ForStatement<'arena> {
     /// Initialization: variable declaration or expression (or None)
     pub init: Option<&'arena ForInit<'arena>>,
     /// Test condition (or None for infinite loop)
-    pub test: OptExprEdge<'arena>,
+    pub test: Option<ExprId>,
     /// Update expression (or None)
-    pub update: OptExprEdge<'arena>,
+    pub update: Option<ExprId>,
     pub body: &'arena Statement<'arena>,
 }
 
 /// For statement initialization - either a variable declaration or expression
 ///
-/// The `Expression` arm stays INLINE, unlike the `Expression`-holding statement heads
-/// above: a for-head's expression comes back from `parse_expression_no_in` (and, for a
-/// for-in/of LHS, through the cover-grammar refinement `refine_assignable`) as an owned
-/// value, not as the `&'arena Expression` the expression spine threads — so naming the
-/// slot by reference would ADD an allocation rather than remove a copy, which is the
-/// reverse of the trade `ExpressionStatement` takes. `ForInit` is itself reached only
-/// through `Option<&'arena ForInit>`, so its width sets nothing.
+/// `ForInit` is itself reached only through `Option<&'arena ForInit>`, so its width sets
+/// nothing.
 #[derive(Debug, Clone)]
 pub enum ForInit<'arena> {
     VariableDeclaration(VariableDeclaration<'arena>),
-    Expression(ExprSlot<'arena>),
+    Expression(ExprId),
 }
 
 /// For-in statement: `for (left in right) body`
 ///
-/// Head slots are arena references for the density reason on `ForStatement`.
+/// Head slots are ids for the density reason on `ForStatement`.
 #[derive(Debug, Clone)]
 pub struct ForInStatement<'arena> {
     /// Left side: variable declaration or expression pattern
     pub left: &'arena ForInOfLeft<'arena>,
-    pub right: ExprEdge<'arena>,
+    pub right: ExprId,
     pub body: &'arena Statement<'arena>,
 }
 
 /// For-of statement: `for (left of right) body`
 ///
-/// Head slots are arena references for the density reason on `ForStatement`.
+/// Head slots are ids for the density reason on `ForStatement`.
 #[derive(Debug, Clone)]
 pub struct ForOfStatement<'arena> {
     /// Left side: variable declaration or expression pattern
     pub left: &'arena ForInOfLeft<'arena>,
-    pub right: ExprEdge<'arena>,
+    pub right: ExprId,
     /// Whether this is `for await (... of ...)`
     pub r#await: bool,
     pub body: &'arena Statement<'arena>,
@@ -310,13 +303,13 @@ pub struct ForOfStatement<'arena> {
 #[derive(Debug, Clone)]
 pub enum ForInOfLeft<'arena> {
     VariableDeclaration(VariableDeclaration<'arena>),
-    Pattern(ExprSlot<'arena>),
+    Pattern(ExprId),
 }
 
 /// While statement: `while (test) body`
 #[derive(Debug, Clone)]
 pub struct WhileStatement<'arena> {
-    pub test: ExprEdge<'arena>,
+    pub test: ExprId,
     pub body: &'arena Statement<'arena>,
 }
 
@@ -324,20 +317,20 @@ pub struct WhileStatement<'arena> {
 #[derive(Debug, Clone)]
 pub struct DoWhileStatement<'arena> {
     pub body: &'arena Statement<'arena>,
-    pub test: ExprEdge<'arena>,
+    pub test: ExprId,
 }
 
 /// With statement: `with (object) body` — sloppy-mode Script code only.
 #[derive(Debug, Clone)]
 pub struct WithStatement<'arena> {
-    pub object: ExprEdge<'arena>,
+    pub object: ExprId,
     pub body: &'arena Statement<'arena>,
 }
 
 /// Switch statement: `switch (discriminant) { cases }`
 #[derive(Debug, Clone)]
 pub struct SwitchStatement<'arena> {
-    pub discriminant: ExprEdge<'arena>,
+    pub discriminant: ExprId,
     pub cases: &'arena [SwitchCase<'arena>],
 }
 
@@ -345,7 +338,7 @@ pub struct SwitchStatement<'arena> {
 #[derive(Debug, Clone)]
 pub struct SwitchCase<'arena> {
     /// Test expression, or None for `default:`
-    pub test: OptExprEdge<'arena>,
+    pub test: Option<ExprId>,
     pub consequent: &'arena [Statement<'arena>],
     pub span: Span,
 }
@@ -376,8 +369,8 @@ pub struct CatchClause<'arena> {
 
 /// Throw statement: `throw argument`
 #[derive(Debug, Clone)]
-pub struct ThrowStatement<'arena> {
-    pub argument: ExprEdge<'arena>,
+pub struct ThrowStatement {
+    pub argument: ExprId,
 }
 
 /// Break statement: `break` or `break label`
@@ -423,7 +416,7 @@ pub struct FunctionDeclaration<'arena> {
     /// Type parameters (TypeScript generics): `function fn<T>() {}`
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
-    pub params: ExprRun<'arena>,
+    pub params: Run<Expr>,
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
     pub return_type: Option<TSTypeAnnotation<'arena>>,
     /// Function body (block statement with statements)
@@ -483,7 +476,7 @@ impl VariableDeclarationKind {
 #[derive(Debug, Clone)]
 pub struct VariableDeclaration<'arena> {
     pub kind: VariableDeclarationKind,
-    pub declarations: &'arena [VariableDeclarator<'arena>],
+    pub declarations: &'arena [VariableDeclarator],
     /// Whether this is an ambient declaration (`declare const x: T;`)
     pub declare: bool,
     pub span: Span,
@@ -491,15 +484,14 @@ pub struct VariableDeclaration<'arena> {
 
 /// One declarator of a variable declaration: `x`, `x = init`, `{a, b} = init`.
 ///
-/// Both slots are `&'arena` references rather than inline `Expression`s, for the
-/// density reason on [`super::Property`] — 160 B → 32 on every element of every
-/// `declarations` slice, and no allocation added, because the parser's expression
-/// spine already hands back an arena reference.
+/// Both slots are ids rather than inline `Expression`s, for the density reason on
+/// [`super::Property`] — 160 B → 20 on every element of every `declarations` slice, and
+/// no row added, because the parser's expression spine already hands back the id.
 #[derive(Debug, Clone)]
-pub struct VariableDeclarator<'arena> {
+pub struct VariableDeclarator {
     /// The binding pattern (Identifier, ArrayPattern, or ObjectPattern)
-    pub id: ExprEdge<'arena>,
-    pub init: OptExprEdge<'arena>,
+    pub id: ExprId,
+    pub init: Option<ExprId>,
     /// Definite assignment assertion (`!` after identifier, e.g., `let x!: string;`)
     pub definite: bool,
     pub span: Span,

@@ -3,7 +3,7 @@
 use crate::ast::{
     Accessibility, BlockStatement, ClassBody, ClassDeclaration, ClassExpression, ClassMember,
     Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind, ExportNamedDeclaration,
-    Expression, ExpressionKind, FunctionExpression, Identifier, Literal, LiteralValue,
+    ExprId, Expression, ExpressionKind, FunctionExpression, Identifier, Literal, LiteralValue,
     MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Statement, StatementKind,
     StaticBlock, TSIndexSignature, TSInterfaceHeritage, TSTypeParameterDeclaration,
     TSTypeParameterInstantiation,
@@ -12,8 +12,7 @@ use crate::lexer::{KeywordKind, TokenKind};
 use crate::printer::ParenContext;
 use tsv_lang::{Error, Span};
 
-use super::super::Parser;
-use super::super::expression::alloc_expr;
+use super::super::{ExprRet, Parser};
 use super::ModuleItemContext;
 
 /// Whose `DecoratorList` is being parsed — the axis that decides whether the run
@@ -40,7 +39,7 @@ pub(in crate::parser) enum DecoratorListKind {
 #[expect(clippy::struct_excessive_bools)] // independent modifier flags, not a state machine
 struct ClassMemberHeader<'arena> {
     start: usize,
-    decorators: &'arena [Decorator<'arena>],
+    decorators: &'arena [Decorator],
     accessibility: Option<Accessibility>,
     is_static: bool,
     is_declare: bool,
@@ -52,7 +51,7 @@ struct ClassMemberHeader<'arena> {
     is_async: bool,
     accessor_kind: Option<MethodKind>,
     computed: bool,
-    key: Expression<'arena>,
+    key: ExprId,
     /// Whether the (plain identifier or string-literal) key spells `constructor`
     /// — the one bit `finish_method_member` derives from the member name to pick
     /// `MethodKind::Constructor`. Computed/private/numeric keys are never the
@@ -87,7 +86,7 @@ pub(in crate::parser) enum DecoratedClassExport {
 struct ClassHead<'arena> {
     id: Option<Identifier<'arena>>,
     type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
-    super_class: Option<&'arena Expression<'arena>>,
+    super_class: Option<ExprId>,
     super_type_parameters: Option<TSTypeParameterInstantiation<'arena>>,
     implements: &'arena [TSInterfaceHeritage<'arena>],
     body: ClassBody<'arena>,
@@ -239,7 +238,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn finish_decorated_class(
         &mut self,
         deco_start: usize,
-        decorators: crate::parser::BumpVec<'arena, Decorator<'arena>>,
+        decorators: crate::parser::BumpVec<'arena, Decorator>,
         export: DecoratedClassExport,
     ) -> Result<ClassDeclaration<'arena>, Error> {
         // `export default class {}` is the one name-optional decorated form.
@@ -337,9 +336,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (so the statement ends at the class) and the one position that admits `abstract`
     /// (`export default @dec abstract class {}`), reads the list itself and finishes it
     /// through [`Parser::finish_decorated_class_expression`].
-    pub(in crate::parser) fn parse_decorated_class_expression(
-        &mut self,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    pub(in crate::parser) fn parse_decorated_class_expression(&mut self) -> Result<ExprRet, Error> {
         let start = self.current_pos().0;
         // one wire level: the `ClassExpression` over its decorators, heritage and body
         self.nested(1, |p| {
@@ -366,9 +363,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn finish_decorated_class_expression(
         &mut self,
         start: usize,
-        decorators: crate::parser::BumpVec<'arena, Decorator<'arena>>,
+        decorators: crate::parser::BumpVec<'arena, Decorator>,
         r#abstract: bool,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    ) -> Result<ExprRet, Error> {
         if r#abstract {
             self.advance()?; // consume 'abstract'
         }
@@ -403,7 +400,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_decorators(
         &mut self,
         kind: DecoratorListKind,
-    ) -> Result<crate::parser::BumpVec<'arena, Decorator<'arena>>, Error> {
+    ) -> Result<crate::parser::BumpVec<'arena, Decorator>, Error> {
         match kind {
             DecoratorListKind::Class => self.with_strict_class_scope(Self::parse_decorator_run),
             DecoratorListKind::Parameter => self.parse_decorator_run(),
@@ -413,9 +410,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The run itself: `@dec` until the `@`s stop. Split out so
     /// [`parse_decorators`](Self::parse_decorators) can hand it to the strict-scope
     /// combinator or call it bare, one spelling either way.
-    fn parse_decorator_run(
-        &mut self,
-    ) -> Result<crate::parser::BumpVec<'arena, Decorator<'arena>>, Error> {
+    fn parse_decorator_run(&mut self) -> Result<crate::parser::BumpVec<'arena, Decorator>, Error> {
         let mut decorators = self.bvec();
 
         while *self.current_kind() == TokenKind::At {
@@ -427,7 +422,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a single decorator: `@expression`, where the expression follows the
     /// restricted ES decorators grammar — see `parse_decorator_expression`.
-    fn parse_decorator(&mut self) -> Result<Decorator<'arena>, Error> {
+    fn parse_decorator(&mut self) -> Result<Decorator, Error> {
         let start = self.current_pos().0;
 
         // Consume '@'
@@ -442,7 +437,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // one wire level: the `Decorator` over its expression (the depth limit's count) —
         // the holder's own level is its caller's (`Parser::parse_decorated_class_expression`,
         // a member's and a parameter's list position)
-        let expression = self.nested(1, Self::parse_decorator_expression)?;
+        let expression = self.nested(1, Self::parse_decorator_expression)?.id();
 
         // The decorator span covers a parenthesized expression's closing `)`
         // (`@(expr)`), which the paren-stripped expression span excludes
@@ -454,9 +449,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // ends before the decorator does; a pair around a callee alone (`@(a!)(…)`) holds
         // less than the printer's would
         // (a wire-only parse keeps that pair as a node, `parse_preserve_parens`)
-        if crate::printer::decorator_takes_pair(self.stores.view(), &expression)
-            && expression.span().end as usize == end
-            && !matches!(expression.kind, ExpressionKind::ParenthesizedExpression(_))
+        let view = self.stores.view();
+        let expression_node = view.expr(expression);
+        if crate::printer::decorator_takes_pair(view, expression_node)
+            && expression_node.span().end as usize == end
+            && !matches!(
+                expression_node.kind,
+                ExpressionKind::ParenthesizedExpression(_)
+            )
         {
             self.printer_pair()?;
         }
@@ -474,13 +474,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `(None, None)` when there is no `extends`.
     fn parse_optional_extends_clause(
         &mut self,
-    ) -> Result<
-        (
-            Option<&'arena Expression<'arena>>,
-            Option<TSTypeParameterInstantiation<'arena>>,
-        ),
-        Error,
-    > {
+    ) -> Result<(Option<ExprId>, Option<TSTypeParameterInstantiation<'arena>>), Error> {
         if !matches!(
             self.current_kind(),
             TokenKind::Keyword(KeywordKind::Extends)
@@ -492,11 +486,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // no level of its own: the superclass is a node of its own wherever it holds one
         // (`class extends class extends …` counts each class, `class extends f(…)` the
         // call's arguments), under a class whose level is counted already
-        let expr = self.parse_heritage_expression()?;
+        let expr = self.parse_heritage_expression()?.id();
         // the pair the printer adds around a bare heritage it parenthesizes for clarity
         // (`extends (new B())`), a level of the output's nesting
-        if expr.span().start as usize == heritage_start
-            && expr.span().end as usize == self.prev_token_end()
+        if self.expr(expr).span().start as usize == heritage_start
+            && self.expr(expr).span().end as usize == self.prev_token_end()
         {
             self.count_operand_pairs(Some((expr, ParenContext::SuperClass)), None)?;
         }
@@ -541,9 +535,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - The name is always optional
     /// - They appear in expression position
     /// - No `declare` field
-    pub(in crate::parser) fn parse_class_expression(
-        &mut self,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    pub(in crate::parser) fn parse_class_expression(&mut self) -> Result<ExprRet, Error> {
         let (start, _) = self.current_pos();
         // one wire level: the `ClassExpression` over its heritage and body — a declaration's
         // is its statement's
@@ -556,8 +548,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// The decorators are a parameter rather than a post-hoc patch so the node is
     /// built once, in place: a builder that hands a bare `Expression` back for its
-    /// caller to fix up makes that caller hold the 72 B value across the boxing
-    /// call — see `alloc_expr`.
+    /// caller to fix up makes that caller hold the 64 B value across the push.
     ///
     /// `None` and `Some(&[])` are **different wire shapes** — the field is omitted
     /// for the first and emitted as `[]` for the second (`write_decorators_field`) —
@@ -567,9 +558,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_class_expression_from(
         &mut self,
         start: usize,
-        decorators: Option<&'arena [Decorator<'arena>]>,
+        decorators: Option<&'arena [Decorator]>,
         r#abstract: bool,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    ) -> Result<ExprRet, Error> {
         // Consume 'class' keyword
         debug_assert!(matches!(
             self.current_kind(),
@@ -591,22 +582,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<ClassExpression<'_>>(1);
-        Ok(alloc_expr(
-            self.arena,
-            Expression {
-                span: Span::new(start as u32, end),
-                kind: ExpressionKind::ClassExpression(self.arena.alloc(ClassExpression {
-                    decorators,
-                    id,
-                    super_class,
-                    super_type_parameters,
-                    implements,
-                    body,
-                    r#abstract,
-                    type_parameters,
-                })),
-            },
-        ))
+        Ok(self.push_ret(Expression {
+            span: Span::new(start as u32, end),
+            kind: ExpressionKind::ClassExpression(self.arena.alloc(ClassExpression {
+                decorators,
+                id,
+                super_class,
+                super_type_parameters,
+                implements,
+                body,
+                r#abstract,
+                type_parameters,
+            })),
+        }))
     }
 
     /// Everything a class carries between its `class` keyword and its closing
@@ -1019,7 +1007,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Computed key: [expr] — never the constructor (`['constructor']` is a
                 // normal computed method, unlike the bare/string `constructor`).
                 self.advance()?;
-                (true, self.parse_computed_member_key()?, false)
+                (true, self.parse_computed_member_key()?.id(), false)
             } else if matches!(self.current_kind(), TokenKind::Hash) {
                 // Private identifier key: #name
                 let (private_id, private_span) = self.parse_private_identifier()?;
@@ -1035,10 +1023,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 (
                     false,
-                    Expression {
+                    self.push_expr(Expression {
                         span: private_span,
                         kind: ExpressionKind::PrivateIdentifier(private_id),
-                    },
+                    }),
                     false,
                 )
             } else if self.current_is_identifier_or_keyword() {
@@ -1049,9 +1037,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     .current_decoded()
                     .unwrap_or_else(|| self.current_property_name())
                     == "constructor";
+                let key = self.parse_identifier_name_node()?;
                 (
                     false,
-                    Expression::from_identifier(self.parse_identifier_name_node()?),
+                    self.push_expr(Expression::from_identifier(key)),
                     name_is_constructor,
                 )
             } else if matches!(self.current_kind(), TokenKind::String) {
@@ -1070,10 +1059,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let name_is_constructor = self.resolve_cooked(&cooked, span) == "constructor";
                 (
                     false,
-                    Expression::from_literal(Literal {
+                    self.push_expr(Expression::from_literal(Literal {
                         value: LiteralValue::String(cooked),
                         span,
-                    }),
+                    })),
                     name_is_constructor,
                 )
             } else if matches!(self.current_kind(), TokenKind::Number) {
@@ -1081,16 +1070,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // numeric decode (radix, separators, bigint)
                 let literal = self.parse_number_or_bigint_literal()?;
                 self.advance()?;
-                (false, Expression::from_literal(literal), false)
+                (
+                    false,
+                    self.push_expr(Expression::from_literal(literal)),
+                    false,
+                )
             } else {
                 return Err(self.error_expected("class member name"));
             };
-
-        // a non-computed key is built by value in its member and never placed in the arena
-        #[cfg(feature = "_internal_ast_census")]
-        if !computed {
-            tsv_lang::ast_census_probe::built_inline::<Expression<'arena>>(1);
-        }
 
         // Optional (`?`) / definite (`!`) marker, between the key and any type
         // parameters — methods read `?` as `optional`, properties keep the full modifier.
@@ -1253,9 +1240,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse parameter list and block body (like a function), in the method's
         // own `[Await]`/`[Yield]` context (async/generator method → `[+Await]`/`[+Yield]`).
-        let params = self
-            .with_fn_context(is_async, is_generator, Self::parse_parameter_list)?
-            .into_bump_slice();
+        let params = self.with_fn_context(is_async, is_generator, Self::parse_parameter_list)?;
 
         // A `get`/`set` accessor must obey the accessor arity grammar (getter: no
         // params; setter: exactly one non-rest param). acorn rejects a violation
@@ -1409,8 +1394,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // (it does not inherit a `[+Await]` enclosing — `await` is not an
         // await-expression there, only an identifier under Script goal), unlike
         // a computed key, which inherits.
-        let value: Option<Expression<'arena>> = if self.eat(TokenKind::Equals)? {
-            Some(self.with_fn_context(false, false, Self::parse_assignment_expression)?)
+        let value: Option<ExprId> = if self.eat(TokenKind::Equals)? {
+            Some(
+                self.with_fn_context(false, false, Self::parse_assignment_expression)?
+                    .id(),
+            )
         } else {
             None
         };
@@ -1468,7 +1456,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_class_index_signature(
         &mut self,
         start: usize,
-        decorators: &'arena [Decorator<'arena>],
+        decorators: &'arena [Decorator],
         is_static: bool,
         readonly: bool,
     ) -> Result<ClassMember<'arena>, Error> {

@@ -21,13 +21,13 @@ use tsv_lang::source_scan::{self, TriviaProfile};
 /// spine omits `optional`; a parenthesized `@(expr)` rides the full expression
 /// parser and keeps it. Parens are stripped from the expression, so the only
 /// signal is the span gap.
-pub(super) fn write_decorator(w: &mut JsonWriter, decorator: &ast::Decorator<'_>, ctx: &Ctx<'_>) {
-    let parenthesized = decorator.span.end > ctx.view.slot(&decorator.expression).span().end;
+pub(super) fn write_decorator(w: &mut JsonWriter, decorator: &ast::Decorator, ctx: &Ctx<'_>) {
+    let parenthesized = decorator.span.end > ctx.view.expr(decorator.expression).span().end;
     node_header(w, "Decorator", decorator.span, ctx);
     w.raw(",\"expression\":");
     write_expression_inner(
         w,
-        ctx.view.slot(&decorator.expression),
+        ctx.view.expr(decorator.expression),
         ctx,
         ExprFlags {
             // A decorator expression is a fresh chain root — nothing above it
@@ -44,7 +44,7 @@ pub(super) fn write_decorator(w: &mut JsonWriter, decorator: &ast::Decorator<'_>
 /// (`Option<Vec>` with skip-if-none: present ⇒ emitted, even empty).
 pub(super) fn write_decorators_field(
     w: &mut JsonWriter,
-    decorators: Option<&[ast::Decorator<'_>]>,
+    decorators: Option<&[ast::Decorator]>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(decs) = decorators {
@@ -374,7 +374,7 @@ fn write_modifiers_in_source_order(
 
 /// The modifier scan window's start: past the decorators when present (they
 /// precede the modifiers), else the member's own start.
-fn modifier_scan_start(decorators: Option<&[ast::Decorator<'_>]>, span: Span) -> u32 {
+fn modifier_scan_start(decorators: Option<&[ast::Decorator]>, span: Span) -> u32 {
     decorators
         .and_then(<[_]>::last)
         .map_or(span.start, |d| d.span.end)
@@ -404,13 +404,13 @@ fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition<'_
         &mut mods,
         method.is_static,
         modifier_scan_start(method.decorators, method.span),
-        ctx.view.slot(&method.key).span().start,
+        ctx.view.expr(method.key).span().start,
         ctx,
     );
     w.raw(",\"computed\":");
     w.bool(method.computed);
     w.raw(",\"key\":");
-    write_expression(w, ctx.view.slot(&method.key), ctx);
+    write_expression(w, ctx.view.expr(method.key), ctx);
     if method.optional {
         w.raw(",\"optional\":true");
     }
@@ -490,13 +490,13 @@ fn write_property_definition(
         &mut mods,
         prop.is_static,
         modifier_scan_start(prop.decorators, prop.span),
-        ctx.view.slot(&prop.key).span().start,
+        ctx.view.expr(prop.key).span().start,
         ctx,
     );
     w.raw(",\"computed\":");
     w.bool(prop.computed);
     w.raw(",\"key\":");
-    write_expression(w, ctx.view.slot(&prop.key), ctx);
+    write_expression(w, ctx.view.expr(prop.key), ctx);
     if matches!(prop.modifier, ast::PropertyModifier::Optional) {
         w.raw(",\"optional\":true");
     }
@@ -506,7 +506,7 @@ fn write_property_definition(
     write_type_annotation_field(w, prop.type_annotation.as_ref(), ctx);
     w.raw(",\"value\":");
     write_or_null(w, prop.value.as_ref(), |w, v| {
-        write_expression(w, ctx.view.slot(v), ctx);
+        write_expression(w, ctx.view.expr(*v), ctx);
     });
     write_decorators_field(w, prop.decorators, ctx);
     close_node(w, "PropertyDefinition", prop.span, ctx);

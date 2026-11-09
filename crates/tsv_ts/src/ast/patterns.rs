@@ -6,7 +6,7 @@
 use crate::ast::ExprView;
 use tsv_lang::Span;
 
-use super::{Decorator, ExprEdge, PatternElements, Property, TSTypeAnnotation};
+use super::{Decorator, ExprId, Property, Run, TSTypeAnnotation};
 
 /// Object pattern for destructuring: `{a, b}`, `{a: x, b: y}`, `{...rest}`
 ///
@@ -29,13 +29,13 @@ pub struct ObjectPattern<'arena> {
     /// Parameter decorators (`@dec { a }: T`). Only set in a parameter position;
     /// emitted last in the wire, matching acorn (which attaches a parameter's
     /// decorators to its top-level binding node).
-    pub decorators: Option<&'arena [Decorator<'arena>]>,
+    pub decorators: Option<&'arena [Decorator]>,
 }
 
 /// Object pattern property - either a regular property or a rest element
 #[derive(Debug, Clone)]
 pub enum ObjectPatternProperty<'arena> {
-    Property(Property<'arena>),
+    Property(Property),
     RestElement(RestElement<'arena>),
 }
 
@@ -93,14 +93,14 @@ impl<'arena> ObjectPatternProperty<'arena> {
 #[derive(Debug, Clone)]
 pub struct ArrayPattern<'arena> {
     /// Elements are Option to support holes like `[a, , b]`
-    pub elements: PatternElements<'arena>,
+    pub elements: Run<Option<ExprId>>,
     /// Optional destructuring-pattern parameter (`[a]?`). Only ever set in a
     /// parameter position; the `?` extends the expression's span and precedes `type_annotation`.
     pub optional: bool,
     pub type_annotation: Option<TSTypeAnnotation<'arena>>,
     /// Parameter decorators (`@dec [a]: T`). Only set in a parameter position;
     /// emitted last in the wire, matching acorn.
-    pub decorators: Option<&'arena [Decorator<'arena>]>,
+    pub decorators: Option<&'arena [Decorator]>,
 }
 
 /// Assignment pattern for default values in destructuring: `a = 1`
@@ -114,13 +114,13 @@ pub struct ArrayPattern<'arena> {
 #[derive(Debug, Clone)]
 pub struct AssignmentPattern<'arena> {
     /// The binding (identifier or nested pattern)
-    pub left: ExprEdge<'arena>,
+    pub left: ExprId,
     /// The default value expression
-    pub right: ExprEdge<'arena>,
+    pub right: ExprId,
     /// Parameter decorators (`@dec a = 1`, `@dec { a } = {}`). Only set in a
     /// parameter position; emitted last in the wire — acorn attaches a decorated
     /// default parameter's decorators to the `AssignmentPattern`, not its `left`.
-    pub decorators: Option<&'arena [Decorator<'arena>]>,
+    pub decorators: Option<&'arena [Decorator]>,
 }
 
 /// Rest element in destructuring: `...rest`
@@ -131,7 +131,7 @@ pub struct AssignmentPattern<'arena> {
 #[derive(Debug, Clone)]
 pub struct RestElement<'arena> {
     /// The binding for the rest (typically an identifier)
-    pub argument: ExprEdge<'arena>,
+    pub argument: ExprId,
     /// Optional rest parameter (`...a?`). Only ever set in a parameter position;
     /// the `?` extends `span` and precedes `type_annotation`. `...a?` is invalid
     /// TypeScript (tsc TS1047, a *deferred* grammar-check like TS1051 `set x(a?)`),

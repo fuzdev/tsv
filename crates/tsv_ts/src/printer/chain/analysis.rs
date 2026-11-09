@@ -130,7 +130,7 @@ pub(crate) fn linearize_chain_from_call_into<'a>(
 /// Returns whether the chain holds a long-curried pair ([`finalize_chain_nodes`]).
 pub(crate) fn linearize_chain_from_member_into<'a>(
     view: ExprView<'a>,
-    member: &'a ast::MemberExpression<'_>,
+    member: &'a ast::MemberExpression,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -156,7 +156,7 @@ pub(crate) fn linearize_chain_from_member_into<'a>(
 /// non-nulls go through the walk's own step ([`non_null_step`]), which does gate.
 pub(crate) fn linearize_chain_from_non_null_into<'a>(
     view: ExprView<'a>,
-    non_null: &'a ast::TSNonNullExpression<'_>,
+    non_null: &'a ast::TSNonNullExpression,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -595,7 +595,7 @@ pub(crate) fn chain_paren_leading_gap(
 /// is a parenthesized optional chain this access seals (`( // c⏎a?.b).ddd`).
 pub(crate) fn member_object_paren_leading_start(
     view: ExprView<'_>,
-    member: &ast::MemberExpression<'_>,
+    member: &ast::MemberExpression,
     span: Span,
 ) -> Option<u32> {
     child_stops_optional_chain(view, span.start, member.optional, view.expr(member.object))
@@ -640,7 +640,7 @@ pub(crate) fn tag_paren_leading_start(
 /// linearizer's arm, whose condition this is.
 fn non_null_operand_paren_leading_start(
     view: ExprView<'_>,
-    non_null: &ast::TSNonNullExpression<'_>,
+    non_null: &ast::TSNonNullExpression,
     span: Span,
     comments: &[Comment],
 ) -> Option<u32> {
@@ -692,13 +692,13 @@ enum PendingLink<'a> {
     },
     /// A member: push its lookup node ([`linearize_member_node`]).
     Member {
-        member: &'a ast::MemberExpression<'a>,
+        member: &'a ast::MemberExpression,
         span: Span,
     },
     /// A non-null assertion whose operand did not keep the pair the `!` closes
     /// ([`non_null_step`]): push its `!` ([`finish_non_null`]).
     NonNull {
-        non_null: &'a ast::TSNonNullExpression<'a>,
+        non_null: &'a ast::TSNonNullExpression,
         span: Span,
     },
 }
@@ -901,7 +901,7 @@ enum NonNullStep<'a> {
 #[inline(always)]
 fn non_null_step<'a>(
     view: ExprView<'a>,
-    non_null: &'a ast::TSNonNullExpression<'_>,
+    non_null: &'a ast::TSNonNullExpression,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -948,7 +948,7 @@ fn non_null_step<'a>(
 #[inline(always)]
 fn finish_non_null(
     view: ExprView<'_>,
-    non_null: &ast::TSNonNullExpression<'_>,
+    non_null: &ast::TSNonNullExpression,
     span: Span,
     nodes: &mut ChainNodeVec<'_>,
 ) {
@@ -989,7 +989,7 @@ fn finish_non_null(
 /// `ChainBase` rule, its type args kept.
 fn linearize_member_object<'a>(
     view: ExprView<'a>,
-    member: &'a ast::MemberExpression<'_>,
+    member: &'a ast::MemberExpression,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -1006,7 +1006,7 @@ fn linearize_member_object<'a>(
 #[inline(always)]
 fn member_object_step<'a>(
     view: ExprView<'a>,
-    member: &'a ast::MemberExpression<'_>,
+    member: &'a ast::MemberExpression,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -1176,7 +1176,7 @@ fn finish_call_callee(
 /// record names an earlier member node, and there is none.
 pub(super) fn member_lookup_node<'a>(
     view: ExprView<'a>,
-    member: &'a ast::MemberExpression<'_>,
+    member: &'a ast::MemberExpression,
     member_span: Span,
     input: LinearizeInput<'_>,
 ) -> ChainNode<'a> {
@@ -1204,7 +1204,7 @@ pub(super) fn member_lookup_node<'a>(
 /// `linearize_chain_from_member_into`.
 fn linearize_member_node<'a>(
     view: ExprView<'a>,
-    member: &'a ast::MemberExpression<'_>,
+    member: &'a ast::MemberExpression,
     member_span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -1895,7 +1895,7 @@ mod tests {
 
     /// Helper to create a member expression: object.property
     fn make_member<'arena>(
-        arena: &'arena Bump,
+        stores: &mut ast::AstStores<'arena>,
         object: Expression<'arena>,
         property_name: &'arena str,
         object_end: u32,
@@ -1907,14 +1907,19 @@ mod tests {
         };
         let property_start = object_end + 1; // after the dot
         let span_end = property_start + property_name.len() as u32;
+        let object = crate::__private::push_expression(stores, object);
+        let property = crate::__private::push_expression(
+            stores,
+            Expression::from_identifier(Identifier::simple(
+                prop_name,
+                Span::new(property_start, span_end),
+            )),
+        );
         Expression {
             span: Span::new(0, span_end),
             kind: ExpressionKind::MemberExpression(MemberExpression {
-                object: arena.alloc(object),
-                property: arena.alloc(Expression::from_identifier(Identifier::simple(
-                    prop_name,
-                    Span::new(property_start, span_end),
-                ))),
+                object,
+                property,
                 computed: false,
                 optional: false,
             }),
@@ -1923,14 +1928,15 @@ mod tests {
 
     /// Helper to create a call expression: callee()
     fn make_call<'arena>(
-        arena: &'arena Bump,
+        stores: &mut ast::AstStores<'arena>,
         callee: Expression<'arena>,
         callee_end: u32,
     ) -> Expression<'arena> {
+        let callee = crate::__private::push_expression(stores, callee);
         Expression {
             kind: ExpressionKind::CallExpression(CallExpression {
-                callee: arena.alloc(callee),
-                arguments: &[],
+                callee,
+                arguments: ast::Run::EMPTY,
                 type_arguments: None,
                 optional: false,
             }),
@@ -1960,15 +1966,14 @@ mod tests {
 
     #[test]
     fn test_linearize_member_chain() {
-        let arena = Bump::new();
+        let mut stores = ast::AstStores::new();
         // Build: a.b.c
         let a = make_identifier("a");
-        let ab = make_member(&arena, a, "b", 1);
-        let abc = make_member(&arena, ab, "c", 3);
+        let ab = make_member(&mut stores, a, "b", 1);
+        let abc = make_member(&mut stores, ab, "c", 3);
 
         let docs = DocArena::new();
         let lines = LineBreaks::new("", Vec::new());
-        let stores = ast::AstStores::new();
         let printer = make_printer(&docs, &lines, &[], &stores);
         let nodes = linearize_chain(printer.view, &abc, printer.linearize_input());
 
@@ -1981,16 +1986,15 @@ mod tests {
 
     #[test]
     fn test_linearize_call_chain() {
-        let arena = Bump::new();
+        let mut stores = ast::AstStores::new();
         // Build: a().b()
         let a = make_identifier("a");
-        let a_call = make_call(&arena, a, 1);
-        let ab = make_member(&arena, a_call, "b", 3);
-        let ab_call = make_call(&arena, ab, 5);
+        let a_call = make_call(&mut stores, a, 1);
+        let ab = make_member(&mut stores, a_call, "b", 3);
+        let ab_call = make_call(&mut stores, ab, 5);
 
         let docs = DocArena::new();
         let lines = LineBreaks::new("", Vec::new());
-        let stores = ast::AstStores::new();
         let printer = make_printer(&docs, &lines, &[], &stores);
         let nodes = linearize_chain(printer.view, &ab_call, printer.linearize_input());
 
@@ -2004,16 +2008,15 @@ mod tests {
 
     #[test]
     fn test_group_member_only_chain() {
-        let arena = Bump::new();
+        let mut stores = ast::AstStores::new();
         // Build: a.b.c.d
         let a = make_identifier("a");
-        let ab = make_member(&arena, a, "b", 1);
-        let abc = make_member(&arena, ab, "c", 3);
-        let abcd = make_member(&arena, abc, "d", 5);
+        let ab = make_member(&mut stores, a, "b", 1);
+        let abc = make_member(&mut stores, ab, "c", 3);
+        let abcd = make_member(&mut stores, abc, "d", 5);
 
         let docs = DocArena::new();
         let lines = LineBreaks::new("", Vec::new());
-        let stores = ast::AstStores::new();
         let printer = make_printer(&docs, &lines, &[], &stores);
         let nodes = linearize_chain(printer.view, &abcd, printer.linearize_input());
         let groups = group_chain_nodes(&nodes, &printer);
@@ -2033,17 +2036,16 @@ mod tests {
 
     #[test]
     fn test_group_call_chain_breaks_after_call() {
-        let arena = Bump::new();
+        let mut stores = ast::AstStores::new();
         // Build: a().b().c
         let a = make_identifier("a");
-        let a_call = make_call(&arena, a, 1);
-        let ab = make_member(&arena, a_call, "b", 3);
-        let ab_call = make_call(&arena, ab, 5);
-        let abc = make_member(&arena, ab_call, "c", 7);
+        let a_call = make_call(&mut stores, a, 1);
+        let ab = make_member(&mut stores, a_call, "b", 3);
+        let ab_call = make_call(&mut stores, ab, 5);
+        let abc = make_member(&mut stores, ab_call, "c", 7);
 
         let docs = DocArena::new();
         let lines = LineBreaks::new("", Vec::new());
-        let stores = ast::AstStores::new();
         let printer = make_printer(&docs, &lines, &[], &stores);
         let nodes = linearize_chain(printer.view, &abc, printer.linearize_input());
         let groups = group_chain_nodes(&nodes, &printer);
@@ -2108,9 +2110,9 @@ mod tests {
     /// members-after-a-call run.
     #[test]
     fn test_group_splits_at_a_member_whose_gap_holds_a_line_comment() {
-        let arena = Bump::new();
+        let mut stores = ast::AstStores::new();
         let base = make_identifier("a");
-        let call_expr = make_call(&arena, make_identifier("a"), 1);
+        let call_expr = make_call(&mut stores, make_identifier("a"), 1);
         let ExpressionKind::CallExpression(call) = &call_expr.kind else {
             panic!("make_call builds a CallExpression")
         };
@@ -2140,7 +2142,6 @@ mod tests {
                 let comments = [make_line_comment(gap_start + 1)];
                 let arena_docs = DocArena::new();
                 let lines = LineBreaks::new("", Vec::new());
-                let stores = ast::AstStores::new();
                 let printer = make_printer(&arena_docs, &lines, &comments, &stores);
                 let groups = group_chain_nodes(&nodes, &printer);
 

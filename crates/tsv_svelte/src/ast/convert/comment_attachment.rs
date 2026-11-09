@@ -316,7 +316,7 @@ pub(super) fn pattern_comment_window(pattern: &tsv_ts::ast::Expression<'_>) -> S
 /// the id and init windows split at the end of the BINDING rather than of its bare name.
 pub(super) fn attach_const_tag_init<'a>(
     view: ExprView<'_>,
-    tag: &ast::ConstTag<'_>,
+    tag: &ast::ConstTag,
     attach: AttachInputs<'a>,
 ) -> CommentAttach<'a> {
     let binding_end = pattern_comment_window(view.expr(tag.id)).end;

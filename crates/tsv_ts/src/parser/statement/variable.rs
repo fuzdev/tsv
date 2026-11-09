@@ -91,7 +91,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_declarator_list(
         &mut self,
         site: DeclaratorSite,
-    ) -> Result<(&'arena [VariableDeclarator<'arena>], u32), Error> {
+    ) -> Result<(&'arena [VariableDeclarator], u32), Error> {
         // one wire level each: the `VariableDeclarator` over its pattern and initializer
         let first = self.nested(1, |p| p.parse_declarator(site))?;
         let mut end = first.span.end;
@@ -111,10 +111,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse one variable declarator; `site` settles the two grammar parameters
     /// that differ between a statement and a `for` head.
-    fn parse_declarator(
-        &mut self,
-        site: DeclaratorSite,
-    ) -> Result<VariableDeclarator<'arena>, Error> {
+    fn parse_declarator(&mut self, site: DeclaratorSite) -> Result<VariableDeclarator, Error> {
         let id_start = self.current_pos().0;
 
         // Parse binding pattern: identifier, array pattern [a, b], or object pattern {a, b}
@@ -137,16 +134,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Both slots are by-reference (see `VariableDeclarator`): the nodes live in
         // the arena and the declarator holds pointers, so the element the
         // declaration's vector moves is 32 B rather than 160.
-        let id: &'arena Expression<'arena> = self.alloc(id);
+        let id: ExprId = self.push_expr(id);
 
         // Check for initializer
         // Use assignment_expression because comma separates declarators
-        let init: Option<&'arena Expression<'arena>> = if !self.eat(TokenKind::Equals)? {
+        let init: Option<ExprId> = if !self.eat(TokenKind::Equals)? {
             None
         } else if site == DeclaratorSite::ForHead {
-            Some(self.with_no_in(Self::parse_assignment_expression_ref)?)
+            Some(self.with_no_in(Self::parse_assignment_expression)?.id())
         } else {
-            Some(self.parse_assignment_expression_ref()?)
+            Some(self.parse_assignment_expression()?.id())
         };
 
         // Use the later of expression span end and prev_token_end() to include any
@@ -158,7 +155,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // definite assignment `!` was consumed without a type annotation (`let a!;`).
         let end = init.as_ref().map_or_else(
             || id_end.max(self.prev_token_end()),
-            |e| e.span().end_usize().max(self.prev_token_end()),
+            |e| self.expr(*e).span().end_usize().max(self.prev_token_end()),
         );
 
         Ok(VariableDeclarator {

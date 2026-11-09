@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::ast::{
-    AstStores, ExprView, Expression, ExpressionKind, Parsed, ParsedRef, Statement,
+    AstStores, ExprId, ExprView, Expression, ExpressionKind, Parsed, ParsedRef, Run, Statement,
     TSTypeAnnotation, TSTypeParameterDeclaration, VariableDeclaration,
 };
 use tsv_lang::Span;
@@ -348,8 +348,8 @@ pub fn parse_expression_with_comments<'arena>(
     arena: &'arena bumpalo::Bump,
     stores: &mut AstStores<'arena>,
     end: &str,
-    host_check: impl Fn(ExprView<'_>, &'arena Expression<'arena>) -> Result<()>,
-) -> Result<(&'arena Expression<'arena>, &'arena [ast::Comment])> {
+    host_check: impl Fn(ExprView<'_>, ExprId) -> Result<()>,
+) -> Result<(ExprId, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
@@ -399,7 +399,7 @@ pub fn parse_pattern_with_comments<'arena>(
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
     stores: &mut AstStores<'arena>,
-) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
+) -> Result<(ExprId, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
@@ -408,12 +408,6 @@ pub fn parse_pattern_with_comments<'arena>(
         stores,
         |parser| {
             let expr = parser.parse_expression_unbounded()?;
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::reclassify::<Expression<'_>>(
-                tsv_lang::ast_census_probe::Dead::MovedInline,
-                tsv_lang::ast_census_probe::Dead::DuplicateRoot,
-                1,
-            );
             let pattern = parser.expression_to_svelte_pattern(expr)?;
             // The pattern must fill the whole slice the caller bounded. Without this a trailing
             // token is silently dropped, losing content. The slice is the pattern itself (a name
@@ -446,11 +440,36 @@ pub fn parse_pattern_with_comments<'arena>(
 /// nowhere (real content loss on a format round-trip), and is unreachable to every
 /// consumer that reasons about TypeScript by walking the tree. So the fallback
 /// **errors** rather than dropping.
+/// Push `expr` into `stores` and mint its id — for a host-built expression, such as a
+/// shorthand directive's synthesized identifier.
+#[inline]
+pub fn push_expression<'arena>(stores: &mut AstStores<'arena>, expr: Expression<'arena>) -> ExprId {
+    #[cfg(feature = "_internal_ast_census")]
+    tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
+    stores.exprs.push(expr)
+}
+
+/// Copy `ids` into `stores`' id-list store as one run — for a list the host gathered itself
+/// (`{@debug}`'s identifiers).
+pub fn push_expression_list(stores: &mut AstStores<'_>, ids: &[ExprId]) -> Run<ExprId> {
+    let mark = stores.expr_list_scratch.mark();
+    for &id in ids {
+        stores.expr_list_scratch.push(id);
+    }
+    let run = stores
+        .expr_list_scratch
+        .flush_copy(mark, &mut stores.expr_lists);
+    #[cfg(feature = "_internal_ast_census")]
+    tsv_lang::ast_census_probe::mint::<ExprId>(run.len());
+    run
+}
+
 pub fn attach_pattern_type_annotation<'arena>(
-    pattern: &mut Expression<'arena>,
+    stores: &mut AstStores<'arena>,
+    pattern: ExprId,
     mut ta: TSTypeAnnotation<'arena>,
     arena: &'arena bumpalo::Bump,
-) -> Result<()> {
+) -> Result<ExprId> {
     // Re-anchor the annotation at the BINDING's end, which is where Svelte starts it:
     // `read_type_annotation` takes `const start = parser.index` *before* its
     // `allow_whitespace()`, so whatever the author put between the binding and the `:`
@@ -466,32 +485,63 @@ pub fn attach_pattern_type_annotation<'arena>(
     // fixture in the tree and essentially all real code — so this line is load-bearing only
     // on the spellings that separate them. `pattern` is still the bare binding here: both
     // callers parse the annotation separately and attach it after.
-    ta.span.start = pattern.span().end;
-    match &mut pattern.kind {
+    let node = stores.exprs.get(pattern);
+    let span = node.span;
+    ta.span.start = node.span().end;
+    // The annotated binding replaces the bare one as a new row (the row itself is never
+    // edited), built from the bare one's fields.
+    let kind = match &node.kind {
         ExpressionKind::Identifier(id) => {
             // Re-bind the identifier's binding extra with the parsed type
             // annotation (preserving any decorators already present).
             let decorators = id.decorators();
             #[cfg(feature = "_internal_ast_census")]
             tsv_lang::ast_census_probe::mint::<ast::IdentifierParamExtra<'_>>(1);
-            id.extra = Some(arena.alloc(ast::IdentifierParamExtra {
-                type_annotation: Some(ta),
-                decorators,
-            }));
+            ExpressionKind::Identifier(ast::Identifier {
+                escaped_name: id.escaped_name,
+                name_len: id.name_len,
+                name_plain_ascii: id.name_plain_ascii,
+                optional: id.optional,
+                extra: Some(arena.alloc(ast::IdentifierParamExtra {
+                    type_annotation: Some(ta),
+                    decorators,
+                })),
+                span: id.span,
+            })
         }
-        ExpressionKind::ObjectPattern(pattern) => pattern.type_annotation = Some(ta),
-        ExpressionKind::ArrayPattern(pattern) => pattern.type_annotation = Some(ta),
+        ExpressionKind::ObjectPattern(pattern) => {
+            ExpressionKind::ObjectPattern(ast::ObjectPattern {
+                properties: pattern.properties,
+                optional: pattern.optional,
+                type_annotation: Some(ta),
+                decorators: pattern.decorators,
+            })
+        }
+        ExpressionKind::ArrayPattern(pattern) => ExpressionKind::ArrayPattern(ast::ArrayPattern {
+            elements: pattern.elements,
+            optional: pattern.optional,
+            type_annotation: Some(ta),
+            decorators: pattern.decorators,
+        }),
         // The Svelte block grammar admits an identifier or a destructuring
         // pattern, so nothing else is reachable — and no other `Expression`
         // variant has an annotation slot to hold it. Reject rather than drop.
         _ => {
             return Err(Error::lex(
                 "type annotation is not valid on this binding pattern",
-                pattern.span.start as usize,
+                span.start as usize,
             ));
         }
+    };
+    #[cfg(feature = "_internal_ast_census")]
+    {
+        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
+        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+            tsv_lang::ast_census_probe::Dead::Superseded,
+            1,
+        );
     }
-    Ok(())
+    Ok(stores.exprs.push(Expression { span, kind }))
 }
 
 /// The read counterpart of [`attach_pattern_type_annotation`] — the annotation a binding
@@ -609,8 +659,8 @@ pub fn parse_expression_partial_with_comments<'arena>(
     arena: &'arena bumpalo::Bump,
     stores: &mut AstStores<'arena>,
     top_level_as: TopLevelAs,
-    host_check: impl Fn(ExprView<'_>, &'arena Expression<'arena>, usize) -> Result<()>,
-) -> Result<(&'arena Expression<'arena>, usize, &'arena [ast::Comment])> {
+    host_check: impl Fn(ExprView<'_>, ExprId, usize) -> Result<()>,
+) -> Result<(ExprId, usize, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
@@ -786,7 +836,7 @@ pub fn build_expression_doc(
 pub fn build_bare_sequence_operand_docs(
     view: ExprView<'_>,
     arena: &DocArena,
-    sequence: &ast::SequenceExpression<'_>,
+    sequence: &ast::SequenceExpression,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
     mut build: impl FnMut(usize) -> bool,

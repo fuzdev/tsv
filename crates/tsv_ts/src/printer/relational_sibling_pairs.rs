@@ -97,10 +97,10 @@ fn any_expression_child<'e>(
         ExpressionKind::ArrayPattern(array) => {
             decorators_any(view, array.decorators, &mut visit)
                 || view
-                    .pattern_elements(array.elements)
+                    .opt_list(array.elements)
                     .iter()
                     .flatten()
-                    .any(|child| visit(view.slot(child), Other))
+                    .any(|child| visit(view.expr(*child), Other))
         }
         ExpressionKind::CallExpression(call) => {
             let list_end = Some(expr.span.end);
@@ -204,13 +204,13 @@ fn any_expression_child<'e>(
 /// Whether any decorator's expression satisfies `visit` — a decorator is an `Other` child.
 fn decorators_any<'e>(
     view: ExprView<'e>,
-    decorators: Option<&'e [Decorator<'e>]>,
+    decorators: Option<&'e [Decorator]>,
     visit: &mut impl FnMut(&'e Expression<'e>, ChildSlot) -> bool,
 ) -> bool {
     decorators.is_some_and(|items| {
         items
             .iter()
-            .any(|item| visit(view.slot(&item.expression), ChildSlot::Other))
+            .any(|item| visit(view.expr(item.expression), ChildSlot::Other))
     })
 }
 
@@ -225,7 +225,7 @@ fn decorators_any<'e>(
 fn expression_holds_binary<'e>(
     view: ExprView<'e>,
     expr: &'e Expression<'e>,
-    predicate: impl Fn(&BinaryExpression<'_>) -> bool,
+    predicate: impl Fn(&BinaryExpression) -> bool,
 ) -> bool {
     let mut pending: SmallVec<[&'e Expression<'e>; 16]> = smallvec![expr];
     while let Some(expr) = pending.pop() {
@@ -245,7 +245,7 @@ fn expression_holds_binary<'e>(
 /// The key a chain link is recorded under in `Printer::relational_chain_walked_links`: the
 /// source its operands cover. A binary node holds no span of its own, and no two binaries
 /// cover the same operand source — an ancestor's reaches past its descendant's on one side.
-fn chain_link_key(view: ExprView<'_>, node: &BinaryExpression<'_>) -> Span {
+fn chain_link_key(view: ExprView<'_>, node: &BinaryExpression) -> Span {
     Span::new(
         view.expr(node.left).span().start,
         view.expr(node.right).span().end,
@@ -253,7 +253,7 @@ fn chain_link_key(view: ExprView<'_>, node: &BinaryExpression<'_>) -> Span {
 }
 
 /// Whether `binary` is a `<` / `<<`, the operators that open a type-argument region.
-fn opens_region(binary: &BinaryExpression<'_>) -> bool {
+fn opens_region(binary: &BinaryExpression) -> bool {
     matches!(
         binary.operator,
         BinaryOperator::LessThan | BinaryOperator::LeftShift
@@ -307,10 +307,10 @@ impl<'a> Printer<'a> {
     /// once from the left and the closer once from the right, never per candidate, and
     /// an element an enclosing list's walk already covered is not walked again
     /// ([`Self::region_walked_elements`]).
-    pub(crate) fn mark_relational_sibling_authored_pairs<'e>(
+    pub(crate) fn mark_relational_sibling_authored_pairs(
         &self,
         elements: impl Clone
-        + DoubleEndedIterator<Item = crate::ast::OptExprEdge<'e>>
+        + DoubleEndedIterator<Item = Option<crate::ast::ExprId>>
         + ExactSizeIterator,
     ) {
         let view = self.view;
@@ -384,10 +384,7 @@ impl<'a> Printer<'a> {
     /// binary's two operands with `ChildSlot::Other`, the slot this call gives them, so a
     /// covered link's marks are the ones this call would set; and a deeper link of the same
     /// spine lies inside a covered link's left operand. Each binary is walked once.
-    pub(in crate::printer) fn mark_relational_chain_region(
-        &self,
-        node: &BinaryExpression<'_>,
-    ) -> bool {
+    pub(in crate::printer) fn mark_relational_chain_region(&self, node: &BinaryExpression) -> bool {
         if node.operator != BinaryOperator::LessThan {
             return false;
         }
@@ -414,7 +411,7 @@ impl<'a> Printer<'a> {
     /// [`Self::mark_relational_chain_region`] past its preflight, out of line: a `>` byte
     /// behind a `<` link is the rare case.
     #[cold]
-    fn relational_chain_region_marked(&self, node: &BinaryExpression<'_>) -> bool {
+    fn relational_chain_region_marked(&self, node: &BinaryExpression) -> bool {
         if !(holds_region_opener(self.view, self.view.expr(node.left))
             && holds_region_closer(self.view, self.view.expr(node.right)))
         {
@@ -649,7 +646,7 @@ impl<'a> Printer<'a> {
     /// fixed point: the comment prints inside a pair of its own (`typeof (/* j */ (c)())`),
     /// which is the operand's shell on the next pass, and the head's shell inside it is
     /// still the author's.
-    fn mark_prefix_operator_shells(&self, unary: &UnaryExpression<'_>) {
+    fn mark_prefix_operator_shells(&self, unary: &UnaryExpression) {
         let mut node = self.view.expr(unary.argument);
         // Where the last marked pair's content starts: a head starting there too stands
         // behind that same `(`, which is not a pair of its own.

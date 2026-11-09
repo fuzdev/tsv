@@ -2,7 +2,7 @@
 // the single `TemplateElement` constructor every template site builds through —
 // expression AND type templates, head/middle/tail/no-substitution alike.
 
-use crate::ast::{TemplateCooked, TemplateElement, TemplateLiteral};
+use crate::ast::{Run, TemplateCooked, TemplateElement, TemplateLiteral};
 use crate::lexer::TokenKind;
 use crate::lexer::escapes::find_legacy_escape;
 use tsv_lang::{Error, Span};
@@ -218,7 +218,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<TemplateLiteral<'arena>, Error> {
         let (start, _) = self.current_pos();
         let mut quasis = self.bvec();
-        let mut expressions = self.bvec();
 
         match self.current_kind() {
             TokenKind::NoSubstitutionTemplate => {
@@ -233,7 +232,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 Ok(TemplateLiteral {
                     quasis: quasis.into_bump_slice(),
-                    expressions: expressions.into_bump_slice(),
+                    expressions: Run::EMPTY,
                     span: Span::new(start as u32, elem_end as u32),
                 })
             }
@@ -251,12 +250,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 // Parse expressions and remaining template parts; the interpolations are
                 // siblings (`ListFrame`)
+                let mark = self.stores.expr_list_scratch.mark();
                 let mut frame = self.list_frame();
                 loop {
-                    frame.element(self, expressions.len());
+                    let len = self.stores.expr_list_scratch.len_since(mark);
+                    frame.element(self, len);
                     // Parse the interpolated expression
-                    let expr = self.parse_expression_ref()?;
-                    expressions.push(expr);
+                    let expr = self.parse_expression()?.id();
+                    self.stores.expr_list_scratch.push(expr);
 
                     // Each `${…}` is a delimiter of its own: its `}` ends the `<` regions
                     // opened inside it, as the template's end does for the last one
@@ -319,7 +320,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 Ok(TemplateLiteral {
                     quasis: quasis.into_bump_slice(),
-                    expressions: expressions.into_bump_slice(),
+                    expressions: self.flush_expr_list(mark),
                     span: Span::new(start as u32, end),
                 })
             }

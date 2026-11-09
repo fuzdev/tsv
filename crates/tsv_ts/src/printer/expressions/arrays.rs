@@ -22,7 +22,7 @@ use tsv_lang::doc::arena::DocId;
 /// element slides to. The array PATTERN's twin is `array_pattern_gap_end`, whose fallback
 /// stops before a `: T` the pattern's span swallowed; each container names its own end
 /// once and the walk past the holes is shared.
-fn array_gap_end(view: ExprView<'_>, arr: &ast::ArrayExpression<'_>, span: Span, i: usize) -> u32 {
+fn array_gap_end(view: ExprView<'_>, arr: &ast::ArrayExpression, span: Span, i: usize) -> u32 {
     next_real_element_start(view, view.opt_list(arr.elements), i).unwrap_or(span.end - 1)
 }
 
@@ -37,7 +37,7 @@ fn array_gap_end(view: ExprView<'_>, arr: &ast::ArrayExpression<'_>, span: Span,
 /// Free and shape-only so it can be read (and tested) without a printer; the comment clause
 /// that completes the predicate needs the comment array and lives on
 /// [`Printer::is_concisely_printed_array`], the one entry every caller asks.
-fn array_elements_are_signed_numbers(view: ExprView<'_>, arr: &ast::ArrayExpression<'_>) -> bool {
+fn array_elements_are_signed_numbers(view: ExprView<'_>, arr: &ast::ArrayExpression) -> bool {
     !arr.elements.is_empty()
         && view.opt_list(arr.elements).iter().all(|elem| {
             match elem.as_ref().map(|e| &view.expr(*e).kind) {
@@ -65,7 +65,7 @@ impl<'a> Printer<'a> {
     /// - EACH inner array/object has more than 1 item
     ///
     /// This matches prettier's shouldBreak logic in `printArray` (`print/array.js`)
-    fn should_break_nested_array(&self, arr: &ast::ArrayExpression<'_>) -> bool {
+    fn should_break_nested_array(&self, arr: &ast::ArrayExpression) -> bool {
         if arr.elements.len() <= 1 {
             return false;
         }
@@ -146,7 +146,7 @@ impl<'a> Printer<'a> {
     /// arm entirely is what DROPPED an author blank line before an elision.
     fn has_blank_line_after_slot(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         arr_span: Span,
         i: usize,
         emitted_leading_start: Option<u32>,
@@ -236,7 +236,7 @@ impl<'a> Printer<'a> {
     /// the three sites share one walk rather than restating the search past holes.
     fn prev_real_slot<'e>(
         &self,
-        arr: &'e ast::ArrayExpression<'e>,
+        arr: &'e ast::ArrayExpression,
         i: usize,
     ) -> Option<(usize, &'e Expression<'e>)>
     where
@@ -336,7 +336,7 @@ impl<'a> Printer<'a> {
     /// hand-written copy of this rule has at some point got that half wrong.
     fn element_gap_split(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         span: Span,
         idx: usize,
         elem_end: u32,
@@ -387,7 +387,7 @@ impl<'a> Printer<'a> {
     /// the interior, so it has no share to emit and its run is an ordinary one.
     fn slot_paren_interior(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         span: Span,
         idx: usize,
     ) -> Option<Span> {
@@ -408,7 +408,7 @@ impl<'a> Printer<'a> {
     /// emission cannot disagree about it.
     fn slot_run_is_behind_interior(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         span: Span,
         idx: usize,
     ) -> bool {
@@ -486,7 +486,7 @@ impl<'a> Printer<'a> {
     /// conformance_prettier_ts_comments.md §Comment relocation (`across an elision`).
     fn leading_comment_search_start_for(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         span: Span,
         i: usize,
         elem_start: u32,
@@ -509,7 +509,7 @@ impl<'a> Printer<'a> {
     /// trailing-hole seams — so a real element followed by holes must not claim them.
     fn add_trailing_array_comments(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         span: Span,
         elem_end: u32,
         current_index: usize,
@@ -581,7 +581,7 @@ impl<'a> Printer<'a> {
     /// `None` when the array holds no real element: there is nothing to scan past.
     fn end_scan_start(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         span: Span,
         role: LiteralRole,
     ) -> Option<u32> {
@@ -594,7 +594,7 @@ impl<'a> Printer<'a> {
     /// ([`Printer::element_claim_anchor`]).
     fn element_printed_end(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         span: Span,
         idx: usize,
         elem: &Expression<'_>,
@@ -610,7 +610,7 @@ impl<'a> Printer<'a> {
     /// the `)` is the only one to reach it. Its comments lie inside the spread's own span,
     /// out of every gap scan the other triggers make. A frozen slot has no share
     /// ([`Self::slot_paren_interior`]): its verbatim slice printed the interior.
-    fn spread_has_share(&self, arr: &ast::ArrayExpression<'_>, span: Span) -> bool {
+    fn spread_has_share(&self, arr: &ast::ArrayExpression, span: Span) -> bool {
         (0..arr.elements.len()).any(|idx| {
             !self
                 .paren_interior_own_line_comments(self.slot_paren_interior(arr, span, idx))
@@ -629,7 +629,7 @@ impl<'a> Printer<'a> {
     /// interior there (`[...(b⏎/* i */⏎), , ]`) as unprinted.
     fn grouped_end_scan_finds_comment(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         arr_span: Span,
         role: LiteralRole,
     ) -> bool {
@@ -660,7 +660,7 @@ impl<'a> Printer<'a> {
     /// emitter does.
     fn last_element_trailing_split(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         span: Span,
         role: LiteralRole,
     ) -> Option<(u32, u32)> {
@@ -680,7 +680,7 @@ impl<'a> Printer<'a> {
     /// one layout decision serves every one of them.
     pub(in crate::printer) fn build_array_doc(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         arr_span: Span,
     ) -> DocId {
         self.build_array_doc_as(arr, arr_span, LiteralRole::Expression)
@@ -692,7 +692,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::should_break_nested_array`], an `ArrayExpression` rule) does not apply.
     pub(in crate::printer) fn build_array_doc_as(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         arr_span: Span,
         role: LiteralRole,
     ) -> DocId {
@@ -768,7 +768,7 @@ impl<'a> Printer<'a> {
     /// line, one the next pass immediately collapsed (`[a⏎, /* c */⏎b]` was a 2-pass).
     fn has_own_line_block_comments_in_array(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         span: Span,
         role: LiteralRole,
     ) -> bool {
@@ -806,7 +806,7 @@ impl<'a> Printer<'a> {
     /// No array-wide zero-comment gate: the per-element ask is a signed literal's own span,
     /// which for all but a huge number is narrower than a comment can be, so
     /// `range_too_narrow_for_a_comment` answers it at the call site without a search.
-    fn is_concisely_printed_array(&self, arr: &ast::ArrayExpression<'_>) -> bool {
+    fn is_concisely_printed_array(&self, arr: &ast::ArrayExpression) -> bool {
         array_elements_are_signed_numbers(self.view, arr)
             && !self
                 .view
@@ -853,7 +853,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_array_doc_with_expanding_comments`] before the fill is built.
     fn build_array_fill_doc(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         span: Span,
         has_comments: bool,
     ) -> DocId {
@@ -921,7 +921,7 @@ impl<'a> Printer<'a> {
     /// comment-independent and stays with the callers, outside the gate.
     fn push_array_element_with_inline_comments(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         span: Span,
         i: usize,
         has_comments: bool,
@@ -961,7 +961,7 @@ impl<'a> Printer<'a> {
     /// Note: Arrays with expanding comments use build_array_doc_with_expanding_comments instead.
     fn build_array_group_doc(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         arr_span: Span,
         has_comments: bool,
         role: LiteralRole,
@@ -1063,7 +1063,7 @@ impl<'a> Printer<'a> {
     /// block comments (hardlines must propagate). Always expands to multiline.
     fn build_array_doc_with_expanding_comments(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         span: Span,
         role: LiteralRole,
     ) -> DocId {
@@ -1417,7 +1417,7 @@ impl<'a> Printer<'a> {
     /// Produces: `[\n  elem,\n]` with actual hardlines.
     pub(in crate::printer) fn build_array_doc_expanded(
         &self,
-        arr: &ast::ArrayExpression<'_>,
+        arr: &ast::ArrayExpression,
         span: Span,
     ) -> DocId {
         self.mark_relational_sibling_authored_pairs(
@@ -1467,25 +1467,30 @@ mod tests {
     use super::*;
     use bumpalo::Bump;
 
-    /// Parse a bare array expression to its internal AST node (spans index into `src`),
-    /// allocated in the caller-supplied `arena`.
-    fn parse_array<'a>(arena: &'a Bump, src: &str) -> &'a ast::ArrayExpression<'a> {
-        match crate::__private::parse_expression_with_comments(
+    /// Run `f` over a bare array expression parsed from `src` (its spans index into `src`) and
+    /// the view of the stores it was parsed into.
+    fn with_array<R>(
+        src: &str,
+        f: impl for<'a> FnOnce(ExprView<'a>, &'a ast::ArrayExpression) -> R,
+    ) -> R {
+        let arena = Bump::new();
+        let mut stores = ast::AstStores::new();
+        let (id, _) = crate::__private::parse_expression_with_comments(
             src,
             0,
             0,
-            arena,
-            &mut ast::AstStores::new(),
+            &arena,
+            &mut stores,
             "end of input",
             |_, _| Ok(()),
         )
-        .expect("expression should parse")
-        .0
-        {
+        .expect("expression should parse");
+        let view = stores.view();
+        match view.expr(id) {
             Expression {
                 kind: ExpressionKind::ArrayExpression(arr),
                 ..
-            } => arr,
+            } => f(view, arr),
             other => panic!("expected an array expression, got: {other:?}"),
         }
     }
@@ -1495,39 +1500,30 @@ mod tests {
     /// fixture.
     #[test]
     fn concise_array_shape_detection() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
-        let arena = Bump::new();
-        assert!(array_elements_are_signed_numbers(
-            view,
-            parse_array(&arena, "[1, 2, 3]")
-        ));
+        assert!(with_array("[1, 2, 3]", |view, arr| {
+            array_elements_are_signed_numbers(view, arr)
+        }));
         // A single +/- prefix over a numeric literal is a signed number.
-        assert!(array_elements_are_signed_numbers(
-            view,
-            parse_array(&arena, "[-1, +2]")
-        ));
+        assert!(with_array("[-1, +2]", |view, arr| {
+            array_elements_are_signed_numbers(view, arr)
+        }));
         // …but the rule is NOT recursive (prettier's `isSignedNumericLiteral`), so a
         // doubled sign is not one.
-        assert!(!array_elements_are_signed_numbers(
-            view,
-            parse_array(&arena, "[- -1, -2]")
-        ));
+        assert!(!with_array("[- -1, -2]", |view, arr| {
+            array_elements_are_signed_numbers(view, arr)
+        }));
         // An empty array is not concisely printed.
-        assert!(!array_elements_are_signed_numbers(
-            view,
-            parse_array(&arena, "[]")
-        ));
+        assert!(!with_array("[]", |view, arr| {
+            array_elements_are_signed_numbers(view, arr)
+        }));
         // A non-numeric element disqualifies it.
-        assert!(!array_elements_are_signed_numbers(
-            view,
-            parse_array(&arena, "[1, 'x']")
-        ));
+        assert!(!with_array("[1, 'x']", |view, arr| {
+            array_elements_are_signed_numbers(view, arr)
+        }));
         // A hole is not a numeric element (unlike is_simple_call_argument) — the fill
         // printer has nothing to push for one.
-        assert!(!array_elements_are_signed_numbers(
-            view,
-            parse_array(&arena, "[1, , 2]")
-        ));
+        assert!(!with_array("[1, , 2]", |view, arr| {
+            array_elements_are_signed_numbers(view, arr)
+        }));
     }
 }

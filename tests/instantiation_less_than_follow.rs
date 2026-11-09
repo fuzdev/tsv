@@ -686,3 +686,28 @@ fn a_relational_chain_over_a_shift_reads_as_tscs_tree() {
         assert_eq!(expression_tree(source), tsc_tree, "{source:?}");
     }
 }
+
+/// Where a tsc follower gives one list up and keeps another, the driver reads the text again
+/// as acorn-typescript does; where that second reading fails, the first reading stands, and
+/// nothing the failed reading opened may stay open behind it. A list's scratch frame left open
+/// fires a `debug_assert!` at the driver's exit, so this test grades that in a build with
+/// `debug_assertions` on (a plain `cargo test`); an optimized build prints the same output
+/// either way. Each input keeps a list (`f<T><U>;`), gives one up (`g(1, x<T,U><T>⏎ax)`, whose
+/// comparison reading parses) and fails the re-read, which leaves a call's argument list open.
+#[test]
+fn a_reparse_that_fails_leaves_no_list_frame_open() {
+    assert_eq!(
+        tsv_ts::format("f<T><U>;\ng(1, x<T,U><T>\nax);\n").expect("the first reading parses"),
+        "(f<T>)<U>;\ng(1, x < T, U > <T>ax);\n"
+    );
+}
+
+/// The same inside a Svelte template island, whose failed re-read is the embedded path's.
+#[test]
+fn an_island_reparse_that_fails_leaves_no_list_frame_open() {
+    assert_eq!(
+        tsv_svelte::format("<p>{g(1, x<T,U><T>\nax) + (f<T><U>)}</p>")
+            .expect("the first reading parses"),
+        "<p>{g(1, x < T, U > <T>ax) + (f<T>)<U>}</p>\n"
+    );
+}

@@ -47,18 +47,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Check for default value: param = default
         if self.eat(TokenKind::Equals)? {
-            let default_value = self.parse_assignment_expression_ref()?;
+            let default_value = self.parse_assignment_expression()?.id();
             // prev_token_end covers a parenthesized default's closing `)`
             let assign_end = self.prev_token_end() as u32;
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
             param = Expression {
                 span: Span::new(param_start as u32, assign_end),
                 kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
-                    // `Bump::alloc`, always inlined, not `Parser::alloc`: an outlined call
-                    // here grows this frame, which sits on the recursion path of every
-                    // parameter default nested in another
-                    left: self.arena.alloc(param),
+                    left: self.push_expr(param),
                     right: default_value,
                     decorators: None,
                 }),
@@ -75,9 +70,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// default-value case (`@dec a = 1`) attaches to the `AssignmentPattern`, not
     /// its `left`.
     fn attach_param_decorators(
-        &self,
+        &mut self,
         mut param: Expression<'arena>,
-        decorators: &'arena [Decorator<'arena>],
+        decorators: &'arena [Decorator],
     ) -> Expression<'arena> {
         let arena = self.arena;
         match &mut param.kind {
@@ -85,15 +80,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // property wrapper. Recurse (the inner is an Identifier or, for
             // `@dec private a = 1`, an AssignmentPattern).
             ExpressionKind::TSParameterProperty(pp) => {
-                let inner = self.attach_param_decorators((*pp.parameter).clone(), decorators);
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
+                let inner =
+                    self.attach_param_decorators(self.expr(pp.parameter).clone(), decorators);
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
                     tsv_lang::ast_census_probe::Dead::DuplicateRoot,
                     1,
                 );
-                pp.parameter = arena.alloc(inner);
+                pp.parameter = self.push_expr(inner);
                 param
             }
             ExpressionKind::Identifier(id) => {
@@ -289,9 +283,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// constructor, object-literal methods, and ambient `declare function`s —
     /// every position acorn's `parseAssignableListItem` parses decorators in.
     /// Consumes both opening and closing parentheses.
-    pub(super) fn parse_parameter_list(
-        &mut self,
-    ) -> Result<crate::parser::BumpVec<'arena, Expression<'arena>>, Error> {
+    pub(super) fn parse_parameter_list(&mut self) -> Result<Run<Expr>, Error> {
         self.parse_parameter_list_inner(true, 1)
     }
 
@@ -308,9 +300,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// are not valid here" (TS1206) from its checker. So the uniform rejection here does
     /// not rest on tsc's parser, and the reject-vs-defer line (`docs/conformance_tsc.md`)
     /// normally defers a checker-raised rule.
-    pub(super) fn parse_parameter_list_no_decorators(
-        &mut self,
-    ) -> Result<crate::parser::BumpVec<'arena, Expression<'arena>>, Error> {
+    pub(super) fn parse_parameter_list_no_decorators(&mut self) -> Result<Run<Expr>, Error> {
         self.parse_parameter_list_inner(false, 1)
     }
 
@@ -323,9 +313,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `check_signature_params` then rejects — it is that one level, and what nests below
     /// it is charged where it is parsed: a pattern's own levels, a rest parameter's
     /// pattern at the rest, a parameter property's binding inside the property.
-    pub(super) fn parse_signature_parameter_list(
-        &mut self,
-    ) -> Result<crate::parser::BumpVec<'arena, Expression<'arena>>, Error> {
+    pub(super) fn parse_signature_parameter_list(&mut self) -> Result<Run<Expr>, Error> {
         self.parse_parameter_list_inner(false, 0)
     }
 
@@ -352,16 +340,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         allow_decorators: bool,
         parameter_levels: u32,
-    ) -> Result<crate::parser::BumpVec<'arena, Expression<'arena>>, Error> {
+    ) -> Result<Run<Expr>, Error> {
         self.expect(&TokenKind::ParenOpen)?;
         self.enter_grouping()?;
 
-        let mut params = self.bvec();
+        let mark = self.stores.expr_scratch.mark();
         if !self.check(&TokenKind::ParenClose) {
             // the parameters are siblings (`ListFrame`)
             let mut frame = self.list_frame();
             loop {
-                frame.element(self, params.len());
+                let len = self.stores.expr_scratch.len_since(mark);
+                frame.element(self, len);
                 // one wire level: the parameter, over its decorators, its pattern, its
                 // annotation and its default (the depth limit's count) — none where the
                 // list's grouping level is the parameter's (`parameter_levels`)
@@ -370,7 +359,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 })?;
 
                 let is_rest = matches!(param.kind, ExpressionKind::RestElement(_));
-                params.push(param);
+                self.stores.expr_scratch.push(param);
 
                 // A rest parameter must be the last in the list. Per the grammar
                 // (`FormalParameters : FormalParameterList `,` FunctionRestParameter`)
@@ -402,7 +391,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         self.expect(&TokenKind::ParenClose)?;
         self.exit_grouping();
-        Ok(params)
+        Ok(self.flush_expr_run(mark))
     }
 
     /// One parameter of a list ([`Parser::parse_parameter_list_inner`]): its decorators
@@ -427,7 +416,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // again with the level charged (`Parser::decorated_parameter_properties`).
         let decorators_start = self.current_pos().0 as u32;
         let mut reread: Option<Checkpoint<'arena>> = None;
-        let decorators: &'arena [Decorator<'arena>] = if self.check(&TokenKind::At) {
+        let decorators: &'arena [Decorator] = if self.check(&TokenKind::At) {
             // Reject decorators where the position forbids them (arrow
             // parameters, type-member signatures). Checked per-parameter, so
             // a mid-list decorator (`(a, @dec b)`) rejects too.
@@ -505,7 +494,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             accessibility,
                             readonly,
                             r#override: is_override,
-                            parameter: self.alloc(parameter),
+                            parameter: self.push_expr(parameter),
                         }),
                     }
                 } else {
@@ -537,13 +526,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Check for default value
                 if self.eat(TokenKind::Equals)? {
                     let pattern_start = pattern.span().start;
-                    let default_value = self.parse_assignment_expression_ref()?;
+                    let default_value = self.parse_assignment_expression()?.id();
                     // prev_token_end covers a parenthesized default's closing `)`
                     let assign_end = self.prev_token_end() as u32;
                     Expression {
                         span: Span::new(pattern_start, assign_end),
                         kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
-                            left: self.alloc(pattern),
+                            left: self.push_expr(pattern),
                             right: default_value,
                             decorators: None,
                         }),
@@ -582,7 +571,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let (optional, type_annotation, arg_end) =
                         self.parse_rest_param_tail(pattern.span().end)?;
                     Expression::from_rest_element(RestElement {
-                        argument: self.alloc(pattern),
+                        argument: self.push_expr(pattern),
                         optional,
                         type_annotation,
                         span: Span::new(rest_start as u32, arg_end),
@@ -607,7 +596,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let (optional, type_annotation, arg_end) =
                         self.parse_rest_param_tail(id_end as u32)?;
                     Expression::from_rest_element(RestElement {
-                        argument: self.alloc(argument),
+                        argument: self.push_expr(argument),
                         optional,
                         type_annotation,
                         span: Span::new(rest_start as u32, arg_end),
@@ -651,9 +640,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn check_accessor_param_arity(
         &self,
         is_getter: bool,
-        params: &[Expression<'arena>],
+        params: Run<Expr>,
         allow_this_param: bool,
     ) -> Result<(), Error> {
+        let params = self.stores.view().run(params);
         let mut expected = if is_getter { 0 } else { 1 };
         if allow_this_param && params.first().is_some_and(|p| self.is_this_param(p)) {
             expected += 1;
@@ -691,11 +681,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn check_type_member_accessor_params(
         &self,
         kind: MethodKind,
-        params: &[Expression<'arena>],
+        params: Run<Expr>,
     ) -> Result<(), Error> {
         let is_getter = matches!(kind, MethodKind::Get);
         self.check_accessor_param_arity(is_getter, params, false)?;
         if !is_getter {
+            let params = self.stores.view().run(params);
             if self.is_this_param(&params[0]) {
                 return Err(
                     self.error_msg("'get' and 'set' accessors cannot declare 'this' parameters")
@@ -721,11 +712,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// *ambient* declaration (`declare function f(v = 1)`, TS1039 deferred), and an
     /// *overload* keep their defaults (all acorn-accepts). Function *types* reject
     /// defaults already via their own param parser (`parse_function_type_params`).
-    pub(super) fn check_signature_params(
-        &self,
-        params: &[Expression<'arena>],
-    ) -> Result<(), Error> {
-        for param in params {
+    pub(super) fn check_signature_params(&self, params: Run<Expr>) -> Result<(), Error> {
+        for param in self.stores.view().run(params) {
             if !matches!(
                 param.kind,
                 ExpressionKind::Identifier(_)
@@ -748,7 +736,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (`base_offset` added), so it shifts back before slicing `self.source` (the
     /// local, possibly Svelte-embedded slice) — same discipline as
     /// `resolve_cooked`; `.get` keeps a stray span from panicking.
-    pub(super) fn is_this_param(&self, param: &Expression<'arena>) -> bool {
+    pub(super) fn is_this_param(&self, param: &Expression<'_>) -> bool {
         let ExpressionKind::Identifier(id) = &param.kind else {
             return false;
         };

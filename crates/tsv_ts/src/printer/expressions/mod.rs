@@ -53,7 +53,7 @@ use tsv_lang::doc::arena::DocId;
 /// the level's expression, its non-null, and its stripped-paren leading run.
 type CommentedNonNullLevel<'e, 'arena> = (
     &'e Expression<'arena>,
-    &'e crate::ast::TSNonNullExpression<'arena>,
+    &'e crate::ast::TSNonNullExpression,
     Option<DocId>,
 );
 
@@ -556,7 +556,7 @@ impl<'a> Printer<'a> {
     /// goes with it. Pinned by `typescript/syntax/comments/jsdoc_type_cast_leading_run_blank`.
     fn build_comment_bound_pair_lead_doc(
         &self,
-        cast: &crate::ast::CommentBoundPair<'_>,
+        cast: &crate::ast::CommentBoundPair,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -618,7 +618,7 @@ impl<'a> Printer<'a> {
     /// inner and the closing `)`.
     fn build_comment_bound_pair_doc(
         &self,
-        cast: &crate::ast::CommentBoundPair<'_>,
+        cast: &crate::ast::CommentBoundPair,
         cast_span: Span,
     ) -> DocId {
         let inner = self.view.expr(cast.inner);
@@ -1645,7 +1645,7 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_ts_non_null_doc(
         &self,
-        non_null_expr: &crate::ast::TSNonNullExpression<'_>,
+        non_null_expr: &crate::ast::TSNonNullExpression,
         span: Span,
     ) -> DocId {
         let expression = self.view.expr(non_null_expr.expression);
@@ -1934,7 +1934,7 @@ impl<'a> Printer<'a> {
     fn push_commented_non_null_suffix(
         &self,
         parts: &mut DocBuf,
-        non_null: &crate::ast::TSNonNullExpression<'_>,
+        non_null: &crate::ast::TSNonNullExpression,
         end: u32,
     ) {
         self.append_trailing_paren_comments(
@@ -1950,7 +1950,7 @@ impl<'a> Printer<'a> {
     fn close_commented_non_null_doc(
         &self,
         operand_doc: DocId,
-        non_null: &crate::ast::TSNonNullExpression<'_>,
+        non_null: &crate::ast::TSNonNullExpression,
         span: Span,
     ) -> DocId {
         let mut parts: DocBuf = smallvec![operand_doc];
@@ -2027,7 +2027,7 @@ impl<'a> Printer<'a> {
 
     /// Build binary chain doc with indented continuations
     /// Used when the binary expression is inside inline parens
-    fn build_binary_chain_doc_indented(&self, binary: &BinaryExpression<'_>, span: Span) -> DocId {
+    fn build_binary_chain_doc_indented(&self, binary: &BinaryExpression, span: Span) -> DocId {
         let d = self.d();
         // The comment-aware twin keeps comments and their line breaks: `fn(a && // c\n b)`.
         // Continuation-indent style, matching this builder's own, and grouped BEFORE the
@@ -2144,7 +2144,7 @@ impl<'a> Printer<'a> {
     /// indent style, which is the only thing the two callers disagree on.
     fn prepare_binary_chain_layout(
         &self,
-        binary: &BinaryExpression<'_>,
+        binary: &BinaryExpression,
         span: Span,
         build_commented: impl FnOnce(&Self) -> DocId,
     ) -> BinaryChainLayout {
@@ -2181,7 +2181,7 @@ impl<'a> Printer<'a> {
     /// which answers the comment question first.
     fn collect_binary_operands_for_indent(
         &self,
-        expr: &BinaryExpression<'_>,
+        expr: &BinaryExpression,
         operands: &mut DocBuf,
         operators: &mut OperatorBuf,
     ) {
@@ -2189,7 +2189,7 @@ impl<'a> Printer<'a> {
         // `collect_binary_chain_with_spans`), without recursing — the walk order
         // `collect_binary_chain_with_spans` states; otherwise the left operand is built with
         // parens if needed.
-        let mut spine: SmallVec<[&BinaryExpression<'_>; 8]> = smallvec![expr];
+        let mut spine: SmallVec<[&BinaryExpression; 8]> = smallvec![expr];
         let mut node = expr;
         // Whether a link above has walked the chain's region, which covers every link
         // below it ([`Self::mark_relational_chain_region`]).
@@ -2241,7 +2241,7 @@ impl<'a> Printer<'a> {
     /// In break: `a /\nb /\nc` (with outer indent providing indentation)
     pub(crate) fn build_binary_chain_for_parens(
         &self,
-        binary: &BinaryExpression<'_>,
+        binary: &BinaryExpression,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -2300,7 +2300,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript parameter property
     fn build_ts_parameter_property_doc(
         &self,
-        param_prop: &crate::ast::TSParameterProperty<'_>,
+        param_prop: &crate::ast::TSParameterProperty,
         param_prop_span: Span,
     ) -> DocId {
         let mut parts: DocBuf = DocBuf::new();

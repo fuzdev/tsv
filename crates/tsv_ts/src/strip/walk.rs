@@ -404,7 +404,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// arguments, inlined into [`Self::expr_inner`], cost every expression's walk a register
     /// for a kind few expressions are.
     #[inline(never)]
-    fn import_expression(&mut self, import: &ImportExpression<'_>, span: Span) {
+    fn import_expression(&mut self, import: &ImportExpression, span: Span) {
         if self.collects() {
             self.record_dynamic(import, span);
         }
@@ -414,7 +414,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
     }
 
-    fn record_dynamic(&mut self, import: &ImportExpression<'_>, span: Span) {
+    fn record_dynamic(&mut self, import: &ImportExpression, span: Span) {
         let specifier = match &self.view.expr(import.source).kind {
             ExpressionKind::Literal(literal)
                 if matches!(literal.value, LiteralValue::String(_)) =>
@@ -690,7 +690,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             StatementKind::TSExportAssignment(assignment) => {
                 self.refuse(UnsupportedConstruct::ExportEquals, outer);
                 if self.walks_refused() {
-                    self.expr(self.view.slot(&assignment.expression));
+                    self.expr(self.view.expr(assignment.expression));
                 }
                 true
             }
@@ -715,7 +715,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 if let Some(init) = s.init {
                     match init {
                         ForInit::VariableDeclaration(decl) => self.variable_declaration(decl),
-                        ForInit::Expression(e) => self.expr(self.view.slot(e)),
+                        ForInit::Expression(e) => self.expr(self.view.expr(*e)),
                     }
                 }
                 if let Some(test) = self.view.opt(s.test) {
@@ -831,7 +831,9 @@ impl<'s, 'b> Walk<'s, 'b> {
                 .declaration
                 .map_or(Tail::Closed, |declaration| self.statement_tail(declaration)),
             StatementKind::ExportDefaultDeclaration(export) => match &export.declaration {
-                ExportDefaultValue::Expression(e) => self.unterminated_tail(self.view.slot(e), end),
+                ExportDefaultValue::Expression(e) => {
+                    self.unterminated_tail(self.view.expr(*e), end)
+                }
                 ExportDefaultValue::FunctionDeclaration(_)
                 | ExportDefaultValue::TSDeclareFunction(_)
                 | ExportDefaultValue::ClassDeclaration(_)
@@ -913,7 +915,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     fn for_left(&mut self, left: &ForInOfLeft<'_>) {
         match left {
             ForInOfLeft::VariableDeclaration(decl) => self.variable_declaration(decl),
-            ForInOfLeft::Pattern(pattern) => self.expr(self.view.slot(pattern)),
+            ForInOfLeft::Pattern(pattern) => self.expr(self.view.expr(*pattern)),
         }
     }
 
@@ -960,7 +962,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     ) -> bool {
         match &export.declaration {
             ExportDefaultValue::Expression(e) => {
-                self.expr(self.view.slot(e));
+                self.expr(self.view.expr(*e));
                 true
             }
             ExportDefaultValue::FunctionDeclaration(func) => {
@@ -1051,7 +1053,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// would spend a frame per operator: the leftmost operand, then each right operand
     /// innermost first, the source order a recursion visits them in.
     #[inline(never)]
-    fn binary_chain(&mut self, binary: &BinaryExpression<'_>) {
+    fn binary_chain(&mut self, binary: &BinaryExpression) {
         let mut rights: SmallVec<[&Expression<'_>; 8]> = SmallVec::new();
         rights.push(self.view.expr(binary.right));
         let mut left = self.view.expr(binary.left);
@@ -1332,13 +1334,8 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             ExpressionKind::ArrayPattern(pattern) => {
                 self.decorators(pattern.decorators);
-                for element in self
-                    .view
-                    .pattern_elements(pattern.elements)
-                    .iter()
-                    .flatten()
-                {
-                    self.expr(self.view.slot(element));
+                for element in self.view.opt_list(pattern.elements).iter().flatten() {
+                    self.expr(self.view.expr(*element));
                 }
                 self.pattern_tail(e.span, pattern.optional, pattern.type_annotation.as_ref());
             }
@@ -1399,7 +1396,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         let annotation = id.type_annotation();
         if id.optional {
             let from = decorators
-                .and_then(<[Decorator<'_>]>::last)
+                .and_then(<[Decorator]>::last)
                 .map_or(id.span.start, |last| last.span.end);
             let end = annotation.map_or(id.span.end, |a| a.span.start);
             if let Some(question) = self.src.find_char(from, end, b'?') {
@@ -1412,7 +1409,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     /// An object-literal or object-pattern property: a computed key and the value.
-    fn property(&mut self, property: &Property<'_>) {
+    fn property(&mut self, property: &Property) {
         if property.computed {
             self.expr(self.view.expr(property.key));
         }
@@ -1443,9 +1440,9 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
     }
 
-    fn decorators(&mut self, decorators: Option<&[Decorator<'_>]>) {
+    fn decorators(&mut self, decorators: Option<&[Decorator]>) {
         for decorator in decorators.unwrap_or_default() {
-            self.expr(self.view.slot(&decorator.expression));
+            self.expr(self.view.expr(decorator.expression));
         }
     }
 
@@ -1568,7 +1565,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     /// `constructor(public x)` and its kin: refused, the span the first modifier.
-    fn parameter_property(&mut self, span: Span, property: &TSParameterProperty<'_>) {
+    fn parameter_property(&mut self, span: Span, property: &TSParameterProperty) {
         let end = self.view.expr(property.parameter).span.start;
         let keywords = [
             property.accessibility.map(|a| a.as_str().as_bytes()),
@@ -1652,7 +1649,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         self.decorators(class.decorators);
         let modifiers_from = class
             .decorators
-            .and_then(<[Decorator<'_>]>::last)
+            .and_then(<[Decorator]>::last)
             .map_or(outer_start, |last| last.span.end.max(outer_start));
         if class.r#abstract
             && let Some(at) =
@@ -1692,7 +1689,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                     ClassMember::PropertyDefinition(PropertyDefinition {
                         value: Some(value),
                         ..
-                    }) => self.unterminated_tail(self.view.slot(value), span.end),
+                    }) => self.unterminated_tail(self.view.expr(*value), span.end),
                     _ => Tail::Closed,
                 };
             }
@@ -1727,7 +1724,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     fn property_definition(&mut self, property: &PropertyDefinition<'_>, open_field: bool) -> bool {
-        let key = self.view.slot(&property.key);
+        let key = self.view.expr(property.key);
         // `declare x: T` and `abstract x: T` declare no runtime field
         if property.declare || property.r#abstract {
             self.blank_statement(property.span, Position::List);
@@ -1771,7 +1768,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                     property
                         .value
                         .as_ref()
-                        .map(|v| self.view.slot(v).span.start)
+                        .map(|v| self.view.expr(*v).span.start)
                 })
                 .unwrap_or(property.span.end);
             if let Some(at) = self.src.find_char(key.span.end, end, mark) {
@@ -1781,7 +1778,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         if let Some(annotation) = annotation {
             self.blank_span(annotation.span);
         }
-        if let Some(value) = self.view.opt_slot(&property.value) {
+        if let Some(value) = self.view.opt(property.value) {
             self.enter_function();
             self.expr(value);
             self.leave_function();
@@ -1790,7 +1787,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     fn method_definition(&mut self, method: &MethodDefinition<'_>, open_field: bool) -> bool {
-        let key = self.view.slot(&method.key);
+        let key = self.view.expr(method.key);
         let func = &method.value;
         // an overload signature or an abstract method or accessor: no body
         if func.body.body.is_empty() && func.body.span.start == func.body.span.end {
@@ -1846,7 +1843,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     fn enum_initializers(&mut self, decl: &TSEnumDeclaration<'_>) {
         self.enter_function();
         for member in decl.members {
-            if let Some(initializer) = self.view.opt_slot(&member.initializer) {
+            if let Some(initializer) = self.view.opt(member.initializer) {
                 self.expr(initializer);
             }
         }
@@ -1990,9 +1987,9 @@ fn is_link(e: &Expression<'_>) -> bool {
     )
 }
 
-fn decorators_end(decorators: Option<&[Decorator<'_>]>, start: u32) -> u32 {
+fn decorators_end(decorators: Option<&[Decorator]>, start: u32) -> u32 {
     decorators
-        .and_then(<[Decorator<'_>]>::last)
+        .and_then(<[Decorator]>::last)
         .map_or(start, |last| last.span.end)
 }
 
@@ -2052,7 +2049,7 @@ impl<'n, 'a> FunctionView<'n, 'a> {
 
 /// The parts of a class the walk reads, from a declaration or an expression.
 struct ClassView<'n, 'a> {
-    decorators: Option<&'a [Decorator<'a>]>,
+    decorators: Option<&'a [Decorator]>,
     r#abstract: bool,
     type_parameters: Option<&'n TSTypeParameterDeclaration<'a>>,
     super_class: Option<&'n Expression<'n>>,

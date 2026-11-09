@@ -279,7 +279,7 @@ pub(crate) fn choose_layout(
 /// Prettier ref: `shouldInlineLogicalExpression` (`print/binaryish.js`)
 pub fn should_inline_logical_expression(
     view: ExprView<'_>,
-    binary: &ast::BinaryExpression<'_>,
+    binary: &ast::BinaryExpression,
 ) -> bool {
     if !binary.operator.is_logical() {
         return false;

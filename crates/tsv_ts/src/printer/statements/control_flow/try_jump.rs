@@ -195,7 +195,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_throw_statement_doc(
         &self,
-        stmt: &ast::ThrowStatement<'_>,
+        stmt: &ast::ThrowStatement,
         span: Span,
         gap: TerminatorGap,
     ) -> DocId {

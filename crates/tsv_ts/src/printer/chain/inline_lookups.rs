@@ -126,7 +126,7 @@ pub(super) fn resolve_inline_lookups(
 /// The caller declines for any comment in `member`'s span, so the node's gap emitters have
 /// nothing to print and no `lineSuffixBoundary` is owed between the two halves.
 pub(crate) fn build_lookup_after_operand_doc(
-    member: &MemberExpression<'_>,
+    member: &MemberExpression,
     span: Span,
     object_doc: DocId,
     printer: &Printer<'_>,
@@ -166,7 +166,7 @@ fn strip_non_null<'e>(view: ExprView<'e>, mut expr: &'e Expression<'e>) -> &'e E
 /// The walk stops at a sealed optional chain (`(a?.b).c` — [`child_stops_optional_chain`]):
 /// that is a nested `ChainExpression`, the OBJECT of the chain `member` ends rather than
 /// one of its links, as the linearizer's sealed base is for the chain root.
-fn spine_has_optional_link(view: ExprView<'_>, member: &MemberExpression<'_>, span: Span) -> bool {
+fn spine_has_optional_link(view: ExprView<'_>, member: &MemberExpression, span: Span) -> bool {
     if member.optional {
         return true;
     }

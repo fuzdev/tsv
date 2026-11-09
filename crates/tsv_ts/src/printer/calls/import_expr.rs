@@ -36,7 +36,7 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 /// and the scan starts mid-comment, missing it. That was the drop.
 fn build_import_head_doc(
     printer: &Printer<'_>,
-    import_expr: &ast::ImportExpression<'_>,
+    import_expr: &ast::ImportExpression,
     import_expr_span: Span,
 ) -> (DocId, u32) {
     let d = printer.d();
@@ -272,7 +272,7 @@ pub(in crate::printer) fn build_import_args_comment_layout(
 /// - Only the options object expands with its properties indented
 pub(super) fn build_import_expression_doc(
     printer: &Printer<'_>,
-    import_expr: &ast::ImportExpression<'_>,
+    import_expr: &ast::ImportExpression,
     span: Span,
 ) -> DocId {
     let d = printer.d();
@@ -308,7 +308,7 @@ pub(super) fn build_import_expression_doc(
 /// empty doc when the head→`(` gap's pre-paren half has taken it.
 fn build_import_args_doc(
     printer: &Printer<'_>,
-    import_expr: &ast::ImportExpression<'_>,
+    import_expr: &ast::ImportExpression,
     span: Span,
     head: DocId,
     leading_scan_start: u32,

@@ -199,7 +199,7 @@ pub(super) fn write_call_expression_tail(
 /// walks member → object (its object's flags are the chain walk's).
 pub(super) fn write_member_expression_tail(
     w: &mut JsonWriter,
-    member: &ast::MemberExpression<'_>,
+    member: &ast::MemberExpression,
     span: Span,
     ctx: &Ctx<'_>,
     force_optional: bool,
@@ -236,7 +236,7 @@ pub(super) fn write_member_expression_tail(
 /// Emits a `ConditionalExpression` node.
 pub(super) fn write_conditional_expression(
     w: &mut JsonWriter,
-    cond: &ast::ConditionalExpression<'_>,
+    cond: &ast::ConditionalExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -253,7 +253,7 @@ pub(super) fn write_conditional_expression(
 /// Emits an `AwaitExpression` node.
 pub(super) fn write_await_expression(
     w: &mut JsonWriter,
-    await_expr: &ast::AwaitExpression<'_>,
+    await_expr: &ast::AwaitExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -267,7 +267,7 @@ pub(super) fn write_await_expression(
 /// (nullable).
 pub(super) fn write_yield_expression(
     w: &mut JsonWriter,
-    yield_expr: &ast::YieldExpression<'_>,
+    yield_expr: &ast::YieldExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {

@@ -34,7 +34,7 @@ impl<'a> Printer<'a> {
     /// An assignment's clarity parens (`{@html (a = b)}`) are applied inside
     /// [`Printer::build_expression_with_comments_doc`], so they land inside a frozen head's
     /// break rather than around it.
-    pub(super) fn build_html_tag_doc(&self, tag: &ast::HtmlTag<'_>) -> DocId {
+    pub(super) fn build_html_tag_doc(&self, tag: &ast::HtmlTag) -> DocId {
         // Build expression doc with surrounding comments
         // Span range: after "{@html " to before "}"
         let head = self.build_expression_with_comments_doc(
@@ -47,7 +47,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for {@const declaration}
-    pub(super) fn build_const_tag_doc(&self, tag: &ast::ConstTag<'_>) -> DocId {
+    pub(super) fn build_const_tag_doc(&self, tag: &ast::ConstTag) -> DocId {
         self.build_assignment_tag_doc(
             AT_CONST_TAG_OPEN,
             self.view.expr(tag.id),
@@ -455,8 +455,13 @@ impl<'a> Printer<'a> {
     /// the previous identifier, one after it leads the next. Without the split a
     /// pre-comma comment (`{@debug x /* c */, y}`) falls through both
     /// per-identifier buckets and is dropped.
-    pub(super) fn build_debug_tag_doc(&self, tag: &ast::DebugTag<'_>) -> DocId {
-        let identifiers = self.view.run(tag.identifiers);
+    pub(super) fn build_debug_tag_doc(&self, tag: &ast::DebugTag) -> DocId {
+        let identifiers: Vec<&Expression<'_>> = self
+            .view
+            .list(tag.identifiers)
+            .iter()
+            .map(|&id| self.view.expr(id))
+            .collect();
         let d = self.d();
 
         // Every gap below is read with `comments_in_source_between` — the **in-source** axis
@@ -520,13 +525,9 @@ impl<'a> Printer<'a> {
         // `indents_content` is also the dedent the trailing run below owes —
         // `trailing_comment_docs`' `closer_owns_break`, spelled out by hand here since this
         // builder emits its own run.
-        let mut layout = self
-            .view
-            .run(tag.identifiers)
-            .first()
-            .map_or(HeadLayout::Inline, |first| {
-                self.head_layout(last_end, first.span().start, false)
-            });
+        let mut layout = identifiers.first().map_or(HeadLayout::Inline, |first| {
+            self.head_layout(last_end, first.span().start, false)
+        });
         // A `//` in a COMMA gap breaks the list the same way one in the head gap does: the
         // identifiers below it hang one level in and the `}` drops to the tag's column —
         // the geometry every braced head a `//` breaks already has. Only the inline
@@ -625,7 +626,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for {@render snippet(args)}
-    pub(super) fn build_render_tag_doc(&self, tag: &ast::RenderTag<'_>) -> DocId {
+    pub(super) fn build_render_tag_doc(&self, tag: &ast::RenderTag) -> DocId {
         // Build expression doc with surrounding comments
         // Span range: after "{@render " to before "}"
         let head = self.build_expression_with_comments_doc(

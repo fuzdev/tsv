@@ -490,7 +490,7 @@ impl<'a> Printer<'a> {
             open_paren,
             init_start: stmt.init.as_ref().map(|i| match i {
                 ast::ForInit::VariableDeclaration(d) => d.span.start,
-                ast::ForInit::Expression(e) => self.view.slot(e).span().start,
+                ast::ForInit::Expression(e) => self.view.expr(*e).span().start,
             }),
             init_end,
             test_start: stmt.test.as_ref().map(|t| self.view.expr(*t).span().start),
@@ -1153,7 +1153,7 @@ impl<'a> Printer<'a> {
     /// is gone rather than duplicated.
     fn build_for_sequence_clause_doc(
         &self,
-        seq: &ast::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression,
         seq_span: Span,
         build_elem: impl Fn(&Expression<'_>) -> DocId,
     ) -> DocId {
@@ -1825,7 +1825,7 @@ impl<'a> Printer<'a> {
     fn get_for_in_of_left_end(&self, left: &ast::ForInOfLeft<'_>) -> u32 {
         match left {
             ast::ForInOfLeft::VariableDeclaration(decl) => decl.span.end,
-            ast::ForInOfLeft::Pattern(expr) => self.view.slot(expr).span().end,
+            ast::ForInOfLeft::Pattern(expr) => self.view.expr(*expr).span().end,
         }
     }
 
@@ -1833,7 +1833,7 @@ impl<'a> Printer<'a> {
     fn get_for_in_of_left_start(&self, left: &ast::ForInOfLeft<'_>) -> u32 {
         match left {
             ast::ForInOfLeft::VariableDeclaration(decl) => decl.span.start,
-            ast::ForInOfLeft::Pattern(expr) => self.view.slot(expr).span().start,
+            ast::ForInOfLeft::Pattern(expr) => self.view.expr(*expr).span().start,
         }
     }
 
@@ -1852,7 +1852,7 @@ impl<'a> Printer<'a> {
                 .map_or(decl.span.start, |declarator| {
                     self.view.expr(declarator.id).span().start
                 }),
-            ast::ForInOfLeft::Pattern(expr) => self.view.slot(expr).span().start,
+            ast::ForInOfLeft::Pattern(expr) => self.view.expr(*expr).span().start,
         }
     }
 
@@ -2094,7 +2094,7 @@ impl<'a> Printer<'a> {
         match init {
             // This clause IS the init; it needs no ambient flag to know it.
             ast::ForInit::Expression(expr)
-                if self.frozen_slice_hands_header_a_bare_in(self.view.slot(expr), frozen.end) =>
+                if self.frozen_slice_hands_header_a_bare_in(self.view.expr(*expr), frozen.end) =>
             {
                 self.d().parens(doc)
             }
@@ -2344,9 +2344,9 @@ impl<'a> Printer<'a> {
                 // ([`Printer::build_for_init_value_doc`]), as does a sequence clause's last
                 // operand; the bare clause and the update clause want that routing too.
                 self.with_expr_stmt_paren_target(
-                    self.for_init_head_target(self.view.slot(expr)),
+                    self.for_init_head_target(self.view.expr(*expr)),
                     || {
-                        self.build_for_expr_clause(self.view.slot(expr), |e| {
+                        self.build_for_expr_clause(self.view.expr(*expr), |e| {
                             self.wrap_for_init_in(e, self.build_expression_doc(e))
                         })
                     },
@@ -2383,7 +2383,9 @@ impl<'a> Printer<'a> {
         // for-in/of. Unlike `(async)`, the paren can belong to a node *inside* the clause
         // (`for ((let).a of x)`), so it is handed to that node rather than wrapped here.
         let let_target = match left {
-            ast::ForInOfLeft::Pattern(expr) => self.for_in_of_let_head_target(self.view.slot(expr)),
+            ast::ForInOfLeft::Pattern(expr) => {
+                self.for_in_of_let_head_target(self.view.expr(*expr))
+            }
             ast::ForInOfLeft::VariableDeclaration(_) => None,
         };
         if let Some(open) = spans.open_paren
@@ -2433,7 +2435,7 @@ impl<'a> Printer<'a> {
             // bare `for (async of x)` is a syntax error).
             ast::ForInOfLeft::Pattern(expr) => {
                 let doc = self.with_expr_stmt_paren_target(let_target, || {
-                    self.build_expression_doc(self.view.slot(expr))
+                    self.build_expression_doc(self.view.expr(*expr))
                 });
                 if wrap_async_paren { d.parens(doc) } else { doc }
             }
@@ -2457,7 +2459,7 @@ impl<'a> Printer<'a> {
                 left,
                 ast::ForInOfLeft::Pattern(pattern)
                     if matches!(
-                        &self.view.slot(pattern).kind,
+                        &self.view.expr(*pattern).kind,
                         ExpressionKind::Identifier(id) if self.with_ident_name(id, |s| s == "async")
                     )
             )
@@ -2467,7 +2469,7 @@ impl<'a> Printer<'a> {
     fn get_for_init_span_end(&self, init: &ast::ForInit<'_>) -> u32 {
         match init {
             ast::ForInit::VariableDeclaration(decl) => decl.span.end,
-            ast::ForInit::Expression(expr) => self.view.slot(expr).span().end,
+            ast::ForInit::Expression(expr) => self.view.expr(*expr).span().end,
         }
     }
 }

@@ -79,16 +79,15 @@ pub(in crate::printer) fn run_defers_line(run: &[&Comment]) -> bool {
 /// [`Printer::hole_slot_comma`]. Two questions, two far ends, and answering either with
 /// the other's is a bug pointing the opposite way.
 ///
-/// Generic over the slot's element so the array literal (`Option<&Expression>`) and the
-/// array pattern (`Option<Expression>`) share it.
-pub(in crate::printer) fn next_real_element_start<E: crate::ast::ListElement>(
+/// The array literal and the array pattern share it, each holding a list of optional ids.
+pub(in crate::printer) fn next_real_element_start(
     view: ExprView<'_>,
-    elements: &[Option<E>],
+    elements: &[Option<crate::ast::ExprId>],
     idx: usize,
 ) -> Option<u32> {
     elements[idx + 1..]
         .iter()
-        .find_map(|e| e.as_ref().map(|e| e.element(view).span().start))
+        .find_map(|e| e.map(|e| view.expr(e).span().start))
 }
 
 /// Trailing comments collected for a list element (property or array element)

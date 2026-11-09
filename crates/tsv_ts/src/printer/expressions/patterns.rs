@@ -52,7 +52,7 @@ fn array_pattern_gap_end(
     i: usize,
     body_end: u32,
 ) -> u32 {
-    next_real_element_start(view, view.pattern_elements(arr.elements), i).unwrap_or(body_end)
+    next_real_element_start(view, view.opt_list(arr.elements), i).unwrap_or(body_end)
 }
 
 /// Check if an arrow function has a nested arrow function as its body
@@ -138,7 +138,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an assignment expression
     pub(super) fn build_assignment_doc(
         &self,
-        assign: &ast::AssignmentExpression<'_>,
+        assign: &ast::AssignmentExpression,
         span: Span,
     ) -> DocId {
         // Assignment RHS — an `ancestorNameMap` value position.
@@ -151,7 +151,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an assignment expression with chain context
     fn build_assignment_doc_with_context(
         &self,
-        assign: &ast::AssignmentExpression<'_>,
+        assign: &ast::AssignmentExpression,
         assign_span: Span,
         context: AssignmentContext,
     ) -> DocId {
@@ -604,12 +604,12 @@ impl<'a> Printer<'a> {
         let type_annotation = arr.type_annotation.as_ref();
         let last_content_end = self
             .view
-            .pattern_elements(arr.elements)
+            .opt_list(arr.elements)
             .iter()
             .rev()
             .flatten()
             .next()
-            .map_or(span.start + 1, |e| self.view.slot(e).span().end);
+            .map_or(span.start + 1, |e| self.view.expr(*e).span().end);
         PatternTail {
             body_end: self.pattern_body_end(
                 span,
@@ -1374,12 +1374,8 @@ impl<'a> Printer<'a> {
         let has_comments = self.has_comments_on_page_between(arr_span.start, boundary);
         let (has_line_comments, has_multiline_block, has_own_line_block) = if has_comments {
             // Flatten once (skip holes) and share across the scans.
-            let non_null: SmallVec<[_; 8]> = self
-                .view
-                .pattern_elements(arr.elements)
-                .iter()
-                .flatten()
-                .collect();
+            let non_null: SmallVec<[_; 8]> =
+                self.view.opt_list(arr.elements).iter().flatten().collect();
             // Only the line-comment half: an array pattern does NOT force-expand on a
             // blank line (the object pattern does), so `.1` is deliberately discarded
             // rather than forgotten — the shared scan just answers one question more
@@ -1390,8 +1386,8 @@ impl<'a> Printer<'a> {
                     boundary,
                     &non_null,
                     true,
-                    |elem| self.view.slot(*elem).span(),
-                    |elem| self.view.slot(*elem).printed_end(self.view),
+                    |elem| self.view.expr(**elem).span(),
+                    |elem| self.view.expr(**elem).printed_end(self.view),
                 )
                 .0;
             let has_multiline_block =
@@ -1404,8 +1400,8 @@ impl<'a> Printer<'a> {
                 // not print it — the same widening the trailing seam takes.
                 |elem| {
                     Span::new(
-                        self.view.slot(*elem).span().start,
-                        self.view.slot(*elem).printed_end(self.view),
+                        self.view.expr(**elem).span().start,
+                        self.view.expr(**elem).printed_end(self.view),
                     )
                 },
             );
@@ -1419,9 +1415,9 @@ impl<'a> Printer<'a> {
         let rest_interior_expands = has_comments
             && self.paren_interior_forces_expansion(
                 self.view
-                    .pattern_elements(arr.elements)
+                    .opt_list(arr.elements)
                     .last()
-                    .and_then(|e| self.view.slot(e.as_ref()?).paren_interior(self.view)),
+                    .and_then(|e| self.view.expr((*e)?).paren_interior(self.view)),
             );
 
         if has_line_comments || has_multiline_block || has_own_line_block || rest_interior_expands {
@@ -1458,12 +1454,12 @@ impl<'a> Printer<'a> {
         let mut parts = d.pooled_docbuf();
         let mut prev_end = span.start + 1;
 
-        for (i, elem) in self.view.pattern_elements(arr.elements).iter().enumerate() {
+        for (i, elem) in self.view.opt_list(arr.elements).iter().enumerate() {
             let is_last = i == arr.elements.len() - 1;
 
             if let Some(e) = elem {
                 // Check for leading comments before this element
-                let elem_start = self.view.slot(e).span().start;
+                let elem_start = self.view.expr(*e).span().start;
                 if has_comments {
                     let leading_comments =
                         self.build_inline_comments_between_doc_trailing_space(prev_end, elem_start);
@@ -1471,15 +1467,15 @@ impl<'a> Printer<'a> {
                 }
 
                 parts.push(
-                    self.build_list_element_doc(self.view.slot(e).span().start, || {
-                        self.build_expression_doc(self.view.slot(e))
+                    self.build_list_element_doc(self.view.expr(*e).span().start, || {
+                        self.build_expression_doc(self.view.expr(*e))
                     }),
                 );
 
                 // Unguarded for the same reason as the object pattern's grouped twin: a
                 // freeze needs a directive comment, which routes the pattern to the
                 // expanded builder before this path is reached.
-                let elem_end = self.view.slot(e).printed_end(self.view);
+                let elem_end = self.view.expr(*e).printed_end(self.view);
 
                 // Collect trailing comments, bounded by the next REAL element or (past the
                 // last) the body's end — `array_pattern_gap_end` carries both halves.
@@ -1520,7 +1516,7 @@ impl<'a> Printer<'a> {
         if has_comments
             && self
                 .view
-                .pattern_elements(arr.elements)
+                .opt_list(arr.elements)
                 .last()
                 .is_some_and(Option::is_none)
         {
@@ -1552,7 +1548,7 @@ impl<'a> Printer<'a> {
         arr_span: Span,
         tail: PatternTail<'_>,
     ) -> DocId {
-        let elements = self.view.pattern_elements(arr.elements);
+        let elements = self.view.opt_list(arr.elements);
         let d = self.d();
         let boundary = tail.body_end;
         let mut parts = DocBuf::new();
@@ -1566,12 +1562,12 @@ impl<'a> Printer<'a> {
         // span to anchor the range); otherwise the existing path handles comments.
         let (bracket_line_prefix, bracket_pull_pos) = match self
             .view
-            .pattern_elements(arr.elements)
+            .opt_list(arr.elements)
             .first()
             .and_then(|opt| opt.as_ref())
         {
             Some(first) => self
-                .delimiter_line_comment_prefix(arr_span.start, self.view.slot(first).span().start),
+                .delimiter_line_comment_prefix(arr_span.start, self.view.expr(*first).span().start),
             None => (None, None),
         };
 
@@ -1580,7 +1576,7 @@ impl<'a> Printer<'a> {
 
             if let Some(e) = elem {
                 // Check for leading comments before this element (with blank line preservation)
-                let elem_start = self.view.slot(e).span().start;
+                let elem_start = self.view.expr(*e).span().start;
                 let leading_comments = self.collect_item_leading_comments(
                     prev_end,
                     elem_start,
@@ -1594,9 +1590,9 @@ impl<'a> Printer<'a> {
                 // either spelling of an own-line comment routes the pattern here.
                 let frozen_span = self.element_frozen_span(arr_span.start + 1, elements, i);
                 let element_doc = match frozen_span {
-                    Some(frozen) => self.build_frozen_arg_doc(self.view.slot(e), frozen),
-                    None => self.build_list_element_doc(self.view.slot(e).span().start, || {
-                        self.build_expression_doc(self.view.slot(e))
+                    Some(frozen) => self.build_frozen_arg_doc(self.view.expr(*e), frozen),
+                    None => self.build_list_element_doc(self.view.expr(*e).span().start, || {
+                        self.build_expression_doc(self.view.expr(*e))
                     }),
                 };
                 parts.push(self.build_list_element_group_from_comments(
@@ -1607,7 +1603,7 @@ impl<'a> Printer<'a> {
 
                 let elem_end = Self::element_claim_anchor(
                     frozen_span,
-                    self.view.slot(e).printed_end(self.view),
+                    self.view.expr(*e).printed_end(self.view),
                 );
 
                 // Collect trailing comments, bounded by the next REAL element or (past the
@@ -1617,7 +1613,7 @@ impl<'a> Printer<'a> {
                 // run past its `)` follows the pattern's share of it.
                 let rest_interior = self
                     .view
-                    .slot(e)
+                    .expr(*e)
                     .paren_interior(self.view)
                     .filter(|_| frozen_span.is_none());
                 let trailing = self.collect_element_trailing_comments(
@@ -1691,7 +1687,7 @@ impl<'a> Printer<'a> {
         // Check for dangling comments after the last element (before `]`)
         let past_elision = self
             .view
-            .pattern_elements(arr.elements)
+            .opt_list(arr.elements)
             .last()
             .is_some_and(Option::is_none);
         parts.push(self.build_pattern_trailing_dangling_comments(prev_end, boundary, past_elision));
@@ -1990,29 +1986,25 @@ impl Printer<'_> {
             }
             ExpressionKind::ArrayPattern(arr) if !arr.elements.is_empty() => {
                 let boundary = self.array_pattern_tail(arr, expr.span).body_end;
-                let non_null: SmallVec<[_; 8]> = self
-                    .view
-                    .pattern_elements(arr.elements)
-                    .iter()
-                    .flatten()
-                    .collect();
+                let non_null: SmallVec<[_; 8]> =
+                    self.view.opt_list(arr.elements).iter().flatten().collect();
                 self.has_own_line_block_comments_in_bracket_list(
                     Span::new(expr.span.start, boundary),
                     &non_null,
                     |elem| {
                         Span::new(
-                            self.view.slot(*elem).span().start,
-                            self.view.slot(*elem).printed_end(self.view),
+                            self.view.expr(**elem).span().start,
+                            self.view.expr(**elem).printed_end(self.view),
                         )
                     },
                 ) || self.paren_interior_forces_expansion(
                     self.view
-                        .pattern_elements(arr.elements)
+                        .opt_list(arr.elements)
                         .last()
-                        .and_then(|e| self.view.slot(e.as_ref()?).paren_interior(self.view)),
+                        .and_then(|e| self.view.expr((*e)?).paren_interior(self.view)),
                 ) || non_null
                     .iter()
-                    .any(|e| self.pattern_own_line_block_breaks(self.view.slot(*e)))
+                    .any(|e| self.pattern_own_line_block_breaks(self.view.expr(**e)))
             }
             // A default value is no list of this pattern's, but an own-line block inside it
             // opens the value itself (an object's or array's elements, a call's arguments, an

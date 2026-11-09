@@ -89,7 +89,7 @@ impl<'a> Printer<'a> {
     pub(super) fn arg_paren_interior(
         &self,
         container_start: u32,
-        args: &[ast::ExprEdge<'_>],
+        args: &[ast::ExprId],
         i: usize,
     ) -> Option<Span> {
         let interior = self.printed_paren_interior(self.view.expr(args[i]))?;
@@ -330,7 +330,7 @@ pub(super) fn has_inter_argument_comments(
 
 /// Check if there are comments between arguments in a slice
 pub(super) fn has_inter_argument_comments_slice(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
     printer: &Printer<'_>,
 ) -> bool {
     if arguments.len() < 2 {
@@ -367,7 +367,7 @@ pub(super) fn has_inter_argument_comments_slice(
 /// itself: a **test call** is joined by `printCallExpression` directly, so it has no
 /// `anyArgEmptyLine` at all (see `call_formatting.rs`, which asks `is_test_call` — the callee, not
 /// the layout).
-pub(super) fn any_arg_empty_line(arguments: &[ast::ExprEdge<'_>], printer: &Printer<'_>) -> bool {
+pub(super) fn any_arg_empty_line(arguments: &[ast::ExprId], printer: &Printer<'_>) -> bool {
     arguments.windows(2).any(|pair| {
         printer.is_next_line_empty(
             printer.view.expr(pair[0]).span().end,
@@ -453,7 +453,7 @@ pub(super) fn should_force_expansion_for_comments(
 /// answers `false` here, which is what prettier's `hasComment(arg)` reports for it too.
 /// **On page**, since an owned annotation glued to an argument is a comment prettier sees.
 pub(super) fn any_arg_gap_has_comment_on_page(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
     printer: &Printer<'_>,
     paren_open: u32,
     call_end: u32,
@@ -493,7 +493,7 @@ pub(super) fn any_comment_forces_expansion(
 /// asked [`has_inter_argument_comments_slice`] instead, which counts a same-line inline
 /// block (`new A(a /* c */, () => {…})`) and so broke out a list prettier keeps hugged.
 pub(super) fn any_comment_forces_expansion_slice(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
     printer: &Printer<'_>,
     paren_open: u32,
     call_end: u32,
@@ -573,7 +573,7 @@ pub(super) fn any_comment_forces_expansion_slice(
 /// Used to prevent expand-last-arg layout when the last arg has comments,
 /// since prettier's shouldExpandLastArg returns false in that case.
 pub(super) fn last_arg_has_comments(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
     printer: &Printer<'_>,
     call_end: u32,
     paren_open: u32,
@@ -626,7 +626,7 @@ pub(super) fn last_arg_has_comments(
 /// argument is on the page just like any other leading comment, so prettier's
 /// `shouldExpandFirstArg` refuses the hug for it too.
 pub(super) fn first_arg_has_any_comments(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
     printer: &Printer<'_>,
     paren_open: u32,
 ) -> bool {
@@ -678,7 +678,7 @@ pub(super) fn has_trailing_comments_on_args(
 ///
 /// Used by both CallExpression and NewExpression.
 pub(super) fn has_trailing_line_comments_slice(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
     call_span_end: u32,
     printer: &Printer<'_>,
 ) -> bool {
@@ -804,7 +804,7 @@ pub(super) fn emit_last_arg_trailing_comments(
 /// This is important for new expressions where block comments after arguments
 /// can also be lost if not handled properly.
 pub(super) fn has_trailing_comments_slice(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
     call_span_end: u32,
     printer: &Printer<'_>,
 ) -> bool {
@@ -817,7 +817,7 @@ pub(super) fn has_trailing_comments_slice(
 #[inline]
 fn has_trailing_comments_slice_impl<F>(
     view: ExprView<'_>,
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
     call_span_end: u32,
     has_comments: F,
 ) -> bool

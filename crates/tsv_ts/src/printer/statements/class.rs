@@ -411,7 +411,7 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a property definition
     fn build_property_definition_doc(&self, prop: &ast::PropertyDefinition<'_>) -> DocId {
-        let key = self.view.slot(&prop.key);
+        let key = self.view.expr(prop.key);
         let d = self.d();
         let mut parts = smallvec![];
 
@@ -525,7 +525,7 @@ impl<'a> Printer<'a> {
         };
 
         // Value if present - use assignment layout (matches prettier's printAssignment)
-        if let Some(value) = self.view.opt_slot(&prop.value) {
+        if let Some(value) = self.view.opt(prop.value) {
             let before_eq = prop
                 .type_annotation
                 .as_ref()
@@ -565,7 +565,7 @@ impl<'a> Printer<'a> {
         let content_end = prop
             .value
             .as_ref()
-            .map(|v| self.view.slot(v).span().end)
+            .map(|v| self.view.expr(*v).span().end)
             .or_else(|| prop.type_annotation.as_ref().map(|ta| ta.span.end))
             .unwrap_or(after_modifier);
         self.push_semicolon_with_gap_comments(&mut parts, content_end, prop.span.end, true, None);
@@ -739,7 +739,7 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a method definition
     fn build_method_definition_doc(&self, method: &ast::MethodDefinition<'_>) -> DocId {
-        let key = self.view.slot(&method.key);
+        let key = self.view.expr(method.key);
         let d = self.d();
         let mut parts = smallvec![];
 

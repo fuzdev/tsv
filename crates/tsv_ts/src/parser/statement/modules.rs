@@ -100,10 +100,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // export = expr; (TypeScript CommonJS-style export)
             TokenKind::Equals => {
                 self.advance()?; // consume '='
-                let expression = self.parse_expression()?;
+                let expression = self.parse_expression()?.id();
                 let end = self.semicolon_end()?;
                 #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<TSExportAssignment<'_>>(1);
+                tsv_lang::ast_census_probe::mint::<TSExportAssignment>(1);
                 Ok(Statement {
                     span: Span::new(start as u32, end),
                     kind: StatementKind::TSExportAssignment(
@@ -491,36 +491,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let value_start = self.current_pos().0;
                     let decorators = self.parse_decorators(DecoratorListKind::Class)?;
                     let r#abstract = self.at_abstract_class_modifier();
-                    let class = self.finish_decorated_class_expression(
-                        value_start,
-                        decorators,
-                        r#abstract,
-                    )?;
+                    let class = self
+                        .finish_decorated_class_expression(value_start, decorators, r#abstract)?
+                        .id();
                     // The expression parse's head binding, which this arm bypasses: a
                     // block comment glued to the first `@` is the class's to print.
                     self.bind_leading_comment(value_start, class);
                     let end = if self.eat(TokenKind::Semicolon)? {
                         self.prev_token_end() as u32
                     } else {
-                        class.span.end
+                        self.expr(class).span.end
                     };
-                    #[cfg(feature = "_internal_ast_census")]
-                    tsv_lang::ast_census_probe::dead::<Expression<'_>>(
-                        tsv_lang::ast_census_probe::Dead::MovedInline,
-                        1,
-                    );
                     #[cfg(feature = "_internal_ast_census")]
                     tsv_lang::ast_census_probe::mint::<ExportDefaultDeclaration<'_>>(1);
                     return Ok(Statement {
                         span: Span::new(start, end),
                         kind: StatementKind::ExportDefaultDeclaration(self.arena.alloc(
                             ExportDefaultDeclaration {
-                                declaration: ExportDefaultValue::Expression(class.clone()),
+                                declaration: ExportDefaultValue::Expression(class),
                             },
                         )),
                     });
                 }
-                let expr = self.parse_expression()?;
+                let expr = self.parse_expression()?.id();
                 let end = self.semicolon_end()?;
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::mint::<ExportDefaultDeclaration<'_>>(1);

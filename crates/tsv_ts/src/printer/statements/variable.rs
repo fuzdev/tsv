@@ -78,7 +78,7 @@ pub(in crate::printer) struct DeclaratorEqGap {
 pub(in crate::printer) struct DeclaratorInitInputs<'e, 'a> {
     /// The declarator itself — read for its binding (the break-lhs arms rebuild the id doc
     /// with a wrapping / non-wrapping type annotation) and its definite `!`.
-    pub declarator: &'e ast::VariableDeclarator<'a>,
+    pub declarator: &'e ast::VariableDeclarator,
     /// Its initializer. Passed rather than read back off `declarator.init`, since the caller
     /// has already matched on it to get here.
     pub init: &'e Expression<'a>,
@@ -786,10 +786,7 @@ impl<'a> Printer<'a> {
     /// function — unless its sole argument is an object type (`isObjectType`), which hugs
     /// as anywhere. That list takes the ordinary group, so its `<…>` can break ahead of the
     /// `=` (`const a: Foo<⏎\tB | null⏎> = () => …`).
-    fn arrow_variable_type_args_start(
-        &self,
-        declarator: &ast::VariableDeclarator<'_>,
-    ) -> Option<u32> {
+    fn arrow_variable_type_args_start(&self, declarator: &ast::VariableDeclarator) -> Option<u32> {
         if !matches!(
             declarator.init.map(|init| &self.view.expr(init).kind),
             Some(ExpressionKind::ArrowFunctionExpression(_))

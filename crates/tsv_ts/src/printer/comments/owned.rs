@@ -103,7 +103,7 @@ fn outermost_claim_child<'x>(
 fn leading_comment_bound_pair_walk<'x>(
     view: ExprView<'x>,
     expr: &'x Expression<'x>,
-) -> Option<(&'x ast::CommentBoundPair<'x>, Span)> {
+) -> Option<(&'x ast::CommentBoundPair, Span)> {
     let start = expr.span().start;
     let mut node = expr;
     loop {
@@ -152,7 +152,7 @@ impl<'a> Printer<'a> {
     fn leading_comment_bound_pair<'x>(
         &self,
         value: &'x Expression<'x>,
-    ) -> Option<(&'x ast::CommentBoundPair<'x>, Span)>
+    ) -> Option<(&'x ast::CommentBoundPair, Span)>
     where
         'a: 'x,
     {
@@ -923,7 +923,7 @@ impl<'a> Printer<'a> {
     /// can be forgotten at a fourth read site is worth less than the two compares it saves.
     pub(crate) fn comment_bound_pair_comment(
         &self,
-        cast: &ast::CommentBoundPair<'_>,
+        cast: &ast::CommentBoundPair,
         span: Span,
     ) -> ast::Comment {
         self.owned_leading_comment_at(span.start)
@@ -977,7 +977,7 @@ impl<'a> Printer<'a> {
     /// caller so the two cannot part.
     pub(crate) fn jsdoc_cast_comment_own_line(
         &self,
-        cast: &ast::CommentBoundPair<'_>,
+        cast: &ast::CommentBoundPair,
         span: Span,
     ) -> bool {
         let comment = self.comment_bound_pair_comment(cast, span);

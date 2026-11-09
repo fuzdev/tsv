@@ -608,7 +608,7 @@ impl<'a> Printer<'a> {
 
     /// The token a member gap ends at, for [`Self::argument_gap_hangs`]: the property's
     /// first printed byte — past a private name's `#`, which prints with the `.`.
-    fn member_gap_token(&self, member: &ast::MemberExpression<'_>) -> u32 {
+    fn member_gap_token(&self, member: &ast::MemberExpression) -> u32 {
         let prop_start = self.view.expr(member.property).span().start;
         prop_start + u32::from(self.source.as_bytes().get(prop_start as usize) == Some(&b'#'))
     }

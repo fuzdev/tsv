@@ -7,6 +7,7 @@ use crate::lexer::TokenKind;
 use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::TriviaProfile;
 use tsv_lang::{Error, Span};
+use tsv_ts::ast::ExprId;
 use tsv_ts::ast::{ExprView, Expression, ExpressionKind};
 
 use super::parser_impl::SvelteParser;
@@ -46,8 +47,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         start: usize,
         keyword: &str,
-        host_check: impl Fn(&Self, ExprView<'_>, &'arena Expression<'arena>) -> Result<(), Error>,
-    ) -> Result<(&'arena Expression<'arena>, Span), Error> {
+        host_check: impl Fn(&Self, ExprView<'_>, ExprId) -> Result<(), Error>,
+    ) -> Result<(ExprId, Span), Error> {
         let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
@@ -234,7 +235,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         decl_str: &'a str,
         decl_offset: usize,
-    ) -> Result<(&'arena Expression<'arena>, &'arena Expression<'arena>), Error> {
+    ) -> Result<(ExprId, ExprId), Error> {
         let (id, binding_end) = self.parse_block_pattern(decl_str, decl_offset)?;
         let after_binding = &decl_str[binding_end - decl_offset..];
         let at_eq = after_binding.trim_start_matches(is_svelte_ws);
@@ -250,8 +251,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // `f<T, U><V>(x)` is the sequence `f < T, U > <V>(x)`, which only the re-read as
         // acorn-typescript's call repairs (`parse_ts_expression_checked`).
         let init =
-            self.parse_ts_expression_checked(init_str, init_offset, "'}'", |this, _, init| {
-                this.reject_multi_declarator(init, init_str, init_offset)
+            self.parse_ts_expression_checked(init_str, init_offset, "'}'", |this, view, init| {
+                this.reject_multi_declarator(view.expr(init), init_str, init_offset)
             })?;
         Ok((id, init))
     }
@@ -280,7 +281,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// can no longer produce a false positive.
     fn reject_multi_declarator(
         &self,
-        init: &Expression<'arena>,
+        init: &Expression<'_>,
         init_str: &str,
         init_offset: usize,
     ) -> Result<(), Error> {
@@ -347,26 +348,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // `{@debug (a, b)}` both yield `[a, b]` (a comma inside `()` is not a
             // top-level separator, so the parenthesized form is one
             // `SequenceExpression`); a single expression is a one-element list.
-            match &expr.kind {
+            let view = self.ts_view();
+            match &view.expr(expr).kind {
                 ExpressionKind::SequenceExpression(seq) => {
-                    #[cfg(feature = "_internal_ast_census")]
-                    tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
-                        tsv_lang::ast_census_probe::Dead::DuplicateRoot,
-                        1,
-                    );
-                    #[cfg(feature = "_internal_ast_census")]
-                    tsv_lang::ast_census_probe::dead::<&'arena Expression<'arena>>(
-                        tsv_lang::ast_census_probe::Dead::DuplicateRoot,
-                        seq.expressions.len(),
-                    );
-                    for element in seq.expressions {
-                        self.require_debug_identifier(element)?;
-                        #[cfg(feature = "_internal_ast_census")]
-                        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
-                            tsv_lang::ast_census_probe::Dead::DuplicateRoot,
-                            1,
-                        );
-                        identifiers.push((*element).clone());
+                    for &element in view.list(seq.expressions) {
+                        self.require_debug_identifier(view, element)?;
+                        identifiers.push(element);
                     }
                 }
                 _ => {
@@ -379,26 +366,23 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     // through the cast would drop its parens from the output
                     // (breaking idempotency and the cast's binding).
                     if let ExpressionKind::SequenceExpression(seq) =
-                        &expr.unwrap_comment_bound_pairs(ExprView::of_parse()).kind
+                        &view.expr(expr).unwrap_comment_bound_pairs(view).kind
                     {
-                        for element in seq.expressions {
-                            self.require_debug_identifier(element)?;
+                        for &element in view.list(seq.expressions) {
+                            self.require_debug_identifier(view, element)?;
                         }
                     } else {
-                        self.require_debug_identifier(expr)?;
+                        self.require_debug_identifier(view, expr)?;
                     }
-                    #[cfg(feature = "_internal_ast_census")]
-                    tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
-                        tsv_lang::ast_census_probe::Dead::DuplicateRoot,
-                        1,
-                    );
-                    identifiers.push(expr.clone());
+                    identifiers.push(expr);
                 }
             }
         }
 
+        let identifiers = tsv_ts::__private::push_expression_list(self.stores_mut(), &identifiers);
+
         Ok(FragmentNode::DebugTag(DebugTag {
-            identifiers: identifiers.into_bump_slice(),
+            identifiers,
             span: Span {
                 start: start as u32,
                 end: after_close as u32,
@@ -415,9 +399,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// (`unwrap_comment_bound_pairs`): Svelte validates after `remove_parens`, to which a
     /// cast is nothing but parens + a comment, so `{@debug /** @type {A} */ (a)}`
     /// is an identifier to both parsers.
-    fn require_debug_identifier(&self, expr: &Expression<'arena>) -> Result<(), Error> {
+    fn require_debug_identifier(&self, view: ExprView<'_>, expr: ExprId) -> Result<(), Error> {
+        let expr = view.expr(expr);
         if matches!(
-            expr.unwrap_comment_bound_pairs(ExprView::of_parse()).kind,
+            expr.unwrap_comment_bound_pairs(view).kind,
             ExpressionKind::Identifier(_)
         ) {
             Ok(())
@@ -452,6 +437,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // (`parse_ts_expression_checked`).
         let (expression, span) =
             self.parse_keyword_expression_tag(start, "render", |this, view, expression| {
+                let expression = view.expr(expression);
                 if matches!(
                     expression.unwrap_comment_bound_pairs(view).kind,
                     ExpressionKind::CallExpression(_)

@@ -124,7 +124,7 @@ pub(super) fn write_rest_element(w: &mut JsonWriter, rest: &ast::RestElement<'_>
 /// (`parseGetterSetter`) and generic object methods (`m<T>() {}`, the
 /// `parsePropertyValue` override). Vanilla acorn (`ctx.vanilla_acorn`) assigns
 /// `value` first everywhere.
-pub(super) fn write_property(w: &mut JsonWriter, prop: &ast::Property<'_>, ctx: &Ctx<'_>) {
+pub(super) fn write_property(w: &mut JsonWriter, prop: &ast::Property, ctx: &Ctx<'_>) {
     node_header(w, "Property", prop.span, ctx);
     // `method` and `computed` are nearly always `false`, so the common shape is
     // one literal per `shorthand` value, the four keys folded in.
@@ -182,7 +182,7 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &ast::Property<'_>, ctx: 
 /// `AssignmentPattern` on the wire: acorn reads every `{ a = 1 }` through
 /// `parseMaybeDefault`, whatever the literal becomes. The internal literal keeps the
 /// `=` assignment it was parsed as; a pattern property already holds the pattern.
-fn write_property_value(w: &mut JsonWriter, prop: &ast::Property<'_>, ctx: &Ctx<'_>) {
+fn write_property_value(w: &mut JsonWriter, prop: &ast::Property, ctx: &Ctx<'_>) {
     let method_value = prop.method || !matches!(prop.kind, ast::PropertyKind::Init);
     match (ctx.view.expr(prop.value), method_value) {
         (

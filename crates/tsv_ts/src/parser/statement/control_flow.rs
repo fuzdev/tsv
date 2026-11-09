@@ -22,7 +22,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse condition: (test)
         self.expect(&TokenKind::ParenOpen)?;
-        let test = self.parse_expression_ref()?;
+        let test = self.parse_expression()?.id();
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse consequent (can be any statement, including block)
@@ -189,8 +189,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 Span::new(id_start as u32, id_end as u32),
             ));
             self.advance()?; // consume 'of'
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::built_inline::<Expression<'_>>(1);
+            let async_ident = self.push_expr(async_ident);
             #[cfg(feature = "_internal_ast_census")]
             tsv_lang::ast_census_probe::mint::<ForInOfLeft<'_>>(1);
             return self.parse_for_of(
@@ -203,7 +202,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse expression (could be init or left-hand side)
         // Use parse_expression_no_in to prevent `in` from being parsed as binary operator
         // a bare assignment as the init prints bare ([`Parser::self_pair`])
-        let expr = self.pair_free_root(RootEnd::ForClause, Self::parse_expression_no_in)?;
+        let expr = self
+            .pair_free_root(RootEnd::ForClause, Self::parse_expression_no_in)?
+            .id();
 
         // A no-declaration for-in/of LHS is refined through `refine_assignable` (the
         // cover-grammar conversion): per the spec an `ObjectLiteral`/`ArrayLiteral` LHS
@@ -242,7 +243,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.printer_pair()?;
         }
         self.advance()?;
-        let left = self.refine_for_head_target(expr)?;
+        let left = self.refine_for_head_target(expr)?.id();
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<ForInOfLeft<'_>>(1);
         let left = self.arena.alloc(ForInOfLeft::Pattern(left));
@@ -363,7 +364,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let test = if self.check(&TokenKind::Semicolon) {
             None
         } else {
-            Some(self.parse_expression_ref()?)
+            Some(self.parse_expression()?.id())
         };
         self.expect(&TokenKind::Semicolon)?;
 
@@ -372,7 +373,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             None
         } else {
             // a bare assignment as the update prints bare ([`Parser::self_pair`])
-            Some(self.pair_free_root(RootEnd::ForClause, Self::parse_expression_ref)?)
+            Some(
+                self.pair_free_root(RootEnd::ForClause, Self::parse_expression)?
+                    .id(),
+            )
         };
         self.expect(&TokenKind::ParenClose)?;
 
@@ -404,7 +408,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<Statement<'arena>, Error> {
         self.reject_for_await_without_of(await_at)?;
 
-        let right = self.parse_expression_ref()?;
+        let right = self.parse_expression()?.id();
         self.expect(&TokenKind::ParenClose)?;
 
         #[cfg(feature = "_internal_ast_census")]
@@ -425,7 +429,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         left: &'arena ForInOfLeft<'arena>,
         r#await: bool,
     ) -> Result<Statement<'arena>, Error> {
-        let right = self.parse_expression_ref()?;
+        let right = self.parse_expression()?.id();
         self.expect(&TokenKind::ParenClose)?;
 
         #[cfg(feature = "_internal_ast_census")]
@@ -472,7 +476,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_paren_head_statement(
         &mut self,
         keyword: KeywordKind,
-    ) -> Result<(&'arena Expression<'arena>, &'arena Statement<'arena>, Span), Error> {
+    ) -> Result<(ExprId, &'arena Statement<'arena>, Span), Error> {
         let (start, _) = self.current_pos();
 
         debug_assert_eq!(self.current_kind(), &TokenKind::Keyword(keyword));
@@ -480,7 +484,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse the head: (expression)
         self.expect(&TokenKind::ParenOpen)?;
-        let head = self.parse_expression_ref()?;
+        let head = self.parse_expression()?.id();
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse body
@@ -520,7 +524,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse condition: (test)
         self.expect(&TokenKind::ParenOpen)?;
-        let test = self.parse_expression_ref()?;
+        let test = self.parse_expression()?.id();
         self.expect(&TokenKind::ParenClose)?;
 
         // A semicolon is automatically inserted after a do-while's `)`
@@ -551,7 +555,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse discriminant: (expr)
         self.expect(&TokenKind::ParenOpen)?;
-        let discriminant = self.parse_expression_ref()?;
+        let discriminant = self.parse_expression()?.id();
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse cases: { case ... }
@@ -589,7 +593,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Check for 'case' or 'default'
         let test = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Case)) {
             self.advance()?;
-            Some(self.parse_expression_ref()?)
+            Some(self.parse_expression()?.id())
         } else if matches!(
             self.current_kind(),
             TokenKind::Keyword(KeywordKind::Default)
@@ -785,7 +789,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let argument_token = self.current_pos().0;
-        let argument = self.parse_expression_ref()?;
+        let argument = self.parse_expression()?.id();
         self.restricted_argument_pair(argument, argument_token)?;
         let end = self.semicolon_end()?;
 

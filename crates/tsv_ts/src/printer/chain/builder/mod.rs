@@ -1285,7 +1285,7 @@ fn build_assumed_param_hug_state<'a>(
         .iter()
         .rev()
         .find_map(ChainNode::as_call_expression)?;
-    let callback = |arg: &crate::ast::ExprEdge<'_>| {
+    let callback = |arg: &crate::ast::ExprId| {
         flat_sole_param_literal(printer, printer.view.expr(*arg)).is_some()
     };
     let (arg, separator) = match printer.view.list(call.arguments) {

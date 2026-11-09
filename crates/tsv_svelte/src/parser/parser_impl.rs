@@ -12,7 +12,7 @@ use tsv_lang::{Comment, DepthBudget, DepthLimit, Error, Span};
 use tsv_ts::__private::TopLevelAs;
 use tsv_ts::__private::{is_id_continue, is_id_start};
 use tsv_ts::ast::TSTypeAnnotation;
-use tsv_ts::ast::{AstStores, ExprView, Expression};
+use tsv_ts::ast::{AstStores, ExprId, ExprView, Expression};
 
 /// Build an expression `Comment` from its already-shifted `span` / `content_span`.
 /// `content` is the comment body, read only to compute the `multiline` flag (whether
@@ -68,7 +68,7 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// The wire-only parameter lists of the `{#snippet}` heads that hold a grouping pair,
     /// in read order — which is source order, since a head is read before its body. See
     /// [`ast::SnippetWireParameters`].
-    pub(crate) snippet_wire_parameters: BumpVec<'arena, ast::SnippetWireParameters<'arena>>,
+    pub(crate) snippet_wire_parameters: BumpVec<'arena, ast::SnippetWireParameters>,
     /// True while the nearest *element* ancestor is `<svelte:head>` — mirrors Svelte's
     /// `parent_is_head` (`1-parse/state/element.js`): set entering a head's children, reset by a
     /// nested RegularElement/Component, transparent through other special elements and blocks.
@@ -236,6 +236,31 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let parsed = parse(self, stores);
         self.stores = Some(stores);
         parsed
+    }
+
+    /// Push an expression the parser built itself (a shorthand's synthesized identifier).
+    #[inline]
+    pub(crate) fn push_ts_expr(&mut self, expr: Expression<'arena>) -> ExprId {
+        tsv_ts::__private::push_expression(self.stores_mut(), expr)
+    }
+
+    /// The document's stores, for an operation outside an island parse.
+    #[expect(clippy::expect_used)]
+    #[inline]
+    pub(crate) fn stores_mut(&mut self) -> &mut AstStores<'arena> {
+        self.stores
+            .as_deref_mut()
+            .expect("the island stores are out only while a `&Self` is held")
+    }
+
+    /// The view reading the document's expressions outside an island parse.
+    #[expect(clippy::expect_used)]
+    #[inline]
+    pub(crate) fn ts_view(&self) -> ExprView<'_> {
+        self.stores
+            .as_deref()
+            .expect("the island stores are out only while a `&Self` is held")
+            .view()
     }
 
     /// Run `f` `units` wire levels deeper — the depth limit's count ([`DepthBudget`]),
@@ -687,7 +712,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
         end: &str,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    ) -> Result<ExprId, Error> {
         self.parse_ts_expression_checked(source, base_offset, end, |_, _, _| Ok(()))
     }
 
@@ -706,8 +731,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
         end: &str,
-        host_check: impl Fn(&Self, ExprView<'_>, &'arena Expression<'arena>) -> Result<(), Error>,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+        host_check: impl Fn(&Self, ExprView<'_>, ExprId) -> Result<(), Error>,
+    ) -> Result<ExprId, Error> {
         let (expr, comments) = self.with_island_stores(|this, stores| {
             tsv_ts::__private::parse_expression_with_comments(
                 source,
@@ -745,8 +770,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
         top_level_as: TopLevelAs,
-        host_check: impl Fn(&Self, ExprView<'_>, &'arena Expression<'arena>, usize) -> Result<(), Error>,
-    ) -> Result<(&'arena Expression<'arena>, usize), Error> {
+        host_check: impl Fn(&Self, ExprView<'_>, ExprId, usize) -> Result<(), Error>,
+    ) -> Result<(ExprId, usize), Error> {
         let (expr, end_pos, comments) = self.with_island_stores(|this, stores| {
             tsv_ts::__private::parse_expression_partial_with_comments(
                 source,
@@ -798,13 +823,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// for canonical (`read_pattern` calls `read_type_annotation` after it), so the caller
     /// reads it through [`Self::parse_ts_type_annotation`].
     ///
-    /// The pattern is arena-allocated here and handed back `&mut`, so the `{#each}` head can
-    /// still attach its separately-parsed annotation in place before storing the reference.
+    /// The `{#each}` head attaches its separately-parsed annotation by appending the
+    /// annotated row in the bare one's place (`attach_pattern_type_annotation`).
     pub(crate) fn parse_ts_pattern(
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<&'arena mut Expression<'arena>, Error> {
+    ) -> Result<ExprId, Error> {
         let (pattern, comments) = self.with_island_stores(|this, stores| {
             tsv_ts::__private::parse_pattern_with_comments(
                 source,
@@ -815,13 +840,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             )
         })?;
         debug_assert!(
-            tsv_ts::__private::pattern_type_annotation(&pattern).is_none(),
+            tsv_ts::__private::pattern_type_annotation(self.ts_view().expr(pattern)).is_none(),
             "a block pattern's `: T` is its own sub-parse (`parse_block_pattern`)"
         );
         self.expression_comments.extend_from_slice(comments);
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-        Ok(self.arena.alloc(pattern))
+        Ok(pattern)
     }
 
     /// How far every ledger an embedded parse appends to had filled before it ran,

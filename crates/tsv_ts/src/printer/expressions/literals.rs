@@ -464,7 +464,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a spread element
-    pub(in crate::printer) fn build_spread_doc(&self, spread: &ast::SpreadElement<'_>) -> DocId {
+    pub(in crate::printer) fn build_spread_doc(&self, spread: &ast::SpreadElement) -> DocId {
         let argument = self.view.expr(spread.argument);
         let d = self.d();
         let needs_parens = self.needs_parens(argument, super::ParenContext::SpreadArgument);

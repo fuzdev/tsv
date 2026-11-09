@@ -62,7 +62,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             if self.eat(TokenKind::DotDotDot)? {
                 let operand_token = self.current_pos().0;
                 // Use assignment_expression because comma separates properties
-                let argument = self.parse_assignment_expression_ref()?;
+                let argument = self.parse_assignment_expression()?.id();
                 // the pair the printer adds around the argument (`{...(a || b)}`), a level
                 // of the output's nesting
                 self.count_prefix_operand_pairs(
@@ -150,13 +150,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // valid bare shorthand (`{ [e] }` requires `: value`).
                 TokenKind::BracketOpen => {
                     self.advance()?; // consume '['
-                    #[cfg(feature = "_internal_ast_census")]
-                    tsv_lang::ast_census_probe::reclassify::<Expression<'arena>>(
-                        tsv_lang::ast_census_probe::Dead::MovedInline,
-                        tsv_lang::ast_census_probe::Dead::DuplicateRoot,
-                        1,
-                    );
-                    (self.parse_computed_member_key()?, true, true)
+                    (self.parse_computed_member_key()?.id(), true, true)
                 }
                 // Both identifiers and keywords can be property keys: { foo: 1, object: 2, in: 3 }
                 TokenKind::Identifier => {
@@ -164,10 +158,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let name = self.current_ident_name();
                     self.advance()?;
                     (
-                        Expression::from_identifier(Identifier::simple(
+                        self.push_expr(Expression::from_identifier(Identifier::simple(
                             name,
                             Span::new(key_start as u32, key_end as u32),
-                        )),
+                        ))),
                         false,
                         false,
                     )
@@ -192,10 +186,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     };
                     self.advance()?;
                     (
-                        Expression::from_identifier(Identifier::simple(
+                        self.push_expr(Expression::from_identifier(Identifier::simple(
                             name,
                             Span::new(key_start as u32, key_end as u32),
-                        )),
+                        ))),
                         false,
                         restricted,
                     )
@@ -204,8 +198,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // valid only with a `:` value — never a bare shorthand (`{ '' }`, `{ 0 }`).
                 TokenKind::String => {
                     // String literal key: {"prop-name": value}
+                    let literal = self.parse_string_literal()?;
                     (
-                        Expression::from_literal(self.parse_string_literal()?),
+                        self.push_expr(Expression::from_literal(literal)),
                         false,
                         true,
                     )
@@ -215,7 +210,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // shares the full numeric decode (radix, separators, bigint)
                     let literal = self.parse_number_or_bigint_literal()?;
                     self.advance()?;
-                    (Expression::from_literal(literal), false, true)
+                    (
+                        self.push_expr(Expression::from_literal(literal)),
+                        false,
+                        true,
+                    )
                 }
                 _ => {
                     return Err(self.error_expected_found_at("property key", prop_start));
@@ -226,9 +225,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // lives in the arena and the property holds a pointer to it, so the
             // 160 B element the `properties` vector moves is 32 B instead (see
             // `Property`'s field docs).
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-            let key: &'arena Expression<'arena> = arena.alloc(key);
+            // The key is the `Property`'s by-id slot from here on, so the element the
+            // `properties` vector moves is small (see `Property`'s field docs).
 
             // Determine property kind, value, shorthand, and method flags
             let (kind, value, shorthand, method) = if let Some(accessor) = accessor_kind {
@@ -246,12 +244,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     true,
                 )?;
                 #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-                #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::mint::<FunctionExpression<'arena>>(1);
                 (
                     accessor,
-                    &*arena.alloc(Expression::from_function_expression(arena.alloc(func_expr))),
+                    self.push_expr(Expression::from_function_expression(arena.alloc(func_expr))),
                     false,
                     false,
                 )
@@ -265,12 +261,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let func_expr =
                     self.nested(1, |p| p.parse_method_body(is_async_method, is_generator))?;
                 #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-                #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::mint::<FunctionExpression<'arena>>(1);
                 (
                     PropertyKind::Init,
-                    &*arena.alloc(Expression::from_function_expression(arena.alloc(func_expr))),
+                    self.push_expr(Expression::from_function_expression(arena.alloc(func_expr))),
                     false,
                     true,
                 )
@@ -278,7 +272,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Use assignment_expression because comma separates properties
                 (
                     PropertyKind::Init,
-                    self.parse_assignment_expression_ref()?,
+                    self.parse_assignment_expression()?.id(),
                     false,
                     false,
                 )
@@ -295,18 +289,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 if shorthand_ineligible {
                     return Err(self.error_msg_at(
                         "Object literal shorthand property must be an identifier reference",
-                        key.span().start_usize(),
+                        self.expr(key).span().start_usize(),
                     ));
                 }
                 if self.eat(TokenKind::Equals)? {
                     // `{ a = 1 }`: parsed as an AssignmentExpression. One wire level: the
                     // `AssignmentPattern` the pattern context refines it to, over its
                     // default (the depth limit's count)
-                    let default_value = self.nested(1, Self::parse_assignment_expression_ref)?;
+                    let default_value = self.nested(1, Self::parse_assignment_expression)?.id();
                     // prev_token_end covers a parenthesized default's closing `)`
                     let assign_end = self.prev_token_end() as u32;
-                    #[cfg(feature = "_internal_ast_census")]
-                    tsv_lang::ast_census_probe::mint::<Expression<'arena>>(2);
                     #[cfg(feature = "_internal_ast_census")]
                     tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
                         tsv_lang::ast_census_probe::Dead::DuplicateKept,
@@ -314,14 +306,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     );
                     (
                         PropertyKind::Init,
-                        &*arena.alloc(Expression {
-                            span: Span::new(key.span().start, assign_end),
-                            kind: ExpressionKind::AssignmentExpression(AssignmentExpression {
-                                left: arena.alloc(key.clone()),
-                                operator: AssignmentOperator::Assign,
-                                right: default_value,
-                            }),
-                        }),
+                        {
+                            let span = Span::new(self.expr(key).span().start, assign_end);
+                            let left = self.push_expr(self.expr(key).clone());
+                            self.push_expr(Expression {
+                                span,
+                                kind: ExpressionKind::AssignmentExpression(AssignmentExpression {
+                                    left,
+                                    operator: AssignmentOperator::Assign,
+                                    right: default_value,
+                                }),
+                            })
+                        },
                         true,
                         false,
                     )
@@ -331,13 +327,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // that keys a node on its address (`tsv_check`'s binder) still
                     // sees two.
                     #[cfg(feature = "_internal_ast_census")]
-                    tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-                    #[cfg(feature = "_internal_ast_census")]
                     tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
                         tsv_lang::ast_census_probe::Dead::DuplicateKept,
                         1,
                     );
-                    (PropertyKind::Init, &*arena.alloc(key.clone()), true, false)
+                    (
+                        PropertyKind::Init,
+                        self.push_expr(self.expr(key).clone()),
+                        true,
+                        false,
+                    )
                 }
             };
 
@@ -383,14 +382,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - Empty arrays: `[]`
     ///
     /// Returns the node beside its span, as `parse_object_expression` does.
-    pub(super) fn parse_array_expression(
-        &mut self,
-    ) -> Result<(ArrayExpression<'arena>, Span), Error> {
+    pub(super) fn parse_array_expression(&mut self) -> Result<(ArrayExpression, Span), Error> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BracketOpen)?; // consume '['
         self.enter_grouping()?;
 
-        let mut elements = self.bvec();
         // Set when a trailing comma follows a final spread element (`[...a,]`):
         // legal in a literal, rejected by `refine_assignable` in pattern context.
         let mut spread_trailing_comma = false;
@@ -402,7 +398,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.exit_grouping();
             return Ok((
                 ArrayExpression {
-                    elements: elements.into_bump_slice(),
+                    elements: Run::EMPTY,
                     spread_trailing_comma: false,
                 },
                 Span::new(start as u32, end as u32),
@@ -410,12 +406,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         // Parse elements (including elision/holes), siblings each (`ListFrame`)
+        let mark = self.stores.expr_opt_scratch.mark();
         let mut frame = self.list_frame();
         loop {
-            frame.element(self, elements.len());
+            let len = self.stores.expr_opt_scratch.len_since(mark);
+            frame.element(self, len);
             // Check for elision (hole): leading comma means empty slot
             if self.eat(TokenKind::Comma)? {
-                elements.push(None); // hole
+                self.stores.expr_opt_scratch.push(None); // hole
                 // Check if we hit the closing bracket (trailing comma after hole)
                 if self.check(&TokenKind::BracketClose) {
                     break;
@@ -430,8 +428,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             // Parse element expression (assignment_expression because comma separates
             // elements); a leading `...` is a SpreadElement (ecma262 ElementList).
-            let elem = self.parse_spread_or_assignment_element()?;
-            elements.push(Some(elem));
+            let elem = self.parse_spread_or_assignment_element()?.id();
+            self.stores.expr_opt_scratch.push(Some(elem));
 
             // Check for comma or closing bracket
             if self.eat(TokenKind::Comma)? {
@@ -440,13 +438,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // A trailing comma after a final spread (`[...a,]`) is the
                     // rest-trailing-comma case; record it for `refine_assignable`
                     // (the discarded comma leaves no other trace).
-                    if matches!(
-                        elements.last(),
-                        Some(Some(Expression {
-                            kind: ExpressionKind::SpreadElement(_),
-                            ..
-                        }))
-                    ) {
+                    if matches!(self.expr(elem).kind, ExpressionKind::SpreadElement(_)) {
                         spread_trailing_comma = true;
                     }
                     break;
@@ -465,7 +457,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok((
             ArrayExpression {
-                elements: elements.into_bump_slice(),
+                elements: self.flush_opt_expr_list(mark),
                 spread_trailing_comma,
             },
             Span::new(start as u32, end as u32),
@@ -488,9 +480,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (params_start, _) = self.current_pos();
         // Params + body in the method's `[Await]`/`[Yield]` context (async → `[+Await]`,
         // generator → `[+Yield]`).
-        let params = self
-            .with_fn_context(is_async, is_generator, Self::parse_parameter_list)?
-            .into_bump_slice();
+        let params = self.with_fn_context(is_async, is_generator, Self::parse_parameter_list)?;
 
         // Check for return type annotation: (): type or type predicate
         let return_type = self.parse_optional_return_type()?;

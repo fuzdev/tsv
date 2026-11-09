@@ -6,7 +6,7 @@
 use tsv_lang::Span;
 
 use super::{
-    ExprRun, ExprSlot, ExprView, Identifier, Literal, Statement, TSEntityName, TSTypeAnnotation,
+    Expr, ExprId, ExprView, Identifier, Literal, Run, Statement, TSEntityName, TSTypeAnnotation,
     TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 
@@ -44,7 +44,7 @@ pub struct TSInterfaceBody<'arena> {
 pub struct TSDeclareFunction<'arena> {
     pub id: Identifier<'arena>,
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
-    pub params: ExprRun<'arena>,
+    pub params: Run<Expr>,
     pub return_type: Option<TSTypeAnnotation<'arena>>,
     /// Whether to print the `declare` keyword.
     /// True for top-level `declare function`, false inside `declare namespace`.
@@ -83,7 +83,7 @@ pub struct TSEnumMember<'arena> {
     /// Member name (identifier or computed)
     pub id: TSEnumMemberId<'arena>,
     /// Optional initializer expression
-    pub initializer: Option<ExprSlot<'arena>>,
+    pub initializer: Option<ExprId>,
     /// The member's full source extent, running through a grouping paren the
     /// initializer's own span stops inside (`A = (a, b)`) — acorn's shape, and
     /// what `prettier-ignore` must reproduce verbatim. Ask
@@ -104,7 +104,7 @@ impl<'arena> TSEnumMember<'arena> {
     /// where nothing else emits — a DROPPED comment
     /// (`docs/comments.md` §The element-comma seam).
     pub fn printed_end(&self, view: ExprView<'_>) -> u32 {
-        view.opt_slot(&self.initializer)
+        view.opt(self.initializer)
             .map_or_else(|| self.id.span().end, |e| e.printed_end(view))
     }
 }

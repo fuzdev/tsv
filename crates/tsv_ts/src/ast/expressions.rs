@@ -7,10 +7,9 @@ use crate::ast::ExprView;
 use tsv_lang::{Comment, Span};
 
 use super::{
-    ArrayPattern, AssignmentPattern, BlockStatement, ClassExpression, ExprEdge, ExprList, ExprRun,
-    Identifier, Literal, ObjectPattern, OptExprEdge, OptExprList, PrivateIdentifier, RestElement,
-    TSParameterProperty, TSType, TSTypeAnnotation, TSTypeParameterDeclaration,
-    TSTypeParameterInstantiation,
+    ArrayPattern, AssignmentPattern, BlockStatement, ClassExpression, Expr, ExprId, Identifier,
+    Literal, ObjectPattern, PrivateIdentifier, RestElement, Run, TSParameterProperty, TSType,
+    TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 
 /// Expression node: the span every variant shares, beside the variant itself.
@@ -31,43 +30,43 @@ pub enum ExpressionKind<'arena> {
     Identifier(Identifier<'arena>),
     PrivateIdentifier(PrivateIdentifier<'arena>),
     ObjectExpression(ObjectExpression<'arena>),
-    ArrayExpression(ArrayExpression<'arena>),
-    UnaryExpression(UnaryExpression<'arena>),
-    UpdateExpression(UpdateExpression<'arena>),
-    BinaryExpression(BinaryExpression<'arena>),
+    ArrayExpression(ArrayExpression),
+    UnaryExpression(UnaryExpression),
+    UpdateExpression(UpdateExpression),
+    BinaryExpression(BinaryExpression),
     CallExpression(CallExpression<'arena>),
     NewExpression(NewExpression<'arena>),
-    MemberExpression(MemberExpression<'arena>),
-    ConditionalExpression(ConditionalExpression<'arena>),
+    MemberExpression(MemberExpression),
+    ConditionalExpression(ConditionalExpression),
     // Arena-boxed, unlike every variant above: these five are the only ones wide
     // enough to set the enum's own size, and each is rare enough that the allocation
     // is free — over 8 MB of real TypeScript, `ClassExpression` and
     // `TaggedTemplateExpression` occur 0.000% of the time, `FunctionExpression`
     // 0.004–0.019%, `MetaProperty` 0.000–0.014%, and `ArrowFunctionExpression`
-    // 3.0–3.8%. Inline they would make an `Expression` 176 bytes instead of 72, and
+    // 3.0–3.8%. Inline they would make an `Expression` 176 bytes instead of 64, and
     // that width is paid on every `Expression` SLOT in the tree — both of a
-    // `Property`'s, both of a `VariableDeclarator`'s, and every element of every
-    // `&[Expression]` — not just on the rare node that needs it. The next-widest
-    // variant is `CallExpression` at 64 bytes, and it is 14–21% of expressions, so
-    // the ladder stops here: boxing it would tax the common path.
+    // `Property`'s, both of a `VariableDeclarator`'s, and every row of a value run —
+    // not just on the rare node that needs it. The next-widest inline variant is
+    // `ObjectPattern`, and `CallExpression` at 40 bytes is 14–21% of expressions, so the
+    // ladder stops here: boxing it would tax the common path.
     //
     // The pointer chase this adds is on the rare read, and the parser's recursion is
-    // unaffected either way — it threads expressions by reference already (every
-    // `parse_*` on its ladder returns an `&'arena Expression`).
+    // unaffected either way — it threads expressions by id (every `parse_*` on its
+    // ladder returns an `ExprRet`).
     ArrowFunctionExpression(&'arena ArrowFunctionExpression<'arena>),
     FunctionExpression(&'arena FunctionExpression<'arena>),
     ClassExpression(&'arena ClassExpression<'arena>),
-    SpreadElement(SpreadElement<'arena>),
+    SpreadElement(SpreadElement),
     TemplateLiteral(TemplateLiteral<'arena>),
     TaggedTemplateExpression(&'arena TaggedTemplateExpression<'arena>),
-    AwaitExpression(AwaitExpression<'arena>),
-    YieldExpression(YieldExpression<'arena>),
-    SequenceExpression(SequenceExpression<'arena>),
+    AwaitExpression(AwaitExpression),
+    YieldExpression(YieldExpression),
+    SequenceExpression(SequenceExpression),
     RegexLiteral(RegexLiteral),
     ThisExpression(ThisExpression),
     Super(Super),
     // Assignment and patterns
-    AssignmentExpression(AssignmentExpression<'arena>),
+    AssignmentExpression(AssignmentExpression),
     ObjectPattern(ObjectPattern<'arena>),
     ArrayPattern(ArrayPattern<'arena>),
     AssignmentPattern(AssignmentPattern<'arena>),
@@ -79,21 +78,21 @@ pub enum ExpressionKind<'arena> {
     // TypeScript instantiation expression: f<T>
     TSInstantiationExpression(TSInstantiationExpression<'arena>),
     // TypeScript non-null assertion: expr!
-    TSNonNullExpression(TSNonNullExpression<'arena>),
+    TSNonNullExpression(TSNonNullExpression),
     // TypeScript parameter property: constructor(public x)
-    TSParameterProperty(TSParameterProperty<'arena>),
+    TSParameterProperty(TSParameterProperty),
     // Dynamic import: import('...')
-    ImportExpression(ImportExpression<'arena>),
+    ImportExpression(ImportExpression),
     // Meta property: import.meta, new.target (two inline Identifiers)
     MetaProperty(&'arena MetaProperty<'arena>),
     // A grouping pair bound to the comment before its `(` — the JSDoc type cast
     // `/** @type {T} */ (inner)`, or a glued block whose pair opens with a line comment
     // (`/* c */ (⏎// d⏎inner)`). Internal-only, never serialized
-    CommentBoundPair(CommentBoundPair<'arena>),
+    CommentBoundPair(CommentBoundPair),
     // Preserved grouping parens: `(expr)` — only produced under the parser's
     // `preserve_parens` mode (snippet parameters), serialized to match acorn's
     // `preserveParens` output.
-    ParenthesizedExpression(ParenthesizedExpression<'arena>),
+    ParenthesizedExpression(ParenthesizedExpression),
 }
 
 impl<'arena> Expression<'arena> {
@@ -147,7 +146,7 @@ impl<'arena> Expression<'arena> {
 
     /// Wrap a [`SpreadElement`] (see [`Expression::from_identifier`]).
     #[inline]
-    pub fn from_spread_element(spread: SpreadElement<'arena>) -> Self {
+    pub fn from_spread_element(spread: SpreadElement) -> Self {
         Self {
             span: spread.span,
             kind: ExpressionKind::SpreadElement(spread),
@@ -156,7 +155,7 @@ impl<'arena> Expression<'arena> {
 
     /// Wrap a [`UnaryExpression`] (see [`Expression::from_identifier`]).
     #[inline]
-    pub fn from_unary_expression(unary: UnaryExpression<'arena>) -> Self {
+    pub fn from_unary_expression(unary: UnaryExpression) -> Self {
         Self {
             span: unary.span,
             kind: ExpressionKind::UnaryExpression(unary),
@@ -330,8 +329,8 @@ impl<'arena> Expression<'arena> {
 /// is opaque to layout heuristics (expand-last etc.), mirroring how acorn's
 /// `ParenthesizedExpression` hides the inner type in prettier-plugin-svelte.
 #[derive(Debug, Clone)]
-pub struct CommentBoundPair<'arena> {
-    pub inner: ExprEdge<'arena>,
+pub struct CommentBoundPair {
+    pub inner: ExprId,
     /// The comment glued to `span.start` — the `@type`/`@satisfies` comment of a cast, or
     /// the glued block. The node owns it (`Comment::owned_by_node`), so the generic
     /// comment machinery skips it and this node is the only thing that prints it — which
@@ -379,11 +378,11 @@ pub enum CommentBoundPairKind {
 /// parses to. A pair answers no paren question about its position, so a printer handed
 /// one prints `(x + y) * 2` as `x + y * 2`.
 #[derive(Debug, Clone)]
-pub struct ParenthesizedExpression<'arena> {
-    pub expression: ExprEdge<'arena>,
+pub struct ParenthesizedExpression {
+    pub expression: ExprId,
 }
 
-impl<'arena> ParenthesizedExpression<'arena> {
+impl<'arena> ParenthesizedExpression {
     /// The pair's contents, for a consumer of the paren-free tree — which never holds one.
     ///
     /// The exhaustive matches in the printer and the compiler keep an arm for this node
@@ -402,7 +401,7 @@ impl<'arena> ParenthesizedExpression<'arena> {
 
 #[derive(Debug, Clone)]
 pub struct ObjectExpression<'arena> {
-    pub properties: &'arena [ObjectProperty<'arena>],
+    pub properties: &'arena [ObjectProperty],
     /// `true` when a trailing comma follows a final spread property (`{...a,}`).
     /// Valid in an object *literal*, but a syntax error once the literal is
     /// refined to an object pattern — the grammar's rest property admits no
@@ -413,12 +412,12 @@ pub struct ObjectExpression<'arena> {
 
 /// Object property - either a regular property or a spread element
 #[derive(Debug, Clone)]
-pub enum ObjectProperty<'arena> {
-    Property(Property<'arena>),
-    SpreadElement(SpreadElement<'arena>),
+pub enum ObjectProperty {
+    Property(Property),
+    SpreadElement(SpreadElement),
 }
 
-impl<'arena> ObjectProperty<'arena> {
+impl ObjectProperty {
     pub fn span(&self) -> Span {
         match self {
             ObjectProperty::Property(p) => p.span,
@@ -466,8 +465,8 @@ impl<'arena> ObjectProperty<'arena> {
 /// Elements are wrapped in Option to support sparse arrays like `[1,,3]`
 /// where missing elements are represented as None.
 #[derive(Debug, Clone)]
-pub struct ArrayExpression<'arena> {
-    pub elements: OptExprList<'arena>,
+pub struct ArrayExpression {
+    pub elements: Run<Option<ExprId>>,
     /// `true` when a trailing comma follows a final spread element (`[...a,]`).
     /// Valid in an array *literal*, but a syntax error once the literal is
     /// refined to an array pattern — the grammar's rest element admits no
@@ -500,9 +499,9 @@ impl UpdateOperator {
 /// indicates whether the operator appears before (true) or after (false)
 /// the argument.
 #[derive(Debug, Clone)]
-pub struct UpdateExpression<'arena> {
+pub struct UpdateExpression {
     pub operator: UpdateOperator,
-    pub argument: ExprEdge<'arena>,
+    pub argument: ExprId,
     pub prefix: bool, // true for `++x`/`--x`, false for `x++`/`x--`
 }
 
@@ -545,9 +544,9 @@ impl UnaryOperator {
 
 /// Unary expression: `-x`, `+x`, `!x`, etc.
 #[derive(Debug, Clone)]
-pub struct UnaryExpression<'arena> {
+pub struct UnaryExpression {
     pub operator: UnaryOperator,
-    pub argument: ExprEdge<'arena>,
+    pub argument: ExprId,
     pub span: Span,
 }
 
@@ -679,10 +678,10 @@ impl BinaryOperator {
 
 /// Binary expression: `a + b`, `x && y`, etc.
 #[derive(Debug, Clone)]
-pub struct BinaryExpression<'arena> {
-    pub left: ExprEdge<'arena>,
+pub struct BinaryExpression {
+    pub left: ExprId,
     pub operator: BinaryOperator,
-    pub right: ExprEdge<'arena>,
+    pub right: ExprId,
     /// For a `<` node UNDER A `>` only: whether the region this `<` opens would re-lex as a
     /// TYPE-ARGUMENT LIST once printed — the parser's own relaxed reading of the same
     /// lookahead that decided this `<` is the less-than operator, recorded here because the
@@ -760,7 +759,7 @@ pub struct BinaryExpression<'arena> {
     pub may_close_type_arguments: bool,
 }
 
-impl<'arena> BinaryExpression<'arena> {
+impl<'arena> BinaryExpression {
     /// The right operand of prettier's REBALANCED tree: the deepest right of the spine
     /// [`BinaryOperator::rebalances_with`] joins, which is this chain's LAST operand.
     ///
@@ -795,9 +794,9 @@ impl<'arena> BinaryExpression<'arena> {
 /// Call expression: `foo()`, `obj.method(arg1, arg2)`, `fn<T>()`
 #[derive(Debug, Clone)]
 pub struct CallExpression<'arena> {
-    pub callee: ExprEdge<'arena>,
+    pub callee: ExprId,
     pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
-    pub arguments: ExprList<'arena>,
+    pub arguments: Run<ExprId>,
     pub optional: bool, // true for `foo?.()` (optional chaining)
 }
 
@@ -808,18 +807,18 @@ pub struct CallExpression<'arena> {
 /// Type arguments like `new Map<K, V>()` are stored in `type_arguments`.
 #[derive(Debug, Clone)]
 pub struct NewExpression<'arena> {
-    pub callee: ExprEdge<'arena>,
+    pub callee: ExprId,
     pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
-    pub arguments: ExprList<'arena>,
+    pub arguments: Run<ExprId>,
 }
 
 /// Dynamic import expression: `import('module')` or `import('module', options)`,
 /// optionally phased as `import.source(…)` / `import.defer(…)`.
 #[derive(Debug, Clone)]
-pub struct ImportExpression<'arena> {
-    pub source: ExprEdge<'arena>,
+pub struct ImportExpression {
+    pub source: ExprId,
     /// Optional second argument for import attributes: `{with: {type: 'json'}}`
-    pub options: OptExprEdge<'arena>,
+    pub options: Option<ExprId>,
     /// Import phase: `Source`/`Defer` for `import.source(…)` / `import.defer(…)`.
     pub phase: super::modules::ImportPhase,
 }
@@ -835,19 +834,19 @@ pub struct MetaProperty<'arena> {
 
 /// Member expression: `obj.prop`, `arr[0]`
 #[derive(Debug, Clone)]
-pub struct MemberExpression<'arena> {
-    pub object: ExprEdge<'arena>,
-    pub property: ExprEdge<'arena>,
+pub struct MemberExpression {
+    pub object: ExprId,
+    pub property: ExprId,
     pub computed: bool, // true for `arr[0]`, false for `obj.prop`
     pub optional: bool, // true for `obj?.prop` (optional chaining)
 }
 
 /// Conditional (ternary) expression: `a ? b : c`
 #[derive(Debug, Clone)]
-pub struct ConditionalExpression<'arena> {
-    pub test: ExprEdge<'arena>,
-    pub consequent: ExprEdge<'arena>,
-    pub alternate: ExprEdge<'arena>,
+pub struct ConditionalExpression {
+    pub test: ExprId,
+    pub consequent: ExprId,
+    pub alternate: ExprId,
 }
 
 /// Arrow function expression: `() => expr` or `() => { stmts }`
@@ -860,7 +859,7 @@ pub struct ArrowFunctionExpression<'arena> {
     /// Type parameters (TypeScript generics): `<T>() => ...`
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
-    pub params: ExprRun<'arena>,
+    pub params: Run<Expr>,
     pub body: ArrowFunctionBody<'arena>,
     /// Return type annotation (TypeScript): (): number => ...
     pub return_type: Option<TSTypeAnnotation<'arena>>,
@@ -880,7 +879,7 @@ pub struct ArrowFunctionExpression<'arena> {
 #[derive(Debug, Clone)]
 pub enum ArrowFunctionBody<'arena> {
     /// Expression body: `() => expr`
-    Expression(ExprEdge<'arena>),
+    Expression(ExprId),
     /// Block body: `() => { stmts }`
     BlockStatement(BlockStatement<'arena>),
 }
@@ -912,7 +911,7 @@ pub struct FunctionExpression<'arena> {
     /// Type parameters (TypeScript generics): `function<T>() {}`
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
-    pub params: ExprRun<'arena>,
+    pub params: Run<Expr>,
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
     pub return_type: Option<TSTypeAnnotation<'arena>>,
     /// Function body (block statement with statements)
@@ -930,12 +929,12 @@ pub struct FunctionExpression<'arena> {
 ///
 /// Used in array literals (`[...arr]`) and object literals (`{...obj}`)
 #[derive(Debug, Clone)]
-pub struct SpreadElement<'arena> {
-    pub argument: ExprEdge<'arena>,
+pub struct SpreadElement {
+    pub argument: ExprId,
     pub span: Span,
 }
 
-impl SpreadElement<'_> {
+impl SpreadElement {
     /// The source the grouping parens the parser stripped from the argument leave behind
     /// — `[argument end, span end)`, the region between the argument and the shell's last
     /// `)` (`...(x /* c */)`). Its comments are split between the spread's own doc and the
@@ -970,16 +969,15 @@ impl PropertyKind {
 /// Object property: `{ key: value }` — and, reused verbatim, a destructuring
 /// pattern's property (`ObjectPatternProperty::Property`).
 ///
-/// Both slots are `&'arena` references rather than inline `Expression`s, which
-/// takes the element every object literal and every object pattern moves from
-/// 160 B to 32. It costs no allocation: the parser's expression spine already
-/// returns an arena-allocated `&Expression`, so an inline slot
-/// was a copy *out of* the arena rather than the place the node lives — see the
-/// density note in `ast/mod.rs` and `Parser::parse_assignment_expression_ref`.
+/// Both slots are ids rather than inline `Expression`s, which takes the element every
+/// object literal and every object pattern moves from 160 B to 20. It costs no row: the
+/// parser's expression spine already returns the id of the node it pushed, so an inline
+/// slot would be a copy *out of* the store rather than the place the node lives — see
+/// the density note in `ast/mod.rs`.
 #[derive(Debug, Clone)]
-pub struct Property<'arena> {
-    pub key: ExprEdge<'arena>,
-    pub value: ExprEdge<'arena>,
+pub struct Property {
+    pub key: ExprId,
+    pub value: ExprId,
     pub kind: PropertyKind, // init, get, or set
     pub shorthand: bool,    // true for `{ prop }`, false for `{ prop: value }`
     pub computed: bool,     // true for `{ [expr]: value }`, false for `{ prop: value }`
@@ -999,7 +997,7 @@ pub struct Property<'arena> {
 #[derive(Debug, Clone)]
 pub struct TemplateLiteral<'arena> {
     pub quasis: &'arena [TemplateElement<'arena>],
-    pub expressions: ExprList<'arena>,
+    pub expressions: Run<ExprId>,
     pub span: Span,
 }
 
@@ -1102,7 +1100,7 @@ impl<'arena> TemplateElement<'arena> {
 /// separately rather than wrapping the tag in `TSInstantiationExpression`.
 #[derive(Debug, Clone)]
 pub struct TaggedTemplateExpression<'arena> {
-    pub tag: ExprEdge<'arena>,
+    pub tag: ExprId,
     pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
     pub quasi: TemplateLiteral<'arena>,
 }
@@ -1112,8 +1110,8 @@ pub struct TaggedTemplateExpression<'arena> {
 /// Used in async functions to wait for a Promise to resolve.
 /// The argument is the expression being awaited.
 #[derive(Debug, Clone)]
-pub struct AwaitExpression<'arena> {
-    pub argument: ExprEdge<'arena>,
+pub struct AwaitExpression {
+    pub argument: ExprId,
 }
 
 /// Yield expression: `yield value` or `yield* iterable`
@@ -1123,9 +1121,9 @@ pub struct AwaitExpression<'arena> {
 /// - `yield value` yields the given value
 /// - `yield* iterable` delegates to another generator/iterable
 #[derive(Debug, Clone)]
-pub struct YieldExpression<'arena> {
+pub struct YieldExpression {
     /// The value to yield (None for `yield` with no argument)
-    pub argument: OptExprEdge<'arena>,
+    pub argument: Option<ExprId>,
     /// Whether this is a delegating yield: `yield*`
     pub delegate: bool,
 }
@@ -1135,8 +1133,8 @@ pub struct YieldExpression<'arena> {
 /// Evaluates all expressions left to right, returns the last value.
 /// Created by the comma operator at expression level.
 #[derive(Debug, Clone)]
-pub struct SequenceExpression<'arena> {
-    pub expressions: ExprList<'arena>,
+pub struct SequenceExpression {
+    pub expressions: Run<ExprId>,
 }
 
 /// Regular expression literal: `/pattern/flags`
@@ -1198,7 +1196,7 @@ pub struct TSTypeAssertion<'arena> {
     /// The target type
     pub type_annotation: &'arena TSType<'arena>,
     /// The expression being type-asserted
-    pub expression: ExprEdge<'arena>,
+    pub expression: ExprId,
 }
 
 /// TypeScript `as` type assertion: `expr as Type` or `expr as const`
@@ -1210,7 +1208,7 @@ pub struct TSTypeAssertion<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSAsExpression<'arena> {
     /// The expression being type-asserted
-    pub expression: ExprEdge<'arena>,
+    pub expression: ExprId,
     /// The target type
     pub type_annotation: &'arena TSType<'arena>,
 }
@@ -1225,7 +1223,7 @@ pub struct TSAsExpression<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSSatisfiesExpression<'arena> {
     /// The expression being checked
-    pub expression: ExprEdge<'arena>,
+    pub expression: ExprId,
     /// The type to satisfy
     pub type_annotation: &'arena TSType<'arena>,
 }
@@ -1240,7 +1238,7 @@ pub struct TSSatisfiesExpression<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSInstantiationExpression<'arena> {
     /// The expression being instantiated
-    pub expression: ExprEdge<'arena>,
+    pub expression: ExprId,
     /// The type arguments: <T, U>
     pub type_arguments: TSTypeParameterInstantiation<'arena>,
 }
@@ -1252,12 +1250,12 @@ pub struct TSInstantiationExpression<'arena> {
 ///
 /// Example: `document.getElementById("app")!`
 #[derive(Debug, Clone)]
-pub struct TSNonNullExpression<'arena> {
+pub struct TSNonNullExpression {
     /// The expression being asserted non-null
-    pub expression: ExprEdge<'arena>,
+    pub expression: ExprId,
 }
 
-impl<'arena> TSNonNullExpression<'arena> {
+impl TSNonNullExpression {
     /// True when this non-null assertion seals a **parenthesized** optional chain
     /// (`(a?.b)!` — the `!` outside the source parens). The grouping parens are
     /// stripped, so the only signal is the span gap: this node's span starts before
@@ -1283,13 +1281,13 @@ impl<'arena> TSNonNullExpression<'arena> {
 /// - Destructuring: `{a, b} = obj`, `[x, y] = arr`
 /// - Compound assignment: `x += 1` (uses AssignmentOperator)
 #[derive(Debug, Clone)]
-pub struct AssignmentExpression<'arena> {
+pub struct AssignmentExpression {
     /// The assignment target (identifier, member expression, or pattern)
-    pub left: ExprEdge<'arena>,
+    pub left: ExprId,
     /// The operator: "=" for simple, "+=", "-=", etc. for compound
     pub operator: AssignmentOperator,
     /// The value being assigned
-    pub right: ExprEdge<'arena>,
+    pub right: ExprId,
 }
 
 /// Assignment operator: `=`, `+=`, `-=`, etc.

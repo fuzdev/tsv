@@ -40,7 +40,7 @@ pub(super) fn write_for_statement(
         Some(ast::ForInit::VariableDeclaration(decl)) => {
             write_variable_declaration(w, decl, ctx, false);
         }
-        Some(ast::ForInit::Expression(expr)) => write_expression(w, ctx.view.slot(expr), ctx),
+        Some(ast::ForInit::Expression(expr)) => write_expression(w, ctx.view.expr(*expr), ctx),
         None => w.null(),
     }
     w.raw(",\"test\":");
@@ -62,7 +62,7 @@ fn write_for_in_of_left(w: &mut JsonWriter, left: &ast::ForInOfLeft<'_>, ctx: &C
         ast::ForInOfLeft::VariableDeclaration(decl) => {
             write_variable_declaration(w, decl, ctx, false);
         }
-        ast::ForInOfLeft::Pattern(expr) => write_expression(w, ctx.view.slot(expr), ctx),
+        ast::ForInOfLeft::Pattern(expr) => write_expression(w, ctx.view.expr(*expr), ctx),
     }
 }
 
@@ -205,7 +205,7 @@ pub(super) fn write_try_statement(
 /// Emits a `ThrowStatement` node.
 pub(super) fn write_throw_statement(
     w: &mut JsonWriter,
-    throw_stmt: &ast::ThrowStatement<'_>,
+    throw_stmt: &ast::ThrowStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {

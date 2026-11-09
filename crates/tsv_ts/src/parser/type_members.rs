@@ -131,7 +131,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if self.check(&TokenKind::ParenOpen) || self.check(&TokenKind::LessThan) {
             // Parse optional type parameters: <T>
             let type_parameters = self.parse_optional_type_parameters()?;
-            let params = self.parse_signature_parameter_list()?.into_bump_slice();
+            let params = self.parse_signature_parameter_list()?;
             self.check_signature_params(params)?;
             let (return_type, end) = self.parse_signature_return_type(true)?;
             return Ok(TSTypeElement::CallSignature(TSCallSignatureDeclaration {
@@ -155,7 +155,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?;
                 // Parse optional type parameters: <T>
                 let type_parameters = self.parse_optional_type_parameters()?;
-                let params = self.parse_signature_parameter_list()?.into_bump_slice();
+                let params = self.parse_signature_parameter_list()?;
                 self.check_signature_params(params)?;
                 let (return_type, end) = self.parse_signature_return_type(false)?;
                 return Ok(TSTypeElement::ConstructSignature(
@@ -218,20 +218,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // conditional's consequent. An object literal's key takes the same from
             // the literal's own braces.
             self.enter_grouping()?;
-            let key = self.parse_computed_member_key()?;
+            let key = self.parse_computed_member_key()?.id();
             self.exit_grouping();
             (true, key)
         } else if self.current_is_identifier_or_keyword() {
-            (
-                false,
-                Expression::from_identifier(self.parse_identifier_name_node()?),
-            )
+            let key = self.parse_identifier_name_node()?;
+            (false, self.push_expr(Expression::from_identifier(key)))
         } else if self.check(&TokenKind::String) {
             // String literal key: {'multi-word': number}
-            (
-                false,
-                Expression::from_literal(self.parse_string_literal()?),
-            )
+            let key = self.parse_string_literal()?;
+            (false, self.push_expr(Expression::from_literal(key)))
         } else if self.check(&TokenKind::Number) {
             // Number literal key: {0: string, 1: number}. Routed through the one
             // numeric-literal reader so this key reads its radix prefixes, separators
@@ -239,16 +235,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // strict-mode leading-zero gate.
             let literal = self.parse_number_or_bigint_literal()?;
             self.advance()?;
-            (false, Expression::from_literal(literal))
+            (false, self.push_expr(Expression::from_literal(literal)))
         } else {
             return Err(self.error_expected("property name"));
         };
-
-        // a non-computed key is built by value in its member and never placed in the arena
-        #[cfg(feature = "_internal_ast_census")]
-        if !computed {
-            tsv_lang::ast_census_probe::built_inline::<Expression<'arena>>(1);
-        }
 
         // Check for optional: ?
         let optional = self.eat(TokenKind::Question)?;
@@ -268,7 +258,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 return Err(self.error_msg("An accessor cannot have type parameters"));
             }
 
-            let params = self.parse_signature_parameter_list()?.into_bump_slice();
+            let params = self.parse_signature_parameter_list()?;
             // Every signature param must be a plain binding (no default / parameter
             // property) — acorn's `tsParseBindingListForSignature`.
             self.check_signature_params(params)?;
@@ -306,7 +296,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Without a type annotation, prev_token_end() extends past the key when an
         // optional `?` was consumed (`interface I { a? }`), matching acorn's span.
         let end = type_annotation.as_ref().map_or_else(
-            || key.span().end.max(self.prev_token_end() as u32),
+            || self.expr(key).span().end.max(self.prev_token_end() as u32),
             |ta| ta.span.end,
         );
 

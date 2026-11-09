@@ -16,7 +16,7 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Deref;
 
-use tsv_lang::store::{Id, ListBuf, Row, Store};
+use tsv_lang::store::{Id, ListBuf, ListMark, Row, Store};
 
 use super::{Expression, ExpressionKind, Program, Span, ThisExpression};
 
@@ -29,6 +29,14 @@ impl Row for Expression<'_> {
 
 /// A handle to one [`Expression`] row.
 pub type ExprId = Id<Expr>;
+
+#[cfg(test)]
+const _: () = {
+    use tsv_lang::store::{Run, STORE_CHECK};
+    assert!(STORE_CHECK || size_of::<ExprId>() == 4);
+    assert!(STORE_CHECK || size_of::<Option<ExprId>>() == 4);
+    assert!(STORE_CHECK || size_of::<Run<ExprId>>() == 8);
+};
 
 /// Slot 0 of the expression store. No id reaches it, so its contents are never read.
 const EXPR_SENTINEL: Expression<'static> = Expression {
@@ -49,7 +57,44 @@ pub struct AstStores<'arena> {
     pub(crate) expr_opt_scratch: ListBuf<Option<ExprId>>,
 }
 
+/// The tops of the three scratch stacks, taken together: a speculation's or a discarded
+/// parse's restore point.
+#[derive(Clone, Copy)]
+pub(crate) struct ScratchMarks {
+    exprs: ListMark<Expr>,
+    lists: ListMark<ExprId>,
+    opt_lists: ListMark<Option<ExprId>>,
+}
+
 impl AstStores<'_> {
+    /// The current tops of the scratch stacks.
+    #[inline]
+    pub(crate) fn scratch_marks(&self) -> ScratchMarks {
+        ScratchMarks {
+            exprs: self.expr_scratch.mark(),
+            lists: self.expr_list_scratch.mark(),
+            opt_lists: self.expr_opt_scratch.mark(),
+        }
+    }
+
+    /// Truncates the scratch stacks to `marks`, discarding the frames opened since. The
+    /// stores keep the rows pushed since: an abandoned row is an orphan, and any id already
+    /// handed out stays valid.
+    #[inline]
+    pub(crate) fn truncate_scratch(&mut self, marks: ScratchMarks) {
+        self.expr_scratch.truncate(marks.exprs);
+        self.expr_list_scratch.truncate(marks.lists);
+        self.expr_opt_scratch.truncate(marks.opt_lists);
+    }
+
+    /// Whether the scratch stacks stand at `marks`.
+    #[cfg(debug_assertions)]
+    pub(crate) fn scratch_is_at(&self, marks: ScratchMarks) -> bool {
+        self.expr_scratch.len_since(marks.exprs) == 0
+            && self.expr_list_scratch.len_since(marks.lists) == 0
+            && self.expr_opt_scratch.len_since(marks.opt_lists) == 0
+    }
+
     /// Empty stores for one document.
     #[must_use]
     pub fn new() -> Self {
