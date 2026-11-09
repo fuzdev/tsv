@@ -12,7 +12,12 @@ use bumpalo::collections::Vec as BumpVec;
 use census_vec::BumpVec;
 use std::collections::BTreeSet;
 use std::ops::ControlFlow;
+use tsv_lang::store::{IdRet, ListMark};
 use tsv_lang::{DepthBudget, DepthLimit, Error, Span, SpineCount};
+
+/// What the expression ladder's parse functions return: see §The expression ladder's return
+/// currency in `expression.rs`.
+pub(in crate::parser) type ExprRet = IdRet<Expr>;
 
 // Import parsing implementations
 mod expression;
@@ -385,25 +390,25 @@ pub(super) const LINK_TYPE_SUFFIX: u32 = 5;
 /// it is inlined.
 const SPINE_WALK_LINKS: u32 = 4;
 
-/// What the last walk past [`SPINE_WALK_LINKS`] found, keyed by the address of the node its
-/// bounded walk stopped at (`0`: none yet). The link over a chain's operand stops one link
+/// What the last walk past [`SPINE_WALK_LINKS`] found, keyed by the id of the node its
+/// bounded walk stopped at (`None`: none yet). The link over a chain's operand stops one link
 /// above where the link before it stopped, so its walk past the bound takes one step to a
-/// key: a chain of `n` links walks `n` times the bound, not `n²` steps. Sound because an
-/// arena node is never mutated or freed while the parser lives, so a node's answer is fixed
-/// once it is built; a walk that meets no key (another chain's walk took the memo) walks to
-/// the end of its spine — slower, never wrong.
+/// key: a chain of `n` links walks `n` times the bound, not `n²` steps. Sound because a
+/// stored row is never edited or truncated while the parser lives, so a node's answer is
+/// fixed once it is built; a walk that meets no key (another chain's walk took the memo)
+/// walks to the end of its spine — slower, never wrong.
 ///
 /// Deliberately left out of [`Checkpoint`]: a rewind need not restore it, since an abandoned
-/// branch's nodes stay allocated in the arena and their addresses are never reused, so a key
-/// one of them left names that node alone and its answer stays true.
+/// branch's rows stay in the store and their ids are never reused, so a key one of them
+/// left names that node alone and its answer stays true.
 #[derive(Clone, Copy, Default)]
 struct SpineMemo {
     /// The node [`Parser::spine_whole_past`] last stopped at.
-    whole_at: usize,
+    whole_at: Option<ExprId>,
     /// Whether the first call down that node's spine may be one the printer prints whole.
     whole: bool,
     /// The node [`Parser::call_units_past`] last stopped at.
-    call_at: usize,
+    call_at: Option<ExprId>,
     /// [`Parser::call_link_units`] of that node.
     call_units: u32,
 }
@@ -415,9 +420,9 @@ struct SpineMemo {
 /// take.
 #[expect(clippy::inline_always)]
 #[inline(always)]
-fn call_spine_step<'e>(inner: &'e Expression<'e>) -> ControlFlow<u32, &'e Expression<'e>> {
+fn call_spine_step(view: ExprView<'_>, inner: ExprId) -> ControlFlow<u32, ExprId> {
     tsv_lang::fanout_probe::predicate();
-    match &inner.kind {
+    match &view.expr(inner).kind {
         ExpressionKind::TSNonNullExpression(n) => ControlFlow::Continue(n.expression),
         ExpressionKind::TSInstantiationExpression(i) => ControlFlow::Continue(i.expression),
         ExpressionKind::CallExpression(_) | ExpressionKind::TaggedTemplateExpression(_) => {
@@ -441,8 +446,9 @@ fn call_spine_step<'e>(inner: &'e Expression<'e>) -> ControlFlow<u32, &'e Expres
 /// kept from an abandoned type-argument list
 /// ([`Parser::abandoned_type_arguments_error`]).
 /// Context flags (`allow_in`, `in_await`, …) are not carried — their combinators
-/// restore them on every path — and neither are arena nodes, which an abandoned
-/// parse simply leaves unreachable.
+/// restore them on every path — and neither are stored rows or arena nodes, which an
+/// abandoned parse simply leaves unreachable (the scratch stacks' tops are carried:
+/// an abandoned parse's open frames must not outlive it).
 ///
 /// ⚠️ That first exemption is a **standing obligation**, not an observation: a
 /// context flag whose save/restore is hand-rolled around a `?` leaks its value
@@ -499,6 +505,9 @@ pub(super) struct Checkpoint<'arena> {
     spine: SpineCount,
     lt_regions: LtRegions,
     abandoned_type_arguments_error: Option<Error>,
+    /// The scratch stacks' tops, truncated to on every rewind. The stores are not: an
+    /// abandoned row stays orphaned, and the ids already handed out stay valid.
+    scratch_marks: ScratchMarks,
     #[cfg(feature = "_internal_ast_census")]
     ast_census_mark: u32,
 }
@@ -869,6 +878,66 @@ pub(crate) struct Parser<'a, 'arena> {
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
+    /// Push a finished expression and mint its id — the tail of every node builder on the
+    /// expression ladder (see §The expression ladder's return currency in `expression.rs`).
+    #[inline]
+    pub(in crate::parser) fn push_expr(&mut self, expr: Expression<'arena>) -> ExprId {
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
+        self.stores.exprs.push(expr)
+    }
+
+    /// [`Parser::push_expr`] in the ladder's return currency.
+    #[inline]
+    pub(in crate::parser) fn push_ret(&mut self, expr: Expression<'arena>) -> ExprRet {
+        ExprRet::wrap(self.push_expr(expr))
+    }
+
+    /// Flush the id list opened at `mark` (`ListBuf::flush_copy`).
+    #[inline]
+    pub(in crate::parser) fn flush_expr_list(&mut self, mark: ListMark<ExprId>) -> Run<ExprId> {
+        let run = self
+            .stores
+            .expr_list_scratch
+            .flush_copy(mark, &mut self.stores.expr_lists);
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<ExprId>(run.len());
+        run
+    }
+
+    /// Flush the list with holes opened at `mark`.
+    #[inline]
+    pub(in crate::parser) fn flush_opt_expr_list(
+        &mut self,
+        mark: ListMark<Option<ExprId>>,
+    ) -> Run<Option<ExprId>> {
+        let run = self
+            .stores
+            .expr_opt_scratch
+            .flush_copy(mark, &mut self.stores.expr_opt_lists);
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Option<ExprId>>(run.len());
+        run
+    }
+
+    /// Flush the value run opened at `mark` into the expression store.
+    #[inline]
+    pub(in crate::parser) fn flush_expr_run(&mut self, mark: ListMark<Expr>) -> Run<Expr> {
+        let run = self
+            .stores
+            .expr_scratch
+            .flush_move(mark, &mut self.stores.exprs);
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(run.len());
+        run
+    }
+
+    /// The row `id` names, as the parser reads a node it has built.
+    #[inline]
+    pub(in crate::parser) fn expr(&self, id: ExprId) -> &Expression<'arena> {
+        self.stores.exprs.get(id)
+    }
+
     /// Allocate a single AST node in the arena, returning a shared `&'arena`
     /// reference (replaces `Box::new`). Zero-copy: `Bump::alloc` moves the value
     /// into arena memory; the mut→shared reborrow is implicit.
@@ -1335,13 +1404,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline(always)]
     pub(super) fn count_operand_pairs(
         &mut self,
-        left: Option<(&Expression<'_>, ParenContext)>,
-        right: Option<(&Expression<'_>, ParenContext)>,
+        left: Option<(ExprId, ParenContext)>,
+        right: Option<(ExprId, ParenContext)>,
     ) -> Result<(), Error> {
         for (operand, ctx) in [left, right].into_iter().flatten() {
+            let view = self.stores.view();
             if crate::printer::printer_adds_operand_pair(
-                self.stores.view(),
-                operand,
+                view,
+                view.expr(operand),
                 ctx,
                 self.in_for_header,
             ) {
@@ -1360,12 +1430,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn binary_operand_pairs(
         &mut self,
         operator: BinaryOperator,
-        left: &Expression<'_>,
-        right: &Expression<'_>,
+        left: ExprId,
+        right: ExprId,
         expr_start: usize,
     ) -> Result<(), Error> {
-        let left_bare = expr_start == left.span().start as usize;
-        let right_bare = right.span().end as usize == self.prev_token_end();
+        let view = self.stores.view();
+        let left_bare = expr_start == view.expr(left).span().start as usize;
+        let right_bare = view.expr(right).span().end as usize == self.prev_token_end();
         self.count_operand_pairs(
             left_bare.then_some((
                 left,
@@ -1434,21 +1505,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline]
     pub(super) fn count_prefix_operand_pairs(
         &mut self,
-        operand: &Expression<'_>,
+        operand: ExprId,
         ctx: ParenContext,
         operand_token: usize,
         holder: Option<(usize, usize)>,
         shell: bool,
     ) -> Result<(), Error> {
+        let node = self.stores.view().expr(operand);
         if !shell
             && ctx.is_operator_position()
             && !matches!(
-                operand.kind,
+                node.kind,
                 ExpressionKind::AssignmentExpression(_)
                     | ExpressionKind::SequenceExpression(_)
                     | ExpressionKind::ParenthesizedExpression(_)
             )
-            && crate::printer::operator_operand_takes_no_pair(operand)
+            && crate::printer::operator_operand_takes_no_pair(node)
             && holder.is_none_or(|(operator_end, _)| {
                 self.comments
                     .last()
@@ -1464,7 +1536,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline(never)]
     fn count_prefix_operand_pairs_by_rule(
         &mut self,
-        operand: &Expression<'_>,
+        operand: ExprId,
         ctx: ParenContext,
         operand_token: usize,
         holder: Option<(usize, usize)>,
@@ -1473,9 +1545,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // a wire-only parse keeps the author's pairs as nodes (`parse_preserve_parens`): they
         // are counted as the pairs they are, so it charges what the parse the printer reads
         // charges
-        let mut operand = operand;
+        let view = self.stores.view();
+        let mut operand = view.expr(operand);
         while let ExpressionKind::ParenthesizedExpression(paren) = &operand.kind {
-            operand = paren.expression;
+            operand = view.expr(paren.expression);
         }
         let span = operand.span();
         let bare = span.start as usize == operand_token;
@@ -1488,12 +1561,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 operand.kind,
                 ExpressionKind::AssignmentExpression(_) | ExpressionKind::SequenceExpression(_)
             ))
-            || crate::printer::printer_adds_operand_pair(
-                self.stores.view(),
-                operand,
-                ctx,
-                self.in_for_header,
-            );
+            || crate::printer::printer_adds_operand_pair(view, operand, ctx, self.in_for_header);
         let written = u32::from(position_pair) + u32::from(commented) + u32::from(shell);
         if written == 0 {
             return Ok(());
@@ -1539,9 +1607,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline]
     pub(super) fn restricted_argument_pair(
         &mut self,
-        argument: &Expression<'_>,
+        argument: ExprId,
         argument_token: usize,
     ) -> Result<(), Error> {
+        let argument = self.stores.view().expr(argument);
         if matches!(argument.kind, ExpressionKind::BinaryExpression(_))
             && argument.span().start as usize == argument_token
         {
@@ -1560,18 +1629,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline(never)]
     pub(super) fn conditional_head_pairs(
         &mut self,
-        test: &Expression<'_>,
+        test: ExprId,
         expr_start: usize,
-        consequent: &Expression<'_>,
+        consequent: ExprId,
         consequent_start: usize,
     ) -> Result<(), Error> {
-        if matches!(consequent.kind, ExpressionKind::ConditionalExpression(_))
-            && consequent.span().start as usize == consequent_start
-        {
+        let view = self.stores.view();
+        let (test, consequent_node) = (view.expr(test), view.expr(consequent));
+        let nested_conditional = matches!(
+            consequent_node.kind,
+            ExpressionKind::ConditionalExpression(_)
+        ) && consequent_node.span().start as usize == consequent_start;
+        let test_pair = test.span().start as usize == expr_start
+            && crate::printer::ternary_test_takes_pair(test);
+        if nested_conditional {
             self.printer_pair()?;
         }
-        if test.span().start as usize == expr_start && crate::printer::ternary_test_takes_pair(test)
-        {
+        if test_pair {
             self.printer_pair()?;
         }
         self.ternary_branch_pair(consequent, consequent_start)
@@ -1583,9 +1657,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline]
     pub(super) fn ternary_branch_pair(
         &mut self,
-        branch: &Expression<'_>,
+        branch: ExprId,
         branch_token: usize,
     ) -> Result<(), Error> {
+        let view = self.stores.view();
+        let branch = view.expr(branch);
         if branch.span().start as usize == branch_token
             && crate::printer::ternary_branch_takes_pair(branch)
         {
@@ -1602,20 +1678,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline]
     pub(super) fn function_head_pair(
         &mut self,
-        head: &Expression<'_>,
+        head: ExprId,
         start: u32,
         ctx: ParenContext,
     ) -> Result<(), Error> {
+        let view = self.stores.view();
+        let head = view.expr(head);
         if matches!(
             head.kind,
             ExpressionKind::FunctionExpression(_) | ExpressionKind::ClassExpression(_)
         ) && head.span().start == start
-            && crate::printer::printer_adds_operand_pair(
-                self.stores.view(),
-                head,
-                ctx,
-                self.in_for_header,
-            )
+            && crate::printer::printer_adds_operand_pair(view, head, ctx, self.in_for_header)
         {
             self.printer_pair()
         } else {
@@ -1652,14 +1725,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (`(1).toString()`, `printer::needs_parens`'s chain-base rule), where `object` —
     /// a chain's head starting at `start` — is one the author wrote bare.
     #[inline]
-    pub(super) fn chain_base_pair(
-        &mut self,
-        object: &Expression<'_>,
-        start: u32,
-    ) -> Result<(), Error> {
+    pub(super) fn chain_base_pair(&mut self, object: ExprId, start: u32) -> Result<(), Error> {
+        let view = self.stores.view();
+        let object = view.expr(object);
         if matches!(object.kind, ExpressionKind::Literal(_))
             && object.span().start == start
-            && crate::printer::printer_parenthesizes_chain_base(self.stores.view(), object)
+            && crate::printer::printer_parenthesizes_chain_base(view, object)
         {
             self.printer_pair()
         } else {
@@ -1703,11 +1774,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// [`Parser::call_units_past`], so a run of `n` `!` costs `n` steps, not `n²`.
     #[expect(clippy::inline_always)]
     #[inline(always)]
-    pub(super) fn call_link_units(&mut self, operand: &Expression<'_>) -> u32 {
+    pub(super) fn call_link_units(&mut self, operand: ExprId) -> u32 {
+        let view = self.stores.view();
         let mut inner = operand;
         let mut links = SPINE_WALK_LINKS;
         loop {
-            match call_spine_step(inner) {
+            match call_spine_step(view, inner) {
                 ControlFlow::Continue(next) => inner = next,
                 ControlFlow::Break(units) => return units,
             }
@@ -1718,23 +1790,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// [`Parser::call_link_units`]'s walk from `cut`, the node its bounded walk stopped at,
+    /// [`Parser::call_link_units`]' walk from `cut`, the node its bounded walk stopped at,
     /// answered by [`SpineMemo`] where the walk reaches the node the last such walk stopped
     /// at — one link below `cut` when the link before this one was a `!` or instantiation
     /// over it.
     #[inline(never)]
-    fn call_units_past(&mut self, cut: &Expression<'_>) -> u32 {
+    fn call_units_past(&mut self, cut: ExprId) -> u32 {
+        let view = self.stores.view();
         let mut inner = cut;
         let units = loop {
-            if std::ptr::from_ref(inner).addr() == self.spine_memo.call_at {
+            if Some(inner) == self.spine_memo.call_at {
                 break self.spine_memo.call_units;
             }
-            match call_spine_step(inner) {
+            match call_spine_step(view, inner) {
                 ControlFlow::Continue(next) => inner = next,
                 ControlFlow::Break(units) => break units,
             }
         };
-        self.spine_memo.call_at = std::ptr::from_ref(cut).addr();
+        self.spine_memo.call_at = Some(cut);
         self.spine_memo.call_units = units;
         units
     }
@@ -1752,10 +1825,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// outlined, so a call site keeps only the bounded walk.
     #[expect(clippy::inline_always)]
     #[inline(always)]
-    pub(super) fn member_link_units(&mut self, object: &Expression<'_>) -> u32 {
-        let view = ExprView::of_parse();
-        let whole = matches!(object.kind, ExpressionKind::TaggedTemplateExpression(_))
-            || match crate::printer::spine_first_call_within(view, object, SPINE_WALK_LINKS) {
+    pub(super) fn member_link_units(&mut self, object: ExprId) -> u32 {
+        let view = self.stores.view();
+        let whole =
+            matches!(
+                view.expr(object).kind,
+                ExpressionKind::TaggedTemplateExpression(_)
+            ) || match crate::printer::spine_first_call_within(view, object, SPINE_WALK_LINKS) {
                 Ok(call) => {
                     call.is_some_and(|call| crate::printer::call_may_print_whole(view, call))
                 }
@@ -1770,11 +1846,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// stopped at, one link below `cut` when the link before this one was a member or `!`
     /// over it.
     #[inline(never)]
-    fn spine_whole_past(&mut self, cut: &Expression<'_>) -> bool {
-        let view = ExprView::of_parse();
+    fn spine_whole_past(&mut self, cut: ExprId) -> bool {
+        let view = self.stores.view();
         let mut node = cut;
         let whole = loop {
-            if std::ptr::from_ref(node).addr() == self.spine_memo.whole_at {
+            if Some(node) == self.spine_memo.whole_at {
                 break self.spine_memo.whole;
             }
             match crate::printer::spine_first_call_within(view, node, 1) {
@@ -1785,7 +1861,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 Err(next) => node = next,
             }
         };
-        self.spine_memo.whole_at = std::ptr::from_ref(cut).addr();
+        self.spine_memo.whole_at = Some(cut);
         self.spine_memo.whole = whole;
         whole
     }
@@ -1794,20 +1870,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// answered inline for the commonest call — a callee that is no call (nor a `!` over
     /// one) and no sole template argument, which no rule there admits.
     #[inline]
-    fn call_prints_whole(call: &Expression<'_>) -> bool {
-        match &call.kind {
+    fn call_prints_whole(view: ExprView<'_>, call: ExprId) -> bool {
+        match &view.expr(call).kind {
             ExpressionKind::CallExpression(c) => {
                 (matches!(
-                    c.callee.kind,
+                    view.expr(c.callee).kind,
                     ExpressionKind::CallExpression(_) | ExpressionKind::TSNonNullExpression(_)
                 ) || matches!(
-                    c.arguments,
+                    view.list(c.arguments),
                     [argument] if matches!(
-                        argument.kind,
+                        view.expr(*argument).kind,
                         ExpressionKind::TemplateLiteral(_)
                             | ExpressionKind::TaggedTemplateExpression(_)
                     )
-                )) && crate::printer::call_may_print_whole(ExprView::of_parse(), c)
+                )) && crate::printer::call_may_print_whole(view, call)
             }
             _ => false,
         }
@@ -1817,7 +1893,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// a curried call's ([`Parser::call_link_units`]), a member's
     /// ([`Parser::member_link_units`]) and its own ([`LINK_NON_NULL`]).
     #[inline]
-    pub(super) fn non_null_link_units(&mut self, operand: &Expression<'_>) -> u32 {
+    pub(super) fn non_null_link_units(&mut self, operand: ExprId) -> u32 {
         self.call_link_units(operand)
             .max(self.member_link_units(operand))
             .max(LINK_NON_NULL)
@@ -1834,9 +1910,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// [`Parser::call_prints_whole`] test, so the call site keeps only that test.
     #[expect(clippy::inline_always)]
     #[inline(always)]
-    pub(super) fn settle_call_link(&mut self, call: &Expression<'_>) -> Result<(), Error> {
-        if Self::call_prints_whole(call)
-            && let ExpressionKind::CallExpression(c) = &call.kind
+    pub(super) fn settle_call_link(&mut self, call: ExprId) -> Result<(), Error> {
+        let view = self.stores.view();
+        if Self::call_prints_whole(view, call)
+            && let ExpressionKind::CallExpression(c) = &view.expr(call).kind
         {
             let charged = self.call_link_units(c.callee);
             if charged < LINK_REENTRY {
@@ -1852,7 +1929,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// of the printer's own predicate (`printer::binary_left_operand_reenters`), so the
     /// price follows the walk it prices — else [`LINK_OPERATOR`].
     #[inline]
-    pub(super) fn binary_link_units(&self, operator: BinaryOperator, left: &Expression<'_>) -> u32 {
+    pub(super) fn binary_link_units(&self, operator: BinaryOperator, left: ExprId) -> u32 {
+        let view = self.stores.view();
+        let left = view.expr(left);
         // the predicate's own first test, inline: every other operand ends the spine
         if !matches!(
             left.kind,
@@ -1862,12 +1941,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ) {
             return LINK_OPERATOR;
         }
-        if crate::printer::binary_left_operand_reenters(
-            self.stores.view(),
-            operator,
-            left,
-            self.in_for_header,
-        ) {
+        if crate::printer::binary_left_operand_reenters(view, operator, left, self.in_for_header) {
             LINK_REENTRY
         } else {
             LINK_OPERATOR
@@ -2505,6 +2579,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             spine: self.spine,
             lt_regions: self.lt_regions,
             abandoned_type_arguments_error: self.abandoned_type_arguments_error.clone(),
+            scratch_marks: self.stores.scratch_marks(),
             #[cfg(feature = "_internal_ast_census")]
             ast_census_mark: tsv_lang::ast_census_probe::mark(),
         }
@@ -2534,6 +2609,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             spine,
             lt_regions,
             abandoned_type_arguments_error,
+            scratch_marks,
             #[cfg(feature = "_internal_ast_census")]
             ast_census_mark,
         } = checkpoint;
@@ -2554,6 +2630,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.spine = spine;
         self.lt_regions = lt_regions;
         self.abandoned_type_arguments_error = abandoned_type_arguments_error;
+        self.stores.truncate_scratch(scratch_marks);
         // Whatever the abandoned parse's type grammar was handing to itself is not
         // for the re-parse to receive (`checkpoint` asserts it was empty).
         self.pending_conditional_extends = None;
@@ -3719,7 +3796,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// # Example
     /// ```ignore
     /// let has_init = if self.eat(TokenKind::Equals)? {
-    ///     Some(self.parse_expression()?)
+    ///     Some(self.parse_expression()?.id())
     /// } else {
     ///     None
     /// };
@@ -3936,8 +4013,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the result to a Svelte pattern, then enforces end-of-input itself. (Expression tags
     /// use `parse_expression_with_comments`, which requires full consumption via
     /// `expect_end_of_input`.)
-    pub(crate) fn parse_expression_unbounded(&mut self) -> Result<Expression<'arena>, Error> {
-        self.parse_expression()
+    pub(crate) fn parse_expression_unbounded(&mut self) -> Result<ExprId, Error> {
+        Ok(self.parse_expression()?.id())
     }
 
     /// Require that parsing has consumed the whole input slice — the current token must
@@ -3970,8 +4047,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(crate) fn parse_expression_with_comments(
         &mut self,
         end: &str,
-    ) -> Result<(&'arena Expression<'arena>, &'arena [Comment]), Error> {
-        let expr = self.parse_expression_ref()?;
+    ) -> Result<(ExprId, &'arena [Comment]), Error> {
+        let expr = self.parse_expression()?.id();
         self.expect_end_of_input(end)?;
         let comments = self.take_comments();
         Ok((expr, comments))
@@ -3998,15 +4075,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(crate) fn parse_assignment_expression_partial(
         &mut self,
         top_level_as: TopLevelAs,
-    ) -> Result<(&'arena Expression<'arena>, usize), Error> {
+    ) -> Result<(ExprId, usize), Error> {
         let saved = std::mem::replace(
             &mut self.top_level_as_is_assertion,
             top_level_as == TopLevelAs::Assertion,
         );
-        let result = self.parse_assignment_expression_ref();
+        let result = self.parse_assignment_expression();
         self.top_level_as_is_assertion = saved;
 
-        let expr = result?;
+        let expr = result?.id();
         // Return the start of the current (unconsumed) token
         let next_pos = self.current.start as usize + self.base_offset;
         Ok((expr, next_pos))
@@ -4029,17 +4106,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// * `Ok(Expression)` - The converted pattern (ObjectPattern, ArrayPattern, etc.)
     /// * `Err(Error)` - If the expression cannot be converted to a valid pattern
-    pub(crate) fn expression_to_svelte_pattern(
-        &mut self,
-        expr: Expression<'arena>,
-    ) -> Result<Expression<'arena>, Error> {
+    pub(crate) fn expression_to_svelte_pattern(&mut self, expr: ExprId) -> Result<ExprId, Error> {
         // Svelte block and `{@const}` patterns, which Svelte reads as assignment
         // targets: a member or parenthesized target is accepted, a type-assertion
         // target still rejects (see `AssignableContext::SveltePattern`).
-        self.refine_owned_assignable(
-            expr,
-            expression_assignable::AssignableContext::SveltePattern,
-        )
+        Ok(self
+            .refine_placed_assignable(
+                expr,
+                expression_assignable::AssignableContext::SveltePattern,
+            )?
+            .id())
     }
 
     /// Parse a string literal into a Literal node.
@@ -4148,6 +4224,9 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
             .map(|()| parsed)
             .map_err(|error| (error, true))
     };
+    // the scratch's top: a parse that fails leaves frames open, and a caller may go on to
+    // another parse of the document past the failure (a goal retry, a host's own fallback)
+    let scratch_marks = stores.scratch_marks();
     #[cfg(feature = "_internal_ast_census")]
     let ast_census_mark = tsv_lang::ast_census_probe::mark();
     let mut parser = Parser::new(source, base_offset, goal, arena, stores);
@@ -4159,7 +4238,10 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     if !parser.gave_up_list_to_tsc_follower
         || (first.is_ok() && !parser.kept_list_past_tsc_follower)
     {
-        return first.map_err(|(error, _)| error);
+        return finish_driver_parse(stores, scratch_marks, first.map_err(|(error, _)| error));
+    }
+    if first.is_err() {
+        stores.truncate_scratch(scratch_marks);
     }
     #[cfg(feature = "_internal_ast_census")]
     let ast_census_retry_mark = tsv_lang::ast_census_probe::mark();
@@ -4173,6 +4255,10 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
         .and_then(|()| f(&mut retry))
         .map_err(|error| (error, false))
         .and_then(|parsed| checked(retry.stores.view(), parsed));
+    // A failed re-read leaves its open frames behind whichever parse is kept.
+    if second.is_err() {
+        stores.truncate_scratch(scratch_marks);
+    }
     // the parse kept is the second if it succeeded, else the first; the other's rows are
     // abandoned
     #[cfg(feature = "_internal_ast_census")]
@@ -4183,11 +4269,32 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
         (Err(_), Ok(_)) => tsv_lang::ast_census_probe::rewind(ast_census_retry_mark),
         (Err(_), Err(_)) => tsv_lang::ast_census_probe::rewind(ast_census_mark),
     }
-    match (second, first) {
+    let outcome = match (second, first) {
         (Ok(parsed), _) | (Err(_), Ok(parsed)) => Ok(parsed),
         (Err((_, false)), Err((error, false))) if !embedded => Err(error),
         (Err((error, _)), Err(_)) => Err(error),
+    };
+    finish_driver_parse(stores, scratch_marks, outcome)
+}
+
+/// The driver's exit: a failed parse leaves no open scratch frame behind it, for whatever
+/// the caller goes on to parse.
+#[inline]
+fn finish_driver_parse<'arena, T>(
+    stores: &mut AstStores<'arena>,
+    marks: ScratchMarks,
+    outcome: Result<T, Error>,
+) -> Result<T, Error> {
+    if outcome.is_err() {
+        stores.truncate_scratch(marks);
+    } else {
+        #[cfg(debug_assertions)]
+        debug_assert!(
+            stores.scratch_is_at(marks),
+            "a parse left an open list frame"
+        );
     }
+    outcome
 }
 
 /// [`parse_typescript`] against an explicit goal symbol. `parse_typescript` is

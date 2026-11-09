@@ -279,7 +279,7 @@ impl<'a> Printer<'a> {
     /// gaps (test→`?`, consequent→`:`) freezes nothing, so treating one as a branch directive
     /// would break a ternary open for a freeze that never fires. Behind the document-level
     /// flag, so a directive-free document never pays for the two operator scans.
-    fn ternary_branch_gap_frozen(&self, cond: &ast::ConditionalExpression<'_>) -> bool {
+    fn ternary_branch_gap_frozen(&self, cond: &ast::ConditionalExpression) -> bool {
         let alternate = self.view.expr(cond.alternate);
         let consequent = self.view.expr(cond.consequent);
         if !self.has_format_ignore {
@@ -402,7 +402,7 @@ impl<'a> Printer<'a> {
     /// [`Self::place_nested_ternary_test`].
     fn build_ternary_test_doc(
         &self,
-        cond: &ast::ConditionalExpression<'_>,
+        cond: &ast::ConditionalExpression,
         span: Span,
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
@@ -522,7 +522,7 @@ impl<'a> Printer<'a> {
     /// thing with `indent_binary_test`, which is the only axis between them.
     pub(in crate::printer) fn build_conditional_doc(
         &self,
-        cond: &ast::ConditionalExpression<'_>,
+        cond: &ast::ConditionalExpression,
         span: Span,
     ) -> DocId {
         self.build_conditional_doc_impl(cond, span, TernaryNesting::Root, false)
@@ -536,7 +536,7 @@ impl<'a> Printer<'a> {
     /// exempts binaries from indent only when the grandparent is NOT one of these types.
     pub(in crate::printer) fn build_conditional_doc_with_binary_test_indent(
         &self,
-        cond: &ast::ConditionalExpression<'_>,
+        cond: &ast::ConditionalExpression,
         span: Span,
     ) -> DocId {
         self.build_conditional_doc_impl(cond, span, TernaryNesting::Root, true)
@@ -556,7 +556,7 @@ impl<'a> Printer<'a> {
     /// below always passes `false` (`ternary/nested_binary_branch_long`).
     fn build_conditional_doc_impl(
         &self,
-        cond: &ast::ConditionalExpression<'_>,
+        cond: &ast::ConditionalExpression,
         cond_span: Span,
         nesting: TernaryNesting,
         indent_binary_test: bool,
@@ -584,7 +584,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_conditional_doc_impl`] under its left-spine claim.
     fn build_conditional_doc_claimed(
         &self,
-        cond: &ast::ConditionalExpression<'_>,
+        cond: &ast::ConditionalExpression,
         cond_span: Span,
         nesting: TernaryNesting,
         indent_binary_test: bool,
@@ -923,7 +923,7 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_conditional_doc_with_line_comments(
         &self,
-        cond: &ast::ConditionalExpression<'_>,
+        cond: &ast::ConditionalExpression,
         cond_span: Span,
         nesting: TernaryNesting,
     ) -> DocId {

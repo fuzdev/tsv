@@ -1415,7 +1415,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn withhold_clarity_pairs_behind_region_close(
         &self,
-        expr: &ast::BinaryExpression<'_>,
+        expr: &ast::BinaryExpression,
     ) {
         if expr.may_close_type_arguments {
             self.record_withheld_clarity_pairs(expr);
@@ -1425,7 +1425,7 @@ impl<'a> Printer<'a> {
     /// [`Self::withhold_clarity_pairs_behind_region_close`]'s recording, out of line: a
     /// comparison behind an open `<` region is the rare one.
     #[cold]
-    fn record_withheld_clarity_pairs(&self, close: &ast::BinaryExpression<'_>) {
+    fn record_withheld_clarity_pairs(&self, close: &ast::BinaryExpression) {
         let withheld = clarity_pairs_behind_region_close(
             self.view,
             close,
@@ -2347,10 +2347,7 @@ impl<'a> Printer<'a> {
     /// share ([`Self::paren_interior_own_line_comments`]) — so each comment is printed once.
     /// A frozen argument's slice prints its shells and their comments verbatim, so its
     /// interior opens at its span end.
-    pub(in crate::printer) fn spread_printed_interior(
-        &self,
-        spread: &ast::SpreadElement<'_>,
-    ) -> Span {
+    pub(in crate::printer) fn spread_printed_interior(&self, spread: &ast::SpreadElement) -> Span {
         let interior = spread.paren_interior(self.view);
         if !self.has_comments_to_emit_between(interior.start, interior.end) {
             return interior;
@@ -2384,7 +2381,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::printed_paren_interior`]).
     pub(in crate::printer) fn printed_property_paren_interior(
         &self,
-        prop: &ast::ObjectProperty<'_>,
+        prop: &ast::ObjectProperty,
     ) -> Option<Span> {
         match prop {
             ast::ObjectProperty::SpreadElement(s) => Some(self.spread_printed_interior(s)),
@@ -3548,7 +3545,7 @@ impl<'a> Printer<'a> {
     /// Returns `fallback` if there are no decorators or the keyword isn't found.
     pub(crate) fn find_keyword_after_decorators(
         &self,
-        decorators: Option<&[ast::Decorator<'_>]>,
+        decorators: Option<&[ast::Decorator]>,
         keyword: &str,
         fallback: u32,
     ) -> u32 {

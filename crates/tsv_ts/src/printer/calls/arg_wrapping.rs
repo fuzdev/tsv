@@ -691,7 +691,7 @@ pub(super) fn prebuild_expand_last_obj_array_body(
 /// - last_arg_doc: the last argument doc
 /// - all_args_broken: all args joined with comma_line() for fallback (includes inline block comments)
 pub(super) fn build_args_split_last(
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
     printer: &Printer<'_>,
     paren_open: u32,
     has_comments: bool,
@@ -810,7 +810,7 @@ pub(super) fn build_args_split_last(
 /// expressions instead.
 pub(super) fn try_hook_deps_args_doc(
     printer: &Printer<'_>,
-    args: &[ast::ExprEdge<'_>],
+    args: &[ast::ExprId],
     paren_open: u32,
     call_end: u32,
     has_comments: bool,
@@ -828,7 +828,7 @@ pub(super) fn try_hook_deps_args_doc(
 /// the call never wraps around them.
 fn build_hook_deps_args_doc(
     printer: &Printer<'_>,
-    args: &[ast::ExprEdge<'_>],
+    args: &[ast::ExprId],
     paren_open: u32,
     prefix: DocId,
 ) -> DocId {
@@ -2324,7 +2324,7 @@ fn prebuild_callback_block_body(
 pub(super) fn build_expand_first_arg_doc(
     printer: &Printer<'_>,
     opener: ArgOpener,
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
     paren_open: u32,
     call_end: u32,
 ) -> DocId {
@@ -2416,7 +2416,7 @@ pub(super) fn build_expand_first_arg_doc(
 /// Prettier disables expand-last-arg hug state when `penultimateArg.type === lastArg.type`
 /// (`couldExpandArg`, `print/call-arguments.js`). This covers both arrays, both objects, and also both TSAsExpression,
 /// both TSSatisfiesExpression, etc.
-pub(super) fn last_two_args_same_type(view: ExprView<'_>, args: &[ast::ExprEdge<'_>]) -> bool {
+pub(super) fn last_two_args_same_type(view: ExprView<'_>, args: &[ast::ExprId]) -> bool {
     let last = view.expr(args[args.len() - 1]);
     let penultimate = view.expr(args[args.len() - 2]);
     std::mem::discriminant(&last.kind) == std::mem::discriminant(&penultimate.kind)
@@ -2671,7 +2671,7 @@ pub(super) fn build_arrow_call_body_states(
 /// [`wrap_call_with_hard_breaks_paren_line`].
 pub(super) fn build_args_joined_with_comments(
     printer: &Printer<'_>,
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
     paren_open: u32,
     paren_close: u32,
     join: ArgsJoin,
@@ -2803,7 +2803,7 @@ pub(super) fn build_args_joined_with_comments(
 pub(super) fn build_call_args_expanded(
     printer: &Printer<'_>,
     opener: ArgOpener,
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
     paren_open: u32,
     paren_close: u32,
 ) -> DocId {
@@ -2873,7 +2873,7 @@ impl ArgsJoin {
 pub(super) fn build_joined_argument_doc(
     printer: &Printer<'_>,
     paren_open: u32,
-    args: &[ast::ExprEdge<'_>],
+    args: &[ast::ExprId],
     i: usize,
 ) -> DocId {
     build_printed_argument_doc(printer, printer.view.expr(args[i]), || {
@@ -2887,7 +2887,7 @@ pub(super) fn build_joined_argument_doc(
 /// - First arg is function/arrow with block body
 /// - Remaining args are "hopefully short" (simple values)
 /// - Result: first arg expands, tail args stay inline after closing `}`
-pub(super) fn should_expand_first_arg(printer: &Printer<'_>, args: &[ast::ExprEdge<'_>]) -> bool {
+pub(super) fn should_expand_first_arg(printer: &Printer<'_>, args: &[ast::ExprId]) -> bool {
     // Need exactly 2 args (first is function, second is short)
     if args.len() != 2 {
         return false;
@@ -2939,7 +2939,7 @@ pub(super) fn should_expand_first_arg(printer: &Printer<'_>, args: &[ast::ExprEd
 /// here would expand a list prettier hugs.
 pub(super) fn first_arg_signature_refuses_expand_first(
     printer: &Printer<'_>,
-    args: &[ast::ExprEdge<'_>],
+    args: &[ast::ExprId],
 ) -> bool {
     matches!(
         printer.view.opt(args.first().copied()),
@@ -3008,7 +3008,7 @@ pub(super) fn build_empty_args_doc(
 /// [`try_hug_multiline_template_arg`].
 pub(super) fn multiline_template_hug_applies(
     printer: &Printer<'_>,
-    args: &[ast::ExprEdge<'_>],
+    args: &[ast::ExprId],
     gap_start: u32,
 ) -> bool {
     is_sole_multiline_template_arg(printer.view, args)
@@ -3117,10 +3117,7 @@ fn sole_template_on_its_own_line_commented(
 /// the whole question (the call dispatcher resolves a callee gap for it) can ask this
 /// first: nearly no call has the shape, and a call without it is answered here.
 #[inline]
-pub(super) fn is_sole_multiline_template_arg(
-    view: ExprView<'_>,
-    args: &[ast::ExprEdge<'_>],
-) -> bool {
+pub(super) fn is_sole_multiline_template_arg(view: ExprView<'_>, args: &[ast::ExprId]) -> bool {
     matches!(args, [arg] if is_multiline_template_expression(view.expr(*arg)))
 }
 
@@ -3151,7 +3148,7 @@ pub(super) fn is_sole_multiline_template_arg(
 pub(super) fn try_hug_multiline_template_arg(
     printer: &Printer<'_>,
     callee: DocId,
-    args: &[ast::ExprEdge<'_>],
+    args: &[ast::ExprId],
     gap_start: u32,
     paren_close: u32,
 ) -> Option<DocId> {
@@ -3208,7 +3205,7 @@ pub(super) fn try_hug_multiline_template_arg(
 pub(super) fn build_call_args_with_blank_lines(
     printer: &Printer<'_>,
     callee: DocId,
-    args: &[ast::ExprEdge<'_>],
+    args: &[ast::ExprId],
     paren_open: u32,
     paren_close: u32,
 ) -> DocId {

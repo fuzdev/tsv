@@ -3,17 +3,24 @@
 // Pratt kernel in `expression.rs` calls into these; they never call back into it.
 
 use crate::ast::{
-    ArrowFunctionBody, ArrowFunctionExpression, Expression, ExpressionKind, Identifier,
+    ArrowFunctionBody, ArrowFunctionExpression, Expr, Expression, ExpressionKind, Identifier, Run,
 };
 use crate::lexer::TokenKind;
 use tsv_lang::{Error, Span};
 
-use super::Parser;
-use super::expression::alloc_expr;
 use super::expression_lookahead::{ArrowHead, scan_angle_brackets, scan_arrow_after_identifier};
 use super::scan::skip_whitespace_and_comments;
+use super::{ExprRet, Parser};
 
 impl<'a, 'arena> Parser<'a, 'arena> {
+    /// A value run of the one parameter of a parenless arrow.
+    #[inline]
+    fn single_param_run(&mut self, param: Expression<'arena>) -> Run<Expr> {
+        let mark = self.stores.expr_scratch.mark();
+        self.stores.expr_scratch.push(param);
+        self.flush_expr_run(mark)
+    }
+
     /// Consume the arrow `=>`, enforcing `ArrowFunction`'s `[no LineTerminator here]`
     /// restriction (ecma262): no line terminator between the arrow parameters (or
     /// return type) and `=>`. A bare newline, a line comment, or a block comment
@@ -94,8 +101,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_arrow_or_rewind(
         &mut self,
         head: ArrowHead,
-        parse: fn(&mut Self) -> Result<&'arena Expression<'arena>, Error>,
-    ) -> Result<Option<&'arena Expression<'arena>>, Error> {
+        parse: fn(&mut Self) -> Result<ExprRet, Error>,
+    ) -> Result<Option<ExprRet>, Error> {
         if !self.arrow_return_type_barred() || !head.has_return_type(self.source.as_bytes()) {
             return parse(self).map(Some);
         }
@@ -110,8 +117,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_annotated_arrow_in_consequent(
         &mut self,
         head: ArrowHead,
-        parse: fn(&mut Self) -> Result<&'arena Expression<'arena>, Error>,
-    ) -> Result<Option<&'arena Expression<'arena>>, Error> {
+        parse: fn(&mut Self) -> Result<ExprRet, Error>,
+    ) -> Result<Option<ExprRet>, Error> {
         if head.commits_to_signature(self.source.as_bytes()) {
             return self.with_arrow_return_type_allowed(parse).map(Some);
         }
@@ -177,9 +184,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse generic arrow function: `<T>() => ...`, `<T, U extends V>() => ...`
-    pub(super) fn parse_generic_arrow_function(
-        &mut self,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    pub(super) fn parse_generic_arrow_function(&mut self) -> Result<ExprRet, Error> {
         let (start, _) = self.current_pos();
 
         // Parse type parameters: <T, U extends V, ...>
@@ -192,7 +197,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // never async/generator itself; the return type between them is await-free,
         // and `yield` in an arrow inside a generator is a plain identifier).
         let (params, return_type, body, arrow_token) = self.with_fn_context(false, false, |p| {
-            let params = p.parse_parameter_list_no_decorators()?.into_bump_slice();
+            let params = p.parse_parameter_list_no_decorators()?;
             // Return type annotation: <T>(): type => ... or type predicate
             let return_type = p.parse_optional_return_type()?;
             p.arrow_return_pair(return_type.as_ref())?;
@@ -208,23 +213,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<ArrowFunctionExpression<'_>>(1);
-        Ok(alloc_expr(
-            self.arena,
-            Expression {
-                span: Span::new(start as u32, end),
-                kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
-                    ArrowFunctionExpression {
-                        type_parameters: Some(type_parameters),
-                        params,
-                        body,
-                        return_type,
-                        r#async: false,
-                        params_start: Some(params_start as u32),
-                        arrow_token,
-                    },
-                )),
-            },
-        ))
+        Ok(self.push_ret(Expression {
+            span: Span::new(start as u32, end),
+            kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
+                ArrowFunctionExpression {
+                    type_parameters: Some(type_parameters),
+                    params,
+                    body,
+                    return_type,
+                    r#async: false,
+                    params_start: Some(params_start as u32),
+                    arrow_token,
+                },
+            )),
+        }))
     }
 
     /// Parse arrow function body: expression or block statement
@@ -244,15 +246,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // outer In context, so `for (a = () => x in y;;)` still rejects.
             // Use assignment_expression so comma doesn't consume next object property
             let body_start = self.current_pos().0;
-            let body = self.nested(1, Self::parse_assignment_expression_ref)?;
+            let body = self.nested(1, Self::parse_assignment_expression)?.id();
             // a bare body the printer parenthesizes — a conditional (`() => (a ? b : c)`),
             // or one its position takes a pair around (`() => (@dec class {})`, asked of
             // the printer's predicate) — a level of the output's nesting
-            if body.span().start as usize == body_start
-                && (matches!(body.kind, ExpressionKind::ConditionalExpression(_))
+            let view = self.stores.view();
+            let body_node = view.expr(body);
+            if body_node.span().start as usize == body_start
+                && (matches!(body_node.kind, ExpressionKind::ConditionalExpression(_))
                     || crate::printer::printer_adds_operand_pair(
-                        self.stores.view(),
-                        body,
+                        view,
+                        body_node,
                         crate::printer::ParenContext::ArrowBody,
                         self.in_for_header,
                     ))
@@ -276,7 +280,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Note: Single parameter without parens (`x => expr`) is handled by
     /// `parse_single_param_arrow_function()`.
-    pub(super) fn parse_arrow_function(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    pub(super) fn parse_arrow_function(&mut self) -> Result<ExprRet, Error> {
         let (start, _) = self.current_pos();
 
         // Capture paren position before parsing params
@@ -285,7 +289,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Params + body in the arrow's own `[~Await, ~Yield]` context (an arrow is
         // never async/generator itself).
         let (params, return_type, body, arrow_token) = self.with_fn_context(false, false, |p| {
-            let params = p.parse_parameter_list_no_decorators()?.into_bump_slice();
+            let params = p.parse_parameter_list_no_decorators()?;
             // Return type annotation: (): type => ... or type predicate
             let return_type = p.parse_optional_return_type()?;
             p.arrow_return_pair(return_type.as_ref())?;
@@ -301,29 +305,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<ArrowFunctionExpression<'_>>(1);
-        Ok(alloc_expr(
-            self.arena,
-            Expression {
-                span: Span::new(start as u32, end),
-                kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
-                    ArrowFunctionExpression {
-                        type_parameters: None, // Generic arrows like <T>() => {} are handled by parse_generic_arrow_function()
-                        params,
-                        body,
-                        return_type,
-                        r#async: false, // Non-async arrow function; async ones are parsed via parse_async_arrow_function
-                        params_start: Some(params_start as u32),
-                        arrow_token,
-                    },
-                )),
-            },
-        ))
+        Ok(self.push_ret(Expression {
+            span: Span::new(start as u32, end),
+            kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
+                ArrowFunctionExpression {
+                    type_parameters: None, // Generic arrows like <T>() => {} are handled by parse_generic_arrow_function()
+                    params,
+                    body,
+                    return_type,
+                    r#async: false, // Non-async arrow function; async ones are parsed via parse_async_arrow_function
+                    params_start: Some(params_start as u32),
+                    arrow_token,
+                },
+            )),
+        }))
     }
 
     /// Parse single-parameter arrow function without parentheses: `x => expr`
-    pub(super) fn parse_single_param_arrow_function(
-        &mut self,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    pub(super) fn parse_single_param_arrow_function(&mut self) -> Result<ExprRet, Error> {
         let (start, _) = self.current_pos();
 
         // Parse the single parameter: a plain identifier, a contextual type keyword
@@ -339,12 +338,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.nested(2, |_| Ok(()))?;
         self.advance()?;
 
-        let mut params = self.bvec();
-        params.push(Expression::from_identifier(Identifier::simple(
+        let params = self.single_param_run(Expression::from_identifier(Identifier::simple(
             name,
             Span::new(id_start as u32, id_end as u32),
         )));
-        let params = params.into_bump_slice();
 
         let arrow_token = self.expect_arrow()?; // consume '=>' (no LineTerminator before it)
 
@@ -358,43 +355,38 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<ArrowFunctionExpression<'_>>(1);
-        Ok(alloc_expr(
-            self.arena,
-            Expression {
-                span: Span::new(start as u32, end),
-                kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
-                    ArrowFunctionExpression {
-                        type_parameters: None,
-                        params,
-                        body,
-                        return_type: None, // Single-param without parens can't have return type
-                        r#async: false,
-                        params_start: None, // No parens for single-param arrows
-                        arrow_token,
-                    },
-                )),
-            },
-        ))
+        Ok(self.push_ret(Expression {
+            span: Span::new(start as u32, end),
+            kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
+                ArrowFunctionExpression {
+                    type_parameters: None,
+                    params,
+                    body,
+                    return_type: None, // Single-param without parens can't have return type
+                    r#async: false,
+                    params_start: None, // No parens for single-param arrows
+                    arrow_token,
+                },
+            )),
+        }))
     }
 
     /// Parse async arrow function after 'async' has been consumed: `() => ...`, `x => ...`, or `<T>() => ...`
     pub(super) fn parse_async_arrow_function_after_async(
         &mut self,
         start: usize,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    ) -> Result<ExprRet, Error> {
         // Check for type parameters: `async <T>() => ...`
         let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse parameter list or single parameter
         // Note: with type parameters, must have parentheses
-        let (params, params_start): (&'arena [Expression<'arena>], Option<u32>) = if self
-            .check(&TokenKind::ParenOpen)
+        let (params, params_start): (Run<Expr>, Option<u32>) = if self.check(&TokenKind::ParenOpen)
         {
             let (paren_pos, _) = self.current_pos();
             (
                 // Async arrow params are `[+Await]`.
-                self.with_fn_context(true, false, Self::parse_parameter_list_no_decorators)?
-                    .into_bump_slice(),
+                self.with_fn_context(true, false, Self::parse_parameter_list_no_decorators)?,
                 Some(paren_pos as u32),
             )
         } else if type_parameters.is_none() && matches!(self.current_kind(), TokenKind::Identifier)
@@ -406,12 +398,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // its levels in the format's output, `async (x) => …` (the depth limit's count)
             self.nested(2, |_| Ok(()))?;
             self.advance()?;
-            let mut params = self.bvec();
-            params.push(Expression::from_identifier(Identifier::simple(
+            let params = self.single_param_run(Expression::from_identifier(Identifier::simple(
                 name,
                 Span::new(id_start as u32, id_end as u32),
             )));
-            (params.into_bump_slice(), None)
+            (params, None)
         } else {
             return Err(self.error_expected_after("'(' or identifier", "async"));
         };
@@ -432,22 +423,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<ArrowFunctionExpression<'_>>(1);
-        Ok(alloc_expr(
-            self.arena,
-            Expression {
-                span: Span::new(start as u32, end),
-                kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
-                    ArrowFunctionExpression {
-                        type_parameters,
-                        params,
-                        body,
-                        return_type,
-                        r#async: true,
-                        params_start,
-                        arrow_token,
-                    },
-                )),
-            },
-        ))
+        Ok(self.push_ret(Expression {
+            span: Span::new(start as u32, end),
+            kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
+                ArrowFunctionExpression {
+                    type_parameters,
+                    params,
+                    body,
+                    return_type,
+                    r#async: true,
+                    params_start,
+                    arrow_token,
+                },
+            )),
+        }))
     }
 }

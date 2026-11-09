@@ -4,8 +4,7 @@ use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{Error, Span};
 
-use super::super::Parser;
-use super::super::expression::alloc_expr;
+use super::super::{ExprRet, Parser};
 
 impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_return_statement(&mut self) -> Result<Statement<'arena>, Error> {
@@ -31,7 +30,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // No ASI - parse the return value expression
         let argument_token = self.current_pos().0;
-        let argument = self.parse_expression_ref()?;
+        let argument = self.parse_expression()?.id();
         self.restricted_argument_pair(argument, argument_token)?;
         let end = self.semicolon_end()?;
 
@@ -96,9 +95,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse parameter list (in the function's own `[Await]`/`[Yield]` context —
         // async/generator params are `[+Await]`/`[+Yield]`).
-        let params: &'arena [Expression<'arena>] = self
-            .with_fn_context(is_async, is_generator, Self::parse_parameter_list)?
-            .into_bump_slice();
+        let params: Run<Expr> =
+            self.with_fn_context(is_async, is_generator, Self::parse_parameter_list)?;
 
         // Check for return type annotation
         let return_type = self.parse_optional_return_type()?;
@@ -203,9 +201,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (params_start, _) = self.current_pos();
 
         // Parse parameter list (in the function's own `[Await]`/`[Yield]` context).
-        let params: &'arena [Expression<'arena>] = self
-            .with_fn_context(is_async, is_generator, Self::parse_parameter_list)?
-            .into_bump_slice();
+        let params: Run<Expr> =
+            self.with_fn_context(is_async, is_generator, Self::parse_parameter_list)?;
 
         // Check for return type annotation
         let return_type = self.parse_optional_return_type()?;
@@ -262,9 +259,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Function expressions are similar to function declarations but:
     /// - The name is always optional
     /// - They appear in expression position
-    pub(in crate::parser) fn parse_function_expression(
-        &mut self,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    pub(in crate::parser) fn parse_function_expression(&mut self) -> Result<ExprRet, Error> {
         let (start, _) = self.current_pos();
         self.parse_function_expression_inner(start, false)
     }
@@ -275,7 +270,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_async_function_expression(
         &mut self,
         start: usize,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    ) -> Result<ExprRet, Error> {
         self.parse_function_expression_inner(start, true)
     }
 
@@ -284,7 +279,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         is_async: bool,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    ) -> Result<ExprRet, Error> {
         // Consume 'function' keyword
         debug_assert!(matches!(
             self.current_kind(),
@@ -337,8 +332,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // expression sits in a for-header init.
         let (params, return_type, body) = self.with_fn_context(is_async, is_generator, |p| {
             p.with_body_frame(|p| {
-                let params: &'arena [Expression<'arena>] =
-                    p.parse_parameter_list()?.into_bump_slice();
+                let params: Run<Expr> = p.parse_parameter_list()?;
                 let return_type = p.parse_optional_return_type()?;
                 // three wire levels: the `FunctionExpression`, its body's `BlockStatement`
                 // and its statements — a declaration's own level is its statement's
@@ -350,19 +344,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<FunctionExpression<'_>>(1);
-        Ok(alloc_expr(
-            self.arena,
-            Expression::from_function_expression(self.arena.alloc(FunctionExpression {
-                id,
-                type_parameters,
-                params,
-                return_type,
-                body,
-                generator: is_generator,
-                r#async: is_async,
-                params_start: params_start as u32,
-                span: Span::new(start as u32, end),
-            })),
-        ))
+        Ok(
+            self.push_ret(Expression::from_function_expression(self.arena.alloc(
+                FunctionExpression {
+                    id,
+                    type_parameters,
+                    params,
+                    return_type,
+                    body,
+                    generator: is_generator,
+                    r#async: is_async,
+                    params_start: params_start as u32,
+                    span: Span::new(start as u32, end),
+                },
+            ))),
+        )
     }
 }

@@ -12,7 +12,7 @@
 //!
 //! One row per element type a parser placed in its arena, named by that type: a single
 //! allocation counts one, a flushed list counts its length. A list of references reads
-//! `&T (ids)` and an `Option` of one `Option<&T> (ids)`; those are id lists, not rows of
+//! `Id<T> (ids)` and an `Option` of one `Option<Id<T>> (ids)` (references read the same way); those are id lists, not rows of
 //! `T`, whose nodes are counted where they were allocated. A pattern is an `Expression` row,
 //! except an array pattern's elements, which are a by-value list and read `Option<Expression>`
 //! (a hole is a row there, and an element is not an `Expression` row).
@@ -144,9 +144,10 @@ mod census {
         (krate, tail)
     }
 
-    /// `type_name`'s spelling of an element type, as the report reads it: a reference is an
-    /// id list's element (`&T (ids)`), an `Option` of one is `Option<&T> (ids)`, and an
-    /// `Option` of a value keeps its element. Anything else (a tuple, `str`) stays as printed.
+    /// `type_name`'s spelling of an element type, as the report reads it: a store id is an
+    /// id list's element (`Id<T> (ids)`), and an `Option` of one `Option<Id<T>> (ids)`; a
+    /// reference and an `Option` of one read the same way, and an `Option` of a value keeps
+    /// its element. Anything else (a tuple, `str`) stays as printed.
     pub(super) fn store_key(type_name: &str) -> StoreKey {
         // `type_name` prints a type's lifetime arguments as `<'_>`
         let type_name = type_name.replace("<'_>", "");
@@ -155,6 +156,20 @@ mod census {
             krate: krate.to_string(),
             label,
         };
+        if let Some(inner) = type_name
+            .strip_prefix("core::option::Option<tsv_lang::store::Id<")
+            .and_then(|s| s.strip_suffix(">>"))
+        {
+            let (krate, tail) = crate_and_tail(inner);
+            return key(krate, format!("Option<Id<{tail}>> (ids)"));
+        }
+        if let Some(inner) = type_name
+            .strip_prefix("tsv_lang::store::Id<")
+            .and_then(|s| s.strip_suffix('>'))
+        {
+            let (krate, tail) = crate_and_tail(inner);
+            return key(krate, format!("Id<{tail}> (ids)"));
+        }
         if let Some(inner) = type_name
             .strip_prefix("core::option::Option<&")
             .and_then(|s| s.strip_suffix('>'))
@@ -572,9 +587,8 @@ mod tests {
 
     /// `[a] = x;`: the array parses as a literal (`a` and the array itself are expressions,
     /// the element list a one-row id list), then the `=` converts it: the pattern's new row
-    /// replaces the array, a new list replaces the id list, and `a` moves into that by-value
-    /// `Option<Expression>` list, stranding its row. The right side and the assignment bring
-    /// the minted total to five, three of them live.
+    /// replaces the array, a new id list replaces the old one with `a`'s own id in it. The
+    /// right side and the assignment bring the minted total to five, four of them live.
     #[test]
     fn a_cover_grammar_orphan_is_minted_and_not_live() {
         let census = census_of("[a] = x;", ParserType::TypeScript);
@@ -584,17 +598,15 @@ mod tests {
             "a, the array, x, the pattern's row, the assignment"
         );
         assert_eq!(expr.duplicate_dead, 0);
-        assert_eq!(expr.moved_inline, 1, "`a`");
+        assert_eq!(expr.moved_inline, 0);
         assert_eq!(expr.superseded, 1, "the array");
-        assert_eq!(expr.live(), 3, "x, the pattern's row, the assignment");
-        let ids = row(&census, "tsv_ts", "Option<&Expression> (ids)");
+        assert_eq!(expr.live(), 4, "a, x, the pattern's row, the assignment");
+        let ids = row(&census, "tsv_ts", "Option<Id<Expr>> (ids)");
         assert_eq!(
             (ids.minted, ids.superseded),
-            (1, 1),
-            "the literal's element list"
+            (2, 1),
+            "the literal's element list and the pattern's"
         );
-        let values = row(&census, "tsv_ts", "Option<Expression>");
-        assert_eq!(values.minted, 1, "`a` in the pattern's by-value elements");
         assert_eq!(row(&census, "tsv_ts", "Statement").minted, 1);
     }
 
@@ -645,11 +657,11 @@ mod tests {
 
     #[test]
     fn a_reference_list_row_names_its_element_as_ids() {
-        let key = store_key("&tsv_ts::ast::expressions::Expression");
-        assert_eq!(key.label, "&Expression (ids)");
+        let key = store_key("tsv_lang::store::Id<tsv_ts::ast::stores::Expr>");
+        assert_eq!(key.label, "Id<Expr> (ids)");
         assert_eq!(key.krate, "tsv_ts");
-        let opt = store_key("core::option::Option<&tsv_ts::ast::expressions::Expression>");
-        assert_eq!(opt.label, "Option<&Expression> (ids)");
+        let opt = store_key("core::option::Option<tsv_lang::store::Id<tsv_ts::ast::stores::Expr>>");
+        assert_eq!(opt.label, "Option<Id<Expr>> (ids)");
         let value = store_key("core::option::Option<tsv_ts::ast::expressions::Expression>");
         assert_eq!(value.label, "Option<Expression>");
         let plain = store_key("tsv_ts::ast::statements::Statement");
@@ -707,28 +719,27 @@ mod tests {
         );
     }
 
-    /// `class A { x = 1 }`: the initializer `1` is minted once, then moved by value into its
-    /// field, so its row is stranded but its node is alive; the key `x` is built by value and
-    /// never placed. Neither is waste.
+    /// `class A { x = 1 }`: the key `x` and the initializer `1` are both stored rows, held
+    /// by id; neither is waste.
     #[test]
-    fn a_by_value_holder_is_moved_inline_not_waste() {
+    fn a_class_key_and_initializer_are_stored_rows() {
         let census = census_of("class A { x = 1 }", ParserType::TypeScript);
         let expr = row(&census, "tsv_ts", "Expression");
-        assert_eq!(expr.minted, 1, "the initializer `1`");
-        assert_eq!(expr.moved_inline, 1, "the initializer, into its field");
-        assert_eq!(expr.built_inline, 1, "the key `x`");
-        assert_eq!(expr.live(), 0, "the tree holds it by value");
+        assert_eq!(expr.minted, 2, "the key `x` and the initializer `1`");
+        assert_eq!(expr.moved_inline, 0);
+        assert_eq!(expr.built_inline, 0);
+        assert_eq!(expr.live(), 2);
         assert_eq!(expr.duplicate_dead, 0);
     }
 
-    /// A computed object key clones out of the arena and is allocated again: a duplicate
-    /// root, not a by-value holder.
+    /// A computed object key is a row the property holds by id: nothing is copied out and
+    /// nothing is stranded.
     #[test]
-    fn a_computed_object_key_is_a_duplicate_root() {
+    fn a_computed_object_key_keeps_its_row() {
         let census = census_of("({ [k]: 1 });", ParserType::TypeScript);
         let expr = row(&census, "tsv_ts", "Expression");
         assert_eq!(expr.moved_inline, 0);
-        assert_eq!(expr.duplicate_dead, 1, "the key's original");
+        assert_eq!(expr.duplicate_dead, 0);
     }
 
     /// A prelude that is no condition is re-read raw: everything the condition reader

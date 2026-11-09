@@ -40,14 +40,12 @@ impl<'a> Printer<'a> {
     /// `canDecoratorExpressionUnparenthesized` in parentheses/parent-needs-parentheses.js.
     pub(in crate::printer) fn build_decorator_expression_doc(
         &self,
-        decorator: &ast::Decorator<'_>,
+        decorator: &ast::Decorator,
     ) -> DocId {
         let d = self.d();
-        let expr_doc = self.build_expression_doc(self.view.slot(&decorator.expression));
-        if can_decorator_expression_unparenthesized(
-            self.view,
-            self.view.slot(&decorator.expression),
-        ) {
+        let expr_doc = self.build_expression_doc(self.view.expr(decorator.expression));
+        if can_decorator_expression_unparenthesized(self.view, self.view.expr(decorator.expression))
+        {
             expr_doc
         } else {
             d.parens(expr_doc)
@@ -77,19 +75,19 @@ impl<'a> Printer<'a> {
     /// where `decorator.span` ends at the expression — so a comment the author wrote
     /// *after* the decorator stays the following gap's to emit, and cannot be
     /// double-printed here.
-    fn push_decorator_head(&self, parts: &mut DocBuf, decorator: &ast::Decorator<'_>) {
+    fn push_decorator_head(&self, parts: &mut DocBuf, decorator: &ast::Decorator) {
         let d = self.d();
         parts.push(d.text("@"));
         if let Some(c) = self.build_rhs_comments_opt(
             decorator.span.start + 1,
-            self.view.slot(&decorator.expression).span().start,
+            self.view.expr(decorator.expression).span().start,
         ) {
             parts.push(c);
         }
         parts.push(self.build_decorator_expression_doc(decorator));
         self.push_trailing_comments_in_range(
             parts,
-            self.view.slot(&decorator.expression).span().end,
+            self.view.expr(decorator.expression).span().end,
             decorator.span.end,
         );
     }
@@ -127,7 +125,7 @@ impl<'a> Printer<'a> {
     fn push_decorator_run_blank(
         &self,
         parts: &mut DocBuf,
-        decorator: &ast::Decorator<'_>,
+        decorator: &ast::Decorator,
         own_line_run: &[&Comment],
     ) {
         let Some(first) = own_line_run.first() else {
@@ -152,7 +150,7 @@ impl<'a> Printer<'a> {
         &'c self,
         buf: &mut DocBuf,
         pending: &mut DocBuf,
-        decorator: &ast::Decorator<'_>,
+        decorator: &ast::Decorator,
         boundary: u32,
         is_last: bool,
     ) -> (CommentVec<'c>, bool) {
@@ -237,7 +235,7 @@ impl<'a> Printer<'a> {
     /// agreement is the single loop, not a shared callee.
     fn collect_decorator_items(
         &self,
-        decorators: &[ast::Decorator<'_>],
+        decorators: &[ast::Decorator],
         next_token_start: u32,
     ) -> DecoratorItems {
         let d = self.d();
@@ -336,7 +334,7 @@ impl<'a> Printer<'a> {
     /// the newline do NOT count — prettier only skips spaces/tabs, so `@fn /* c */\nb`
     /// yields false (the first non-space char is `/`). Drives both class-member
     /// decorators and parameter decorators.
-    fn has_newline_after_any_decorator(&self, decorators: &[ast::Decorator<'_>]) -> bool {
+    fn has_newline_after_any_decorator(&self, decorators: &[ast::Decorator]) -> bool {
         // A source newline after a decorator is authoring layout intent, erased in
         // the canonical reprint (decorators then stay inline unless width breaks them).
         if self.canonical {
@@ -360,7 +358,7 @@ impl<'a> Printer<'a> {
     /// falls in, so the two disagreeing about it would put the same comment in two places.
     pub(in crate::printer) fn member_decorator_boundary(
         &self,
-        decorators: Option<&[ast::Decorator<'_>]>,
+        decorators: Option<&[ast::Decorator]>,
         span_start: u32,
     ) -> u32 {
         decorators
@@ -474,7 +472,7 @@ impl<'a> Printer<'a> {
     /// bounds the scan for comments after the last decorator.
     pub(in crate::printer) fn with_param_decorators(
         &self,
-        decorators: Option<&[ast::Decorator<'_>]>,
+        decorators: Option<&[ast::Decorator]>,
         inner: DocId,
         inner_start: u32,
     ) -> DocId {
@@ -516,7 +514,7 @@ impl<'a> Printer<'a> {
     /// `build_leading_param_comments` stops collecting at the first decorator.
     fn build_param_decorators_doc(
         &self,
-        decorators: &[ast::Decorator<'_>],
+        decorators: &[ast::Decorator],
         inner: DocId,
         inner_start: u32,
     ) -> DocId {
@@ -559,7 +557,7 @@ impl<'a> Printer<'a> {
     /// moot here; there is no flat render for them to rule out.
     pub(in crate::printer) fn build_decorators_doc(
         &self,
-        decorators: Option<&[ast::Decorator<'_>]>,
+        decorators: Option<&[ast::Decorator]>,
         next_token_start: u32,
     ) -> Option<DocId> {
         let decorators = non_empty_decorators(decorators)?;
@@ -586,7 +584,7 @@ impl<'a> Printer<'a> {
     /// uses `hasNewlineBetweenOrAfterDecorators` to decide `hardline` vs `line`.
     pub(in crate::printer) fn build_class_member_decorators_doc(
         &self,
-        decorators: Option<&[ast::Decorator<'_>]>,
+        decorators: Option<&[ast::Decorator]>,
         next_token_start: u32,
     ) -> Option<DocId> {
         let decorators = non_empty_decorators(decorators)?;
@@ -629,7 +627,7 @@ impl<'a> Printer<'a> {
 fn param_decorators<'arena>(
     view: ExprView<'arena>,
     expr: &ast::Expression<'arena>,
-) -> Option<&'arena [ast::Decorator<'arena>]> {
+) -> Option<&'arena [ast::Decorator]> {
     let decorators = match &expr.kind {
         ast::ExpressionKind::Identifier(id) => id.decorators(),
         ast::ExpressionKind::ObjectPattern(obj) => obj.decorators,
@@ -654,9 +652,9 @@ fn param_decorators<'arena>(
 /// A caller that wants the LAST decorator asks `.and_then(<[_]>::last)` of the raw field
 /// instead — that is a different question which happens to answer this one, and routing it
 /// through here only to index back in reads worse.
-pub(in crate::printer) fn non_empty_decorators<'d, 'arena>(
-    decorators: Option<&'d [ast::Decorator<'arena>]>,
-) -> Option<&'d [ast::Decorator<'arena>]> {
+pub(in crate::printer) fn non_empty_decorators(
+    decorators: Option<&[ast::Decorator]>,
+) -> Option<&[ast::Decorator]> {
     decorators.filter(|decs| !decs.is_empty())
 }
 

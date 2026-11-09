@@ -1,6 +1,6 @@
 //! Call-argument and arrow shape predicates shared by the call, new, and chain printers.
 
-use crate::ast::ExprEdge;
+use crate::ast::ExprId;
 use crate::ast::ExprView;
 use crate::ast::{self, Expression, ExpressionKind, TSType};
 use crate::printer::Printer;
@@ -169,7 +169,7 @@ enum CallLikeArguments<'a> {
     /// A call's or `new`'s callee and argument list.
     Called {
         callee: &'a Expression<'a>,
-        arguments: &'a [ExprEdge<'a>],
+        arguments: &'a [ExprId],
     },
     /// A dynamic import's specifier and optional options object. It has **no callee**, and
     /// prettier's simplicity test skips the callee arm for it rather than failing on it.
@@ -384,10 +384,7 @@ pub(super) fn is_expandable_object(expr: &Expression<'_>) -> bool {
 
 /// Check if the last argument is an array or object expression (unwrapping type assertions)
 #[inline]
-pub(super) fn last_arg_is_array_or_object(
-    arguments: &[ExprEdge<'_>],
-    printer: &Printer<'_>,
-) -> bool {
+pub(super) fn last_arg_is_array_or_object(arguments: &[ExprId], printer: &Printer<'_>) -> bool {
     arguments
         .last()
         .is_some_and(|arg| is_array_or_object_unwrapped(printer.view.expr(*arg), printer))
@@ -497,7 +494,7 @@ pub(super) fn is_block_function(expr: &Expression<'_>) -> bool {
 /// `hasComment` sees.
 pub(super) fn is_react_hook_call_with_deps_array<F>(
     view: ExprView<'_>,
-    args: &[ExprEdge<'_>],
+    args: &[ExprId],
     arg_gap_has_comment: F,
 ) -> bool
 where
@@ -719,7 +716,7 @@ pub(super) fn lone_arg_params_render_flat(view: ExprView<'_>, arg: &Expression<'
 ///   any argument is a call expression containing a function/arrow argument
 ///
 /// This triggers `allArgsBrokenOut()` in Prettier to expand all arguments.
-pub(super) fn is_function_composition_args(view: ExprView<'_>, arguments: &[ExprEdge<'_>]) -> bool {
+pub(super) fn is_function_composition_args(view: ExprView<'_>, arguments: &[ExprId]) -> bool {
     if arguments.len() <= 1 {
         return false;
     }
@@ -758,41 +755,44 @@ mod tests {
     use super::*;
     use bumpalo::Bump;
 
-    /// Parse a bare expression to its internal AST node (spans index into `src`),
-    /// allocated in the caller-supplied `arena`.
-    fn parse_expr<'a>(arena: &'a Bump, src: &str) -> &'a Expression<'a> {
-        crate::__private::parse_expression_with_comments(
+    /// Run `f` over a bare expression parsed from `src` (its spans index into `src`) and the
+    /// view of the stores it was parsed into.
+    fn with_parsed<R>(
+        src: &str,
+        f: impl for<'a> FnOnce(ExprView<'a>, &'a Expression<'a>) -> R,
+    ) -> R {
+        let arena = Bump::new();
+        let mut stores = ast::AstStores::new();
+        let (id, _) = crate::__private::parse_expression_with_comments(
             src,
             0,
             0,
-            arena,
-            &mut ast::AstStores::new(),
+            &arena,
+            &mut stores,
             "end of input",
             |_, _| Ok(()),
         )
-        .expect("expression should parse")
-        .0
+        .expect("expression should parse");
+        let view = stores.view();
+        f(view, view.expr(id))
     }
 
-    /// Parse a call expression and return its argument list.
-    fn args_of<'a>(view: ExprView<'a>, arena: &'a Bump, src: &str) -> &'a [ExprEdge<'a>] {
-        match parse_expr(arena, src) {
+    /// Run `f` over the argument list of a parsed call expression.
+    fn with_args<R>(src: &str, f: impl for<'a> FnOnce(ExprView<'a>, &'a [ExprId]) -> R) -> R {
+        with_parsed(src, |view, expr| match expr {
             Expression {
                 kind: ExpressionKind::CallExpression(call),
                 ..
-            } => view.list(call.arguments),
+            } => f(view, view.list(call.arguments)),
             other => panic!("expected a call expression, got: {other:?}"),
-        }
+        })
     }
 
     /// The argument shapes whose parameter list stays breakable inside the hug — everything
     /// but a function expression whose parameters are all plain, unannotated identifiers.
     #[test]
     fn lone_arg_params_render_flat_only_for_plain_identifiers() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
-        let arena = Bump::new();
-        let flat = |src| lone_arg_params_render_flat(view, parse_expr(&arena, src));
+        let flat = |src| with_parsed(src, lone_arg_params_render_flat);
 
         // Plain identifiers — including none at all.
         assert!(flat("(function () {})"));
@@ -816,46 +816,43 @@ mod tests {
 
     #[test]
     fn simple_call_argument_depth_and_shape() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
-        let arena = Bump::new();
         // Depth 0 is always "not simple".
-        assert!(!is_simple_call_argument(view, parse_expr(&arena, "x"), 0));
+        assert!(!with_parsed("x", |view, expr| is_simple_call_argument(
+            view, expr, 0
+        )));
         // Literals / identifiers are simple at any positive depth.
-        assert!(is_simple_call_argument(view, parse_expr(&arena, "42"), 1));
-        assert!(is_simple_call_argument(view, parse_expr(&arena, "foo"), 1));
+        assert!(with_parsed("42", |view, expr| is_simple_call_argument(
+            view, expr, 1
+        )));
+        assert!(with_parsed("foo", |view, expr| is_simple_call_argument(
+            view, expr, 1
+        )));
         // Regex is simple only if the pattern width is <= 5.
-        assert!(is_simple_call_argument(
-            view,
-            parse_expr(&arena, "/abcde/"),
-            2
+        assert!(with_parsed(
+            "/abcde/",
+            |view, expr| is_simple_call_argument(view, expr, 2)
         ));
-        assert!(!is_simple_call_argument(
-            view,
-            parse_expr(&arena, "/abcdef/"),
-            2
-        ));
+        assert!(!with_parsed("/abcdef/", |view, expr| {
+            is_simple_call_argument(view, expr, 2)
+        }));
         // A call's args must fit within the remaining depth: `f(a)` needs depth >= 2.
-        assert!(!is_simple_call_argument(
-            view,
-            parse_expr(&arena, "f(a)"),
-            1
-        ));
-        assert!(is_simple_call_argument(view, parse_expr(&arena, "f(a)"), 2));
+        assert!(!with_parsed("f(a)", |view, expr| is_simple_call_argument(
+            view, expr, 1
+        )));
+        assert!(with_parsed("f(a)", |view, expr| is_simple_call_argument(
+            view, expr, 2
+        )));
         // Spread elements are never simple.
-        assert!(!is_simple_call_argument(
-            view,
-            parse_expr(&arena, "[...x]"),
-            2
+        assert!(!with_parsed(
+            "[...x]",
+            |view, expr| is_simple_call_argument(view, expr, 2)
         ));
     }
 
     #[test]
     fn simple_call_argument_looks_through_only_the_chain_wrappers() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
-        let arena = Bump::new();
-        let simple = |src: &str| is_simple_call_argument(view, parse_expr(&arena, src), 2);
+        let simple =
+            |src: &str| with_parsed(src, |view, expr| is_simple_call_argument(view, expr, 2));
         // `!` is prettier's `stripChainElementWrappers`, so `x!` is as simple as `x`.
         assert!(simple("x!"));
         // A TS cast is not looked through — prettier has no case for one.
@@ -873,19 +870,14 @@ mod tests {
         assert!(simple("import('a')"));
         assert!(simple("import(a, b)"));
         // …and the argument count is still held to the depth.
-        assert!(!is_simple_call_argument(
-            view,
-            parse_expr(&arena, "import(a, b)"),
-            1
-        ));
+        assert!(!with_parsed("import(a, b)", |view, expr| {
+            is_simple_call_argument(view, expr, 1)
+        }));
     }
 
     #[test]
     fn hopefully_short_reads_a_cast_through_its_type() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
-        let arena = Bump::new();
-        let short = |src: &str| is_hopefully_short_arg(view, parse_expr(&arena, src));
+        let short = |src: &str| with_parsed(src, is_hopefully_short_arg);
         // A bare type reference is simple, so the cast-wrapped seed stays short.
         assert!(short("{} as T"));
         assert!(short("{} satisfies T"));
@@ -910,39 +902,31 @@ mod tests {
 
     #[test]
     fn function_composition_args_detection() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
-        let arena = Bump::new();
         // Two arrow args ⇒ composition.
-        assert!(is_function_composition_args(
-            view,
-            args_of(view, &arena, "compose(a => a, b => b)")
-        ));
+        assert!(with_args("compose(a => a, b => b)", |view, args| {
+            is_function_composition_args(view, args)
+        }));
         // A single arg is never composition.
-        assert!(!is_function_composition_args(
-            view,
-            args_of(view, &arena, "f(a => a)")
-        ));
+        assert!(!with_args("f(a => a)", |view, args| {
+            is_function_composition_args(view, args)
+        }));
         // A call argument that itself wraps a callback ⇒ composition.
-        assert!(is_function_composition_args(
-            view,
-            args_of(view, &arena, "compose(x, g(() => {}))")
-        ));
+        assert!(with_args("compose(x, g(() => {}))", |view, args| {
+            is_function_composition_args(view, args)
+        }));
         // Two non-function args ⇒ not composition.
-        assert!(!is_function_composition_args(
-            view,
-            args_of(view, &arena, "f(a, b)")
-        ));
+        assert!(!with_args("f(a, b)", |view, args| {
+            is_function_composition_args(view, args)
+        }));
     }
 
     #[test]
     fn react_hook_deps_array_shape() {
-        let stores = ast::AstStores::new();
-        let view = stores.view();
-        let arena = Bump::new();
         // The gap-comment conjunct is the caller's; these cases isolate the shape.
         let shape = |src: &str| {
-            is_react_hook_call_with_deps_array(view, args_of(view, &arena, src), || false)
+            with_args(src, |view, args| {
+                is_react_hook_call_with_deps_array(view, args, || false)
+            })
         };
 
         // Two-argument form: zero-parameter block arrow, then an array literal.
@@ -973,10 +957,8 @@ mod tests {
         assert!(!shape("fn(() => {}, [a], b)"));
 
         // A comment attached to an argument refuses it, whatever the shape says.
-        assert!(!is_react_hook_call_with_deps_array(
-            view,
-            args_of(view, &arena, "fn(() => {}, [a])"),
-            || true
-        ));
+        assert!(!with_args("fn(() => {}, [a])", |view, args| {
+            is_react_hook_call_with_deps_array(view, args, || true)
+        }));
     }
 }

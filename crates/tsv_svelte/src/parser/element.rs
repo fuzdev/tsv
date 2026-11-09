@@ -276,7 +276,7 @@ enum SpecialThisBinding<'arena> {
     /// `<svelte:element this={tag}>` / `<svelte:element this="div">`.
     Element(SpecialThis<'arena>),
     /// `<svelte:component this={Comp}>`.
-    Component(ExpressionTag<'arena>),
+    Component(ExpressionTag),
 }
 
 /// Result of parsing special element attributes: the attribute list with the binding `this`

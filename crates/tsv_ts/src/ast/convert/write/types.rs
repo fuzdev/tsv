@@ -441,7 +441,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement<'_>, ctx: &C
             }
             // acorn quirk: omits `computed` when the key is the `new` keyword
             // and the signature is neither computed nor readonly.
-            let is_new_key = matches!(&ctx.view.slot(&p.key).kind, ast::ExpressionKind::Identifier(id)
+            let is_new_key = matches!(&ctx.view.expr(p.key).kind, ast::ExpressionKind::Identifier(id)
                 if id.name(ctx.source) == "new");
             if !p.computed && !p.readonly && is_new_key {
                 w.raw(",\"key\":");
@@ -452,7 +452,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement<'_>, ctx: &C
                     b",\"computed\":false,\"key\":",
                 );
             }
-            write_expression(w, ctx.view.slot(&p.key), ctx);
+            write_expression(w, ctx.view.expr(p.key), ctx);
             if p.optional {
                 w.raw(",\"optional\":true");
             }
@@ -477,7 +477,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement<'_>, ctx: &C
             w.raw(",\"computed\":");
             w.bool(m.computed);
             w.raw(",\"key\":");
-            write_expression(w, ctx.view.slot(&m.key), ctx);
+            write_expression(w, ctx.view.expr(m.key), ctx);
             let getset = matches!(m.kind, ast::MethodKind::Get | ast::MethodKind::Set);
             if getset {
                 w.raw(",\"kind\":");
@@ -686,7 +686,7 @@ pub(super) fn write_enum_declaration(
             ast::TSEnumMemberId::Identifier(id) => write_identifier_plain(w, id, ctx),
             ast::TSEnumMemberId::String(lit) => write_literal(w, lit, ctx),
         }
-        if let Some(init) = ctx.view.opt_slot(&member.initializer) {
+        if let Some(init) = ctx.view.opt(member.initializer) {
             w.raw(",\"initializer\":");
             write_expression(w, init, ctx);
         }

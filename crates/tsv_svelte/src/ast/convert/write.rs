@@ -187,7 +187,7 @@ struct Ctx<'a> {
     positions: WirePositions<'a>,
     /// `Root::snippet_wire_parameters`: the preserved-paren parameter lists the wire emits
     /// in place of a head's paren-free `SnippetBlock::parameters`.
-    snippet_wire_parameters: &'a [ast::SnippetWireParameters<'a>],
+    snippet_wire_parameters: &'a [ast::SnippetWireParameters],
     /// Template comments, sorted by position (empty on the common no-comment
     /// template — the whole spine then fuses).
     comments: &'a [&'a Comment],
@@ -730,7 +730,7 @@ fn write_special_tag(w: &mut JsonWriter, this: &ast::SpecialThis<'_>, ctx: &Ctx<
 }
 
 /// Emits an `ExpressionTag` node (fragment `{expr}`).
-fn write_expression_tag(w: &mut JsonWriter, tag: &ast::ExpressionTag<'_>, ctx: &Ctx<'_>) {
+fn write_expression_tag(w: &mut JsonWriter, tag: &ast::ExpressionTag, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ExpressionTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
@@ -742,7 +742,7 @@ fn write_expression_tag(w: &mut JsonWriter, tag: &ast::ExpressionTag<'_>, ctx: &
 /// into the identifier's `loc`. The shorthand form requires `tag.span == id.span`
 /// (the identifier *is* the tag), so no comment can lie between the braces and the
 /// name — attach is always a no-op here — and the whole tag fuses.
-fn write_shorthand_expression_tag(w: &mut JsonWriter, tag: &ast::ExpressionTag<'_>, ctx: &Ctx<'_>) {
+fn write_shorthand_expression_tag(w: &mut JsonWriter, tag: &ast::ExpressionTag, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ExpressionTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
@@ -1089,7 +1089,7 @@ fn write_snippet_parameters(
 //
 
 /// Emits an `HtmlTag` node (`{@html expr}`).
-fn write_html_tag(w: &mut JsonWriter, tag: &ast::HtmlTag<'_>, ctx: &Ctx<'_>) {
+fn write_html_tag(w: &mut JsonWriter, tag: &ast::HtmlTag, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"HtmlTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
@@ -1098,7 +1098,7 @@ fn write_html_tag(w: &mut JsonWriter, tag: &ast::HtmlTag<'_>, ctx: &Ctx<'_>) {
 }
 
 /// Emits a `RenderTag` node (`{@render expr}`).
-fn write_render_tag(w: &mut JsonWriter, tag: &ast::RenderTag<'_>, ctx: &Ctx<'_>) {
+fn write_render_tag(w: &mut JsonWriter, tag: &ast::RenderTag, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"RenderTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");
@@ -1113,7 +1113,7 @@ fn write_render_tag(w: &mut JsonWriter, tag: &ast::RenderTag<'_>, ctx: &Ctx<'_>)
 /// once across the list with the wrapper-end trailing suppression, each element's own
 /// grouping pairs run as silent frames. A single identifier is itself the parse root and
 /// takes the generic-island path (root-fallback trailing).
-fn write_debug_tag(w: &mut JsonWriter, tag: &ast::DebugTag<'_>, ctx: &Ctx<'_>) {
+fn write_debug_tag(w: &mut JsonWriter, tag: &ast::DebugTag, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"DebugTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"identifiers\":");
@@ -1126,33 +1126,35 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &ast::DebugTag<'_>, ctx: &Ctx<'_>) {
     // paren-inclusive spans are what give the discarded-wrapper bounds below
     // canonical's own values. The cast-free common case borrows the parsed
     // slice untouched.
-    let spliced = if ctx.view.run(tag.identifiers).iter().any(|entry| {
+    let entries = ctx.view.list(tag.identifiers);
+    let spliced = if entries.iter().any(|&entry| {
         matches!(
-            entry.unwrap_comment_bound_pairs(ctx.view).kind,
+            ctx.view
+                .expr(entry)
+                .unwrap_comment_bound_pairs(ctx.view)
+                .kind,
             tsv_ts::ast::ExpressionKind::SequenceExpression(_)
         )
     }) {
-        let mut flat = Vec::with_capacity(tag.identifiers.len() + 1);
-        for entry in ctx.view.run(tag.identifiers) {
-            match &entry.unwrap_comment_bound_pairs(ctx.view).kind {
+        let mut flat = Vec::with_capacity(entries.len() + 1);
+        for &entry in entries {
+            match &ctx
+                .view
+                .expr(entry)
+                .unwrap_comment_bound_pairs(ctx.view)
+                .kind
+            {
                 tsv_ts::ast::ExpressionKind::SequenceExpression(seq) => {
-                    flat.extend(
-                        ctx.view
-                            .list(seq.expressions)
-                            .iter()
-                            .map(|e| ctx.view.expr(*e).clone()),
-                    );
+                    flat.extend_from_slice(ctx.view.list(seq.expressions));
                 }
-                _ => flat.push(entry.clone()),
+                _ => flat.push(entry),
             }
         }
         Some(flat)
     } else {
         None
     };
-    let identifiers = spliced
-        .as_deref()
-        .unwrap_or_else(|| ctx.view.run(tag.identifiers));
+    let identifiers: &[tsv_ts::ast::ExprId] = spliced.as_deref().unwrap_or(entries);
     // `[_, _, ..]` is the multi-identifier case: a single identifier (which the pattern
     // excludes) has no wrapper at all.
     if let [_, _, ..] = identifiers
@@ -1168,14 +1170,19 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &ast::DebugTag<'_>, ctx: &Ctx<'_>) {
         let element_parens: Vec<Vec<Span>> = identifiers
             .iter()
             .map(|id| {
-                grouping_parens_around(attach_inputs, tag.span.start, id.span(), tag.span.end)
+                grouping_parens_around(
+                    attach_inputs,
+                    tag.span.start,
+                    ctx.view.expr(*id).span(),
+                    tag.span.end,
+                )
             })
             .collect();
         let outer = |i: usize| {
             element_parens[i]
                 .first()
                 .copied()
-                .unwrap_or_else(|| identifiers[i].span())
+                .unwrap_or_else(|| ctx.view.expr(identifiers[i]).span())
         };
         let wrapper = Span::new(outer(0).start, outer(identifiers.len() - 1).end);
         let attach = attach_expression_list(
@@ -1191,13 +1198,13 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &ast::DebugTag<'_>, ctx: &Ctx<'_>) {
             identifiers.iter().zip(&element_parens),
             |w, (id, parens)| {
                 mode.with_silent_parens(parens, || {
-                    write_expression_embedded(w, id, ctx.embed(mode));
+                    write_expression_embedded(w, ctx.view.expr(*id), ctx.embed(mode));
                 });
             },
         );
     } else {
         write_array(w, identifiers, |w, id| {
-            write_braced_island(w, id, tag.span, ctx);
+            write_braced_island(w, ctx.view.expr(*id), tag.span, ctx);
         });
     }
     w.raw("}");
@@ -1214,7 +1221,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &ast::DebugTag<'_>, ctx: &Ctx<'_>) {
 /// canonical acorn parse — `read_pattern`'s synthetic `pattern = 1` for the id (plus
 /// its `: T` annotation's own, when typed) and `read_expression`'s for the init — so a
 /// comment in one window can never reach another's tree.
-fn write_const_tag(w: &mut JsonWriter, tag: &ast::ConstTag<'_>, ctx: &Ctx<'_>) {
+fn write_const_tag(w: &mut JsonWriter, tag: &ast::ConstTag, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ConstTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"declaration\":");
@@ -1264,7 +1271,7 @@ fn write_const_tag(w: &mut JsonWriter, tag: &ast::ConstTag<'_>, ctx: &Ctx<'_>) {
 /// whitespace silently and recording the end of each `)` closer / comment —
 /// the last recorded end is the declarator end. Comment-aware by construction
 /// (positions come from the parsed comment list, never a substring scan).
-fn const_declarator_end(tag: &ast::ConstTag<'_>, ctx: &Ctx<'_>) -> u32 {
+fn const_declarator_end(tag: &ast::ConstTag, ctx: &Ctx<'_>) -> u32 {
     let close = (tag.span.end - 1) as usize; // the closing `}`
     let mut end = ctx.view.expr(tag.init).span().end;
     let mut i = end as usize;
@@ -1306,7 +1313,7 @@ fn const_declarator_end(tag: &ast::ConstTag<'_>, ctx: &Ctx<'_>) -> u32 {
 /// the id's window reach the init's tree (see `attach_const_tag_init`).
 fn write_const_declaration(
     w: &mut JsonWriter,
-    tag: &ast::ConstTag<'_>,
+    tag: &ast::ConstTag,
     decl_end: u32,
     declarator_end: u32,
     (id_mode, id_annotation_mode): (CommentMode<'_>, CommentMode<'_>),
@@ -1412,11 +1419,7 @@ fn write_attribute(w: &mut JsonWriter, attr: &ast::Attribute<'_>, ctx: &Ctx<'_>)
 /// Emit the value an attribute was written with — a boolean attribute has none, and
 /// [`write_attribute`] writes its `true`: a bare `{expr}` (plain object), or a
 /// text/quoted sequence (array).
-fn write_attribute_value_field(
-    w: &mut JsonWriter,
-    values: &[ast::AttributeValue<'_>],
-    ctx: &Ctx<'_>,
-) {
+fn write_attribute_value_field(w: &mut JsonWriter, values: &[ast::AttributeValue], ctx: &Ctx<'_>) {
     let has_text = values
         .iter()
         .any(|v| matches!(v, ast::AttributeValue::Text(_)));
@@ -1444,7 +1447,7 @@ fn write_attribute_value_field(
 }
 
 /// One attribute-value part (array element or bare-object body).
-fn write_attribute_value(w: &mut JsonWriter, value: &ast::AttributeValue<'_>, ctx: &Ctx<'_>) {
+fn write_attribute_value(w: &mut JsonWriter, value: &ast::AttributeValue, ctx: &Ctx<'_>) {
     match value {
         ast::AttributeValue::Text(text) => write_sequence_text(w, text, ctx),
         ast::AttributeValue::ExpressionTag(tag) => write_expression_tag(w, tag, ctx),
@@ -1452,7 +1455,7 @@ fn write_attribute_value(w: &mut JsonWriter, value: &ast::AttributeValue<'_>, ct
 }
 
 /// Emits a `SpreadAttribute` node (`{...expr}`).
-fn write_spread_attribute(w: &mut JsonWriter, spread: &ast::SpreadAttribute<'_>, ctx: &Ctx<'_>) {
+fn write_spread_attribute(w: &mut JsonWriter, spread: &ast::SpreadAttribute, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"SpreadAttribute\",\"start\":");
     w.span_start_end(ctx.positions, spread.span.start, spread.span.end);
     w.raw(",\"expression\":");
@@ -1461,7 +1464,7 @@ fn write_spread_attribute(w: &mut JsonWriter, spread: &ast::SpreadAttribute<'_>,
 }
 
 /// Emits an `AttachTag` node (`{@attach expr}`).
-fn write_attach_tag(w: &mut JsonWriter, tag: &ast::AttachTag<'_>, ctx: &Ctx<'_>) {
+fn write_attach_tag(w: &mut JsonWriter, tag: &ast::AttachTag, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"AttachTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"expression\":");

@@ -88,13 +88,13 @@ pub(super) fn write_expressions<'a, 'arena: 'a>(
 ///
 /// `ArrayPattern` only: `ArrayExpression` takes `write_body_array_holes`, which is
 /// this plus the last-in-body mark acorn's trailing rule reads.
-fn write_expression_holes<'a, 'arena: 'a>(
+fn write_expression_holes<'a>(
     w: &mut JsonWriter,
-    items: impl IntoIterator<Item = &'a Option<ast::ExprSlot<'arena>>>,
+    items: impl IntoIterator<Item = &'a Option<ast::ExprId>>,
     ctx: &Ctx<'_>,
 ) {
     write_array(w, items, |w, e| match e {
-        Some(expr) => write_expression(w, ctx.view.slot(expr), ctx),
+        Some(expr) => write_expression(w, ctx.view.expr(*expr), ctx),
         None => w.null(),
     });
 }
@@ -187,7 +187,7 @@ fn write_expression_identifier(
 #[inline(never)]
 fn write_binary_chain(
     w: &mut JsonWriter,
-    binary: &ast::BinaryExpression<'_>,
+    binary: &ast::BinaryExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -200,7 +200,7 @@ fn write_binary_chain(
             _ => "BinaryExpression",
         }
     }
-    let mut spine: SmallVec<[(&ast::BinaryExpression<'_>, Span); 8]> = SmallVec::new();
+    let mut spine: SmallVec<[(&ast::BinaryExpression, Span); 8]> = SmallVec::new();
     let (mut node, mut node_span) = (binary, span);
     loop {
         node_header(w, node_type(node.operator), node_span, ctx);
@@ -428,7 +428,7 @@ fn write_expression_full_dispatch(
                 ctx,
             );
             w.raw(",\"elements\":");
-            write_expression_holes(w, ctx.view.pattern_elements(arr.elements), ctx);
+            write_expression_holes(w, ctx.view.opt_list(arr.elements), ctx);
             if arr.optional {
                 w.raw(",\"optional\":true");
             }
@@ -576,7 +576,7 @@ enum ChainTail<'e> {
         strip: bool,
     },
     Member {
-        member: &'e ast::MemberExpression<'e>,
+        member: &'e ast::MemberExpression,
         force: bool,
         strip: bool,
     },
@@ -784,7 +784,7 @@ fn flags_after_wrap(flags: ExprFlags, needs_chain: bool) -> (bool, bool) {
 }
 
 /// Emit an object-literal property (a `Property` or a `SpreadElement`).
-fn write_object_property(w: &mut JsonWriter, prop: &ast::ObjectProperty<'_>, ctx: &Ctx<'_>) {
+fn write_object_property(w: &mut JsonWriter, prop: &ast::ObjectProperty, ctx: &Ctx<'_>) {
     match prop {
         ast::ObjectProperty::Property(p) => write_property(w, p, ctx),
         ast::ObjectProperty::SpreadElement(s) => {

@@ -13,8 +13,8 @@ use tsv_lang::store::{Id, IdRet, ListBuf, ListMark, PoolText, Run, Store, StoreV
 use tsv_svelte::ast::{AttributeNode, Element, ExpressionTag, FragmentNode};
 use tsv_ts::Error;
 use tsv_ts::ast::{
-    Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, Property, Statement,
-    StatementKind, SwitchCase, TSType, VariableDeclarator,
+    Expr, ExprId, Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, Property,
+    Statement, StatementKind, SwitchCase, TSType, VariableDeclarator,
 };
 
 // `DocContext` rides inline in `DocNode::WithContext`; see its native pin in `tsv_lang`
@@ -35,14 +35,14 @@ const _: () = assert!(size_of::<Option<Statement<'static>>>() == size_of::<State
 const _: () = assert!(size_of::<StatementKind<'static>>() == 40);
 const _: () = assert!(size_of::<TSType<'static>>() == 56);
 // The list elements and their shared `Property` payload, as the same native pins hold them.
-const _: () = assert!(size_of::<Property<'static>>() == 20);
-const _: () = assert!(size_of::<ObjectProperty<'static>>() == 20);
+const _: () = assert!(size_of::<Property>() == 20);
+const _: () = assert!(size_of::<ObjectProperty>() == 20);
 const _: () = assert!(size_of::<ObjectPatternProperty<'static>>() == 28);
-const _: () = assert!(size_of::<VariableDeclarator<'static>>() == 20);
+const _: () = assert!(size_of::<VariableDeclarator>() == 20);
 const _: () = assert!(size_of::<SwitchCase<'static>>() == 20);
-// The ladders' return currency: a reference plus the pointer-sized `Error` is two words. See
+// The ladders' return currency: an id word plus the pointer-sized `Error` is two words. See
 // the native pins in `tsv_ts`'s `parser/expression.rs` and `parser/types.rs`.
-const _: () = assert!(size_of::<Result<&Expression<'static>, Error>>() == 2 * size_of::<usize>());
+const _: () = assert!(size_of::<Result<IdRet<Expr>, Error>>() == 2 * size_of::<usize>());
 const _: () = assert!(size_of::<Result<&TSType<'static>, Error>>() == 2 * size_of::<usize>());
 // The CSS numeric carriers, 4-aligned through `PackedF64`. See the native `ColorChannel` and
 // `CssValue` pins in `tsv_css`'s `ast/mod.rs`.
@@ -53,11 +53,14 @@ const _: () = assert!(size_of::<SimpleSelector<'static>>() == 60);
 const _: () = assert!(size_of::<Element<'static>>() == 40);
 const _: () = assert!(size_of::<FragmentNode<'static>>() == 80);
 const _: () = assert!(size_of::<AttributeNode<'static>>() == 52);
-const _: () = assert!(size_of::<ExpressionTag<'static>>() == 12);
+const _: () = assert!(size_of::<ExpressionTag>() == 12);
 
 enum Family {}
 
 // The store handles, each niche-packed. See the native pins in `tsv_lang`'s `store.rs`.
+const _: () = assert!(size_of::<ExprId>() == 4);
+const _: () = assert!(size_of::<Option<ExprId>>() == 4);
+const _: () = assert!(size_of::<Run<ExprId>>() == 8);
 const _: () = assert!(size_of::<Id<Family>>() == 4);
 const _: () = assert!(size_of::<Option<Id<Family>>>() == 4);
 const _: () = assert!(size_of::<Run<Family>>() == 8);

@@ -10,6 +10,7 @@ use bumpalo::Bump;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
 use tsv_lang::{Error, Span};
 use tsv_ts::__private::TopLevelAs;
+use tsv_ts::ast::ExprId;
 use tsv_ts::ast::{AstStores, Expression, ExpressionKind};
 
 use super::expression_tag::{scan_head_to_matching_brace, scan_to_matching_paren};
@@ -115,7 +116,7 @@ const AWAIT_BODY_STOPS: &[&str] = &["then", "catch", "await"];
 
 /// What one `{#await}` clause holds: its fragment and its binding pattern, kept together
 /// so filling a clause and asking whether it is filled cannot name different slots.
-type AwaitSlot<'arena> = (Option<Fragment<'arena>>, Option<&'arena Expression<'arena>>);
+type AwaitSlot<'arena> = (Option<Fragment<'arena>>, Option<ExprId>);
 
 /// The TypeScript assertion keywords, each paired with whether it can BE a `{#each}`
 /// binding separator. Both continue an assertion chain; only `as` is spelled the way
@@ -281,15 +282,10 @@ fn snippet_signature<'arena>(
 /// Return type for parse_each_binding: (context, index, key, consumed_end).
 /// `consumed_end` is the absolute source offset just past the last token the binding
 /// consumed — the caller rejects any non-whitespace between it and the closing `}`.
-type EachBindingResult<'arena> = (
-    &'arena Expression<'arena>,
-    Option<&'arena str>,
-    Option<EachKey<'arena>>,
-    usize,
-);
+type EachBindingResult<'arena> = (ExprId, Option<&'arena str>, Option<EachKey>, usize);
 
 /// Return type for parse_index_and_key_after_context: (index, key, consumed_end).
-type IndexAndKeyResult<'arena> = (Option<&'arena str>, Option<EachKey<'arena>>, usize);
+type IndexAndKeyResult<'arena> = (Option<&'arena str>, Option<EachKey>, usize);
 
 /// An `{#each}` head's ", index" / "(key)" tail as `SvelteParser::split_index_and_key`
 /// reads it — the key bounded by its parens but not yet parsed.
@@ -479,7 +475,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         iterable: &str,
         expr_offset: usize,
         mark: EmbeddedParseMark,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    ) -> Result<ExprId, Error> {
         self.rewind_embedded_parses(mark);
         // Leading whitespace only, and `expr_offset` is already the first non-whitespace byte:
         // this slice ends at the head's SECOND `as`, so its trailing run may be a line
@@ -488,8 +484,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // The partial parse stopped at no top-level comma, so a bare sequence here is tsc's
         // comparison reading a list the partial parse read as acorn-typescript's
         // (`f<T, U><V>(x) as A[]`) — refused inside the parse, so it is re-read the same way.
-        self.parse_ts_expression_checked(iterable, expr_offset, "'}'", |_, _, expression| {
-            match super::tag::bare_sequence_comma(expression, iterable) {
+        self.parse_ts_expression_checked(iterable, expr_offset, "'}'", |_, view, expression| {
+            match super::tag::bare_sequence_comma(view.expr(expression), iterable) {
                 Some(comma) => Err(Self::error_expected_at("'as'", expr_offset + comma)),
                 None => Ok(()),
             }
@@ -511,7 +507,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &self,
         content: &str,
         content_offset: usize,
-        expression: &Expression<'arena>,
+        expression: &Expression<'_>,
         expr_end_pos: usize,
     ) -> Result<(), Error> {
         if strip_head_keyword(&content[expr_end_pos - content_offset..], "as").is_some() {
@@ -561,8 +557,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             expr_str,
             expr_offset,
             TopLevelAs::HostSeparator,
-            |this, _, expression, end_pos| {
-                this.check_each_head_tail(content, content_offset, expression, end_pos)
+            |this, view, expression, end_pos| {
+                this.check_each_head_tail(content, content_offset, view.expr(expression), end_pos)
             },
         )?;
 
@@ -637,7 +633,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // rejected below, not a silently kept comment. (The binding branch keeps
                 // using `after_expr` so a comment *before* `as` — `{#each items /* c */ as
                 // item}`, which Svelte accepts — still resolves to the binding.)
-                let semantic_end = expression.span().end as usize;
+                let semantic_end = self.ts_view().expr(expression).span().end as usize;
                 let after_semantic = &content[semantic_end - content_offset..];
                 let (idx, k, b_end) =
                     self.parse_index_and_key_after_context(after_semantic, semantic_end)?;
@@ -772,7 +768,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         input: &str,
         offset: usize,
-    ) -> Result<(&'arena Expression<'arena>, usize), Error> {
+    ) -> Result<(ExprId, usize), Error> {
         let trimmed = input.trim_start_matches(is_svelte_ws);
         let ws_len = input.len() - trimmed.len();
         let adjusted = offset + ws_len;
@@ -819,8 +815,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // (`{#each xs as x: T /* c */}` → `expected_token`), and accepting it here
         // would drop the comment.
         let annotation_end = ta.span.end as usize;
-        tsv_ts::__private::attach_pattern_type_annotation(expr, ta, self.arena)?;
-        Ok((expr, annotation_end))
+        let arena = self.arena;
+        let attached = self.with_island_stores(|_, stores| {
+            tsv_ts::__private::attach_pattern_type_annotation(stores, expr, ta, arena)
+        })?;
+        Ok((attached, annotation_end))
     }
 
     /// The byte offset just past the bracket that closes the `open` (`{` or `[`) at
@@ -1123,7 +1122,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         keyword: &str,
         stop_keywords: &[&str],
-    ) -> Result<(Option<Fragment<'arena>>, Option<&'arena Expression<'arena>>), Error> {
+    ) -> Result<(Option<Fragment<'arena>>, Option<ExprId>), Error> {
         let tag_start = self.current_end();
         let (tag_content, content_start) = self.scan_block_tag_content(tag_start)?;
         // The value is absent only when the `}` follows the keyword directly (`{:then}`).
@@ -1288,7 +1287,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         region: &str,
         region_offset: usize,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    ) -> Result<ExprId, Error> {
         let (pattern, binding_end) = self.parse_block_pattern(region, region_offset)?;
         self.reject_trailing_tag_content(&region[binding_end - region_offset..], binding_end)?;
         Ok(pattern)
@@ -1452,7 +1451,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // `ThisExpression`, a `Literal`, a `Super`, none of which the wire's
         // `SnippetBlock.expression` may hold. Stated rather than assumed, so the filter and
         // the node shape can never drift apart silently.
-        if !matches!(expression.kind, ExpressionKind::Identifier(_)) {
+        if !matches!(
+            self.ts_view().expr(expression).kind,
+            ExpressionKind::Identifier(_)
+        ) {
             return Err(Self::error_expected_at("snippet name", content_offset));
         }
 
@@ -1527,7 +1529,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // was lossy twice over: the wire emits no parameters at all, and the printer
         // reflowed the kept text.
         let mut type_parameters: Option<tsv_ts::ast::TSTypeParameterDeclaration<'arena>> = None;
-        let mut parameters: &'arena [Expression<'arena>] = &[];
+        let mut parameters: tsv_ts::ast::Run<tsv_ts::ast::Expr> = tsv_ts::ast::Run::EMPTY;
         if type_params_raw.is_some() || !params_str.trim_matches(is_svelte_ws).is_empty() {
             // The head runs from where the signature begins (`<` or `(`) through the `)`.
             let head_slice = &content[head_start..=close_paren];

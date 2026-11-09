@@ -11,6 +11,7 @@ use crate::whitespace::{
     brace_interior_start, char_at, is_svelte_ws, name_run_end, skip_svelte_ws,
 };
 use tsv_lang::{Error, Span};
+use tsv_ts::ast::ExprId;
 use tsv_ts::ast::{Expression, IdentName, Identifier};
 
 use super::expression_tag::{
@@ -538,7 +539,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// Accepts both `{expr}` and `"{expr}"` (quoted mustache) forms.
     /// Svelte's parser accepts quoted expressions in directives; prettier strips the quotes.
-    fn parse_directive_expression(&mut self) -> Result<(&'arena Expression<'arena>, Span), Error> {
+    fn parse_directive_expression(&mut self) -> Result<(ExprId, Span), Error> {
         self.check_directive_value_placement()?;
         if self.current_opens_directive_value() {
             // Standard form: {expr}
@@ -563,23 +564,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Create an identifier expression for shorthand directives (bind:value, class:class1)
-    fn make_shorthand_identifier(
-        &self,
-        name: &str,
-        start: usize,
-        end: usize,
-    ) -> &'arena Expression<'arena> {
+    fn make_shorthand_identifier(&mut self, name: &str, start: usize, end: usize) -> ExprId {
         let span = Span {
             start: start as u32,
             end: end as u32,
         };
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-        self.arena
-            .alloc(Expression::from_identifier(Identifier::simple(
-                self.synthesized_ident_name(name, span),
-                span,
-            )))
+        let name = self.synthesized_ident_name(name, span);
+        self.push_ts_expr(Expression::from_identifier(Identifier::simple(name, span)))
     }
 
     /// Name channel for a synthesized TS `Identifier` covering `span`:
@@ -721,7 +712,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// - A call expression: {@attach tooltip("hi")}
     /// - A conditional: {@attach a ? fn1 : fn2}
     /// - An arrow function: {@attach (el) => el.focus()}
-    pub(crate) fn parse_attach_tag(&mut self) -> Result<AttachTag<'arena>, Error> {
+    pub(crate) fn parse_attach_tag(&mut self) -> Result<AttachTag, Error> {
         // We're at the `{` of `{@attach expr}`; scan forward to find the closing `}`.
         let start = self.current_start();
 
@@ -796,7 +787,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// - An identifier: {...obj}
     /// - A call expression: {...getProps()}
     /// - A member expression: {...obj.nested}
-    fn parse_spread_attribute(&mut self) -> Result<SpreadAttribute<'arena>, Error> {
+    fn parse_spread_attribute(&mut self) -> Result<SpreadAttribute, Error> {
         let start = self.current_start();
 
         // We're at '{', scan forward to find the closing '}'
@@ -935,10 +926,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let identifier =
             Identifier::simple(self.synthesized_ident_name(name, ident_span), ident_span);
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
         let expression_tag = ExpressionTag {
-            expression: self.arena.alloc(Expression::from_identifier(identifier)),
+            expression: self.push_ts_expr(Expression::from_identifier(identifier)),
             span: ident_span,
         };
 
@@ -1128,7 +1117,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Returns a `Vec<AttributeValue>` to support mixed text/expressions
     pub(crate) fn parse_attribute_value(
         &mut self,
-    ) -> Result<BumpVec<'arena, AttributeValue<'arena>>, Error> {
+    ) -> Result<BumpVec<'arena, AttributeValue>, Error> {
         // Any value not starting with a quote is unquoted, read as a Svelte
         // `read_sequence` — a run of Text + {expr} chunks to the terminator regex.
         // Covers a bare identifier (`data-attr=value`), a single expression
@@ -1247,31 +1236,30 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// set is far laxer and whose `{` is never an expression.
     pub(crate) fn parse_unquoted_attribute_value(
         &mut self,
-    ) -> Result<BumpVec<'arena, AttributeValue<'arena>>, Error> {
+    ) -> Result<BumpVec<'arena, AttributeValue>, Error> {
         // `src`/`bytes` borrow the source data (lifetime `'a`), so they stay valid
         // across the `&mut self` `parse_expression_tag_at` call below.
         let src = self.source;
         let bytes = src.as_bytes();
         let start = self.current_start();
-        let mut parts: BumpVec<'arena, AttributeValue<'arena>> = self.bvec();
+        let mut parts: BumpVec<'arena, AttributeValue> = self.bvec();
         let mut text_start = start;
         let mut pos = start;
 
-        let flush_text =
-            |parts: &mut BumpVec<'arena, AttributeValue<'arena>>, from: usize, to: usize| {
-                if to > from {
-                    let span = Span {
-                        start: from as u32,
-                        end: to as u32,
-                    };
-                    parts.push(AttributeValue::Text(Text::new(
-                        span,
-                        TextDecoding::AttributeValue,
-                        span,
-                        src,
-                    )));
-                }
-            };
+        let flush_text = |parts: &mut BumpVec<'arena, AttributeValue>, from: usize, to: usize| {
+            if to > from {
+                let span = Span {
+                    start: from as u32,
+                    end: to as u32,
+                };
+                parts.push(AttributeValue::Text(Text::new(
+                    span,
+                    TextDecoding::AttributeValue,
+                    span,
+                    src,
+                )));
+            }
+        };
 
         loop {
             // Terminator regex: `/>` or one of `\s` " ' = < > `

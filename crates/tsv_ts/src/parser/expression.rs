@@ -3,12 +3,13 @@
 use crate::ast::{
     AssignmentExpression, AssignmentOperator, AwaitExpression, BinaryExpression, BinaryOperator,
     BlockStatement, CallExpression, CommentBoundPair, CommentBoundPairKind, ConditionalExpression,
-    Expression, ExpressionKind, IdentName, Identifier, ImportExpression, ImportPhase, Literal,
-    LiteralValue, MemberExpression, MetaProperty, NewExpression, ParenthesizedExpression,
-    RegexLiteral, SequenceExpression, SpreadElement, Statement, Super, TSAsExpression,
-    TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion,
-    TSTypeParameterInstantiation, TaggedTemplateExpression, TemplateLiteral, ThisExpression,
-    UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator, YieldExpression,
+    ExprId, ExprView, Expression, ExpressionKind, IdentName, Identifier, ImportExpression,
+    ImportPhase, Literal, LiteralValue, MemberExpression, MetaProperty, NewExpression,
+    ParenthesizedExpression, RegexLiteral, Run, SequenceExpression, SpreadElement, Statement,
+    Super, TSAsExpression, TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression,
+    TSTypeAssertion, TSTypeParameterInstantiation, TaggedTemplateExpression, TemplateLiteral,
+    ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
+    YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::printer::ParenContext;
@@ -26,7 +27,7 @@ use super::scan::{
     skip_whitespace_and_comments,
 };
 use super::{
-    Checkpoint, GroupingParen, LINK_ASSERTION, LINK_NON_NULL, LINK_OPERATOR, LINK_REENTRY,
+    Checkpoint, ExprRet, GroupingParen, LINK_ASSERTION, LINK_NON_NULL, LINK_OPERATOR, LINK_REENTRY,
     LINK_SUBSCRIPT, LINK_TAG, Parser, RootEnd,
 };
 
@@ -60,14 +61,13 @@ const BP_UNARY: u8 = 29;
 
 // ## The expression ladder's return currency
 //
-// Every `parse_*` on the expression cycle returns `Result<&'arena Expression, Error>`:
-// the node is built in the arena at the tail of its own builder (`alloc_expr`) and the
-// recursion moves a reference. That `Result` is two words — the reference plus the
-// pointer-sized `Error`'s discriminant — which x86-64 returns in two registers. A
-// wider success value does not: `{&Expression, u32, u32}` is the same 16 B once the error
-// niche-packs into it, but a three-field aggregate is no two-scalar pair, so it came back
-// through an sret stack slot at every outlined call. (wasm32 returns every `Result` through
-// a slot either way.)
+// Every `parse_*` on the expression cycle returns `Result<ExprRet, Error>`: the node is pushed
+// at the tail of its own builder and the recursion moves its id, widened to a word on 64-bit
+// (`ExprRet`, `tsv_lang::store::IdRet`) so the `Result` is two scalars, which x86-64 returns in
+// two registers. A bare `u32` id would pair with the pointer-sized `Error` as a mismatched
+// aggregate, returned through an sret slot at every call. A caller narrows the word to an
+// `ExprId` once, at the first consumer of the value. (wasm32 returns every `Result` through a
+// slot either way, so there it is an id as it stands.)
 //
 // **An expression's paren-inclusive extent is the tokens its parse consumed**, so it
 // travels with no field at all: it starts at the token current when the parse begins and
@@ -81,7 +81,7 @@ const BP_UNARY: u8 = 29;
 // consumed. A caller that asks "was this operand parenthesized?" compares the extent's
 // start with the node's own `span().start`.
 //
-// ⚠️ The frame is what the reference buys as much as the return. LLVM gives each sret call
+// ⚠️ The frame is what the id buys as much as the return. LLVM gives each sret call
 // site its own stack slot and does not merge them across match arms, and a frame is sized
 // once for its widest arm — so a dispatcher with N arms that each call a `parse_*` returning
 // a bare `Expression` (72 B) reserves N × 72 B at **every** recursion level, whichever arm
@@ -90,33 +90,19 @@ const BP_UNARY: u8 = 29;
 // their slots set the stack every nesting level costs, which the depth limits' margin is
 // made of — see `docs/cli.md` §Recursion Depth. The rule
 // that follows: **no `parse_*` reached from a dispatcher returns the bare `Expression`
-// enum.** A builder returns either the arena reference (boxing at its own tail) or its own
+// enum.** A builder returns either the id (pushing at its own tail) or its own
 // concrete node struct — an `ObjectExpression` / `ArrayExpression` / `TemplateLiteral` is
-// 32–40 B and niche-packs into its `Result`, so the arm that wraps one in `Expression::…`
+// small and niche-packs into its `Result`, so the arm that wraps one in `Expression::…`
 // inline builds a temporary LLVM *does* merge with its sibling arms'. The type parser keeps
 // the same rule for `TSType` (`Parser::parse_type`).
 //
-// The assert is width-relative (a reference and an `Error` are each one `usize`), so it
-// holds on `wasm32` too (pinned in `tsv_wasm`), where the return is a slot regardless. The
-// `Result`'s two words are rustc's layout, not a guarantee, so it is pinned in the test build.
+// The assert is width-relative (`ExprRet` and an `Error` are each one `usize`), so it holds on
+// `wasm32` too (pinned in `tsv_wasm`), where the return is a slot regardless. The `Result`'s
+// two words are rustc's layout, not a guarantee, so it is pinned in the test build.
 #[cfg(test)]
-const _: () = assert!(size_of::<Result<&Expression<'static>, Error>>() == 2 * size_of::<usize>());
-
-/// Box a freshly built expression node into the arena — the tail of every node builder
-/// on the expression ladder (see §The expression ladder's return currency above).
-///
-/// Called at the **tail of the node builder**, never by its caller: a `parse_*` that
-/// hands back a bare `Expression` makes its caller hold a 72 B value across the boxing
-/// call, and a caller with N such arms pays N slots in **every** frame.
-#[inline]
-pub(in crate::parser) fn alloc_expr<'arena>(
-    arena: &'arena bumpalo::Bump,
-    expr: Expression<'arena>,
-) -> &'arena Expression<'arena> {
-    #[cfg(feature = "_internal_ast_census")]
-    tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-    arena.alloc(expr)
-}
+const _: () = assert!(
+    tsv_lang::store::STORE_CHECK || size_of::<Result<ExprRet, Error>>() == 2 * size_of::<usize>()
+);
 
 /// Debug-check a node extent derived from the parser's cursor against the operands it
 /// covers: the span `start..end` must enclose `first`'s start and `last`'s end. A
@@ -126,16 +112,17 @@ pub(in crate::parser) fn alloc_expr<'arena>(
 /// release builds — the operands are read only inside the `debug_assert!`.
 #[inline]
 pub(in crate::parser) fn debug_assert_encloses(
+    view: ExprView<'_>,
     start: u32,
     end: u32,
-    first: &Expression<'_>,
-    last: &Expression<'_>,
+    first: ExprId,
+    last: ExprId,
 ) {
     debug_assert!(
-        start <= first.span().start && last.span().end <= end,
+        start <= view.expr(first).span().start && view.expr(last).span().end <= end,
         "derived extent {start}..{end} must enclose its operands {}..{}",
-        first.span().start,
-        last.span().end
+        view.expr(first).span().start,
+        view.expr(last).span().end
     );
 }
 
@@ -159,6 +146,14 @@ fn is_bare_assignment_head(expr: &Expression<'_>, start: usize, in_yield: bool) 
     let is_head = matches!(expr.kind, ExpressionKind::ArrowFunctionExpression(_))
         || (in_yield && matches!(expr.kind, ExpressionKind::YieldExpression(_)));
     is_head && start == expr.span().start as usize
+}
+
+/// The `Copy` pieces of a `<` comparison read back at its closing `>`.
+struct LtChild {
+    left: ExprId,
+    right: ExprId,
+    span: Span,
+    may_close_type_arguments: bool,
 }
 
 /// How `parse_postfix_expression` should treat the subscript chain.
@@ -314,22 +309,31 @@ pub(super) enum DirectivePrologue {
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
+    /// `id`'s pieces, when it is a `<` comparison.
+    fn lt_child_pieces(&self, id: ExprId) -> Option<LtChild> {
+        let node = self.expr(id);
+        match &node.kind {
+            ExpressionKind::BinaryExpression(child)
+                if child.operator == BinaryOperator::LessThan =>
+            {
+                Some(LtChild {
+                    left: child.left,
+                    right: child.right,
+                    span: node.span,
+                    may_close_type_arguments: child.may_close_type_arguments,
+                })
+            }
+            _ => None,
+        }
+    }
+
     /// Parse an expression using Pratt parsing for operator precedence
     ///
     /// This is the top-level entry point that handles ALL expression forms including
     /// the comma operator (sequence expression). Use `parse_assignment_expression()`
     /// for contexts where comma is a separator (function args, array elements, etc.)
-    pub(super) fn parse_expression(&mut self) -> Result<Expression<'arena>, Error> {
-        // The spine returns an arena ref; this owned form (shallow clone — children are
-        // refs) serves the callers that store the value: the by-value `export =` /
-        // `export default` fields, and the pattern path (`parse_expression_unbounded`),
-        // which converts it to a binding pattern.
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
-            tsv_lang::ast_census_probe::Dead::MovedInline,
-            1,
-        );
-        Ok(self.parse_expression_bp(BP_COMMA)?.clone())
+    pub(super) fn parse_expression(&mut self) -> Result<ExprRet, Error> {
+        self.parse_expression_bp(BP_COMMA)
     }
 
     /// Parse an assignment expression (excludes comma operator)
@@ -341,19 +345,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - Variable initializers: `const x = expr` - comma would be ambiguous with declarators
     ///
     /// To use the comma operator in these contexts, wrap in parens: `foo((a, b))`
-    ///
-    /// This owned form (a shallow clone of the spine's arena node) serves the callers that
-    /// store the value by value — a computed member key, an enum member initializer; a
-    /// slot or list element that holds `&'arena Expression` (call arguments, array
-    /// elements, property values, initializers) takes `parse_assignment_expression_ref`.
-    pub(super) fn parse_assignment_expression(&mut self) -> Result<Expression<'arena>, Error> {
+    pub(super) fn parse_assignment_expression(&mut self) -> Result<ExprRet, Error> {
         // Use BP_ASSIGNMENT to skip comma handling (which only triggers at BP_COMMA)
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
-            tsv_lang::ast_census_probe::Dead::MovedInline,
-            1,
-        );
-        Ok(self.parse_expression_bp(BP_ASSIGNMENT)?.clone())
+        self.parse_expression_bp(BP_ASSIGNMENT)
     }
 
     /// Parse a computed property/member name `[ AssignmentExpression ]`, assuming the
@@ -366,8 +360,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// stops before `,`, then `expect(']')` fails on it); the spread parses as a primary
     /// expression tsv accepts in array/object/call positions, so it needs an explicit
     /// guard. A member-access *subscript* (`obj[a, b]`) is a full `Expression` and uses
-    /// `parse_expression_ref` directly — not this helper.
-    pub(super) fn parse_computed_member_key(&mut self) -> Result<Expression<'arena>, Error> {
+    /// `parse_expression` directly — not this helper.
+    pub(super) fn parse_computed_member_key(&mut self) -> Result<ExprRet, Error> {
         if matches!(self.current_kind(), TokenKind::DotDotDot) {
             return Err(self.error_msg("A computed property name cannot be a spread element"));
         }
@@ -376,26 +370,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(key)
     }
 
-    /// `parse_expression`'s ref-returning sibling: hands back the spine's arena
-    /// ref directly, for consumers whose AST field is `&'arena Expression` —
-    /// skipping the owned boundary's shallow clone + re-alloc round trip.
-    pub(super) fn parse_expression_ref(&mut self) -> Result<&'arena Expression<'arena>, Error> {
-        self.parse_expression_bp(BP_COMMA)
-    }
-
-    /// `parse_assignment_expression`'s ref-returning sibling (see
-    /// `parse_expression_ref`).
-    pub(super) fn parse_assignment_expression_ref(
-        &mut self,
-    ) -> Result<&'arena Expression<'arena>, Error> {
-        self.parse_expression_bp(BP_ASSIGNMENT)
-    }
-
     /// Parse an expression without allowing `in` as a binary operator.
     ///
     /// Used in for-loop headers to distinguish `for (x in y)` from expressions.
     /// The `in` keyword is recognized as the for-in separator, not as a binary operator.
-    pub(super) fn parse_expression_no_in(&mut self) -> Result<Expression<'arena>, Error> {
+    pub(super) fn parse_expression_no_in(&mut self) -> Result<ExprRet, Error> {
         self.with_no_in(Self::parse_expression)
     }
 
@@ -511,7 +490,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         min_bp: u8,
         expr_start: usize,
-        left: &mut &'arena Expression<'arena>,
+        left: &mut ExprId,
     ) -> Result<bool, Error> {
         let is_as = match self.current_kind() {
             TokenKind::Keyword(KeywordKind::As) => true,
@@ -549,17 +528,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Ok(false);
         }
 
-        let arena = self.arena;
+        let operand = *left;
         // one link of the operator chain: an assertion nests its operand to the left
         self.spine_link(LINK_ASSERTION)?;
         // and the pair the printer adds around a bare operand that binds looser
         // (`(a + b) as T`), a level of the output's nesting
-        if expr_start == left.span().start as usize {
-            self.count_operand_pairs(Some((left, ParenContext::TypeAssertion)), None)?;
+        let operand_span = self.expr(operand).span();
+        if expr_start == operand_span.start as usize {
+            self.count_operand_pairs(Some((operand, ParenContext::TypeAssertion)), None)?;
             // a bare `async` keeps a pair at every position (`(async) as T`), which acorn
             // would read as an async arrow head
-            if matches!(left.kind, ExpressionKind::Identifier(_))
-                && self.source_slice(left.span()) == "async"
+            if matches!(self.expr(operand).kind, ExpressionKind::Identifier(_))
+                && self.source_slice(operand_span) == "async"
             {
                 self.printer_pair()?;
             }
@@ -571,7 +551,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Expression {
                 span,
                 kind: ExpressionKind::TSAsExpression(TSAsExpression {
-                    expression: left,
+                    expression: operand,
                     type_annotation,
                 }),
             }
@@ -579,14 +559,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Expression {
                 span,
                 kind: ExpressionKind::TSSatisfiesExpression(TSSatisfiesExpression {
-                    expression: left,
+                    expression: operand,
                     type_annotation,
                 }),
             }
         };
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-        *left = arena.alloc(expr);
+        *left = self.push_expr(expr);
         Ok(true)
     }
 
@@ -598,14 +576,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// It counts no depth of its own: an expression's nesting is counted where its grammar
     /// recurses — a grouping delimiter ([`Parser::enter_grouping`]), an operator's
     /// operand, an arrow's body — so a plain operand pays nothing.
-    fn parse_expression_bp(&mut self, min_bp: u8) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_expression_bp(&mut self, min_bp: u8) -> Result<ExprRet, Error> {
         // Track the true start position (before any parentheses)
         // This is needed because grouped expressions like (a && b) should have their
         // containing binary expression span include the opening paren
         let expr_start = self.current_pos().0;
 
         // Parse prefix expression (primary or unary)
-        let left = self.parse_prefix_expression()?;
+        let left = self.parse_prefix_expression()?.id();
         self.parse_expression_operators(min_bp, expr_start, left)
     }
 
@@ -626,10 +604,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         min_bp: u8,
         expr_start: usize,
-        mut left: &'arena Expression<'arena>,
-    ) -> Result<&'arena Expression<'arena>, Error> {
-        let arena = self.arena;
-
+        mut left: ExprId,
+    ) -> Result<ExprRet, Error> {
         // A leading *unparenthesized* arrow function — or a bare `yield` inside a
         // generator — is a complete `AssignmentExpression` (see
         // `is_bare_assignment_head`), so no operator may extend it: a trailing
@@ -641,7 +617,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // concise arrow body (`() => x || a`) or the yield argument
         // (`yield a || b`, `yield +c`) — so this fires only for a truly complete
         // head with no argument/body to absorb it.
-        let leading_bare_head = is_bare_assignment_head(left, expr_start, self.in_yield);
+        let leading_bare_head = is_bare_assignment_head(self.expr(left), expr_start, self.in_yield);
 
         // The same head is no OPERAND either. Above the assignment tier this parse is a
         // unary operator's argument or a binary operator's right side — a
@@ -653,7 +629,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Err(Error::invalid_syntax(
                 "An arrow function or `yield` expression cannot be an operand without parentheses"
                     .to_string(),
-                left.span().start as usize,
+                self.expr(left).span().start as usize,
             ));
         }
 
@@ -704,14 +680,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Detect unparenthesized unary: the operand's parse began at its own span start
             if operator == BinaryOperator::StarStar
                 && matches!(
-                    left.kind,
+                    self.expr(left).kind,
                     ExpressionKind::UnaryExpression(_) | ExpressionKind::AwaitExpression(_)
                 )
-                && expr_start == left.span().start as usize
+                && expr_start == self.expr(left).span().start as usize
             {
                 return Err(Error::invalid_syntax(
                     "Unary expression cannot be the left operand of ** without parentheses. Use (-x) ** y or -(x ** y).".to_string(),
-                    left.span().start as usize,
+                    self.expr(left).span().start as usize,
                 ));
             }
             // An angle-bracket assertion is the same error in tsc (`A type assertion
@@ -721,12 +697,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // `parseMaybeUnary`, which consumes the `**` — so tsv rejects rather than build
             // tsc's `(<T>x) ** y` beside a wire that says otherwise.
             if operator == BinaryOperator::StarStar
-                && matches!(left.kind, ExpressionKind::TSTypeAssertion(_))
-                && expr_start == left.span().start as usize
+                && matches!(self.expr(left).kind, ExpressionKind::TSTypeAssertion(_))
+                && expr_start == self.expr(left).span().start as usize
             {
                 return Err(Error::invalid_syntax(
                     "Type assertion cannot be the left operand of ** without parentheses. Use (<T>x) ** y or <T>(x ** y).".to_string(),
-                    left.span().start as usize,
+                    self.expr(left).span().start as usize,
                 ));
             }
 
@@ -745,32 +721,34 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // is not there. The bit rides the `<` node, already in the arena, so setting it
             // re-allocates that one node; only a chain that takes the pair pays for it.
             if operator == BinaryOperator::GreaterThan
-                && let ExpressionKind::BinaryExpression(child) = &left.kind
-                && child.operator == BinaryOperator::LessThan
+                && let Some(child) = self.lt_child_pieces(left)
                 && let Some(lt) = infix_operator_offset(
                     self.source.as_bytes(),
-                    self.local_pos(child.left.span().end),
+                    self.local_pos(self.expr(child.left).span().end),
                     b'<',
                 )
-                && self.chain_owes_type_argument_pair(lt, expr_start != left.span().start as usize)
+                && self.chain_owes_type_argument_pair(lt, expr_start != child.span.start as usize)
             {
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
                     tsv_lang::ast_census_probe::Dead::Superseded,
                     1,
                 );
-                left = arena.alloc(Expression {
-                    span: left.span,
+                left = self.push_expr(Expression {
+                    span: child.span,
                     kind: ExpressionKind::BinaryExpression(BinaryExpression {
+                        left: child.left,
+                        operator: BinaryOperator::LessThan,
+                        right: child.right,
                         relexes_as_type_arguments: true,
-                        ..child.clone()
+                        may_close_type_arguments: child.may_close_type_arguments,
                     }),
                 });
             }
 
-            left = self.parse_binary_step(left, expr_start, operator, right_bp)?;
+            left = self
+                .parse_binary_step(left, expr_start, operator, right_bp)?
+                .id();
         }
 
         // Handle assignment operator (after binary ops, before ternary)
@@ -783,7 +761,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             && min_bp <= BP_ASSIGNMENT
             && let Some(operator) = self.try_assignment_operator()
         {
-            left = self.parse_assignment_step(left, expr_start, operator)?;
+            left = self.parse_assignment_step(left, expr_start, operator)?.id();
         }
 
         // Handle ternary operator (lowest precedence among binary-like ops, above comma)
@@ -795,21 +773,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // for the arrow form acorn over-leniently accepts it — a cataloged
         // `tsv_rejects` divergence, see conformance_svelte.md.)
         if !leading_bare_head && min_bp <= BP_ASSIGNMENT && self.eat(TokenKind::Question)? {
-            left = self.parse_conditional_step(left, expr_start)?;
+            left = self.parse_conditional_step(left, expr_start)?.id();
         }
 
         // Handle comma operator (lowest precedence, after ternary)
         // Only handle at top level (BP_COMMA) to avoid conflicts with comma in
         // function calls, array literals, and object literals
         if min_bp == BP_COMMA && self.check(&TokenKind::Comma) {
-            left = self.parse_sequence_step(left, expr_start)?;
+            left = self.parse_sequence_step(left, expr_start)?.id();
         }
 
-        Ok(left)
+        Ok(ExprRet::wrap(left))
     }
 
     /// Parse a prefix expression (a primary or unary head plus its subscript chain)
-    fn parse_prefix_expression(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_prefix_expression(&mut self) -> Result<ExprRet, Error> {
         // The head token — the leftmost token of the expression being parsed, and the
         // only one a leading comment can be glued to. Taken before the match, which
         // produces exactly the node that token begins (postfix subscripts wrap it after).
@@ -838,7 +816,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::Await) => self.in_await,
             _ => false,
         };
-        let parsed = match self.current_kind() {
+        let parsed: ExprRet = match self.current_kind() {
             TokenKind::Minus | TokenKind::Plus | TokenKind::Bang | TokenKind::Tilde => {
                 self.parse_unary_expression()?
             }
@@ -1010,6 +988,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             _ => self.parse_primary_expression()?,
         };
 
+        let parsed = parsed.id();
         self.bind_leading_comment(head_start, parsed);
 
         // An unparenthesized arrow function — or a bare `yield` inside a generator
@@ -1020,8 +999,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // *starts* an expression is instead absorbed earlier as the yield argument
         // (`yield [x]` is `yield` of an array; `yield (e)` its parenthesized arg),
         // so only the no-argument bare head reaches here.
-        if is_bare_assignment_head(parsed, head_start, self.in_yield) {
-            return Ok(parsed);
+        if is_bare_assignment_head(self.expr(parsed), head_start, self.in_yield) {
+            return Ok(ExprRet::wrap(parsed));
         }
 
         // A prefix operator's expression takes no subscript (see `prefix_operator_head`):
@@ -1029,7 +1008,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // statements), and on the same line, or where no statement can end, the token is
         // a syntax error (`!b++(z)`, `g(!b++⏎(z))`).
         if prefix_operator_head {
-            return Ok(parsed);
+            return Ok(ExprRet::wrap(parsed));
         }
 
         // Parse any postfix operations (member access, call expressions)
@@ -1040,27 +1019,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Assumes the opening `(` has already been consumed.
     /// Returns the arguments and the end position of the closing `)`.
-    pub(super) fn parse_call_arguments(
-        &mut self,
-    ) -> Result<
-        (
-            crate::parser::BumpVec<'arena, &'arena Expression<'arena>>,
-            usize,
-        ),
-        Error,
-    > {
+    pub(super) fn parse_call_arguments(&mut self) -> Result<(Run<ExprId>, usize), Error> {
         self.enter_grouping()?;
-        let mut arguments = self.bvec();
+        let mark = self.stores.expr_list_scratch.mark();
 
         if !self.check(&TokenKind::ParenClose) {
             // the arguments are siblings (`ListFrame`)
             let mut frame = self.list_frame();
             loop {
-                frame.element(self, arguments.len());
+                let len = self.stores.expr_list_scratch.len_since(mark);
+                frame.element(self, len);
                 // A leading `...` is a SpreadElement (ecma262 ArgumentList); everywhere
                 // else falls through to a plain AssignmentExpression.
-                let arg = self.parse_spread_or_assignment_element()?;
-                arguments.push(arg);
+                let arg = self.parse_spread_or_assignment_element()?.id();
+                self.stores.expr_list_scratch.push(arg);
 
                 if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::ParenClose)? {
                     break;
@@ -1072,7 +1044,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (_, paren_end) = self.current_pos();
         self.expect(&TokenKind::ParenClose)?;
         self.exit_grouping();
-        Ok((arguments, paren_end))
+        Ok((self.flush_expr_list(mark), paren_end))
     }
 
     /// Parse the expression part of a decorator (the `expr` in `@expr`), per the
@@ -1113,15 +1085,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// See `docs/conformance_svelte.md` §TypeScript Corrections. A member's own
     /// definite-assignment `!` is unaffected (`@dec x!: number` binds the `!` to `x`,
     /// since the decorator expression ends at `dec`).
-    pub(in crate::parser) fn parse_decorator_expression(
-        &mut self,
-    ) -> Result<Expression<'arena>, Error> {
+    pub(in crate::parser) fn parse_decorator_expression(&mut self) -> Result<ExprRet, Error> {
         // a decorator's member chain is a chain of its own (`Parser::chain`)
         self.chain(Self::parse_decorator_expression_chain)
     }
 
     /// [`Parser::parse_decorator_expression`] inside its chain frame.
-    fn parse_decorator_expression_chain(&mut self) -> Result<Expression<'arena>, Error> {
+    fn parse_decorator_expression_chain(&mut self) -> Result<ExprRet, Error> {
         let head_start = self.current_pos().0;
         let is_parenthesized = *self.current_kind() == TokenKind::ParenOpen;
 
@@ -1132,9 +1102,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `parse_primary_expression` already accepts as an `Identifier` (plain
         // names plus value-position contextual keywords like `async`/`as`, and
         // `await` at `Script` goal), never `this`/`super`/a literal/`new`.
-        let mut expr = self.parse_primary_expression()?;
+        let mut expr = self.parse_primary_expression()?.id();
         if !is_parenthesized {
-            if !matches!(expr.kind, ExpressionKind::Identifier(_)) {
+            if !matches!(self.expr(expr).kind, ExpressionKind::Identifier(_)) {
                 // `parse_primary_expression` has already consumed the head, so
                 // anchor the error at its start, not the now-current token.
                 return Err(Error::invalid_syntax(
@@ -1158,26 +1128,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         self.advance()?; // consume '.'
                         let (property, prop_end) = self.parse_dot_property()?;
                         let span = Span::new(head_start as u32, prop_end as u32);
-                        #[cfg(feature = "_internal_ast_census")]
-                        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-                        expr = alloc_expr(
-                            self.arena,
-                            Expression {
-                                span,
-                                kind: ExpressionKind::MemberExpression(MemberExpression {
-                                    object: expr,
-                                    property: self.arena.alloc(property),
-                                    computed: false,
-                                    optional: false,
-                                }),
-                            },
-                        );
+                        let property = self.push_expr(property);
+                        expr = self.push_expr(Expression {
+                            span,
+                            kind: ExpressionKind::MemberExpression(MemberExpression {
+                                object: expr,
+                                property,
+                                computed: false,
+                                optional: false,
+                            }),
+                        });
                     }
                     // same ASI gate as every other `wrap_non_null_assertion` caller:
                     // a line terminator before `!` makes it a prefix `!`, not ours
                     TokenKind::Bang if !self.had_line_terminator => {
                         self.spine_link(LINK_NON_NULL)?;
-                        expr = self.wrap_non_null_assertion(expr, head_start as u32)?;
+                        expr = self.wrap_non_null_assertion(expr, head_start as u32)?.id();
                     }
                     _ => break,
                 }
@@ -1205,49 +1171,35 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if *self.current_kind() == TokenKind::ParenOpen {
             self.advance()?; // consume '('
             let (arguments, paren_end) = self.parse_call_arguments()?;
-            let arguments = arguments.into_bump_slice();
             // The call node starts at the callee's own start (acorn's
             // `startNodeAtNode(expr)`), not at any stripped wrapping paren.
-            let start = expr.span().start;
+            let start = self.expr(expr).span().start;
             let span = Span::new(start, paren_end as u32);
-            expr = alloc_expr(
-                self.arena,
-                Expression {
-                    span,
-                    kind: ExpressionKind::CallExpression(CallExpression {
-                        callee: expr,
-                        type_arguments,
-                        arguments,
-                        optional: false,
-                    }),
-                },
-            );
+            expr = self.push_expr(Expression {
+                span,
+                kind: ExpressionKind::CallExpression(CallExpression {
+                    callee: expr,
+                    type_arguments,
+                    arguments,
+                    optional: false,
+                }),
+            });
         } else if let Some(type_arguments) = type_arguments {
             // Type arguments with no call — `@a.b<number>` ahead of the class. The
             // decorator expression is a `TSInstantiationExpression`, anchored at the
             // callee's own start like the call form above.
-            let start = expr.span().start;
+            let start = self.expr(expr).span().start;
             let end = type_arguments.span.end;
-            expr = alloc_expr(
-                self.arena,
-                Expression {
-                    span: Span::new(start, end),
-                    kind: ExpressionKind::TSInstantiationExpression(TSInstantiationExpression {
-                        expression: expr,
-                        type_arguments,
-                    }),
-                },
-            );
+            expr = self.push_expr(Expression {
+                span: Span::new(start, end),
+                kind: ExpressionKind::TSInstantiationExpression(TSInstantiationExpression {
+                    expression: expr,
+                    type_arguments,
+                }),
+            });
         }
 
-        // Hand back an owned `Expression` (shallow clone — children are arena
-        // refs), matching `parse_assignment_expression`'s by-value boundary.
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
-            tsv_lang::ast_census_probe::Dead::MovedInline,
-            1,
-        );
-        Ok(expr.clone())
+        Ok(ExprRet::wrap(expr))
     }
 
     /// Parse an optional call's type-argument list, which a call **must** follow, and
@@ -1278,21 +1230,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// on. Callers gate on
     /// `Bang` + `!had_line_terminator` (ASI: a line terminator before `!` makes it a
     /// prefix `!` on the next statement instead).
-    fn wrap_non_null_assertion(
-        &mut self,
-        expr: &'arena Expression<'arena>,
-        start: u32,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    fn wrap_non_null_assertion(&mut self, expr: ExprId, start: u32) -> Result<ExprRet, Error> {
         let (_, op_end) = self.current_pos();
         self.advance()?; // consume '!'
         let span = Span::new(start, op_end as u32);
-        Ok(alloc_expr(
-            self.arena,
-            Expression {
-                span,
-                kind: ExpressionKind::TSNonNullExpression(TSNonNullExpression { expression: expr }),
-            },
-        ))
+        Ok(self.push_ret(Expression {
+            span,
+            kind: ExpressionKind::TSNonNullExpression(TSNonNullExpression { expression: expr }),
+        }))
     }
 
     /// Parse the property after a consumed `.` or `?.`: a private name
@@ -1324,10 +1269,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline(never)]
     fn parse_assignment_step(
         &mut self,
-        left: &'arena Expression<'arena>,
+        left: ExprId,
         expr_start: usize,
         operator: AssignmentOperator,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    ) -> Result<ExprRet, Error> {
         // A bare operator expression is no `LeftHandSideExpression` — a grammar
         // error, read before the operator is consumed while `prev_token_end` still
         // closes the left side.
@@ -1340,9 +1285,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse right-hand side (assignment is right-associative, so same precedence):
         // one wire level (the depth limit's count)
         // a bare assignment on the right of another prints bare (`a = b = c`)
-        let right = self.nested(1, |p| {
-            p.pair_free_root(RootEnd::Anywhere, |p| p.parse_expression_bp(BP_ASSIGNMENT))
-        })?;
+        let right = self
+            .nested(1, |p| {
+                p.pair_free_root(RootEnd::Anywhere, |p| p.parse_expression_bp(BP_ASSIGNMENT))
+            })?
+            .id();
         let end = self.prev_token_end() as u32;
 
         // Convert left side to pattern if needed (cover grammar). An assignment accepts a
@@ -1356,12 +1303,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // parenthesized assignment there (`(a = b) += 1`) still has no wire shape.
         let left_pattern = if operator != AssignmentOperator::Assign
             && matches!(
-                left.kind,
+                self.expr(left).kind,
                 ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_)
             ) {
             left
         } else {
-            self.refine_assignment_target(left)?
+            self.refine_assignment_target(left)?.id()
         };
 
         // one wire level: the assignment over its target, read before the operator said it
@@ -1369,19 +1316,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // end of the target, plus one — none over a bare name, which nests nothing, the
         // wire-only tree's grouping pairs looked through so it counts no more than the
         // paren-free parse
-        let mut target = left_pattern;
+        let mut target = self.expr(left_pattern);
         while let ExpressionKind::ParenthesizedExpression(paren) = &target.kind {
-            target = paren.expression;
+            target = self.expr(paren.expression);
         }
         if !matches!(target.kind, ExpressionKind::Identifier(_)) {
             self.level_above_operand(target_peak)?;
         }
 
         let span = Span::new(expr_start as u32, end);
-        debug_assert_encloses(span.start, span.end, left, right);
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-        let assignment = self.arena.alloc(Expression {
+        debug_assert_encloses(self.stores.view(), span.start, span.end, left, right);
+        let assignment = self.push_ret(Expression {
             span,
             kind: ExpressionKind::AssignmentExpression(AssignmentExpression {
                 left: left_pattern,
@@ -1400,9 +1345,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline(never)]
     fn parse_conditional_step(
         &mut self,
-        left: &'arena Expression<'arena>,
+        left: ExprId,
         expr_start: usize,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    ) -> Result<ExprRet, Error> {
         // the test, parsed before the `?` said it was one, is the conditional's left
         // operand: a spine link, which every walk takes by re-entering its printer
         // (`((a ? b : c) ? d : e)` nests a conditional per grouping paren)
@@ -1421,11 +1366,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // alternate inherits the enclosing rule, as it does in tsc.
         // each branch one wire level (the depth limit's count)
         let consequent_start = self.current_pos().0;
-        let consequent = self.nested(1, |p| {
-            p.with_allow_in(|p| {
-                p.with_arrow_return_type_barred(|p| p.parse_expression_bp(BP_ASSIGNMENT))
-            })
-        })?;
+        let consequent = self
+            .nested(1, |p| {
+                p.with_allow_in(|p| {
+                    p.with_arrow_return_type_barred(|p| p.parse_expression_bp(BP_ASSIGNMENT))
+                })
+            })?
+            .id();
         self.conditional_head_pairs(left, expr_start, consequent, consequent_start)?;
 
         // Expect ':'
@@ -1433,14 +1380,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse alternate (else branch) - use BP_ASSIGNMENT to exclude comma operator
         let alternate_start = self.current_pos().0;
-        let alternate = self.nested(1, |p| p.parse_expression_bp(BP_ASSIGNMENT))?;
+        let alternate = self
+            .nested(1, |p| p.parse_expression_bp(BP_ASSIGNMENT))?
+            .id();
         self.ternary_branch_pair(alternate, alternate_start)?;
 
         let span = Span::new(expr_start as u32, self.prev_token_end() as u32);
-        debug_assert_encloses(span.start, span.end, left, alternate);
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-        Ok(self.arena.alloc(Expression {
+        debug_assert_encloses(self.stores.view(), span.start, span.end, left, alternate);
+        Ok(self.push_ret(Expression {
             span,
             kind: ExpressionKind::ConditionalExpression(ConditionalExpression {
                 test: left,
@@ -1454,13 +1401,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// elements after `left` (starting at `expr_start`). Out of line, off the expression
     /// ladder's common path.
     #[inline(never)]
-    fn parse_sequence_step(
-        &mut self,
-        left: &'arena Expression<'arena>,
-        expr_start: usize,
-    ) -> Result<&'arena Expression<'arena>, Error> {
-        let mut expressions = self.bvec();
-        expressions.push(left);
+    fn parse_sequence_step(&mut self, left: ExprId, expr_start: usize) -> Result<ExprRet, Error> {
+        let mark = self.stores.expr_list_scratch.mark();
+        self.stores.expr_list_scratch.push(left);
 
         // the first element, parsed before the comma said it was one, is the sequence's
         // left operand: a spine link, which every walk takes by re-entering its printer
@@ -1469,11 +1412,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // the elements are siblings (`ListFrame`); the first is already counted
         let mut frame = self.list_frame();
         while self.eat(TokenKind::Comma)? {
-            frame.element(self, expressions.len());
+            let len = self.stores.expr_list_scratch.len_since(mark);
+            frame.element(self, len);
             // Parse next expression - use BP_ASSIGNMENT to stop before next comma; one
             // wire level: the element under its `SequenceExpression`
-            let next = self.nested(1, |p| p.parse_expression_bp(BP_ASSIGNMENT))?;
-            expressions.push(next);
+            let next = self
+                .nested(1, |p| p.parse_expression_bp(BP_ASSIGNMENT))?
+                .id();
+            self.stores.expr_list_scratch.push(next);
         }
         frame.close(self);
         // the pair the printer writes around it (`(a, b);`), a level of the output's
@@ -1482,16 +1428,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // the last element's last consumed token (a trailing grouping paren included)
         let span = Span::new(expr_start as u32, self.prev_token_end() as u32);
-        if let (Some(first), Some(last)) = (expressions.first(), expressions.last()) {
-            debug_assert_encloses(span.start, span.end, first, last);
+        let expressions = self.flush_expr_list(mark);
+        #[cfg(debug_assertions)]
+        {
+            let list = self.stores.view().list(expressions);
+            if let (Some(&first), Some(&last)) = (list.first(), list.last()) {
+                debug_assert_encloses(self.stores.view(), span.start, span.end, first, last);
+            }
         }
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-        Ok(self.arena.alloc(Expression {
+        Ok(self.push_ret(Expression {
             span,
-            kind: ExpressionKind::SequenceExpression(SequenceExpression {
-                expressions: expressions.into_bump_slice(),
-            }),
+            kind: ExpressionKind::SequenceExpression(SequenceExpression { expressions }),
         }))
     }
 
@@ -1504,11 +1451,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline(never)]
     fn parse_binary_step(
         &mut self,
-        left: &'arena Expression<'arena>,
+        left: ExprId,
         expr_start: usize,
         operator: BinaryOperator,
         right_bp: u8,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    ) -> Result<ExprRet, Error> {
         // Read BEFORE the operator is consumed and the right operand parsed: the
         // question is whether enough `<` stand AHEAD of this token for it to close
         // every list they open — one for a `>`, two for a `>>`, three for a `>>>` —
@@ -1542,7 +1489,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // frame's count runs long, each operand takes a spine frame of its own, the
         // chain's operands being siblings; the chain's own links stay in this frame.
         let chain = self.spine.runs_long().then(|| self.spine.take());
-        let right = self.nested(1, |p| p.parse_expression_bp(right_bp))?;
+        let right = self.nested(1, |p| p.parse_expression_bp(right_bp))?.id();
         if let Some(chain) = chain {
             self.spine.fold(chain);
         }
@@ -1552,8 +1499,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // a left operand is bare where it starts the chain's own extent, a right one
         // where it ends at the last token read — and an `in` binary's own inside a
         // `for` header ([`Parser::self_pair`])
-        if !(crate::printer::operator_operand_takes_no_pair(left)
-            && crate::printer::operator_operand_takes_no_pair(right))
+        if !(crate::printer::operator_operand_takes_no_pair(self.expr(left))
+            && crate::printer::operator_operand_takes_no_pair(self.expr(right)))
         {
             self.binary_operand_pairs(operator, left, right, expr_start)?;
         }
@@ -1565,10 +1512,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `expr_start` (which includes any opening paren) to the right operand's last
         // consumed token (which includes any closing paren)
         let span = Span::new(expr_start as u32, self.prev_token_end() as u32);
-        debug_assert_encloses(span.start, span.end, left, right);
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-        Ok(self.arena.alloc(Expression {
+        debug_assert_encloses(self.stores.view(), span.start, span.end, left, right);
+        Ok(self.push_ret(Expression {
             span,
             kind: ExpressionKind::BinaryExpression(BinaryExpression {
                 left,
@@ -1585,12 +1530,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// starting at `start`, the current token the `?.`). Out of line, off the chain's common
     /// links.
     #[inline(never)]
-    fn parse_optional_link(
-        &mut self,
-        mut left: &'arena Expression<'arena>,
-        start: u32,
-    ) -> Result<&'arena Expression<'arena>, Error> {
-        let arena = self.arena;
+    fn parse_optional_link(&mut self, mut left: ExprId, start: u32) -> Result<ExprRet, Error> {
         self.chain_base_pair(left, start)?;
         self.advance()?; // consume '?.'
         // counted once the token past the `?.` tells a call from a member
@@ -1611,65 +1551,54 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let (property, prop_end) = self.parse_dot_property()?;
 
                 let span = Span::new(start, prop_end as u32);
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-                left = alloc_expr(
-                    self.arena,
-                    Expression {
-                        span,
-                        kind: ExpressionKind::MemberExpression(MemberExpression {
-                            object: left,
-                            property: arena.alloc(property),
-                            computed: false,
-                            optional: true,
-                        }),
-                    },
-                );
+                let property = self.push_expr(property);
+                left = self.push_expr(Expression {
+                    span,
+                    kind: ExpressionKind::MemberExpression(MemberExpression {
+                        object: left,
+                        property,
+                        computed: false,
+                        optional: true,
+                    }),
+                });
             }
             TokenKind::BracketOpen => {
                 // obj?.[expr] - optional computed access
                 self.advance()?; // consume '['
                 self.enter_grouping()?;
 
-                let index = self.parse_expression_ref()?;
+                let index = self.parse_expression()?.id();
 
                 let (_, bracket_end) = self.current_pos();
                 self.expect(&TokenKind::BracketClose)?; // consume ']'
                 self.exit_grouping();
 
                 let span = Span::new(start, bracket_end as u32);
-                left = alloc_expr(
-                    self.arena,
-                    Expression {
-                        span,
-                        kind: ExpressionKind::MemberExpression(MemberExpression {
-                            object: left,
-                            property: index,
-                            computed: true,
-                            optional: true,
-                        }),
-                    },
-                );
+                left = self.push_expr(Expression {
+                    span,
+                    kind: ExpressionKind::MemberExpression(MemberExpression {
+                        object: left,
+                        property: index,
+                        computed: true,
+                        optional: true,
+                    }),
+                });
             }
             TokenKind::ParenOpen => {
                 // obj?.() - optional call
                 self.advance()?; // consume '('
                 let (arguments, paren_end) = self.parse_call_arguments()?;
-                let arguments = arguments.into_bump_slice();
 
                 let span = Span::new(start, paren_end as u32);
-                left = alloc_expr(
-                    self.arena,
-                    Expression {
-                        span,
-                        kind: ExpressionKind::CallExpression(CallExpression {
-                            callee: left,
-                            type_arguments: None,
-                            arguments,
-                            optional: true,
-                        }),
-                    },
-                );
+                left = self.push_expr(Expression {
+                    span,
+                    kind: ExpressionKind::CallExpression(CallExpression {
+                        callee: left,
+                        type_arguments: None,
+                        arguments,
+                        optional: true,
+                    }),
+                });
                 self.settle_call_link(left)?;
             }
             TokenKind::LessThan | TokenKind::LeftShift
@@ -1680,28 +1609,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let type_args = self.parse_type_arguments_before_call()?;
                 self.advance()?; // consume '('
                 let (arguments, paren_end) = self.parse_call_arguments()?;
-                let arguments = arguments.into_bump_slice();
 
                 let span = Span::new(start, paren_end as u32);
-                left = alloc_expr(
-                    self.arena,
-                    Expression {
-                        span,
-                        kind: ExpressionKind::CallExpression(CallExpression {
-                            callee: left,
-                            type_arguments: Some(type_args),
-                            arguments,
-                            optional: true,
-                        }),
-                    },
-                );
+                left = self.push_expr(Expression {
+                    span,
+                    kind: ExpressionKind::CallExpression(CallExpression {
+                        callee: left,
+                        type_arguments: Some(type_args),
+                        arguments,
+                        optional: true,
+                    }),
+                });
                 self.settle_call_link(left)?;
             }
             _ => {
                 return Err(self.error_expected_after("property name, '[', or '('", "?."));
             }
         }
-        Ok(left)
+        Ok(ExprRet::wrap(left))
     }
 
     /// The tagged template link of [`Parser::parse_postfix_expression`]'s chain over `left`
@@ -1711,10 +1636,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline(never)]
     fn parse_tag_link(
         &mut self,
-        left: &'arena Expression<'arena>,
+        left: ExprId,
         start: u32,
         optional_chained: bool,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    ) -> Result<ExprRet, Error> {
         self.spine_link(LINK_TAG)?;
         self.function_head_pair(left, start, ParenContext::TaggedTemplateTag)?;
         // one wire level: the quasi's `TemplateLiteral` under its tag node, whose
@@ -1740,11 +1665,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Handles chained expressions like `obj.prop`, `arr[0]`, `foo()`, `obj.method().prop`
     fn parse_postfix_expression(
         &mut self,
-        mut left: &'arena Expression<'arena>,
+        mut left: ExprId,
         start: u32,
         mode: SubscriptMode,
-    ) -> Result<&'arena Expression<'arena>, Error> {
-        let arena = self.arena;
+    ) -> Result<ExprRet, Error> {
         // Tracks whether an optional `?.` was consumed in THIS subscript chain (not
         // inside a parenthesized sub-expression — those are parsed as their own
         // primary with a fresh flag). An optional chain may not be the tag of a
@@ -1762,25 +1686,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let (property, prop_end) = self.parse_dot_property()?;
 
                     let span = Span::new(start, prop_end as u32);
-                    #[cfg(feature = "_internal_ast_census")]
-                    tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-                    left = alloc_expr(
-                        self.arena,
-                        Expression {
-                            span,
-                            kind: ExpressionKind::MemberExpression(MemberExpression {
-                                object: left,
-                                property: arena.alloc(property),
-                                computed: false,
-                                optional: false,
-                            }),
-                        },
-                    );
+                    let property = self.push_expr(property);
+                    left = self.push_expr(Expression {
+                        span,
+                        kind: ExpressionKind::MemberExpression(MemberExpression {
+                            object: left,
+                            property,
+                            computed: false,
+                            optional: false,
+                        }),
+                    });
                 }
                 TokenKind::QuestionDot => {
                     // Optional chaining: obj?.prop, obj?.#private, obj?.[expr], obj?.()
                     optional_chained = true;
-                    left = self.parse_optional_link(left, start)?;
+                    left = self.parse_optional_link(left, start)?.id();
                 }
                 TokenKind::BracketOpen => {
                     // Computed member access: arr[0]
@@ -1789,25 +1709,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.advance()?; // consume '['
                     self.enter_grouping()?;
 
-                    let index = self.parse_expression_ref()?;
+                    let index = self.parse_expression()?.id();
 
                     let (_, bracket_end) = self.current_pos();
                     self.expect(&TokenKind::BracketClose)?; // consume ']'
                     self.exit_grouping();
 
                     let span = Span::new(start, bracket_end as u32);
-                    left = alloc_expr(
-                        self.arena,
-                        Expression {
-                            span,
-                            kind: ExpressionKind::MemberExpression(MemberExpression {
-                                object: left,
-                                property: index,
-                                computed: true,
-                                optional: false,
-                            }),
-                        },
-                    );
+                    left = self.push_expr(Expression {
+                        span,
+                        kind: ExpressionKind::MemberExpression(MemberExpression {
+                            object: left,
+                            property: index,
+                            computed: true,
+                            optional: false,
+                        }),
+                    });
                 }
                 TokenKind::ParenOpen => {
                     // Call expression: foo()
@@ -1822,29 +1739,25 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     )?;
                     self.advance()?; // consume '('
                     let (arguments, paren_end) = self.parse_call_arguments()?;
-                    let arguments = arguments.into_bump_slice();
 
                     let span = Span::new(start, paren_end as u32);
                     // A `foo<T>(...)` generic call lifts the callee's `<T>` into
                     // the call's `typeArguments` (see `flatten_instantiation`).
                     let (callee, type_arguments) = self.flatten_instantiation(left, start);
-                    left = alloc_expr(
-                        self.arena,
-                        Expression {
-                            span,
-                            kind: ExpressionKind::CallExpression(CallExpression {
-                                callee,
-                                type_arguments,
-                                arguments,
-                                optional: false,
-                            }),
-                        },
-                    );
+                    left = self.push_expr(Expression {
+                        span,
+                        kind: ExpressionKind::CallExpression(CallExpression {
+                            callee,
+                            type_arguments,
+                            arguments,
+                            optional: false,
+                        }),
+                    });
                     self.settle_call_link(left)?;
                 }
                 TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
                     // Tagged template expression: tag`content`
-                    left = self.parse_tag_link(left, start, optional_chained)?;
+                    left = self.parse_tag_link(left, start, optional_chained)?.id();
                 }
                 kind @ TokenKind::PlusPlus | kind @ TokenKind::MinusMinus
                     if mode == SubscriptMode::Normal && !self.had_line_terminator =>
@@ -1864,17 +1777,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.advance()?;
 
                     let span = Span::new(start, op_end as u32);
-                    left = alloc_expr(
-                        self.arena,
-                        Expression {
-                            span,
-                            kind: ExpressionKind::UpdateExpression(UpdateExpression {
-                                operator,
-                                argument: left,
-                                prefix: false,
-                            }),
-                        },
-                    );
+                    left = self.push_expr(Expression {
+                        span,
+                        kind: ExpressionKind::UpdateExpression(UpdateExpression {
+                            operator,
+                            argument: left,
+                            prefix: false,
+                        }),
+                    });
                     // A postfix `++`/`--` yields an UpdateExpression, which is not a
                     // `LeftHandSideExpression` — no further member/call subscript can
                     // apply (`a++[b]` / `a++.c` / `a++()` are grammar errors; acorn
@@ -1912,10 +1822,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // the pair the printer keeps around an instantiation instantiated
                     // again (`(f<T>)<U>`, a call's or tag's list included, which flatten
                     // this one), a level of the output's nesting
-                    if Self::is_bare_instantiation(left, start) {
+                    if Self::is_bare_instantiation(self.expr(left), start) {
                         self.printer_pair()?;
                     }
-                    left = instantiation;
+                    left = instantiation.id();
                     // An instantiation expression can't be followed by a property
                     // access (`f<T>.x`); a call or tagged template, which the loop
                     // below flattens into the expression, stays valid.
@@ -1925,13 +1835,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // TypeScript non-null assertion: `expr!`.
                     let units = self.non_null_link_units(left);
                     self.spine_link(units)?;
-                    left = self.wrap_non_null_assertion(left, start)?;
+                    left = self.wrap_non_null_assertion(left, start)?.id();
                 }
                 _ => break,
             }
         }
 
-        Ok(left)
+        Ok(ExprRet::wrap(left))
     }
 
     /// Parse the superclass expression of an `extends` clause.
@@ -1944,12 +1854,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `await`, assignment, and a top-level `=>` arrow) are excluded — the class body
     /// then errors when it fails to find `{`. A bare `<T>` is left for the class's
     /// `super_type_parameters` split via `SubscriptMode::ClassHeritage`.
-    pub(in crate::parser) fn parse_heritage_expression(
-        &mut self,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    pub(in crate::parser) fn parse_heritage_expression(&mut self) -> Result<ExprRet, Error> {
         self.chain(|p| {
             let start = p.current_pos().0 as u32;
-            let atom = p.parse_heritage_atom()?;
+            let atom = p.parse_heritage_atom()?.id();
             p.parse_postfix_expression(atom, start, SubscriptMode::ClassHeritage)
         })
     }
@@ -1972,7 +1880,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// literals, parens, arrays, objects, templates, `this`/`super`, and regex; the
     /// keyword-led expression atoms (`new`, `class`, `function`, `async function`,
     /// `import`) sit above the primary layer and are dispatched here.
-    fn parse_heritage_atom(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_heritage_atom(&mut self) -> Result<ExprRet, Error> {
         let (start, _) = self.current_pos();
         // `async function () {}` is the only `async`-led heritage atom. A bare `async`
         // (or an `async`-arrow, which isn't a valid heritage atom) falls through to the
@@ -1990,19 +1898,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::Function) => self.parse_function_expression(),
             TokenKind::Keyword(KeywordKind::Import) => self.parse_import_or_meta_property(),
             _ => {
-                let parsed = self.parse_primary_expression()?;
+                let parsed = self.parse_primary_expression()?.id();
                 // Reject a top-level (unparenthesized) arrow: `class C extends (a) => b {}`.
                 // acorn parses the heritage atom with `canBeArrow = false`, so an outer
                 // arrow isn't a valid superclass. A *parenthesized* arrow
                 // (`extends (a => b) {}`) is fine — there the arrow's own span starts
                 // past the `(`, so it differs from where the atom's parse began
                 // (`is_bare_assignment_head`, the one spelling of that test).
-                if is_bare_assignment_head(parsed, start, false) {
+                if is_bare_assignment_head(self.expr(parsed), start, false) {
                     return Err(self.error_msg(
                         "Arrow functions cannot be used as a class heritage expression",
                     ));
                 }
-                Ok(parsed)
+                Ok(ExprRet::wrap(parsed))
             }
         }
     }
@@ -2088,24 +1996,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a primary expression
-    fn parse_primary_expression(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_primary_expression(&mut self) -> Result<ExprRet, Error> {
         match self.current_kind() {
             TokenKind::Number => {
                 let literal = self.parse_number_or_bigint_literal()?;
                 self.advance()?;
-                Ok(alloc_expr(self.arena, Expression::from_literal(literal)))
+                Ok(self.push_ret(Expression::from_literal(literal)))
             }
             TokenKind::String => {
                 let literal = self.parse_string_literal()?;
-                Ok(alloc_expr(self.arena, Expression::from_literal(literal)))
+                Ok(self.push_ret(Expression::from_literal(literal)))
             }
             TokenKind::Identifier => {
                 let (start, end) = self.current_pos();
                 let name = self.current_ident_name();
                 self.advance()?;
-                Ok(alloc_expr(
-                    self.arena,
-                    Expression::from_identifier(Identifier::simple(
+                Ok(self.push_ret(Expression::from_identifier(Identifier::simple(
                         name,
                         Span::new(start as u32, end as u32),
                     )),
@@ -2125,9 +2031,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // one wire level beyond the expression's own: the `Property` its values
                 // sit under (the depth limit's count, `Parser::nested`)
                 let (object, span) = self.nested(1, Self::parse_object_expression)?;
-                Ok(alloc_expr(
-                    self.arena,
-                    Expression {
+                Ok(self.push_ret(Expression {
                         span,
                         kind: ExpressionKind::ObjectExpression(object),
                     },
@@ -2135,9 +2039,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             TokenKind::BracketOpen => {
                 let (array, span) = self.parse_array_expression()?;
-                Ok(alloc_expr(
-                    self.arena,
-                    Expression {
+                Ok(self.push_ret(Expression {
                         span,
                         kind: ExpressionKind::ArrayExpression(array),
                     },
@@ -2146,9 +2048,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::True) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
-                Ok(alloc_expr(
-                    self.arena,
-                    Expression::from_literal(Literal {
+                Ok(self.push_ret(Expression::from_literal(Literal {
                         value: LiteralValue::Boolean(true),
                         span: Span::new(start as u32, end as u32),
                     }),
@@ -2157,9 +2057,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::False) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
-                Ok(alloc_expr(
-                    self.arena,
-                    Expression::from_literal(Literal {
+                Ok(self.push_ret(Expression::from_literal(Literal {
                         value: LiteralValue::Boolean(false),
                         span: Span::new(start as u32, end as u32),
                     }),
@@ -2168,9 +2066,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::Null) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
-                Ok(alloc_expr(
-                    self.arena,
-                    Expression::from_literal(Literal {
+                Ok(self.push_ret(Expression::from_literal(Literal {
                         value: LiteralValue::Null,
                         span: Span::new(start as u32, end as u32),
                     }),
@@ -2179,18 +2075,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::This) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
-                Ok(alloc_expr(
-                    self.arena,
-                    Expression { span: Span::new(start as u32, end as u32), kind: ExpressionKind::ThisExpression(ThisExpression {
+                Ok(self.push_ret(Expression { span: Span::new(start as u32, end as u32), kind: ExpressionKind::ThisExpression(ThisExpression {
                     }) },
                 ))
             }
             TokenKind::Keyword(KeywordKind::Super) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
-                Ok(alloc_expr(
-                    self.arena,
-                    Expression { span: Span::new(start as u32, end as u32), kind: ExpressionKind::Super(Super {
+                Ok(self.push_ret(Expression { span: Span::new(start as u32, end as u32), kind: ExpressionKind::Super(Super {
                     }) },
                 ))
             }
@@ -2201,10 +2093,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
                 // Untagged template literal (a primary expression): invalid escapes
                 // are a syntax error (only tagged templates tolerate them).
-                Ok(alloc_expr(
-                    self.arena,
-                    Expression::from_template_literal(self.parse_template_literal(false)?),
-                ))
+                let template = self.parse_template_literal(false)?;
+                Ok(self.push_ret(Expression::from_template_literal(template)))
             }
             TokenKind::Slash | TokenKind::SlashEquals => {
                 // In expression context, `/` or `/=` starts a regex literal, not division
@@ -2257,9 +2147,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.had_line_terminator = self.lexer.had_line_terminator();
                 self.collect_comments()?;
 
-                Ok(alloc_expr(
-                    self.arena,
-                    Expression { kind: ExpressionKind::RegexLiteral(RegexLiteral {
+                Ok(self.push_ret(Expression { kind: ExpressionKind::RegexLiteral(RegexLiteral {
                         pattern_span,
                         flags_span,
                         pattern_width,
@@ -2278,9 +2166,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
                     return Err(self.error_expected_after("'in'", "private name"));
                 }
-                Ok(alloc_expr(
-                    self.arena,
-                    Expression {
+                Ok(self.push_ret(Expression {
                         span,
                         kind: ExpressionKind::PrivateIdentifier(private_id),
                     },
@@ -2312,9 +2198,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let (start, end) = self.current_pos();
                 let name = self.current_raw_ident_name();
                 self.advance()?;
-                Ok(alloc_expr(
-                    self.arena,
-                    Expression::from_identifier(Identifier::simple(
+                Ok(self.push_ret(Expression::from_identifier(Identifier::simple(
                         name,
                         Span::new(start as u32, end as u32),
                     )),
@@ -2334,7 +2218,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - Grouped expression: `(expr)`
     ///
     /// Uses lookahead to detect arrow functions by scanning for `=>` after `)`.
-    fn parse_paren_expression(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_paren_expression(&mut self) -> Result<ExprRet, Error> {
         // Check if this looks like an arrow function by scanning ahead. In a
         // conditional's consequent the arrow may be handed back (`None`): its
         // return-type `:` was the conditional's, and the head is the grouped
@@ -2363,8 +2247,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         self.enter_grouping()?;
         // the author's pair: a node that would count one for itself counts none
-        let parsed =
-            self.pair_free_root(RootEnd::AtParenClose, |p| p.parse_expression_bp(BP_COMMA))?;
+        let parsed = self
+            .pair_free_root(RootEnd::AtParenClose, |p| p.parse_expression_bp(BP_COMMA))?
+            .id();
 
         // Capture the end position of ')' before consuming it
         let (_, paren_end) = self.current_pos();
@@ -2372,12 +2257,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // The one delimiter the printer may strip, so a `<` region opened inside it is
         // not closed by this `)`.
         self.exit_stripped_grouping();
-        debug_assert_encloses(paren_start as u32, paren_end as u32, parsed, parsed);
+        debug_assert_encloses(
+            self.stores.view(),
+            paren_start as u32,
+            paren_end as u32,
+            parsed,
+            parsed,
+        );
         // A binding pattern is read as a literal and refined after the parse, so the
         // pair it would reject has to outlive the discard (`let [(a)] = x`).
         if self.record_grouping_parens {
             self.grouping_parens.push(GroupingParen {
-                inner: parsed.span(),
+                inner: self.expr(parsed).span(),
                 open: paren_start as u32,
             });
         }
@@ -2421,7 +2312,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.comments[idx].owned_by_node = true;
             }
             self.preserved_a_paren = true;
-            self.alloc(Expression {
+            self.push_expr(Expression {
                 span: paren_span,
                 kind: ExpressionKind::ParenthesizedExpression(ParenthesizedExpression {
                     expression: parsed,
@@ -2436,7 +2327,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         {
             self.comments[idx].owned_by_node = true;
             let comment = self.comments[idx];
-            self.alloc(Expression {
+            self.push_expr(Expression {
                 span: paren_span,
                 kind: ExpressionKind::CommentBoundPair(CommentBoundPair {
                     inner: parsed,
@@ -2447,7 +2338,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } else {
             parsed
         };
-        Ok(expr)
+        Ok(ExprRet::wrap(expr))
     }
 
     /// The index in `self.comments` of the JSDoc type-cast block comment
@@ -2573,12 +2464,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// a node genuinely starts at the token, never when the head was a grouping `(` the
     /// parser discards (`/* c */ (a + b)` — there the comment leads a paren, no node
     /// begins at it, and it stays an ordinary positional comment).
-    pub(in crate::parser) fn bind_leading_comment(
-        &mut self,
-        head_start: usize,
-        expr: &Expression<'arena>,
-    ) {
-        if expr.span().start as usize != head_start {
+    pub(in crate::parser) fn bind_leading_comment(&mut self, head_start: usize, expr: ExprId) {
+        if self.expr(expr).span().start as usize != head_start {
             return;
         }
         let Some(idx) = self.glued_block_comment_index(head_start) else {
@@ -2623,8 +2510,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// but doesn't work in JSX because it looks like an element.
     ///
     /// Example: `<string>value`, `<T>a`
-    fn parse_type_assertion(&mut self) -> Result<&'arena Expression<'arena>, Error> {
-        let arena = self.arena;
+    fn parse_type_assertion(&mut self) -> Result<ExprRet, Error> {
         let (start, _) = self.current_pos();
 
         // Parse <Type> (`<<` splits when the assertion type is a generic
@@ -2641,15 +2527,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // assertion vs. generic arrow). A *parenthesized* arrow (`<T>(() => {})`) stays a
         // valid operand.
         // one wire level: the operand (the depth limit's count)
-        let parsed = self.nested(1, |p| p.parse_expression_bp(BP_UNARY))?;
+        let parsed = self.nested(1, |p| p.parse_expression_bp(BP_UNARY))?.id();
         let end = self.prev_token_end() as u32;
-        debug_assert_encloses(start as u32, end, parsed, parsed);
+        debug_assert_encloses(self.stores.view(), start as u32, end, parsed, parsed);
         // the pairs the printer adds around the operand, each a level of the output's
         // nesting: the one its position takes (`<T>(<U>x)`), and the shell a broken cast
         // breaks the operand into (`<T>(⏎\tx⏎)`, prettier's `shouldBreakAfterCast`) around
         // any operand but an array or object literal, which expand themselves
         let shell = !matches!(
-            parsed.kind,
+            self.expr(parsed).kind,
             ExpressionKind::ArrayExpression(_) | ExpressionKind::ObjectExpression(_)
         );
         self.count_prefix_operand_pairs(
@@ -2660,16 +2546,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             shell,
         )?;
 
-        Ok(alloc_expr(
-            arena,
-            Expression {
-                span: Span::new(start as u32, end),
-                kind: ExpressionKind::TSTypeAssertion(TSTypeAssertion {
-                    type_annotation,
-                    expression: parsed,
-                }),
-            },
-        ))
+        Ok(self.push_ret(Expression {
+            span: Span::new(start as u32, end),
+            kind: ExpressionKind::TSTypeAssertion(TSTypeAssertion {
+                type_annotation,
+                expression: parsed,
+            }),
+        }))
     }
 
     /// Parse a TypeScript instantiation expression `expr<Type>` from an
@@ -2683,25 +2566,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// ([`Parser::parse_type_arguments_or_rewind`]).
     fn parse_instantiation_expression(
         &mut self,
-        left: &'arena Expression<'arena>,
+        left: ExprId,
         start: u32,
-    ) -> Result<Option<&'arena Expression<'arena>>, Error> {
+    ) -> Result<Option<ExprRet>, Error> {
         // Parse type parameter instantiation: <T, U>
         let Some(type_args) = self.parse_type_arguments_or_rewind(Some((left, start)))? else {
             return Ok(None);
         };
         let end = type_args.span.end;
 
-        Ok(Some(alloc_expr(
-            self.arena,
-            Expression {
-                span: Span::new(start, end),
-                kind: ExpressionKind::TSInstantiationExpression(TSInstantiationExpression {
-                    expression: left,
-                    type_arguments: type_args,
-                }),
-            },
-        )))
+        Ok(Some(self.push_ret(Expression {
+            span: Span::new(start, end),
+            kind: ExpressionKind::TSInstantiationExpression(TSInstantiationExpression {
+                expression: left,
+                type_arguments: type_args,
+            }),
+        })))
     }
 
     /// Parse the type-argument list at the current `<`, which the lookahead admitted
@@ -2769,7 +2649,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// read theirs committed.
     pub(super) fn parse_type_arguments_or_rewind(
         &mut self,
-        operand: Option<(&'arena Expression<'arena>, u32)>,
+        operand: Option<(ExprId, u32)>,
     ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, Error> {
         let lt = self.current.start;
         if self.type_arguments_abandoned_at(lt) {
@@ -2857,7 +2737,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// checkpoint survives the rewind, so it is put back here.
     pub(super) fn type_arguments_follower_settled(
         &mut self,
-        left: &'arena Expression<'arena>,
+        left: ExprId,
         start: u32,
         close_end: usize,
     ) -> bool {
@@ -2964,17 +2844,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// type arguments. Shared by the subscript loop's call and tagged-template arms.
     fn flatten_instantiation(
         &self,
-        expr: &'arena Expression<'arena>,
+        expr: ExprId,
         start: u32,
-    ) -> (
-        &'arena Expression<'arena>,
-        Option<TSTypeParameterInstantiation<'arena>>,
-    ) {
-        match expr {
-            Expression {
-                kind: ExpressionKind::TSInstantiationExpression(inst),
-                ..
-            } if Self::is_bare_instantiation(expr, start) => {
+    ) -> (ExprId, Option<TSTypeParameterInstantiation<'arena>>) {
+        match &self.expr(expr).kind {
+            ExpressionKind::TSInstantiationExpression(inst)
+                if Self::is_bare_instantiation(self.expr(expr), start) =>
+            {
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
                     tsv_lang::ast_census_probe::Dead::Superseded,
@@ -2982,7 +2858,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 );
                 (inst.expression, Some(inst.type_arguments.clone()))
             }
-            other => (other, None),
+            _ => (expr, None),
         }
     }
 
@@ -3022,7 +2898,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Unary operators have higher precedence than all binary operators.
     /// The binding power (29) is higher than exponentiation (27-28).
-    fn parse_unary_expression(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_unary_expression(&mut self) -> Result<ExprRet, Error> {
         let (start, _) = self.current_pos();
 
         let operator = match self.current_kind() {
@@ -3041,12 +2917,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // This allows chained unary: --x, -+x, !!x, ~~x etc.
         // and proper precedence: -a * b parses as (-a) * b
         // one wire level: the operand (the depth limit's count)
-        let parsed = self.nested(1, |p| p.parse_expression_bp(BP_UNARY))?;
+        let parsed = self.nested(1, |p| p.parse_expression_bp(BP_UNARY))?.id();
 
         // End at the operand's last consumed token to include trailing parens in the span
         // (matches Svelte's behavior): `!(a && b)` spans from `!` to `)`, not just to `b`
         let end = self.prev_token_end() as u32;
-        debug_assert_encloses(start as u32, end, parsed, parsed);
+        debug_assert_encloses(self.stores.view(), start as u32, end, parsed, parsed);
         // the pairs the printer adds around the operand (`-(-x)`, `!(/* c */ x)`), levels of
         // the output's nesting
         self.count_prefix_operand_pairs(
@@ -3059,20 +2935,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             false,
         )?;
 
-        Ok(alloc_expr(
-            self.arena,
-            Expression::from_unary_expression(UnaryExpression {
+        Ok(
+            self.push_ret(Expression::from_unary_expression(UnaryExpression {
                 operator,
                 argument: parsed,
                 span: Span::new(start as u32, end),
-            }),
-        ))
+            })),
+        )
     }
 
     /// Parse unary keyword expression: `typeof x`, `void 0`, `delete obj.x`
     ///
     /// These keyword operators have the same precedence as other unary operators.
-    fn parse_unary_keyword_expression(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_unary_keyword_expression(&mut self) -> Result<ExprRet, Error> {
         let (start, _) = self.current_pos();
 
         let operator = match self.current_kind() {
@@ -3088,9 +2963,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse the operand with high binding power (unary is right-associative)
         // one wire level: the operand (the depth limit's count)
-        let parsed = self.nested(1, |p| p.parse_expression_bp(BP_UNARY))?;
+        let parsed = self.nested(1, |p| p.parse_expression_bp(BP_UNARY))?.id();
         let end = self.prev_token_end() as u32;
-        debug_assert_encloses(start as u32, end, parsed, parsed);
+        debug_assert_encloses(self.stores.view(), start as u32, end, parsed, parsed);
         // the pairs the printer adds around the operand (`typeof (<T>x)`,
         // `typeof (/* c */ x)`), levels of the output's nesting
         self.count_prefix_operand_pairs(
@@ -3103,29 +2978,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             false,
         )?;
 
-        Ok(alloc_expr(
-            self.arena,
-            Expression::from_unary_expression(UnaryExpression {
+        Ok(
+            self.push_ret(Expression::from_unary_expression(UnaryExpression {
                 operator,
                 argument: parsed,
                 span: Span::new(start as u32, end),
-            }),
-        ))
+            })),
+        )
     }
 
     /// Parse await expression: `await promise`
     ///
     /// Await expressions have high precedence like unary operators.
-    fn parse_await_expression(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_await_expression(&mut self) -> Result<ExprRet, Error> {
         let (start, _) = self.current_pos();
         self.advance()?; // consume 'await'
         let operand_token = self.current_pos().0;
 
         // Parse the operand with high binding power (same as unary)
         // one wire level: the operand (the depth limit's count)
-        let parsed = self.nested(1, |p| p.parse_expression_bp(BP_UNARY))?;
+        let parsed = self.nested(1, |p| p.parse_expression_bp(BP_UNARY))?.id();
         let end = self.prev_token_end() as u32;
-        debug_assert_encloses(start as u32, end, parsed, parsed);
+        debug_assert_encloses(self.stores.view(), start as u32, end, parsed, parsed);
         // the pair the printer adds around the operand (`await (<T>x)`), a level of the
         // output's nesting
         self.count_prefix_operand_pairs(
@@ -3136,13 +3010,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             false,
         )?;
 
-        Ok(alloc_expr(
-            self.arena,
-            Expression {
-                span: Span::new(start as u32, end),
-                kind: ExpressionKind::AwaitExpression(AwaitExpression { argument: parsed }),
-            },
-        ))
+        Ok(self.push_ret(Expression {
+            span: Span::new(start as u32, end),
+            kind: ExpressionKind::AwaitExpression(AwaitExpression { argument: parsed }),
+        }))
     }
 
     /// Consume the current keyword token as an ordinary `IdentifierReference`.
@@ -3154,17 +3025,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// here in a `[+Await]` / `[+Yield]` context would silently turn an operator
     /// into a name. Used for a primary reference and a `new` callee (`new await()`,
     /// `new yield()`).
-    fn parse_keyword_identifier_reference(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_keyword_identifier_reference(&mut self) -> Result<ExprRet, Error> {
         let (start, end) = self.current_pos();
         let name = self.current_raw_ident_name();
         self.advance()?;
-        Ok(alloc_expr(
-            self.arena,
-            Expression::from_identifier(Identifier::simple(
+        Ok(
+            self.push_ret(Expression::from_identifier(Identifier::simple(
                 name,
                 Span::new(start as u32, end as u32),
-            )),
-        ))
+            ))),
+        )
     }
 
     /// [`Parser::parse_keyword_identifier_reference`] for `await` read as a name, noting
@@ -3175,7 +3045,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (`isAwaitExpression`) — so `Parser::parse` marks that error a goal gate. A line
     /// break after the name closes the statement by ASI, so a token past one is no
     /// operand.
-    fn parse_await_name_reference(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_await_name_reference(&mut self) -> Result<ExprRet, Error> {
         let reference = self.parse_keyword_identifier_reference()?;
         if self.in_await_if_module && !self.had_line_terminator {
             self.await_name_operand = Some(self.current_pos().0);
@@ -3189,7 +3059,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - `yield` with no argument yields undefined
     /// - `yield value` yields the given value
     /// - `yield* iterable` delegates to another generator/iterable
-    fn parse_yield_expression(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_yield_expression(&mut self) -> Result<ExprRet, Error> {
         let (start, yield_end) = self.current_pos();
         self.advance()?; // consume 'yield'
 
@@ -3224,35 +3094,36 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // true`), so a consequent's bar does not reach `a ? yield (b): c => d : e`.
         let (argument, end) = if delegate {
             // yield* requires an argument
-            let parsed = self.nested(1, |p| {
-                p.with_arrow_return_type_allowed(|p| p.parse_expression_bp(BP_YIELD))
-            })?;
+            let parsed = self
+                .nested(1, |p| {
+                    p.with_arrow_return_type_allowed(|p| p.parse_expression_bp(BP_YIELD))
+                })?
+                .id();
             let end = self.prev_token_end() as u32;
-            debug_assert_encloses(start as u32, end, parsed, parsed);
+            debug_assert_encloses(self.stores.view(), start as u32, end, parsed, parsed);
             (Some(parsed), end)
         } else if self.can_insert_semicolon() || matches!(self.current_kind(), TokenKind::Eof) {
             // No argument - yield with no value
             (None, yield_end as u32)
         } else if self.is_expression_start() {
             // Parse the argument
-            let parsed = self.nested(1, |p| {
-                p.with_arrow_return_type_allowed(|p| p.parse_expression_bp(BP_YIELD))
-            })?;
+            let parsed = self
+                .nested(1, |p| {
+                    p.with_arrow_return_type_allowed(|p| p.parse_expression_bp(BP_YIELD))
+                })?
+                .id();
             let end = self.prev_token_end() as u32;
-            debug_assert_encloses(start as u32, end, parsed, parsed);
+            debug_assert_encloses(self.stores.view(), start as u32, end, parsed, parsed);
             (Some(parsed), end)
         } else {
             // No argument
             (None, yield_end as u32)
         };
 
-        Ok(alloc_expr(
-            self.arena,
-            Expression {
-                span: Span::new(start as u32, end),
-                kind: ExpressionKind::YieldExpression(YieldExpression { argument, delegate }),
-            },
-        ))
+        Ok(self.push_ret(Expression {
+            span: Span::new(start as u32, end),
+            kind: ExpressionKind::YieldExpression(YieldExpression { argument, delegate }),
+        }))
     }
 
     /// Check if the current token can start an expression
@@ -3298,7 +3169,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse prefix update expression: `++x`, `--x`
     ///
     /// Prefix increment/decrement has the same precedence as unary operators.
-    fn parse_prefix_update_expression(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_prefix_update_expression(&mut self) -> Result<ExprRet, Error> {
         let (start, _) = self.current_pos();
 
         let operator = match self.current_kind() {
@@ -3314,10 +3185,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse the operand - update expressions apply to member expressions or identifiers
         // Use high binding power so ++x.y parses correctly
         // one wire level: the operand (the depth limit's count)
-        let parsed = self.nested(1, |p| p.parse_expression_bp(BP_UNARY))?;
+        let parsed = self.nested(1, |p| p.parse_expression_bp(BP_UNARY))?.id();
 
         let end = self.prev_token_end() as u32;
-        debug_assert_encloses(start as u32, end, parsed, parsed);
+        debug_assert_encloses(self.stores.view(), start as u32, end, parsed, parsed);
         // the pair the printer adds around the operand (`++(-x)`), a level of the output's
         // nesting
         self.count_prefix_operand_pairs(
@@ -3328,17 +3199,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             false,
         )?;
 
-        Ok(alloc_expr(
-            self.arena,
-            Expression {
-                span: Span::new(start as u32, end),
-                kind: ExpressionKind::UpdateExpression(UpdateExpression {
-                    operator,
-                    argument: parsed,
-                    prefix: true,
-                }),
-            },
-        ))
+        Ok(self.push_ret(Expression {
+            span: Span::new(start as u32, end),
+            kind: ExpressionKind::UpdateExpression(UpdateExpression {
+                operator,
+                argument: parsed,
+                prefix: true,
+            }),
+        }))
     }
 
     /// Parse new expression: `new Date()`, `new Map()`, `new Foo.Bar()`
@@ -3346,7 +3214,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// The `new` keyword has the same precedence as unary operators.
     /// It takes a callee (identifier or member expression) and optional arguments.
-    fn parse_new_expression(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_new_expression(&mut self) -> Result<ExprRet, Error> {
         self.parse_new_expression_in(false)
     }
 
@@ -3358,19 +3226,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         heritage: bool,
         is_async_function: bool,
         callee_start: u32,
-    ) -> Result<
-        (
-            &'arena Expression<'arena>,
-            Option<TSTypeParameterInstantiation<'arena>>,
-        ),
-        Error,
-    > {
-        let arena = self.arena;
-        let callee_parsed = self.parse_new_callee(is_async_function)?;
+    ) -> Result<(ExprId, Option<TSTypeParameterInstantiation<'arena>>), Error> {
+        let callee_parsed = self.parse_new_callee(is_async_function)?.id();
 
         // A bare arrow is an `AssignmentExpression`, never the `MemberExpression` a `new`
         // callee is: `new () => a` is a syntax error where `new (() => a)` constructs.
-        if is_bare_assignment_head(callee_parsed, callee_start as usize, false) {
+        if is_bare_assignment_head(self.expr(callee_parsed), callee_start as usize, false) {
             return Err(Error::invalid_syntax(
                 "An arrow function cannot be a `new` callee without parentheses".to_string(),
                 callee_start as usize,
@@ -3397,44 +3258,37 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let (property, prop_end) = self.parse_dot_property()?;
 
                     let span = Span::new(callee_start, prop_end as u32);
-                    #[cfg(feature = "_internal_ast_census")]
-                    tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-                    callee = alloc_expr(
-                        self.arena,
-                        Expression {
-                            span,
-                            kind: ExpressionKind::MemberExpression(MemberExpression {
-                                object: callee,
-                                property: arena.alloc(property),
-                                computed: false,
-                                optional: false,
-                            }),
-                        },
-                    );
+                    let property = self.push_expr(property);
+                    callee = self.push_expr(Expression {
+                        span,
+                        kind: ExpressionKind::MemberExpression(MemberExpression {
+                            object: callee,
+                            property,
+                            computed: false,
+                            optional: false,
+                        }),
+                    });
                 }
                 TokenKind::BracketOpen => {
                     let units = self.member_link_units(callee);
                     self.spine_link(units)?;
                     self.advance()?; // consume '['
                     self.enter_grouping()?;
-                    let index = self.parse_expression_ref()?;
+                    let index = self.parse_expression()?.id();
                     let (_, bracket_end) = self.current_pos();
                     self.expect(&TokenKind::BracketClose)?;
                     self.exit_grouping();
 
                     let span = Span::new(callee_start, bracket_end as u32);
-                    callee = alloc_expr(
-                        self.arena,
-                        Expression {
-                            span,
-                            kind: ExpressionKind::MemberExpression(MemberExpression {
-                                object: callee,
-                                property: index,
-                                computed: true,
-                                optional: false,
-                            }),
-                        },
-                    );
+                    callee = self.push_expr(Expression {
+                        span,
+                        kind: ExpressionKind::MemberExpression(MemberExpression {
+                            object: callee,
+                            property: index,
+                            computed: true,
+                            optional: false,
+                        }),
+                    });
                 }
                 TokenKind::QuestionDot => {
                     // An optional chain can't be a `new` callee (per spec): `new a?.b()`
@@ -3449,7 +3303,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // then binds as the `new` argument list, not a call on the callee.
                     let units = self.non_null_link_units(callee);
                     self.spine_link(units)?;
-                    callee = self.wrap_non_null_assertion(callee, callee_start)?;
+                    callee = self.wrap_non_null_assertion(callee, callee_start)?.id();
                 }
                 TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
                     // A tagged template extends the callee itself: `new Foo`x`` is
@@ -3458,7 +3312,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // includes `MemberExpression TemplateLiteral` — so a trailing tag
                     // before any explicit `(...)` binds to the callee, not the `new`.
                     self.spine_link(LINK_TAG)?;
-                    callee = self.attach_new_callee_tag(callee, callee_start, None)?;
+                    callee = self.attach_new_callee_tag(callee, callee_start, None)?.id();
                 }
                 // `<T>` here is either the tag's type arguments (`new Foo<T>`x``,
                 // where they flatten onto a TaggedTemplateExpression callee — acorn
@@ -3479,32 +3333,31 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.spine_link(LINK_TAG)?;
                     // the pair the printer keeps around an instantiation that takes a
                     // second list (`new (a.b<T>)<U>()`), a level of the output's nesting
-                    if Self::is_bare_instantiation(callee, callee_start) {
+                    if Self::is_bare_instantiation(self.expr(callee), callee_start) {
                         self.printer_pair()?;
                     }
                     if matches!(
                         self.current_kind(),
                         TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead
                     ) {
-                        callee = self.attach_new_callee_tag(callee, callee_start, Some(ta))?;
+                        callee = self
+                            .attach_new_callee_tag(callee, callee_start, Some(ta))?
+                            .id();
                     } else if self.new_callee_continues_past_type_args() {
                         // The list stays on the callee as an instantiation and the chain
                         // goes on: a second list tsc's comparison could not take
                         // (`new a.b<T><U>()` constructs `a.b<T>` with `<U>`,
                         // acorn-typescript's tree) or a member past a line break
                         // (`new f<T>⏎[x](y)` constructs `f<T>[x]`, tsc's and acorn's).
-                        callee = alloc_expr(
-                            arena,
-                            Expression {
-                                span: Span::new(callee_start, ta.span.end),
-                                kind: ExpressionKind::TSInstantiationExpression(
-                                    TSInstantiationExpression {
-                                        expression: callee,
-                                        type_arguments: ta,
-                                    },
-                                ),
-                            },
-                        );
+                        callee = self.push_expr(Expression {
+                            span: Span::new(callee_start, ta.span.end),
+                            kind: ExpressionKind::TSInstantiationExpression(
+                                TSInstantiationExpression {
+                                    expression: callee,
+                                    type_arguments: ta,
+                                },
+                            ),
+                        });
                     } else {
                         type_arguments = Some(ta);
                         break;
@@ -3519,10 +3372,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The callee of a `new` ([`Parser::parse_new_expression_in`]) up to its member chain:
     /// an `async function` (`is_async_function`, asked by the caller), another `new`, a
     /// function or class expression, `import.meta`, or a primary.
-    fn parse_new_callee(
-        &mut self,
-        is_async_function: bool,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_new_callee(&mut self, is_async_function: bool) -> Result<ExprRet, Error> {
         if is_async_function {
             // Async function expression: `new async function() {}`
             let (start, _) = self.current_pos();
@@ -3547,7 +3397,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // import()").
                 let (import_start, _) = self.current_pos();
                 let parsed = self.parse_import_or_meta_property()?;
-                if matches!(parsed.kind, ExpressionKind::ImportExpression(_)) {
+                if matches!(
+                    self.expr(parsed.id()).kind,
+                    ExpressionKind::ImportExpression(_)
+                ) {
                     return Err(self.error_msg_at("Cannot use new with import()", import_start));
                 }
                 Ok(parsed)
@@ -3560,10 +3413,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// [`Parser::parse_new_expression`], told whether the `new` is a class heritage's
     /// superclass (`heritage`), where its callee's type-argument lists have no comparison
     /// reading to fall back to ([`Parser::parse_type_arguments_or_rewind`]).
-    fn parse_new_expression_in(
-        &mut self,
-        heritage: bool,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_new_expression_in(&mut self, heritage: bool) -> Result<ExprRet, Error> {
         let arena = self.arena;
         let (start, new_end) = self.current_pos();
         self.advance()?; // consume 'new'
@@ -3580,19 +3430,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let prop_span = Span::new(prop_start as u32, prop_end as u32);
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::mint::<MetaProperty<'arena>>(1);
-                return Ok(alloc_expr(
-                    arena,
-                    Expression {
-                        span: Span::new(start as u32, prop_end as u32),
-                        kind: ExpressionKind::MetaProperty(arena.alloc(MetaProperty {
-                            meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
-                            property: Identifier::simple(
-                                IdentName::from_span(prop_span),
-                                prop_span,
-                            ),
-                        })),
-                    },
-                ));
+                return Ok(self.push_ret(Expression {
+                    span: Span::new(start as u32, prop_end as u32),
+                    kind: ExpressionKind::MetaProperty(arena.alloc(MetaProperty {
+                        meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
+                        property: Identifier::simple(IdentName::from_span(prop_span), prop_span),
+                    })),
+                }));
             }
             return Err(self.error_expected_after("'target'", "new."));
         }
@@ -3616,57 +3460,53 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `Arguments` grouping delimiter, so it shares `parse_call_arguments` (which
         // bumps `grouping_depth`) — `in` is a binary operator inside the arguments even
         // in a for-header init, matching call arguments (ecma262 `ArgumentList[+In]`).
-        let (arguments, end): (&'arena [&'arena Expression<'arena>], u32) =
-            if self.eat(TokenKind::ParenOpen)? {
-                let (args, paren_end) = self.parse_call_arguments()?;
-                (args.into_bump_slice(), paren_end as u32)
-            } else {
-                // new Date without parens - valid JS; bare instantiation type args
-                // (`new A<T>`) extend the span past the callee. A bare `new A<T>`
-                // (type args, no call arguments) is instantiation-style: like `f<T>`
-                // it can't be followed by a property access (`new A<T>.x` rejects);
-                // `new A<T>()` took the `(` branch above, so its later `.prop` is an
-                // ordinary member access.
-                if type_arguments.is_some() {
-                    // An argument-less `new` cannot head an optional call, and the list
-                    // cannot extend its callee into one (tsc TS1209): no argument list is
-                    // inferred ahead of the `?.` for the chain to start from. A `?.` that
-                    // opens a property access is refused below, as after any list.
-                    if matches!(self.current_kind(), TokenKind::QuestionDot)
-                        && self.peek_is(&TokenKind::ParenOpen)
-                    {
-                        return Err(self.error_msg(
-                            "Optional chaining cannot appear in the callee of new expressions",
-                        ));
-                    }
-                    self.reject_instantiation_follower()?;
+        let (arguments, end): (Run<ExprId>, u32) = if self.eat(TokenKind::ParenOpen)? {
+            let (args, paren_end) = self.parse_call_arguments()?;
+            (args, paren_end as u32)
+        } else {
+            // new Date without parens - valid JS; bare instantiation type args
+            // (`new A<T>`) extend the span past the callee. A bare `new A<T>`
+            // (type args, no call arguments) is instantiation-style: like `f<T>`
+            // it can't be followed by a property access (`new A<T>.x` rejects);
+            // `new A<T>()` took the `(` branch above, so its later `.prop` is an
+            // ordinary member access.
+            if type_arguments.is_some() {
+                // An argument-less `new` cannot head an optional call, and the list
+                // cannot extend its callee into one (tsc TS1209): no argument list is
+                // inferred ahead of the `?.` for the chain to start from. A `?.` that
+                // opens a property access is refused below, as after any list.
+                if matches!(self.current_kind(), TokenKind::QuestionDot)
+                    && self.peek_is(&TokenKind::ParenOpen)
+                {
+                    return Err(self.error_msg(
+                        "Optional chaining cannot appear in the callee of new expressions",
+                    ));
                 }
-                let end = type_arguments
-                    .as_ref()
-                    .map_or_else(|| self.prev_token_end() as u32, |ta| ta.span.end);
-                // the argument list the printer writes (`new A()`), a grouping delimiter
-                // and so a level of the output's nesting
-                self.printer_pair()?;
-                (&[], end)
-            };
+                self.reject_instantiation_follower()?;
+            }
+            let end = type_arguments
+                .as_ref()
+                .map_or_else(|| self.prev_token_end() as u32, |ta| ta.span.end);
+            // the argument list the printer writes (`new A()`), a grouping delimiter
+            // and so a level of the output's nesting
+            self.printer_pair()?;
+            (Run::EMPTY, end)
+        };
 
         // the pair the printer adds around a bare callee it parenthesizes (`new (class {})()`),
         // a level of the output's nesting
-        if callee.span().start == callee_start {
+        if self.expr(callee).span().start == callee_start {
             self.count_operand_pairs(Some((callee, ParenContext::NewCallee)), None)?;
         }
 
-        Ok(alloc_expr(
-            arena,
-            Expression {
-                span: Span::new(start as u32, end),
-                kind: ExpressionKind::NewExpression(NewExpression {
-                    callee,
-                    type_arguments,
-                    arguments,
-                }),
-            },
-        ))
+        Ok(self.push_ret(Expression {
+            span: Span::new(start as u32, end),
+            kind: ExpressionKind::NewExpression(NewExpression {
+                callee,
+                type_arguments,
+                arguments,
+            }),
+        }))
     }
 
     /// Whether a `new` callee's type argument list, just parsed and followed by no
@@ -3721,10 +3561,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// that).
     fn attach_new_callee_tag(
         &mut self,
-        tag: &'arena Expression<'arena>,
+        tag: ExprId,
         tag_start: u32,
         type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    ) -> Result<ExprRet, Error> {
         // one wire level: the quasi's `TemplateLiteral` under its tag node
         let template = self.nested(1, |p| p.parse_template_literal(true))?;
         Ok(self.build_tagged_template(tag, tag_start, type_arguments, template))
@@ -3739,28 +3579,25 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `TSInstantiationExpression` off the tag first (via `flatten_instantiation`),
     /// lifting `<T>` into `type_arguments`.
     fn build_tagged_template(
-        &self,
-        tag: &'arena Expression<'arena>,
+        &mut self,
+        tag: ExprId,
         tag_start: u32,
         type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
         quasi: TemplateLiteral<'arena>,
-    ) -> &'arena Expression<'arena> {
+    ) -> ExprRet {
         let end = quasi.span.end;
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<TaggedTemplateExpression<'arena>>(1);
-        alloc_expr(
-            self.arena,
-            Expression {
-                span: Span::new(tag_start, end),
-                kind: ExpressionKind::TaggedTemplateExpression(self.arena.alloc(
-                    TaggedTemplateExpression {
-                        tag,
-                        type_arguments,
-                        quasi,
-                    },
-                )),
-            },
-        )
+        self.push_ret(Expression {
+            span: Span::new(tag_start, end),
+            kind: ExpressionKind::TaggedTemplateExpression(self.arena.alloc(
+                TaggedTemplateExpression {
+                    tag,
+                    type_arguments,
+                    quasi,
+                },
+            )),
+        })
     }
 
     /// Reject a spread element where an `ImportCall` argument (an
@@ -3783,7 +3620,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - `import.source('module')` / `import.defer('module')` - phased dynamic
     ///   import (the source-phase-imports / import-defer proposals)
     /// - `import.meta` - meta property
-    fn parse_import_or_meta_property(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_import_or_meta_property(&mut self) -> Result<ExprRet, Error> {
         let (start, import_end) = self.current_pos();
         self.advance()?; // consume 'import'
 
@@ -3805,19 +3642,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let prop_span = Span::new(prop_start as u32, prop_end as u32);
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::mint::<MetaProperty<'arena>>(1);
-                return Ok(alloc_expr(
-                    self.arena,
-                    Expression {
-                        span: Span::new(start as u32, prop_end as u32),
-                        kind: ExpressionKind::MetaProperty(self.arena.alloc(MetaProperty {
-                            meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
-                            property: Identifier::simple(
-                                IdentName::from_span(prop_span),
-                                prop_span,
-                            ),
-                        })),
-                    },
-                ));
+                return Ok(self.push_ret(Expression {
+                    span: Span::new(start as u32, prop_end as u32),
+                    kind: ExpressionKind::MetaProperty(self.arena.alloc(MetaProperty {
+                        meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
+                        property: Identifier::simple(IdentName::from_span(prop_span), prop_span),
+                    })),
+                }));
             }
             // `import.source(…)` / `import.defer(…)` — the import-phase proposals.
             // The phase keyword must be immediately followed by the `(` call: a bare
@@ -3847,7 +3678,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.reject_import_call_spread()?;
 
         // Parse the source expression (usually a string literal)
-        let source = self.parse_assignment_expression_ref()?;
+        let source = self.parse_assignment_expression()?.id();
 
         // The `ImportCall` grammar allows an optional trailing comma after the
         // source (1-arg form) and after the options (2-arg form):
@@ -3858,10 +3689,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // grammar and still error at the `)` below — a deliberate divergence
         // from acorn-typescript, which accepts 3+ args and rejects the trailing
         // comma. See docs/conformance_svelte.md.
-        let mut options: Option<&'arena Expression<'arena>> = None;
+        let mut options: Option<ExprId> = None;
         if self.eat(TokenKind::Comma)? && !self.check(&TokenKind::ParenClose) {
             self.reject_import_call_spread()?; // the options arg is likewise no spread
-            options = Some(self.parse_assignment_expression_ref()?);
+            options = Some(self.parse_assignment_expression()?.id());
             self.eat(TokenKind::Comma)?; // optional trailing comma after the options
         }
 
@@ -3870,17 +3701,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::ParenClose)?;
         self.exit_grouping();
 
-        Ok(alloc_expr(
-            self.arena,
-            Expression {
-                span: Span::new(start as u32, paren_end as u32),
-                kind: ExpressionKind::ImportExpression(ImportExpression {
-                    source,
-                    options,
-                    phase,
-                }),
-            },
-        ))
+        Ok(self.push_ret(Expression {
+            span: Span::new(start as u32, paren_end as u32),
+            kind: ExpressionKind::ImportExpression(ImportExpression {
+                source,
+                options,
+                phase,
+            }),
+        }))
     }
 
     /// Parse a block statement: `{ stmt1; stmt2; }`
@@ -3977,28 +3805,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// error: `parse_primary_expression` does not accept it, so spread stays
     /// confined to exactly these list contexts (object literals and parameter
     /// lists build their own spread/rest nodes inline).
-    pub(super) fn parse_spread_or_assignment_element(
-        &mut self,
-    ) -> Result<&'arena Expression<'arena>, Error> {
+    pub(super) fn parse_spread_or_assignment_element(&mut self) -> Result<ExprRet, Error> {
         if matches!(self.current_kind(), TokenKind::DotDotDot) {
             self.parse_spread_element()
         } else {
-            self.parse_assignment_expression_ref()
+            self.parse_assignment_expression()
         }
     }
 
     /// Parse spread element: `...expr`
-    fn parse_spread_element(&mut self) -> Result<&'arena Expression<'arena>, Error> {
+    fn parse_spread_element(&mut self) -> Result<ExprRet, Error> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::DotDotDot)?; // consume '...'
         let operand_token = self.current_pos().0;
 
         // Use assignment_expression because comma separates array elements/object properties;
         // one wire level: the `SpreadElement` over its argument (the depth limit's count)
-        let argument = self.nested(1, Self::parse_assignment_expression_ref)?;
+        let argument = self.nested(1, Self::parse_assignment_expression)?.id();
         // Use prev_token_end() to include closing paren when argument is parenthesized
         let end = self.prev_token_end() as u32;
-        debug_assert_encloses(start as u32, end, argument, argument);
+        debug_assert_encloses(self.stores.view(), start as u32, end, argument, argument);
         // the pair the printer adds around the argument (`...(a || b)`), a level of the
         // output's nesting
         self.count_prefix_operand_pairs(
@@ -4008,14 +3834,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             None,
             false,
         )?;
-
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-        Ok(self
-            .arena
-            .alloc(Expression::from_spread_element(SpreadElement {
+        Ok(
+            self.push_ret(Expression::from_spread_element(SpreadElement {
                 argument,
                 span: Span::new(start as u32, end),
-            })))
+            })),
+        )
     }
 }

@@ -29,7 +29,7 @@ use std::borrow::Cow;
 use tsv_css::ast::CssStyleSheet;
 pub use tsv_lang::{Comment, Span};
 use tsv_ts::ast::{
-    AstStores, ExprEdge, ExprRun, ExprView, OptExprEdge, Program, TSTypeParameterDeclaration,
+    AstStores, Expr, ExprId, ExprView, Program, Run, TSTypeParameterDeclaration,
     VariableDeclaration,
 };
 
@@ -99,7 +99,7 @@ pub struct Root<'arena> {
     /// The wire's parameter lists for the `{#snippet}` heads that hold a grouping pair,
     /// ascending by [`SnippetWireParameters::snippet_start`] — see
     /// [`SnippetWireParameters`].
-    pub snippet_wire_parameters: &'arena [SnippetWireParameters<'arena>],
+    pub snippet_wire_parameters: &'arena [SnippetWireParameters],
     /// Whether the parser read a `<script>` / `<style>` nested in the markup — a raw-text
     /// element anywhere in `fragment`, as opposed to the lifted top-level `instance` /
     /// `module` / `css`. Recorded where the parser already knows it, so the printer can skip
@@ -122,10 +122,10 @@ pub struct Root<'arena> {
 /// field on the block because `SnippetBlock` sets `FragmentNode`'s width, which every
 /// template node pays, for a list no printer reads.
 #[derive(Debug, Clone, Copy)]
-pub struct SnippetWireParameters<'arena> {
+pub struct SnippetWireParameters {
     /// The snippet block's `span.start` — the key the writer finds the list by.
     pub snippet_start: u32,
-    pub parameters: ExprRun<'arena>,
+    pub parameters: Run<Expr>,
 }
 
 /// Svelte Fragment - container for template nodes
@@ -148,7 +148,7 @@ pub struct Fragment<'arena> {
 pub enum FragmentNode<'arena> {
     Element(Element<'arena>),
     SpecialElement(SpecialElement<'arena>),
-    ExpressionTag(ExpressionTag<'arena>),
+    ExpressionTag(ExpressionTag),
     Text(Text),
     Comment(HtmlComment),
     IfBlock(IfBlock<'arena>),
@@ -156,11 +156,11 @@ pub enum FragmentNode<'arena> {
     AwaitBlock(AwaitBlock<'arena>),
     KeyBlock(KeyBlock<'arena>),
     SnippetBlock(SnippetBlock<'arena>),
-    HtmlTag(HtmlTag<'arena>),
-    ConstTag(ConstTag<'arena>),
+    HtmlTag(HtmlTag),
+    ConstTag(ConstTag),
     DeclarationTag(DeclarationTag<'arena>),
-    DebugTag(DebugTag<'arena>),
-    RenderTag(RenderTag<'arena>),
+    DebugTag(DebugTag),
+    RenderTag(RenderTag),
 }
 
 /// HTML comment node: <!-- content -->
@@ -195,7 +195,7 @@ impl HtmlComment {
 #[derive(Debug, Clone)]
 pub struct IfBlock<'arena> {
     pub elseif: bool,
-    pub test: ExprEdge<'arena>,
+    pub test: ExprId,
     pub consequent: Fragment<'arena>,
     pub alternate: Option<Fragment<'arena>>,
     pub span: Span,
@@ -209,10 +209,10 @@ pub struct IfBlock<'arena> {
 /// Also supports {#each expression} and {#each expression, index} without `as`.
 #[derive(Debug, Clone)]
 pub struct EachBlock<'arena> {
-    pub expression: ExprEdge<'arena>,
-    pub context: OptExprEdge<'arena>, // Pattern (identifier or destructuring), None if no `as`
+    pub expression: ExprId,
+    pub context: Option<ExprId>, // Pattern (identifier or destructuring), None if no `as`
     pub index: Option<&'arena str>,
-    pub key: Option<EachKey<'arena>>,
+    pub key: Option<EachKey>,
     pub body: Fragment<'arena>,
     pub fallback: Option<Fragment<'arena>>,
     pub span: Span,
@@ -230,8 +230,8 @@ pub struct EachBlock<'arena> {
 /// them did, and one silently widened its comment window back over the binding
 /// pattern.
 #[derive(Debug, Clone)]
-pub struct EachKey<'arena> {
-    pub expression: ExprEdge<'arena>,
+pub struct EachKey {
+    pub expression: ExprId,
     /// Span of the key INCLUDING its parentheses — `(` through past `)`.
     pub span: Span,
 }
@@ -242,9 +242,9 @@ pub struct EachKey<'arena> {
 /// Also supports shorthand: {#await expression then value}...{/await}
 #[derive(Debug, Clone)]
 pub struct AwaitBlock<'arena> {
-    pub expression: ExprEdge<'arena>,
-    pub value: OptExprEdge<'arena>, // Pattern for :then binding
-    pub error: OptExprEdge<'arena>, // Pattern for :catch binding
+    pub expression: ExprId,
+    pub value: Option<ExprId>, // Pattern for :then binding
+    pub error: Option<ExprId>, // Pattern for :catch binding
     /// The pending-phase **content** (`{#await x}<here>{:then}…`), or `None` when
     /// empty. Distinct from `pending_block`: an empty block-form pending is `None`
     /// here but `pending_block == true`. The printer reads this (an empty pending
@@ -271,7 +271,7 @@ pub struct AwaitBlock<'arena> {
 /// Forces re-creation of contents when expression changes.
 #[derive(Debug, Clone)]
 pub struct KeyBlock<'arena> {
-    pub expression: ExprEdge<'arena>,
+    pub expression: ExprId,
     pub fragment: Fragment<'arena>,
     pub span: Span,
     /// Span of the opening tag `{#key ... }` for comment lookup
@@ -284,7 +284,7 @@ pub struct KeyBlock<'arena> {
 /// Defines a reusable chunk of markup that can be rendered with {@render}.
 #[derive(Debug, Clone)]
 pub struct SnippetBlock<'arena> {
-    pub expression: ExprEdge<'arena>, // Snippet name (Identifier)
+    pub expression: ExprId, // Snippet name (Identifier)
     /// Parsed generic type parameters (`<T extends X = Y>`), routed through
     /// `tsv_ts`'s type-parameter printer for constraint/default/modifier
     /// handling and width-based wrapping. `Some` whenever `type_params_raw` is
@@ -298,7 +298,7 @@ pub struct SnippetBlock<'arena> {
     /// with the same text parses to, so the printer and the compiler read the head exactly
     /// as they read that signature, re-deriving every grouping pair from precedence. The
     /// wire's own shape of a head that holds a pair is [`Root::snippet_wire_parameters`].
-    pub parameters: ExprRun<'arena>,
+    pub parameters: Run<Expr>,
     /// Source span of the parameter parens: `start` is the `(`, `end` is the `)`
     /// (for leading / dangling / trailing comment lookup when printing parameters).
     /// `None` only if no `(` was found (malformed).
@@ -314,8 +314,8 @@ pub struct SnippetBlock<'arena> {
 /// Represents {@html expression} tags.
 /// Injects raw HTML content without escaping.
 #[derive(Debug, Clone)]
-pub struct HtmlTag<'arena> {
-    pub expression: ExprEdge<'arena>,
+pub struct HtmlTag {
+    pub expression: ExprId,
     pub span: Span,
 }
 
@@ -325,9 +325,9 @@ pub struct HtmlTag<'arena> {
 /// Declares a local constant within a block scope.
 /// The `id` is the pattern (identifier or destructuring) and `init` is the value.
 #[derive(Debug, Clone)]
-pub struct ConstTag<'arena> {
-    pub id: ExprEdge<'arena>,   // Pattern (identifier or destructuring)
-    pub init: ExprEdge<'arena>, // Initializer expression
+pub struct ConstTag {
+    pub id: ExprId,   // Pattern (identifier or destructuring)
+    pub init: ExprId, // Initializer expression
     pub span: Span,
 }
 
@@ -353,8 +353,8 @@ pub struct DeclarationTag<'arena> {
 /// within debug tags. Comments are stored in `Root.comments` and looked
 /// up by span during formatting. This is an intentional divergence.
 #[derive(Debug, Clone)]
-pub struct DebugTag<'arena> {
-    pub identifiers: ExprRun<'arena>, // List of identifiers to debug
+pub struct DebugTag {
+    pub identifiers: Run<ExprId>, // List of identifiers to debug
     pub span: Span,
 }
 
@@ -363,8 +363,8 @@ pub struct DebugTag<'arena> {
 /// Represents {@render fn()} or {@render fn?.()} tags.
 /// Renders a snippet, optionally with arguments.
 #[derive(Debug, Clone)]
-pub struct RenderTag<'arena> {
-    pub expression: ExprEdge<'arena>, // CallExpression or ChainExpression
+pub struct RenderTag {
+    pub expression: ExprId, // CallExpression or ChainExpression
     pub span: Span,
 }
 
@@ -373,8 +373,8 @@ pub struct RenderTag<'arena> {
 /// Represents {@attach expr} inside element opening tags.
 /// Attaches reactive functions to elements (Svelte 5.29+).
 #[derive(Debug, Clone)]
-pub struct AttachTag<'arena> {
-    pub expression: ExprEdge<'arena>,
+pub struct AttachTag {
+    pub expression: ExprId,
     pub span: Span,
 }
 
@@ -393,7 +393,7 @@ pub struct OnDirective<'arena> {
     /// `name_span.extract(source)`. Distinct from `head_span` below, which is the whole
     /// directive head token ("on:click|preventDefault", prefix + name + modifiers).
     pub name_span: Span,
-    pub expression: OptExprEdge<'arena>,  // Handler function
+    pub expression: Option<ExprId>,       // Handler function
     pub modifiers: &'arena [&'arena str], // "preventDefault", "stopPropagation", etc.
     pub span: Span,
     /// Span of the whole directive head (`on:click|preventDefault`); used as `name_loc`.
@@ -410,7 +410,7 @@ pub struct OnDirective<'arena> {
 pub struct BindDirective<'arena> {
     /// Span of the property name only (e.g. "value") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: ExprEdge<'arena>, // Binding target (always present - auto-generated for shorthand)
+    pub expression: ExprId, // Binding target (always present - auto-generated for shorthand)
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -426,7 +426,7 @@ pub struct BindDirective<'arena> {
 pub struct ClassDirective<'arena> {
     /// Span of the class name only (e.g. "class1") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: ExprEdge<'arena>, // Condition (always present - auto-generated for shorthand)
+    pub expression: ExprId, // Condition (always present - auto-generated for shorthand)
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -456,9 +456,9 @@ pub enum StyleDirectiveValue<'arena> {
     /// Shorthand: `style:color` (uses variable with same name)
     True,
     /// Pure expression: `style:color={value}`
-    ExpressionTag(ExpressionTag<'arena>),
+    ExpressionTag(ExpressionTag),
     /// Mixed value (string with possible expressions): `style:color="red"`
-    Parts(&'arena [AttributeValue<'arena>]),
+    Parts(&'arena [AttributeValue]),
 }
 
 /// UseDirective - action (`use:action={params}`)
@@ -468,7 +468,7 @@ pub enum StyleDirectiveValue<'arena> {
 pub struct UseDirective<'arena> {
     /// Span of the action name only (e.g. "action") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: OptExprEdge<'arena>, // Parameters passed to the action
+    pub expression: Option<ExprId>, // Parameters passed to the action
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -529,7 +529,7 @@ impl TransitionDirection {
 pub struct TransitionDirective<'arena> {
     /// Span of the transition name only (e.g. "fade") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: OptExprEdge<'arena>,  // Transition parameters
+    pub expression: Option<ExprId>,       // Transition parameters
     pub modifiers: &'arena [&'arena str], // "local", "global"
     pub direction: TransitionDirection,   // Which animations to run
     pub span: Span,
@@ -545,7 +545,7 @@ pub struct TransitionDirective<'arena> {
 pub struct AnimateDirective<'arena> {
     /// Span of the animation name only (e.g. "flip") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: OptExprEdge<'arena>,  // Animation parameters
+    pub expression: Option<ExprId>,       // Animation parameters
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -560,7 +560,7 @@ pub struct AnimateDirective<'arena> {
 pub struct LetDirective<'arena> {
     /// Span of the slot-prop name only (e.g. "item") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: OptExprEdge<'arena>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
+    pub expression: Option<ExprId>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -680,7 +680,7 @@ impl SpecialElementTag {
 pub enum SpecialThis<'arena> {
     /// `this={expr}` — the expression form. The tag's span covers the braces, so the
     /// printer emits it as the `{…}` attribute value it is.
-    Braced(ExpressionTag<'arena>),
+    Braced(ExpressionTag),
     /// `this="value"` — the plain HTML-attribute form. No braces (so no gap a comment could
     /// occupy) and **no expression parse at all**: the value is the attribute's decoded
     /// text, held as such. Svelte's wire reports it as a `Literal`, which the writer emits
@@ -742,7 +742,7 @@ pub enum SpecialElementKind<'arena> {
     /// `<svelte:component this={Component}>` - dynamic component (legacy). Always the
     /// braced form: a missing or non-`{expression}` `this` is rejected at parse, as Svelte
     /// does — so unlike `<svelte:element>` there is no plain-string variant to model.
-    SvelteComponent { expression: ExpressionTag<'arena> },
+    SvelteComponent { expression: ExpressionTag },
     /// `<svelte:self>` - recursive self-reference
     SvelteSelf,
     /// `<slot>` - content slot
@@ -865,7 +865,7 @@ impl<'arena> SpecialElementKind<'arena> {
     /// The whole tag, not the bare expression: its `{…}` span is what bounds the expression's
     /// comment-attach window, and handing out the expression without it is how comments
     /// outside the braces came to attach to it.
-    pub fn expression(&self) -> Option<&ExpressionTag<'arena>> {
+    pub fn expression(&self) -> Option<&ExpressionTag> {
         match self {
             Self::SvelteComponent { expression } => Some(expression),
             _ => None,
@@ -1562,7 +1562,7 @@ const _: () = assert!(size_of::<Element<'static>>() == 56);
 /// Detection is implicit: check if name matches expression identifier.
 #[derive(Debug, Clone)]
 pub struct Attribute<'arena> {
-    pub value: Option<&'arena [AttributeValue<'arena>]>,
+    pub value: Option<&'arena [AttributeValue]>,
     pub span: Span,
     pub name_span: Span,
 }
@@ -1583,8 +1583,8 @@ impl Attribute<'_> {
 /// Represents `{...obj}` syntax that spreads an object's properties as attributes.
 /// The expression can be any valid expression: identifier, call, member access, etc.
 #[derive(Debug, Clone)]
-pub struct SpreadAttribute<'arena> {
-    pub expression: ExprEdge<'arena>,
+pub struct SpreadAttribute {
+    pub expression: ExprId,
     pub span: Span,
 }
 
@@ -1599,8 +1599,8 @@ pub struct SpreadAttribute<'arena> {
 #[derive(Debug, Clone)]
 pub enum AttributeNode<'arena> {
     Attribute(Attribute<'arena>),
-    SpreadAttribute(SpreadAttribute<'arena>),
-    AttachTag(AttachTag<'arena>),
+    SpreadAttribute(SpreadAttribute),
+    AttachTag(AttachTag),
     // Directives
     OnDirective(OnDirective<'arena>),
     BindDirective(BindDirective<'arena>),
@@ -1635,9 +1635,9 @@ impl<'arena> AttributeNode<'arena> {
 ///
 /// Attribute values can contain static text or dynamic expressions.
 #[derive(Debug, Clone)]
-pub enum AttributeValue<'arena> {
+pub enum AttributeValue {
     Text(Text),
-    ExpressionTag(ExpressionTag<'arena>),
+    ExpressionTag(ExpressionTag),
 }
 
 /// Whether `b` is **collapsible whitespace** — the characters CSS white-space processing
@@ -2091,8 +2091,8 @@ fn decode_text_data(raw: &str, context: crate::html::ReferenceContext) -> String
 /// Represents a TypeScript/JS expression embedded in the template.
 /// The expression is evaluated and its result is rendered.
 #[derive(Debug, Clone)]
-pub struct ExpressionTag<'arena> {
-    pub expression: ExprEdge<'arena>,
+pub struct ExpressionTag {
+    pub expression: ExprId,
     pub span: Span,
 }
 
@@ -2145,17 +2145,17 @@ pub struct Style<'arena> {
 // template `{expr}` holds. Every variant stays inline by value: arena-boxing the fat
 // ones for a smaller enum shrank the slice element but added a pointer-chase on hot
 // format-read paths that cost more than the density win. The embedded TypeScript
-// expressions are the other story — the TS parser has already arena-allocated each one,
-// so the nodes hold them as `&'arena Expression` rather than copying 72 B out of that
-// allocation (`docs/architecture.md` §Nested AST, the second density rule). `SnippetBlock`
+// expressions are the other story — the TS parser has already pushed each one, so the
+// nodes hold its `ExprId` rather than copying the row (`docs/architecture.md` §Nested AST,
+// the second density rule). `SnippetBlock`
 // sets `FragmentNode`'s width. 64-bit here — pointers and slices are half-width on
 // wasm32, a different layout `tsv_wasm` pins.
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<FragmentNode<'static>>() == 120);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<FragmentNode<'static>>() == 104);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<AttributeNode<'static>>() == 72);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<AttributeNode<'static>>() == 72);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<ExpressionTag<'static>>() == 16);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionTag>() == 12);
 
 #[cfg(test)]
 mod tests {

@@ -356,7 +356,7 @@ The `doc` module implements a declarative document builder inspired by prettier'
 
 ### Core Types (Arena-Based)
 
-Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is also bump-arena-allocated but uses **`&'arena` references, not `DocId` indices** — it's traversed repeatedly, so direct pointer access beats index lookups — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
+Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is arena- and store-allocated — `Expression` nodes sit in per-document stores indexed by `ExprId`, the other families in the bump arena behind `&'arena` references — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
 
 ```rust
 pub enum DocNode {
@@ -976,7 +976,21 @@ references — but allocates the nodes in a **per-parse bump arena** (`bumpalo`)
 tied to the program lifetime. Recursive children are `&'arena T<'arena>` (not
 `Box`), child collections are `&'arena [T<'arena>]` (not `Vec`), and decoded
 strings are `&'arena str`, so a whole parse is one bump-allocated graph freed
-wholesale when the arena drops, with no per-node `Drop`:
+wholesale when the arena drops, with no per-node `Drop`.
+
+**`Expression` nodes are the exception: they live in `AstStores`** (`ast/stores.rs`), one
+per document, kept beside the tree in a `Parsed` and shared across a Svelte component's
+embedded islands. An edge to an expression is an `ExprId`, an index into the
+`Store<Expression>`; a child list is a `Run` over a store of ids (`Run<ExprId>`: call and
+`new` arguments, sequence and template expressions; `Run<Option<ExprId>>`: array and
+array-pattern elements) or a value run over the expression store itself (`Run<Expr>`:
+parameter lists). A reader reaches them through an `ExprView`, one word holding a
+reference to the stores; a store row, once pushed, is never edited or truncated, so a parser
+that replaces a node (a cover-grammar conversion, an annotated binding pattern) appends the
+new row and the old one is orphaned. `Statement`, `TSType` and the boxed expression payloads
+(`ArrowFunctionExpression` and its fellows) remain arena nodes. The rest of this section
+describes the arena-held layout the expression stores were built to keep.
+
 
 ```rust
 pub struct Program<'arena> {
@@ -994,7 +1008,7 @@ pub struct Statement<'arena> {
 
 pub enum StatementKind<'arena> {
     VariableDeclaration(VariableDeclaration<'arena>), // small → inline by value
-    IfStatement(IfStatement<'arena>), // test: &'arena Expression; consequent: &'arena Statement
+    IfStatement(IfStatement<'arena>), // test: ExprId; consequent: &'arena Statement
     // …
 }
 ```
@@ -1023,12 +1037,12 @@ size on its own taxes the whole tree, while a pointer chase is paid only where t
 variant is actually spelled. Where such a variant is also **rare**, it holds its
 payload by `&'arena` reference:
 
-- `Expression` is **72 B**, not 176 — `ClassExpression`, `FunctionExpression`,
+- `Expression` is **64 B**, not 176 — `ClassExpression`, `FunctionExpression`,
   `ArrowFunctionExpression`, `MetaProperty` and `TaggedTemplateExpression` are boxed.
   Together they are ~3% of expressions in real source (the two widest, ~0.02%). The
   next-widest variant is `CallExpression`, and it is 14–21% of expressions, which is
   where the ladder stops. `Expression` is a header over its variant —
-  `struct Expression { span, kind: ExpressionKind }` (`ExpressionKind` 64 B) — so reading
+  `struct Expression { span, kind: ExpressionKind }` (`ExpressionKind` 56 B) — so reading
   an expression's span is a field load rather than a dispatch over the variants. A
   variant struct carries no span of its own unless some node also holds that type
   outside an `Expression` (`Identifier`, `Literal`, `TemplateLiteral`, `RestElement`,
@@ -1070,22 +1084,22 @@ measured rather than assumed (`Statement`'s last two heads are the one place it 
 and paid).
 
 **The second rule needs no rarity, because it adds no allocation at all: an inline
-slot whose value the producer already arena-allocated is a COPY OUT of the arena, not
-the place the node lives.** The expression parser threads `&'arena Expression`
-all the way up its Pratt ladder, so a by-value `Expression` container field copies
-72 B *out* of the node's own allocation into the container's slot, while an
-`&'arena Expression` field keeps the allocation the parser already made — *removing*
-work on 100% of the traffic instead of adding it. The two list-element containers
+slot whose value the producer has already placed is a COPY OUT of the store, not the
+place the node lives.** The expression parser threads `ExprId` all the way up its Pratt
+ladder, so a by-value `Expression` container field would copy the node *out* of its own
+row into the container's slot, while an `ExprId` field keeps the row the parser already
+pushed — *removing* work on 100% of the traffic instead of adding it. The two list-element containers
 whose own width was two such slots take it:
 
 - `Property` (an object literal's `key: value`, and a destructuring pattern's, which
-  reuses the same struct) is **32 B**, not 160 — so `ObjectProperty` is 32 and
-  `ObjectPatternProperty` 40 (its `RestElement` arm sets that one).
-- `VariableDeclarator` is **32 B**, not 160.
-- every `Expression`-holding `Statement` head takes it too: `ExpressionStatement`
-  88 → **16**, `IfStatement` / `SwitchStatement` 96 → **24** (`SwitchCase`, which keeps its
-  own span, **32**), `WhileStatement` / `DoWhileStatement` 88 → **16**, `ReturnStatement` /
-  `ThrowStatement` 80 → **8** (their spans now on `Statement`'s header). `CatchClause` is the one that does *not*: its `param`
+  reuses the same struct) is **20 B**, not 160 — so `ObjectProperty` is 20 and
+  `ObjectPatternProperty` 32 (its `RestElement` arm sets that one).
+- `VariableDeclarator` is **20 B**, not 160.
+- every `Expression`-holding `Statement` head takes it too, an `ExprId` costing 4 B where the
+  value would cost the node: `ExpressionStatement` holds its id alone, `IfStatement` /
+  `SwitchStatement` an id and a statement ref, `SwitchCase` (which keeps its own span) **32**,
+  and `ReturnStatement` / `ThrowStatement` an `Option<ExprId>` (their spans now on
+  `Statement`'s header). `CatchClause` is the one that does *not*: its `param`
   is built by the parser as an owned value rather than through the spine, so a
   reference there would add an allocation instead of removing a copy — and
   `CatchClause` is reached only through `Option<&CatchClause>`, so its width sets
@@ -1094,30 +1108,27 @@ whose own width was two such slots take it:
   (`{#if}`'s test, `{#each}`'s iterable, context and key, `{#await}`'s expression and its
   `{:then}` / `{:catch}` bindings, `{#key}`, `{#snippet}`'s name), the `{@html}` /
   `{@render}` / `{@const}` / `{@attach}` tags, every directive's expression and a spread
-  attribute hold `&'arena Expression` (`Option<&'arena Expression>` where it may be absent).
-  So `ExpressionTag` — the element of every attribute value — is **16 B**, `AttributeNode`
-  **72** and `FragmentNode` **120**, set by `SnippetBlock`. The binding *patterns* among
-  them (`{#each}`'s context, the `{:then}` / `{:catch}` bindings, `{@const}`'s id) are
-  built by the TypeScript side as owned values — converted from an expression, with an
-  annotation attached in place — so the Svelte parser allocates each one into the arena
-  itself, once; so does every identifier it synthesizes (the `bind:value` / `class:name`
-  shorthand, the `{name}` attribute). That is an allocation the rule otherwise never
-  adds, and it still pays where `CatchClause` would not: these fields set the width of
+  attribute hold `ExprId` (`Option<ExprId>` where it may be absent). So `ExpressionTag` — the
+  element of every attribute value — is **12 B**, `AttributeNode` **72** and `FragmentNode`
+  **104**, set by `SnippetBlock`. The binding *patterns* among them (`{#each}`'s context,
+  the `{:then}` / `{:catch}` bindings, `{@const}`'s id) are built by the TypeScript side as
+  stored rows — converted from an expression, with an annotation appended as a superseding
+  row — and every identifier the Svelte parser synthesizes (the `bind:value` / `class:name`
+  shorthand, the `{name}` attribute) is pushed the same way. These fields set the width of
   `FragmentNode` and `AttributeNode`, which are slice elements and are built by value at
   every level of the recursive parse (the block and tag parsers return
   `Result<FragmentNode>`, and `parse_children` wraps each parsed element in one), where
   `CatchClause`'s width reaches nothing past its `Option<&>`. `{#snippet}`'s parameters
-  and `{@debug}`'s identifiers stay by-value slices.
+  are a value run, and `{@debug}`'s identifiers an id list.
 - the expression LISTS whose elements come off the ladder take it per element: call and
-  `new` arguments, sequence and template-literal expressions are
-  `&'arena [&'arena Expression]`, and array-literal elements
-  `&'arena [Option<&'arena Expression>]` (a hole stays `None`; the `Option` is
-  niche-packed) — a pointer-width element where a by-value one is the whole
-  `Expression` (72 B native, 48 on wasm32). A spread
-  element, built fresh rather than returned by the ladder, is allocated once to join
-  them. The parameter lists and `ArrayPattern`'s elements stay by-value slices: their
-  elements are built by the parser as owned values (a binding pattern, or an expression
-  converted to one), so a reference there would add an allocation.
+  `new` arguments, sequence and template-literal expressions are `Run<ExprId>`, and
+  array-literal and array-pattern elements `Run<Option<ExprId>>` (a hole stays `None`; the
+  `Option` is niche-packed) — a 4 B element where a by-value one is the whole `Expression`
+  (64 B native, 48 on wasm32). A spread element, built fresh rather than returned by
+  the ladder, is pushed once to join them. The parameter lists are value runs (`Run<Expr>`),
+  which are rows of the expression store: their elements are built by the parser as
+  values (a binding pattern, or an expression converted to one), so an id list would add
+  a hop for no row saved.
 
 **The one exception to "rarity is the whole of the argument".** Once those heads
 narrowed, the only variants left setting `Statement`'s width were `ImportDeclaration`
@@ -1140,24 +1151,23 @@ spans are `pub`; they stay equal because that is the only way the wrapped form i
 and no span write reaches one of those payloads after it is wrapped, and a debug build
 asserts the agreement on every `Statement::span()` read. On wasm32 `Statement` is 48 B.
 
-`parse_expression_ref` / `parse_assignment_expression_ref` are the spine's
-ref-returning entry points these fields are filled from. The read side does pay one
-dependent load per `prop.key` / `decl.init`, which is why the trade is settled by
+`parse_expression` / `parse_assignment_expression` are the entry points these fields are
+filled from. The read side does pay one indexed load per `prop.key` / `decl.init`, which is why the trade is settled by
 measurement rather than by argument; measured, the parse-side copies removed and the
 5× narrower slice element dominate it.
 
 The fat inline nodes carry no by-value-return penalty in the **expression**
-recursion either: each node is built in the arena and threaded up the recursive
-descent **by reference** (every `parse_*` on the expression ladder returns an
-`&'arena Expression`), so the recursion moves pointers regardless of node size. The
-return stays two scalars end to end: with `Error` boxing its
-own payload, `Result<&Expression, Error>` is two words, which x86-64 returns in
-two registers. Nothing rides beside the reference — a paren-stripped operand's
-paren-inclusive extent is not a field but the tokens its parse consumed (from the
-token current when the parse begins to the previous token's end when it returns),
-because even a narrow `{&Expression, u32, u32}` is a three-field aggregate returned
-through an sret stack slot. (wasm32 returns every `Result` through a slot either way.)
-The reference buys the *caller's frame* as much as the return: an arm holding a node by
+recursion either: each node is pushed into the store and threaded up the recursive
+descent **by id** (every `parse_*` on the expression ladder returns an `ExprRet`, an
+`ExprId` widened to a word on 64-bit), so the recursion moves a word regardless of node
+size. The return stays two scalars end to end: with `Error` boxing its own payload,
+`Result<ExprRet, Error>` is two words, which x86-64 returns in two registers. Nothing
+rides beside the id — a paren-stripped operand's paren-inclusive extent is not a field
+but the tokens its parse consumed (from the token current when the parse begins to the
+previous token's end when it returns), because even a narrow `{ExprId, u32, u32}` is a
+three-field aggregate returned through an sret stack slot. (wasm32 returns every
+`Result` through a slot either way.) The id buys the *caller's frame* as much as the
+return: an arm holding a node by
 value reserves its bytes at every recursion level, whichever arm the dispatcher takes,
 so the choice sets the stack a level costs rather than throughput — and with it the
 margin the depth limits keep ([cli.md §Recursion Depth](./cli.md#recursion-depth)). Node *layout* is tuned for
@@ -1169,12 +1179,12 @@ them widens that margin too, as a side effect rather than the goal.
 **Rationale vs flat/indexed:** Flat/indexed layouts (index arrays, à la Zig's
 `MultiArrayList`) were benchmarked early in development and were slower —
 traversal replaced direct pointer/reference access with index lookups, and a
-formatter traverses constantly. The arena keeps direct `&'arena` access (full
-traversal speed) while eliminating per-node `malloc`/`free` and improving locality
-(nodes are bump-allocated in ≈parse order, which approximates traversal order).
-The `DocArena` (the doc-builder IR) is the index-arena precedent for the
-build-once/render-once doc tree; the AST uses references rather than indices
-because it is traversed repeatedly.
+formatter traverses constantly. That comparison is what the expression stores
+reopen: a store read is a load of the store's slice header and one indexed load, and the non-expression
+families keep direct `&'arena` access while eliminating per-node `malloc`/`free` and
+improving locality (nodes are bump-allocated in ≈parse order, which approximates
+traversal order). The `DocArena` (the doc-builder IR) is the index-arena precedent
+for the build-once/render-once doc tree.
 
 **Still open (separate axis):** re-run the **flat/indexed structure** comparison
 on the mature codebase — an independent question from allocation strategy (the

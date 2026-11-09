@@ -30,12 +30,11 @@ mod stores;
 mod types;
 mod view;
 
+pub(crate) use stores::ScratchMarks;
 pub use stores::{AstStores, Expr, ExprId, Parsed, with_stores};
+pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
-pub use view::{
-    ExprEdge, ExprList, ExprRun, ExprSlot, ExprView, ListElement, OptExprEdge, OptExprList,
-    ParsedRef, PatternElements,
-};
+pub use view::{ExprView, ParsedRef};
 
 //
 // Re-exports from submodules
@@ -110,8 +109,8 @@ pub use expressions::{
 // call is a stack-depth decision, not a style one: a frame is sized once for its
 // widest arm, so a dispatcher with N arms that each hold one reserves N times these
 // bytes at every recursion level, which is the stack the depth limits' margin is made
-// of (`docs/cli.md` §Recursion Depth); the parser's expression ladder returns
-// `&'arena Expression` to keep `Expression` out of those frames.
+// of (`docs/cli.md` §Recursion Depth); the parser's expression ladder returns an id
+// to keep `Expression` out of those frames.
 //
 // Both enums are also the ELEMENT WIDTH of the containers that hold them, which is
 // the larger cost: an `Expression` slot is paid on every element of every
@@ -136,27 +135,22 @@ pub use expressions::{
 // (`ExpressionStatement` 16 B, `IfStatement` / `SwitchStatement` 24, `SwitchCase` 32,
 // `WhileStatement` / `DoWhileStatement` / `WithStatement` 16,
 // `ReturnStatement` / `ThrowStatement` 8)
-// — instead hold those slots by reference, which is not the same trade: the parser's
-// expression spine already returns an arena-allocated `&Expression`,
-// so an inline slot is a COPY OUT of the arena rather than a place the node lives.
-// Naming the slots by reference removes that copy instead of adding an allocation,
-// and takes the element every object-literal and declarator list moves from 160 B to
-// 32 (`ObjectPatternProperty` 40, its `RestElement` arm setting it) — see
-// `parse_expression_ref`. `CatchClause` keeps its inline `param` deliberately: that
-// one is built by the parser as an owned value rather than through the spine, so a
-// reference there would ADD an allocation, and `CatchClause` is reached only through
-// `Option<&CatchClause>` so its width sets nothing. The expression LISTS whose
-// elements come off the spine take the reference per element, since there too the
-// reference keeps the spine's allocation rather than copying out of it — call and
-// `new` arguments, sequence and template expressions (`&[&Expression]`) and
-// array-literal elements (`&[Option<&Expression>]`); the parameter lists and
-// `ArrayPattern`'s elements are built as owned values, `CatchClause`'s case, and stay
-// by value.
+// — instead hold those slots by id, which is not the same trade: the parser's
+// expression spine already returns a pushed row's id, so an inline slot would be a COPY
+// OUT of the store rather than a place the node lives. Naming the slots by id removes
+// that copy instead of adding a row, and takes the element every object-literal and
+// declarator list moves from 160 B to 20 (`ObjectPatternProperty` 32, its `RestElement`
+// arm setting it). `CatchClause` keeps its inline `param` deliberately: it is built by
+// the parser as an owned value rather than through the spine, so an id there would ADD a
+// row, and `CatchClause` is reached only through `Option<&CatchClause>` so its width sets
+// nothing. The expression LISTS whose elements come off the spine hold ids — call and
+// `new` arguments and sequence and template expressions (`Run<ExprId>`), array-literal
+// and array-pattern elements (`Run<Option<ExprId>>`) — and the parameter lists are value
+// runs over the expression store itself (`Run<Expr>`), `CatchClause`'s case.
 //
 // `Expression` and `Statement` are each a header over their variant (`span` +
 // `ExpressionKind` / `StatementKind`), so a span read is a field load rather than a
-// dispatch; the variant payloads shed their own spans to pay for the header, which is
-// why both widths hold at 72.
+// dispatch; the variant payloads shed their own spans to pay for the header.
 //
 // Pinned so a variant that widens any of them shows up as a failed test build rather
 // than as a silently thinner depth-limit margin and a fatter element slot. Each is rustc's
@@ -167,29 +161,30 @@ pub use expressions::{
 // 4 B) in `tsv_wasm`, the crate compiled for wasm32, and `Expression`'s and `Statement`'s
 // `Option` must stay niche-packed on both.
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<Expression<'static>>() == 72);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Expression<'static>>() == 64);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<ExpressionKind<'static>>() == 64);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind<'static>>() == 56);
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Expression<'static>>>() == size_of::<Expression<'static>>());
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<Statement<'static>>() == 72);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Statement<'static>>() == 72);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<StatementKind<'static>>() == 64);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<StatementKind<'static>>() == 64);
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Statement<'static>>>() == size_of::<Statement<'static>>());
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<Property<'static>>() == 32);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Property>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<ObjectProperty<'static>>() == 32);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ObjectProperty>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<ObjectPatternProperty<'static>>() == 40);
+const _: () =
+    assert!(tsv_lang::store::STORE_CHECK || size_of::<ObjectPatternProperty<'static>>() == 32);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<VariableDeclarator<'static>>() == 32);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<VariableDeclarator>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<SwitchCase<'static>>() == 32);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<SwitchCase<'static>>() == 32);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<TSType<'static>>() == 80);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType<'static>>() == 80);
 
 //
 // Foundational Types (defined here, used everywhere)
@@ -216,9 +211,9 @@ pub struct Program<'arena> {
 /// The expression can be an identifier (`@foo`), call expression (`@foo()`),
 /// or member expression (`@foo.bar`).
 #[derive(Debug, Clone)]
-pub struct Decorator<'arena> {
+pub struct Decorator {
     /// The decorator expression (identifier, call, or member expression)
-    pub expression: ExprSlot<'arena>,
+    pub expression: ExprId,
     pub span: Span,
 }
 
@@ -428,7 +423,7 @@ pub struct Identifier<'arena> {
 #[derive(Debug, Clone)]
 pub struct IdentifierParamExtra<'arena> {
     pub type_annotation: Option<TSTypeAnnotation<'arena>>,
-    pub decorators: Option<&'arena [Decorator<'arena>]>,
+    pub decorators: Option<&'arena [Decorator]>,
 }
 
 impl<'arena> Identifier<'arena> {
@@ -440,7 +435,7 @@ impl<'arena> Identifier<'arena> {
 
     /// The parameter decorators, if any (`None` for a reference).
     #[inline]
-    pub fn decorators(&self) -> Option<&'arena [Decorator<'arena>]> {
+    pub fn decorators(&self) -> Option<&'arena [Decorator]> {
         self.extra.and_then(|e| e.decorators)
     }
 

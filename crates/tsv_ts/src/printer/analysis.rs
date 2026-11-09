@@ -287,8 +287,8 @@ fn pattern_nesting_depth(view: ExprView<'_>, obj: &ast::ObjectPattern<'_>) -> us
 fn array_pattern_nesting_depth(view: ExprView<'_>, arr: &ast::ArrayPattern<'_>) -> usize {
     let mut max_depth = 1;
 
-    for elem in view.pattern_elements(arr.elements).iter().flatten() {
-        let nested_depth = match &view.slot(elem).kind {
+    for elem in view.opt_list(arr.elements).iter().flatten() {
+        let nested_depth = match &view.expr(*elem).kind {
             ast::ExpressionKind::ObjectPattern(nested_obj) => {
                 1 + pattern_nesting_depth(view, nested_obj)
             }

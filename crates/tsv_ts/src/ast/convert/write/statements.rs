@@ -172,7 +172,7 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
         ast::StatementKind::TSExportAssignment(export_assign) => {
             node_header(w, "TSExportAssignment", stmt.span, ctx);
             w.raw(",\"expression\":");
-            write_expression(w, ctx.view.slot(&export_assign.expression), ctx);
+            write_expression(w, ctx.view.expr(export_assign.expression), ctx);
             close_node(w, "TSExportAssignment", stmt.span, ctx);
         }
         ast::StatementKind::TSNamespaceExportDeclaration(ns_export) => {

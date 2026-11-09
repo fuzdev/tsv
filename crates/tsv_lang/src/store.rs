@@ -507,8 +507,7 @@ impl<T: Row> Store<T> {
         self.view().slice(run)
     }
 
-    /// A read-only view of the rows for a walk: the bound slice, so a read after this costs
-    /// one load fewer than through the store.
+    /// A read-only view of the rows: the bound slice every read of this store goes through.
     #[inline]
     pub fn view(&self) -> StoreView<'_, T> {
         StoreView {

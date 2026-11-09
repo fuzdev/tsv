@@ -333,7 +333,7 @@ fn call_paren_split(
 pub(super) fn paren_split_for(
     printer: &Printer<'_>,
     gap_start: u32,
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
 ) -> Option<(u32, u32)> {
     let first_arg_start = printer.view.expr(*arguments.first()?).span().start;
     if printer.gap_known_comment_free(gap_start, first_arg_start) {
@@ -353,7 +353,7 @@ pub(super) fn paren_split_for(
 pub(super) fn paren_split_for_outlined(
     printer: &Printer<'_>,
     gap_start: u32,
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
 ) -> Option<(u32, u32)> {
     paren_split_for(printer, gap_start, arguments)
 }
@@ -371,7 +371,7 @@ fn split_paren_wide(
     printer: &Printer<'_>,
     gap_start: u32,
     first_arg_start: u32,
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
 ) -> Option<u32> {
     let paren = printer.find_char_outside_comments(gap_start, first_arg_start, b'(')?;
     if !printer.has_line_comments_between(gap_start, paren) {
@@ -420,7 +420,7 @@ fn split_strands_directive(
     printer: &Printer<'_>,
     gap_start: u32,
     arg_side_start: u32,
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
 ) -> bool {
     !arguments.is_empty()
         && printer.args_frozen_span(gap_start, arguments, 0).is_some()
@@ -567,7 +567,7 @@ pub(super) enum CalleeParens<'a> {
     /// softline])` over FLAT parts. The operand is therefore the ungrouped chain — the
     /// paren group alone decides whether to break after `(` — and not the
     /// continuation-indented default a binaryish value takes everywhere else.
-    Binary(&'a ast::BinaryExpression<'a>, Span),
+    Binary(&'a ast::BinaryExpression, Span),
 }
 
 impl<'a> CalleeParens<'a> {
@@ -720,16 +720,13 @@ fn callee_is_curried_member_chain_call(view: ExprView<'_>, callee: &ast::Express
 #[expect(clippy::inline_always)]
 #[inline(always)]
 fn spine_step<'e>(
-    view: ExprView<'e>,
     expr: &'e ast::Expression<'e>,
-) -> ControlFlow<Option<(&'e ast::CallExpression<'e>, Span)>, &'e ast::Expression<'e>> {
+) -> ControlFlow<Option<(&'e ast::CallExpression<'e>, Span)>, ast::ExprId> {
     tsv_lang::fanout_probe::predicate();
     match &expr.kind {
-        ast::ExpressionKind::MemberExpression(member) => {
-            ControlFlow::Continue(view.expr(member.object))
-        }
+        ast::ExpressionKind::MemberExpression(member) => ControlFlow::Continue(member.object),
         ast::ExpressionKind::TSNonNullExpression(non_null) => {
-            ControlFlow::Continue(view.expr(non_null.expression))
+            ControlFlow::Continue(non_null.expression)
         }
         ast::ExpressionKind::CallExpression(call) => ControlFlow::Break(Some((call, expr.span))),
         _ => ControlFlow::Break(None),
@@ -746,30 +743,30 @@ fn spine_first_call<'e>(
 ) -> Option<(&'e ast::CallExpression<'e>, Span)> {
     let mut expr = expr;
     loop {
-        match spine_step(view, expr) {
-            ControlFlow::Continue(next) => expr = next,
+        match spine_step(expr) {
+            ControlFlow::Continue(next) => expr = view.expr(next),
             ControlFlow::Break(found) => return found,
         }
     }
 }
 
-/// [`spine_first_call`]'s walk, `links` links at most (`links` > 0): `Ok` with the first
-/// call down `expr`'s object spine, or `None` where the spine reaches anything else first,
-/// when the walk ends within them; else `Err` with the node the walk stopped at, still on
-/// the spine. The parser's depth limit walks a chain's spine once per link, so it takes a
-/// bounded walk and carries what lies past the bound from link to link
+/// [`spine_first_call`]'s walk, `links` links at most (`links` > 0): `Ok` with the id of the
+/// first call down `expr`'s object spine, or `None` where the spine reaches anything else
+/// first, when the walk ends within them; else `Err` with the id of the node the walk stopped
+/// at, still on the spine. The parser's depth limit walks a chain's spine once per link, so
+/// it takes a bounded walk and carries what lies past the bound from link to link
 /// (`Parser::member_link_units`).
-pub(crate) fn spine_first_call_within<'e>(
-    view: ExprView<'e>,
-    expr: &'e ast::Expression<'e>,
+pub(crate) fn spine_first_call_within(
+    view: ExprView<'_>,
+    expr: ast::ExprId,
     links: u32,
-) -> Result<Option<&'e ast::CallExpression<'e>>, &'e ast::Expression<'e>> {
+) -> Result<Option<ast::ExprId>, ast::ExprId> {
     let mut expr = expr;
     let mut links = links;
     loop {
-        match spine_step(view, expr) {
+        match spine_step(view.expr(expr)) {
             ControlFlow::Continue(next) => expr = next,
-            ControlFlow::Break(found) => return Ok(found.map(|(call, _)| call)),
+            ControlFlow::Break(found) => return Ok(found.map(|_| expr)),
         }
         links -= 1;
         if links == 0 {
@@ -778,19 +775,22 @@ pub(crate) fn spine_first_call_within<'e>(
     }
 }
 
-/// Whether `call`, the call a chain link is printed over, may be one the printer prints
-/// WHOLE, re-entering the expression printer for its callee: a call on a curried call on a
-/// member chain ([`callee_is_curried_member_chain_call`]), or one whose sole argument is a
-/// multi-line template — the shape test [`Printer::call_takes_template_bypass`] opens with,
-/// so a superset of the calls that take the bypass. Of the call link itself (asked once its
-/// arguments are read) or of the first call down the object spine of a member or `!` over
-/// it ([`spine_first_call_within`]), which prints over such a call whole
-/// ([`Printer::spine_first_call_prints_whole`]).
+/// Whether the call `call` names, the call a chain link is printed over, may be one the
+/// printer prints WHOLE, re-entering the expression printer for its callee: a call on a
+/// curried call on a member chain ([`callee_is_curried_member_chain_call`]), or one whose
+/// sole argument is a multi-line template — the shape test
+/// [`Printer::call_takes_template_bypass`] opens with, so a superset of the calls that take
+/// the bypass. Of the call link itself (asked once its arguments are read) or of the first
+/// call down the object spine of a member or `!` over it ([`spine_first_call_within`]), which
+/// prints over such a call whole ([`Printer::spine_first_call_prints_whole`]).
 ///
 /// The parser's question (`Parser::member_link_units`, `Parser::settle_call_link`),
 /// asked of the printer's own predicates so the depth limit prices the walk the printer
 /// takes.
-pub(crate) fn call_may_print_whole(view: ExprView<'_>, call: &ast::CallExpression<'_>) -> bool {
+pub(crate) fn call_may_print_whole(view: ExprView<'_>, call: ast::ExprId) -> bool {
+    let ast::ExpressionKind::CallExpression(call) = &view.expr(call).kind else {
+        return false;
+    };
     callee_is_curried_member_chain_call(view, view.expr(call.callee))
         || is_sole_multiline_template_arg(view, view.list(call.arguments))
 }
@@ -943,7 +943,7 @@ impl<'a> Printer<'a> {
     #[inline(never)]
     fn build_whole_call_member_doc(
         &self,
-        member: &ast::MemberExpression<'_>,
+        member: &ast::MemberExpression,
         span: Span,
     ) -> Option<DocId> {
         let object_doc = self.build_whole_call_operand_doc(
@@ -1178,7 +1178,7 @@ impl<'a> Printer<'a> {
     /// 1. Linearize AST into flat list of chain nodes
     /// 2. Group nodes by natural break points
     /// 3. Build doc with conditionalGroup for oneLine/expanded alternatives
-    pub(super) fn build_member_doc(&self, member: &ast::MemberExpression<'_>, span: Span) -> DocId {
+    pub(super) fn build_member_doc(&self, member: &ast::MemberExpression, span: Span) -> DocId {
         let object = self.view.expr(member.object);
         // A format-ignore directive attached to this member access (in the gap between
         // the object and the property) makes prettier print the entire member
@@ -1220,7 +1220,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a dynamic import expression: `import('module')` or `import('module', options)`
     pub(super) fn build_import_expression_doc(
         &self,
-        import_expr: &ast::ImportExpression<'_>,
+        import_expr: &ast::ImportExpression,
         span: Span,
     ) -> DocId {
         import_expr::build_import_expression_doc(self, import_expr, span)

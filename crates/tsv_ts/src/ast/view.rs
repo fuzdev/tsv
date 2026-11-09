@@ -1,128 +1,56 @@
 //! How a tree's readers reach an [`Expression`] from the field that refers to it.
 //!
-//! A field of expression type is spelled with one of the aliases here, and every read of one
-//! goes through an [`ExprView`], so a reader's code does not depend on what an edge is.
+//! An expression edge is an [`ExprId`], a list an id run or a value run over the stores, and
+//! every read of one goes through an [`ExprView`]. The view is one word: a walk reaches a row
+//! through a load of the store's slice header and an indexed load, and holds one register for
+//! the view.
 
-use std::marker::PhantomData;
+use tsv_lang::store::Run;
 
-use super::{AstStores, Expression, Parsed, Program};
+use super::{AstStores, Expr, ExprId, Expression, Parsed, Program};
 
-/// One edge to an expression held in the tree.
-// TODO: `ExprId`.
-pub type ExprEdge<'a> = &'a Expression<'a>;
-
-/// An edge that may be absent.
-// TODO: `Option<ExprId>`.
-pub type OptExprEdge<'a> = Option<ExprEdge<'a>>;
-
-/// A list of edges: call and `new` arguments, sequence and template expressions.
-// TODO: `Run<ExprId>`.
-pub type ExprList<'a> = &'a [ExprEdge<'a>];
-
-/// A list of edges with holes: array elements.
-// TODO: `Run<Option<ExprId>>`.
-pub type OptExprList<'a> = &'a [OptExprEdge<'a>];
-
-/// A run of expressions held by value: parameter lists.
-// TODO: `Run<Expr>`.
-pub type ExprRun<'a> = &'a [Expression<'a>];
-
-/// An expression its parent holds by value: read through [`ExprView::slot`], as an edge is
-/// through [`ExprView::expr`].
-// TODO: `ExprId`.
-pub type ExprSlot<'a> = Expression<'a>;
-
-/// An array pattern's elements, with holes.
-// TODO: `OptExprList`, the elements read as edges.
-pub type PatternElements<'a> = &'a [Option<ExprSlot<'a>>];
-
-/// The read access every consumer of the tree holds: resolves edges, lists and slots.
+/// The read access every consumer of the tree holds: resolves edges and the three kinds of
+/// list.
 ///
 /// `Copy`, and bound to the stores of the document whose tree it reads.
 #[derive(Clone, Copy)]
 pub struct ExprView<'a> {
-    // TODO: the `StoreView`s of `exprs`, `expr_lists` and `expr_opt_lists`.
-    stores: PhantomData<&'a ()>,
+    stores: &'a AstStores<'a>,
 }
+
+// One word, in the check build too: a walk's frame and registers are what it pays for.
+#[cfg(test)]
+const _: () = assert!(size_of::<ExprView<'static>>() == size_of::<usize>());
 
 impl<'a> ExprView<'a> {
-    /// A view for the parser's reads of nodes it has just built, which hold no borrow of the
-    /// stores across a mutable call of the parser.
-    // TODO: the parser's predicates take ids and read the stores themselves.
+    /// The expression `id` names. A miss ends in the store's shared cold path.
     #[inline]
-    pub fn of_parse() -> ExprView<'static> {
-        ExprView {
-            stores: PhantomData,
-        }
+    pub fn expr(self, id: ExprId) -> &'a Expression<'a> {
+        self.stores.exprs.get(id)
     }
 
-    /// The expression `edge` names.
+    /// The expression `id` names, when it is present.
     #[inline]
-    pub fn expr(self, edge: ExprEdge<'a>) -> &'a Expression<'a> {
-        edge
+    pub fn opt(self, id: Option<ExprId>) -> Option<&'a Expression<'a>> {
+        id.map(|id| self.expr(id))
     }
 
-    /// The expression `edge` names, when it is present.
+    /// The ids of `list`: call and `new` arguments, sequence and template expressions.
     #[inline]
-    pub fn opt(self, edge: OptExprEdge<'a>) -> Option<&'a Expression<'a>> {
-        edge
+    pub fn list(self, list: Run<ExprId>) -> &'a [ExprId] {
+        self.stores.expr_lists.slice(list)
     }
 
-    /// The edges of `list`.
+    /// The ids of `list`, holes included: array elements and array-pattern elements.
     #[inline]
-    pub fn list(self, list: ExprList<'a>) -> &'a [ExprEdge<'a>] {
-        list
+    pub fn opt_list(self, list: Run<Option<ExprId>>) -> &'a [Option<ExprId>] {
+        self.stores.expr_opt_lists.slice(list)
     }
 
-    /// The edges of `list`, holes included.
+    /// The expressions of `run`, held by value: parameter lists.
     #[inline]
-    pub fn opt_list(self, list: OptExprList<'a>) -> &'a [OptExprEdge<'a>] {
-        list
-    }
-
-    /// The expressions of `run`.
-    #[inline]
-    pub fn run(self, run: ExprRun<'a>) -> &'a [Expression<'a>] {
-        run
-    }
-
-    /// The expression `slot` holds.
-    #[inline]
-    pub fn slot(self, slot: &'a ExprSlot<'a>) -> &'a Expression<'a> {
-        slot
-    }
-
-    /// The expression `slot` holds, when it holds one.
-    #[inline]
-    pub fn opt_slot(self, slot: &'a Option<ExprSlot<'a>>) -> Option<&'a Expression<'a>> {
-        slot.as_ref()
-    }
-
-    /// The elements of an array pattern.
-    #[inline]
-    pub fn pattern_elements(self, elements: PatternElements<'a>) -> &'a [Option<ExprSlot<'a>>] {
-        elements
-    }
-}
-
-/// An element of a list with holes, read whichever way the list holds it.
-// TODO: every such list holds `Option<ExprId>`, and this resolves through `ExprView::expr`.
-pub trait ListElement {
-    /// The expression this element names.
-    fn element<'s>(&'s self, view: ExprView<'s>) -> &'s Expression<'s>;
-}
-
-impl ListElement for &Expression<'_> {
-    #[inline]
-    fn element<'s>(&'s self, view: ExprView<'s>) -> &'s Expression<'s> {
-        view.expr(self)
-    }
-}
-
-impl ListElement for Expression<'_> {
-    #[inline]
-    fn element<'s>(&'s self, view: ExprView<'s>) -> &'s Expression<'s> {
-        view.slot(self)
+    pub fn run(self, run: Run<Expr>) -> &'a [Expression<'a>] {
+        self.stores.exprs.slice(run)
     }
 }
 
@@ -130,9 +58,7 @@ impl<'arena> AstStores<'arena> {
     /// The view reading the expressions of these stores.
     #[inline]
     pub fn view(&self) -> ExprView<'_> {
-        ExprView {
-            stores: PhantomData,
-        }
+        ExprView { stores: self }
     }
 }
 

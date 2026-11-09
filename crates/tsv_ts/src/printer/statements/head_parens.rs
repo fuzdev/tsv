@@ -261,7 +261,7 @@ impl<'a> Printer<'a> {
     /// `build_expression_statement_doc`, so a real directive never reaches here.
     pub(in crate::printer::statements) fn needs_avoid_directive_parens(
         &self,
-        stmt: &ast::ExpressionStatement<'_>,
+        stmt: &ast::ExpressionStatement,
         in_program_or_block: bool,
     ) -> bool {
         in_program_or_block && is_string_literal(self.view.expr(stmt.expression))

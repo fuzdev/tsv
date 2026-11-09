@@ -45,7 +45,7 @@ impl<'a> Printer<'a> {
             // Preserve comments after the keyword (e.g., `readonly /* c */ a`);
             // bounded at `[` for computed keys (inner comments are the
             // bracket builder's)
-            let key_start = self.view.slot(&prop.key).span().start;
+            let key_start = self.view.expr(prop.key).span().start;
             let mut cursor = prop.span.start;
             self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, key_start);
             let bound = if prop.computed {
@@ -63,7 +63,7 @@ impl<'a> Printer<'a> {
         }
         let (key_doc, key_region_end) = self.build_type_member_key_doc(
             prop.span.start,
-            self.view.slot(&prop.key),
+            self.view.expr(prop.key),
             prop.computed,
         );
         parts.push(key_doc);
@@ -195,7 +195,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
-        let key_start = self.view.slot(&method.key).span().start;
+        let key_start = self.view.expr(method.key).span().start;
         // The `readonly` modifier, then the accessor keyword for get/set signatures, each
         // preserving the comments between it and what follows (`readonly /* c */ x()`,
         // `readonly /* c */ get /* d */ x()`).
@@ -229,7 +229,7 @@ impl<'a> Printer<'a> {
                 Some(lit) => (self.build_string_literal_doc(lit), lit.span.end),
                 None => self.build_type_member_key_doc(
                     method.span.start,
-                    self.view.slot(&method.key),
+                    self.view.expr(method.key),
                     method.computed,
                 ),
             };
@@ -792,7 +792,7 @@ fn method_signature_new_key<'m>(
     if method.computed {
         return None;
     }
-    match &view.slot(&method.key).kind {
+    match &view.expr(method.key).kind {
         ast::ExpressionKind::Literal(
             lit @ ast::Literal {
                 value: ast::LiteralValue::String(cooked),

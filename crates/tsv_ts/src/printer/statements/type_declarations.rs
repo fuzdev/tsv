@@ -1459,7 +1459,7 @@ impl<'a> Printer<'a> {
         };
 
         // Initializer: ` = value`
-        if let Some(init) = self.view.opt_slot(&member.initializer) {
+        if let Some(init) = self.view.opt(member.initializer) {
             // Extract comments between `=` and initializer value
             let id_end = member.id.span().end;
             let init_start = init.span().start;

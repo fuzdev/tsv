@@ -713,7 +713,7 @@ impl<'a> Printer<'a> {
     /// hold one — and the byte before the first part is that opening quote (an unquoted value
     /// opens past a `=` or whitespace, a single-quoted one past a `'`). Nearly every value in
     /// real markup is double-quoted, and the scan reads every byte of its text.
-    fn attribute_value_delims(&self, parts: &[ast::AttributeValue<'_>]) -> (DocId, DocId) {
+    fn attribute_value_delims(&self, parts: &[ast::AttributeValue]) -> (DocId, DocId) {
         let d = self.d();
         let value_start = match parts.first() {
             Some(ast::AttributeValue::Text(text)) => text.raw_span.start,
@@ -744,7 +744,7 @@ impl<'a> Printer<'a> {
     /// Out of line: its scan keeps more live than the double-quoted answer needs, and inlined
     /// it would make every attribute save registers for a walk few of them take.
     #[inline(never)]
-    fn scanned_attribute_value_delims(&self, parts: &[ast::AttributeValue<'_>]) -> ValueDelims {
+    fn scanned_attribute_value_delims(&self, parts: &[ast::AttributeValue]) -> ValueDelims {
         let mut texts = parts.iter().filter_map(|part| match part {
             ast::AttributeValue::Text(text) => Some(text.raw(self.source)),
             ast::AttributeValue::ExpressionTag(_) => None,
@@ -770,7 +770,7 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for an attribute value part — the VERBATIM rule every quoted value takes
     /// unless its host has a narrower one.
-    fn build_attribute_value_doc(&self, value: &ast::AttributeValue<'_>) -> DocId {
+    fn build_attribute_value_doc(&self, value: &ast::AttributeValue) -> DocId {
         match value {
             ast::AttributeValue::Text(text) => self.build_attribute_text_doc(text, None),
             ast::AttributeValue::ExpressionTag(expr_tag) => self.build_expression_tag_doc(expr_tag),
@@ -784,7 +784,7 @@ impl<'a> Printer<'a> {
     /// Expression tags are passed through unchanged.
     fn build_class_attribute_value_doc(
         &self,
-        value: &ast::AttributeValue<'_>,
+        value: &ast::AttributeValue,
         is_last_part: bool,
     ) -> DocId {
         match value {
@@ -842,7 +842,7 @@ impl<'a> Printer<'a> {
     /// character no source holds and costs a zero-tolerance gate its emptiness, so a
     /// form-feed-bearing run joins the held half above. The *newline* test is `\n`-keyed, as
     /// prettier's `printWhitespace` is; the format path has already folded every `<CR>`.
-    fn push_style_value_part(&self, parts: &mut DocBuf, value: &ast::AttributeValue<'_>) {
+    fn push_style_value_part(&self, parts: &mut DocBuf, value: &ast::AttributeValue) {
         if let ast::AttributeValue::Text(text) = value
             && text.is_collapsible_ws_only
             && text.has_newline()
@@ -903,7 +903,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a spread attribute: `{...expr}`
-    fn build_spread_attribute_doc(&self, spread: &ast::SpreadAttribute<'_>) -> DocId {
+    fn build_spread_attribute_doc(&self, spread: &ast::SpreadAttribute) -> DocId {
         self.build_braced_expression_doc(
             SPREAD_OPEN,
             self.view.expr(spread.expression),
@@ -913,7 +913,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an attach tag: `{@attach expr}`
-    fn build_attach_tag_doc(&self, tag: &ast::AttachTag<'_>) -> DocId {
+    fn build_attach_tag_doc(&self, tag: &ast::AttachTag) -> DocId {
         self.build_braced_expression_doc(
             ATTACH_TAG_OPEN,
             self.view.expr(tag.expression),
@@ -1483,7 +1483,7 @@ impl<'a> Printer<'a> {
     /// `value_sequence_trailing_comment` divergence fixture).
     fn build_bind_sequence_with_comments_doc(
         &self,
-        seq: &tsv_ts::ast::SequenceExpression<'_>,
+        seq: &tsv_ts::ast::SequenceExpression,
         span: Span,
         tag_span: Span,
     ) -> DocId {
@@ -1549,7 +1549,7 @@ impl<'a> Printer<'a> {
     /// forced break in the surrounding `{ }` (a leading comment) doesn't break them — they
     /// break only when they overflow or carry an interior forced break (a mid line comment,
     /// a block-body arrow). Matches prettier.
-    fn build_bind_sequence_operands_doc(&self, seq: &tsv_ts::ast::SequenceExpression<'_>) -> DocId {
+    fn build_bind_sequence_operands_doc(&self, seq: &tsv_ts::ast::SequenceExpression) -> DocId {
         let expressions = self.view.list(seq.expressions);
         let d = self.d();
         let bytes = self.source.as_bytes();
@@ -1614,7 +1614,7 @@ impl<'a> Printer<'a> {
     /// its frozen slice, and a plain path as its own bytes.
     fn build_bind_operand_docs(
         &self,
-        seq: &tsv_ts::ast::SequenceExpression<'_>,
+        seq: &tsv_ts::ast::SequenceExpression,
         frozen_at: impl Fn(usize) -> bool,
     ) -> Vec<DocId> {
         let built = tsv_ts::__private::build_bare_sequence_operand_docs(
@@ -1673,7 +1673,7 @@ impl<'a> Printer<'a> {
     ///   condB &&
     ///   condC}
     /// ```
-    pub(super) fn build_expression_tag_doc(&self, tag: &ast::ExpressionTag<'_>) -> DocId {
+    pub(super) fn build_expression_tag_doc(&self, tag: &ast::ExpressionTag) -> DocId {
         self.build_expression_tag_doc_at(tag, TagSite::Sequence)
     }
 
@@ -1687,7 +1687,7 @@ impl<'a> Printer<'a> {
     /// fail. A comment printed ahead of the literal already keeps the `{` off the `/`
     /// (`{/* c */ /a/.test(s)}` parses), so it takes none. Prettier prints the bare form.
     /// See `docs/conformance_prettier_svelte.md` §Svelte: Regex-led expression tag.
-    pub(super) fn build_text_expression_tag_doc(&self, tag: &ast::ExpressionTag<'_>) -> DocId {
+    pub(super) fn build_text_expression_tag_doc(&self, tag: &ast::ExpressionTag) -> DocId {
         let site = if self.in_textarea_content() {
             TagSite::Sequence
         } else {
@@ -1705,12 +1705,12 @@ impl<'a> Printer<'a> {
     /// the path is the `{`, so it owns no comment either. What the general builder adds
     /// around a value never applies: the clarity pair is an assignment's, and the regex
     /// pair a regex-led value's. Every byte of the tag is then plain ASCII.
-    fn tag_is_plain_path(view: ExprView<'_>, tag: &ast::ExpressionTag<'_>) -> bool {
+    fn tag_is_plain_path(view: ExprView<'_>, tag: &ast::ExpressionTag) -> bool {
         super::plain_path_span(view, view.expr(tag.expression))
             .is_some_and(|path| path.start == tag.span.start + 1 && path.end + 1 == tag.span.end)
     }
 
-    fn build_expression_tag_doc_at(&self, tag: &ast::ExpressionTag<'_>, site: TagSite) -> DocId {
+    fn build_expression_tag_doc_at(&self, tag: &ast::ExpressionTag, site: TagSite) -> DocId {
         let expression = self.view.expr(tag.expression);
         let d = self.d();
         if Self::tag_is_plain_path(self.view, tag) && super::fuses_source_spans() {
@@ -1758,7 +1758,7 @@ impl<'a> Printer<'a> {
     fn is_shorthand_attribute(
         &self,
         attr: &ast::Attribute<'_>,
-        value_parts: &[ast::AttributeValue<'_>],
+        value_parts: &[ast::AttributeValue],
     ) -> bool {
         let [ast::AttributeValue::ExpressionTag(expr_tag)] = value_parts else {
             return false;

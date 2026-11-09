@@ -68,7 +68,7 @@ pub(super) fn find_option_values<'arena>(
     attrs: &[ast::AttributeNode<'arena>],
     name: &str,
     source: &str,
-) -> Option<&'arena [ast::AttributeValue<'arena>]> {
+) -> Option<&'arena [ast::AttributeValue]> {
     attrs.iter().find_map(|attr| {
         if let ast::AttributeNode::Attribute(attr) = attr
             && attr.name(source) == name
@@ -84,7 +84,7 @@ pub(super) fn find_option_values<'arena>(
 ///
 /// `pub(super)` — shared with the wire-JSON writer's fused `<svelte:options>`.
 pub(super) fn text_value<'src>(
-    values: &[ast::AttributeValue<'_>],
+    values: &[ast::AttributeValue],
     source: &'src str,
 ) -> Option<Cow<'src, str>> {
     values.iter().find_map(|v| {

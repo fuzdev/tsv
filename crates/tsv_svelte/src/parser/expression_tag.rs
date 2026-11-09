@@ -35,7 +35,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// directive values). Position-based callers that own their own cursor — the
     /// attribute-value sequence readers — use `parse_expression_tag_at`, which runs
     /// the same scan + parse without touching the lexer.
-    pub(crate) fn parse_expression_tag(&mut self) -> Result<ExpressionTag<'arena>, Error> {
+    pub(crate) fn parse_expression_tag(&mut self) -> Result<ExpressionTag, Error> {
         // Verify we're at opening brace — a `{/` included, which the lexer calls a block
         // close but a directive value reads as a regex-led expression
         // (`current_opens_directive_value`).
@@ -71,7 +71,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         brace_pos: usize,
         location: SequenceLocation,
-    ) -> Result<ExpressionTag<'arena>, Error> {
+    ) -> Result<ExpressionTag, Error> {
         self.check_sequence_placement(brace_pos, location)?;
         self.parse_expression_tag_at(brace_pos)
     }
@@ -130,7 +130,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn parse_expression_tag_at(
         &mut self,
         brace_pos: usize,
-    ) -> Result<ExpressionTag<'arena>, Error> {
+    ) -> Result<ExpressionTag, Error> {
         debug_assert_eq!(
             self.source.as_bytes().get(brace_pos),
             Some(&b'{'),

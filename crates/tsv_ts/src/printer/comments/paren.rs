@@ -1821,10 +1821,7 @@ impl<'a> Printer<'a> {
     /// spread's interior is exactly as invisible as a last one's. Spelling the gate on
     /// `arguments.last()` is what dropped it at three of the call family's entry points
     /// (the same reach `any_comment_forces_expansion` already has per argument).
-    pub(crate) fn any_paren_interior_forces_expansion(
-        &self,
-        elements: &[ast::ExprEdge<'_>],
-    ) -> bool {
+    pub(crate) fn any_paren_interior_forces_expansion(&self, elements: &[ast::ExprId]) -> bool {
         elements.iter().any(|e| {
             self.paren_interior_forces_expansion(self.printed_paren_interior(self.view.expr(*e)))
         })
@@ -2010,7 +2007,7 @@ impl<'a> Printer<'a> {
     /// would pull the statement's own terminator-gap comments inside the parens.
     fn build_shell_sequence_doc(
         &self,
-        seq: &ast::SequenceExpression<'_>,
+        seq: &ast::SequenceExpression,
         span: Span,
         expr_end: u32,
         boundary_end: u32,

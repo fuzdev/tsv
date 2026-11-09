@@ -41,10 +41,10 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript export assignment
     pub(super) fn build_export_assignment_doc(
         &self,
-        decl: &ast::TSExportAssignment<'_>,
+        decl: &ast::TSExportAssignment,
         span: Span,
     ) -> DocId {
-        let expression = self.view.slot(&decl.expression);
+        let expression = self.view.expr(decl.expression);
         let d = self.d();
         let value_span = expression.span();
         // `export =` word by word: the `export`→`=` gap is a position an author can
@@ -444,10 +444,10 @@ impl<'a> Printer<'a> {
             ast::ExportDefaultValue::Expression(expr)
                 if !left_spine_shell_is_comment_free(
                     self.source,
-                    self.view.slot(expr).span().start,
+                    self.view.expr(*expr).span().start,
                 ) =>
             {
-                self.export_default_leading_edge(self.view.slot(expr), value_doc)
+                self.export_default_leading_edge(self.view.expr(*expr), value_doc)
             }
             _ => (value_doc, false),
         };
@@ -464,8 +464,8 @@ impl<'a> Printer<'a> {
         // sequence, which prints its own `(` ahead of the cast.
         if left_spine_run
             || matches!(&decl.declaration, ast::ExportDefaultValue::Expression(expr)
-                if !matches!(self.view.slot(expr).kind, ast::ExpressionKind::SequenceExpression(_))
-                    && self.is_own_line_jsdoc_cast(self.view.slot(expr)))
+                if !matches!(self.view.expr(*expr).kind, ast::ExpressionKind::SequenceExpression(_))
+                    && self.is_own_line_jsdoc_cast(self.view.expr(*expr)))
             || self
                 .keyword_value_hang_doc(keyword_end, decl_start, || value_doc)
                 .is_some()
@@ -545,18 +545,18 @@ impl<'a> Printer<'a> {
                 // behind a same-line block of that run and welded onto its line. Asked of the
                 // shell's own close, read from the value's span end, so a gap holding no `//`
                 // opens no shell; a FROZEN value's slice prints its shells itself.
-                let frozen = self.value_head_frozen_span(keyword_end, self.view.slot(expr).span());
+                let frozen = self.value_head_frozen_span(keyword_end, self.view.expr(*expr).span());
                 let line_comment_close = self
                     .value_paren_line_comment_close(value_span.end, span.end)
                     .filter(|_| frozen.is_none());
                 let run_start = line_comment_close.map_or(value_span.end, |_| {
-                    self.pair_trailing_gap_start(self.view.slot(expr))
+                    self.pair_trailing_gap_start(self.view.expr(*expr))
                 });
                 // A multi-line comment the value owns prints outside the value's own group (the
                 // keyword gap's run never sees it), beneath the clarity parens added below.
                 let expr_doc = self.with_claimed_right_spine_run(run_start, value_span.end, || {
-                    self.build_value_head_doc(keyword_end, self.view.slot(expr), || {
-                        self.build_expression_doc_claiming_outermost(self.view.slot(expr))
+                    self.build_value_head_doc(keyword_end, self.view.expr(*expr), || {
+                        self.build_expression_doc_claiming_outermost(self.view.expr(*expr))
                     })
                 });
                 // Prettier wraps the exported expression when its leftmost
@@ -573,13 +573,13 @@ impl<'a> Printer<'a> {
                 // verbatim slice, which carries no pair the printer would add inside.
                 let needs_pair = export_default_needs_parens(
                     self.view,
-                    self.view.slot(expr),
+                    self.view.expr(*expr),
                     LeftmostText::of_value(frozen.is_some()),
                 );
                 let argument_end = value_span.end;
                 if !self.has_comments_to_emit_between(argument_end, span.end) {
                     let doc = self.export_default_value_pair(
-                        self.view.slot(expr),
+                        self.view.expr(*expr),
                         expr_doc,
                         needs_pair,
                         frozen,
@@ -616,7 +616,7 @@ impl<'a> Printer<'a> {
                     return d.concat(&parts);
                 }
                 let mut parts = smallvec![self.export_default_value_pair(
-                    self.view.slot(expr),
+                    self.view.expr(*expr),
                     expr_doc,
                     needs_pair,
                     frozen
@@ -726,7 +726,7 @@ impl<'a> Printer<'a> {
         let ast::ExportDefaultValue::Expression(value) = &decl.declaration else {
             return None;
         };
-        let value = self.view.slot(value);
+        let value = self.view.expr(*value);
         let ast::Expression {
             span: class_span,
             kind: ast::ExpressionKind::ClassExpression(class_expr),

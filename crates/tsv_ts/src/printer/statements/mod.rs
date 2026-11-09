@@ -331,7 +331,7 @@ impl<'a> Printer<'a> {
     /// directive-prologue entry) plus the `;` and the comments bound to it.
     fn build_expression_statement_doc(
         &self,
-        stmt: &ast::ExpressionStatement<'_>,
+        stmt: &ast::ExpressionStatement,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {
@@ -455,7 +455,7 @@ impl<'a> Printer<'a> {
     /// directive is a bare string literal by grammar, so the literal's span start is the
     /// statement's first printed byte — the left-edge fact
     /// [`Printer::prepend_owned_leading_comment_at`] asks each caller for.
-    fn build_directive_doc(&self, stmt: &ast::ExpressionStatement<'_>) -> DocId {
+    fn build_directive_doc(&self, stmt: &ast::ExpressionStatement) -> DocId {
         let d = self.d();
         let span = self.view.expr(stmt.expression).span();
         let text = d.text_pooled(&format_directive(span.extract(self.source)));
@@ -467,7 +467,7 @@ impl<'a> Printer<'a> {
     #[inline]
     fn build_expression_statement_expr_doc(
         &self,
-        stmt: &ast::ExpressionStatement<'_>,
+        stmt: &ast::ExpressionStatement,
         nested_paren: Option<Span>,
     ) -> DocId {
         self.expr_stmt_paren_target.set(nested_paren);
@@ -510,7 +510,7 @@ impl<'a> Printer<'a> {
     /// source would drop what it declined to claim, or double what it handed over.
     fn build_expression_statement_value_doc(
         &self,
-        stmt: &ast::ExpressionStatement<'_>,
+        stmt: &ast::ExpressionStatement,
         span: Span,
         in_program_or_block: bool,
     ) -> (DocId, u32) {
@@ -740,7 +740,7 @@ impl<'a> Printer<'a> {
     /// gap (threaded through the restricted production's own emitters).
     fn build_return_statement_doc(
         &self,
-        ret: &ast::ReturnStatement<'_>,
+        ret: &ast::ReturnStatement,
         span: Span,
         gap: TerminatorGap,
     ) -> DocId {

@@ -682,9 +682,10 @@ A walk's stack per level is its frames', and **a frame is sized once for its wid
 every level pays all of it whichever arm it takes, so a dispatcher that holds one by-value
 AST node per arm multiplies that node's size by its arm count, at every level. That is why
 no `parse_*` on the expression cycle hands its caller a bare `Expression` by value, and no
-`parse_*` on the type ladder a bare `TSType`: a node builder either boxes into the arena at
-its own tail (`alloc_expr` for expressions, `Parser::alloc` for types, leaving the caller
-an 8-byte reference) or returns its own concrete node struct, whose wrapping temporary the
+`parse_*` on the type ladder a bare `TSType`: a node builder either places the node at its
+own tail (`Parser::push_ret` into the expression store, leaving the caller a word-wide
+`ExprRet`, and `Parser::alloc` into the arena for types, leaving an 8-byte reference) or
+returns its own concrete node struct, whose wrapping temporary the
 compiler merges with its sibling arms'. The printer answers the same pressure the same
 way — the chain entry points fill a caller-owned `ChainNodeVec` rather than returning one.
 The node enums answer it by density: a variant wide enough to set its enum's size on its

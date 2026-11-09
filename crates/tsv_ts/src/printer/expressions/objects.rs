@@ -72,7 +72,7 @@ impl LiteralRole {
     pub(in crate::printer) fn property_printed_end(
         self,
         view: ExprView<'_>,
-        prop: &ast::ObjectProperty<'_>,
+        prop: &ast::ObjectProperty,
     ) -> u32 {
         match prop {
             ast::ObjectProperty::Property(p) => self.printed_end(view, view.expr(p.value)),
@@ -524,7 +524,7 @@ impl<'a> Printer<'a> {
     /// queries in `build_property_doc`.
     fn build_object_property_doc(
         &self,
-        prop: &ast::ObjectProperty<'_>,
+        prop: &ast::ObjectProperty,
         has_comments: bool,
         role: LiteralRole,
     ) -> DocId {
@@ -575,7 +575,7 @@ impl<'a> Printer<'a> {
     /// [`LiteralRole::property_printed_end`] read through a `:`→value head freeze: a frozen
     /// value's verbatim slice prints its whole span, the value shell included, so the trailing
     /// run starts past it ([`Self::property_value_frozen_span`]).
-    fn property_printed_end(&self, prop: &ast::ObjectProperty<'_>, role: LiteralRole) -> u32 {
+    fn property_printed_end(&self, prop: &ast::ObjectProperty, role: LiteralRole) -> u32 {
         let printed_end = role.property_printed_end(self.view, prop);
         match prop {
             ast::ObjectProperty::Property(p)
@@ -608,7 +608,7 @@ impl<'a> Printer<'a> {
 
     /// Where a regular property's KEY region ends: past the `]` of a computed key, else at
     /// the key's own end — the `key_region_end` [`Self::build_property_doc`] scans from.
-    fn property_key_region_end(&self, prop: &ast::Property<'_>) -> u32 {
+    fn property_key_region_end(&self, prop: &ast::Property) -> u32 {
         if prop.computed {
             self.find_closing_bracket_after(self.view.expr(prop.key).span().end) + 1
         } else {
@@ -623,7 +623,7 @@ impl<'a> Printer<'a> {
     /// unprinted.
     fn property_value_frozen_span(
         &self,
-        prop: &ast::Property<'_>,
+        prop: &ast::Property,
         key_region_end: u32,
     ) -> Option<Span> {
         if !self.has_format_ignore {
@@ -644,7 +644,7 @@ impl<'a> Printer<'a> {
     /// lookups are skipped (canonical reference: `build_params_doc_with_comments`).
     fn build_property_doc(
         &self,
-        prop: &ast::Property<'_>,
+        prop: &ast::Property,
         has_comments: bool,
         role: LiteralRole,
     ) -> DocId {

@@ -458,9 +458,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse parameters in the signature's own `[Await]`/`[Yield]` context, as the
         // overload path (`parse_function_or_overload`) does for the same node type.
-        let params = self
-            .with_fn_context(is_async, is_generator, Self::parse_parameter_list)?
-            .into_bump_slice();
+        let params = self.with_fn_context(is_async, is_generator, Self::parse_parameter_list)?;
 
         // Parse return type (may be a type predicate)
         let return_type = self.parse_optional_return_type()?;
@@ -749,7 +747,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse optional initializer: = value
         // Use assignment expression (not full expression) to stop at commas
         let (initializer, end) = if self.eat(TokenKind::Equals)? {
-            let expr = self.parse_assignment_expression()?;
+            let expr = self.parse_assignment_expression()?.id();
             // The member ends at the last token consumed, NOT at the initializer's
             // span: tsv drops a grouping paren rather than building a node for it,
             // so a parenthesized initializer (`A = (a, b)`) leaves the expression

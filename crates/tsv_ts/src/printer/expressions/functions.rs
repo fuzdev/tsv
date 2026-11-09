@@ -581,20 +581,17 @@ fn param_is_flat(view: ExprView<'_>, param: &ast::Expression<'_>) -> bool {
         ast::ExpressionKind::ArrayPattern(pattern) => {
             pattern.decorators.unwrap_or_default().is_empty()
                 && annotation_is_flat(pattern.type_annotation.as_ref())
-                && view
-                    .pattern_elements(pattern.elements)
-                    .iter()
-                    .all(|element| {
-                        element
-                            .as_ref()
-                            .is_none_or(|element| match &view.slot(element).kind {
-                                ast::ExpressionKind::RestElement(rest) => {
-                                    rest.type_annotation.is_none()
-                                        && is_bare_identifier(view.expr(rest.argument))
-                                }
-                                _ => is_bare_identifier(view.slot(element)),
-                            })
-                    })
+                && view.opt_list(pattern.elements).iter().all(|element| {
+                    element
+                        .as_ref()
+                        .is_none_or(|element| match &view.expr(*element).kind {
+                            ast::ExpressionKind::RestElement(rest) => {
+                                rest.type_annotation.is_none()
+                                    && is_bare_identifier(view.expr(rest.argument))
+                            }
+                            _ => is_bare_identifier(view.expr(*element)),
+                        })
+                })
         }
         ast::ExpressionKind::RestElement(rest) => {
             is_bare_identifier(view.expr(rest.argument))

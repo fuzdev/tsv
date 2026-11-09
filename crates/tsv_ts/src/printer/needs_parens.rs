@@ -1539,7 +1539,7 @@ fn is_function_dividend(expr: &Expression<'_>, parent_op: BinaryOperator) -> boo
 fn dividend_opens_on_its_pair(
     view: ExprView<'_>,
     expr: &Expression<'_>,
-    binary: &BinaryExpression<'_>,
+    binary: &BinaryExpression,
     text: LeftmostText,
 ) -> bool {
     is_function_dividend(view.expr(binary.left), binary.operator)
@@ -1603,7 +1603,7 @@ pub(crate) fn flattened_left_operand<'e>(
     parent_op: BinaryOperator,
     left: &'e Expression<'e>,
     needs_pair: impl FnOnce(&Expression<'_>, ParenContext) -> bool,
-) -> Option<&'e BinaryExpression<'e>> {
+) -> Option<&'e BinaryExpression> {
     let ExpressionKind::BinaryExpression(left_binary) = &left.kind else {
         return None;
     };
@@ -1692,7 +1692,7 @@ pub(crate) fn printer_adds_operand_pair(
 /// header counts its own pair.
 #[inline]
 fn binary_operand_takes_pair_by_operators(
-    child: &BinaryExpression<'_>,
+    child: &BinaryExpression,
     ctx: ParenContext,
     in_for_header: bool,
 ) -> Option<bool> {
@@ -2028,7 +2028,7 @@ fn binary_child_pair(
 // authored whole-element pair, which does not answer this invented-pair gap.
 pub(in crate::printer) fn clarity_pairs_behind_region_close(
     view: ExprView<'_>,
-    close: &BinaryExpression<'_>,
+    close: &BinaryExpression,
     in_for_init: bool,
     source_holds_pair: impl Fn(&Expression<'_>) -> bool,
 ) -> SmallVec<[Span; 2]> {

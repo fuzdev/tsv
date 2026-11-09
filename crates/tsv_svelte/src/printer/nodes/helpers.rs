@@ -565,7 +565,7 @@ impl<'a> Printer<'a> {
     /// Property dispatcher for an `ObjectExpression` reached as an assignment-pattern
     /// **default value** (`{ a = { b: /* c */ 1 } }`). Same shape as the binding
     /// dispatcher; only the enum (`ObjectProperty` / `SpreadElement`) differs.
-    fn build_object_expr_property_doc(&self, prop: &tsv_ts::ast::ObjectProperty<'_>) -> DocId {
+    fn build_object_expr_property_doc(&self, prop: &tsv_ts::ast::ObjectProperty) -> DocId {
         match prop {
             tsv_ts::ast::ObjectProperty::Property(p) => self.build_pattern_property_kv(
                 p.shorthand,
@@ -624,12 +624,11 @@ impl<'a> Printer<'a> {
     /// formatter. Comments thread through every gap (after `[`, around each `,`, before
     /// `]`); a hole (`[a, , b]`) has no element span to anchor against, so its separator
     /// stays a bare comma. Shared by the `ArrayPattern` (binding) and `ArrayExpression`
-    /// (default-value) arms — generic over the slot's element, since the pattern holds
-    /// `Option<Expression>` and the literal `Option<&Expression>`.
+    /// (default-value) arms, both of which hold a list of optional ids.
     /// Claims the owned leading comment for the same reason its object twin does.
-    fn build_array_brackets<E: tsv_ts::ast::ListElement>(
+    fn build_array_brackets(
         &self,
-        elements: &[Option<E>],
+        elements: &[Option<tsv_ts::ast::ExprId>],
         span_start: u32,
         span_end: u32,
     ) -> DocId {
@@ -637,7 +636,7 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = smallvec![d.text("[")];
         let mut prev_end = span_start + 1; // past `[`
         for (i, elem) in elements.iter().enumerate() {
-            let elem = elem.as_ref().map(|e| e.element(self.view));
+            let elem = elem.map(|e| self.view.expr(e));
             if i == 0 {
                 if let Some(e) = elem {
                     parts.push(self.build_pattern_leading_comments(prev_end, e.span().start));
@@ -800,7 +799,7 @@ impl<'a> Printer<'a> {
             }
             ExpressionKind::ArrayPattern(arr) => {
                 let brackets = self.build_array_brackets(
-                    self.view.pattern_elements(arr.elements),
+                    self.view.opt_list(arr.elements),
                     expr.span.start,
                     expr.span.end,
                 );
@@ -1042,7 +1041,7 @@ impl<'a> Printer<'a> {
     /// key's own paren span rather than an opening literal — it covers the paren interior.
     /// One statement of that arithmetic for the two each-key layouts (the block builder and
     /// the whitespace-sensitive element's inline form).
-    pub(super) fn build_each_key_expr(&self, key: &EachKey<'_>, wrapping: bool) -> HeadExpr {
+    pub(super) fn build_each_key_expr(&self, key: &EachKey, wrapping: bool) -> HeadExpr {
         self.build_expression_doc_for_block(
             self.view.expr(key.expression),
             key.span.start + 1, // after "("

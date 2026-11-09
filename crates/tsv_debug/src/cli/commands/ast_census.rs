@@ -932,7 +932,7 @@ mod tests {
             },
         ];
         attach_sizes(&mut rows);
-        assert_eq!(rows[0].size, Some(size_of::<tsv_ts::ast::Property<'_>>()));
+        assert_eq!(rows[0].size, Some(size_of::<tsv_ts::ast::Property>()));
         assert_eq!(rows[2].size, None, "a name off the board reports no size");
         // `StringCooked` resolves only if the two crates happen to agree; the
         // assertion is that the join never picks one of two disagreeing widths.

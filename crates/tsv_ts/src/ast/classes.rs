@@ -6,8 +6,8 @@
 use tsv_lang::Span;
 
 use super::{
-    Decorator, ExprEdge, ExprSlot, FunctionExpression, Identifier, OptExprEdge, Statement,
-    TSIndexSignature, TSInterfaceHeritage, TSTypeAnnotation, TSTypeParameterDeclaration,
+    Decorator, ExprId, FunctionExpression, Identifier, Statement, TSIndexSignature,
+    TSInterfaceHeritage, TSTypeAnnotation, TSTypeParameterDeclaration,
     TSTypeParameterInstantiation,
 };
 
@@ -18,11 +18,11 @@ use super::{
 #[derive(Debug, Clone)]
 pub struct ClassDeclaration<'arena> {
     /// Decorators applied to this class
-    pub decorators: Option<&'arena [Decorator<'arena>]>,
+    pub decorators: Option<&'arena [Decorator]>,
     /// Class name (required for declarations, optional for export default)
     pub id: Option<Identifier<'arena>>,
     /// Optional superclass expression (for `extends`)
-    pub super_class: OptExprEdge<'arena>,
+    pub super_class: Option<ExprId>,
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
     pub super_type_parameters: Option<TSTypeParameterInstantiation<'arena>>,
     /// Implements clause for declare class: `implements Foo, Bar`
@@ -45,11 +45,11 @@ pub struct ClassDeclaration<'arena> {
 #[derive(Debug, Clone)]
 pub struct ClassExpression<'arena> {
     /// Decorators applied to this class
-    pub decorators: Option<&'arena [Decorator<'arena>]>,
+    pub decorators: Option<&'arena [Decorator]>,
     /// Class name (always optional for expressions)
     pub id: Option<Identifier<'arena>>,
     /// Optional superclass expression (for `extends`)
-    pub super_class: OptExprEdge<'arena>,
+    pub super_class: Option<ExprId>,
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
     pub super_type_parameters: Option<TSTypeParameterInstantiation<'arena>>,
     /// Implements clause: `implements Foo, Bar`
@@ -97,7 +97,7 @@ pub struct StaticBlock<'arena> {
     /// Decorators in front of the block (`@a static {}`). No decorator grammar
     /// reaches a static block (tsc's checker reports TS1206); acorn keeps the list
     /// and tsv defers the error, so the list is kept and printed.
-    pub decorators: Option<&'arena [Decorator<'arena>]>,
+    pub decorators: Option<&'arena [Decorator]>,
     pub body: &'arena [Statement<'arena>],
     pub span: Span,
 }
@@ -154,7 +154,7 @@ impl Accessibility {
 
 /// TypeScript parameter property in constructor: `constructor(public x: number)`
 #[derive(Debug, Clone)]
-pub struct TSParameterProperty<'arena> {
+pub struct TSParameterProperty {
     /// Accessibility modifier: public, private, protected
     pub accessibility: Option<Accessibility>,
     /// Whether the parameter is readonly
@@ -162,7 +162,7 @@ pub struct TSParameterProperty<'arena> {
     /// Whether the parameter property carries the `override` modifier
     pub r#override: bool,
     /// The actual parameter - can be Identifier or AssignmentPattern (with default value)
-    pub parameter: ExprEdge<'arena>,
+    pub parameter: ExprId,
 }
 
 /// Method definition in a class body: `method() { ... }` or `get x() { ... }`
@@ -170,9 +170,9 @@ pub struct TSParameterProperty<'arena> {
 #[expect(clippy::struct_excessive_bools)] // independent flags, not a state machine
 pub struct MethodDefinition<'arena> {
     /// Decorators applied to this method
-    pub decorators: Option<&'arena [Decorator<'arena>]>,
+    pub decorators: Option<&'arena [Decorator]>,
     /// Method name (key)
-    pub key: ExprSlot<'arena>,
+    pub key: ExprId,
     /// Method implementation (value)
     pub value: FunctionExpression<'arena>,
     /// Method kind (constructor, method, get, set)
@@ -215,13 +215,13 @@ pub enum PropertyModifier {
 #[derive(Debug, Clone)]
 pub struct PropertyDefinition<'arena> {
     /// Decorators applied to this property
-    pub decorators: Option<&'arena [Decorator<'arena>]>,
+    pub decorators: Option<&'arena [Decorator]>,
     /// Property name (key)
-    pub key: ExprSlot<'arena>,
+    pub key: ExprId,
     /// Type annotation (e.g., `: number` in `a: number = 0;`)
     pub type_annotation: Option<TSTypeAnnotation<'arena>>,
     /// Optional initial value
-    pub value: Option<ExprSlot<'arena>>,
+    pub value: Option<ExprId>,
     /// Accessibility modifier (public, private, protected)
     pub accessibility: Option<Accessibility>,
     /// Whether this is a static property

@@ -952,7 +952,7 @@ pub(super) fn write_identifier_parts(
     name: ast::IdentName<'_>,
     optional: bool,
     type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
-    decorators: Option<&[ast::Decorator<'_>]>,
+    decorators: Option<&[ast::Decorator]>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "Identifier", span, ctx);
@@ -970,7 +970,7 @@ pub(super) fn write_identifier_parts_with_character(
     name: ast::IdentName<'_>,
     optional: bool,
     type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
-    decorators: Option<&[ast::Decorator<'_>]>,
+    decorators: Option<&[ast::Decorator]>,
     ctx: &Ctx<'_>,
 ) {
     // A typed simple block binding is the bare `Identifier` the annotation hangs
@@ -1001,7 +1001,7 @@ fn write_identifier_fields(
     name: ast::IdentName<'_>,
     optional: bool,
     type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
-    decorators: Option<&[ast::Decorator<'_>]>,
+    decorators: Option<&[ast::Decorator]>,
     ctx: &Ctx<'_>,
 ) {
     write_name_field(w, name, span.start, ctx);
@@ -1016,7 +1016,7 @@ fn write_identifier_tail(
     span: Span,
     optional: bool,
     type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
-    decorators: Option<&[ast::Decorator<'_>]>,
+    decorators: Option<&[ast::Decorator]>,
     ctx: &Ctx<'_>,
 ) {
     if optional {
@@ -1248,17 +1248,18 @@ mod tests {
     fn plain_identifier_under_a_comment_attach_emits_its_comments() {
         let source = "/* c */ name";
         let arena = bumpalo::Bump::new();
+        let mut stores = ast::AstStores::new();
         let (expression, comments) = crate::__private::parse_expression_with_comments(
             source,
             0,
             0,
             &arena,
-            &mut ast::AstStores::new(),
+            &mut stores,
             "end of input",
             |_, _| Ok(()),
         )
         .expect("parses");
-        let ast::ExpressionKind::Identifier(id) = &expression.kind else {
+        let ast::ExpressionKind::Identifier(id) = &stores.view().expr(expression).kind else {
             panic!("an identifier expected");
         };
         let attach = || {

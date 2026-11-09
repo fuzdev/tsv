@@ -93,10 +93,6 @@
 //! and the `_internal_*` features are tsv's own plumbing for its sibling crates, which pin
 //! each other exactly; they change in any release, outside semver.
 
-#![expect(
-    clippy::explicit_auto_deref,
-    reason = "an edge is spelled `view.expr(*edge)` so a read is the same call whatever an edge is"
-)]
 #![warn(missing_docs)]
 
 // The README's example compiles as a doctest, so the crates.io page cannot drift.

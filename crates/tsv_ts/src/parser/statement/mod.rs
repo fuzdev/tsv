@@ -464,7 +464,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0 as u32;
         // a bare assignment as the statement prints bare ([`Parser::self_pair`])
         // (a bare sequence takes a pair, `(a, b);`, counted as it is built)
-        let expr = self.pair_free_root(RootEnd::BeforeAnyButComma, Self::parse_expression_ref)?;
+        let expr = self
+            .pair_free_root(RootEnd::BeforeAnyButComma, Self::parse_expression)?
+            .id();
         let end = self.semicolon_end()?;
         Ok(Statement {
             span: Span::new(start, end),
@@ -510,7 +512,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let StatementKind::ExpressionStatement(expr_stmt) = &mut stmt.kind else {
             return Ok(false);
         };
-        let ExpressionKind::Literal(lit) = &expr_stmt.expression.kind else {
+        let ExpressionKind::Literal(lit) = &self.expr(expr_stmt.expression).kind else {
             return Ok(false);
         };
         if !matches!(lit.value, LiteralValue::String(_)) {
@@ -546,7 +548,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let StatementKind::ExpressionStatement(expr_stmt) = &stmt.kind else {
             return None;
         };
-        let ExpressionKind::Literal(lit) = &expr_stmt.expression.kind else {
+        let ExpressionKind::Literal(lit) = &self.expr(expr_stmt.expression).kind else {
             return None;
         };
         // The literal's own span, not the statement's: the two differ by the trailing

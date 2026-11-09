@@ -418,7 +418,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 let unary = UnaryExpression {
                     operator: UnaryOperator::Minus,
-                    argument: self.alloc(Expression::from_literal(argument)),
+                    argument: self.push_expr(Expression::from_literal(argument)),
                     span: Span::new(start as u32, num_end as u32),
                 };
                 Ok(self.alloc(TSType::Literal(TSLiteralType::UnaryExpression(unary))))
@@ -702,8 +702,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let argument = self.parse_string_literal()?;
 
         // Optional options object: `import('module', {with: {type: 'json'}})`
-        let options: Option<&'arena Expression<'arena>> = if self.eat(TokenKind::Comma)? {
-            Some(self.parse_expression_ref()?)
+        let options: Option<ExprId> = if self.eat(TokenKind::Comma)? {
+            Some(self.parse_expression()?.id())
         } else {
             None
         };
@@ -991,7 +991,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             })));
         }
 
-        let params = self.parse_function_type_params()?.into_bump_slice();
+        let params = self.parse_function_type_params()?;
         self.expect(&TokenKind::ParenClose)?;
 
         // Committed to a function-type parameter list, so the `=>` and return type
@@ -1029,7 +1029,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse parameter list
         self.expect(&TokenKind::ParenOpen)?;
-        let params = self.parse_function_type_params()?.into_bump_slice();
+        let params = self.parse_function_type_params()?;
         self.expect(&TokenKind::ParenClose)?;
 
         // Expect arrow
@@ -1077,7 +1077,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse parameter list
         self.expect(&TokenKind::ParenOpen)?;
-        let params = self.parse_function_type_params()?.into_bump_slice();
+        let params = self.parse_function_type_params()?;
         self.expect(&TokenKind::ParenClose)?;
 
         // Expect arrow
@@ -1104,10 +1104,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse function type parameters, up to (not including) the closing `)`.
-    fn parse_function_type_params(
-        &mut self,
-    ) -> Result<crate::parser::BumpVec<'arena, Expression<'arena>>, Error> {
-        let mut params = self.bvec();
+    fn parse_function_type_params(&mut self) -> Result<Run<Expr>, Error> {
+        let mark = self.stores.expr_scratch.mark();
 
         // two wire levels each: the function type over its parameters, and the parameter
         // over its pattern and annotation (the depth limit's count; the function type's
@@ -1115,7 +1113,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if !self.check(&TokenKind::ParenClose) {
             let first = self.nested(2, Self::parse_function_type_param)?;
             let mut rest_seen = matches!(first.kind, ExpressionKind::RestElement(_));
-            params.push(first);
+            self.stores.expr_scratch.push(first);
             // the parameters are siblings (`ListFrame`); the first is already counted
             let mut frame = self.list_frame();
             while self.eat(TokenKind::Comma)? {
@@ -1133,15 +1131,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 if self.check(&TokenKind::ParenClose) {
                     break;
                 }
-                frame.element(self, params.len());
+                let len = self.stores.expr_scratch.len_since(mark);
+                frame.element(self, len);
                 let param = self.nested(2, Self::parse_function_type_param)?;
                 rest_seen = matches!(param.kind, ExpressionKind::RestElement(_));
-                params.push(param);
+                self.stores.expr_scratch.push(param);
             }
             frame.close(self);
         }
 
-        Ok(params)
+        Ok(self.flush_expr_run(mark))
     }
 
     /// Parse a single function type parameter: an identifier (`x: T`), the `this`
@@ -1180,7 +1179,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (optional, type_annotation, arg_end) =
                 self.parse_rest_param_tail(argument.span().end)?;
             return Ok(Expression::from_rest_element(RestElement {
-                argument: self.alloc(argument),
+                argument: self.push_expr(argument),
                 optional,
                 type_annotation,
                 span: Span::new(start as u32, arg_end),

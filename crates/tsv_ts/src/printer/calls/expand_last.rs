@@ -90,7 +90,7 @@ impl ArgOwner {
 /// no state below can hug, and the caller's general path prints it whole.
 pub(super) fn try_expand_last_arg(
     printer: &Printer<'_>,
-    arguments: &[ast::ExprEdge<'_>],
+    arguments: &[ast::ExprId],
     callee: DocId,
     paren_open: u32,
     call_end: u32,
