@@ -253,14 +253,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .expect("the island stores are out only while a `&Self` is held")
     }
 
-    /// The view reading the document's expressions outside an island parse.
+    /// The document's stores, read outside an island parse.
     #[expect(clippy::expect_used)]
     #[inline]
-    pub(crate) fn ts_view(&self) -> AstView<'_> {
+    pub(crate) fn ts_stores(&self) -> &AstStores<'arena> {
         self.stores
             .as_deref()
             .expect("the island stores are out only while a `&Self` is held")
-            .view()
+    }
+
+    /// The view reading the document's stores outside an island parse.
+    #[inline]
+    pub(crate) fn ts_view(&self) -> AstView<'_> {
+        self.ts_stores().view()
     }
 
     /// Run `f` `units` wire levels deeper — the depth limit's count ([`DepthBudget`]),

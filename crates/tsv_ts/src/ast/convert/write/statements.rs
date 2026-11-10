@@ -119,7 +119,7 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
             let start = export_start(
                 ctx.source,
                 stmt.span.start,
-                matches!(export_decl.declaration, Some(ast::Statement {
+                matches!(ctx.view.opt_stmt(export_decl.declaration), Some(ast::Statement {
                     kind: ast::StatementKind::ClassDeclaration(class),
                     ..
                 })
@@ -129,7 +129,7 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
             node_header(w, "ExportNamedDeclaration", export_span, ctx);
             write_export_kind_field(w, export_decl.export_kind, ctx);
             w.raw(",\"declaration\":");
-            write_or_null(w, export_decl.declaration.as_ref(), |w, d| {
+            write_or_null(w, ctx.view.opt_stmt(export_decl.declaration), |w, d| {
                 write_exported_declaration(w, d, ctx, is_type_export);
             });
             w.raw(",\"specifiers\":");
@@ -306,7 +306,9 @@ pub(super) fn write_module_declaration(
             ast::TSModuleDeclarationBody::TSModuleBlock(block) => {
                 node_header(w, "TSModuleBlock", block.span, ctx);
                 w.raw(",\"body\":");
-                write_array(w, block.body, |w, s| write_statement(w, s, ctx));
+                write_array(w, ctx.view.stmt_list(block.body), |w, s| {
+                    write_statement(w, ctx.view.stmt_slot(s), ctx);
+                });
                 close_node(w, "TSModuleBlock", block.span, ctx);
             }
             ast::TSModuleDeclarationBody::TSModuleDeclaration(nested) => {
@@ -328,7 +330,9 @@ pub(super) fn write_block_statement(
 ) {
     node_header(w, "BlockStatement", block.span, ctx);
     w.raw(",\"body\":");
-    super::write_body_array(w, block.body, ctx, |w, s| write_statement(w, s, ctx));
+    super::write_body_array(w, ctx.view.stmt_list(block.body), ctx, |w, s| {
+        write_statement(w, ctx.view.stmt_slot(s), ctx);
+    });
     close_node(w, "BlockStatement", block.span, ctx);
 }
 

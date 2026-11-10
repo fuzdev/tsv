@@ -1715,7 +1715,7 @@ impl<'a> Printer<'a> {
                 // brace range rather than the statement list.
                 if let Some(frozen) = frozen_body {
                     parts.push(self.build_frozen_span_doc(frozen));
-                } else if is_effectively_empty_body(block.body) {
+                } else if is_effectively_empty_body(self.view, self.view.stmt_list(block.body)) {
                     // Empty namespace body - handle comments inside
                     parts.push(self.build_empty_body_with_comments_doc(block.span));
                 } else {
@@ -1725,7 +1725,8 @@ impl<'a> Printer<'a> {
                     // comment). Same mechanism as block-statement bodies. See
                     // conformance_prettier_ts_comments.md §Comment relocation (Namespace/module
                     // body `{`).
-                    let first_stmt_start = block.body[0].span().start;
+                    let body = self.view.stmt_list(block.body);
+                    let first_stmt_start = self.view.stmt_slot(&body[0]).span().start;
                     let (brace_line_prefix, delimiter_pull_pos) =
                         self.delimiter_line_comment_prefix(block.span.start, first_stmt_start);
 
@@ -1745,7 +1746,7 @@ impl<'a> Printer<'a> {
                     let mut stmt_parts = d.pooled_docbuf();
                     let tail = self.build_statement_list_docs_into(
                         &mut stmt_parts,
-                        block.body,
+                        body,
                         Span::new(body_start, body_end),
                         false,
                         delimiter_pull_pos,

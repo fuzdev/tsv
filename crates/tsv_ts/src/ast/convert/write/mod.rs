@@ -188,7 +188,9 @@ pub fn write_pattern_embedded(
 fn write_program(w: &mut JsonWriter, program: &ast::Program<'_>, ctx: &Ctx<'_>) {
     node_header(w, "Program", program.span, ctx);
     w.raw(",\"body\":");
-    write_body_array(w, program.body, ctx, |w, s| write_statement(w, s, ctx));
+    write_body_array(w, ctx.view.stmt_list(program.body), ctx, |w, s| {
+        write_statement(w, ctx.view.stmt_slot(s), ctx);
+    });
     w.raw(",\"sourceType\":");
     w.token(program.goal.source_type());
     close_node(w, "Program", program.span, ctx);
@@ -1124,10 +1126,11 @@ mod tests {
         view: ast::AstView<'a>,
         program: &'a ast::Program<'a>,
     ) -> &'a ast::Identifier<'a> {
-        let [statement] = program.body else {
+        let [statement] = view.stmt_list(program.body) else {
             panic!("one statement expected");
         };
-        let ast::StatementKind::ExpressionStatement(statement) = &statement.kind else {
+        let ast::StatementKind::ExpressionStatement(statement) = &view.stmt_slot(statement).kind
+        else {
             panic!("an expression statement expected");
         };
         let ast::ExpressionKind::Identifier(id) = &view.expr(statement.expression).kind else {

@@ -6,7 +6,7 @@
 use tsv_lang::Span;
 
 use super::{
-    AstView, Expr, ExprId, Identifier, Literal, Run, Statement, TSEntityName, TSTypeAnnotation,
+    AstView, Expr, ExprId, Identifier, Literal, Run, StmtList, TSEntityName, TSTypeAnnotation,
     TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 
@@ -187,6 +187,6 @@ pub enum TSModuleDeclarationBody<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSModuleBlock<'arena> {
     /// Statements inside the module block
-    pub body: &'arena [Statement<'arena>],
+    pub body: StmtList<'arena>,
     pub span: Span,
 }

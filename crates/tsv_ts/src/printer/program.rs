@@ -68,7 +68,7 @@ impl<'a> Printer<'a> {
         // author blank, at the top level only.
         let tail = self.build_statement_list_docs_into(
             &mut parts,
-            program.body,
+            self.view.stmt_list(program.body),
             Span::new(0, program.span.end),
             false,
             None,

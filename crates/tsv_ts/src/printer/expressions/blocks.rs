@@ -507,14 +507,14 @@ impl<'a> Printer<'a> {
     /// such seam past its end, so its slots always claim.
     pub(in crate::printer) fn orphan_semi_slot(
         &self,
-        body: &[ast::Statement<'_>],
+        body: &[ast::StmtSlot<'_>],
         index: usize,
         list_end: u32,
         tail_target: Option<u32>,
         cursor: OrphanSemiCursor,
         claims: bool,
     ) -> OrphanSemiSlot<'_> {
-        let stmt_end = body[index].span().end;
+        let stmt_end = self.view.stmt_slot(&body[index]).span().end;
         // Zero-comment fast gate, the list's own: with no comment anywhere in its window
         // every query below is provably empty, so the slot reaches exactly its own `;` and
         // claims nothing. The block walk had this; the consequent's copy ran the searches
@@ -527,7 +527,9 @@ impl<'a> Printer<'a> {
                 claims,
             };
         }
-        let next_start = body.get(index + 1).map_or(list_end, |s| s.span().start);
+        let next_start = body
+            .get(index + 1)
+            .map_or(list_end, |s| self.view.stmt_slot(s).span().start);
         // A comment hugging the next printed statement's start leads it
         // (`a(); ; /* c */ b();`) — or, past the last one, the construct at `tail_target` (a
         // consequent's next `case` label). The orphan run must stop at the claim split so
@@ -678,7 +680,8 @@ impl<'a> Printer<'a> {
         // `EmptyStatement`s are still picked up by
         // `build_inner_comments_for_empty_block`, which scans the full brace
         // range rather than the statement list.
-        if is_effectively_empty_body(block.body) {
+        let body = self.view.stmt_list(block.body);
+        if is_effectively_empty_body(self.view, body) {
             let inner_comments = self.build_inner_comments_for_empty_block(block);
             if !inner_comments.is_empty() {
                 // Block with inner comments
@@ -702,7 +705,7 @@ impl<'a> Printer<'a> {
         // line when the body expands (divergence from prettier, which relocates it
         // to its own line as the body's leading comment).
         // See conformance_prettier_ts_comments.md §Comment relocation (Block body `{`).
-        let first_stmt_start = block.body[0].span().start;
+        let first_stmt_start = self.view.stmt_slot(&body[0]).span().start;
         let (brace_line_prefix, delimiter_pull_pos) =
             self.delimiter_line_comment_prefix(block.span.start, first_stmt_start);
 
@@ -713,7 +716,7 @@ impl<'a> Printer<'a> {
         let mut body_parts = d.pooled_docbuf();
         let tail = self.build_statement_list_docs_into(
             &mut body_parts,
-            block.body,
+            body,
             Span::new(block_start, block_end),
             false,
             delimiter_pull_pos,
@@ -781,7 +784,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_statement_list_docs_into(
         &self,
         body_parts: &mut DocBuf,
-        body: &[ast::Statement<'_>],
+        body: &[ast::StmtSlot<'_>],
         body_span: Span,
         has_leading: bool,
         delimiter_pull_pos: Option<u32>,
@@ -819,6 +822,7 @@ impl<'a> Printer<'a> {
         let body_has_comments = self.has_comments_on_page_between(body_start, body_end);
 
         for (i, stmt) in body.iter().enumerate() {
+            let stmt = self.view.stmt_slot(stmt);
             let stmt_start = stmt.span().start;
             let is_first = i == 0;
 

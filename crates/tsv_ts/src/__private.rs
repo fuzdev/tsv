@@ -4,8 +4,9 @@
 
 use super::*;
 use crate::ast::{
-    AstStores, AstView, ExprId, Expression, ExpressionKind, Parsed, ParsedRef, Run, Statement,
-    TSTypeAnnotation, TSTypeParameterDeclaration, VariableDeclaration,
+    AstStores, AstView, ExprId, Expression, ExpressionKind, FunctionDeclaration, Parsed, ParsedRef,
+    Program, Run, Statement, StatementKind, TSTypeAnnotation, TSTypeParameterDeclaration,
+    VariableDeclaration,
 };
 use tsv_lang::Span;
 
@@ -447,6 +448,23 @@ pub fn push_expression<'arena>(stores: &mut AstStores<'arena>, expr: Expression<
     #[cfg(feature = "_internal_ast_census")]
     tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
     stores.exprs.push(expr)
+}
+
+/// The `FunctionDeclaration` `program`'s first statement is, at the arena's lifetime — for a
+/// host that keeps parts of it (a `{#snippet}` head's wrapper, whose parameters and type
+/// parameters the block takes).
+///
+/// A read, not a view: a view's reads end at its own borrow of `stores`, and the host's
+/// fields outlive it.
+// TODO: read the statement row through `stores.stmts` once `Program.body` holds ids.
+pub fn first_function_declaration<'arena>(
+    _stores: &AstStores<'arena>,
+    program: &Program<'arena>,
+) -> Option<&'arena FunctionDeclaration<'arena>> {
+    match program.body.first().map(|stmt| &stmt.kind) {
+        Some(StatementKind::FunctionDeclaration(func)) => Some(*func),
+        _ => None,
+    }
 }
 
 /// Copy `ids` into `stores`' id-list store as one run — for a list the host gathered itself

@@ -270,8 +270,9 @@ impl<'a> Printer<'a> {
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
+        let body = self.view.stmt(stmt.body);
         let label_end = stmt.label.span.end;
-        let body_start = stmt.body.span().start;
+        let body_start = body.span().start;
 
         // Find actual colon position (skip comments between label and colon)
         let colon_pos = find_char_skipping_comments(
@@ -285,7 +286,7 @@ impl<'a> Printer<'a> {
 
         // Build the `: body` tail (including any colon→body comments).
         let mut tail_parts: DocBuf = smallvec![];
-        if self.gap_frozen_span(colon_end, stmt.body.span()).is_some() {
+        if self.gap_frozen_span(colon_end, body.span()).is_some() {
             // An own-line directive in the `:`→body gap freezes the body. The inline
             // emission below would trail the run on the label's line (`lll: // c`), an
             // inert placement that loses the freeze on the second pass, so route through
@@ -295,7 +296,7 @@ impl<'a> Printer<'a> {
             // ([`Printer::build_frozen_statement_doc`]).
             tail_parts.push(d.text(":"));
             self.push_header_to_body_gap(&mut tail_parts, colon_end, body_start);
-            tail_parts.push(self.build_frozen_statement_doc(stmt.body));
+            tail_parts.push(self.build_frozen_statement_doc(body));
         } else if self.has_comments_to_emit_between(colon_end, body_start) {
             // The run is pinned to the `:` line (prettier hoists it above the whole labeled
             // statement instead — the sanctioned position divergence), but its INTERNAL
@@ -322,16 +323,16 @@ impl<'a> Printer<'a> {
                 LeadingGlue::AdjacentAnchorLine,
             );
             tail_parts.push(d.group(d.concat(&run)));
-            tail_parts.push(self.build_statement_doc(stmt.body, ctx.labeled_body()));
+            tail_parts.push(self.build_statement_doc(body, ctx.labeled_body()));
         } else {
             // No space before empty statement: `label:;` not `label: ;`
-            let separator = if matches!(&stmt.body.kind, StatementKind::EmptyStatement(_)) {
+            let separator = if matches!(&body.kind, StatementKind::EmptyStatement(_)) {
                 ":"
             } else {
                 ": "
             };
             tail_parts.push(d.text(separator));
-            tail_parts.push(self.build_statement_doc(stmt.body, ctx.labeled_body()));
+            tail_parts.push(self.build_statement_doc(body, ctx.labeled_body()));
         }
         let tail = d.concat(&tail_parts);
 

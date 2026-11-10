@@ -5,10 +5,32 @@
 //! stores, and every read of one goes through the view. The view is one word: a walk reaches a
 //! row through a load of the store's slice header and an indexed load, and holds one register
 //! for the view.
+//!
+//! Statement edges and lists are read through the view too, spelled with the aliases here
+//! while the tree still holds them as references and slices.
 
 use tsv_lang::store::Run;
 
-use super::{AstStores, Expr, ExprId, Expression, Parsed, Program};
+use super::{AstStores, Expr, ExprId, Expression, Parsed, Program, Statement};
+
+/// One edge to a statement held in the tree: an `if`'s branches, a loop's, a `with`'s or a
+/// label's body, an `export`'s declaration.
+// TODO: `StmtId`.
+pub type StmtEdge<'a> = &'a Statement<'a>;
+
+/// A statement edge that may be absent.
+// TODO: `Option<StmtId>`.
+pub type OptStmtEdge<'a> = Option<StmtEdge<'a>>;
+
+/// A statement a list holds: read through [`AstView::stmt_slot`], as an edge is through
+/// [`AstView::stmt`].
+// TODO: `StmtId`.
+pub type StmtSlot<'a> = Statement<'a>;
+
+/// A statement list: a program's, a block's, a `case`'s, a static block's or a namespace's
+/// body.
+// TODO: `Run<StmtId>`.
+pub type StmtList<'a> = &'a [StmtSlot<'a>];
 
 /// The read access every consumer of the tree holds: resolves edges and the three kinds of
 /// list.
@@ -52,6 +74,30 @@ impl<'a> AstView<'a> {
     #[inline]
     pub fn run(self, run: Run<Expr>) -> &'a [Expression<'a>] {
         self.stores.exprs.slice(run)
+    }
+
+    /// The statement `edge` names.
+    #[inline]
+    pub fn stmt(self, edge: StmtEdge<'a>) -> &'a Statement<'a> {
+        edge
+    }
+
+    /// The statement `edge` names, when it is present.
+    #[inline]
+    pub fn opt_stmt(self, edge: OptStmtEdge<'a>) -> Option<&'a Statement<'a>> {
+        edge
+    }
+
+    /// The elements of `list`, each resolved through [`Self::stmt_slot`].
+    #[inline]
+    pub fn stmt_list(self, list: StmtList<'a>) -> &'a [StmtSlot<'a>] {
+        list
+    }
+
+    /// The statement `slot` holds.
+    #[inline]
+    pub fn stmt_slot(self, slot: &'a StmtSlot<'a>) -> &'a Statement<'a> {
+        slot
     }
 }
 

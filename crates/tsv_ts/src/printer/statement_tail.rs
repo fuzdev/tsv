@@ -45,11 +45,15 @@ impl<'a> Printer<'a> {
     /// Which terminator rule a statement's kind follows — prettier's
     /// `shouldIgnoredNodePrintSemicolon`. A header kind resolves through its TAIL statement
     /// the way prettier does: a statement's terminator is its tail's.
-    pub(in crate::printer) fn statement_terminator(
-        mut stmt: &ast::Statement<'_>,
-    ) -> StatementTerminator {
+    pub(in crate::printer) fn statement_terminator<'s>(
+        &self,
+        mut stmt: &'s ast::Statement<'s>,
+    ) -> StatementTerminator
+    where
+        'a: 's,
+    {
         loop {
-            match Self::own_statement_terminator(stmt) {
+            match self.own_statement_terminator(stmt) {
                 Ok(terminator) => return terminator,
                 Err(tail) => stmt = tail,
             }
@@ -81,12 +85,18 @@ impl<'a> Printer<'a> {
     /// Conflating them cost one DOUBLE-PRINT (every `export type A = B;`) and one
     /// DROP (every `l: a();`), each found by the gap-injection audit rather than by a
     /// fixture — the authoring is one no formatted document contains.
-    fn delegated_statement<'s, 'arena>(
-        stmt: &'s ast::Statement<'arena>,
-    ) -> Option<&'s ast::Statement<'arena>> {
+    fn delegated_statement<'s>(
+        &self,
+        stmt: &'s ast::Statement<'s>,
+    ) -> Option<&'s ast::Statement<'s>>
+    where
+        'a: 's,
+    {
         match &stmt.kind {
-            ast::StatementKind::ExportNamedDeclaration(decl) => decl.declaration,
-            ast::StatementKind::LabeledStatement(stmt) => Some(stmt.body),
+            ast::StatementKind::ExportNamedDeclaration(decl) => {
+                self.view.opt_stmt(decl.declaration)
+            }
+            ast::StatementKind::LabeledStatement(stmt) => Some(self.view.stmt(stmt.body)),
             _ => None,
         }
     }
@@ -101,9 +111,13 @@ impl<'a> Printer<'a> {
     /// belongs to a CLAUSE BODY, printed by a site that keeps the node-owned split, so
     /// lowering the enclosing list's cursor over it would claim a comment that body already
     /// prints (a DOUBLE-PRINT).
-    fn own_statement_terminator<'s, 'arena>(
-        stmt: &'s ast::Statement<'arena>,
-    ) -> Result<StatementTerminator, &'s ast::Statement<'arena>> {
+    fn own_statement_terminator<'s>(
+        &self,
+        stmt: &'s ast::Statement<'s>,
+    ) -> Result<StatementTerminator, &'s ast::Statement<'s>>
+    where
+        'a: 's,
+    {
         Ok(match &stmt.kind {
             ast::StatementKind::VariableDeclaration(_)
             | ast::StatementKind::BreakStatement(_)
@@ -118,14 +132,14 @@ impl<'a> Printer<'a> {
             | ast::StatementKind::ExportDefaultDeclaration(_)
             | ast::StatementKind::ExportAllDeclaration(_) => StatementTerminator::IfAuthored,
             ast::StatementKind::IfStatement(s) => {
-                return Err(s.alternate.unwrap_or(s.consequent));
+                return Err(self.view.stmt(s.alternate.unwrap_or(s.consequent)));
             }
-            ast::StatementKind::ForStatement(s) => return Err(s.body),
-            ast::StatementKind::ForInStatement(s) => return Err(s.body),
-            ast::StatementKind::ForOfStatement(s) => return Err(s.body),
-            ast::StatementKind::WhileStatement(s) => return Err(s.body),
-            ast::StatementKind::WithStatement(s) => return Err(s.body),
-            ast::StatementKind::LabeledStatement(s) => return Err(s.body),
+            ast::StatementKind::ForStatement(s) => return Err(self.view.stmt(s.body)),
+            ast::StatementKind::ForInStatement(s) => return Err(self.view.stmt(s.body)),
+            ast::StatementKind::ForOfStatement(s) => return Err(self.view.stmt(s.body)),
+            ast::StatementKind::WhileStatement(s) => return Err(self.view.stmt(s.body)),
+            ast::StatementKind::WithStatement(s) => return Err(self.view.stmt(s.body)),
+            ast::StatementKind::LabeledStatement(s) => return Err(self.view.stmt(s.body)),
             _ => StatementTerminator::Never,
         })
     }
@@ -156,7 +170,7 @@ impl<'a> Printer<'a> {
     /// way and for the same reason, each stated at its own site.
     pub(in crate::printer) fn statement_content_end(&self, stmt: &ast::Statement<'_>) -> u32 {
         let span = stmt.span();
-        if Self::statement_terminator(stmt) == StatementTerminator::Never {
+        if self.statement_terminator(stmt) == StatementTerminator::Never {
             return span.end;
         }
         let Some(content) = span.extract(self.source).strip_suffix(';') else {
@@ -197,10 +211,13 @@ impl<'a> Printer<'a> {
     /// to the construct.
     ///
     /// A kind the table calls [`StatementTerminator::Never`] has no terminator to eject at all.
-    pub(in crate::printer) fn statement_hands_off_terminator_gap(
+    pub(in crate::printer) fn statement_hands_off_terminator_gap<'s>(
         &self,
-        mut stmt: &ast::Statement<'_>,
-    ) -> bool {
+        mut stmt: &'s ast::Statement<'s>,
+    ) -> bool
+    where
+        'a: 's,
+    {
         // Walk to the statement that actually prints the `;` — through every DELEGATING
         // wrapper, and through every clause-bearing HEADER to its tail-most clause body
         // ([`Self::own_statement_terminator`] picks that body: an `if`'s alternate before its
@@ -216,9 +233,9 @@ impl<'a> Printer<'a> {
             if let ast::StatementKind::ExportDefaultDeclaration(decl) = &stmt.kind {
                 return matches!(decl.declaration, ast::ExportDefaultValue::Expression(_));
             }
-            let inner = match Self::delegated_statement(stmt) {
+            let inner = match self.delegated_statement(stmt) {
                 Some(inner) => inner,
-                None => match Self::own_statement_terminator(stmt) {
+                None => match self.own_statement_terminator(stmt) {
                     Ok(terminator) => {
                         return matches!(
                             terminator,

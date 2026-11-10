@@ -85,7 +85,8 @@ fn statement_count(source: &str) -> usize {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::__private::parse(source, &arena);
     assert!(program.is_ok(), "{source:?} must parse: {program:?}");
-    program.expect("checked above").body.len()
+    let parsed = program.expect("checked above");
+    parsed.view().stmt_list(parsed.body).len()
 }
 
 /// A multi-line block written last inside a shell down a sequence's last operand, where a

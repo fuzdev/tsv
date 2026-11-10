@@ -33,7 +33,6 @@ use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use smallvec::SmallVec;
 
-use crate::ast::AstView;
 use crate::ast::{
     ArrowFunctionBody, ArrowFunctionExpression, BinaryExpression, BinaryOperator, BlockStatement,
     ClassBody, ClassDeclaration, ClassExpression, ClassMember, Decorator, ExportDefaultDeclaration,
@@ -45,6 +44,7 @@ use crate::ast::{
     TSModuleDeclarationKind, TSModuleName, TSParameterProperty, TSType, TSTypeAnnotation,
     TSTypeParameterDeclaration, TSTypeParameterInstantiation, VariableDeclaration,
 };
+use crate::ast::{AstView, StmtList};
 use crate::ast::{
     ExportAllDeclaration, ImportAttribute, ImportExpression, LiteralValue, TSEnumDeclaration,
     TSImportEqualsDeclaration, TSModuleReference, VariableDeclarationKind,
@@ -265,7 +265,8 @@ impl<'s, 'b> Walk<'s, 'b> {
         // `statement_list`
         let outer_end = self.statement_end;
         let outer_open = std::mem::replace(&mut self.open, Tail::Closed);
-        for statement in program.body {
+        for statement in self.view.stmt_list(program.body) {
+            let statement = self.view.stmt_slot(statement);
             if self.collects() {
                 self.module_syntax |= is_module_declaration(statement);
             }
@@ -557,14 +558,15 @@ impl<'s, 'b> Walk<'s, 'b> {
     // Statements
     //
 
-    fn statement_list(&mut self, list: &[Statement<'_>], function_body: bool) {
+    fn statement_list(&mut self, list: StmtList<'_>, function_body: bool) {
         let outer_marked = self.marked_end;
         if function_body {
             self.marked_end = None;
         }
         let outer_end = self.statement_end;
         let outer_open = std::mem::replace(&mut self.open, Tail::Closed);
-        for statement in list {
+        for statement in self.view.stmt_list(list) {
+            let statement = self.view.stmt_slot(statement);
             self.statement_end = Some(statement.span.end);
             self.statement(statement, statement.span, Position::List);
         }
@@ -641,7 +643,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 true
             }
             StatementKind::TSModuleDeclaration(decl) => {
-                if module_is_type_only(decl) {
+                if module_is_type_only(self.view, decl) {
                     self.blank_statement(outer, position);
                     return false;
                 }
@@ -705,8 +707,8 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             StatementKind::IfStatement(s) => {
                 self.expr(self.view.expr(s.test));
-                self.nested_statement(s.consequent);
-                if let Some(alternate) = s.alternate {
+                self.nested_statement(self.view.stmt(s.consequent));
+                if let Some(alternate) = self.view.opt_stmt(s.alternate) {
                     self.nested_statement(alternate);
                 }
                 true
@@ -724,13 +726,13 @@ impl<'s, 'b> Walk<'s, 'b> {
                 if let Some(update) = self.view.opt(s.update) {
                     self.expr(update);
                 }
-                self.nested_statement(s.body);
+                self.nested_statement(self.view.stmt(s.body));
                 true
             }
             StatementKind::ForInStatement(s) => {
                 self.for_left(s.left);
                 self.expr(self.view.expr(s.right));
-                self.nested_statement(s.body);
+                self.nested_statement(self.view.stmt(s.body));
                 true
             }
             StatementKind::ForOfStatement(s) => {
@@ -739,22 +741,22 @@ impl<'s, 'b> Walk<'s, 'b> {
                 }
                 self.for_left(s.left);
                 self.expr(self.view.expr(s.right));
-                self.nested_statement(s.body);
+                self.nested_statement(self.view.stmt(s.body));
                 true
             }
             StatementKind::WhileStatement(s) => {
                 self.expr(self.view.expr(s.test));
-                self.nested_statement(s.body);
+                self.nested_statement(self.view.stmt(s.body));
                 true
             }
             StatementKind::DoWhileStatement(s) => {
-                self.nested_statement(s.body);
+                self.nested_statement(self.view.stmt(s.body));
                 self.expr(self.view.expr(s.test));
                 true
             }
             StatementKind::WithStatement(s) => {
                 self.expr(self.view.expr(s.object));
-                self.nested_statement(s.body);
+                self.nested_statement(self.view.stmt(s.body));
                 true
             }
             StatementKind::SwitchStatement(s) => {
@@ -800,7 +802,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             StatementKind::LabeledStatement(s) => {
                 self.mark(s.label.span.end);
-                self.nested_statement(s.body);
+                self.nested_statement(self.view.stmt(s.body));
                 true
             }
             StatementKind::EmptyStatement(_) | StatementKind::DebuggerStatement(_) => true,
@@ -827,9 +829,11 @@ impl<'s, 'b> Walk<'s, 'b> {
                 }),
                 _ => Tail::Closed,
             },
-            StatementKind::ExportNamedDeclaration(export) => export
-                .declaration
-                .map_or(Tail::Closed, |declaration| self.statement_tail(declaration)),
+            StatementKind::ExportNamedDeclaration(export) => {
+                export.declaration.map_or(Tail::Closed, |declaration| {
+                    self.statement_tail(self.view.stmt(declaration))
+                })
+            }
             StatementKind::ExportDefaultDeclaration(export) => match &export.declaration {
                 ExportDefaultValue::Expression(e) => {
                     self.unterminated_tail(self.view.expr(*e), end)
@@ -840,14 +844,14 @@ impl<'s, 'b> Walk<'s, 'b> {
                 | ExportDefaultValue::TSInterfaceDeclaration(_) => Tail::Closed,
             },
             StatementKind::IfStatement(s) => {
-                self.statement_tail(s.alternate.unwrap_or(s.consequent))
+                self.statement_tail(self.view.stmt(s.alternate.unwrap_or(s.consequent)))
             }
-            StatementKind::ForStatement(s) => self.statement_tail(s.body),
-            StatementKind::ForInStatement(s) => self.statement_tail(s.body),
-            StatementKind::ForOfStatement(s) => self.statement_tail(s.body),
-            StatementKind::WhileStatement(s) => self.statement_tail(s.body),
-            StatementKind::WithStatement(s) => self.statement_tail(s.body),
-            StatementKind::LabeledStatement(s) => self.statement_tail(s.body),
+            StatementKind::ForStatement(s) => self.statement_tail(self.view.stmt(s.body)),
+            StatementKind::ForInStatement(s) => self.statement_tail(self.view.stmt(s.body)),
+            StatementKind::ForOfStatement(s) => self.statement_tail(self.view.stmt(s.body)),
+            StatementKind::WhileStatement(s) => self.statement_tail(self.view.stmt(s.body)),
+            StatementKind::WithStatement(s) => self.statement_tail(self.view.stmt(s.body)),
+            StatementKind::LabeledStatement(s) => self.statement_tail(self.view.stmt(s.body)),
             StatementKind::TSTypeAliasDeclaration(_)
             | StatementKind::TSInterfaceDeclaration(_)
             | StatementKind::TSDeclareFunction(_)
@@ -933,7 +937,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             self.blank_statement(outer, position);
             return false;
         }
-        if let Some(declaration) = export.declaration {
+        if let Some(declaration) = self.view.opt_stmt(export.declaration) {
             return self.statement_kind(declaration, outer, position);
         }
         let mut every_type = !export.specifiers.is_empty();
@@ -1790,7 +1794,9 @@ impl<'s, 'b> Walk<'s, 'b> {
         let key = self.view.expr(method.key);
         let func = &method.value;
         // an overload signature or an abstract method or accessor: no body
-        if func.body.body.is_empty() && func.body.span.start == func.body.span.end {
+        if self.view.stmt_list(func.body.body).is_empty()
+            && func.body.span.start == func.body.span.end
+        {
             self.blank_signature(method.span, Position::List);
             return false;
         }
@@ -2160,46 +2166,49 @@ const fn precedence(operator: BinaryOperator) -> u8 {
 /// refused (ts-blank-space's `visitModule`): `declare global`, an ambient `module 'x'`, and
 /// a `namespace` that is `declare`d or holds no value. A `module` keyword with an
 /// identifier name is refused even when ambient, as both oracles refuse it.
-fn module_is_type_only(decl: &TSModuleDeclaration<'_>) -> bool {
+fn module_is_type_only(view: AstView<'_>, decl: &TSModuleDeclaration<'_>) -> bool {
     decl.global
         || matches!(decl.id, TSModuleName::Literal(_))
         || (decl.kind == TSModuleDeclarationKind::Namespace
-            && (decl.declare || !namespace_holds_value(decl)))
+            && (decl.declare || !namespace_holds_value(view, decl)))
 }
 
 /// Whether a `namespace`'s body holds a value (ts-blank-space's `valueNamespaceWorker`).
-fn namespace_holds_value(decl: &TSModuleDeclaration<'_>) -> bool {
+fn namespace_holds_value(view: AstView<'_>, decl: &TSModuleDeclaration<'_>) -> bool {
     match &decl.body {
         None => false,
         Some(TSModuleDeclarationBody::TSModuleDeclaration(inner)) => {
-            nested_module_holds_value(inner)
+            nested_module_holds_value(view, inner)
         }
-        Some(TSModuleDeclarationBody::TSModuleBlock(block)) => {
-            block.body.iter().any(namespace_member_holds_value)
-        }
+        Some(TSModuleDeclarationBody::TSModuleBlock(block)) => view
+            .stmt_list(block.body)
+            .iter()
+            .any(|statement| namespace_member_holds_value(view, view.stmt_slot(statement))),
     }
 }
 
 /// A module nested in a namespace: one not spelled `namespace` (an ambient `module 'x'`,
 /// `global`, a `module` keyword) counts as a value, as ts-blank-space counts it.
-fn nested_module_holds_value(decl: &TSModuleDeclaration<'_>) -> bool {
-    decl.global || decl.kind != TSModuleDeclarationKind::Namespace || namespace_holds_value(decl)
+fn nested_module_holds_value(view: AstView<'_>, decl: &TSModuleDeclaration<'_>) -> bool {
+    decl.global
+        || decl.kind != TSModuleDeclarationKind::Namespace
+        || namespace_holds_value(view, decl)
 }
 
 /// Whether one statement of a namespace body is a value: anything but a type alias, an
 /// interface, a type-only nested namespace, or an unexported import-equals alias.
-fn namespace_member_holds_value(statement: &Statement<'_>) -> bool {
+fn namespace_member_holds_value(view: AstView<'_>, statement: &Statement<'_>) -> bool {
     match &statement.kind {
         StatementKind::TSTypeAliasDeclaration(_) | StatementKind::TSInterfaceDeclaration(_) => {
             false
         }
-        StatementKind::TSModuleDeclaration(decl) => nested_module_holds_value(decl),
+        StatementKind::TSModuleDeclaration(decl) => nested_module_holds_value(view, decl),
         StatementKind::TSImportEqualsDeclaration(decl) => decl.is_export,
-        StatementKind::ExportNamedDeclaration(export) => match export.declaration {
+        StatementKind::ExportNamedDeclaration(export) => match view.opt_stmt(export.declaration) {
             Some(declaration) => match &declaration.kind {
                 StatementKind::TSTypeAliasDeclaration(_)
                 | StatementKind::TSInterfaceDeclaration(_) => false,
-                StatementKind::TSModuleDeclaration(decl) => nested_module_holds_value(decl),
+                StatementKind::TSModuleDeclaration(decl) => nested_module_holds_value(view, decl),
                 StatementKind::TSImportEqualsDeclaration(_)
                 | StatementKind::ExpressionStatement(_)
                 | StatementKind::VariableDeclaration(_)

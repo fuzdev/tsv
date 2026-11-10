@@ -269,7 +269,9 @@ fn write_class_body(w: &mut JsonWriter, body: &ast::ClassBody<'_>, ctx: &Ctx<'_>
         ast::ClassMember::StaticBlock(block) => {
             node_header(w, "StaticBlock", block.span, ctx);
             w.raw(",\"body\":");
-            write_array(w, block.body, |w, s| write_statement(w, s, ctx));
+            write_array(w, ctx.view.stmt_list(block.body), |w, s| {
+                write_statement(w, ctx.view.stmt_slot(s), ctx);
+            });
             // acorn-typescript attaches a member's decorators once it has built it,
             // so a static block's list follows its `body`.
             write_decorators_field(w, block.decorators, ctx);
@@ -424,7 +426,8 @@ fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition<'_
     // Both value shapes are otherwise identical — typeParameters stays on
     // the MethodDefinition, never on the value node.
     let is_bodyless = method.r#abstract
-        || (func.body.body.is_empty() && func.body.span.start == func.body.span.end);
+        || (ctx.view.stmt_list(func.body.body).is_empty()
+            && func.body.span.start == func.body.span.end);
     let (value_type, body) = if is_bodyless {
         ("TSDeclareMethod", None)
     } else {

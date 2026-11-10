@@ -139,7 +139,7 @@ impl<'a> Printer<'a> {
         span: Span,
     ) -> DocId {
         let d = self.d();
-        if let Some(declaration) = &decl.declaration {
+        if let Some(declaration) = self.view.opt_stmt(decl.declaration) {
             // When exporting a declaration, always use plain "export " because
             // the type/interface/declare keyword is part of the declaration itself
             let export_keyword = "export";

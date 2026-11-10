@@ -265,15 +265,16 @@ impl<'a> Printer<'a> {
         // The consequent is always one `adjustClause` indent in, and an `else`
         // CONTINUES on the line its tail flushes at (a block consequent ignores this).
         let body_ctx = ctx.clause_body(stmt.alternate.is_some(), true);
-        match &stmt.consequent.kind {
+        let consequent = self.view.stmt(stmt.consequent);
+        match &consequent.kind {
             // Block consequent: `if (` + condition + `) ` + block.
             StatementKind::BlockStatement(block) => {
                 self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
-                parts.push(self.build_branch_body_doc(paren_end, stmt.consequent, body_ctx));
+                parts.push(self.build_branch_body_doc(paren_end, consequent, body_ctx));
             }
             // `if (cond);` or `if (cond) /* c */ ;`
             StatementKind::EmptyStatement(_) => {
-                let empty_start = stmt.consequent.span().start;
+                let empty_start = consequent.span().start;
                 self.append_close_paren_empty_stmt_with_comments(
                     &mut parts,
                     paren_end,
@@ -285,9 +286,8 @@ impl<'a> Printer<'a> {
             // broken. `parts` holds exactly the head at this point, which is what
             // adjustClause groups with the body.
             _ => {
-                let body_start = stmt.consequent.span().start;
-                let consequent_doc =
-                    self.build_branch_body_doc(paren_end, stmt.consequent, body_ctx);
+                let body_start = consequent.span().start;
+                let consequent_doc = self.build_branch_body_doc(paren_end, consequent, body_ctx);
                 let head = std::mem::take(&mut parts);
                 parts.push(self.build_adjust_clause_with_comments(
                     &head,
@@ -336,9 +336,10 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts = self.build_if_head_and_consequent(stmt, span, ctx);
+        let consequent = self.view.stmt(stmt.consequent);
 
-        if let Some(alternate) = &stmt.alternate {
-            let consequent_end = stmt.consequent.span().end;
+        if let Some(alternate) = self.view.opt_stmt(stmt.alternate) {
+            let consequent_end = consequent.span().end;
             let alternate_start = alternate.span().start;
             // One keyword scan for both halves of the clause: the `}`→`else` gap needs the
             // keyword's START, the clause itself its END.
@@ -350,15 +351,15 @@ impl<'a> Printer<'a> {
                 &mut parts,
                 consequent_end,
                 before_else_end,
-                matches!(&stmt.consequent.kind, StatementKind::BlockStatement(_)),
-                self.terminator_defers_comment(stmt.consequent.span().start, consequent_end),
+                matches!(&consequent.kind, StatementKind::BlockStatement(_)),
+                self.terminator_defers_comment(consequent.span().start, consequent_end),
             );
             self.append_else_clause(&mut parts, alternate, else_end, false, ctx);
         }
 
         let doc = d.concat(&parts);
         if matches!(
-            &stmt.consequent.kind,
+            &consequent.kind,
             StatementKind::BlockStatement(_) | StatementKind::EmptyStatement(_)
         ) {
             d.group(doc)

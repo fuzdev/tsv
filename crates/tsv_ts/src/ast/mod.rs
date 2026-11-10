@@ -34,7 +34,7 @@ pub(crate) use stores::ScratchMarks;
 pub use stores::{AstStores, Expr, ExprId, Parsed, Stmt, StmtId, with_stores};
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
-pub use view::{AstView, ParsedRef};
+pub use view::{AstView, OptStmtEdge, ParsedRef, StmtEdge, StmtList, StmtSlot};
 
 //
 // Re-exports from submodules
@@ -198,7 +198,7 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType<'static>>
 /// satisfying bumpalo's no-`Drop` rule).
 #[derive(Debug, Clone)]
 pub struct Program<'arena> {
-    pub body: &'arena [Statement<'arena>],
+    pub body: StmtList<'arena>,
     pub comments: &'arena [Comment],
     pub span: Span,
     /// The goal symbol this program was parsed against. Drives the public AST's

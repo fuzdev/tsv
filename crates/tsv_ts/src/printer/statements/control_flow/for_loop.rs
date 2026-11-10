@@ -227,15 +227,16 @@ impl<'a> Printer<'a> {
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
+        let body = self.view.stmt(stmt.body);
         let header_doc = self.build_for_header_doc(stmt, span, parens, None);
-        if matches!(&stmt.body.kind, StatementKind::EmptyStatement(_)) {
+        if matches!(&body.kind, StatementKind::EmptyStatement(_)) {
             // No space before empty statement: `for (...);` (the ctx is inert — an
             // EmptyStatement is bare `";"` with no terminator gap)
             d.concat(&[
                 header_doc,
-                self.build_statement_doc(stmt.body, ctx.clause_body(false, true)),
+                self.build_statement_doc(body, ctx.clause_body(false, true)),
             ])
-        } else if let StatementKind::BlockStatement(block) = &stmt.body.kind {
+        } else if let StatementKind::BlockStatement(block) = &body.kind {
             // Block body: `for (...) { ... }`
             // Note: Unlike for-in/for-of, standard for loops keep empty blocks inline `{}`
             d.concat(&[
@@ -243,7 +244,7 @@ impl<'a> Printer<'a> {
                 d.text(" "),
                 self.build_statement_head_doc(
                     self.get_for_header_end(stmt, span, parens),
-                    stmt.body,
+                    body,
                     || self.build_block_statement_doc(block),
                 ),
             ])
@@ -257,10 +258,10 @@ impl<'a> Printer<'a> {
             // width-only overflow keeps the header flat (matching Prettier).
             let body_doc = self.build_statement_head_doc(
                 self.get_for_header_end(stmt, span, parens),
-                stmt.body,
+                body,
                 // `adjustClause` wraps the body in one indent; nothing continues on
                 // the tail's line.
-                || self.build_statement_doc(stmt.body, ctx.clause_body(false, true)),
+                || self.build_statement_doc(body, ctx.clause_body(false, true)),
             );
             d.group(d.concat(&[header_doc, d.indent_line(body_doc)]))
         }
@@ -1346,7 +1347,7 @@ impl<'a> Printer<'a> {
         self.build_for_in_of_statement_with_body_doc(
             stmt.left,
             self.view.expr(stmt.right),
-            stmt.body,
+            self.view.stmt(stmt.body),
             span.start,
             "in",
             false,
@@ -1364,7 +1365,7 @@ impl<'a> Printer<'a> {
         self.build_for_in_of_statement_with_body_doc(
             stmt.left,
             self.view.expr(stmt.right),
-            stmt.body,
+            self.view.stmt(stmt.body),
             span.start,
             "of",
             stmt.r#await,
@@ -1887,6 +1888,7 @@ impl<'a> Printer<'a> {
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
+        let body = self.view.stmt(stmt.body);
 
         // Preserve comments between `for` keyword and `(` in place:
         //   for/* c */(;;){} → for /* c */ (;;) {}
@@ -1898,7 +1900,7 @@ impl<'a> Printer<'a> {
 
         // Check for comments between ) and body (Prettier 3.7 #18108)
         let header_end = self.get_for_header_end(stmt, span, parens);
-        let body_start = stmt.body.span().start;
+        let body_start = body.span().start;
 
         if has_pre_paren_comments || self.has_comments_to_emit_between(header_end, body_start) {
             // Build parts with proper comment handling. A comment between `)` and the
@@ -1914,18 +1916,18 @@ impl<'a> Printer<'a> {
             // the body drops to its own indented line when the header breaks (a
             // comment hardline propagates) or the whole thing overflows — while the
             // header group still decides its own flat/break.
-            let is_block_body = matches!(&stmt.body.kind, StatementKind::BlockStatement(_));
+            let is_block_body = matches!(&body.kind, StatementKind::BlockStatement(_));
             // A C-style `for` collapses its empty block body (`for (…) {}`) — unless an
             // own-line directive in the `)`→body gap freezes it.
-            let body_doc = self.build_statement_head_doc(header_end, stmt.body, || {
+            let body_doc = self.build_statement_head_doc(header_end, body, || {
                 // Every arm below that prints a non-block body wraps it in one indent
                 // (`adjustClause`); nothing continues on the tail's line.
-                self.build_collapsing_body_doc(stmt.body, ctx.clause_body(false, true))
+                self.build_collapsing_body_doc(body, ctx.clause_body(false, true))
             });
 
             let gap_breaks = self.header_to_body_gap_breaks(header_end, body_start);
             let (tail, group_it) = if self.has_comments_to_emit_between(header_end, body_start) {
-                if matches!(&stmt.body.kind, StatementKind::EmptyStatement(_)) {
+                if matches!(&body.kind, StatementKind::EmptyStatement(_)) {
                     // Asked FIRST: the empty-body arm below is guarded by this branch;
                     // asked later, a comment in the gap would route the `;` through
                     // `adjustClause` and indent it. An empty body has no clause — prettier returns `";"`
@@ -1975,7 +1977,7 @@ impl<'a> Printer<'a> {
                         )
                     }
                 }
-            } else if matches!(&stmt.body.kind, StatementKind::EmptyStatement(_)) {
+            } else if matches!(&body.kind, StatementKind::EmptyStatement(_)) {
                 // Empty body attaches directly: `);` (no space, no adjustClause).
                 // Matches the main path (`build_for_statement_with_body_doc`) and Prettier.
                 (body_doc, false)

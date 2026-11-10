@@ -45,7 +45,7 @@ pub struct ParsedRoot<'arena> {
 }
 
 impl<'arena> ParsedRoot<'arena> {
-    /// The view reading this tree's expressions.
+    /// The view reading this tree's stores.
     #[inline]
     pub fn view(&self) -> AstView<'_> {
         self.stores.view()

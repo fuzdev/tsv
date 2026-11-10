@@ -48,9 +48,13 @@ pub(crate) fn skip_identifier_at(bytes: &[u8], pos: usize, end: usize) -> usize 
 /// are picked up separately, by scanning the full brace range rather than the
 /// statement list). Used by block-statement and namespace/module bodies to
 /// decide between the empty-body and normal rendering paths.
-pub(crate) fn is_effectively_empty_body(body: &[ast::Statement<'_>]) -> bool {
-    body.iter()
-        .all(|s| matches!(&s.kind, ast::StatementKind::EmptyStatement(_)))
+pub(crate) fn is_effectively_empty_body(view: AstView<'_>, body: &[ast::StmtSlot<'_>]) -> bool {
+    body.iter().all(|s| {
+        matches!(
+            &view.stmt_slot(s).kind,
+            ast::StatementKind::EmptyStatement(_)
+        )
+    })
 }
 
 /// The start of the next statement after `index` that will actually be printed
@@ -64,11 +68,12 @@ pub(crate) fn is_effectively_empty_body(body: &[ast::Statement<'_>]) -> bool {
 /// the comment (neither the statement's trailing scan nor the dropped `;`'s
 /// leading-comment collection claims it) and silently drop it.
 pub(crate) fn next_printed_stmt_start(
-    body: &[ast::Statement<'_>],
+    view: AstView<'_>,
+    body: &[ast::StmtSlot<'_>],
     index: usize,
     body_end: u32,
 ) -> u32 {
-    next_printed_stmt(body, index).map_or(body_end, |s| s.span().start)
+    next_printed_stmt(view, body, index).map_or(body_end, |s| s.span().start)
 }
 
 /// The next statement after `body[index]` that `printStatementSequence` will actually
@@ -76,12 +81,14 @@ pub(crate) fn next_printed_stmt_start(
 /// `Option` form of [`next_printed_stmt_start`], for the callers whose behavior
 /// differs when nothing prints (the trailing-claim split runs only toward a printed
 /// statement — a comment hugging the body's `}` still trails).
-pub(crate) fn next_printed_stmt<'s, 'arena>(
-    body: &'s [ast::Statement<'arena>],
+pub(crate) fn next_printed_stmt<'s>(
+    view: AstView<'s>,
+    body: &'s [ast::StmtSlot<'s>],
     index: usize,
-) -> Option<&'s ast::Statement<'arena>> {
+) -> Option<&'s ast::Statement<'s>> {
     body[index + 1..]
         .iter()
+        .map(|s| view.stmt_slot(s))
         .find(|s| !matches!(&s.kind, ast::StatementKind::EmptyStatement(_)))
 }
 
@@ -91,12 +98,17 @@ pub(crate) fn next_printed_stmt<'s, 'arena>(
 /// content before it (`a(); /* c */ ; b();` — prettier reads it the same way), so the
 /// leads-next scan ([`Printer::trailing_claim_end`](super::Printer::trailing_claim_end))
 /// must not reach back across one.
-pub(crate) fn statement_gap_floor(body: &[ast::Statement<'_>], index: usize) -> u32 {
+pub(crate) fn statement_gap_floor(
+    view: AstView<'_>,
+    body: &[ast::StmtSlot<'_>],
+    index: usize,
+) -> u32 {
     body[index + 1..]
         .iter()
+        .map(|s| view.stmt_slot(s))
         .take_while(|s| matches!(&s.kind, ast::StatementKind::EmptyStatement(_)))
         .last()
-        .map_or_else(|| body[index].span().end, |s| s.span().end)
+        .map_or_else(|| view.stmt_slot(&body[index]).span().end, |s| s.span().end)
 }
 
 /// Check if an expression is a module path call that should use fluid assignment wrapping
