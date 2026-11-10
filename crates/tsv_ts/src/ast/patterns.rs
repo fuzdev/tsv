@@ -3,7 +3,7 @@
 //! Contains object patterns, array patterns, assignment patterns,
 //! and rest elements for destructuring declarations and assignments.
 
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use tsv_lang::Span;
 
 use super::{Decorator, ExprId, Property, Run, TSTypeAnnotation};
@@ -59,7 +59,7 @@ impl<'arena> ObjectPatternProperty<'arena> {
     /// own only in the *valid* spelling, and the permissively parsed `{ a = 1 }` — the
     /// literal shape of this very binding — is exactly where the key anchor cost it that
     /// comment.
-    pub fn value_end(&self, view: ExprView<'_>) -> u32 {
+    pub fn value_end(&self, view: AstView<'_>) -> u32 {
         match self {
             ObjectPatternProperty::Property(p) => view.expr(p.value).printed_end(view),
             // The rest element's own end: its stripped-paren interior is its doc's share.
@@ -70,7 +70,7 @@ impl<'arena> ObjectPatternProperty<'arena> {
     /// The rest element's stripped-paren interior ([`RestElement::paren_interior`]), if this
     /// property is the rest — the pattern counterpart of
     /// [`super::ObjectProperty::paren_interior`].
-    pub fn paren_interior(&self, view: ExprView<'_>) -> Option<Span> {
+    pub fn paren_interior(&self, view: AstView<'_>) -> Option<Span> {
         match self {
             ObjectPatternProperty::RestElement(r) => Some(r.paren_interior(view)),
             ObjectPatternProperty::Property(_) => None,
@@ -154,7 +154,7 @@ impl RestElement<'_> {
     ///
     /// Empty for a rest carrying a `?` marker or a `: T` annotation: that tail is what
     /// extends its span there, and its gaps are the tail emitter's, never an interior.
-    pub fn paren_interior(&self, view: ExprView<'_>) -> Span {
+    pub fn paren_interior(&self, view: AstView<'_>) -> Span {
         let arg_end = view.expr(self.argument).span().end;
         if self.optional || self.type_annotation.is_some() {
             Span::new(arg_end, arg_end)

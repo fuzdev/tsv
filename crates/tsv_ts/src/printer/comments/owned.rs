@@ -13,7 +13,7 @@
 // against — inert for an annotation the next token was carrying (`/* @__PURE__ */`).
 
 use super::paren::left_spine_has_no_shell;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{self, Expression, ExpressionKind};
 use crate::printer::Printer;
 use crate::printer::expressions::assignment::is_curried_arrow_chain_owning_break;
@@ -34,10 +34,7 @@ use tsv_lang::source_scan;
 /// recurses to the leaf and stops at IIFE callees/tags; this one takes a single step and
 /// asks only whether the child *starts where the parent does*. Merging them would be a
 /// behavior change, not a cleanup.
-fn left_spine_child<'x>(
-    view: ExprView<'x>,
-    expr: &'x Expression<'x>,
-) -> Option<&'x Expression<'x>> {
+fn left_spine_child<'x>(view: AstView<'x>, expr: &'x Expression<'x>) -> Option<&'x Expression<'x>> {
     Some(match &expr.kind {
         ExpressionKind::MemberExpression(m) => view.expr(m.object),
         ExpressionKind::CallExpression(c) => view.expr(c.callee),
@@ -70,7 +67,7 @@ fn left_spine_child<'x>(
 /// hoist declines at the same pair ([`Printer::hoisted_owned_value_gap_run_opt`]), so the
 /// two readings of one seam agree.
 fn outermost_claim_child<'x>(
-    view: ExprView<'x>,
+    view: AstView<'x>,
     value: &'x Expression<'x>,
 ) -> Option<&'x Expression<'x>> {
     match &value.kind {
@@ -101,7 +98,7 @@ fn outermost_claim_child<'x>(
 /// which carries the document-level short-circuit; this half exists only so that
 /// short-circuit has exactly one spelling.
 fn leading_comment_bound_pair_walk<'x>(
-    view: ExprView<'x>,
+    view: AstView<'x>,
     expr: &'x Expression<'x>,
 ) -> Option<(&'x ast::CommentBoundPair, Span)> {
     let start = expr.span().start;

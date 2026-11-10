@@ -8,7 +8,7 @@ use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::TriviaProfile;
 use tsv_lang::{Error, Span};
 use tsv_ts::ast::ExprId;
-use tsv_ts::ast::{ExprView, Expression, ExpressionKind};
+use tsv_ts::ast::{AstView, Expression, ExpressionKind};
 
 use super::parser_impl::SvelteParser;
 use super::subslice_offset;
@@ -47,7 +47,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         start: usize,
         keyword: &str,
-        host_check: impl Fn(&Self, ExprView<'_>, ExprId) -> Result<(), Error>,
+        host_check: impl Fn(&Self, AstView<'_>, ExprId) -> Result<(), Error>,
     ) -> Result<(ExprId, Span), Error> {
         let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
@@ -399,7 +399,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// (`unwrap_comment_bound_pairs`): Svelte validates after `remove_parens`, to which a
     /// cast is nothing but parens + a comment, so `{@debug /** @type {A} */ (a)}`
     /// is an identifier to both parsers.
-    fn require_debug_identifier(&self, view: ExprView<'_>, expr: ExprId) -> Result<(), Error> {
+    fn require_debug_identifier(&self, view: AstView<'_>, expr: ExprId) -> Result<(), Error> {
         let expr = view.expr(expr);
         if matches!(
             expr.unwrap_comment_bound_pairs(view).kind,

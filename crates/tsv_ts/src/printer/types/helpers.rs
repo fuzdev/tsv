@@ -6,7 +6,7 @@
 // - Source scanning helpers
 
 use super::Printer;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{
     self, TSIntersectionType, TSKeywordKind, TSLiteralType, TSParenthesizedType, TSType,
     TSUnionType,
@@ -750,7 +750,7 @@ pub(super) fn type_needs_parens_in_union_or_intersection(
 /// Asked of the AST, never the source: a `{` inside a string-literal type, a template
 /// type's text or a comment opens nothing that breaks.
 pub(in crate::printer) fn type_literal_members_hold_brace_type(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     literal: &ast::TSTypeLiteral<'_>,
 ) -> bool {
     literal
@@ -760,7 +760,7 @@ pub(in crate::printer) fn type_literal_members_hold_brace_type(
 }
 
 /// [`type_literal_members_hold_brace_type`] for one member.
-fn type_element_holds_brace_type(view: ExprView<'_>, member: &ast::TSTypeElement<'_>) -> bool {
+fn type_element_holds_brace_type(view: AstView<'_>, member: &ast::TSTypeElement<'_>) -> bool {
     use ast::TSTypeElement;
     match member {
         TSTypeElement::PropertySignature(p) => {
@@ -794,14 +794,14 @@ fn type_element_holds_brace_type(view: ExprView<'_>, member: &ast::TSTypeElement
 }
 
 fn annotation_holds_brace_type(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     annotation: Option<&ast::TSTypeAnnotation<'_>>,
 ) -> bool {
     annotation.is_some_and(|a| type_holds_brace_type(view, a.type_annotation))
 }
 
 fn signature_holds_brace_type(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
     params: &[ast::Expression<'_>],
     return_type: Option<&ast::TSTypeAnnotation<'_>>,
@@ -814,7 +814,7 @@ fn signature_holds_brace_type(
 }
 
 fn type_parameters_hold_brace_type(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     decl: &ast::TSTypeParameterDeclaration<'_>,
 ) -> bool {
     decl.params
@@ -822,7 +822,7 @@ fn type_parameters_hold_brace_type(
         .any(|param| type_parameter_holds_brace_type(view, param))
 }
 
-fn type_parameter_holds_brace_type(view: ExprView<'_>, param: &ast::TSTypeParameter<'_>) -> bool {
+fn type_parameter_holds_brace_type(view: AstView<'_>, param: &ast::TSTypeParameter<'_>) -> bool {
     param
         .constraint
         .is_some_and(|ty| type_holds_brace_type(view, ty))
@@ -832,7 +832,7 @@ fn type_parameter_holds_brace_type(view: ExprView<'_>, param: &ast::TSTypeParame
 }
 
 fn type_arguments_hold_brace_type(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     args: Option<&ast::TSTypeParameterInstantiation<'_>>,
 ) -> bool {
     args.is_some_and(|args| args.params.iter().any(|ty| type_holds_brace_type(view, ty)))
@@ -840,7 +840,7 @@ fn type_arguments_hold_brace_type(
 
 /// A signature parameter's annotation. A destructuring pattern itself is not a brace type:
 /// its width break does not read back as authored, so only its annotation is walked.
-fn param_holds_brace_type(view: ExprView<'_>, param: &ast::Expression<'_>) -> bool {
+fn param_holds_brace_type(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
     use ast::ExpressionKind;
     match &param.kind {
         ExpressionKind::Identifier(id) => annotation_holds_brace_type(view, id.type_annotation()),
@@ -860,7 +860,7 @@ fn param_holds_brace_type(view: ExprView<'_>, param: &ast::Expression<'_>) -> bo
 }
 
 /// [`type_literal_members_hold_brace_type`] for one type, the type itself included.
-fn type_holds_brace_type(view: ExprView<'_>, ty: &TSType<'_>) -> bool {
+fn type_holds_brace_type(view: AstView<'_>, ty: &TSType<'_>) -> bool {
     match ty {
         // An empty literal has nothing to break.
         TSType::TypeLiteral(l) => !l.members.is_empty(),

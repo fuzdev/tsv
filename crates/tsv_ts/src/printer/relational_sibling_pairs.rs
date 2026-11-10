@@ -4,7 +4,7 @@
 
 use super::Printer;
 use super::expressions::functions::has_leftmost_arrow_body_parens;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{
     ArrowFunctionBody, ArrowFunctionExpression, BinaryExpression, BinaryOperator, Decorator,
     Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, UnaryExpression,
@@ -51,7 +51,7 @@ impl ChildSlot {
 /// opener, the closer and the region marks cannot drift. Every wrapper is explicit; a new
 /// expression kind must settle its own children.
 fn any_expression_child<'e>(
-    view: ExprView<'e>,
+    view: AstView<'e>,
     expr: &'e Expression<'e>,
     mut visit: impl FnMut(&'e Expression<'e>, ChildSlot) -> bool,
 ) -> bool {
@@ -203,7 +203,7 @@ fn any_expression_child<'e>(
 
 /// Whether any decorator's expression satisfies `visit` — a decorator is an `Other` child.
 fn decorators_any<'e>(
-    view: ExprView<'e>,
+    view: AstView<'e>,
     decorators: Option<&'e [Decorator]>,
     visit: &mut impl FnMut(&'e Expression<'e>, ChildSlot) -> bool,
 ) -> bool {
@@ -223,7 +223,7 @@ fn decorators_any<'e>(
 /// surfaces). The answer is a pure predicate over the subtree, so the visiting order is
 /// free.
 fn expression_holds_binary<'e>(
-    view: ExprView<'e>,
+    view: AstView<'e>,
     expr: &'e Expression<'e>,
     predicate: impl Fn(&BinaryExpression) -> bool,
 ) -> bool {
@@ -245,7 +245,7 @@ fn expression_holds_binary<'e>(
 /// The key a chain link is recorded under in `Printer::relational_chain_walked_links`: the
 /// source its operands cover. A binary node holds no span of its own, and no two binaries
 /// cover the same operand source — an ancestor's reaches past its descendant's on one side.
-fn chain_link_key(view: ExprView<'_>, node: &BinaryExpression) -> Span {
+fn chain_link_key(view: AstView<'_>, node: &BinaryExpression) -> Span {
     Span::new(
         view.expr(node.left).span().start,
         view.expr(node.right).span().end,
@@ -261,13 +261,13 @@ fn opens_region(binary: &BinaryExpression) -> bool {
 }
 
 /// Whether `expr` holds a binary `<` / `<<` ([`opens_region`]).
-fn holds_region_opener(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+fn holds_region_opener(view: AstView<'_>, expr: &Expression<'_>) -> bool {
     expression_holds_binary(view, expr, opens_region)
 }
 
 /// Whether `expr` holds a binary the parser flagged as one that may close an open region
 /// (`BinaryExpression::may_close_type_arguments`).
-fn holds_region_closer(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+fn holds_region_closer(view: AstView<'_>, expr: &Expression<'_>) -> bool {
     expression_holds_binary(view, expr, |binary| binary.may_close_type_arguments)
 }
 

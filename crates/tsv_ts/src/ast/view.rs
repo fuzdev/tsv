@@ -1,9 +1,10 @@
-//! How a tree's readers reach an [`Expression`] from the field that refers to it.
+//! How a tree's readers reach a stored node from the field that refers to it.
 //!
-//! An expression edge is an [`ExprId`], a list an id run or a value run over the stores, and
-//! every read of one goes through an [`ExprView`]. The view is one word: a walk reaches a row
-//! through a load of the store's slice header and an indexed load, and holds one register for
-//! the view.
+//! One [`AstView`] serves every family of the tree the stores hold; today that is the
+//! expressions. An expression edge is an [`ExprId`], a list an id run or a value run over the
+//! stores, and every read of one goes through the view. The view is one word: a walk reaches a
+//! row through a load of the store's slice header and an indexed load, and holds one register
+//! for the view.
 
 use tsv_lang::store::Run;
 
@@ -14,15 +15,15 @@ use super::{AstStores, Expr, ExprId, Expression, Parsed, Program};
 ///
 /// `Copy`, and bound to the stores of the document whose tree it reads.
 #[derive(Clone, Copy)]
-pub struct ExprView<'a> {
+pub struct AstView<'a> {
     stores: &'a AstStores<'a>,
 }
 
 // One word, in the check build too: a walk's frame and registers are what it pays for.
 #[cfg(test)]
-const _: () = assert!(size_of::<ExprView<'static>>() == size_of::<usize>());
+const _: () = assert!(size_of::<AstView<'static>>() == size_of::<usize>());
 
-impl<'a> ExprView<'a> {
+impl<'a> AstView<'a> {
     /// The expression `id` names. A miss ends in the store's shared cold path.
     #[inline]
     pub fn expr(self, id: ExprId) -> &'a Expression<'a> {
@@ -55,17 +56,17 @@ impl<'a> ExprView<'a> {
 }
 
 impl<'arena> AstStores<'arena> {
-    /// The view reading the expressions of these stores.
+    /// The view reading these stores.
     #[inline]
-    pub fn view(&self) -> ExprView<'_> {
-        ExprView { stores: self }
+    pub fn view(&self) -> AstView<'_> {
+        AstView { stores: self }
     }
 }
 
 impl<'arena> Parsed<'arena> {
-    /// The view reading this tree's expressions.
+    /// The view reading this tree's stores.
     #[inline]
-    pub fn view(&self) -> ExprView<'_> {
+    pub fn view(&self) -> AstView<'_> {
         self.stores.view()
     }
 }
@@ -77,7 +78,7 @@ pub struct ParsedRef<'a> {
     /// The tree.
     pub program: &'a Program<'a>,
     /// The view over the stores the tree's edges index.
-    pub view: ExprView<'a>,
+    pub view: AstView<'a>,
 }
 
 impl<'a, 'arena: 'a> From<&'a Parsed<'arena>> for ParsedRef<'a> {

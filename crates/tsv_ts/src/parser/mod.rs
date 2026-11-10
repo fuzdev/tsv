@@ -420,7 +420,7 @@ struct SpineMemo {
 /// take.
 #[expect(clippy::inline_always)]
 #[inline(always)]
-fn call_spine_step(view: ExprView<'_>, inner: ExprId) -> ControlFlow<u32, ExprId> {
+fn call_spine_step(view: AstView<'_>, inner: ExprId) -> ControlFlow<u32, ExprId> {
     tsv_lang::fanout_probe::predicate();
     match &view.expr(inner).kind {
         ExpressionKind::TSNonNullExpression(n) => ControlFlow::Continue(n.expression),
@@ -1870,7 +1870,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// answered inline for the commonest call — a callee that is no call (nor a `!` over
     /// one) and no sole template argument, which no rule there admits.
     #[inline]
-    fn call_prints_whole(view: ExprView<'_>, call: ExprId) -> bool {
+    fn call_prints_whole(view: AstView<'_>, call: ExprId) -> bool {
         match &view.expr(call).kind {
             ExpressionKind::CallExpression(c) => {
                 (matches!(
@@ -4216,10 +4216,10 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     stores: &mut AstStores<'arena>,
     embedded: bool,
     f: impl Fn(&mut Parser<'_, 'arena>) -> Result<T, Error>,
-    host_check: impl Fn(ExprView<'_>, &T) -> Result<(), Error>,
+    host_check: impl Fn(AstView<'_>, &T) -> Result<(), Error>,
 ) -> Result<T, Error> {
     // Each failure carries whether the host refused it (`true`) or the parse itself did.
-    let checked = |view: ExprView<'_>, parsed: T| {
+    let checked = |view: AstView<'_>, parsed: T| {
         host_check(view, &parsed)
             .map(|()| parsed)
             .map_err(|error| (error, true))

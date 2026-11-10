@@ -306,7 +306,7 @@ pub(crate) struct Printer<'a> {
     /// Comments from the program (for printing leading/trailing comments)
     pub(crate) comments: &'a [ast::Comment],
     /// Reads the expressions of the tree being printed.
-    pub(crate) view: ast::ExprView<'a>,
+    pub(crate) view: ast::AstView<'a>,
     /// Whether any comment in this document is owned by a node (`owned_by_node`).
     /// Document-level presence flag (from `PrinterInputs`), computed once per document
     /// — never here, per that field's doc (the `.svelte` per-`{expr}` trap). Gates the

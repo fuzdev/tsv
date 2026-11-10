@@ -3,7 +3,7 @@
 // Switch head, case labels, and case-body layout with comment handling.
 
 use super::{HeadChainGrouping, OpenParenLineBlockComment};
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{self, StatementKind};
 use crate::printer::expressions::blocks::{OrphanSemiCursor, StatementBlankScan};
 use crate::printer::statements::StatementContext;
@@ -245,7 +245,7 @@ impl<'a> Printer<'a> {
     /// Where the case's head ends — past the test expression, or past the `default`
     /// keyword — which is where the head→`:` gap opens. The one anchor both the label
     /// scan and the label emitter measure that gap from.
-    fn case_head_end(view: ExprView<'_>, case: &ast::SwitchCase<'_>) -> u32 {
+    fn case_head_end(view: AstView<'_>, case: &ast::SwitchCase<'_>) -> u32 {
         case.test.as_ref().map_or_else(
             || case.span.start + "default".len() as u32,
             |test| view.expr(*test).span().end,

@@ -5,7 +5,7 @@
 // including comment placement between decorators and the decorated member.
 
 use crate::ast;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::printer::comments::CommentVec;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -625,7 +625,7 @@ impl<'a> Printer<'a> {
 /// Normalized through [`non_empty_decorators`], so an undecorated parameter and a
 /// decorated one with an empty list are the same answer here as everywhere else.
 fn param_decorators<'arena>(
-    view: ExprView<'arena>,
+    view: AstView<'arena>,
     expr: &ast::Expression<'arena>,
 ) -> Option<&'arena [ast::Decorator]> {
     let decorators = match &expr.kind {
@@ -674,7 +674,7 @@ pub(in crate::printer) fn class_expr_has_decorators(c: &ast::ClassExpression<'_>
 
 /// Whether `expr` is a bare-decorator member chain: an identifier, or a
 /// non-computed, non-optional member chain of identifiers down to one.
-fn is_decorator_member_expression(view: ExprView<'_>, expr: &ast::Expression<'_>) -> bool {
+fn is_decorator_member_expression(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
     let mut expr = expr;
     loop {
         match &expr.kind {
@@ -701,11 +701,8 @@ fn is_decorator_member_expression(view: ExprView<'_>, expr: &ast::Expression<'_>
 /// A wire-only parse keeps the author's grouping parens as nodes (`parse_preserve_parens`),
 /// which the printer never meets; read through them here, a callee's pair (`@(a)(…)`)
 /// answers as the parse the printer reads does.
-pub(crate) fn decorator_takes_pair(view: ExprView<'_>, expr: &ast::Expression<'_>) -> bool {
-    fn unwrap<'e>(
-        view: ExprView<'e>,
-        mut expr: &'e ast::Expression<'e>,
-    ) -> &'e ast::Expression<'e> {
+pub(crate) fn decorator_takes_pair(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
+    fn unwrap<'e>(view: AstView<'e>, mut expr: &'e ast::Expression<'e>) -> &'e ast::Expression<'e> {
         while let ast::ExpressionKind::ParenthesizedExpression(paren) = &expr.kind {
             expr = view.expr(paren.expression);
         }
@@ -722,10 +719,7 @@ pub(crate) fn decorator_takes_pair(view: ExprView<'_>, expr: &ast::Expression<'_
 
 /// Whether a decorator expression is valid without parens (see
 /// `Printer::build_decorator_expression_doc`).
-fn can_decorator_expression_unparenthesized(
-    view: ExprView<'_>,
-    expr: &ast::Expression<'_>,
-) -> bool {
+fn can_decorator_expression_unparenthesized(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
     match &expr.kind {
         ast::ExpressionKind::CallExpression(call) => {
             !call.optional && is_decorator_member_expression(view, view.expr(call.callee))

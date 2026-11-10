@@ -14,7 +14,7 @@ mod expansion;
 mod helpers;
 mod member_only;
 
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use std::iter;
 
 use expansion::{
@@ -1513,7 +1513,7 @@ fn build_type_arg_hug_state<'a>(
 /// drift: one reading the last call and the other the last node would let a shape
 /// into one state that the other's gate had already refused.
 fn last_group_single_argument<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     rest_groups: &[ChainGroup<'a>],
 ) -> Option<&'a Expression<'a>> {
     let call = rest_groups
@@ -1531,7 +1531,7 @@ fn last_group_single_argument<'a>(
 /// An arrow whose grammar-parenthesized expression body is an object literal —
 /// the `.map((item) => ({ … }))` shape, the arrow spelling of the object-rooted
 /// kind set.
-fn is_arrow_with_paren_object_body(view: ExprView<'_>, arg: &Expression<'_>) -> bool {
+fn is_arrow_with_paren_object_body(view: AstView<'_>, arg: &Expression<'_>) -> bool {
     matches!(
         &arg.kind,
         ExpressionKind::ArrowFunctionExpression(arrow) if matches!(
@@ -1550,7 +1550,7 @@ fn is_arrow_with_paren_object_body(view: ExprView<'_>, arg: &Expression<'_>) -> 
 /// chain's hot path — the same reason `should_force_chain_expand` iterates its call
 /// nodes in place.
 fn other_calls_have_function_arguments<'a>(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
 ) -> bool {

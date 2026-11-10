@@ -25,7 +25,7 @@
 // comment is not relocated across it.
 
 use super::{CommentVec, Printer, ShareSite};
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use smallvec::SmallVec;
 use tsv_lang::Comment;
 use tsv_lang::Span;
@@ -81,7 +81,7 @@ pub(in crate::printer) fn run_defers_line(run: &[&Comment]) -> bool {
 ///
 /// The array literal and the array pattern share it, each holding a list of optional ids.
 pub(in crate::printer) fn next_real_element_start(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     elements: &[Option<crate::ast::ExprId>],
     idx: usize,
 ) -> Option<u32> {

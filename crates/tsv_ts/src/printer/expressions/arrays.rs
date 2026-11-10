@@ -6,7 +6,7 @@
 // - Comment preservation
 
 use super::objects::{LiteralRole, is_compound_target_value};
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{self, Expression, ExpressionKind, LiteralValue};
 use crate::printer::comments::{
     ShareSite, block_is_before_comma, next_real_element_start, run_defers_line,
@@ -22,7 +22,7 @@ use tsv_lang::doc::arena::DocId;
 /// element slides to. The array PATTERN's twin is `array_pattern_gap_end`, whose fallback
 /// stops before a `: T` the pattern's span swallowed; each container names its own end
 /// once and the walk past the holes is shared.
-fn array_gap_end(view: ExprView<'_>, arr: &ast::ArrayExpression, span: Span, i: usize) -> u32 {
+fn array_gap_end(view: AstView<'_>, arr: &ast::ArrayExpression, span: Span, i: usize) -> u32 {
     next_real_element_start(view, view.opt_list(arr.elements), i).unwrap_or(span.end - 1)
 }
 
@@ -37,7 +37,7 @@ fn array_gap_end(view: ExprView<'_>, arr: &ast::ArrayExpression, span: Span, i: 
 /// Free and shape-only so it can be read (and tested) without a printer; the comment clause
 /// that completes the predicate needs the comment array and lives on
 /// [`Printer::is_concisely_printed_array`], the one entry every caller asks.
-fn array_elements_are_signed_numbers(view: ExprView<'_>, arr: &ast::ArrayExpression) -> bool {
+fn array_elements_are_signed_numbers(view: AstView<'_>, arr: &ast::ArrayExpression) -> bool {
     !arr.elements.is_empty()
         && view.opt_list(arr.elements).iter().all(|elem| {
             match elem.as_ref().map(|e| &view.expr(*e).kind) {
@@ -1471,7 +1471,7 @@ mod tests {
     /// the view of the stores it was parsed into.
     fn with_array<R>(
         src: &str,
-        f: impl for<'a> FnOnce(ExprView<'a>, &'a ast::ArrayExpression) -> R,
+        f: impl for<'a> FnOnce(AstView<'a>, &'a ast::ArrayExpression) -> R,
     ) -> R {
         let arena = Bump::new();
         let mut stores = ast::AstStores::new();

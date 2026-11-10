@@ -34,7 +34,7 @@ pub(crate) use stores::ScratchMarks;
 pub use stores::{AstStores, Expr, ExprId, Parsed, with_stores};
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
-pub use view::{ExprView, ParsedRef};
+pub use view::{AstView, ParsedRef};
 
 //
 // Re-exports from submodules

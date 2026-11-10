@@ -3,7 +3,7 @@
 //! Contains the Expression enum and all expression types including
 //! operators, literals, function expressions, and TypeScript type assertions.
 
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use tsv_lang::{Comment, Span};
 
 use super::{
@@ -194,7 +194,7 @@ impl<'arena> Expression<'arena> {
     /// A spread / rest element is deliberately untouched by this: its stripped-paren
     /// interior is its own doc's share to print (§A stripped-paren interior is a partition
     /// too), so its span end is already its printed end.
-    pub fn printed_end(&self, view: ExprView<'_>) -> u32 {
+    pub fn printed_end(&self, view: AstView<'_>) -> u32 {
         match &self.kind {
             ExpressionKind::AssignmentPattern(assign) => view.expr(assign.right).printed_end(view),
             ExpressionKind::TSParameterProperty(param_prop) => {
@@ -211,7 +211,7 @@ impl<'arena> Expression<'arena> {
     /// `TSInstantiationExpression` (`f<T>`) is deliberately **not** peeled — it is not
     /// an assertion. Peeling is a QUESTION here, never an emission: the wire keeps the
     /// assertion node, and only convert's `unwrap_comment_bound_pairs` drops anything.
-    pub fn skip_type_assertions(&self, view: ExprView<'arena>) -> &Expression<'arena> {
+    pub fn skip_type_assertions(&self, view: AstView<'arena>) -> &Expression<'arena> {
         match &self.kind {
             ExpressionKind::TSAsExpression(e) => view.expr(e.expression).skip_type_assertions(view),
             ExpressionKind::TSSatisfiesExpression(e) => {
@@ -236,7 +236,7 @@ impl<'arena> Expression<'arena> {
     /// against "the converted node" must look through the wrapper. Note the
     /// wrapper's own `span()` covers the parens; the public node's span is the
     /// unwrapped inner's.
-    pub fn unwrap_comment_bound_pairs(&self, view: ExprView<'arena>) -> &Expression<'arena> {
+    pub fn unwrap_comment_bound_pairs(&self, view: AstView<'arena>) -> &Expression<'arena> {
         let mut e = self;
         while let ExpressionKind::CommentBoundPair(cast) = &e.kind {
             e = view.expr(cast.inner);
@@ -249,7 +249,7 @@ impl<'arena> Expression<'arena> {
     /// every other expression, which has none. The list printers' one adapter:
     /// `ObjectProperty::paren_interior` and `ObjectPatternProperty::paren_interior` are the
     /// property-list counterparts.
-    pub fn paren_interior(&self, view: ExprView<'_>) -> Option<Span> {
+    pub fn paren_interior(&self, view: AstView<'_>) -> Option<Span> {
         match &self.kind {
             ExpressionKind::SpreadElement(s) => Some(s.paren_interior(view)),
             ExpressionKind::RestElement(r) => Some(r.paren_interior(view)),
@@ -281,7 +281,7 @@ impl<'arena> Expression<'arena> {
     ///
     /// A loop down the spine, not a recursion: a chain is as long as the spine limit lets
     /// it be, and a frame per link is what the stack contract prices.
-    pub fn has_optional_in_chain(&self, view: ExprView<'_>) -> bool {
+    pub fn has_optional_in_chain(&self, view: AstView<'_>) -> bool {
         let mut expr = self;
         loop {
             let (optional, child) = match &expr.kind {
@@ -303,7 +303,7 @@ impl<'arena> Expression<'arena> {
     /// True when this is a non-null assertion sealing a parenthesized optional chain
     /// (`(a?.b)!`) — [`TSNonNullExpression::seals_optional_chain`] asked of the node that
     /// holds it.
-    pub fn is_sealing_non_null(&self, view: ExprView<'_>) -> bool {
+    pub fn is_sealing_non_null(&self, view: AstView<'_>) -> bool {
         matches!(
             &self.kind,
             ExpressionKind::TSNonNullExpression(n) if n.seals_optional_chain(view, self.span)
@@ -390,7 +390,7 @@ impl<'arena> ParenthesizedExpression {
     /// build refuses a tree that breaks the wire-only contract, and a release build reads
     /// through the pair rather than aborting the host.
     #[track_caller]
-    pub fn unreachable_contents(&self, view: ExprView<'arena>) -> &'arena Expression<'arena> {
+    pub fn unreachable_contents(&self, view: AstView<'arena>) -> &'arena Expression<'arena> {
         #[expect(clippy::unreachable)] // debug builds only: see the doc
         if cfg!(debug_assertions) {
             unreachable!("a ParenthesizedExpression reached a reader of the paren-free tree");
@@ -436,7 +436,7 @@ impl ObjectProperty {
     /// before the `=` (`{ a /* c */ = 1 }`) was claimed as trailing the property and
     /// RELOCATED past the initializer, across the name→`=` binding tsv otherwise refuses to
     /// move a comment over.
-    pub fn value_end(&self, view: ExprView<'_>) -> u32 {
+    pub fn value_end(&self, view: AstView<'_>) -> u32 {
         match self {
             ObjectProperty::Property(p) => view.expr(p.value).span().end,
             // The spread's OWN end, past any grouping parens the parser stripped — not
@@ -452,7 +452,7 @@ impl ObjectProperty {
     /// The spread's stripped-paren interior ([`SpreadElement::paren_interior`]), if this
     /// property is a spread — the property-list counterpart of
     /// [`Expression::paren_interior`].
-    pub fn paren_interior(&self, view: ExprView<'_>) -> Option<Span> {
+    pub fn paren_interior(&self, view: AstView<'_>) -> Option<Span> {
         match self {
             ObjectProperty::SpreadElement(s) => Some(s.paren_interior(view)),
             ObjectProperty::Property(_) => None,
@@ -779,7 +779,7 @@ impl<'arena> BinaryExpression {
     /// (`should_group_binary_continuation`, `is_simple_call_argument`) answers the same on
     /// both trees. Verify, don't assume.
     #[must_use]
-    pub fn rebalanced_right(&self, view: ExprView<'arena>) -> &'arena Expression<'arena> {
+    pub fn rebalanced_right(&self, view: AstView<'arena>) -> &'arena Expression<'arena> {
         let mut right = view.expr(self.right);
         while let ExpressionKind::BinaryExpression(inner) = &right.kind {
             if !self.operator.rebalances_with(inner.operator) {
@@ -885,7 +885,7 @@ pub enum ArrowFunctionBody<'arena> {
 }
 
 impl<'arena> ArrowFunctionBody<'arena> {
-    pub fn span(&self, view: ExprView<'_>) -> Span {
+    pub fn span(&self, view: AstView<'_>) -> Span {
         match self {
             ArrowFunctionBody::Expression(expr) => view.expr(*expr).span(),
             ArrowFunctionBody::BlockStatement(block) => block.span,
@@ -940,7 +940,7 @@ impl SpreadElement {
     /// `)` (`...(x /* c */)`). Its comments are split between the spread's own doc and the
     /// parent list (`docs/comments.md` §A stripped-paren interior is a partition too); the
     /// rest twin is [`RestElement::paren_interior`].
-    pub fn paren_interior(&self, view: ExprView<'_>) -> Span {
+    pub fn paren_interior(&self, view: AstView<'_>) -> Span {
         Span::new(view.expr(self.argument).span().end, self.span.end)
     }
 }
@@ -1267,7 +1267,7 @@ impl TSNonNullExpression {
     /// the `!`, no sealing parens).
     ///
     /// `span` is the span of the `Expression` holding this node.
-    pub fn seals_optional_chain(&self, view: ExprView<'_>, span: Span) -> bool {
+    pub fn seals_optional_chain(&self, view: AstView<'_>, span: Span) -> bool {
         span.start < view.expr(self.expression).span.start
             && view.expr(self.expression).has_optional_in_chain(view)
     }

@@ -19,7 +19,7 @@ use super::arg_predicates::{
     is_ternary_arrow_body,
 };
 use crate::ast;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, arrow_signature_refuses_hug, arrow_token_end,
     flat_sole_param_literal, function_return_hug_break, prepend_leading,
@@ -323,7 +323,7 @@ pub(super) enum ChainArgKind {
 /// body type. A class expression is NOT huggable: prettier's `couldExpandArg` has no class
 /// arm, so a member call breaks a sole class argument onto its own line exactly as a plain
 /// call does (`calls/chain_class_arg_no_hug`).
-pub(super) fn classify_chain_arg(view: ExprView<'_>, arg: &ast::Expression<'_>) -> ChainArgKind {
+pub(super) fn classify_chain_arg(view: AstView<'_>, arg: &ast::Expression<'_>) -> ChainArgKind {
     match &arg.kind {
         // Block-like expressions hug the call parens naturally
         ast::ExpressionKind::ObjectExpression(_)
@@ -362,7 +362,7 @@ fn arrow_has_return_or_type_params(arrow: &ast::ArrowFunctionExpression<'_>) -> 
 
 /// Classify how an arrow function body should be formatted in chain context.
 fn classify_arrow_body(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     arrow: &ast::ArrowFunctionExpression<'_>,
 ) -> ChainArgKind {
     match &arrow.body {
@@ -390,7 +390,7 @@ fn classify_arrow_body(
 /// terminal, so this is that predicate plus the two literal kinds, and the two cannot drift
 /// on how deep a chain reaches.
 pub(super) fn could_expand_arrow_chain(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     arrow: &ast::ArrowFunctionExpression<'_>,
 ) -> bool {
     arrow_terminal_expression_body(view, arrow).is_none_or(|body| {
@@ -416,7 +416,7 @@ pub(super) fn could_expand_arrow_chain(
 /// [`arrow_hug_refused_by_comments`] on top: a comment refusal answers "can THIS arm render
 /// the argument", a different question from "would prettier expand it at all", and the gap
 /// break below needs the second one alone.
-fn could_expand_arrow_arg(view: ExprView<'_>, arrow: &ast::ArrowFunctionExpression<'_>) -> bool {
+fn could_expand_arrow_arg(view: AstView<'_>, arrow: &ast::ArrowFunctionExpression<'_>) -> bool {
     could_expand_arrow_chain(view, arrow)
         || match &arrow.body {
             ast::ArrowFunctionBody::Expression(body) => {
@@ -433,7 +433,7 @@ fn could_expand_arrow_arg(view: ExprView<'_>, arrow: &ast::ArrowFunctionExpressi
 /// are caught earlier by the conditional_group path in chain_args.rs. This
 /// HugsNaturally classification is primarily reached for arrows with
 /// TSTypeReference returns (which bypass that path) and nested arrow chains.
-fn classify_expression_body(view: ExprView<'_>, expr: &ast::Expression<'_>) -> ChainArgKind {
+fn classify_expression_body(view: AstView<'_>, expr: &ast::Expression<'_>) -> ChainArgKind {
     match &expr.kind {
         // Objects and arrays hug naturally (reached mainly for typed-return arrows)
         ast::ExpressionKind::ObjectExpression(_) | ast::ExpressionKind::ArrayExpression(_) => {
@@ -574,7 +574,7 @@ fn arrow_hug_body_needs_parens(body_expr: &ast::Expression<'_>) -> bool {
 /// the chain (`x => (y => …)`), so a gap scan over it reads the shell's comments as the
 /// terminal's.
 fn terminal_arrow<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     arrow: &'a ast::ArrowFunctionExpression<'a>,
 ) -> (&'a ast::ArrowFunctionExpression<'a>, Option<Span>) {
     let mut current = arrow;
@@ -596,7 +596,7 @@ fn terminal_arrow<'a>(
 ///
 /// [`terminal_arrow`] plus the block-vs-expression split.
 fn arrow_terminal_expression_body<'arena>(
-    view: ExprView<'arena>,
+    view: AstView<'arena>,
     arrow: &'arena ast::ArrowFunctionExpression<'arena>,
 ) -> Option<&'arena ast::Expression<'arena>> {
     match &terminal_arrow(view, arrow).0.body {
@@ -619,7 +619,7 @@ fn arrow_terminal_expression_body<'arena>(
 /// on width, since its `expandLastArg` print has no chain layout to break
 /// (`expressions/arrow/curried_untyped_call_arg_long` catches exactly that).
 pub(super) fn arrow_body_expands_internally(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     arrow: &ast::ArrowFunctionExpression<'_>,
 ) -> bool {
     arrow_terminal_expression_body(view, arrow).is_some_and(|body| {
@@ -2416,7 +2416,7 @@ pub(super) fn build_expand_first_arg_doc(
 /// Prettier disables expand-last-arg hug state when `penultimateArg.type === lastArg.type`
 /// (`couldExpandArg`, `print/call-arguments.js`). This covers both arrays, both objects, and also both TSAsExpression,
 /// both TSSatisfiesExpression, etc.
-pub(super) fn last_two_args_same_type(view: ExprView<'_>, args: &[ast::ExprId]) -> bool {
+pub(super) fn last_two_args_same_type(view: AstView<'_>, args: &[ast::ExprId]) -> bool {
     let last = view.expr(args[args.len() - 1]);
     let penultimate = view.expr(args[args.len() - 2]);
     std::mem::discriminant(&last.kind) == std::mem::discriminant(&penultimate.kind)
@@ -3117,7 +3117,7 @@ fn sole_template_on_its_own_line_commented(
 /// the whole question (the call dispatcher resolves a callee gap for it) can ask this
 /// first: nearly no call has the shape, and a call without it is answered here.
 #[inline]
-pub(super) fn is_sole_multiline_template_arg(view: ExprView<'_>, args: &[ast::ExprId]) -> bool {
+pub(super) fn is_sole_multiline_template_arg(view: AstView<'_>, args: &[ast::ExprId]) -> bool {
     matches!(args, [arg] if is_multiline_template_expression(view.expr(*arg)))
 }
 

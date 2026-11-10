@@ -13,7 +13,7 @@
 //
 // - prettier/src/language-js/print/assignment.js
 
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{self, AssignmentOperator, Expression, ExpressionKind};
 use crate::printer::calls::chain_has_calls;
 use crate::printer::chain::{
@@ -277,10 +277,7 @@ pub(crate) fn choose_layout(
 /// its own output on a second pass (`logical/inline_chain_paren_nested_long`).
 ///
 /// Prettier ref: `shouldInlineLogicalExpression` (`print/binaryish.js`)
-pub fn should_inline_logical_expression(
-    view: ExprView<'_>,
-    binary: &ast::BinaryExpression,
-) -> bool {
+pub fn should_inline_logical_expression(view: AstView<'_>, binary: &ast::BinaryExpression) -> bool {
     if !binary.operator.is_logical() {
         return false;
     }
@@ -304,10 +301,7 @@ pub fn should_inline_logical_expression(
 /// Examples that stay inline:
 ///   const f = (x: T) => (y) => expr       // an annotated identifier is still simple
 ///   const f = (): H => (y) => expr        // a return type with no parameters
-pub(crate) fn is_curried_arrow_chain_that_breaks(
-    view: ExprView<'_>,
-    expr: &Expression<'_>,
-) -> bool {
+pub(crate) fn is_curried_arrow_chain_that_breaks(view: AstView<'_>, expr: &Expression<'_>) -> bool {
     is_curried_arrow_chain(view, expr)
         && matches!(&expr.kind, ExpressionKind::ArrowFunctionExpression(arrow) if arrow_chain_should_break(view, arrow))
 }
@@ -318,7 +312,7 @@ pub(crate) fn is_curried_arrow_chain_that_breaks(
 /// takes the fluid layout and prints the operator→value gap's run behind its own softline
 /// ([`Printer::build_led_curried_chain_doc`]).
 pub(crate) fn is_curried_arrow_chain_owning_break(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &Expression<'_>,
 ) -> bool {
     is_curried_arrow_chain(view, expr) && !is_curried_arrow_chain_that_breaks(view, expr)
@@ -328,7 +322,7 @@ pub(crate) fn is_curried_arrow_chain_owning_break(
 /// arrow). The terminal body may be an expression or a block. Used to route the
 /// assignment RHS through the arrow-chain layout regardless of whether any head
 /// triggers the chain break.
-pub(crate) fn is_curried_arrow_chain(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+pub(crate) fn is_curried_arrow_chain(view: AstView<'_>, expr: &Expression<'_>) -> bool {
     if let ExpressionKind::ArrowFunctionExpression(arrow) = &expr.kind {
         matches!(
             &arrow.body,
@@ -356,7 +350,7 @@ pub(crate) fn is_curried_arrow_chain(view: ExprView<'_>, expr: &Expression<'_>) 
 /// with `AssignmentLayout::BreakAfterOperator` and so renders the break itself — see
 /// `should_use_arrow_chain_layout`.
 pub(crate) fn arrow_chain_should_break(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     arrow: &ast::ArrowFunctionExpression<'_>,
 ) -> bool {
     // Check this arrow for breaking conditions:
@@ -417,7 +411,7 @@ pub(crate) fn should_break_after_operator(expr: &Expression<'_>, printer: &Print
 }
 
 /// Unwrap wrapper expressions (TSNonNullExpression, await, unary, yield, parenthesized)
-fn unwrap_expression<'a>(view: ExprView<'a>, mut expr: &'a Expression<'a>) -> &'a Expression<'a> {
+fn unwrap_expression<'a>(view: AstView<'a>, mut expr: &'a Expression<'a>) -> &'a Expression<'a> {
     loop {
         expr = match &expr.kind {
             ExpressionKind::TSNonNullExpression(non_null) => view.expr(non_null.expression),
@@ -669,7 +663,7 @@ struct PoorlyBreakableWalk<'a, 'src> {
 }
 
 fn is_poorly_breakable_chain_walk(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &Expression<'_>,
     mut deep: bool,
     walk: &PoorlyBreakableWalk<'_, '_>,
@@ -837,7 +831,7 @@ fn is_poorly_breakable_chain_walk(
 ///
 /// Note: Prettier uses JS `.length` (UTF-16 code units) for all measurements,
 /// we use `.len()` (UTF-8 bytes). These match for ASCII (the common case).
-fn is_short_arg(view: ExprView<'_>, expr: &Expression<'_>, source: &str) -> bool {
+fn is_short_arg(view: AstView<'_>, expr: &Expression<'_>, source: &str) -> bool {
     // Prettier: LONE_SHORT_ARGUMENT_THRESHOLD_RATE = 0.25
     // (`utilities/is-lone-short-argument.js`)
     let threshold = PRINT_WIDTH / 4;
@@ -901,7 +895,7 @@ fn is_short_arg(view: ExprView<'_>, expr: &Expression<'_>, source: &str) -> bool
 /// for the `is_poorly_breakable_chain` debug_assert below, and deliberately NOT the shared
 /// `is_multiline_string_literal` (a *layout* predicate, continuation-only — widening that
 /// one would change fluid-layout behavior for the over-accepted raw form).
-fn chain_has_multiline_string_arg(view: ExprView<'_>, expr: &Expression<'_>, source: &str) -> bool {
+fn chain_has_multiline_string_arg(view: AstView<'_>, expr: &Expression<'_>, source: &str) -> bool {
     let mut expr = expr;
     loop {
         expr = match &expr.kind {
@@ -924,7 +918,7 @@ fn chain_has_multiline_string_arg(view: ExprView<'_>, expr: &Expression<'_>, sou
 
 /// Whether an argument is a string literal whose raw span contains a newline —
 /// unwrapping unary operators like `is_short_arg` does.
-fn arg_is_multiline_string(view: ExprView<'_>, expr: &Expression<'_>, source: &str) -> bool {
+fn arg_is_multiline_string(view: AstView<'_>, expr: &Expression<'_>, source: &str) -> bool {
     match &expr.kind {
         ExpressionKind::UnaryExpression(unary) => {
             arg_is_multiline_string(view, view.expr(unary.argument), source)
@@ -970,7 +964,7 @@ fn call_arg_has_comments(
 /// we break after `=` instead of inside the call. If the call has short/trivial args, the
 /// type annotation can break instead.
 pub(crate) fn is_type_assertion_call(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &Expression<'_>,
     source: &str,
 ) -> bool {
@@ -996,7 +990,7 @@ pub(crate) fn is_type_assertion_call(
 }
 
 /// Check if an expression is a member-only chain (no calls).
-fn is_member_only_chain(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+fn is_member_only_chain(view: AstView<'_>, expr: &Expression<'_>) -> bool {
     let mut expr = expr;
     loop {
         expr = match &expr.kind {

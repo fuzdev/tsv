@@ -1314,7 +1314,7 @@ impl<'a> Printer<'a> {
     fn build_nested_script_body_doc(
         &self,
         program: &tsv_ts::ast::Program<'_>,
-        view: tsv_ts::ast::ExprView<'_>,
+        view: tsv_ts::ast::AstView<'_>,
     ) -> Option<DocId> {
         // The body is raw text to the canonical parser, so the host's `Root.comments` holds
         // none of its comments: they are this island's, registered here under the host

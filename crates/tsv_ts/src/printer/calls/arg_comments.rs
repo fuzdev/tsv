@@ -5,7 +5,7 @@
 // - Trailing comments on arguments
 // - Leading comments before arguments
 
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use smallvec::SmallVec;
 
 use super::super::{LeadingGlue, Printer};
@@ -816,7 +816,7 @@ pub(super) fn has_trailing_comments_slice(
 /// Shared implementation for checking trailing comments on arguments.
 #[inline]
 fn has_trailing_comments_slice_impl<F>(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     arguments: &[ast::ExprId],
     call_span_end: u32,
     has_comments: F,

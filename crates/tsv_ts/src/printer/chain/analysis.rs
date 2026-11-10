@@ -8,7 +8,7 @@
 use super::builder::{build_chain_doc, mark_long_curried_calls};
 use super::printing::chain_gap_share_any;
 use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{self, Expression, ExpressionKind, IdentName};
 use crate::printer::calls::{call_paren_open, is_memberish, sole_template_on_its_own_line};
 use crate::printer::comments::{paren_pair_keeps_leading_run, paren_shell_close_after};
@@ -60,7 +60,7 @@ pub(crate) struct LinearizeInput<'i> {
 /// General-purpose entry point (used by tests; production code uses typed entry points)
 #[cfg(test)]
 fn linearize_chain<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     expr: &'a Expression<'_>,
     input: LinearizeInput<'_>,
 ) -> ChainNodeVec<'a> {
@@ -109,7 +109,7 @@ fn linearize_chain<'a>(
 ///
 /// Returns whether the chain holds a long-curried pair ([`finalize_chain_nodes`]).
 pub(crate) fn linearize_chain_from_call_into<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     call: &'a ast::CallExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
@@ -129,7 +129,7 @@ pub(crate) fn linearize_chain_from_call_into<'a>(
 ///
 /// Returns whether the chain holds a long-curried pair ([`finalize_chain_nodes`]).
 pub(crate) fn linearize_chain_from_member_into<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     member: &'a ast::MemberExpression,
     span: Span,
     input: LinearizeInput<'_>,
@@ -155,7 +155,7 @@ pub(crate) fn linearize_chain_from_member_into<'a>(
 /// trailing-comment branch), so only the comment-free case arrives here. Nested
 /// non-nulls go through the walk's own step ([`non_null_step`]), which does gate.
 pub(crate) fn linearize_chain_from_non_null_into<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     non_null: &'a ast::TSNonNullExpression,
     span: Span,
     input: LinearizeInput<'_>,
@@ -333,7 +333,7 @@ type ParenGap = (usize, usize, u32, u32);
 /// the chain ([`crate::printer::Printer::left_spine_run_claim`]), where it would print
 /// twice.
 pub(crate) fn chain_mid_chain_paren_gaps(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     root: &Expression<'_>,
     input: LinearizeInput<'_>,
 ) -> SmallVec<[(u32, u32); 2]> {
@@ -363,7 +363,7 @@ pub(crate) fn chain_mid_chain_paren_gaps(
 /// Returns whether the chain holds a long-curried pair ([`mark_own_call_layout`]), which
 /// every entry point hands back for [`build_linearized_chain_doc`].
 fn finalize_chain_nodes(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     nodes: &mut [ChainNode<'_>],
     paren_gaps: &[ParenGap],
     input: LinearizeInput<'_>,
@@ -476,7 +476,7 @@ fn template_preempts_chain_redirect(
 /// (`Printer::withhold_clarity_pairs_behind_region_close`) — read here off the same
 /// marks the bare-callee path reads, so the two paths print one callee one way.
 fn fix_callee_base_parens(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     nodes: &mut [ChainNode<'_>],
     input: LinearizeInput<'_>,
 ) {
@@ -540,7 +540,7 @@ fn fix_callee_base_parens(
 /// converter still preserves acorn's nested `ChainExpression` for that case; this
 /// is a printer-only normalization.
 pub(crate) fn child_stops_optional_chain(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     parent_start: u32,
     parent_optional: bool,
     child: &Expression<'_>,
@@ -570,7 +570,7 @@ pub(crate) fn child_stops_optional_chain(
 /// double-prints; the reverse DROPS. It answered differently with and without a `!`
 /// for as long as the trailing half was keyed on the operand's KIND instead.
 pub(crate) fn chain_paren_leading_gap(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &Expression<'_>,
     comments: &[Comment],
 ) -> Option<(u32, u32)> {
@@ -594,7 +594,7 @@ pub(crate) fn chain_paren_leading_gap(
 /// A member's object keeps the pair — and with it the leading run — when the object
 /// is a parenthesized optional chain this access seals (`( // c⏎a?.b).ddd`).
 pub(crate) fn member_object_paren_leading_start(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     member: &ast::MemberExpression,
     span: Span,
 ) -> Option<u32> {
@@ -606,7 +606,7 @@ pub(crate) fn member_object_paren_leading_start(
 /// and the IIFE — a function or arrow, the one callee kind prettier prints the run
 /// inside the parens for ([`paren_pair_keeps_leading_run`]).
 pub(crate) fn call_callee_paren_leading_start(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     call: &ast::CallExpression<'_>,
     span: Span,
 ) -> Option<u32> {
@@ -625,7 +625,7 @@ pub(crate) fn call_callee_paren_leading_start(
 /// beside its siblings, and in their shape, because it is the same question and the
 /// family answering it in one place is the point ([`chain_paren_leading_gap`]).
 pub(crate) fn tag_paren_leading_start(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     tagged: &ast::TaggedTemplateExpression<'_>,
     span: Span,
 ) -> Option<u32> {
@@ -639,7 +639,7 @@ pub(crate) fn tag_paren_leading_start(
 /// optional chain, and a shell RETAINED for a `//` in the operand→`!` gap — see the
 /// linearizer's arm, whose condition this is.
 fn non_null_operand_paren_leading_start(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     non_null: &ast::TSNonNullExpression,
     span: Span,
     comments: &[Comment],
@@ -724,7 +724,7 @@ const CHAIN_FRAMES: u32 = 16;
 /// the rest of a longer chain is walked by [`linearize_spine_loop`], which runs the same
 /// halves in the same order without a frame per link.
 fn linearize_spine<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     expr: &'a Expression<'_>,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -736,7 +736,7 @@ fn linearize_spine<'a>(
 /// [`linearize_spine`]'s recursion: `expr`'s link, with `frames` link frames left before
 /// the rest of the chain goes to [`linearize_spine_loop`].
 fn linearize_link<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     expr: &'a Expression<'_>,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -787,7 +787,7 @@ fn linearize_link<'a>(
 /// there. A link costs a held entry rather than a native stack frame.
 #[inline(never)]
 fn linearize_spine_loop<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     expr: &'a Expression<'_>,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -870,7 +870,7 @@ fn linearize_spine_loop<'a>(
 #[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
 #[inline(always)]
 fn push_chain_base<'a>(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &'a Expression<'_>,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -900,7 +900,7 @@ enum NonNullStep<'a> {
 #[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
 #[inline(always)]
 fn non_null_step<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     non_null: &'a ast::TSNonNullExpression,
     span: Span,
     input: LinearizeInput<'_>,
@@ -947,7 +947,7 @@ fn non_null_step<'a>(
 #[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
 #[inline(always)]
 fn finish_non_null(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     non_null: &ast::TSNonNullExpression,
     span: Span,
     nodes: &mut ChainNodeVec<'_>,
@@ -988,7 +988,7 @@ fn finish_non_null(
 /// an instantiation object (`(A<T>).x`) becomes a parenthesized base there by the
 /// `ChainBase` rule, its type args kept.
 fn linearize_member_object<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     member: &'a ast::MemberExpression,
     span: Span,
     input: LinearizeInput<'_>,
@@ -1005,7 +1005,7 @@ fn linearize_member_object<'a>(
 #[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
 #[inline(always)]
 fn member_object_step<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     member: &'a ast::MemberExpression,
     span: Span,
     input: LinearizeInput<'_>,
@@ -1044,7 +1044,7 @@ fn member_object_step<'a>(
 /// [`get_chain_base_start`]. A reader that answered on its own would print the list in the
 /// wrong place or lose the comments between the expression and the `<`.
 pub(crate) fn transparent_instantiation_callee<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     call: &'a ast::CallExpression<'a>,
 ) -> Option<&'a ast::TSInstantiationExpression<'a>> {
     match &view.expr(call.callee).kind {
@@ -1078,7 +1078,7 @@ pub(crate) fn transparent_instantiation_callee<'a>(
 /// pass; and the callee gap reads that pair's trailing gap past the callee's end, which
 /// is the `>`.
 pub(crate) fn transparent_callee_sealed_chain<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     call: &'a ast::CallExpression<'a>,
 ) -> Option<(&'a Expression<'a>, u32)> {
     let inst = transparent_instantiation_callee(view, call)?;
@@ -1094,7 +1094,7 @@ pub(crate) fn transparent_callee_sealed_chain<'a>(
 /// does one instantiated by a transparent instantiation callee
 /// ([`transparent_callee_sealed_chain`]). All other callees are walked on.
 fn linearize_call_callee<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     call: &'a ast::CallExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
@@ -1112,7 +1112,7 @@ fn linearize_call_callee<'a>(
 #[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
 #[inline(always)]
 fn call_callee_step<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     call: &'a ast::CallExpression<'_>,
     span: Span,
     input: LinearizeInput<'_>,
@@ -1148,7 +1148,7 @@ fn call_callee_step<'a>(
 #[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
 #[inline(always)]
 fn finish_call_callee(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     call: &ast::CallExpression<'_>,
     span: Span,
     nodes: &mut ChainNodeVec<'_>,
@@ -1175,7 +1175,7 @@ fn finish_call_callee(
 /// Built by the linearizer's own step, over an empty run: the stripped-paren gap it would
 /// record names an earlier member node, and there is none.
 pub(super) fn member_lookup_node<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     member: &'a ast::MemberExpression,
     member_span: Span,
     input: LinearizeInput<'_>,
@@ -1203,7 +1203,7 @@ pub(super) fn member_lookup_node<'a>(
 /// A step of `linearize_spine`, shared with
 /// `linearize_chain_from_member_into`.
 fn linearize_member_node<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     member: &'a ast::MemberExpression,
     member_span: Span,
     input: LinearizeInput<'_>,
@@ -1737,7 +1737,7 @@ pub(crate) fn build_linearized_chain_doc(
 /// printed `const c = e.m()!;`) while the two spellings either side of it, the same shell
 /// with no `!` and one whose `!` is not the chain's outermost node, were correct all along.
 fn chain_head_comment_window(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     nodes: &[ChainNode<'_>],
     expr: &Expression<'_>,
     chain_start: u32,
@@ -1831,7 +1831,7 @@ fn widened_claim_holes(
 ///
 /// [`chain_head_comment_window`] reads this off the linearized base node instead and
 /// keeps the walk as its debug oracle (and the fallback for a node list without one).
-fn get_chain_base_start<'a>(view: ExprView<'a>, mut expr: &'a Expression<'a>) -> u32 {
+fn get_chain_base_start<'a>(view: AstView<'a>, mut expr: &'a Expression<'a>) -> u32 {
     loop {
         expr = match &expr.kind {
             ExpressionKind::MemberExpression(member) => view.expr(member.object),
@@ -2170,7 +2170,7 @@ mod tests {
     /// The nodes and paren gaps of `root`'s chain, walked by [`linearize_link`] with `frames`
     /// link frames — or, for `None`, by [`linearize_spine_loop`] from the first link.
     fn linearized(
-        view: ExprView<'_>,
+        view: AstView<'_>,
         root: &Expression<'_>,
         input: LinearizeInput<'_>,
         frames: Option<u32>,
@@ -2186,7 +2186,7 @@ mod tests {
     /// Every expression a chain test walks from: each link down the spine of `expr`, and
     /// the same for every call argument and every tagged template's tag on the way.
     fn chain_roots<'a>(
-        view: ExprView<'a>,
+        view: AstView<'a>,
         expr: &'a Expression<'a>,
         out: &mut Vec<&'a Expression<'a>>,
     ) {

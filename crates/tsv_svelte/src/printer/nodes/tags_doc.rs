@@ -10,7 +10,7 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::after_operator::fluid_after_operator;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::TriviaProfile;
-use tsv_ts::ast::ExprView;
+use tsv_ts::ast::AstView;
 use tsv_ts::ast::{Expression, ExpressionKind};
 
 // Opening-tag literals whose `.len()` locates the embedded expression past the
@@ -344,7 +344,7 @@ impl<'a> Printer<'a> {
     /// that appear in @const tags, delegating to tsv_ts's predicates so the
     /// rules can't drift from our own assignment printer.
     /// Prettier ref: `shouldBreakAfterOperator` (assignment.js)
-    fn const_should_break_after_op(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+    fn const_should_break_after_op(view: AstView<'_>, expr: &Expression<'_>) -> bool {
         match &expr.kind {
             // Binary expressions break after `=`, UNLESS it's a logical expression
             // with an inlinable RHS (non-empty object/array). In that case, the

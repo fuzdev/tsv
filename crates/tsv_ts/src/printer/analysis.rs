@@ -5,7 +5,7 @@
 // special handling, wrapping, or expansion.
 
 use crate::ast;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::printer::Printer;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -106,7 +106,7 @@ pub(crate) fn statement_gap_floor(body: &[ast::Statement<'_>], index: usize) -> 
 /// - `require.resolve(stringLiteral)`
 /// - `await import(stringLiteral)`
 pub(crate) fn is_module_path_fluid_call(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &ast::Expression<'_>,
     source: &str,
 ) -> bool {
@@ -163,7 +163,7 @@ pub(crate) fn is_string_literal(expr: &ast::Expression<'_>) -> bool {
 /// ```
 ///
 /// Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`)
-pub fn conditional_should_break_after_op(view: ExprView<'_>, expr: &ast::Expression<'_>) -> bool {
+pub fn conditional_should_break_after_op(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
     if let ast::ExpressionKind::ConditionalExpression(cond) = &expr.kind {
         // Check if test is binaryish (BinaryExpression includes logical operators like &&, ||),
         // but exclude logical expressions with inline-able RHS (non-empty object/array).
@@ -233,7 +233,7 @@ pub(crate) enum PatternContext {
 /// - In function parameters: depth 3+ expands (e.g., {a: {b}} stays, {a: {b: {c}}} expands)
 /// - In standalone contexts: depth 2+ expands (e.g., {a: {b}} expands)
 pub(crate) fn object_pattern_should_expand(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     obj: &ast::ObjectPattern<'_>,
     context: PatternContext,
 ) -> bool {
@@ -251,7 +251,7 @@ pub(crate) fn object_pattern_should_expand(
 /// Depth 1 = simple pattern like {a}
 /// Depth 2 = one level of nesting like {a: {b}}
 /// Depth 3 = two levels of nesting like {a: {b: {c}}}
-fn pattern_nesting_depth(view: ExprView<'_>, obj: &ast::ObjectPattern<'_>) -> usize {
+fn pattern_nesting_depth(view: AstView<'_>, obj: &ast::ObjectPattern<'_>) -> usize {
     let mut max_depth = 1;
 
     for prop in obj.properties {
@@ -284,7 +284,7 @@ fn pattern_nesting_depth(view: ExprView<'_>, obj: &ast::ObjectPattern<'_>) -> us
 }
 
 /// Calculate the maximum nesting depth of an array pattern
-fn array_pattern_nesting_depth(view: ExprView<'_>, arr: &ast::ArrayPattern<'_>) -> usize {
+fn array_pattern_nesting_depth(view: AstView<'_>, arr: &ast::ArrayPattern<'_>) -> usize {
     let mut max_depth = 1;
 
     for elem in view.opt_list(arr.elements).iter().flatten() {

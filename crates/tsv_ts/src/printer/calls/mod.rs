@@ -47,7 +47,7 @@ pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_com
 use super::chain::{self, ChainCall, call_callee_paren_leading_start};
 use super::{ArrowChainContext, ParenContext, Printer, SecondTypeArgs, is_curried_arrow_chain};
 use crate::ast;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::printer::expressions::functions::callback_signature_refuses_hug;
 use arg_comments::{any_arg_empty_line, any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
@@ -514,7 +514,7 @@ pub(super) fn call_paren_open(
 /// out-of-line copy otherwise, a call per ask for what is usually one or two kind tests.
 #[expect(clippy::inline_always)]
 #[inline(always)]
-pub(in crate::printer) fn chain_has_calls(view: ExprView<'_>, expr: &ast::Expression<'_>) -> bool {
+pub(in crate::printer) fn chain_has_calls(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
     let mut expr = expr;
     loop {
         expr = match &expr.kind {
@@ -648,7 +648,7 @@ impl<'a> CalleeParens<'a> {
 /// hugs to the call's parentheses directly (a call — through a trailing `!` too — or a
 /// conditional), rather than breaking the call's arguments out around the arrow.
 pub(in crate::printer) fn arrow_body_hugs_call_parens(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     body: &ast::Expression<'_>,
 ) -> bool {
     arg_predicates::arrow_body_is_call_through_non_null(view, body)
@@ -685,7 +685,7 @@ pub(in crate::printer) fn is_memberish(expr: &ast::Expression<'_>) -> bool {
 /// chain's last group, where the chain's layout decides their lists too
 /// ([`Printer::build_curried_member_chain_call_doc`] keeps them out). A curried run on any
 /// other callee (`f(a)(b)`) has no member chain to stop, and stays one chain group.
-fn curried_run_roots_in_member_chain(view: ExprView<'_>, callee: &ast::CallExpression<'_>) -> bool {
+fn curried_run_roots_in_member_chain(view: AstView<'_>, callee: &ast::CallExpression<'_>) -> bool {
     let mut call = callee;
     while let ast::ExpressionKind::CallExpression(inner) = &view.expr(call.callee).kind {
         call = inner;
@@ -701,7 +701,7 @@ fn curried_run_roots_in_member_chain(view: ExprView<'_>, callee: &ast::CallExpre
 /// `printCallExpression`'s `group([callee, args])` exactly as a call on `c(x)` does: the member
 /// chain ends at the innermost call either way. tsv lays the two out alike — a `!` asserts a
 /// type and nothing else — which here is prettier's layout too.
-fn callee_is_curried_member_chain_call(view: ExprView<'_>, callee: &ast::Expression<'_>) -> bool {
+fn callee_is_curried_member_chain_call(view: AstView<'_>, callee: &ast::Expression<'_>) -> bool {
     let mut callee = callee;
     while let ast::ExpressionKind::TSNonNullExpression(non_null) = &callee.kind {
         callee = view.expr(non_null.expression);
@@ -738,7 +738,7 @@ fn spine_step<'e>(
 /// [`Printer::spine_first_call_prints_whole`] takes; the parser's depth limit takes the same
 /// walk a bounded number of links at a time ([`spine_first_call_within`]).
 fn spine_first_call<'e>(
-    view: ExprView<'e>,
+    view: AstView<'e>,
     expr: &'e ast::Expression<'e>,
 ) -> Option<(&'e ast::CallExpression<'e>, Span)> {
     let mut expr = expr;
@@ -757,7 +757,7 @@ fn spine_first_call<'e>(
 /// it takes a bounded walk and carries what lies past the bound from link to link
 /// (`Parser::member_link_units`).
 pub(crate) fn spine_first_call_within(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: ast::ExprId,
     links: u32,
 ) -> Result<Option<ast::ExprId>, ast::ExprId> {
@@ -787,7 +787,7 @@ pub(crate) fn spine_first_call_within(
 /// The parser's question (`Parser::member_link_units`, `Parser::settle_call_link`),
 /// asked of the printer's own predicates so the depth limit prices the walk the printer
 /// takes.
-pub(crate) fn call_may_print_whole(view: ExprView<'_>, call: ast::ExprId) -> bool {
+pub(crate) fn call_may_print_whole(view: AstView<'_>, call: ast::ExprId) -> bool {
     let ast::ExpressionKind::CallExpression(call) = &view.expr(call).kind else {
         return false;
     };
@@ -801,7 +801,7 @@ pub(crate) fn call_may_print_whole(view: ExprView<'_>, call: ast::ExprId) -> boo
 /// the question for a call that prints its callee whole: the plain call's head arms
 /// [`Printer::long_curried_target`] with it, and the curried-callback route in
 /// [`Printer::build_call_doc`], which builds the callee without that head, declines on it.
-fn callee_is_long_curried(view: ExprView<'_>, call: &ast::CallExpression<'_>) -> bool {
+fn callee_is_long_curried(view: AstView<'_>, call: &ast::CallExpression<'_>) -> bool {
     matches!(
         &view.expr(call.callee).kind,
         ast::ExpressionKind::CallExpression(inner)

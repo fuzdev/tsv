@@ -984,7 +984,7 @@ embedded islands. An edge to an expression is an `ExprId`, an index into the
 `Store<Expression>`; a child list is a `Run` over a store of ids (`Run<ExprId>`: call and
 `new` arguments, sequence and template expressions; `Run<Option<ExprId>>`: array and
 array-pattern elements) or a value run over the expression store itself (`Run<Expr>`:
-parameter lists). A reader reaches them through an `ExprView`, one word holding a
+parameter lists). A reader reaches them through an `AstView`, one word holding a
 reference to the stores; a store row, once pushed, is never edited or truncated, so a parser
 that replaces a node (a cover-grammar conversion, an annotated binding pattern) appends the
 new row and the old one is orphaned. `Statement`, `TSType` and the boxed expression payloads

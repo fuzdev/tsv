@@ -39,7 +39,7 @@ use std::borrow::Cow;
 use tsv_lang::Error;
 
 use crate::Goal;
-use crate::ast::{ExprView, Program};
+use crate::ast::{AstView, Program};
 use crate::strip::walk::{Mode, Walk};
 
 /// A byte range in the source a record was collected from: `start..end`, UTF-8 byte
@@ -406,7 +406,7 @@ pub fn parse_imports_into<'arena>(
 /// the walk's scratch, which is never read.
 pub fn collect_imports(
     programs: &[&Program<'_>],
-    view: ExprView<'_>,
+    view: AstView<'_>,
     source: &str,
     arena: &bumpalo::Bump,
 ) -> Imports {

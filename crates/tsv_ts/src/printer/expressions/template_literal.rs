@@ -3,7 +3,7 @@
 // Builds docs for template literals (quasi/interpolation layout, alignment,
 // interpolation comments) and tagged template expressions.
 
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{Expression, ExpressionKind};
 use crate::printer::chain::tag_paren_leading_start;
 use crate::printer::comments::{CommentSpacing, LeftSpineStep, left_spine_shell_is_comment_free};
@@ -387,7 +387,7 @@ impl<'a> Printer<'a> {
     /// question is whether one OCCUPIES the page here — an owned (glued) comment included,
     /// which no emitter's collect reports. See `docs/comments.md` §The three axes.
     fn is_template_softline_expression(
-        view: ExprView<'_>,
+        view: AstView<'_>,
         expr: &Expression<'_>,
         has_comment_on_page: bool,
     ) -> bool {

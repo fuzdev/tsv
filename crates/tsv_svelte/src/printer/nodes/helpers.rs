@@ -12,7 +12,7 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, Span};
-use tsv_ts::ast::ExprView;
+use tsv_ts::ast::AstView;
 use tsv_ts::ast::{Expression, ExpressionKind};
 
 /// What a block head's own syntax prints right after its expression — the question the
@@ -81,7 +81,7 @@ impl HeadTail {
 /// author wrote past the body — and both answer the one question this seam asks: how far into
 /// the head does the expression's comment range reach, without spanning text someone else
 /// prints.
-pub(super) fn each_expr_comment_end(view: ExprView<'_>, block: &EachBlock<'_>) -> u32 {
+pub(super) fn each_expr_comment_end(view: AstView<'_>, block: &EachBlock<'_>) -> u32 {
     match block.context {
         Some(context) => view.expr(context).span().start,
         None => view.expr(block.expression).span().end,

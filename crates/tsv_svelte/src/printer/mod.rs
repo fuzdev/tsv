@@ -46,7 +46,7 @@ use tsv_lang::{
     is_region_end_marker,
 };
 use tsv_lang::{FxHashMap, FxHashSet};
-use tsv_ts::ast::ExprView;
+use tsv_ts::ast::AstView;
 use tsv_ts::ast::{Expression, ExpressionKind};
 
 /// A buffered run of comments from one gap — collected rather than iterated because the
@@ -438,7 +438,7 @@ pub(crate) struct Printer<'a> {
     /// Comments from scripts and template expressions
     comments: &'a [Comment],
     /// Reads the expressions of the tree being printed.
-    pub(crate) view: ExprView<'a>,
+    pub(crate) view: AstView<'a>,
     /// Whether any of `comments` is owned by a node (`owned_by_node`). Computed once
     /// per document at construction and handed to `tsv_ts` via `ts_inputs()`, so the
     /// embedded owned-comment path short-circuits per `{expr}` without an O(comments)
@@ -606,7 +606,7 @@ fn plain_reference_span(id: &tsv_ts::ast::Identifier<'_>) -> Option<Span> {
 /// comments), which sits glued ahead of it — a caller that prints the span instead of
 /// building the doc owes the proof that none does.
 pub(in crate::printer) fn plain_path_span(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &Expression<'_>,
 ) -> Option<Span> {
     let path = match &expr.kind {
@@ -640,7 +640,7 @@ impl<'a> Printer<'a> {
         arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
-        view: ExprView<'a>,
+        view: AstView<'a>,
     ) -> Self {
         let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
         Self::with_line_breaks(
@@ -667,7 +667,7 @@ impl<'a> Printer<'a> {
         arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
-        view: ExprView<'a>,
+        view: AstView<'a>,
         embed: EmbedContext,
         line_breaks: LineBreaks<'a>,
     ) -> Self {

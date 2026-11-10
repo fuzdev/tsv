@@ -13,7 +13,7 @@ use super::{
     write_return_type_field, write_type_annotation_field, write_type_parameters_field,
 };
 use crate::ast;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use tsv_lang::Span;
 use tsv_lang::source_scan::{self, TriviaProfile};
 
@@ -103,7 +103,7 @@ pub(super) fn write_function_declaration(
 /// combined span to wrap with, or `None` for the plain shape. All offsets are
 /// internal byte offsets (the same-line scan byte-indexes `source`).
 fn super_class_wrap_span(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     type_params_span: Option<Span>,
     super_class: Option<&ast::Expression<'_>>,
     super_type_parameters_end: Option<u32>,

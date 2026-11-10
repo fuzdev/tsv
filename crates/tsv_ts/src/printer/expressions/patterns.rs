@@ -9,7 +9,7 @@
 
 use super::assignment::{AssignmentLeft, RhsCommentInfo};
 use super::objects::LiteralRole;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{
     self, ArrowFunctionBody, AssignmentOperator, Expression, ExpressionKind, ObjectPatternProperty,
 };
@@ -47,7 +47,7 @@ enum AssignmentContext {
 /// literal's twin is `array_gap_end`; each container names its own end once and the walk
 /// past the holes is shared.
 fn array_pattern_gap_end(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     arr: &ast::ArrayPattern<'_>,
     i: usize,
     body_end: u32,
@@ -57,7 +57,7 @@ fn array_pattern_gap_end(
 
 /// Check if an arrow function has a nested arrow function as its body
 /// Used for chain-tail-arrow-chain detection: `(x) => (y) => x + y`
-fn is_nested_arrow_function(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+fn is_nested_arrow_function(view: AstView<'_>, expr: &Expression<'_>) -> bool {
     if let ExpressionKind::ArrowFunctionExpression(arrow) = &expr.kind
         && let ArrowFunctionBody::Expression(body_expr) = &arrow.body
     {
