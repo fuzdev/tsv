@@ -6,15 +6,13 @@
 //! over the stores, and every read of one goes through the view. The view is one word: a walk
 //! reaches a row through a load of the store's slice header and an indexed load, and holds one
 //! register for the view.
-//!
-//! The payload edges are read through the view too, spelled with the edge aliases the payload
-//! stores' macro declares while the tree still holds them as references.
 
 use tsv_lang::store::Run;
 
+use super::stores::PayloadStores;
 use super::{
-    AstStores, CatchClause, CatchEdge, Expr, ExprId, Expression, ForHeadEdge, ForInit,
-    IdentifierParamExtra, ParamExtraEdge, Parsed, Program, Statement, StmtId, TSType, TyId,
+    AstStores, CatchClause, CatchId, Expr, ExprId, Expression, ForHeadId, ForInit,
+    IdentifierParamExtra, ParamExtraId, Parsed, Program, Statement, StmtId, TSType, TyId,
 };
 
 /// The read access every consumer of the tree holds: resolves edges and lists.
@@ -98,25 +96,28 @@ impl<'a> AstView<'a> {
         self.stores.ty_lists.slice(list)
     }
 
-    /// The `for` head `edge` names, when it is present.
+    /// The `for` head `id` names, when it is present.
     #[inline]
-    pub fn opt_for_head(self, edge: Option<ForHeadEdge<'a>>) -> Option<&'a ForInit<'a>> {
-        edge.map(|edge| self.for_head(edge))
+    pub fn opt_for_head(self, id: Option<ForHeadId>) -> Option<&'a ForInit<'a>> {
+        id.map(|id| self.for_head(id))
     }
 
-    /// The catch clause `edge` names, when it is present.
+    /// The catch clause `id` names, when it is present.
     #[inline]
-    pub fn opt_catch(self, edge: Option<CatchEdge<'a>>) -> Option<&'a CatchClause<'a>> {
-        edge.map(|edge| self.catch(edge))
+    pub fn opt_catch(self, id: Option<CatchId>) -> Option<&'a CatchClause<'a>> {
+        id.map(|id| self.catch(id))
     }
 
-    /// The parameter name's extras `edge` names, when they are present.
+    /// The parameter name's extras `id` names, when they are present.
     #[inline]
-    pub fn opt_param_extra(
-        self,
-        edge: Option<ParamExtraEdge<'a>>,
-    ) -> Option<&'a IdentifierParamExtra<'a>> {
-        edge.map(|edge| self.param_extra(edge))
+    pub fn opt_param_extra(self, id: Option<ParamExtraId>) -> Option<&'a IdentifierParamExtra<'a>> {
+        id.map(|id| self.param_extra(id))
+    }
+
+    /// The payload stores, for the accessors their macro declares beside them.
+    #[inline]
+    pub(super) fn payloads(self) -> &'a PayloadStores<'a> {
+        &self.stores.payloads
     }
 }
 

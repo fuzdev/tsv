@@ -6,7 +6,7 @@
 use tsv_lang::Span;
 
 use super::{
-    AstView, Expr, ExprId, Identifier, Literal, ModuleDeclEdge, Run, StmtId, TSEntityName,
+    AstView, Expr, ExprId, Identifier, Literal, ModuleDeclId, Run, StmtId, TSEntityName,
     TSTypeAnnotation, TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 
@@ -137,7 +137,7 @@ pub struct TSModuleDeclaration<'arena> {
     pub id: TSModuleName<'arena>,
     /// Module body - either a block or nested module declaration (for `A.B.C`)
     /// `None` for shorthand ambient modules: `declare module 'name';`
-    pub body: Option<TSModuleDeclarationBody<'arena>>,
+    pub body: Option<TSModuleDeclarationBody>,
     /// Whether this is an ambient declaration (`declare namespace/module`)
     pub declare: bool,
     /// The keyword used: `namespace` or `module`
@@ -176,11 +176,11 @@ pub enum TSModuleDeclarationKind {
 
 /// Body of a TypeScript module declaration
 #[derive(Debug, Clone)]
-pub enum TSModuleDeclarationBody<'arena> {
+pub enum TSModuleDeclarationBody {
     /// Block body with statements: `namespace A { ... }`
     TSModuleBlock(TSModuleBlock),
     /// Nested module declaration: `namespace A.B { ... }` - the B part
-    TSModuleDeclaration(ModuleDeclEdge<'arena>),
+    TSModuleDeclaration(ModuleDeclId),
 }
 
 /// TypeScript module block: the `{ ... }` part of a namespace/module declaration

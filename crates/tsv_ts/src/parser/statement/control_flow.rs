@@ -2,6 +2,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
+use crate::parser::push_row;
 use tsv_lang::{Error, Span};
 
 use super::super::{Parser, RootEnd};
@@ -111,13 +112,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             let Some(form) = self.for_in_of_separator() else {
                 // Standard for loop with a declaration as init.
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<ForInit<'_>>(1);
-                return self.parse_c_style_for(
-                    start,
-                    await_at,
-                    Some(self.arena.alloc(ForInit::VariableDeclaration(var_decl))),
+                let init = push_row(
+                    &mut self.stores.payloads.for_heads,
+                    ForInit::VariableDeclaration(var_decl),
                 );
+                return self.parse_c_style_for(start, await_at, Some(init));
             };
 
             // The rules a declaration owes a for-in/of head, stated once here — the
@@ -156,9 +155,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             self.advance()?;
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::mint::<ForInOfLeft<'_>>(1);
-            let left = self.arena.alloc(ForInOfLeft::VariableDeclaration(var_decl));
+            let left = push_row(
+                &mut self.stores.payloads.for_lefts,
+                ForInOfLeft::VariableDeclaration(var_decl),
+            );
             return match form {
                 ForInOf::In => self.parse_for_in(start, await_at, left),
                 ForInOf::Of => self.parse_for_of(start, left, is_await),
@@ -186,13 +186,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             ));
             self.advance()?; // consume 'of'
             let async_ident = self.push_expr(async_ident);
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::mint::<ForInOfLeft<'_>>(1);
-            return self.parse_for_of(
-                start,
-                self.arena.alloc(ForInOfLeft::Pattern(async_ident)),
-                is_await,
+            let left = push_row(
+                &mut self.stores.payloads.for_lefts,
+                ForInOfLeft::Pattern(async_ident),
             );
+            return self.parse_for_of(start, left, is_await);
         }
 
         // Parse expression (could be init or left-hand side)
@@ -210,13 +208,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // WHOLE head, never an `AssignmentPattern` (`for ((a = b) of xs)`).
         let Some(form) = self.for_in_of_separator() else {
             // Standard for loop with expression init.
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::mint::<ForInit<'_>>(1);
-            return self.parse_c_style_for(
-                start,
-                await_at,
-                Some(self.arena.alloc(ForInit::Expression(expr))),
+            let init = push_row(
+                &mut self.stores.payloads.for_heads,
+                ForInit::Expression(expr),
             );
+            return self.parse_c_style_for(start, await_at, Some(init));
         };
         // `ForInOfStatement`'s of-forms carry `[lookahead ∉ { let, async of }]` (and
         // `[lookahead ≠ let]` for the for-await form), a restriction on the head's
@@ -240,9 +236,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
         self.advance()?;
         let left = self.refine_for_head_target(expr)?.id();
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ForInOfLeft<'_>>(1);
-        let left = self.arena.alloc(ForInOfLeft::Pattern(left));
+        let left = push_row(
+            &mut self.stores.payloads.for_lefts,
+            ForInOfLeft::Pattern(left),
+        );
         match form {
             ForInOf::In => self.parse_for_in(start, await_at, left),
             ForInOf::Of => self.parse_for_of(start, left, is_await),
@@ -340,7 +337,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         await_at: Option<usize>,
-        init: Option<ForHeadEdge<'arena>>,
+        init: Option<ForHeadId>,
     ) -> Result<Statement<'arena>, Error> {
         self.reject_for_await_without_of(await_at)?;
         self.expect(&TokenKind::Semicolon)?;
@@ -354,7 +351,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_for_standard(
         &mut self,
         start: usize,
-        init: Option<ForHeadEdge<'arena>>,
+        init: Option<ForHeadId>,
     ) -> Result<Statement<'arena>, Error> {
         // Parse test (optional)
         let test = if self.check(&TokenKind::Semicolon) {
@@ -399,7 +396,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         await_at: Option<usize>,
-        left: ForLeftEdge<'arena>,
+        left: ForLeftId,
     ) -> Result<Statement<'arena>, Error> {
         self.reject_for_await_without_of(await_at)?;
 
@@ -420,7 +417,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_for_of(
         &mut self,
         start: usize,
-        left: ForLeftEdge<'arena>,
+        left: ForLeftId,
         r#await: bool,
     ) -> Result<Statement<'arena>, Error> {
         let right = self.parse_expression()?.id();
@@ -648,12 +645,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let block = self.parse_block_statement()?;
 
         // Parse optional catch clause
-        let handler: Option<CatchEdge<'arena>> =
+        let handler: Option<CatchId> =
             if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Catch)) {
                 // one wire level: the `CatchClause` over its parameter and block
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<CatchClause<'_>>(1);
-                Some(self.arena.alloc(self.nested(1, Self::parse_catch_clause)?))
+                let handler = self.nested(1, Self::parse_catch_clause)?;
+                Some(push_row(&mut self.stores.payloads.catches, handler))
             } else {
                 None
             };

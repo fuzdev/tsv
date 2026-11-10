@@ -7,8 +7,8 @@ use crate::lexer::KeywordKind;
 use tsv_lang::Span;
 
 use super::{
-    CtorTypeEdge, Decorator, Expr, ExprId, IdentName, Identifier, ImportTypeEdge, InferTypeEdge,
-    Literal, MethodKind, QualNameEdge, Run, TemplateElement, TyId, UnaryExpression,
+    CtorTypeId, Decorator, Expr, ExprId, IdentName, Identifier, ImportTypeId, InferTypeId, Literal,
+    MethodKind, QualNameId, Run, TemplateElement, TyId, UnaryExpression,
 };
 
 /// TypeScript type annotation node (e.g., `: number` in `const a: number = 5`)
@@ -27,11 +27,12 @@ pub struct TSTypeAnnotation {
 /// primitive keyword types are implemented. Complex types (unions, intersections,
 /// generics, etc.) will be added incrementally.
 ///
-/// Three variants are arena-boxed rather than inline — `Import`, `Constructor` and
-/// `Infer` — for the density reason `Statement` and `Expression` take: each is wide
-/// enough to set the enum's size on its own and rare enough that the allocation is free,
-/// while the width is paid by every row of the type store. Each carries its span inline
-/// beside the reference, so [`TSType::span`] reads every variant without leaving the row.
+/// Three variants are stored rather than inline — `Import`, `Constructor` and `Infer`,
+/// each a row of its own payload store named by id — for the density reason `Statement`
+/// and `Expression` take: each is wide enough to set the enum's size on its own and rare
+/// enough that the extra row is free, while the width is paid by every row of the type
+/// store. Each carries its span inline beside the id, so [`TSType::span`] reads every
+/// variant without leaving the row.
 /// A type-store row is the only place a `TSType` lives: no AST field holds one by value — every
 /// holder, lists included (union / intersection members, tuple elements, type arguments,
 /// template-literal types, as `Run<TyId>`), names by its [`TyId`] the row the type parser's
@@ -57,7 +58,7 @@ pub enum TSType<'arena> {
     /// Function types: `(x: T) => U`
     Function(TSFunctionType<'arena>),
     /// Constructor types: `new () => T` or `abstract new <T>() => T`
-    Constructor(Span, CtorTypeEdge<'arena>),
+    Constructor(Span, CtorTypeId),
     /// Tuple types: `[T, U]`
     Tuple(TSTupleType),
     /// Parenthesized types: `(T)`
@@ -71,7 +72,7 @@ pub enum TSType<'arena> {
     /// Type operators: `keyof T`, `unique symbol`, `readonly T`
     TypeOperator(TSTypeOperator),
     /// Import types: `import('module')` or `import('module').Foo<T>`
-    Import(Span, ImportTypeEdge<'arena>),
+    Import(Span, ImportTypeId),
     /// Type query: `typeof x`, `typeof Foo.bar`, `typeof import("module")`
     TypeQuery(TSTypeQuery<'arena>),
     /// Indexed access types: `T[K]`, `Obj["key"]`, `T[keyof T]`
@@ -83,7 +84,7 @@ pub enum TSType<'arena> {
     /// Named tuple member: `label: T` or `label?: T`
     NamedTupleMember(TSNamedTupleMember<'arena>),
     /// Infer type: `infer U` (in conditional types)
-    Infer(Span, InferTypeEdge<'arena>),
+    Infer(Span, InferTypeId),
     /// This type: `this` (in type position)
     ThisType(TSThisType),
 }
@@ -369,9 +370,9 @@ pub struct TSTypeReference<'arena> {
 #[derive(Debug, Clone)]
 pub enum TSEntityName<'arena> {
     Identifier(Identifier<'arena>),
-    /// The qualified name's span inline beside the reference, so [`TSEntityName::span`]
-    /// reads it without the hop.
-    QualifiedName(Span, QualNameEdge<'arena>),
+    /// The qualified name's span inline beside its id, so [`TSEntityName::span`] reads it
+    /// without the hop.
+    QualifiedName(Span, QualNameId),
 }
 
 impl<'arena> TSEntityName<'arena> {
@@ -807,8 +808,8 @@ pub struct TSImportType<'arena> {
 pub enum TSTypeQueryExprName<'arena> {
     /// Entity name (Identifier or QualifiedName): `typeof x`, `typeof Foo.bar`
     EntityName(TSEntityName<'arena>),
-    /// Import type: `typeof import("module")`, its span inline beside the reference.
-    Import(Span, ImportTypeEdge<'arena>),
+    /// Import type: `typeof import("module")`, its span inline beside its id.
+    Import(Span, ImportTypeId),
 }
 
 impl<'arena> TSTypeQueryExprName<'arena> {

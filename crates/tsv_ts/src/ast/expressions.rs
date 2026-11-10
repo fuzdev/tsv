@@ -7,10 +7,10 @@ use crate::ast::AstView;
 use tsv_lang::{Comment, Span};
 
 use super::{
-    ArrayPattern, ArrowFnEdge, AssignmentPattern, BlockStatement, ClassExprEdge, Expr, ExprId,
-    FnExprEdge, Identifier, Literal, MetaPropEdge, ObjectPattern, PrivateIdentifier, RestElement,
-    Run, TSParameterProperty, TSTypeAnnotation, TSTypeParameterDeclaration,
-    TSTypeParameterInstantiation, TaggedTplEdge, TyId,
+    ArrayPattern, ArrowFnId, AssignmentPattern, BlockStatement, ClassExprId, Expr, ExprId,
+    FnExprId, Identifier, Literal, MetaPropId, ObjectPattern, PrivateIdentifier, RestElement, Run,
+    TSParameterProperty, TSTypeAnnotation, TSTypeParameterDeclaration,
+    TSTypeParameterInstantiation, TaggedTplId, TyId,
 };
 
 /// Expression node: the span every variant shares, beside the variant itself.
@@ -39,9 +39,9 @@ pub enum ExpressionKind<'arena> {
     NewExpression(NewExpression),
     MemberExpression(MemberExpression),
     ConditionalExpression(ConditionalExpression),
-    // Arena-boxed, unlike every variant above: these five are the only ones wide
-    // enough to set the enum's own size, and each is rare enough that the allocation
-    // is free — over 8 MB of real TypeScript, `ClassExpression` and
+    // Stored, each a row of its own payload store named by id, unlike every variant
+    // above: these five are the only ones wide enough to set the enum's own size, and
+    // each is rare enough that the extra row is free — over 8 MB of real TypeScript, `ClassExpression` and
     // `TaggedTemplateExpression` occur 0.000% of the time, `FunctionExpression`
     // 0.004–0.019%, `MetaProperty` 0.000–0.014%, and `ArrowFunctionExpression`
     // 3.0–3.8%. Inline they would make an `Expression` 176 bytes instead of 64, and
@@ -49,17 +49,17 @@ pub enum ExpressionKind<'arena> {
     // `Property`'s, both of a `VariableDeclarator`'s, and every row of a value run —
     // not just on the rare node that needs it. The next-widest inline variant is
     // `ObjectPattern`, and `CallExpression` at 40 bytes is 14–21% of expressions, so the
-    // ladder stops here: boxing it would tax the common path.
+    // ladder stops here: storing it would tax the common path.
     //
-    // The pointer chase this adds is on the rare read, and the parser's recursion is
+    // The store hop this adds is on the rare read, and the parser's recursion is
     // unaffected either way — it threads expressions by id (every `parse_*` on its
     // ladder returns an `ExprRet`).
-    ArrowFunctionExpression(ArrowFnEdge<'arena>),
-    FunctionExpression(FnExprEdge<'arena>),
-    ClassExpression(ClassExprEdge<'arena>),
+    ArrowFunctionExpression(ArrowFnId),
+    FunctionExpression(FnExprId),
+    ClassExpression(ClassExprId),
     SpreadElement(SpreadElement),
     TemplateLiteral(TemplateLiteral<'arena>),
-    TaggedTemplateExpression(TaggedTplEdge<'arena>),
+    TaggedTemplateExpression(TaggedTplId),
     AwaitExpression(AwaitExpression),
     YieldExpression(YieldExpression),
     SequenceExpression(SequenceExpression),
@@ -85,7 +85,7 @@ pub enum ExpressionKind<'arena> {
     // Dynamic import: import('...')
     ImportExpression(ImportExpression),
     // Meta property: import.meta, new.target (two inline Identifiers)
-    MetaProperty(MetaPropEdge<'arena>),
+    MetaProperty(MetaPropId),
     // A grouping pair bound to the comment before its `(` — the JSDoc type cast
     // `/** @type {T} */ (inner)`, or a glued block whose pair opens with a line comment
     // (`/* c */ (⏎// d⏎inner)`). Internal-only, never serialized
@@ -163,11 +163,12 @@ impl<'arena> Expression<'arena> {
         }
     }
 
-    /// Wrap an arena-allocated [`FunctionExpression`] (see [`Expression::from_identifier`]).
+    /// Wrap a stored [`FunctionExpression`], `span` being the payload's own, read before its
+    /// push (see [`Expression::from_identifier`]).
     #[inline]
-    pub fn from_function_expression(func: &'arena FunctionExpression<'arena>) -> Self {
+    pub fn from_function_expression(span: Span, func: FnExprId) -> Self {
         Self {
-            span: func.span,
+            span,
             kind: ExpressionKind::FunctionExpression(func),
         }
     }

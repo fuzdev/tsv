@@ -7,11 +7,10 @@
 use tsv_lang::Span;
 
 use super::{
-    CatchEdge, ClassDeclEdge, ClassDeclaration, DeclareFnEdge, EnumDeclEdge, ExportAllEdge,
-    ExportAssignEdge, ExportDefaultEdge, ExportNamedEdge, Expr, ExprId, Expression, FnDeclEdge,
-    ForHeadEdge, ForLeftEdge, Identifier, ImportDeclEdge, ImportEqualsEdge, InterfaceDeclEdge,
-    ModuleDeclEdge, Run, StmtId, TSDeclareFunction, TSInterfaceDeclaration, TSModuleDeclaration,
-    TSNamespaceExportDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration, TypeAliasEdge,
+    CatchId, ClassDeclId, DeclareFnId, EnumDeclId, ExportAllId, ExportAssignId, ExportDefaultId,
+    ExportNamedId, Expr, ExprId, Expression, FnDeclId, ForHeadId, ForLeftId, Identifier,
+    ImportDeclId, ImportEqualsId, InterfaceDeclId, ModuleDeclId, Run, StmtId,
+    TSNamespaceExportDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration, TypeAliasId,
 };
 
 /// Statement node: the span every variant shares, beside the variant itself.
@@ -31,12 +30,12 @@ pub struct Statement<'arena> {
 pub enum StatementKind<'arena> {
     ExpressionStatement(ExpressionStatement),
     VariableDeclaration(VariableDeclaration<'arena>),
-    // Arena-boxed, unlike every inline variant here: these are the widest
-    // declaration heads, and their width would otherwise be paid on every
-    // `Statement` ROW — every statement in the store and every `?`-propagation —
-    // not just on the declaration that needs it.
+    // Stored, each a row of its own payload store named by id, unlike every inline
+    // variant here: these are the widest declaration heads, and their width would
+    // otherwise be paid on every `Statement` ROW — every statement in the store and
+    // every `?`-propagation — not just on the declaration that needs it.
     //
-    // Most are boxed because they are RARE, so the allocation is free: over four
+    // Most are stored because they are RARE, so the extra row is free: over four
     // app corpora `TSDeclareFunction`, `ExportAllDeclaration`,
     // `TSImportEqualsDeclaration`, `TSEnumDeclaration` and `TSExportAssignment`
     // occur 0.000% of the time, `TSModuleDeclaration` 0.007–0.019%,
@@ -45,46 +44,46 @@ pub enum StatementKind<'arena> {
     // 0.026–0.204% and `TSInterfaceDeclaration` 0.028–0.128%.
     //
     // `ImportDeclaration` (6.8–11.7% of statements) and `ExportNamedDeclaration`
-    // (2.4–4.0%) are the exception: they are boxed because they are the CEILING,
-    // not because they are rare. Rarity is what makes boxing free, and it is not
-    // the only reason to box — the struct is copied into the arena instead of into
-    // the enum, so the copy volume is unchanged and the cost is one bump pointer,
-    // while all of the file's other statement rows get narrower. Boxed, a `Statement`
-    // is 64 bytes — the span header over a 56-byte `StatementKind` — which is what the
+    // (2.4–4.0%) are the exception: they are stored because they are the CEILING,
+    // not because they are rare. Rarity is what makes a row of its own free, and it is
+    // not the only reason to store one — the struct is copied into its store instead of
+    // into the enum, so the copy volume is unchanged and the cost is one row push, while
+    // all of the file's other statement rows get narrower. Stored, a `Statement` is 56
+    // bytes — the span header over a 48-byte `StatementKind` — which is what the
     // `size_of` asserts in this module's parent pin. The widest inline variant is
-    // `LabeledStatement` at 48 (its inline `Identifier` label beside the body's id),
-    // ahead of `TryStatement` and the `break` / `continue` labels at 40, so the ladder
-    // stops here.
+    // `LabeledStatement` at 40 (its inline `Identifier` label beside the body's id),
+    // ahead of `TryStatement` at 36 and the `break` / `continue` labels at 32, so the
+    // ladder stops here.
     //
-    // (The loop and `try` heads below hold their own heads by reference for the
-    // same reason, one level down; the `Expression`-holding heads below hold
-    // theirs by reference for a different one — see `ExpressionStatement`.)
-    TSTypeAliasDeclaration(TypeAliasEdge<'arena>),
-    TSInterfaceDeclaration(InterfaceDeclEdge<'arena>),
-    TSDeclareFunction(DeclareFnEdge<'arena>),
-    TSEnumDeclaration(EnumDeclEdge<'arena>),
-    TSModuleDeclaration(ModuleDeclEdge<'arena>),
+    // (The loop and `try` heads below hold their own heads by id for the same reason,
+    // one level down; the `Expression`-holding heads below hold theirs by id for a
+    // different one — see `ExpressionStatement`.)
+    TSTypeAliasDeclaration(TypeAliasId),
+    TSInterfaceDeclaration(InterfaceDeclId),
+    TSDeclareFunction(DeclareFnId),
+    TSEnumDeclaration(EnumDeclId),
+    TSModuleDeclaration(ModuleDeclId),
     ReturnStatement(ReturnStatement),
     BlockStatement(BlockStatement),
-    FunctionDeclaration(FnDeclEdge<'arena>),
-    ClassDeclaration(ClassDeclEdge<'arena>),
-    ExportNamedDeclaration(ExportNamedEdge<'arena>),
-    ExportDefaultDeclaration(ExportDefaultEdge<'arena>),
-    ExportAllDeclaration(ExportAllEdge<'arena>),
-    TSExportAssignment(ExportAssignEdge<'arena>),
+    FunctionDeclaration(FnDeclId),
+    ClassDeclaration(ClassDeclId),
+    ExportNamedDeclaration(ExportNamedId),
+    ExportDefaultDeclaration(ExportDefaultId),
+    ExportAllDeclaration(ExportAllId),
+    TSExportAssignment(ExportAssignId),
     TSNamespaceExportDeclaration(TSNamespaceExportDeclaration<'arena>),
-    ImportDeclaration(ImportDeclEdge<'arena>),
-    TSImportEqualsDeclaration(ImportEqualsEdge<'arena>),
+    ImportDeclaration(ImportDeclId),
+    TSImportEqualsDeclaration(ImportEqualsId),
     // Control flow statements
     IfStatement(IfStatement),
-    ForStatement(ForStatement<'arena>),
-    ForInStatement(ForInStatement<'arena>),
-    ForOfStatement(ForOfStatement<'arena>),
+    ForStatement(ForStatement),
+    ForInStatement(ForInStatement),
+    ForOfStatement(ForOfStatement),
     WhileStatement(WhileStatement),
     DoWhileStatement(DoWhileStatement),
     WithStatement(WithStatement),
     SwitchStatement(SwitchStatement<'arena>),
-    TryStatement(TryStatement<'arena>),
+    TryStatement(TryStatement),
     ThrowStatement(ThrowStatement),
     BreakStatement(BreakStatement<'arena>),
     ContinueStatement(ContinueStatement<'arena>),
@@ -103,9 +102,8 @@ impl<'arena> Statement<'arena> {
 
     /// Debug-build check that a payload carrying its own span agrees with the header
     /// (see [`Statement::from_variable_declaration`]). Only the inline payloads are checked:
-    /// an edge's payload is reached through a view, which a span read does not take.
-    // TODO: once the five edge-held payloads are wrapped from an id and a span, assert the two
-    // agree where the payload is pushed.
+    /// a stored payload is reached through a view, which a span read does not take, so the
+    /// parser checks those where it pushes them.
     #[cfg(debug_assertions)]
     fn debug_assert_payload_span(&self) {
         let payload = match &self.kind {
@@ -126,8 +124,9 @@ impl<'arena> Statement<'arena> {
     /// because the wrapped form is built only through these constructors, and no span
     /// write reaches one of these seven after it is wrapped — a parser that rewrites a
     /// payload's span does so before wrapping it. A debug build asserts the agreement on
-    /// every [`Statement::span`] read for the two held inline; the five held by an edge
-    /// take their header span from the payload in the one constructor that wraps each.
+    /// every [`Statement::span`] read for the two held inline. The five held in a store are
+    /// wrapped from their id and the span `push_spanned` read off the payload before its
+    /// push, so the two come from one value.
     #[inline]
     pub fn from_variable_declaration(decl: VariableDeclaration<'arena>) -> Self {
         Self {
@@ -145,47 +144,52 @@ impl<'arena> Statement<'arena> {
         }
     }
 
-    /// Wrap a [`FunctionDeclaration`] (see [`Statement::from_variable_declaration`]).
+    /// Wrap a stored [`FunctionDeclaration`], `span` being the payload's own (see
+    /// [`Statement::from_variable_declaration`]).
     #[inline]
-    pub fn from_function_declaration(func: &'arena FunctionDeclaration<'arena>) -> Self {
+    pub fn from_function_declaration(span: Span, func: FnDeclId) -> Self {
         Self {
-            span: func.span,
+            span,
             kind: StatementKind::FunctionDeclaration(func),
         }
     }
 
-    /// Wrap a [`ClassDeclaration`] (see [`Statement::from_variable_declaration`]).
+    /// Wrap a stored [`ClassDeclaration`](super::ClassDeclaration), `span` being the payload's own
+    /// (see [`Statement::from_variable_declaration`]).
     #[inline]
-    pub fn from_class_declaration(class: &'arena ClassDeclaration<'arena>) -> Self {
+    pub fn from_class_declaration(span: Span, class: ClassDeclId) -> Self {
         Self {
-            span: class.span,
+            span,
             kind: StatementKind::ClassDeclaration(class),
         }
     }
 
-    /// Wrap a [`TSInterfaceDeclaration`] (see [`Statement::from_variable_declaration`]).
+    /// Wrap a stored [`TSInterfaceDeclaration`](super::TSInterfaceDeclaration), `span`
+    /// being the payload's own (see [`Statement::from_variable_declaration`]).
     #[inline]
-    pub fn from_ts_interface_declaration(decl: &'arena TSInterfaceDeclaration<'arena>) -> Self {
+    pub fn from_ts_interface_declaration(span: Span, decl: InterfaceDeclId) -> Self {
         Self {
-            span: decl.span,
+            span,
             kind: StatementKind::TSInterfaceDeclaration(decl),
         }
     }
 
-    /// Wrap a [`TSDeclareFunction`] (see [`Statement::from_variable_declaration`]).
+    /// Wrap a stored [`TSDeclareFunction`](super::TSDeclareFunction), `span`
+    /// being the payload's own (see [`Statement::from_variable_declaration`]).
     #[inline]
-    pub fn from_ts_declare_function(func: &'arena TSDeclareFunction<'arena>) -> Self {
+    pub fn from_ts_declare_function(span: Span, func: DeclareFnId) -> Self {
         Self {
-            span: func.span,
+            span,
             kind: StatementKind::TSDeclareFunction(func),
         }
     }
 
-    /// Wrap a [`TSModuleDeclaration`] (see [`Statement::from_variable_declaration`]).
+    /// Wrap a stored [`TSModuleDeclaration`](super::TSModuleDeclaration), `span`
+    /// being the payload's own (see [`Statement::from_variable_declaration`]).
     #[inline]
-    pub fn from_ts_module_declaration(decl: &'arena TSModuleDeclaration<'arena>) -> Self {
+    pub fn from_ts_module_declaration(span: Span, decl: ModuleDeclId) -> Self {
         Self {
-            span: decl.span,
+            span,
             kind: StatementKind::TSModuleDeclaration(decl),
         }
     }
@@ -245,16 +249,16 @@ pub struct IfStatement {
 /// The three head slots are ids, not inline values. `Statement` is a
 /// by-value enum stored inline as a row of the statement store, so every variant pays its
 /// widest sibling's size on **every** statement row and on every `?`-propagation copy out
-/// of the parser — while a pointer chase is paid only where the variant is actually
-/// spelled. `for (;;)` is 0.05–0.22% of statements in
+/// of the parser — while the hop to a stored head is paid only where the variant is
+/// actually spelled. `for (;;)` is 0.05–0.22% of statements in
 /// real source, and inlining `ForInit` + two `Option<Expression>` here set the whole
 /// enum's size on its own. The same trade is taken by `ForInStatement`,
 /// `ForOfStatement` and `TryStatement`; the frequent declaration variants above keep
 /// their inline layout, where it is the right way round.
 #[derive(Debug, Clone)]
-pub struct ForStatement<'arena> {
+pub struct ForStatement {
     /// Initialization: variable declaration or expression (or None)
-    pub init: Option<ForHeadEdge<'arena>>,
+    pub init: Option<ForHeadId>,
     /// Test condition (or None for infinite loop)
     pub test: Option<ExprId>,
     /// Update expression (or None)
@@ -264,8 +268,8 @@ pub struct ForStatement<'arena> {
 
 /// For statement initialization - either a variable declaration or expression
 ///
-/// `ForInit` is itself reached only through `Option<&'arena ForInit>`, so its width sets
-/// nothing.
+/// `ForInit` is itself a row of its own store, reached only through `Option<ForHeadId>`,
+/// so its width sets nothing.
 #[derive(Debug, Clone)]
 pub enum ForInit<'arena> {
     VariableDeclaration(VariableDeclaration<'arena>),
@@ -276,9 +280,9 @@ pub enum ForInit<'arena> {
 ///
 /// Head slots are ids for the density reason on `ForStatement`.
 #[derive(Debug, Clone)]
-pub struct ForInStatement<'arena> {
+pub struct ForInStatement {
     /// Left side: variable declaration or expression pattern
-    pub left: ForLeftEdge<'arena>,
+    pub left: ForLeftId,
     pub right: ExprId,
     pub body: StmtId,
 }
@@ -287,9 +291,9 @@ pub struct ForInStatement<'arena> {
 ///
 /// Head slots are ids for the density reason on `ForStatement`.
 #[derive(Debug, Clone)]
-pub struct ForOfStatement<'arena> {
+pub struct ForOfStatement {
     /// Left side: variable declaration or expression pattern
-    pub left: ForLeftEdge<'arena>,
+    pub left: ForLeftId,
     pub right: ExprId,
     /// Whether this is `for await (... of ...)`
     pub r#await: bool,
@@ -299,7 +303,8 @@ pub struct ForOfStatement<'arena> {
 /// Left side of for-in/for-of: either a variable declaration or expression pattern
 ///
 /// The `Pattern` arm stays inline for the reason on `ForInit`: its producer returns an
-/// owned `Expression`, and this enum is reached only through `&'arena ForInOfLeft`.
+/// owned `Expression`, and this enum is a row of its own store, reached only through a
+/// `ForLeftId`.
 #[derive(Debug, Clone)]
 pub enum ForInOfLeft<'arena> {
     VariableDeclaration(VariableDeclaration<'arena>),
@@ -345,11 +350,11 @@ pub struct SwitchCase {
 
 /// Try statement: `try { block } catch (param) { handler } finally { finalizer }`
 #[derive(Debug, Clone)]
-pub struct TryStatement<'arena> {
+pub struct TryStatement {
     pub block: BlockStatement,
-    /// Arena reference rather than an inline `CatchClause` (104 B on its own) for the
-    /// density reason on `ForStatement`.
-    pub handler: Option<CatchEdge<'arena>>,
+    /// An id rather than an inline `CatchClause` for the density reason on
+    /// `ForStatement`.
+    pub handler: Option<CatchId>,
     pub finalizer: Option<BlockStatement>,
 }
 
@@ -359,9 +364,9 @@ pub struct CatchClause<'arena> {
     /// Catch parameter, or None for `catch { }` (optional catch binding).
     ///
     /// Inline for the reason on `ForInit`: the parser builds this one as an owned
-    /// value rather than through the expression spine, so a reference would add an
-    /// allocation instead of removing a copy — and a `CatchClause` is reached only
-    /// through `Option<&'arena CatchClause>`, so its width sets nothing.
+    /// value rather than through the expression spine, so an id would add a row
+    /// instead of removing a copy — and a `CatchClause` is reached only through an
+    /// `Option<CatchId>`, so its width sets nothing.
     pub param: Option<Expression<'arena>>,
     pub body: BlockStatement,
     pub span: Span,

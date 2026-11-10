@@ -7,11 +7,12 @@
 //!
 //! ## Arena allocation
 //!
-//! Expressions, statements and types are rows of per-document stores ([`AstStores`]), named
-//! by id and read through an [`AstView`]. The rest of the tree is allocated in a per-parse
-//! [`bumpalo::Bump`] supplied by the caller: its recursive children are `&'arena T<'arena>`
-//! (not `Box`), its child collections `&'arena [T<'arena>]` (not `Vec`), and decoded strings
-//! are `&'arena str` (not `String`) — freed wholesale when the `Bump` drops, with no
+//! Expressions, statements, types and the payloads too rare to sit inline in the node that
+//! refers to them are rows of per-document stores ([`AstStores`]), named by id and read
+//! through an [`AstView`]. The rest of the tree is allocated in a per-parse
+//! [`bumpalo::Bump`] supplied by the caller: its by-value child collections are
+//! `&'arena [T<'arena>]` (not `Vec`), its comments one `&'arena [Comment]`, and decoded
+//! strings are `&'arena str` (not `String`) — freed wholesale when the `Bump` drops, with no
 //! per-node `Drop`. The rare
 //! escaped identifier name is one such `&'arena str` ([`IdentName::escaped`]),
 //! read directly at every consumer — the AST holds no interner and needs no
@@ -33,19 +34,14 @@ mod view;
 
 pub(crate) use stores::ScratchMarks;
 pub use stores::{
-    ArrowFn, ArrowFnEdge, ArrowFnId, AstStores, Catch, CatchEdge, CatchId, ClassDecl,
-    ClassDeclEdge, ClassDeclId, ClassExpr, ClassExprEdge, ClassExprId, CtorType, CtorTypeEdge,
-    CtorTypeId, DeclareFn, DeclareFnEdge, DeclareFnId, EnumDecl, EnumDeclEdge, EnumDeclId,
-    ExportAll, ExportAllEdge, ExportAllId, ExportAssign, ExportAssignEdge, ExportAssignId,
-    ExportDefault, ExportDefaultEdge, ExportDefaultId, ExportNamed, ExportNamedEdge, ExportNamedId,
-    Expr, ExprId, FnDecl, FnDeclEdge, FnDeclId, FnExpr, FnExprEdge, FnExprId, ForHead, ForHeadEdge,
-    ForHeadId, ForLeft, ForLeftEdge, ForLeftId, ImportDecl, ImportDeclEdge, ImportDeclId,
-    ImportEquals, ImportEqualsEdge, ImportEqualsId, ImportType, ImportTypeEdge, ImportTypeId,
-    InferType, InferTypeEdge, InferTypeId, InterfaceDecl, InterfaceDeclEdge, InterfaceDeclId,
-    MetaProp, MetaPropEdge, MetaPropId, ModuleDecl, ModuleDeclEdge, ModuleDeclId, ParamExtra,
-    ParamExtraEdge, ParamExtraId, Parsed, QualName, QualNameEdge, QualNameId, Stmt, StmtId,
-    TaggedTpl, TaggedTplEdge, TaggedTplId, Ty, TyId, TypeAlias, TypeAliasEdge, TypeAliasId,
-    with_stores,
+    ArrowFn, ArrowFnId, AstStores, Catch, CatchId, ClassDecl, ClassDeclId, ClassExpr, ClassExprId,
+    CtorType, CtorTypeId, DeclareFn, DeclareFnId, EnumDecl, EnumDeclId, ExportAll, ExportAllId,
+    ExportAssign, ExportAssignId, ExportDefault, ExportDefaultId, ExportNamed, ExportNamedId, Expr,
+    ExprId, FnDecl, FnDeclId, FnExpr, FnExprId, ForHead, ForHeadId, ForLeft, ForLeftId, ImportDecl,
+    ImportDeclId, ImportEquals, ImportEqualsId, ImportType, ImportTypeId, InferType, InferTypeId,
+    InterfaceDecl, InterfaceDeclId, MetaProp, MetaPropId, ModuleDecl, ModuleDeclId, ParamExtra,
+    ParamExtraId, Parsed, QualName, QualNameId, Stmt, StmtId, TaggedTpl, TaggedTplId, Ty, TyId,
+    TypeAlias, TypeAliasId, with_stores,
 };
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
@@ -131,18 +127,18 @@ pub use expressions::{
 // the larger cost: an `Expression` slot is paid on every element of every
 // `&[Expression]` (parameters, array-pattern elements), so the enum's width
 // multiplies through the whole tree. Both are held down the same way — the variants
-// wide enough to set the size on their own, and rare enough that an arena allocation
-// for each is free, hold their payload by `&'arena` reference: `Expression`'s five
+// wide enough to set the size on their own, and rare enough that a row of their own is
+// free, hold their payload by id into a store per payload type: `Expression`'s five
 // widest (`ClassExpression` / `FunctionExpression` / `ArrowFunctionExpression` /
 // `MetaProperty` / `TaggedTemplateExpression`, together ~3% of expressions, of which
 // the widest two are ~0.02%), `TSType`'s three widest (`TSImportType`,
 // `TSConstructorType`, `TSInferType`, so the inline variants set its pinned width below),
 // `Statement`'s DECLARATION heads and its four loop / `try` heads one level down
 // (`ast/statements.rs`). Two of those declaration heads — `ImportDeclaration` and
-// `ExportNamedDeclaration` — are boxed despite NOT being rare (6.8–11.7% and 2.4–4.0%
-// of statements): they are simply the last two rungs of the ladder, and a boxed head's
-// construction copies the same bytes into the arena that it would have moved into the
-// enum, so the cost is one bump pointer against 24 bytes off every other statement slot.
+// `ExportNamedDeclaration` — are stored despite NOT being rare (6.8–11.7% and 2.4–4.0%
+// of statements): they are simply the last two rungs of the ladder, and a stored head's
+// construction copies the same bytes into its store that it would have moved into the
+// enum, so the cost is one row push against 24 bytes off every other statement slot.
 //
 // The LIST-ELEMENT containers whose own width was inline `Expression`s —
 // `Property` (an object literal's `key: value`, and a destructuring pattern's),
@@ -157,7 +153,7 @@ pub use expressions::{
 // declarator list moves from 160 B to 20 (`ObjectPatternProperty` 28, its `RestElement`
 // arm setting it). `CatchClause` keeps its inline `param` deliberately: it is built by
 // the parser as an owned value rather than through the spine, so an id there would ADD a
-// row, and `CatchClause` is reached only through `Option<&CatchClause>` so its width sets
+// row, and `CatchClause` is reached only through an `Option<CatchId>` so its width sets
 // nothing. The expression LISTS whose elements come off the spine hold ids — call and
 // `new` arguments and sequence and template expressions (`Run<ExprId>`), array-literal
 // and array-pattern elements (`Run<Option<ExprId>>`) — and the parameter lists are value
@@ -188,9 +184,9 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind<'
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Expression<'static>>>() == size_of::<Expression<'static>>());
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Statement<'static>>() == 64);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Statement<'static>>() == 56);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<StatementKind<'static>>() == 56);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<StatementKind<'static>>() == 48);
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Statement<'static>>>() == size_of::<Statement<'static>>());
 #[cfg(all(test, target_pointer_width = "64"))]
@@ -419,9 +415,11 @@ pub struct Identifier<'arena> {
     /// names, and for a Svelte-synthesized name holding a JSON-escaped byte (see
     /// [`IdentName`]). Stored flattened (beside `name_len`) rather than as a nested
     /// [`IdentName`] — the nested struct's tail padding would grow `Identifier`,
-    /// and it is an *inline* `Expression` variant. (`Expression` is dominated by
-    /// far larger variants, so the fat-pointer field does not move
-    /// `sizeof(Expression)`.) Read via [`Self::ident_name`].
+    /// and it is an *inline* `Expression` variant. (The fat pointer is the widest field
+    /// here; `Expression` is set by wider variants, so it does not move
+    /// `sizeof(Expression)`, but it sets `Identifier`'s own width, which every node
+    /// holding one inline pays, a type name or a statement label among them.) Read via
+    /// [`Self::ident_name`].
     pub escaped_name: Option<&'arena str>,
     /// The [`IdentName`] channel's `raw_len`: the raw name-token byte length
     /// (the node span may extend past the name — `?` / `!` / `: Type`).
@@ -435,10 +433,11 @@ pub struct Identifier<'arena> {
     /// Binding-only state (type annotation + parameter decorators), present only
     /// when this identifier is a *binding* — a parameter, `const x: T` declarator
     /// id, catch param, index-signature param, or `{#snippet}` param. `None` for
-    /// every variable *reference* (the overwhelming majority). Folded behind one
-    /// arena pointer so `Identifier` stays ~24 B: it is an *inline* `Expression`
-    /// variant, so its size drives `sizeof(Expression)`. Read through a view, via the
-    /// [`Self::type_annotation`] / [`Self::decorators`] accessors.
+    /// every variable *reference* (the overwhelming majority). Folded behind one id
+    /// into the extras' store, so a reference pays 4 B for it: `Identifier` is an
+    /// *inline* `Expression` variant, held inline by type names and statement labels
+    /// too. Read through a view, via the [`Self::type_annotation`] / [`Self::decorators`]
+    /// accessors.
     ///
     /// ⚠️ Every field of `Identifier` beyond the name is `optional` or behind `extra`: the
     /// three expression-position fast paths (the printer's `build_identifier_expression_doc`,
@@ -446,14 +445,14 @@ pub struct Identifier<'arena> {
     /// (the wire's also its `force_optional` context flag), and `build_identifier_doc_inner`'s
     /// fast path tests `optional` plus each accessor — a new `Identifier` field must join all
     /// four, a new `IdentifierParamExtra` field the last.
-    pub extra: Option<ParamExtraEdge<'arena>>,
+    pub extra: Option<ParamExtraId>,
     pub span: Span,
 }
 
 /// Binding-only extension of [`Identifier`] — the type annotation and parameter
-/// decorators a binding identifier carries. Arena-allocated and pointed to from
-/// `Identifier.extra` only at the few binding sites that set it; absent (one null
-/// pointer) for every reference.
+/// decorators a binding identifier carries. A row of its own store, named by
+/// `Identifier.extra` only at the few binding sites that set it; absent (`None`, folded
+/// into the id's niche) for every reference.
 #[derive(Debug, Clone)]
 pub struct IdentifierParamExtra<'arena> {
     pub type_annotation: Option<TSTypeAnnotation>,
@@ -509,7 +508,7 @@ impl<'arena> Identifier<'arena> {
     ///
     /// Use this for identifiers in expression context (not parameters). For a
     /// binding that carries `?` / a type annotation / decorators, construct
-    /// directly with `extra: Some(arena.alloc(IdentifierParamExtra { … }))`.
+    /// directly with `extra` naming a pushed [`IdentifierParamExtra`] row.
     #[inline]
     pub fn simple(name: IdentName<'arena>, span: Span) -> Self {
         Self {
@@ -557,13 +556,7 @@ impl<'arena> PrivateIdentifier<'arena> {
     }
 }
 
-// The hot AST enums are deliberately NOT boxed down to a smaller node: the arena
-// layout favors traversal locality over node size, keeping recursive children that
-// the parser reads constantly inline (`Expression`/`Statement`/`TSType` fields and
-// the fat variants) rather than arena-boxing them. Boxing them shrank the slice
-// element but added a pointer-chase on hot format-read paths that cost more than the
-// density win, so the inline form stands. The `size_of` asserts at the top of this
-// file are the OTHER HALF of that trade, not a contradiction of it: the inline form
-// buys read locality and pays stack at every recursion level (`docs/cli.md` §Recursion
-// Depth), and pinning the two widths is what makes a variant that widens either enum
-// fail the test build instead of silently eating the depth limits' margin.
+// The size pins at the top of this file are the other half of the layout trade: an inline
+// variant pays its width on every row of its store and at every recursion level that holds
+// one by value (`docs/cli.md` §Recursion Depth), so a variant that widens an enum fails the
+// test build instead of silently eating the depth limits' margin.

@@ -76,7 +76,7 @@ impl<'a> Printer<'a> {
     fn append_catch_clause_body(
         &self,
         parts: &mut DocBuf,
-        stmt: &ast::TryStatement<'_>,
+        stmt: &ast::TryStatement,
         handler: &ast::CatchClause<'_>,
     ) {
         let d = self.d();
@@ -129,7 +129,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_try_statement_doc(
         &self,
-        stmt: &ast::TryStatement<'_>,
+        stmt: &ast::TryStatement,
         span: Span,
     ) -> DocId {
         let d = self.d();

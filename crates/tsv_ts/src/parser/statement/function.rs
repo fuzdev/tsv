@@ -2,6 +2,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
+use crate::parser::push_spanned;
 use tsv_lang::{Error, Span};
 
 use super::super::{ExprRet, Parser};
@@ -57,8 +58,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// `start_override` is the statement's own start when the caller consumed a
     /// leading token of its own (`async`), so the span is built right rather than
-    /// patched afterwards — both variants are arena-boxed and a `&'arena` head has
-    /// no `&mut` to patch through.
+    /// patched afterwards — both variants are rows of their payload stores, and a pushed
+    /// row is never edited.
     fn parse_function_or_overload(
         &mut self,
         is_async: bool,
@@ -107,9 +108,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Function overload signature - parse as TSDeclareFunction
             let end = self.semicolon_end()?;
 
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::mint::<TSDeclareFunction<'_>>(1);
-            Ok(Statement::from_ts_declare_function(self.arena.alloc(
+            let (span, func) = push_spanned(
+                &mut self.stores.payloads.declare_fns,
                 TSDeclareFunction {
                     id,
                     type_parameters,
@@ -120,15 +120,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     generator: is_generator,
                     span: Span::new(start as u32, end),
                 },
-            )))
+                |x| x.span,
+            );
+            Ok(Statement::from_ts_declare_function(span, func))
         } else {
             // Function implementation - parse body (the function's `[Await]`/`[Yield]` context).
             let body = self.with_fn_context(is_async, is_generator, Self::parse_function_body)?;
             let end = body.span.end;
 
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::mint::<FunctionDeclaration<'_>>(1);
-            Ok(Statement::from_function_declaration(self.arena.alloc(
+            let (span, func) = push_spanned(
+                &mut self.stores.payloads.fn_decls,
                 FunctionDeclaration {
                     id: Some(id),
                     type_parameters,
@@ -140,7 +141,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     params_start: params_start as u32,
                     span: Span::new(start as u32, end),
                 },
-            )))
+                |x| x.span,
+            );
+            Ok(Statement::from_function_declaration(span, func))
         }
     }
 
@@ -342,22 +345,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })?;
         let end = body.span.end;
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<FunctionExpression<'_>>(1);
-        Ok(
-            self.push_ret(Expression::from_function_expression(self.arena.alloc(
-                FunctionExpression {
-                    id,
-                    type_parameters,
-                    params,
-                    return_type,
-                    body,
-                    generator: is_generator,
-                    r#async: is_async,
-                    params_start: params_start as u32,
-                    span: Span::new(start as u32, end),
-                },
-            ))),
-        )
+        let (span, func) = push_spanned(
+            &mut self.stores.payloads.fn_exprs,
+            FunctionExpression {
+                id,
+                type_parameters,
+                params,
+                return_type,
+                body,
+                generator: is_generator,
+                r#async: is_async,
+                params_start: params_start as u32,
+                span: Span::new(start as u32, end),
+            },
+            |x| x.span,
+        );
+        Ok(self.push_ret(Expression::from_function_expression(span, func)))
     }
 }

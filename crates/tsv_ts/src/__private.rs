@@ -15,6 +15,7 @@ pub use crate::imports::{collect_imports, parse_imports_in, parse_imports_into};
 #[cfg(feature = "json")]
 pub use crate::imports::{write_imports_json, write_imports_json_string};
 pub use crate::parser::TopLevelAs;
+use crate::parser::push_row;
 pub use crate::strip::{strip_in, strip_into, strip_with_imports_in};
 
 /// The per-document environment shared by every formatting entry point: the
@@ -487,7 +488,6 @@ pub fn attach_pattern_type_annotation<'arena>(
     stores: &mut AstStores<'arena>,
     pattern: ExprId,
     mut ta: TSTypeAnnotation,
-    arena: &'arena bumpalo::Bump,
 ) -> Result<ExprId> {
     // Re-anchor the annotation at the BINDING's end, which is where Svelte starts it:
     // `read_type_annotation` takes `const start = parser.index` *before* its
@@ -511,22 +511,25 @@ pub fn attach_pattern_type_annotation<'arena>(
     // edited), built from the bare one's fields.
     let kind = match &node.kind {
         ExpressionKind::Identifier(id) => {
-            // Re-bind the identifier's binding extra with the parsed type
-            // annotation (preserving any decorators already present).
+            // Re-bind the identifier's binding extra with the parsed type annotation
+            // (preserving any decorators already present). The bare binding's extras stay
+            // behind as an orphan row.
             let decorators = id
                 .extra
                 .and_then(|extra| stores.param_extra_row(extra).decorators);
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::mint::<ast::IdentifierParamExtra<'_>>(1);
+            let extra = push_row(
+                &mut stores.payloads.param_extras,
+                ast::IdentifierParamExtra {
+                    type_annotation: Some(ta),
+                    decorators,
+                },
+            );
             ExpressionKind::Identifier(ast::Identifier {
                 escaped_name: id.escaped_name,
                 name_len: id.name_len,
                 name_plain_ascii: id.name_plain_ascii,
                 optional: id.optional,
-                extra: Some(arena.alloc(ast::IdentifierParamExtra {
-                    type_annotation: Some(ta),
-                    decorators,
-                })),
+                extra: Some(extra),
                 span: id.span,
             })
         }

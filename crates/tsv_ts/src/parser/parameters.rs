@@ -3,6 +3,7 @@
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
+use crate::parser::push_row;
 use crate::parser::statement::DecoratorListKind;
 use tsv_lang::{Error, Span};
 
@@ -74,7 +75,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         mut param: Expression<'arena>,
         decorators: &'arena [Decorator],
     ) -> Expression<'arena> {
-        let arena = self.arena;
         match &mut param.kind {
             // `@dec private a` — decorators ride the inner binding, not the
             // property wrapper. Recurse (the inner is an Identifier or, for
@@ -91,13 +91,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 param
             }
             ExpressionKind::Identifier(id) => {
+                // a new row: the extras the annotation rode in stay behind as an orphan
                 let type_annotation = id.type_annotation(self.stores.view()).cloned();
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<IdentifierParamExtra<'arena>>(1);
-                id.extra = Some(arena.alloc(IdentifierParamExtra {
-                    type_annotation,
-                    decorators: Some(decorators),
-                }));
+                id.extra = Some(push_row(
+                    &mut self.stores.payloads.param_extras,
+                    IdentifierParamExtra {
+                        type_annotation,
+                        decorators: Some(decorators),
+                    },
+                ));
                 param
             }
             ExpressionKind::AssignmentPattern(ap) => {

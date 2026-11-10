@@ -5,6 +5,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
+use crate::parser::push_row;
 use tsv_lang::{Error, Span};
 
 use super::Parser;
@@ -27,13 +28,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let param_type = self.nested(2, Self::parse_type)?.id();
         let param_type_end = self.ty(param_type).span().end;
 
-        let extra: ParamExtraEdge<'arena> = self.alloc(IdentifierParamExtra {
-            type_annotation: Some(TSTypeAnnotation {
-                type_annotation: param_type,
-                span: Span::new(param_colon_start as u32, param_type_end),
-            }),
-            decorators: None,
-        });
+        let extra = push_row(
+            &mut self.stores.payloads.param_extras,
+            IdentifierParamExtra {
+                type_annotation: Some(TSTypeAnnotation {
+                    type_annotation: param_type,
+                    span: Span::new(param_colon_start as u32, param_type_end),
+                }),
+                decorators: None,
+            },
+        );
         let param = Identifier {
             escaped_name: param_name.escaped,
             name_len: param_name.raw_len,

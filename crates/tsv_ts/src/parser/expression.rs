@@ -12,6 +12,7 @@ use crate::ast::{
     UpdateOperator, YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
+use crate::parser::push_row;
 use crate::printer::ParenContext;
 use tsv_lang::printing::visual_width;
 use tsv_lang::source_scan;
@@ -3412,7 +3413,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// superclass (`heritage`), where its callee's type-argument lists have no comparison
     /// reading to fall back to ([`Parser::parse_type_arguments_or_rewind`]).
     fn parse_new_expression_in(&mut self, heritage: bool) -> Result<ExprRet, Error> {
-        let arena = self.arena;
         let (start, new_end) = self.current_pos();
         self.advance()?; // consume 'new'
 
@@ -3426,14 +3426,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // `new` / `target`, so the names are the verbatim spans.
                 let meta_span = Span::new(start as u32, new_end as u32);
                 let prop_span = Span::new(prop_start as u32, prop_end as u32);
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<MetaProperty<'arena>>(1);
-                return Ok(self.push_ret(Expression {
-                    span: Span::new(start as u32, prop_end as u32),
-                    kind: ExpressionKind::MetaProperty(arena.alloc(MetaProperty {
+                let meta = push_row(
+                    &mut self.stores.payloads.meta_props,
+                    MetaProperty {
                         meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
                         property: Identifier::simple(IdentName::from_span(prop_span), prop_span),
-                    })),
+                    },
+                );
+                return Ok(self.push_ret(Expression {
+                    span: Span::new(start as u32, prop_end as u32),
+                    kind: ExpressionKind::MetaProperty(meta),
                 }));
             }
             return Err(self.error_expected_after("'target'", "new."));
@@ -3584,17 +3586,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         quasi: TemplateLiteral<'arena>,
     ) -> ExprRet {
         let end = quasi.span.end;
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<TaggedTemplateExpression<'arena>>(1);
+        let tagged = push_row(
+            &mut self.stores.payloads.tagged_tpls,
+            TaggedTemplateExpression {
+                tag,
+                type_arguments,
+                quasi,
+            },
+        );
         self.push_ret(Expression {
             span: Span::new(tag_start, end),
-            kind: ExpressionKind::TaggedTemplateExpression(self.arena.alloc(
-                TaggedTemplateExpression {
-                    tag,
-                    type_arguments,
-                    quasi,
-                },
-            )),
+            kind: ExpressionKind::TaggedTemplateExpression(tagged),
         })
     }
 
@@ -3638,14 +3640,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // `import` / `meta`, so the names are the verbatim spans.
                 let meta_span = Span::new(start as u32, import_end as u32);
                 let prop_span = Span::new(prop_start as u32, prop_end as u32);
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<MetaProperty<'arena>>(1);
-                return Ok(self.push_ret(Expression {
-                    span: Span::new(start as u32, prop_end as u32),
-                    kind: ExpressionKind::MetaProperty(self.arena.alloc(MetaProperty {
+                let meta = push_row(
+                    &mut self.stores.payloads.meta_props,
+                    MetaProperty {
                         meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
                         property: Identifier::simple(IdentName::from_span(prop_span), prop_span),
-                    })),
+                    },
+                );
+                return Ok(self.push_ret(Expression {
+                    span: Span::new(start as u32, prop_end as u32),
+                    kind: ExpressionKind::MetaProperty(meta),
                 }));
             }
             // `import.source(…)` / `import.defer(…)` — the import-phase proposals.

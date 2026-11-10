@@ -3,6 +3,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
+use crate::parser::push_spanned;
 use tsv_lang::{Error, Span};
 
 use super::Parser;
@@ -28,7 +29,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_object_expression(
         &mut self,
     ) -> Result<(ObjectExpression<'arena>, Span), Error> {
-        let arena = self.arena;
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
         self.enter_grouping()?;
@@ -243,11 +243,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     func_expr.params,
                     true,
                 )?;
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<FunctionExpression<'arena>>(1);
+                let (span, func) =
+                    push_spanned(&mut self.stores.payloads.fn_exprs, func_expr, |f| f.span);
                 (
                     accessor,
-                    self.push_expr(Expression::from_function_expression(arena.alloc(func_expr))),
+                    self.push_expr(Expression::from_function_expression(span, func)),
                     false,
                     false,
                 )
@@ -260,11 +260,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // one wire level: the method's `FunctionExpression` (the depth limit's count)
                 let func_expr =
                     self.nested(1, |p| p.parse_method_body(is_async_method, is_generator))?;
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<FunctionExpression<'arena>>(1);
+                let (span, func) =
+                    push_spanned(&mut self.stores.payloads.fn_exprs, func_expr, |f| f.span);
                 (
                     PropertyKind::Init,
-                    self.push_expr(Expression::from_function_expression(arena.alloc(func_expr))),
+                    self.push_expr(Expression::from_function_expression(span, func)),
                     false,
                     true,
                 )
