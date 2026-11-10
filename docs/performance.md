@@ -804,7 +804,7 @@ size` column ranks a type by where its values come to *rest*, which under-counts
 one the parser returns BY VALUE up a deep precedence ladder — its width is then
 paid once per level and not once per node. Narrowing a by-value-returned
 `TSType` 112 → 80 B outmeasured a `Statement` rung carrying ~3× its slot
-megabytes, by ~1.6× on every corpus; returning `&'arena TSType` from the type
+megabytes, by ~1.6× on every corpus; returning an id (`TyRet`) from the type
 parser's `?`-chain closes that channel for types. The instrument that reads the
 per-level channel directly is the stack the deepest accepted input of a shape needs
 ([cli.md §Recursion Depth](./cli.md#recursion-depth)), worth a look before

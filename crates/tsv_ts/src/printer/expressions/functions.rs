@@ -625,7 +625,7 @@ fn is_bare_identifier(expr: &ast::Expression<'_>) -> bool {
 
 /// An absent annotation, or one whose type is flat ([`type_is_flat`]), a top-level union or
 /// intersection of flat members included.
-fn annotation_is_flat(view: AstView<'_>, annotation: Option<&ast::TSTypeAnnotation<'_>>) -> bool {
+fn annotation_is_flat(view: AstView<'_>, annotation: Option<&ast::TSTypeAnnotation>) -> bool {
     annotation.is_none_or(|annotation| match view.ty(annotation.type_annotation) {
         &ast::TSType::Union(ast::TSUnionType { types, .. })
         | &ast::TSType::Intersection(ast::TSIntersectionType { types, .. }) => view
@@ -903,7 +903,7 @@ pub(in crate::printer) fn function_return_hug_break(
 /// union's members — so the predicate reads the printed form, and a shell the author wrote
 /// cannot refuse a hug its stripped twin takes.
 fn return_type_hug_brace(printer: &Printer<'_>, ty: &ast::TSType<'_>) -> Option<AssumedBreak> {
-    let member_brace = |union: &ast::TSUnionType<'_>| {
+    let member_brace = |union: &ast::TSUnionType| {
         printer
             .view
             .ty_list(union.types)
@@ -3052,7 +3052,7 @@ impl<'a> Printer<'a> {
     /// `(x: T): ((y: T) => U) =>` not `(x: T): (y: T) => U =>`
     fn build_arrow_return_type_doc(
         &self,
-        annotation: &ast::TSTypeAnnotation<'_>,
+        annotation: &ast::TSTypeAnnotation,
         params_start: Option<u32>,
     ) -> DocId {
         // One depth-tracked close-`)` scan feeds both `)`→`:` questions below.

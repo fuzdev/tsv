@@ -18,7 +18,7 @@ use smallvec::SmallVec;
 /// (`ctx.annotation_comments`), since Svelte reads it with a second acorn parse.
 pub(super) fn write_type_annotation(
     w: &mut JsonWriter,
-    type_annotation: &ast::TSTypeAnnotation<'_>,
+    type_annotation: &ast::TSTypeAnnotation,
     ctx: &Ctx<'_>,
 ) {
     let annotation_ctx;
@@ -379,9 +379,9 @@ fn write_qualified_name(w: &mut JsonWriter, qn: &ast::TSQualifiedName<'_>, ctx: 
 
 /// One link of an array / indexed-access type chain ([`write_postfix_type_chain`]).
 #[derive(Clone, Copy)]
-enum PostfixTypeLink<'a, 'arena> {
-    Array(&'a ast::TSArrayType<'arena>),
-    IndexedAccess(&'a ast::TSIndexedAccessType<'arena>),
+enum PostfixTypeLink<'a> {
+    Array(&'a ast::TSArrayType),
+    IndexedAccess(&'a ast::TSIndexedAccessType),
 }
 
 /// Emits an array or indexed-access type and the array and indexed-access types down its
@@ -393,7 +393,7 @@ enum PostfixTypeLink<'a, 'arena> {
 /// the order of the comment-attach node events, of the recursion down that side.
 #[inline(never)]
 fn write_postfix_type_chain(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ctx<'_>) {
-    let mut spine: SmallVec<[PostfixTypeLink<'_, '_>; 8]> = SmallVec::new();
+    let mut spine: SmallVec<[PostfixTypeLink<'_>; 8]> = SmallVec::new();
     let mut node = ts_type;
     loop {
         match node {
@@ -430,7 +430,7 @@ fn write_postfix_type_chain(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: 
 /// Emits a `TSTypeParameterInstantiation` node.
 pub(super) fn write_type_parameter_instantiation(
     w: &mut JsonWriter,
-    params: &ast::TSTypeParameterInstantiation<'_>,
+    params: &ast::TSTypeParameterInstantiation,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TSTypeParameterInstantiation", params.span, ctx);
@@ -544,7 +544,7 @@ fn write_signature_declaration(
     span: tsv_lang::Span,
     type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
     params: &[ast::Expression<'_>],
-    return_type: Option<&ast::TSTypeAnnotation<'_>>,
+    return_type: Option<&ast::TSTypeAnnotation>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, node_type, span, ctx);

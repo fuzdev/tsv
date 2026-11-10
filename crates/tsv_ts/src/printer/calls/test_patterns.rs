@@ -149,7 +149,7 @@ fn get_member_chain_parts<'a>(
 /// about which calls take the flat form. The head spells it out as its two halves because it
 /// needs the [`is_test_call`] half on its own as well.
 pub(super) fn test_call_flat_layout_applies(
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     printer: &Printer<'_>,
 ) -> bool {
@@ -173,7 +173,7 @@ pub(super) fn test_call_flat_layout_applies(
 /// trailing the whole call is likewise fine — the layout emits that itself. See
 /// conformance_prettier_ts_comments.md §Comment relocation.
 pub(super) fn test_call_flat_gaps_clear(
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     printer: &Printer<'_>,
 ) -> bool {
@@ -204,7 +204,7 @@ pub(super) fn test_call_flat_gaps_clear(
 /// argument's interior: a comment inside an argument is printed by that argument's own
 /// doc.
 fn test_call_gaps_have_comments(
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     printer: &Printer<'_>,
     paren_open: u32,
 ) -> bool {
@@ -219,7 +219,7 @@ fn test_call_gaps_have_comments(
 }
 
 /// Check if a call expression is a test function call that should stay on one line
-pub(super) fn is_test_call(call: &ast::CallExpression<'_>, printer: &Printer<'_>) -> bool {
+pub(super) fn is_test_call(call: &ast::CallExpression, printer: &Printer<'_>) -> bool {
     let arguments = printer.view.list(call.arguments);
     // Optional calls (`describe?.(...)`) are never test calls — they format like
     // a normal call (wrap when long), preserving the `?.`. Mirrors prettier's

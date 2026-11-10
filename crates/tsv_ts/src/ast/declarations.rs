@@ -25,7 +25,7 @@ pub struct TSInterfaceDeclaration<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSInterfaceHeritage<'arena> {
     pub expression: TSEntityName<'arena>,
-    pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
     pub span: Span,
 }
 
@@ -45,7 +45,7 @@ pub struct TSDeclareFunction<'arena> {
     pub id: Identifier<'arena>,
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     pub params: Run<Expr>,
-    pub return_type: Option<TSTypeAnnotation<'arena>>,
+    pub return_type: Option<TSTypeAnnotation>,
     /// Whether to print the `declare` keyword.
     /// True for top-level `declare function`, false inside `declare namespace`.
     pub declare: bool,

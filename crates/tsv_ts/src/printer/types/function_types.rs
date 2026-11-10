@@ -34,7 +34,7 @@ fn get_type_literal_from_identifier<'a>(
     expr: &'a ast::Expression<'a>,
 ) -> Option<(
     &'a ast::Identifier<'a>,
-    &'a ast::TSTypeAnnotation<'a>,
+    &'a ast::TSTypeAnnotation,
     &'a ast::TSTypeLiteral<'a>,
 )> {
     match &expr.kind {
@@ -72,7 +72,7 @@ pub(in crate::printer) fn type_params_allow_grouping(
 /// or the return type doc will break across lines.
 pub(in crate::printer) fn return_type_triggers_grouping(
     view: AstView<'_>,
-    return_type: &ast::TSTypeAnnotation<'_>,
+    return_type: &ast::TSTypeAnnotation,
     return_type_doc: DocId,
     d: &DocArena,
 ) -> bool {
@@ -91,7 +91,7 @@ pub(in crate::printer) fn should_group_function_parameters(
     view: AstView<'_>,
     params: &[ast::Expression<'_>],
     type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
-    return_type: Option<&ast::TSTypeAnnotation<'_>>,
+    return_type: Option<&ast::TSTypeAnnotation>,
     return_type_doc: Option<DocId>,
     d: &DocArena,
 ) -> bool {
@@ -117,7 +117,7 @@ pub(in crate::printer) fn group_params_if_should(
     params_doc: DocId,
     params: &[ast::Expression<'_>],
     type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
-    return_type: Option<&ast::TSTypeAnnotation<'_>>,
+    return_type: Option<&ast::TSTypeAnnotation>,
     return_type_doc: Option<DocId>,
     d: &DocArena,
 ) -> DocId {
@@ -150,7 +150,7 @@ impl<'a> Printer<'a> {
     /// same position, so declining keeps the two authorings agreeing.
     fn paren_shell_trailing_gap_empty(
         &self,
-        annotation: &ast::TSTypeAnnotation<'_>,
+        annotation: &ast::TSTypeAnnotation,
         inner: tsv_lang::Span,
     ) -> bool {
         !self.has_comments_to_emit_between(
@@ -230,7 +230,7 @@ impl<'a> Printer<'a> {
     /// pattern's annotation; the identifier arm reads the same two facts itself.
     pub(in crate::printer) fn hugged_param_annotation_literal<'t>(
         &self,
-        type_ann: &'t ast::TSTypeAnnotation<'t>,
+        type_ann: &'t ast::TSTypeAnnotation,
     ) -> Option<&'t ast::TSTypeLiteral<'t>>
     where
         'a: 't,
@@ -247,7 +247,7 @@ impl<'a> Printer<'a> {
     /// own, behind the `:`→literal comment run.
     pub(in crate::printer) fn build_hugged_literal_annotation_doc(
         &self,
-        type_ann: &ast::TSTypeAnnotation<'_>,
+        type_ann: &ast::TSTypeAnnotation,
         type_literal: &ast::TSTypeLiteral<'_>,
         window_has_comments: bool,
     ) -> DocId {
@@ -336,7 +336,7 @@ impl<'a> Printer<'a> {
     /// + hardline, so `=>` starts the next line flush — `() // c\n=> void`).
     fn build_function_type_return_doc(
         &self,
-        return_type: &ast::TSTypeAnnotation<'_>,
+        return_type: &ast::TSTypeAnnotation,
         leading_space: bool,
     ) -> DocId {
         // The **effective** return type: a redundant paren shell holding only leading
@@ -378,7 +378,7 @@ impl<'a> Printer<'a> {
     /// pair with, so the verdict, the window and the suppression cannot drift apart.
     fn build_function_type_return_doc_claimed<'t>(
         &self,
-        return_type: &ast::TSTypeAnnotation<'_>,
+        return_type: &ast::TSTypeAnnotation,
         leading_space: bool,
         return_ty: &'t TSType<'t>,
         type_start: u32,
@@ -537,7 +537,7 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
         params: &[ast::Expression<'_>],
-        return_type: &ast::TSTypeAnnotation<'_>,
+        return_type: &ast::TSTypeAnnotation,
         span_start: u32,
     ) {
         if let Some(type_params) = type_parameters {
@@ -639,7 +639,7 @@ impl<'a> Printer<'a> {
         &self,
         params: &[ast::Expression<'_>],
         paren_search_start: u32,
-        return_type: &ast::TSTypeAnnotation<'_>,
+        return_type: &ast::TSTypeAnnotation,
         type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
     ) -> [DocId; 2] {
         let d = self.d();
@@ -786,7 +786,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_frozen_return_type_doc(
         &self,
         close_paren_after: Option<u32>,
-        return_type: &ast::TSTypeAnnotation<'_>,
+        return_type: &ast::TSTypeAnnotation,
     ) -> Option<DocId> {
         self.build_frozen_annotation_head_doc(close_paren_after?, return_type)
     }
@@ -837,7 +837,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_signature_return_type_doc(
         &self,
         paren_pos: Option<u32>,
-        return_type: &ast::TSTypeAnnotation<'_>,
+        return_type: &ast::TSTypeAnnotation,
     ) -> DocId {
         self.build_function_return_type_doc(
             self.return_type_close_paren(paren_pos, return_type.span.start),
@@ -867,7 +867,7 @@ impl<'a> Printer<'a> {
         &self,
         params: &[ast::Expression<'_>],
         type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
-        return_type: Option<&ast::TSTypeAnnotation<'_>>,
+        return_type: Option<&ast::TSTypeAnnotation>,
         paren_pos: Option<u32>,
     ) -> DocId {
         self.d().group(self.build_signature_params_return_doc(
@@ -885,7 +885,7 @@ impl<'a> Printer<'a> {
         &self,
         params: &[ast::Expression<'_>],
         type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
-        return_type: Option<&ast::TSTypeAnnotation<'_>>,
+        return_type: Option<&ast::TSTypeAnnotation>,
         paren_pos: Option<u32>,
     ) -> DocId {
         let d = self.d();
@@ -919,7 +919,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_function_return_type_doc(
         &self,
         close_paren_after: Option<u32>,
-        return_type: &ast::TSTypeAnnotation<'_>,
+        return_type: &ast::TSTypeAnnotation,
     ) -> DocId {
         // The frozen `)`→`:` route, on the close paren this caller already located.
         if let Some(frozen) = self.build_frozen_return_type_doc(close_paren_after, return_type) {

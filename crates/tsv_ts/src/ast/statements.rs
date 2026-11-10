@@ -419,7 +419,7 @@ pub struct FunctionDeclaration<'arena> {
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Run<Expr>,
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
-    pub return_type: Option<TSTypeAnnotation<'arena>>,
+    pub return_type: Option<TSTypeAnnotation>,
     /// Function body (block statement with statements)
     pub body: BlockStatement,
     /// Whether this is a generator function (`function*`)

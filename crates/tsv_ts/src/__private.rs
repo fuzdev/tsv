@@ -485,7 +485,7 @@ pub fn push_expression_list(stores: &mut AstStores<'_>, ids: &[ExprId]) -> Run<E
 pub fn attach_pattern_type_annotation<'arena>(
     stores: &mut AstStores<'arena>,
     pattern: ExprId,
-    mut ta: TSTypeAnnotation<'arena>,
+    mut ta: TSTypeAnnotation,
     arena: &'arena bumpalo::Bump,
 ) -> Result<ExprId> {
     // Re-anchor the annotation at the BINDING's end, which is where Svelte starts it:
@@ -577,7 +577,7 @@ pub fn attach_pattern_type_annotation<'arena>(
 /// pattern's root is always an identifier or a destructure, so no other root can carry one.
 pub fn pattern_type_annotation<'a, 'arena>(
     pattern: &'a Expression<'arena>,
-) -> Option<&'a TSTypeAnnotation<'arena>> {
+) -> Option<&'a TSTypeAnnotation> {
     match &pattern.kind {
         ExpressionKind::Identifier(id) => id.type_annotation(),
         ExpressionKind::ObjectPattern(obj) => obj.type_annotation.as_ref(),
@@ -631,7 +631,7 @@ pub fn parse_type_annotation_partial<'arena>(
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
     stores: &mut AstStores<'arena>,
-) -> Result<(TSTypeAnnotation<'arena>, &'arena [ast::Comment])> {
+) -> Result<(TSTypeAnnotation, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
         base_offset,
@@ -1126,7 +1126,7 @@ pub fn build_type_parameters_doc(
 /// from the TypeScript pattern printer.
 pub fn build_type_annotation_doc(
     arena: &DocArena,
-    annotation: &TSTypeAnnotation<'_>,
+    annotation: &TSTypeAnnotation,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
 ) -> DocId {

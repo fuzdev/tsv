@@ -24,8 +24,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::Colon)?;
         // two wire levels: the parameter's `Identifier` and its `TSTypeAnnotation` (the
         // depth limit's count, `Parser::nested`)
-        let param_type = self.nested(2, Self::parse_type)?;
-        let param_type_end = param_type.span().end;
+        let param_type = self.nested(2, Self::parse_type)?.id();
+        let param_type_end = self.ty(param_type).span().end;
 
         let extra: &'arena IdentifierParamExtra<'arena> = self.alloc(IdentifierParamExtra {
             type_annotation: Some(TSTypeAnnotation {
@@ -320,7 +320,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_signature_return_type(
         &mut self,
         allow_type_predicate: bool,
-    ) -> Result<(Option<TSTypeAnnotation<'arena>>, u32), Error> {
+    ) -> Result<(Option<TSTypeAnnotation>, u32), Error> {
         let return_type = if self.check(&TokenKind::Colon) {
             Some(if allow_type_predicate {
                 self.parse_return_type_annotation()?

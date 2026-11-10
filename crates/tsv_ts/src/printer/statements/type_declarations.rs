@@ -47,7 +47,7 @@ fn is_generic_type(view: AstView<'_>, ts_type: &TSType<'_>) -> bool {
 /// This matches prettier's `shouldBreakBeforeConditionalType` in assignment.js.
 fn should_break_before_conditional_type(
     view: AstView<'_>,
-    conditional: &ast::TSConditionalType<'_>,
+    conditional: &ast::TSConditionalType,
 ) -> bool {
     is_generic_type(view, view.ty(conditional.check_type))
         || is_generic_type(view, view.ty(conditional.extends_type))
@@ -656,7 +656,7 @@ impl<'a> Printer<'a> {
             };
             // The intersection arms build their own hanging doc — under the same pair,
             // since the intersection's first member is a descent link of that seam.
-            let build_intersection = |i: &ast::TSIntersectionType<'_>| -> DocId {
+            let build_intersection = |i: &ast::TSIntersectionType| -> DocId {
                 self.with_stripped_shell_value(
                     head.claimed_shell,
                     annotation_type,

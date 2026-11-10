@@ -56,7 +56,7 @@ use tsv_lang::doc::arena::DocId;
 #[inline(always)]
 pub(super) fn chain_call_head_doc(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     gap: super::CalleeGap,
 ) -> Option<DocId> {
     let d = printer.d();
@@ -103,7 +103,7 @@ pub(super) fn chain_call_head_doc(
 /// break the key declines, so that printing builds its own.
 fn shared_chain_type_args_doc(
     printer: &Printer<'_>,
-    ta: &ast::TSTypeParameterInstantiation<'_>,
+    ta: &ast::TSTypeParameterInstantiation,
 ) -> DocId {
     let key = printer.chain_share_key_of(ta, ta.span, ShareTag::ChainTypeArgs);
     printer.chain_shared_doc(key, || printer.build_type_parameter_instantiation_doc(ta))
@@ -116,8 +116,8 @@ fn shared_chain_type_args_doc(
 /// inside the pair and again ahead of the `<`.
 fn instantiation_window_start(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
-    inst: &ast::TSInstantiationExpression<'_>,
+    call: &ast::CallExpression,
+    inst: &ast::TSInstantiationExpression,
 ) -> u32 {
     let end = printer.view.expr(inst.expression).span().end;
     Printer::gap_start_after_owned_pair(
@@ -207,7 +207,7 @@ fn build_inline_trailing_comments(
 /// 3. Chain broken (if args broken still doesn't fit)
 pub(super) fn build_call_args_doc_for_chain(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     facts: ChainCall,
 ) -> DocId {
@@ -220,7 +220,7 @@ pub(super) fn build_call_args_doc_for_chain(
 /// `(sig =>\n body,\n)` layout even when the chain forces expansion).
 fn single_arrow_expression_body<'a>(
     view: AstView<'a>,
-    call: &'a ast::CallExpression<'a>,
+    call: &'a ast::CallExpression,
 ) -> Option<(
     &'a ast::ArrowFunctionExpression<'a>,
     Span,
@@ -272,7 +272,7 @@ fn build_hugged_arrow_arg_doc(
 /// Used for the "args expanded, chain inline" state in conditionalGroup.
 pub(super) fn build_call_args_doc_for_chain_expanded(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     facts: ChainCall,
 ) -> DocId {
@@ -330,7 +330,7 @@ struct ChainArgsContext {
 /// Implementation for call args doc building
 fn build_call_args_doc_for_chain_impl(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     facts: ChainCall,
     force_expand: bool,
@@ -560,7 +560,7 @@ fn build_chain_args_empty(
 /// special-cases; everything else uses the blank-line- and comment-aware loop.
 fn build_chain_args_force_expand(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     ctx: ChainArgsContext,
     head: ChainHead,
@@ -865,7 +865,7 @@ fn build_chain_args_force_expand(
 /// classify-and-wrap path. Always returns.
 fn build_chain_args_single(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     ctx: ChainArgsContext,
     head: ChainHead,
@@ -1366,7 +1366,7 @@ fn build_chain_args_single(
 /// last) and the default soft-break-wrapped argument list. Always returns.
 fn build_chain_args_multi(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     call_span: Span,
     ctx: ChainArgsContext,
     head: ChainHead,

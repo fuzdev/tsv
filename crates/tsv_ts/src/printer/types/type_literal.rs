@@ -590,8 +590,8 @@ impl<'a> Printer<'a> {
     /// handled upstream (relocated or emitted before the member).
     pub(super) fn build_parenthesized_union_doc(
         &self,
-        union: &TSUnionType<'_>,
-        paren: Option<&TSParenthesizedType<'_>>,
+        union: &TSUnionType,
+        paren: Option<&TSParenthesizedType>,
         shell_leading_run: ShellLeadingRun,
     ) -> DocId {
         let d = self.d();
@@ -702,9 +702,9 @@ impl<'a> Printer<'a> {
     ///   spaces) when breaking, matching Prettier's `align(2, …)`.
     fn build_parenthesized_intersection_trailing_object_doc(
         &self,
-        intersection: &TSIntersectionType<'_>,
+        intersection: &TSIntersectionType,
         trailing_obj: &TSTypeLiteral<'_>,
-        paren: Option<&TSParenthesizedType<'_>>,
+        paren: Option<&TSParenthesizedType>,
         claimed_shell: Option<Span>,
     ) -> DocId {
         let d = self.d();

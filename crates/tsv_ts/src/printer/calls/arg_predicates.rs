@@ -26,7 +26,7 @@ use tsv_lang::source_scan::has_newline_after_position;
 ///
 /// Asked through [`mark_boolean_coercion_argument`] alone, which is how the answer reaches
 /// the argument.
-fn is_boolean_type_coercion(call: &ast::CallExpression<'_>, printer: &Printer<'_>) -> bool {
+fn is_boolean_type_coercion(call: &ast::CallExpression, printer: &Printer<'_>) -> bool {
     if call.optional || call.arguments.len() != 1 {
         return false;
     }
@@ -50,10 +50,7 @@ fn is_boolean_type_coercion(call: &ast::CallExpression<'_>, printer: &Printer<'_
 /// from the other side — its member-chain printer reprints a call's arguments through the
 /// same `printCallArguments`, where the parent is still the `Boolean(…)` call. A no-op for
 /// every other call, `new Boolean(…)` included.
-pub(super) fn mark_boolean_coercion_argument(
-    printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
-) {
+pub(super) fn mark_boolean_coercion_argument(printer: &Printer<'_>, call: &ast::CallExpression) {
     if is_boolean_type_coercion(call, printer) {
         printer.mark_flat_chain(printer.view.expr(printer.view.list(call.arguments)[0]));
     }

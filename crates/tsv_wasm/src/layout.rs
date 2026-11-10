@@ -14,7 +14,8 @@ use tsv_svelte::ast::{AttributeNode, Element, ExpressionTag, FragmentNode};
 use tsv_ts::Error;
 use tsv_ts::ast::{
     Expr, ExprId, Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, Property,
-    Statement, StatementKind, StmtId, SwitchCase, TSType, TyId, VariableDeclarator,
+    Statement, StatementKind, StmtId, SwitchCase, TSType, TSTypeAnnotation,
+    TSTypeParameterInstantiation, Ty, TyId, VariableDeclarator,
 };
 
 // `DocContext` rides inline in `DocNode::WithContext`; see its native pin in `tsv_lang`
@@ -34,16 +35,22 @@ const _: () = assert!(size_of::<Statement<'static>>() == 48);
 const _: () = assert!(size_of::<Option<Statement<'static>>>() == size_of::<Statement<'static>>());
 const _: () = assert!(size_of::<StatementKind<'static>>() == 40);
 const _: () = assert!(size_of::<TSType<'static>>() == 56);
+// The type-edge holders' `Option`s, folded into the id's niche and the run's. See the native
+// pins in `tsv_ts`'s `ast/mod.rs`.
+const _: () = assert!(size_of::<Option<TSTypeAnnotation>>() == size_of::<TSTypeAnnotation>());
+const _: () = assert!(
+    size_of::<Option<TSTypeParameterInstantiation>>() == size_of::<TSTypeParameterInstantiation>()
+);
 // The list elements and their shared `Property` payload, as the same native pins hold them.
 const _: () = assert!(size_of::<Property>() == 20);
 const _: () = assert!(size_of::<ObjectProperty>() == 20);
-const _: () = assert!(size_of::<ObjectPatternProperty<'static>>() == 28);
+const _: () = assert!(size_of::<ObjectPatternProperty>() == 28);
 const _: () = assert!(size_of::<VariableDeclarator>() == 20);
 const _: () = assert!(size_of::<SwitchCase>() == 20);
 // The ladders' return currency: an id word plus the pointer-sized `Error` is two words. See
 // the native pins in `tsv_ts`'s `parser/expression.rs` and `parser/types.rs`.
 const _: () = assert!(size_of::<Result<IdRet<Expr>, Error>>() == 2 * size_of::<usize>());
-const _: () = assert!(size_of::<Result<&TSType<'static>, Error>>() == 2 * size_of::<usize>());
+const _: () = assert!(size_of::<Result<IdRet<Ty>, Error>>() == 2 * size_of::<usize>());
 // The CSS numeric carriers, 4-aligned through `PackedF64`. See the native `ColorChannel` and
 // `CssValue` pins in `tsv_css`'s `ast/mod.rs`.
 const _: () = assert!(size_of::<ColorChannel>() == 12);

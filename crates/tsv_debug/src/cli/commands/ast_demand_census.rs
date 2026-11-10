@@ -47,8 +47,8 @@
 //! - `scratch_peak`: the largest total of open list prefixes of this type at any moment,
 //!   maximum over files, and the same per source byte (summed per-file peaks over bytes).
 //!   Counted only for lists built in the arena (the census's `BumpVec`); a list built on a
-//!   store's scratch (`ListBuf`: the expression and statement id lists, the parameter value
-//!   runs) is not seen, so its rows read 0 here.
+//!   store's scratch (`ListBuf`: the expression, statement and type id lists, the parameter
+//!   value runs) is not seen, so its rows read 0 here.
 //! - `wire` / `delta`: the wire's count of the node named like the row, when the wire has
 //!   one, and `live - wire`. Rows with no wire name (`Expression`, `Statement`, `TSType`,
 //!   `ObjectProperty`, the id lists) leave it blank, and a row whose wire name is shared by a

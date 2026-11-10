@@ -166,7 +166,7 @@ impl CalleeGap {
     /// window ([`Printer::args_frozen_span`]). Separate from [`Self::start`] so a caller
     /// can't accidentally open the window at the callee and swallow the type arguments'
     /// own comments.
-    pub(super) fn paren_open(&self, call: &ast::CallExpression<'_>) -> u32 {
+    pub(super) fn paren_open(&self, call: &ast::CallExpression) -> u32 {
         // On a split gap the argument side opens AT the `(` — the pre-paren half is the
         // callee side's ([`Self::paren_split`]), and opening before it would hand these
         // windows a comment the head has already emitted. Opening *at* the paren rather than
@@ -189,7 +189,7 @@ impl CalleeGap {
 #[inline(always)]
 pub(super) fn callee_gap(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
 ) -> CalleeGap {
     let callee = printer.view.expr(call.callee);
@@ -230,10 +230,7 @@ pub(super) fn callee_gap(
 /// shell ([`Printer::required_pair_gap_start`]). Every window of [`CalleeGap`] opens from it,
 /// and the call's head claims the region from the callee's own doc.
 #[inline]
-pub(super) fn callee_printed_gap_start(
-    printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
-) -> u32 {
+pub(super) fn callee_printed_gap_start(printer: &Printer<'_>, call: &ast::CallExpression) -> u32 {
     let callee = printer.view.expr(call.callee);
     printer.required_pair_gap_start(callee, || {
         printer.needs_parens(callee, ParenContext::callee_of(call))
@@ -244,7 +241,7 @@ pub(super) fn callee_printed_gap_start(
 /// The derivation behind [`callee_gap`] — the one definition of every field, out of line
 /// for the calls its inline tests cannot answer.
 #[inline(never)]
-fn callee_gap_wide(printer: &Printer<'_>, call: &ast::CallExpression<'_>, span: Span) -> CalleeGap {
+fn callee_gap_wide(printer: &Printer<'_>, call: &ast::CallExpression, span: Span) -> CalleeGap {
     let owned_pair = call_callee_paren_leading_start(printer.view, call, span).is_some();
     let callee_end = if owned_pair {
         printer.view.expr(call.callee).span().end
@@ -280,7 +277,7 @@ fn callee_gap_wide(printer: &Printer<'_>, call: &ast::CallExpression<'_>, span: 
 /// derive [`CalleeGap::paren_split`] — which cannot be read off the struct that is still being
 /// built — and [`CalleeGap::paren_open`] is this plus that split. Written out twice, the two
 /// disagreed the moment either grew a clause, which is the failure that struct's doc names.
-fn args_side_start(call: &ast::CallExpression<'_>, start_after_optional: u32) -> u32 {
+fn args_side_start(call: &ast::CallExpression, start_after_optional: u32) -> u32 {
     call.type_arguments
         .as_ref()
         .map_or(start_after_optional, |ta| ta.span.end)
@@ -305,7 +302,7 @@ fn args_side_start(call: &ast::CallExpression<'_>, start_after_optional: u32) ->
 /// written after the `(` sits in both windows and keeps it.
 fn call_paren_split(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     gap_start: u32,
 ) -> Option<(u32, u32)> {
     if call.optional {
@@ -433,7 +430,7 @@ fn split_strands_directive(
 /// where the callee→`(` gap splits, from which [`CalleeGap::start`] then opens.
 fn call_optional(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     start: u32,
 ) -> CallOptional {
@@ -501,7 +498,7 @@ pub(super) fn optional_callee_gap_doc(printer: &Printer<'_>, gap: CalleeGap) -> 
 /// bypass tests and the test-call predicate, neither of which builds a callee doc.
 pub(super) fn call_paren_open(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
 ) -> u32 {
     callee_gap(printer, call, span).paren_open(call)
@@ -685,7 +682,7 @@ pub(in crate::printer) fn is_memberish(expr: &ast::Expression<'_>) -> bool {
 /// chain's last group, where the chain's layout decides their lists too
 /// ([`Printer::build_curried_member_chain_call_doc`] keeps them out). A curried run on any
 /// other callee (`f(a)(b)`) has no member chain to stop, and stays one chain group.
-fn curried_run_roots_in_member_chain(view: AstView<'_>, callee: &ast::CallExpression<'_>) -> bool {
+fn curried_run_roots_in_member_chain(view: AstView<'_>, callee: &ast::CallExpression) -> bool {
     let mut call = callee;
     while let ast::ExpressionKind::CallExpression(inner) = &view.expr(call.callee).kind {
         call = inner;
@@ -721,7 +718,7 @@ fn callee_is_curried_member_chain_call(view: AstView<'_>, callee: &ast::Expressi
 #[inline(always)]
 fn spine_step<'e>(
     expr: &'e ast::Expression<'e>,
-) -> ControlFlow<Option<(&'e ast::CallExpression<'e>, Span)>, ast::ExprId> {
+) -> ControlFlow<Option<(&'e ast::CallExpression, Span)>, ast::ExprId> {
     tsv_lang::fanout_probe::predicate();
     match &expr.kind {
         ast::ExpressionKind::MemberExpression(member) => ControlFlow::Continue(member.object),
@@ -740,7 +737,7 @@ fn spine_step<'e>(
 fn spine_first_call<'e>(
     view: AstView<'e>,
     expr: &'e ast::Expression<'e>,
-) -> Option<(&'e ast::CallExpression<'e>, Span)> {
+) -> Option<(&'e ast::CallExpression, Span)> {
     let mut expr = expr;
     loop {
         match spine_step(expr) {
@@ -801,7 +798,7 @@ pub(crate) fn call_may_print_whole(view: AstView<'_>, call: ast::ExprId) -> bool
 /// the question for a call that prints its callee whole: the plain call's head arms
 /// [`Printer::long_curried_target`] with it, and the curried-callback route in
 /// [`Printer::build_call_doc`], which builds the callee without that head, declines on it.
-fn callee_is_long_curried(view: AstView<'_>, call: &ast::CallExpression<'_>) -> bool {
+fn callee_is_long_curried(view: AstView<'_>, call: &ast::CallExpression) -> bool {
     matches!(
         &view.expr(call.callee).kind,
         ast::ExpressionKind::CallExpression(inner)
@@ -830,7 +827,7 @@ impl<'a> Printer<'a> {
     #[inline(always)]
     pub(in crate::printer) fn call_takes_template_bypass(
         &self,
-        call: &ast::CallExpression<'_>,
+        call: &ast::CallExpression,
         span: Span,
     ) -> bool {
         // The shape test comes first: it reads the argument list alone, where the rest
@@ -844,7 +841,7 @@ impl<'a> Printer<'a> {
     #[inline(never)]
     fn call_takes_template_bypass_beyond_shape(
         &self,
-        call: &ast::CallExpression<'_>,
+        call: &ast::CallExpression,
         span: Span,
     ) -> bool {
         let paren_open = call_paren_open(self, call, span);
@@ -963,11 +960,7 @@ impl<'a> Printer<'a> {
     /// a callee taking more arguments than this call leaves its own list without a group
     /// ([`Printer::long_curried_target`], armed by the callee build).
     #[inline(never)]
-    fn build_curried_member_chain_call_doc(
-        &self,
-        call: &ast::CallExpression<'_>,
-        span: Span,
-    ) -> DocId {
+    fn build_curried_member_chain_call_doc(&self, call: &ast::CallExpression, span: Span) -> DocId {
         self.is_expression_statement.set(false);
         let doc = self.build_call_doc_with_wrapping(call, span);
         self.d().group(doc)
@@ -976,7 +969,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a call expression with argument wrapping (not chain-aware)
     pub(super) fn build_call_doc_with_wrapping(
         &self,
-        call: &ast::CallExpression<'_>,
+        call: &ast::CallExpression,
         span: Span,
     ) -> DocId {
         call_formatting::build_call_doc_with_wrapping(self, call, span)
@@ -990,7 +983,7 @@ impl<'a> Printer<'a> {
     ///
     /// Simple calls like `obj.method()` use the simple call path unless they have
     /// comments between member segments.
-    pub(super) fn build_call_doc(&self, call: &ast::CallExpression<'_>, span: Span) -> DocId {
+    pub(super) fn build_call_doc(&self, call: &ast::CallExpression, span: Span) -> DocId {
         let callee = self.view.expr(call.callee);
         // A curried call on a member chain (`a.b().c(x)(y)`, `a.b().c(x)!(y)`) is not a link of
         // that chain.
@@ -1236,7 +1229,7 @@ impl<'a> Printer<'a> {
     /// Uses proper group wrapping so args can break independently from the chain.
     pub(super) fn build_call_args_doc_for_chain(
         &self,
-        call: &ast::CallExpression<'_>,
+        call: &ast::CallExpression,
         span: Span,
         facts: ChainCall,
     ) -> DocId {
@@ -1246,7 +1239,7 @@ impl<'a> Printer<'a> {
     /// The doc a chain call prints ahead of its `(` ([`chain_args::chain_call_head_doc`]).
     pub(in crate::printer) fn chain_call_head_doc(
         &self,
-        call: &ast::CallExpression<'_>,
+        call: &ast::CallExpression,
         span: Span,
     ) -> Option<DocId> {
         chain_args::chain_call_head_doc(self, call, callee_gap(self, call, span))
@@ -1257,7 +1250,7 @@ impl<'a> Printer<'a> {
     /// Used for the "args expanded, chain inline" state in conditionalGroup.
     pub(super) fn build_call_args_doc_for_chain_expanded(
         &self,
-        call: &ast::CallExpression<'_>,
+        call: &ast::CallExpression,
         span: Span,
         facts: ChainCall,
     ) -> DocId {

@@ -36,7 +36,7 @@ impl<'a> Printer<'a> {
     /// no-comment path.
     pub(crate) fn build_property_signature_member_doc(
         &self,
-        prop: &ast::TSPropertySignature<'_>,
+        prop: &ast::TSPropertySignature,
         deferred: &mut DocBuf,
     ) -> DocId {
         let d = self.d();
@@ -134,7 +134,7 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         after_marker: u32,
         optional: bool,
-        type_ann: &ast::TSTypeAnnotation<'_>,
+        type_ann: &ast::TSTypeAnnotation,
     ) {
         if let Some(frozen) = self.build_frozen_annotation_head_doc(after_marker, type_ann) {
             parts.push(frozen);
@@ -341,7 +341,7 @@ impl<'a> Printer<'a> {
         &self,
         type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
         params: &[ast::Expression<'_>],
-        return_type: Option<&ast::TSTypeAnnotation<'_>>,
+        return_type: Option<&ast::TSTypeAnnotation>,
         span: ast::Span,
         new_keyword_end: Option<u32>,
         deferred: &mut DocBuf,
@@ -446,7 +446,7 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
         params: &[ast::Expression<'_>],
-        return_type: Option<&ast::TSTypeAnnotation<'_>>,
+        return_type: Option<&ast::TSTypeAnnotation>,
         paren_pos: Option<u32>,
     ) {
         let d = self.d();

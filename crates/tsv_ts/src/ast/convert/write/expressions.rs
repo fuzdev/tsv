@@ -570,7 +570,7 @@ fn write_expression_full_dispatch(
 /// the child its walk continues into.
 enum ChainTail<'e> {
     Call {
-        call: &'e ast::CallExpression<'e>,
+        call: &'e ast::CallExpression,
         callee_chain: ChainState,
         force: bool,
         strip: bool,

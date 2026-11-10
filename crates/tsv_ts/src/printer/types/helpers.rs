@@ -29,7 +29,7 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 /// let function params break first rather than breaking the return type.
 pub(super) fn type_args_should_wrap_for_return_type(
     view: AstView<'_>,
-    args: &ast::TSTypeParameterInstantiation<'_>,
+    args: &ast::TSTypeParameterInstantiation,
 ) -> bool {
     // Multiple type args can break between them
     if args.params.len() > 1 {
@@ -140,7 +140,7 @@ pub(crate) fn is_simple_type_arg(view: AstView<'_>, ty: &TSType<'_>) -> bool {
 /// `isObjectType` this narrows, so a `({ … })` member answers the same here as it does at
 /// [`union_hug_shape`]'s [`is_object_like_type`]. The two are clauses of one gate and must
 /// agree about a parenthesized member, or the gate reads two ways about one union.
-pub(super) fn union_has_brace_member(view: AstView<'_>, union: &TSUnionType<'_>) -> bool {
+pub(super) fn union_has_brace_member(view: AstView<'_>, union: &TSUnionType) -> bool {
     view.ty_list(union.types)
         .iter()
         .any(|&member| is_huggable_type(view, view.ty(member)))
@@ -164,7 +164,7 @@ pub(super) fn union_has_brace_member(view: AstView<'_>, union: &TSUnionType<'_>)
 /// closers (`((A | B) /* c */)[]`, `[((A | B) /* c */)?]`).
 pub(in crate::printer) fn outermost_paren<'a>(
     ts_type: &'a TSType<'a>,
-) -> Option<&'a TSParenthesizedType<'a>> {
+) -> Option<&'a TSParenthesizedType> {
     match ts_type {
         TSType::Parenthesized(p) => Some(p),
         _ => None,
@@ -196,7 +196,7 @@ pub(in crate::printer) fn outermost_paren<'a>(
 /// (`t.span().start` rather than `+ 1`) converts to this pair unchanged.
 pub(in crate::printer) fn paren_shell_gaps(
     view: AstView<'_>,
-    shell: &TSParenthesizedType<'_>,
+    shell: &TSParenthesizedType,
 ) -> (Span, Span) {
     let inner = unwrap_parenthesized(view, view.ty(shell.type_annotation)).span();
     (
@@ -248,7 +248,7 @@ pub(in crate::printer) fn is_huggable_type(view: AstView<'_>, ts_type: &TSType<'
 /// — five gates asked it bare. Every caller must pair it with `union_prints_hugged`
 /// (see [`Printer::type_arg_union_prints_hugged`](super::super::Printer::type_arg_union_prints_hugged)
 /// for the one shape that does).
-pub(super) fn union_hug_shape(view: AstView<'_>, union: &TSUnionType<'_>) -> bool {
+pub(super) fn union_hug_shape(view: AstView<'_>, union: &TSUnionType) -> bool {
     // Exactly one object-like member, and every other member a void type: one pass, each
     // member resolved once
     let mut has_object = false;
@@ -313,7 +313,7 @@ fn is_void_type(view: AstView<'_>, ts_type: &TSType<'_>) -> bool {
 #[inline]
 pub(in crate::printer) fn intersection_has_huggable_last_type(
     view: AstView<'_>,
-    intersection: &TSIntersectionType<'_>,
+    intersection: &TSIntersectionType,
 ) -> bool {
     view.ty_list(intersection.types)
         .last()
@@ -328,7 +328,7 @@ pub(in crate::printer) fn intersection_has_huggable_last_type(
 #[inline]
 pub(in crate::printer) fn intersection_has_expanding_first_type(
     view: AstView<'_>,
-    intersection: &TSIntersectionType<'_>,
+    intersection: &TSIntersectionType,
 ) -> bool {
     view.ty_list(intersection.types)
         .first()
@@ -610,7 +610,7 @@ pub(super) fn is_constrained_infer(ts_type: &TSType<'_>) -> bool {
 /// rather than on the function type.
 fn return_type_is_constrained_infer(
     view: AstView<'_>,
-    return_type: &ast::TSTypeAnnotation<'_>,
+    return_type: &ast::TSTypeAnnotation,
 ) -> bool {
     let mut ty = unwrap_parenthesized(view, view.ty(return_type.type_annotation));
     if let TSType::TypePredicate(pred) = ty {
@@ -801,7 +801,7 @@ fn type_element_holds_brace_type(view: AstView<'_>, member: &ast::TSTypeElement<
 
 fn annotation_holds_brace_type(
     view: AstView<'_>,
-    annotation: Option<&ast::TSTypeAnnotation<'_>>,
+    annotation: Option<&ast::TSTypeAnnotation>,
 ) -> bool {
     annotation.is_some_and(|a| type_holds_brace_type(view, view.ty(a.type_annotation)))
 }
@@ -810,7 +810,7 @@ fn signature_holds_brace_type(
     view: AstView<'_>,
     type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
     params: &[ast::Expression<'_>],
-    return_type: Option<&ast::TSTypeAnnotation<'_>>,
+    return_type: Option<&ast::TSTypeAnnotation>,
 ) -> bool {
     type_parameters.is_some_and(|decl| type_parameters_hold_brace_type(view, decl))
         || params
@@ -839,7 +839,7 @@ fn type_parameter_holds_brace_type(view: AstView<'_>, param: &ast::TSTypeParamet
 
 fn type_arguments_hold_brace_type(
     view: AstView<'_>,
-    args: Option<&ast::TSTypeParameterInstantiation<'_>>,
+    args: Option<&ast::TSTypeParameterInstantiation>,
 ) -> bool {
     args.is_some_and(|args| {
         view.ty_list(args.params)

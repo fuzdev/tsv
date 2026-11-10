@@ -125,7 +125,7 @@ fn super_class_wrap_span(
 fn write_super_class_fields(
     w: &mut JsonWriter,
     super_class: Option<&ast::Expression<'_>>,
-    super_type_parameters: Option<&ast::TSTypeParameterInstantiation<'_>>,
+    super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
     type_params_span: Option<Span>,
     ctx: &Ctx<'_>,
 ) {

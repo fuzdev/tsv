@@ -19,6 +19,9 @@ use tsv_lang::{DepthBudget, DepthLimit, Error, Span, SpineCount};
 /// currency in `expression.rs`.
 pub(in crate::parser) type ExprRet = IdRet<Expr>;
 
+/// What the type ladder's parse functions return: see `Parser::parse_type` in `types.rs`.
+pub(in crate::parser) type TyRet = IdRet<Ty>;
+
 // Import parsing implementations
 mod expression;
 mod expression_arrow; // Arrow function predicate scans and builders
@@ -522,7 +525,7 @@ pub(crate) struct Parser<'a, 'arena> {
     /// local (`let arena = self.arena;`) only when several allocations in one method
     /// share it.
     arena: &'arena Bump,
-    /// The document's expression and statement stores, shared by every parser of the
+    /// The document's expression, statement and type stores, shared by every parser of the
     /// document. `'a` is the source's lifetime, which the `&mut` takes as covariantly as the
     /// `&str`.
     stores: &'a mut AstStores<'arena>,
@@ -875,7 +878,7 @@ pub(crate) struct Parser<'a, 'arena> {
     /// the current token is `?`; consumed by the innermost enclosing
     /// `parse_type`, which nothing can precede (every intermediate
     /// union/intersection/array/operand loop breaks on `?`).
-    pending_conditional_extends: Option<&'arena TSType<'arena>>,
+    pending_conditional_extends: Option<TyId>,
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
@@ -961,6 +964,39 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.stores.exprs.get(id)
     }
 
+    /// Push a finished type and mint its id: the tail of every node builder on the type
+    /// ladder (see `Parser::parse_type`).
+    #[inline]
+    pub(in crate::parser) fn push_ty(&mut self, ty: TSType<'arena>) -> TyId {
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TSType<'arena>>(1);
+        self.stores.tys.push(ty)
+    }
+
+    /// [`Parser::push_ty`] in the type ladder's return currency.
+    #[inline]
+    pub(in crate::parser) fn push_ty_ret(&mut self, ty: TSType<'arena>) -> TyRet {
+        TyRet::wrap(self.push_ty(ty))
+    }
+
+    /// Flush the type id list opened at `mark` (`ListBuf::flush_copy`).
+    #[inline]
+    pub(in crate::parser) fn flush_ty_list(&mut self, mark: ListMark<TyId>) -> Run<TyId> {
+        let run = self
+            .stores
+            .ty_list_scratch
+            .flush_copy(mark, &mut self.stores.ty_lists);
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<TyId>(run.len());
+        run
+    }
+
+    /// The type row `id` names, as the parser reads a type it has built.
+    #[inline]
+    pub(in crate::parser) fn ty(&self, id: TyId) -> &TSType<'arena> {
+        self.stores.tys.get(id)
+    }
+
     /// Allocate a single AST node in the arena, returning a shared `&'arena`
     /// reference (replaces `Box::new`). Zero-copy: `Bump::alloc` moves the value
     /// into arena memory; the mut→shared reborrow is implicit.
@@ -1016,7 +1052,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// present, are folded in separately by the parameter-list caller
     /// (`attach_param_decorators`).
     #[inline]
-    fn typed_extra(&self, ta: TSTypeAnnotation<'arena>) -> &'arena IdentifierParamExtra<'arena> {
+    fn typed_extra(&self, ta: TSTypeAnnotation) -> &'arena IdentifierParamExtra<'arena> {
         self.alloc(IdentifierParamExtra {
             type_annotation: Some(ta),
             decorators: None,
@@ -1725,7 +1761,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline]
     pub(super) fn arrow_return_pair(
         &mut self,
-        return_type: Option<&TSTypeAnnotation<'_>>,
+        return_type: Option<&TSTypeAnnotation>,
     ) -> Result<(), Error> {
         let view = self.stores.view();
         let returns_a_function =

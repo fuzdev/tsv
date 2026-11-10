@@ -679,7 +679,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         argument: ExprId,
         spread_span: Span,
         context: AssignableContext,
-    ) -> Result<RestElement<'arena>, Error> {
+    ) -> Result<RestElement, Error> {
         let argument = self.refine_placed_assignable(argument, context)?.id();
         if matches!(
             self.expr(argument).kind,
@@ -703,7 +703,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         prop: &ObjectProperty,
         context: AssignableContext,
-    ) -> Result<ObjectPatternProperty<'arena>, Error> {
+    ) -> Result<ObjectPatternProperty, Error> {
         match prop {
             ObjectProperty::Property(p) => {
                 // A method, accessor or generator property has no pattern form: the wire

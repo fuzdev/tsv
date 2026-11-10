@@ -108,7 +108,7 @@ pub(crate) enum ChainNode<'a> {
     },
     /// Call expression: ()
     Call {
-        call: &'a ast::CallExpression<'a>,
+        call: &'a ast::CallExpression,
         /// The call's span (the span of the `Expression` holding `call`).
         span: Span,
         /// The facts about this call that only the CHAIN knows — see [`ChainCall`].
@@ -241,7 +241,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Create a new call node
-    pub(crate) fn call(call: &'a ast::CallExpression<'a>, span: Span) -> Self {
+    pub(crate) fn call(call: &'a ast::CallExpression, span: Span) -> Self {
         Self::Call {
             call,
             span,
@@ -461,7 +461,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Get the CallExpression if this is a Call node
-    pub(crate) fn as_call_expression(&self) -> Option<&'a ast::CallExpression<'a>> {
+    pub(crate) fn as_call_expression(&self) -> Option<&'a ast::CallExpression> {
         if let Self::Call { call, .. } = self {
             Some(call)
         } else {

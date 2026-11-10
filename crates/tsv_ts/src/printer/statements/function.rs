@@ -72,7 +72,7 @@ impl<'a> Printer<'a> {
         &self,
         params: &[ast::Expression<'_>],
         type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
-        return_type: Option<&ast::TSTypeAnnotation<'_>>,
+        return_type: Option<&ast::TSTypeAnnotation>,
         params_start: u32,
         body_start: u32,
     ) -> (DocId, u32) {
@@ -109,7 +109,7 @@ impl<'a> Printer<'a> {
         &self,
         params: &[ast::Expression<'_>],
         type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
-        return_type: Option<&ast::TSTypeAnnotation<'_>>,
+        return_type: Option<&ast::TSTypeAnnotation>,
         params_start: u32,
         body_start: u32,
     ) -> (DocId, Option<DocId>, u32) {

@@ -9,7 +9,7 @@ use tsv_lang::{Comment, Span};
 use super::{
     ArrayPattern, AssignmentPattern, BlockStatement, ClassExpression, Expr, ExprId, Identifier,
     Literal, ObjectPattern, PrivateIdentifier, RestElement, Run, TSParameterProperty,
-    TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation, TyEdge,
+    TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation, TyId,
 };
 
 /// Expression node: the span every variant shares, beside the variant itself.
@@ -34,8 +34,8 @@ pub enum ExpressionKind<'arena> {
     UnaryExpression(UnaryExpression),
     UpdateExpression(UpdateExpression),
     BinaryExpression(BinaryExpression),
-    CallExpression(CallExpression<'arena>),
-    NewExpression(NewExpression<'arena>),
+    CallExpression(CallExpression),
+    NewExpression(NewExpression),
     MemberExpression(MemberExpression),
     ConditionalExpression(ConditionalExpression),
     // Arena-boxed, unlike every variant above: these five are the only ones wide
@@ -70,13 +70,13 @@ pub enum ExpressionKind<'arena> {
     ObjectPattern(ObjectPattern<'arena>),
     ArrayPattern(ArrayPattern<'arena>),
     AssignmentPattern(AssignmentPattern<'arena>),
-    RestElement(RestElement<'arena>),
+    RestElement(RestElement),
     // TypeScript type assertions
-    TSTypeAssertion(TSTypeAssertion<'arena>),
-    TSAsExpression(TSAsExpression<'arena>),
-    TSSatisfiesExpression(TSSatisfiesExpression<'arena>),
+    TSTypeAssertion(TSTypeAssertion),
+    TSAsExpression(TSAsExpression),
+    TSSatisfiesExpression(TSSatisfiesExpression),
     // TypeScript instantiation expression: f<T>
-    TSInstantiationExpression(TSInstantiationExpression<'arena>),
+    TSInstantiationExpression(TSInstantiationExpression),
     // TypeScript non-null assertion: expr!
     TSNonNullExpression(TSNonNullExpression),
     // TypeScript parameter property: constructor(public x)
@@ -137,7 +137,7 @@ impl<'arena> Expression<'arena> {
 
     /// Wrap a [`RestElement`] (see [`Expression::from_identifier`]).
     #[inline]
-    pub fn from_rest_element(rest: RestElement<'arena>) -> Self {
+    pub fn from_rest_element(rest: RestElement) -> Self {
         Self {
             span: rest.span,
             kind: ExpressionKind::RestElement(rest),
@@ -793,9 +793,9 @@ impl<'arena> BinaryExpression {
 
 /// Call expression: `foo()`, `obj.method(arg1, arg2)`, `fn<T>()`
 #[derive(Debug, Clone)]
-pub struct CallExpression<'arena> {
+pub struct CallExpression {
     pub callee: ExprId,
-    pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
     pub arguments: Run<ExprId>,
     pub optional: bool, // true for `foo?.()` (optional chaining)
 }
@@ -806,9 +806,9 @@ pub struct CallExpression<'arena> {
 /// identifier or member expression, and arguments are optional.
 /// Type arguments like `new Map<K, V>()` are stored in `type_arguments`.
 #[derive(Debug, Clone)]
-pub struct NewExpression<'arena> {
+pub struct NewExpression {
     pub callee: ExprId,
-    pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
     pub arguments: Run<ExprId>,
 }
 
@@ -862,7 +862,7 @@ pub struct ArrowFunctionExpression<'arena> {
     pub params: Run<Expr>,
     pub body: ArrowFunctionBody,
     /// Return type annotation (TypeScript): (): number => ...
-    pub return_type: Option<TSTypeAnnotation<'arena>>,
+    pub return_type: Option<TSTypeAnnotation>,
     /// Whether this is an async arrow function: `async () => ...`
     pub r#async: bool,
     /// Position of opening paren for params, if parenthesized.
@@ -913,7 +913,7 @@ pub struct FunctionExpression<'arena> {
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Run<Expr>,
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
-    pub return_type: Option<TSTypeAnnotation<'arena>>,
+    pub return_type: Option<TSTypeAnnotation>,
     /// Function body (block statement with statements)
     pub body: BlockStatement,
     /// Whether this is a generator function (`function*`)
@@ -1101,7 +1101,7 @@ impl<'arena> TemplateElement<'arena> {
 #[derive(Debug, Clone)]
 pub struct TaggedTemplateExpression<'arena> {
     pub tag: ExprId,
-    pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
+    pub type_arguments: Option<TSTypeParameterInstantiation>,
     pub quasi: TemplateLiteral<'arena>,
 }
 
@@ -1192,9 +1192,9 @@ pub struct Super;
 ///
 /// Example: `<string>someValue`, `<T>a`
 #[derive(Debug, Clone)]
-pub struct TSTypeAssertion<'arena> {
+pub struct TSTypeAssertion {
     /// The target type
-    pub type_annotation: TyEdge<'arena>,
+    pub type_annotation: TyId,
     /// The expression being type-asserted
     pub expression: ExprId,
 }
@@ -1206,11 +1206,11 @@ pub struct TSTypeAssertion<'arena> {
 ///
 /// Note: `as const` is represented as a type reference with name "const".
 #[derive(Debug, Clone)]
-pub struct TSAsExpression<'arena> {
+pub struct TSAsExpression {
     /// The expression being type-asserted
     pub expression: ExprId,
     /// The target type
-    pub type_annotation: TyEdge<'arena>,
+    pub type_annotation: TyId,
 }
 
 /// TypeScript `satisfies` expression: `expr satisfies Type`
@@ -1221,11 +1221,11 @@ pub struct TSAsExpression<'arena> {
 /// Example: `{ a: 1 } satisfies Record<string, number>` keeps type `{ a: number }`
 /// but verifies it's compatible with `Record<string, number>`.
 #[derive(Debug, Clone)]
-pub struct TSSatisfiesExpression<'arena> {
+pub struct TSSatisfiesExpression {
     /// The expression being checked
     pub expression: ExprId,
     /// The type to satisfy
-    pub type_annotation: TyEdge<'arena>,
+    pub type_annotation: TyId,
 }
 
 /// TypeScript instantiation expression: `f<T>`, `SomeClass<number>`
@@ -1236,11 +1236,11 @@ pub struct TSSatisfiesExpression<'arena> {
 ///
 /// Example: `const boundF = f<number>;` gives `f` with type parameter bound to `number`.
 #[derive(Debug, Clone)]
-pub struct TSInstantiationExpression<'arena> {
+pub struct TSInstantiationExpression {
     /// The expression being instantiated
     pub expression: ExprId,
     /// The type arguments: <T, U>
-    pub type_arguments: TSTypeParameterInstantiation<'arena>,
+    pub type_arguments: TSTypeParameterInstantiation,
 }
 
 /// TypeScript non-null assertion expression: `expr!`

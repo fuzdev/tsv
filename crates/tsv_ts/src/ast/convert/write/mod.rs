@@ -642,7 +642,7 @@ pub(super) fn write_type_parameters_field(
 #[inline]
 pub(super) fn write_type_arguments_field(
     w: &mut JsonWriter,
-    type_arguments: Option<&ast::TSTypeParameterInstantiation<'_>>,
+    type_arguments: Option<&ast::TSTypeParameterInstantiation>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(ta) = type_arguments {
@@ -657,7 +657,7 @@ pub(super) fn write_type_arguments_field(
 #[inline]
 pub(super) fn write_type_annotation_field(
     w: &mut JsonWriter,
-    type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
+    type_annotation: Option<&ast::TSTypeAnnotation>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(ta) = type_annotation {
@@ -670,7 +670,7 @@ pub(super) fn write_type_annotation_field(
 #[inline]
 pub(super) fn write_return_type_field(
     w: &mut JsonWriter,
-    return_type: Option<&ast::TSTypeAnnotation<'_>>,
+    return_type: Option<&ast::TSTypeAnnotation>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(rt) = return_type {
@@ -953,7 +953,7 @@ pub(super) fn write_identifier_parts(
     span: Span,
     name: ast::IdentName<'_>,
     optional: bool,
-    type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
+    type_annotation: Option<&ast::TSTypeAnnotation>,
     decorators: Option<&[ast::Decorator]>,
     ctx: &Ctx<'_>,
 ) {
@@ -971,7 +971,7 @@ pub(super) fn write_identifier_parts_with_character(
     span: Span,
     name: ast::IdentName<'_>,
     optional: bool,
-    type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
+    type_annotation: Option<&ast::TSTypeAnnotation>,
     decorators: Option<&[ast::Decorator]>,
     ctx: &Ctx<'_>,
 ) {
@@ -1002,7 +1002,7 @@ fn write_identifier_fields(
     span: Span,
     name: ast::IdentName<'_>,
     optional: bool,
-    type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
+    type_annotation: Option<&ast::TSTypeAnnotation>,
     decorators: Option<&[ast::Decorator]>,
     ctx: &Ctx<'_>,
 ) {
@@ -1017,7 +1017,7 @@ fn write_identifier_tail(
     w: &mut JsonWriter,
     span: Span,
     optional: bool,
-    type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
+    type_annotation: Option<&ast::TSTypeAnnotation>,
     decorators: Option<&[ast::Decorator]>,
     ctx: &Ctx<'_>,
 ) {

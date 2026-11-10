@@ -21,11 +21,11 @@ use super::{Decorator, ExprId, Property, Run, TSTypeAnnotation};
 /// - Rest: `{...rest}` (collect remaining properties)
 #[derive(Debug, Clone)]
 pub struct ObjectPattern<'arena> {
-    pub properties: &'arena [ObjectPatternProperty<'arena>],
+    pub properties: &'arena [ObjectPatternProperty],
     /// Optional destructuring-pattern parameter (`{a}?`). Only ever set in a
     /// parameter position; the `?` extends the expression's span and precedes `type_annotation`.
     pub optional: bool,
-    pub type_annotation: Option<TSTypeAnnotation<'arena>>,
+    pub type_annotation: Option<TSTypeAnnotation>,
     /// Parameter decorators (`@dec { a }: T`). Only set in a parameter position;
     /// emitted last in the wire, matching acorn (which attaches a parameter's
     /// decorators to its top-level binding node).
@@ -34,12 +34,12 @@ pub struct ObjectPattern<'arena> {
 
 /// Object pattern property - either a regular property or a rest element
 #[derive(Debug, Clone)]
-pub enum ObjectPatternProperty<'arena> {
+pub enum ObjectPatternProperty {
     Property(Property),
-    RestElement(RestElement<'arena>),
+    RestElement(RestElement),
 }
 
-impl<'arena> ObjectPatternProperty<'arena> {
+impl ObjectPatternProperty {
     pub fn span(&self) -> Span {
         match self {
             ObjectPatternProperty::Property(p) => p.span,
@@ -97,7 +97,7 @@ pub struct ArrayPattern<'arena> {
     /// Optional destructuring-pattern parameter (`[a]?`). Only ever set in a
     /// parameter position; the `?` extends the expression's span and precedes `type_annotation`.
     pub optional: bool,
-    pub type_annotation: Option<TSTypeAnnotation<'arena>>,
+    pub type_annotation: Option<TSTypeAnnotation>,
     /// Parameter decorators (`@dec [a]: T`). Only set in a parameter position;
     /// emitted last in the wire, matching acorn.
     pub decorators: Option<&'arena [Decorator]>,
@@ -129,7 +129,7 @@ pub struct AssignmentPattern<'arena> {
 /// - `const [a, ...rest] = arr` (rest gets remaining array elements)
 /// - `const {a, ...rest} = obj` (rest gets remaining properties)
 #[derive(Debug, Clone)]
-pub struct RestElement<'arena> {
+pub struct RestElement {
     /// The binding for the rest (typically an identifier)
     pub argument: ExprId,
     /// Optional rest parameter (`...a?`). Only ever set in a parameter position;
@@ -139,13 +139,13 @@ pub struct RestElement<'arena> {
     /// rest element (never on `argument`). Never set for a destructuring rest
     /// (`[...a]` / `{...a}`), which takes no `?`.
     pub optional: bool,
-    // Inline by value — see `TSFunctionType.return_type`; `TSTypeAnnotation` is held
-    // inline (`Option<TSTypeAnnotation>`) everywhere else.
-    pub type_annotation: Option<TSTypeAnnotation<'arena>>,
+    // Inline by value, a span and a type id — see `TSFunctionType.return_type`; held the
+    // same way (`Option<TSTypeAnnotation>`) everywhere else.
+    pub type_annotation: Option<TSTypeAnnotation>,
     pub span: Span,
 }
 
-impl RestElement<'_> {
+impl RestElement {
     /// The source the grouping parens the parser stripped from the argument leave behind
     /// — `[argument end, span end)`, the region between the argument and the shell's last
     /// `)` (`[...(a /* c */)] = x`). A destructuring-assignment rest is the only one that
