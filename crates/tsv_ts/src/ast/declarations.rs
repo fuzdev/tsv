@@ -6,8 +6,8 @@
 use tsv_lang::Span;
 
 use super::{
-    AstView, Expr, ExprId, Identifier, Literal, Run, StmtId, TSEntityName, TSTypeAnnotation,
-    TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
+    AstView, Expr, ExprId, Identifier, Literal, ModuleDeclEdge, Run, StmtId, TSEntityName,
+    TSTypeAnnotation, TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 
 /// Interface declaration: `interface Foo { ... }` or `interface Foo extends Bar { ... }`
@@ -180,7 +180,7 @@ pub enum TSModuleDeclarationBody<'arena> {
     /// Block body with statements: `namespace A { ... }`
     TSModuleBlock(TSModuleBlock),
     /// Nested module declaration: `namespace A.B { ... }` - the B part
-    TSModuleDeclaration(&'arena TSModuleDeclaration<'arena>),
+    TSModuleDeclaration(ModuleDeclEdge<'arena>),
 }
 
 /// TypeScript module block: the `{ ... }` part of a namespace/module declaration

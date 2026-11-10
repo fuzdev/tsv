@@ -163,9 +163,12 @@ impl<'a> Printer<'a> {
             // they print in the source order rather than through the plain
             // keyword→declaration continuation.
             if frozen.is_none()
-                && let ast::StatementKind::ClassDeclaration(class) = &declaration.kind
-                && let Some(doc) =
-                    self.build_export_named_decorated_class_doc(span, class, export_keyword_end)
+                && let &ast::StatementKind::ClassDeclaration(class) = &declaration.kind
+                && let Some(doc) = self.build_export_named_decorated_class_doc(
+                    span,
+                    self.view.class_decl(class),
+                    export_keyword_end,
+                )
             {
                 return doc;
             }

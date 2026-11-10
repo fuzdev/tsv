@@ -622,7 +622,8 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.blank_statement(outer, position);
                 false
             }
-            StatementKind::TSDeclareFunction(func) => {
+            &StatementKind::TSDeclareFunction(func) => {
+                let func = self.view.declare_fn(func);
                 if func.declare {
                     self.blank_statement(outer, position);
                 } else {
@@ -631,7 +632,8 @@ impl<'s, 'b> Walk<'s, 'b> {
                 }
                 false
             }
-            StatementKind::TSEnumDeclaration(decl) => {
+            &StatementKind::TSEnumDeclaration(decl) => {
+                let decl = self.view.enum_decl(decl);
                 if decl.declare {
                     self.blank_statement(outer, position);
                     return false;
@@ -642,7 +644,8 @@ impl<'s, 'b> Walk<'s, 'b> {
                 }
                 true
             }
-            StatementKind::TSModuleDeclaration(decl) => {
+            &StatementKind::TSModuleDeclaration(decl) => {
+                let decl = self.view.module_decl(decl);
                 if module_is_type_only(self.view, decl) {
                     self.blank_statement(outer, position);
                     return false;
@@ -663,11 +666,13 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.statement_list(block.body, false);
                 true
             }
-            StatementKind::FunctionDeclaration(func) => {
+            &StatementKind::FunctionDeclaration(func) => {
+                let func = self.view.fn_decl(func);
                 self.function(FunctionView::declaration(self.view, func));
                 true
             }
-            StatementKind::ClassDeclaration(class) => {
+            &StatementKind::ClassDeclaration(class) => {
+                let class = self.view.class_decl(class);
                 if class.declare {
                     self.blank_statement(outer, position);
                     return false;
@@ -675,13 +680,16 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.class(ClassView::declaration(self.view, class), outer.start);
                 true
             }
-            StatementKind::ExportNamedDeclaration(export) => {
+            &StatementKind::ExportNamedDeclaration(export) => {
+                let export = self.view.export_named(export);
                 self.export_named(export, outer, position)
             }
-            StatementKind::ExportDefaultDeclaration(export) => {
+            &StatementKind::ExportDefaultDeclaration(export) => {
+                let export = self.view.export_default(export);
                 self.export_default(export, outer, position)
             }
-            StatementKind::ExportAllDeclaration(export) => {
+            &StatementKind::ExportAllDeclaration(export) => {
+                let export = self.view.export_all(export);
                 self.record_export_all(export, outer);
                 if export.export_kind == ExportKind::Type {
                     self.blank_statement(outer, position);
@@ -689,7 +697,8 @@ impl<'s, 'b> Walk<'s, 'b> {
                 }
                 true
             }
-            StatementKind::TSExportAssignment(assignment) => {
+            &StatementKind::TSExportAssignment(assignment) => {
+                let assignment = self.view.export_assign(assignment);
                 self.refuse(UnsupportedConstruct::ExportEquals, outer);
                 if self.walks_refused() {
                     self.expr(self.view.expr(assignment.expression));
@@ -699,8 +708,11 @@ impl<'s, 'b> Walk<'s, 'b> {
             // `export as namespace N;` is kept verbatim, as both oracles keep it: it declares
             // a UMD global, which only a declaration file may (tsc's TS1315)
             StatementKind::TSNamespaceExportDeclaration(_) => true,
-            StatementKind::ImportDeclaration(import) => self.import(import, outer, position),
-            StatementKind::TSImportEqualsDeclaration(import) => {
+            &StatementKind::ImportDeclaration(import) => {
+                self.import(self.view.import_decl(import), outer, position)
+            }
+            &StatementKind::TSImportEqualsDeclaration(import) => {
+                let import = self.view.import_equals(import);
                 self.record_import_equals(import, outer);
                 self.refuse(UnsupportedConstruct::ImportEquals, outer);
                 true
@@ -829,20 +841,23 @@ impl<'s, 'b> Walk<'s, 'b> {
                 }),
                 _ => Tail::Closed,
             },
-            StatementKind::ExportNamedDeclaration(export) => {
+            &StatementKind::ExportNamedDeclaration(export) => {
+                let export = self.view.export_named(export);
                 export.declaration.map_or(Tail::Closed, |declaration| {
                     self.statement_tail(self.view.stmt(declaration))
                 })
             }
-            StatementKind::ExportDefaultDeclaration(export) => match &export.declaration {
-                ExportDefaultValue::Expression(e) => {
-                    self.unterminated_tail(self.view.expr(*e), end)
+            &StatementKind::ExportDefaultDeclaration(export) => {
+                match &self.view.export_default(export).declaration {
+                    ExportDefaultValue::Expression(e) => {
+                        self.unterminated_tail(self.view.expr(*e), end)
+                    }
+                    ExportDefaultValue::FunctionDeclaration(_)
+                    | ExportDefaultValue::TSDeclareFunction(_)
+                    | ExportDefaultValue::ClassDeclaration(_)
+                    | ExportDefaultValue::TSInterfaceDeclaration(_) => Tail::Closed,
                 }
-                ExportDefaultValue::FunctionDeclaration(_)
-                | ExportDefaultValue::TSDeclareFunction(_)
-                | ExportDefaultValue::ClassDeclaration(_)
-                | ExportDefaultValue::TSInterfaceDeclaration(_) => Tail::Closed,
-            },
+            }
             StatementKind::IfStatement(s) => {
                 self.statement_tail(self.view.stmt(s.alternate.unwrap_or(s.consequent)))
             }
@@ -1864,9 +1879,11 @@ impl<'s, 'b> Walk<'s, 'b> {
         self.enter_function();
         let mut decl = decl;
         loop {
-            match &decl.body {
+            match decl.body.as_ref() {
                 None => break,
-                Some(TSModuleDeclarationBody::TSModuleDeclaration(inner)) => decl = inner,
+                Some(&TSModuleDeclarationBody::TSModuleDeclaration(inner)) => {
+                    decl = self.view.module_decl(inner);
+                }
                 Some(TSModuleDeclarationBody::TSModuleBlock(block)) => {
                     self.statement_list(block.body, false);
                     break;
@@ -2172,9 +2189,10 @@ fn module_is_type_only(view: AstView<'_>, decl: &TSModuleDeclaration<'_>) -> boo
 
 /// Whether a `namespace`'s body holds a value (ts-blank-space's `valueNamespaceWorker`).
 fn namespace_holds_value(view: AstView<'_>, decl: &TSModuleDeclaration<'_>) -> bool {
-    match &decl.body {
+    match decl.body.as_ref() {
         None => false,
-        Some(TSModuleDeclarationBody::TSModuleDeclaration(inner)) => {
+        Some(&TSModuleDeclarationBody::TSModuleDeclaration(inner)) => {
+            let inner = view.module_decl(inner);
             nested_module_holds_value(view, inner)
         }
         Some(TSModuleDeclarationBody::TSModuleBlock(block)) => view
@@ -2199,46 +2217,52 @@ fn namespace_member_holds_value(view: AstView<'_>, statement: &Statement<'_>) ->
         StatementKind::TSTypeAliasDeclaration(_) | StatementKind::TSInterfaceDeclaration(_) => {
             false
         }
-        StatementKind::TSModuleDeclaration(decl) => nested_module_holds_value(view, decl),
-        StatementKind::TSImportEqualsDeclaration(decl) => decl.is_export,
-        StatementKind::ExportNamedDeclaration(export) => match view.opt_stmt(export.declaration) {
-            Some(declaration) => match &declaration.kind {
-                StatementKind::TSTypeAliasDeclaration(_)
-                | StatementKind::TSInterfaceDeclaration(_) => false,
-                StatementKind::TSModuleDeclaration(decl) => nested_module_holds_value(view, decl),
-                StatementKind::TSImportEqualsDeclaration(_)
-                | StatementKind::ExpressionStatement(_)
-                | StatementKind::VariableDeclaration(_)
-                | StatementKind::TSDeclareFunction(_)
-                | StatementKind::TSEnumDeclaration(_)
-                | StatementKind::ReturnStatement(_)
-                | StatementKind::BlockStatement(_)
-                | StatementKind::FunctionDeclaration(_)
-                | StatementKind::ClassDeclaration(_)
-                | StatementKind::ExportNamedDeclaration(_)
-                | StatementKind::ExportDefaultDeclaration(_)
-                | StatementKind::ExportAllDeclaration(_)
-                | StatementKind::TSExportAssignment(_)
-                | StatementKind::TSNamespaceExportDeclaration(_)
-                | StatementKind::ImportDeclaration(_)
-                | StatementKind::IfStatement(_)
-                | StatementKind::ForStatement(_)
-                | StatementKind::ForInStatement(_)
-                | StatementKind::ForOfStatement(_)
-                | StatementKind::WhileStatement(_)
-                | StatementKind::DoWhileStatement(_)
-                | StatementKind::WithStatement(_)
-                | StatementKind::SwitchStatement(_)
-                | StatementKind::TryStatement(_)
-                | StatementKind::ThrowStatement(_)
-                | StatementKind::BreakStatement(_)
-                | StatementKind::ContinueStatement(_)
-                | StatementKind::LabeledStatement(_)
-                | StatementKind::EmptyStatement(_)
-                | StatementKind::DebuggerStatement(_) => true,
-            },
-            None => true,
-        },
+        &StatementKind::TSModuleDeclaration(decl) => {
+            nested_module_holds_value(view, view.module_decl(decl))
+        }
+        &StatementKind::TSImportEqualsDeclaration(decl) => view.import_equals(decl).is_export,
+        &StatementKind::ExportNamedDeclaration(export) => {
+            match view.opt_stmt(view.export_named(export).declaration) {
+                Some(declaration) => match &declaration.kind {
+                    StatementKind::TSTypeAliasDeclaration(_)
+                    | StatementKind::TSInterfaceDeclaration(_) => false,
+                    &StatementKind::TSModuleDeclaration(decl) => {
+                        nested_module_holds_value(view, view.module_decl(decl))
+                    }
+                    StatementKind::TSImportEqualsDeclaration(_)
+                    | StatementKind::ExpressionStatement(_)
+                    | StatementKind::VariableDeclaration(_)
+                    | StatementKind::TSDeclareFunction(_)
+                    | StatementKind::TSEnumDeclaration(_)
+                    | StatementKind::ReturnStatement(_)
+                    | StatementKind::BlockStatement(_)
+                    | StatementKind::FunctionDeclaration(_)
+                    | StatementKind::ClassDeclaration(_)
+                    | StatementKind::ExportNamedDeclaration(_)
+                    | StatementKind::ExportDefaultDeclaration(_)
+                    | StatementKind::ExportAllDeclaration(_)
+                    | StatementKind::TSExportAssignment(_)
+                    | StatementKind::TSNamespaceExportDeclaration(_)
+                    | StatementKind::ImportDeclaration(_)
+                    | StatementKind::IfStatement(_)
+                    | StatementKind::ForStatement(_)
+                    | StatementKind::ForInStatement(_)
+                    | StatementKind::ForOfStatement(_)
+                    | StatementKind::WhileStatement(_)
+                    | StatementKind::DoWhileStatement(_)
+                    | StatementKind::WithStatement(_)
+                    | StatementKind::SwitchStatement(_)
+                    | StatementKind::TryStatement(_)
+                    | StatementKind::ThrowStatement(_)
+                    | StatementKind::BreakStatement(_)
+                    | StatementKind::ContinueStatement(_)
+                    | StatementKind::LabeledStatement(_)
+                    | StatementKind::EmptyStatement(_)
+                    | StatementKind::DebuggerStatement(_) => true,
+                },
+                None => true,
+            }
+        }
         StatementKind::ExpressionStatement(_)
         | StatementKind::VariableDeclaration(_)
         | StatementKind::TSDeclareFunction(_)

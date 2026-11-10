@@ -232,7 +232,8 @@ impl<'a> Printer<'a> {
             StatementKind::VariableDeclaration(decl) => {
                 self.build_variable_declaration_doc(decl, Some(ctx.terminator_gap()))
             }
-            StatementKind::TSTypeAliasDeclaration(decl) => {
+            &StatementKind::TSTypeAliasDeclaration(decl) => {
+                let decl = self.view.type_alias(decl);
                 self.build_type_alias_declaration_doc(decl, statement.span, ctx.clause_tail())
             }
             StatementKind::ReturnStatement(ret) => {
@@ -246,27 +247,37 @@ impl<'a> Printer<'a> {
             StatementKind::BlockStatement(block) => {
                 self.build_block_statement_expand_empty_doc(block)
             }
-            StatementKind::FunctionDeclaration(decl) => self.build_function_declaration_doc(decl),
-            StatementKind::ClassDeclaration(decl) => self.build_class_declaration_doc(decl),
-            StatementKind::ExportNamedDeclaration(decl) => {
+            &StatementKind::FunctionDeclaration(decl) => {
+                self.build_function_declaration_doc(self.view.fn_decl(decl))
+            }
+            &StatementKind::ClassDeclaration(decl) => {
+                self.build_class_declaration_doc(self.view.class_decl(decl))
+            }
+            &StatementKind::ExportNamedDeclaration(decl) => {
+                let decl = self.view.export_named(decl);
                 self.build_export_named_declaration_doc(decl, statement.span)
             }
-            StatementKind::ExportDefaultDeclaration(decl) => {
+            &StatementKind::ExportDefaultDeclaration(decl) => {
+                let decl = self.view.export_default(decl);
                 self.build_export_default_declaration_doc(decl, statement.span)
             }
-            StatementKind::ExportAllDeclaration(decl) => {
+            &StatementKind::ExportAllDeclaration(decl) => {
+                let decl = self.view.export_all(decl);
                 self.build_export_all_declaration_doc(decl, statement.span)
             }
-            StatementKind::TSExportAssignment(decl) => {
+            &StatementKind::TSExportAssignment(decl) => {
+                let decl = self.view.export_assign(decl);
                 self.build_export_assignment_doc(decl, statement.span)
             }
             StatementKind::TSNamespaceExportDeclaration(decl) => {
                 self.build_namespace_export_declaration_doc(decl, statement.span)
             }
-            StatementKind::ImportDeclaration(decl) => {
+            &StatementKind::ImportDeclaration(decl) => {
+                let decl = self.view.import_decl(decl);
                 self.build_import_declaration_doc(decl, statement.span)
             }
-            StatementKind::TSImportEqualsDeclaration(decl) => {
+            &StatementKind::TSImportEqualsDeclaration(decl) => {
+                let decl = self.view.import_equals(decl);
                 self.build_import_equals_declaration_doc(decl, statement.span)
             }
             // Control flow statements - use simple doc building
@@ -311,16 +322,20 @@ impl<'a> Printer<'a> {
                 statement.span,
                 ctx.terminator_gap(),
             ),
-            StatementKind::TSInterfaceDeclaration(decl) => {
+            &StatementKind::TSInterfaceDeclaration(decl) => {
+                let decl = self.view.interface_decl(decl);
                 self.build_interface_declaration_doc(decl)
             }
-            StatementKind::TSDeclareFunction(decl) => {
+            &StatementKind::TSDeclareFunction(decl) => {
+                let decl = self.view.declare_fn(decl);
                 self.build_declare_function_doc(decl, ctx.clause_tail())
             }
-            StatementKind::TSEnumDeclaration(decl) => {
+            &StatementKind::TSEnumDeclaration(decl) => {
+                let decl = self.view.enum_decl(decl);
                 self.build_enum_declaration_doc(decl, statement.span)
             }
-            StatementKind::TSModuleDeclaration(decl) => {
+            &StatementKind::TSModuleDeclaration(decl) => {
+                let decl = self.view.module_decl(decl);
                 self.build_module_declaration_doc(decl, ctx.clause_tail())
             }
         }

@@ -33,14 +33,19 @@ mod view;
 
 pub(crate) use stores::ScratchMarks;
 pub use stores::{
-    ArrowFn, ArrowFnId, AstStores, Catch, CatchId, ClassDecl, ClassDeclId, ClassExpr, ClassExprId,
-    CtorType, CtorTypeId, DeclareFn, DeclareFnId, EnumDecl, EnumDeclId, ExportAll, ExportAllId,
-    ExportAssign, ExportAssignId, ExportDefault, ExportDefaultId, ExportNamed, ExportNamedId, Expr,
-    ExprId, FnDecl, FnDeclId, FnExpr, FnExprId, ForHead, ForHeadId, ForLeft, ForLeftId, ImportDecl,
-    ImportDeclId, ImportEquals, ImportEqualsId, ImportType, ImportTypeId, InferType, InferTypeId,
-    InterfaceDecl, InterfaceDeclId, MetaProp, MetaPropId, ModuleDecl, ModuleDeclId, ParamExtra,
-    ParamExtraId, Parsed, QualName, QualNameId, Stmt, StmtId, TaggedTpl, TaggedTplId, Ty, TyId,
-    TypeAlias, TypeAliasId, with_stores,
+    ArrowFn, ArrowFnEdge, ArrowFnId, AstStores, Catch, CatchEdge, CatchId, ClassDecl,
+    ClassDeclEdge, ClassDeclId, ClassExpr, ClassExprEdge, ClassExprId, CtorType, CtorTypeEdge,
+    CtorTypeId, DeclareFn, DeclareFnEdge, DeclareFnId, EnumDecl, EnumDeclEdge, EnumDeclId,
+    ExportAll, ExportAllEdge, ExportAllId, ExportAssign, ExportAssignEdge, ExportAssignId,
+    ExportDefault, ExportDefaultEdge, ExportDefaultId, ExportNamed, ExportNamedEdge, ExportNamedId,
+    Expr, ExprId, FnDecl, FnDeclEdge, FnDeclId, FnExpr, FnExprEdge, FnExprId, ForHead, ForHeadEdge,
+    ForHeadId, ForLeft, ForLeftEdge, ForLeftId, ImportDecl, ImportDeclEdge, ImportDeclId,
+    ImportEquals, ImportEqualsEdge, ImportEqualsId, ImportType, ImportTypeEdge, ImportTypeId,
+    InferType, InferTypeEdge, InferTypeId, InterfaceDecl, InterfaceDeclEdge, InterfaceDeclId,
+    MetaProp, MetaPropEdge, MetaPropId, ModuleDecl, ModuleDeclEdge, ModuleDeclId, ParamExtra,
+    ParamExtraEdge, ParamExtraId, Parsed, QualName, QualNameEdge, QualNameId, Stmt, StmtId,
+    TaggedTpl, TaggedTplEdge, TaggedTplId, Ty, TyId, TypeAlias, TypeAliasEdge, TypeAliasId,
+    with_stores,
 };
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};

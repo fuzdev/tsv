@@ -7,11 +7,11 @@
 use tsv_lang::Span;
 
 use super::{
-    ClassDeclaration, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration, Expr,
-    ExprId, Expression, Identifier, ImportDeclaration, Run, StmtId, TSDeclareFunction,
-    TSEnumDeclaration, TSExportAssignment, TSImportEqualsDeclaration, TSInterfaceDeclaration,
-    TSModuleDeclaration, TSNamespaceExportDeclaration, TSTypeAliasDeclaration, TSTypeAnnotation,
-    TSTypeParameterDeclaration,
+    ClassDeclEdge, ClassDeclaration, DeclareFnEdge, EnumDeclEdge, ExportAllEdge, ExportAssignEdge,
+    ExportDefaultEdge, ExportNamedEdge, Expr, ExprId, Expression, FnDeclEdge, Identifier,
+    ImportDeclEdge, ImportEqualsEdge, InterfaceDeclEdge, ModuleDeclEdge, Run, StmtId,
+    TSDeclareFunction, TSInterfaceDeclaration, TSModuleDeclaration, TSNamespaceExportDeclaration,
+    TSTypeAnnotation, TSTypeParameterDeclaration, TypeAliasEdge,
 };
 
 /// Statement node: the span every variant shares, beside the variant itself.
@@ -59,22 +59,22 @@ pub enum StatementKind<'arena> {
     // (The loop and `try` heads below hold their own heads by reference for the
     // same reason, one level down; the `Expression`-holding heads below hold
     // theirs by reference for a different one — see `ExpressionStatement`.)
-    TSTypeAliasDeclaration(&'arena TSTypeAliasDeclaration<'arena>),
-    TSInterfaceDeclaration(&'arena TSInterfaceDeclaration<'arena>),
-    TSDeclareFunction(&'arena TSDeclareFunction<'arena>),
-    TSEnumDeclaration(&'arena TSEnumDeclaration<'arena>),
-    TSModuleDeclaration(&'arena TSModuleDeclaration<'arena>),
+    TSTypeAliasDeclaration(TypeAliasEdge<'arena>),
+    TSInterfaceDeclaration(InterfaceDeclEdge<'arena>),
+    TSDeclareFunction(DeclareFnEdge<'arena>),
+    TSEnumDeclaration(EnumDeclEdge<'arena>),
+    TSModuleDeclaration(ModuleDeclEdge<'arena>),
     ReturnStatement(ReturnStatement),
     BlockStatement(BlockStatement),
-    FunctionDeclaration(&'arena FunctionDeclaration<'arena>),
-    ClassDeclaration(&'arena ClassDeclaration<'arena>),
-    ExportNamedDeclaration(&'arena ExportNamedDeclaration<'arena>),
-    ExportDefaultDeclaration(&'arena ExportDefaultDeclaration<'arena>),
-    ExportAllDeclaration(&'arena ExportAllDeclaration<'arena>),
-    TSExportAssignment(&'arena TSExportAssignment),
+    FunctionDeclaration(FnDeclEdge<'arena>),
+    ClassDeclaration(ClassDeclEdge<'arena>),
+    ExportNamedDeclaration(ExportNamedEdge<'arena>),
+    ExportDefaultDeclaration(ExportDefaultEdge<'arena>),
+    ExportAllDeclaration(ExportAllEdge<'arena>),
+    TSExportAssignment(ExportAssignEdge<'arena>),
     TSNamespaceExportDeclaration(TSNamespaceExportDeclaration<'arena>),
-    ImportDeclaration(&'arena ImportDeclaration<'arena>),
-    TSImportEqualsDeclaration(&'arena TSImportEqualsDeclaration<'arena>),
+    ImportDeclaration(ImportDeclEdge<'arena>),
+    TSImportEqualsDeclaration(ImportEqualsEdge<'arena>),
     // Control flow statements
     IfStatement(IfStatement),
     ForStatement(ForStatement<'arena>),
@@ -102,17 +102,15 @@ impl<'arena> Statement<'arena> {
     }
 
     /// Debug-build check that a payload carrying its own span agrees with the header
-    /// (see [`Statement::from_variable_declaration`]).
+    /// (see [`Statement::from_variable_declaration`]). Only the inline payloads are checked:
+    /// an edge's payload is reached through a view, which a span read does not take.
+    // TODO: once the five edge-held payloads are wrapped from an id and a span, assert the two
+    // agree where the payload is pushed.
     #[cfg(debug_assertions)]
     fn debug_assert_payload_span(&self) {
         let payload = match &self.kind {
             StatementKind::VariableDeclaration(decl) => decl.span,
             StatementKind::BlockStatement(block) => block.span,
-            StatementKind::FunctionDeclaration(func) => func.span,
-            StatementKind::TSDeclareFunction(func) => func.span,
-            StatementKind::ClassDeclaration(class) => class.span,
-            StatementKind::TSInterfaceDeclaration(decl) => decl.span,
-            StatementKind::TSModuleDeclaration(decl) => decl.span,
             _ => return,
         };
         debug_assert_eq!(
@@ -128,7 +126,8 @@ impl<'arena> Statement<'arena> {
     /// because the wrapped form is built only through these constructors, and no span
     /// write reaches one of these seven after it is wrapped — a parser that rewrites a
     /// payload's span does so before wrapping it. A debug build asserts the agreement on
-    /// every [`Statement::span`] read.
+    /// every [`Statement::span`] read for the two held inline; the five held by an edge
+    /// take their header span from the payload in the one constructor that wraps each.
     #[inline]
     pub fn from_variable_declaration(decl: VariableDeclaration<'arena>) -> Self {
         Self {

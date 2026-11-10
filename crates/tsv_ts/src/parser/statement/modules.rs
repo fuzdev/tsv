@@ -44,7 +44,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// spellings cannot drift apart — which they had, tsv accepting `export declare
     /// global { }` while rejecting `export global { }`, a split neither oracle makes.
     fn require_exported_global_body(&self, declaration: &Statement<'arena>) -> Result<(), Error> {
-        if let StatementKind::TSModuleDeclaration(module) = &declaration.kind
+        if let StatementKind::TSModuleDeclaration(module) = declaration.kind
+            && let module = self.stores.view().module_decl(module)
             && module.global
             && module.body.is_none()
         {
