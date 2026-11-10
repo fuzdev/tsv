@@ -3,6 +3,7 @@
 use crate::ast::*;
 use crate::lexer::KeywordKind;
 use crate::lexer::TokenKind;
+use tsv_lang::store::ListMark;
 use tsv_lang::{Error, Span};
 
 use super::{Parser, RootEnd};
@@ -495,18 +496,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// no escapes and no line continuations, so `"use\u0020strict"` is an ordinary
     /// directive that does not turn strict mode on.
     ///
-    /// `prologue` is the directives this body has already collected — every statement
-    /// ahead of `stmt`, since the loop stops calling this at the first one that is not a
-    /// directive. Turning strict mode on re-grades them: a legacy string escape in an
-    /// *earlier* prologue literal is retroactively a syntax error, so
+    /// `prologue` marks the body's open statement list, whose frame holds the directives
+    /// this body has already collected — every statement ahead of `stmt`, since the loop
+    /// stops calling this at the first one that is not a directive, and `stmt` itself is
+    /// pushed only once this returns. Turning strict mode on re-grades them: a legacy string
+    /// escape in an *earlier* prologue literal is retroactively a syntax error, so
     /// `function f() { '\7'; 'use strict'; }` is rejected (ecma262
     /// sec-literals-string-literals: implementations must enforce the strict rules for
-    /// such literals). Only a sloppy body that turns strict walks the buffer, and a
+    /// such literals). Only a sloppy body that turns strict walks the frame, and a
     /// directive prologue is a handful of short literals.
     pub(super) fn note_directive(
         &mut self,
         stmt: &mut Statement<'arena>,
-        prologue: &[Statement<'arena>],
+        prologue: ListMark<StmtId>,
     ) -> Result<bool, Error> {
         let stmt_start = stmt.span.start;
         let StatementKind::ExpressionStatement(expr_stmt) = &mut stmt.kind else {
@@ -530,7 +532,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Already-strict code graded each earlier literal at consumption, so
             // only the false→true flip has anything to re-read.
             if !was_strict {
-                for earlier in prologue {
+                for &earlier in self.stores.stmt_list_scratch.frame(prologue) {
+                    let earlier = self.stores.stmts.get(earlier);
                     if let Some(err) = self.directive_legacy_escape_error(earlier) {
                         return Err(err);
                     }

@@ -18,17 +18,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
         self.advance()?;
 
-        let arena = self.arena;
-
         // Parse condition: (test)
         self.expect(&TokenKind::ParenOpen)?;
         let test = self.parse_expression()?.id();
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse consequent (can be any statement, including block)
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
-        let consequent = arena.alloc(self.parse_nested_statement()?);
+        let consequent = self.parse_nested_statement()?;
+        let consequent_end = consequent.span().end;
+        let consequent = self.push_stmt(consequent);
 
         // Check for optional else clause
         let (alternate, end) =
@@ -36,11 +34,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?; // consume 'else'
                 let alt = self.parse_nested_statement()?;
                 let alt_end = alt.span().end;
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
-                (Some(&*arena.alloc(alt)), alt_end)
+                (Some(self.push_stmt(alt)), alt_end)
             } else {
-                (None, consequent.span().end)
+                (None, consequent_end)
             };
 
         Ok(Statement {
@@ -381,10 +377,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse body
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
-        let body = self.arena.alloc(self.parse_nested_statement()?);
+        let body = self.parse_nested_statement()?;
         let end = body.span().end;
+        let body = self.push_stmt(body);
 
         Ok(Statement {
             span: Span::new(start as u32, end),
@@ -411,10 +406,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let right = self.parse_expression()?.id();
         self.expect(&TokenKind::ParenClose)?;
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
-        let body = self.arena.alloc(self.parse_nested_statement()?);
+        let body = self.parse_nested_statement()?;
         let end = body.span().end;
+        let body = self.push_stmt(body);
 
         Ok(Statement {
             span: Span::new(start as u32, end),
@@ -432,10 +426,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let right = self.parse_expression()?.id();
         self.expect(&TokenKind::ParenClose)?;
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
-        let body = self.arena.alloc(self.parse_nested_statement()?);
+        let body = self.parse_nested_statement()?;
         let end = body.span().end;
+        let body = self.push_stmt(body);
 
         Ok(Statement {
             span: Span::new(start as u32, end),
@@ -476,7 +469,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_paren_head_statement(
         &mut self,
         keyword: KeywordKind,
-    ) -> Result<(ExprId, &'arena Statement<'arena>, Span), Error> {
+    ) -> Result<(ExprId, StmtId, Span), Error> {
         let (start, _) = self.current_pos();
 
         debug_assert_eq!(self.current_kind(), &TokenKind::Keyword(keyword));
@@ -488,10 +481,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::ParenClose)?;
 
         // Parse body
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
-        let body = self.arena.alloc(self.parse_nested_statement()?);
+        let body = self.parse_nested_statement()?;
         let end = body.span().end;
+        let body = self.push_stmt(body);
 
         Ok((head, body, Span::new(start as u32, end)))
     }
@@ -508,9 +500,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Parse body
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
-        let body = self.arena.alloc(self.parse_nested_statement()?);
+        let body = self.parse_nested_statement()?;
+        let body = self.push_stmt(body);
 
         // Expect 'while'
         if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::While)) {
@@ -587,7 +578,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse switch case: `case test: consequent` or `default: consequent`
-    fn parse_switch_case(&mut self) -> Result<SwitchCase<'arena>, Error> {
+    fn parse_switch_case(&mut self) -> Result<SwitchCase, Error> {
         let (start, _) = self.current_pos();
 
         // Check for 'case' or 'default'
@@ -608,8 +599,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let colon_end = self.prev_token_end();
 
         // Parse consequent statements until next case/default or closing brace
-        let consequent = self.statement_list(1, |p, frame| {
-            let mut consequent = p.bvec();
+        let (consequent, end) = self.statement_list(1, |p, frame| {
+            let mark = p.stores.stmt_list_scratch.mark();
+            let mut last_end = colon_end;
             while !matches!(
                 p.current_kind(),
                 TokenKind::Keyword(KeywordKind::Case)
@@ -617,10 +609,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     | TokenKind::BraceClose
                     | TokenKind::Eof
             ) {
-                consequent.push(p.parse_statement()?);
+                let stmt = p.parse_statement()?;
+                last_end = stmt.span().end_usize();
+                let id = p.push_stmt(stmt);
+                p.stores.stmt_list_scratch.push(id);
                 frame.next(p);
             }
-            Ok(consequent)
+            Ok((p.flush_stmt_list(mark), last_end))
         })?;
         // The next clause's test stands past this clause's statements, whose `<` regions
         // do not reach it. A clause with NO statement ends none: only a `:` and a keyword
@@ -631,13 +626,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.reset_lt_region_for_statement();
         }
 
-        let end = consequent
-            .last()
-            .map_or(colon_end, |s| s.span().end_usize());
-
         Ok(SwitchCase {
             test,
-            consequent: consequent.into_bump_slice(),
+            consequent,
             span: Span::new(start as u32, end as u32),
         })
     }
@@ -942,10 +933,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             ));
         }
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Statement<'_>>(1);
-        let body = self.arena.alloc(body_stmt);
-        let end = body.span().end;
+        let end = body_stmt.span().end;
+        let body = self.push_stmt(body_stmt);
 
         Ok(Statement {
             span: Span::new(start as u32, end),

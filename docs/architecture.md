@@ -356,7 +356,7 @@ The `doc` module implements a declarative document builder inspired by prettier'
 
 ### Core Types (Arena-Based)
 
-Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is arena- and store-allocated — `Expression` nodes sit in per-document stores indexed by `ExprId`, the other families in the bump arena behind `&'arena` references — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
+Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is arena- and store-allocated — `Expression` and `Statement` nodes sit in per-document stores indexed by `ExprId` and `StmtId`, the other families in the bump arena behind `&'arena` references — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
 
 ```rust
 pub enum DocNode {
@@ -978,23 +978,26 @@ tied to the program lifetime. Recursive children are `&'arena T<'arena>` (not
 strings are `&'arena str`, so a whole parse is one bump-allocated graph freed
 wholesale when the arena drops, with no per-node `Drop`.
 
-**`Expression` nodes are the exception: they live in `AstStores`** (`ast/stores.rs`), one
-per document, kept beside the tree in a `Parsed` and shared across a Svelte component's
+**`Expression` and `Statement` nodes are the exceptions: they live in `AstStores`**
+(`ast/stores.rs`), one per document, kept beside the tree in a `Parsed` and shared across a Svelte component's
 embedded islands. An edge to an expression is an `ExprId`, an index into the
 `Store<Expression>`; a child list is a `Run` over a store of ids (`Run<ExprId>`: call and
 `new` arguments, sequence and template expressions; `Run<Option<ExprId>>`: array and
 array-pattern elements) or a value run over the expression store itself (`Run<Expr>`:
-parameter lists). A reader reaches them through an `AstView`, one word holding a
+parameter lists). A statement edge is a `StmtId` into the `Store<Statement>`, and every
+statement list (a program's, a block's, a `case`'s, a static block's, a namespace's body) a
+`Run<StmtId>`. A reader reaches them through an `AstView`, one word holding a
 reference to the stores; a store row, once pushed, is never edited or truncated, so a parser
 that replaces a node (a cover-grammar conversion, an annotated binding pattern) appends the
-new row and the old one is orphaned. `Statement`, `TSType` and the boxed expression payloads
-(`ArrowFunctionExpression` and its fellows) remain arena nodes. The rest of this section
-describes the arena-held layout the expression stores were built to keep.
+new row and the old one is orphaned. `TSType` and the boxed expression and statement
+payloads (`ArrowFunctionExpression`, `FunctionDeclaration` and their fellows) remain arena
+nodes. The rest of this section describes the arena-held layout the stores were built to
+keep.
 
 
 ```rust
 pub struct Program<'arena> {
-    pub body: &'arena [Statement<'arena>],
+    pub body: Run<StmtId>, // the statement store's ids
     pub comments: &'arena [Comment], // arena-gathered; not the per-node target
     pub span: Span,
     // no interner / symbol table — identifier names are span-identity, recovered
@@ -1008,7 +1011,7 @@ pub struct Statement<'arena> {
 
 pub enum StatementKind<'arena> {
     VariableDeclaration(VariableDeclaration<'arena>), // small → inline by value
-    IfStatement(IfStatement<'arena>), // test: ExprId; consequent: &'arena Statement
+    IfStatement(IfStatement), // test: ExprId; consequent: StmtId
     // …
 }
 ```
@@ -1031,7 +1034,7 @@ node *layout* favors traversal locality over byte size.)
 
 **The deliberate exceptions are two density rules, because an enum's width is the
 ELEMENT width of everything that holds one.** An `Expression` slot is paid on every element of every `&[Expression]`; a
-`Statement` slot on every element of every statement slice and every
+`Statement` slot on every row of the statement store and every
 `?`-propagation copy out of the parser. So a variant wide enough to set its enum's
 size on its own taxes the whole tree, while a pointer chase is paid only where that
 variant is actually spelled. Where such a variant is also **rare**, it holds its
@@ -1069,8 +1072,8 @@ payload by `&'arena` reference:
   `TSModuleDeclaration`, `TSExportAssignment`), and one level down `ForStatement`,
   `ForOfStatement`, `ForInStatement` and `TryStatement` hold their heads as
   references. Each of those heads is ≤0.2% of statements on real source and a classic
-  `for (;;)` is 0.05–0.22%. Rarity carries the enum from 544 B down to 96; the last
-  step to **72 B** is the second rule below, plus its one deliberate exception.
+  `for (;;)` is 0.05–0.22%. Rarity carries the enum from 544 B down to 96; the second rule below,
+  plus its one deliberate exception, takes it to **64 B**.
 
 All three widths are pinned by `const` asserts in `ast/mod.rs`, so a variant
 that widens any of these enums fails the test build rather than silently fattening every
@@ -1096,8 +1099,9 @@ whose own width was two such slots take it:
   `ObjectPatternProperty` 32 (its `RestElement` arm sets that one).
 - `VariableDeclarator` is **20 B**, not 160.
 - every `Expression`-holding `Statement` head takes it too, an `ExprId` costing 4 B where the
-  value would cost the node: `ExpressionStatement` holds its id alone, `IfStatement` /
-  `SwitchStatement` an id and a statement ref, `SwitchCase` (which keeps its own span) **32**,
+  value would cost the node: `ExpressionStatement` holds its id alone, `IfStatement`
+  its test's id beside its branches' statement ids, `SwitchStatement` an id and its case
+  slice, `SwitchCase` (which keeps its own span) **20**,
   and `ReturnStatement` / `ThrowStatement` an `Option<ExprId>` (their spans now on
   `Statement`'s header). `CatchClause` is the one that does *not*: its `param`
   is built by the parser as an owned value rather than through the spine, so a
@@ -1129,20 +1133,26 @@ whose own width was two such slots take it:
   which are rows of the expression store: their elements are built by the parser as
   values (a binding pattern, or an expression converted to one), so an id list would add
   a hop for no row saved.
+- `Statement`'s own edges and lists hold ids: an `if`'s branches, a loop's, a `with`'s or a
+  label's body and an `export`'s declaration are `StmtId` (`Option<StmtId>` where absent), and
+  the statement bodies `Run<StmtId>`. A statement parser returns its node by value and
+  the caller pushes it once it has read what it needs (a directive prologue marks a
+  statement before the push), so every statement is a row and an edge or list element
+  costs a 4 B id where it cost a pointer or the whole node.
 
 **The one exception to "rarity is the whole of the argument".** Once those heads
 narrowed, the only variants left setting `Statement`'s width were `ImportDeclaration`
 (6.8–11.7% of statements) and `ExportNamedDeclaration` (2.4–4.0%) — common, not rare.
 They are boxed anyway, because a boxed head's construction copies the same bytes into
 the arena that it would otherwise have moved into the enum, so the cost is one bump
-pointer and the return is 24 bytes off *every other* statement slot. That takes
-`Statement` to **72 B**; the next-widest inline variant is `TryStatement`, which is
-where the ladder stops. The trade is settled by measurement, not by rarity — the
+pointer and the return is 24 bytes off *every other* statement slot. That took
+`Statement` to 72 B, and the id edges took it to **64 B**; its widest inline variant is
+`LabeledStatement`, which is where the ladder stops. The trade is settled by measurement, not by rarity — the
 only place in the three enums where rarity is not the argument.
 
 `Statement` is a header over its variant, as `Expression` is —
-`struct Statement { span, kind: StatementKind }` (`StatementKind` 64 B, set by
-`TryStatement` at 56) — with the same span rule: a variant struct carries no span of
+`struct Statement { span, kind: StatementKind }` (`StatementKind` 56 B, set by
+`LabeledStatement` at 48) — with the same span rule: a variant struct carries no span of
 its own unless some node also holds that type outside a `Statement` (`VariableDeclaration`, `BlockStatement`,
 `FunctionDeclaration`, `TSDeclareFunction`, `ClassDeclaration`,
 `TSInterfaceDeclaration`, `TSModuleDeclaration`); those are wrapped only through the
@@ -1179,8 +1189,8 @@ them widens that margin too, as a side effect rather than the goal.
 **Rationale vs flat/indexed:** Flat/indexed layouts (index arrays, à la Zig's
 `MultiArrayList`) were benchmarked early in development and were slower —
 traversal replaced direct pointer/reference access with index lookups, and a
-formatter traverses constantly. That comparison is what the expression stores
-reopen: a store read is a load of the store's slice header and one indexed load, and the non-expression
+formatter traverses constantly. That comparison is what the stores
+reopen: a store read is a load of the store's slice header and one indexed load, and the other
 families keep direct `&'arena` access while eliminating per-node `malloc`/`free` and
 improving locality (nodes are bump-allocated in ≈parse order, which approximates
 traversal order). The `DocArena` (the doc-builder IR) is the index-arena precedent

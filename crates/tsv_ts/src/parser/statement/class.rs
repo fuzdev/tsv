@@ -4,8 +4,8 @@ use crate::ast::{
     Accessibility, BlockStatement, ClassBody, ClassDeclaration, ClassExpression, ClassMember,
     Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind, ExportNamedDeclaration,
     ExprId, Expression, ExpressionKind, FunctionExpression, Identifier, Literal, LiteralValue,
-    MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Statement, StatementKind,
-    StaticBlock, TSIndexSignature, TSInterfaceHeritage, TSTypeParameterDeclaration,
+    MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Run, Statement,
+    StatementKind, StaticBlock, TSIndexSignature, TSInterfaceHeritage, TSTypeParameterDeclaration,
     TSTypeParameterInstantiation,
 };
 use crate::lexer::{KeywordKind, TokenKind};
@@ -198,13 +198,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::mint::<ClassDeclaration<'_>>(1);
                 let class_decl = Statement::from_class_declaration(self.arena.alloc(class));
+                let class_decl = self.push_stmt(class_decl);
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::mint::<ExportNamedDeclaration<'_>>(1);
                 Ok(Statement {
                     span: Span::new(start as u32, end),
                     kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(
                         ExportNamedDeclaration {
-                            declaration: Some(self.alloc(class_decl)),
+                            declaration: Some(class_decl),
                             specifiers: &[],
                             source: None,
                             attributes: None,
@@ -1296,7 +1297,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Create empty body for abstract methods and overload signatures
             (
                 BlockStatement {
-                    body: &[],
+                    body: Run::EMPTY,
                     span: Span::new(body_end, body_end),
                 },
                 end,

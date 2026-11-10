@@ -11,7 +11,7 @@ use tsv_lang::Span;
 /// Emits an `IfStatement` node.
 pub(super) fn write_if_statement(
     w: &mut JsonWriter,
-    if_stmt: &ast::IfStatement<'_>,
+    if_stmt: &ast::IfStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -106,7 +106,7 @@ pub(super) fn write_for_of_statement(
 /// Emits a `WhileStatement` node.
 pub(super) fn write_while_statement(
     w: &mut JsonWriter,
-    while_stmt: &ast::WhileStatement<'_>,
+    while_stmt: &ast::WhileStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -121,7 +121,7 @@ pub(super) fn write_while_statement(
 /// Emits a `WithStatement` node. Field order: `object`, `body`.
 pub(super) fn write_with_statement(
     w: &mut JsonWriter,
-    with_stmt: &ast::WithStatement<'_>,
+    with_stmt: &ast::WithStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -136,7 +136,7 @@ pub(super) fn write_with_statement(
 /// Emits a `DoWhileStatement` node. Field order: `body`, `test`.
 pub(super) fn write_do_while_statement(
     w: &mut JsonWriter,
-    do_while: &ast::DoWhileStatement<'_>,
+    do_while: &ast::DoWhileStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -164,7 +164,7 @@ pub(super) fn write_switch_statement(
         node_header(w, "SwitchCase", case.span, ctx);
         w.raw(",\"consequent\":");
         write_array(w, ctx.view.stmt_list(case.consequent), |w, s| {
-            write_statement(w, ctx.view.stmt_slot(s), ctx);
+            write_statement(w, ctx.view.stmt(*s), ctx);
         });
         w.raw(",\"test\":");
         write_or_null(w, case.test.as_ref(), |w, t| {

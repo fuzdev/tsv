@@ -1,39 +1,16 @@
 //! How a tree's readers reach a stored node from the field that refers to it.
 //!
-//! One [`AstView`] serves every family of the tree the stores hold; today that is the
-//! expressions. An expression edge is an [`ExprId`], a list an id run or a value run over the
-//! stores, and every read of one goes through the view. The view is one word: a walk reaches a
-//! row through a load of the store's slice header and an indexed load, and holds one register
-//! for the view.
-//!
-//! Statement edges and lists are read through the view too, spelled with the aliases here
-//! while the tree still holds them as references and slices.
+//! One [`AstView`] serves every family of the tree the stores hold: the expressions and the
+//! statements. An edge is an id ([`ExprId`], [`StmtId`]), a list an id run or a value run over
+//! the stores, and every read of one goes through the view. The view is one word: a walk
+//! reaches a row through a load of the store's slice header and an indexed load, and holds one
+//! register for the view.
 
 use tsv_lang::store::Run;
 
-use super::{AstStores, Expr, ExprId, Expression, Parsed, Program, Statement};
+use super::{AstStores, Expr, ExprId, Expression, Parsed, Program, Statement, StmtId};
 
-/// One edge to a statement held in the tree: an `if`'s branches, a loop's, a `with`'s or a
-/// label's body, an `export`'s declaration.
-// TODO: `StmtId`.
-pub type StmtEdge<'a> = &'a Statement<'a>;
-
-/// A statement edge that may be absent.
-// TODO: `Option<StmtId>`.
-pub type OptStmtEdge<'a> = Option<StmtEdge<'a>>;
-
-/// A statement a list holds: read through [`AstView::stmt_slot`], as an edge is through
-/// [`AstView::stmt`].
-// TODO: `StmtId`.
-pub type StmtSlot<'a> = Statement<'a>;
-
-/// A statement list: a program's, a block's, a `case`'s, a static block's or a namespace's
-/// body.
-// TODO: `Run<StmtId>`.
-pub type StmtList<'a> = &'a [StmtSlot<'a>];
-
-/// The read access every consumer of the tree holds: resolves edges and the three kinds of
-/// list.
+/// The read access every consumer of the tree holds: resolves edges and lists.
 ///
 /// `Copy`, and bound to the stores of the document whose tree it reads.
 #[derive(Clone, Copy)]
@@ -76,28 +53,23 @@ impl<'a> AstView<'a> {
         self.stores.exprs.slice(run)
     }
 
-    /// The statement `edge` names.
+    /// The statement `id` names. A miss ends in the store's shared cold path.
     #[inline]
-    pub fn stmt(self, edge: StmtEdge<'a>) -> &'a Statement<'a> {
-        edge
+    pub fn stmt(self, id: StmtId) -> &'a Statement<'a> {
+        self.stores.stmts.get(id)
     }
 
-    /// The statement `edge` names, when it is present.
+    /// The statement `id` names, when it is present.
     #[inline]
-    pub fn opt_stmt(self, edge: OptStmtEdge<'a>) -> Option<&'a Statement<'a>> {
-        edge
+    pub fn opt_stmt(self, id: Option<StmtId>) -> Option<&'a Statement<'a>> {
+        id.map(|id| self.stmt(id))
     }
 
-    /// The elements of `list`, each resolved through [`Self::stmt_slot`].
+    /// The ids of `list`: a program's, a block's, a `case`'s, a static block's or a
+    /// namespace's body.
     #[inline]
-    pub fn stmt_list(self, list: StmtList<'a>) -> &'a [StmtSlot<'a>] {
-        list
-    }
-
-    /// The statement `slot` holds.
-    #[inline]
-    pub fn stmt_slot(self, slot: &'a StmtSlot<'a>) -> &'a Statement<'a> {
-        slot
+    pub fn stmt_list(self, list: Run<StmtId>) -> &'a [StmtId] {
+        self.stores.stmt_lists.slice(list)
     }
 }
 

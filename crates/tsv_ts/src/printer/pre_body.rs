@@ -177,7 +177,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         sig_end: u32,
-        body: &ast::BlockStatement<'_>,
+        body: &ast::BlockStatement,
     ) {
         let (pre_body, frozen) = self.build_declaration_pre_body_doc(sig_end, body.span);
         parts.push(pre_body);

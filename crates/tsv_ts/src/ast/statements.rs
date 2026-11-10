@@ -8,10 +8,10 @@ use tsv_lang::Span;
 
 use super::{
     ClassDeclaration, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration, Expr,
-    ExprId, Expression, Identifier, ImportDeclaration, OptStmtEdge, Run, StmtEdge, StmtList,
-    TSDeclareFunction, TSEnumDeclaration, TSExportAssignment, TSImportEqualsDeclaration,
-    TSInterfaceDeclaration, TSModuleDeclaration, TSNamespaceExportDeclaration,
-    TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration,
+    ExprId, Expression, Identifier, ImportDeclaration, Run, StmtId, TSDeclareFunction,
+    TSEnumDeclaration, TSExportAssignment, TSImportEqualsDeclaration, TSInterfaceDeclaration,
+    TSModuleDeclaration, TSNamespaceExportDeclaration, TSTypeAliasDeclaration, TSTypeAnnotation,
+    TSTypeParameterDeclaration,
 };
 
 /// Statement node: the span every variant shares, beside the variant itself.
@@ -33,8 +33,8 @@ pub enum StatementKind<'arena> {
     VariableDeclaration(VariableDeclaration<'arena>),
     // Arena-boxed, unlike every inline variant here: these are the widest
     // declaration heads, and their width would otherwise be paid on every
-    // `Statement` SLOT — every element of every `&[Statement]` body and every
-    // `?`-propagation — not just on the declaration that needs it.
+    // `Statement` ROW — every statement in the store and every `?`-propagation —
+    // not just on the declaration that needs it.
     //
     // Most are boxed because they are RARE, so the allocation is free: over four
     // app corpora `TSDeclareFunction`, `ExportAllDeclaration`,
@@ -49,11 +49,12 @@ pub enum StatementKind<'arena> {
     // not because they are rare. Rarity is what makes boxing free, and it is not
     // the only reason to box — the struct is copied into the arena instead of into
     // the enum, so the copy volume is unchanged and the cost is one bump pointer,
-    // while all of the file's other statement slots get 24 bytes narrower. With
-    // both inline a `Statement` is 96 bytes; boxed it is 72 — the span header over a
-    // 64-byte `StatementKind` — which is what the `size_of` asserts in this module's
-    // parent pin. The next-widest inline variant is `TryStatement` at 56, so the
-    // ladder stops here.
+    // while all of the file's other statement rows get narrower. Boxed, a `Statement`
+    // is 64 bytes — the span header over a 56-byte `StatementKind` — which is what the
+    // `size_of` asserts in this module's parent pin. The widest inline variant is
+    // `LabeledStatement` at 48 (its inline `Identifier` label beside the body's id),
+    // ahead of `TryStatement` and the `break` / `continue` labels at 40, so the ladder
+    // stops here.
     //
     // (The loop and `try` heads below hold their own heads by reference for the
     // same reason, one level down; the `Expression`-holding heads below hold
@@ -64,7 +65,7 @@ pub enum StatementKind<'arena> {
     TSEnumDeclaration(&'arena TSEnumDeclaration<'arena>),
     TSModuleDeclaration(&'arena TSModuleDeclaration<'arena>),
     ReturnStatement(ReturnStatement),
-    BlockStatement(BlockStatement<'arena>),
+    BlockStatement(BlockStatement),
     FunctionDeclaration(&'arena FunctionDeclaration<'arena>),
     ClassDeclaration(&'arena ClassDeclaration<'arena>),
     ExportNamedDeclaration(&'arena ExportNamedDeclaration<'arena>),
@@ -75,13 +76,13 @@ pub enum StatementKind<'arena> {
     ImportDeclaration(&'arena ImportDeclaration<'arena>),
     TSImportEqualsDeclaration(&'arena TSImportEqualsDeclaration<'arena>),
     // Control flow statements
-    IfStatement(IfStatement<'arena>),
+    IfStatement(IfStatement),
     ForStatement(ForStatement<'arena>),
     ForInStatement(ForInStatement<'arena>),
     ForOfStatement(ForOfStatement<'arena>),
-    WhileStatement(WhileStatement<'arena>),
-    DoWhileStatement(DoWhileStatement<'arena>),
-    WithStatement(WithStatement<'arena>),
+    WhileStatement(WhileStatement),
+    DoWhileStatement(DoWhileStatement),
+    WithStatement(WithStatement),
     SwitchStatement(SwitchStatement<'arena>),
     TryStatement(TryStatement<'arena>),
     ThrowStatement(ThrowStatement),
@@ -138,7 +139,7 @@ impl<'arena> Statement<'arena> {
 
     /// Wrap a [`BlockStatement`] (see [`Statement::from_variable_declaration`]).
     #[inline]
-    pub fn from_block_statement(block: BlockStatement<'arena>) -> Self {
+    pub fn from_block_statement(block: BlockStatement) -> Self {
         Self {
             span: block.span,
             kind: StatementKind::BlockStatement(block),
@@ -215,8 +216,8 @@ pub struct ExpressionStatement {
 /// - If/else bodies (future)
 /// - Loop bodies (future)
 #[derive(Debug, Clone)]
-pub struct BlockStatement<'arena> {
-    pub body: StmtList<'arena>,
+pub struct BlockStatement {
+    pub body: Run<StmtId>,
     pub span: Span,
 }
 
@@ -234,19 +235,19 @@ pub struct ReturnStatement {
 
 /// If statement: `if (test) consequent` or `if (test) consequent else alternate`
 #[derive(Debug, Clone)]
-pub struct IfStatement<'arena> {
+pub struct IfStatement {
     pub test: ExprId,
-    pub consequent: StmtEdge<'arena>,
-    pub alternate: OptStmtEdge<'arena>,
+    pub consequent: StmtId,
+    pub alternate: Option<StmtId>,
 }
 
 /// For statement: `for (init; test; update) body`
 ///
 /// The three head slots are ids, not inline values. `Statement` is a
-/// by-value enum stored inline in `&'arena [Statement]`, so every variant pays its
-/// widest sibling's size on **every** element of **every** statement slice and on
-/// every `?`-propagation copy out of the parser — while a pointer chase is paid only
-/// where the variant is actually spelled. `for (;;)` is 0.05–0.22% of statements in
+/// by-value enum stored inline as a row of the statement store, so every variant pays its
+/// widest sibling's size on **every** statement row and on every `?`-propagation copy out
+/// of the parser — while a pointer chase is paid only where the variant is actually
+/// spelled. `for (;;)` is 0.05–0.22% of statements in
 /// real source, and inlining `ForInit` + two `Option<Expression>` here set the whole
 /// enum's size on its own. The same trade is taken by `ForInStatement`,
 /// `ForOfStatement` and `TryStatement`; the frequent declaration variants above keep
@@ -259,7 +260,7 @@ pub struct ForStatement<'arena> {
     pub test: Option<ExprId>,
     /// Update expression (or None)
     pub update: Option<ExprId>,
-    pub body: StmtEdge<'arena>,
+    pub body: StmtId,
 }
 
 /// For statement initialization - either a variable declaration or expression
@@ -280,7 +281,7 @@ pub struct ForInStatement<'arena> {
     /// Left side: variable declaration or expression pattern
     pub left: &'arena ForInOfLeft<'arena>,
     pub right: ExprId,
-    pub body: StmtEdge<'arena>,
+    pub body: StmtId,
 }
 
 /// For-of statement: `for (left of right) body`
@@ -293,7 +294,7 @@ pub struct ForOfStatement<'arena> {
     pub right: ExprId,
     /// Whether this is `for await (... of ...)`
     pub r#await: bool,
-    pub body: StmtEdge<'arena>,
+    pub body: StmtId,
 }
 
 /// Left side of for-in/for-of: either a variable declaration or expression pattern
@@ -308,49 +309,49 @@ pub enum ForInOfLeft<'arena> {
 
 /// While statement: `while (test) body`
 #[derive(Debug, Clone)]
-pub struct WhileStatement<'arena> {
+pub struct WhileStatement {
     pub test: ExprId,
-    pub body: StmtEdge<'arena>,
+    pub body: StmtId,
 }
 
 /// Do-while statement: `do body while (test)`
 #[derive(Debug, Clone)]
-pub struct DoWhileStatement<'arena> {
-    pub body: StmtEdge<'arena>,
+pub struct DoWhileStatement {
+    pub body: StmtId,
     pub test: ExprId,
 }
 
 /// With statement: `with (object) body` — sloppy-mode Script code only.
 #[derive(Debug, Clone)]
-pub struct WithStatement<'arena> {
+pub struct WithStatement {
     pub object: ExprId,
-    pub body: StmtEdge<'arena>,
+    pub body: StmtId,
 }
 
 /// Switch statement: `switch (discriminant) { cases }`
 #[derive(Debug, Clone)]
 pub struct SwitchStatement<'arena> {
     pub discriminant: ExprId,
-    pub cases: &'arena [SwitchCase<'arena>],
+    pub cases: &'arena [SwitchCase],
 }
 
 /// Switch case: `case test: consequent` or `default: consequent`
 #[derive(Debug, Clone)]
-pub struct SwitchCase<'arena> {
+pub struct SwitchCase {
     /// Test expression, or None for `default:`
     pub test: Option<ExprId>,
-    pub consequent: StmtList<'arena>,
+    pub consequent: Run<StmtId>,
     pub span: Span,
 }
 
 /// Try statement: `try { block } catch (param) { handler } finally { finalizer }`
 #[derive(Debug, Clone)]
 pub struct TryStatement<'arena> {
-    pub block: BlockStatement<'arena>,
+    pub block: BlockStatement,
     /// Arena reference rather than an inline `CatchClause` (104 B on its own) for the
     /// density reason on `ForStatement`.
     pub handler: Option<&'arena CatchClause<'arena>>,
-    pub finalizer: Option<BlockStatement<'arena>>,
+    pub finalizer: Option<BlockStatement>,
 }
 
 /// Catch clause: `catch (param) { body }`
@@ -363,7 +364,7 @@ pub struct CatchClause<'arena> {
     /// allocation instead of removing a copy — and a `CatchClause` is reached only
     /// through `Option<&'arena CatchClause>`, so its width sets nothing.
     pub param: Option<Expression<'arena>>,
-    pub body: BlockStatement<'arena>,
+    pub body: BlockStatement,
     pub span: Span,
 }
 
@@ -389,7 +390,7 @@ pub struct ContinueStatement<'arena> {
 #[derive(Debug, Clone)]
 pub struct LabeledStatement<'arena> {
     pub label: Identifier<'arena>,
-    pub body: StmtEdge<'arena>,
+    pub body: StmtId,
 }
 
 /// Empty statement: `;`
@@ -420,7 +421,7 @@ pub struct FunctionDeclaration<'arena> {
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
     pub return_type: Option<TSTypeAnnotation<'arena>>,
     /// Function body (block statement with statements)
-    pub body: BlockStatement<'arena>,
+    pub body: BlockStatement,
     /// Whether this is a generator function (`function*`)
     pub generator: bool,
     /// Whether this is an async function (`async function`)

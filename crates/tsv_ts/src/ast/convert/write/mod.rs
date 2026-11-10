@@ -189,7 +189,7 @@ fn write_program(w: &mut JsonWriter, program: &ast::Program<'_>, ctx: &Ctx<'_>) 
     node_header(w, "Program", program.span, ctx);
     w.raw(",\"body\":");
     write_body_array(w, ctx.view.stmt_list(program.body), ctx, |w, s| {
-        write_statement(w, ctx.view.stmt_slot(s), ctx);
+        write_statement(w, ctx.view.stmt(*s), ctx);
     });
     w.raw(",\"sourceType\":");
     w.token(program.goal.source_type());
@@ -1129,8 +1129,7 @@ mod tests {
         let [statement] = view.stmt_list(program.body) else {
             panic!("one statement expected");
         };
-        let ast::StatementKind::ExpressionStatement(statement) = &view.stmt_slot(statement).kind
-        else {
+        let ast::StatementKind::ExpressionStatement(statement) = &view.stmt(*statement).kind else {
             panic!("an expression statement expected");
         };
         let ast::ExpressionKind::Identifier(id) = &view.expr(statement.expression).kind else {

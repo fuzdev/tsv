@@ -522,8 +522,9 @@ pub(crate) struct Parser<'a, 'arena> {
     /// local (`let arena = self.arena;`) only when several allocations in one method
     /// share it.
     arena: &'arena Bump,
-    /// The document's expression stores, shared by every parser of the document. `'a` is
-    /// the source's lifetime, which the `&mut` takes as covariantly as the `&str`.
+    /// The document's expression and statement stores, shared by every parser of the
+    /// document. `'a` is the source's lifetime, which the `&mut` takes as covariantly as the
+    /// `&str`.
     stores: &'a mut AstStores<'arena>,
     source: &'a str,
     lexer: Lexer<'a>,
@@ -929,6 +930,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .flush_move(mark, &mut self.stores.exprs);
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<Expression<'arena>>(run.len());
+        run
+    }
+
+    /// Push a finished statement and mint its id: where a statement becomes a row, at a
+    /// single edge or as a list element. Statements return by value, so the caller pushes
+    /// once it has read what it needs of the value.
+    #[inline]
+    pub(in crate::parser) fn push_stmt(&mut self, stmt: Statement<'arena>) -> StmtId {
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<Statement<'arena>>(1);
+        self.stores.stmts.push(stmt)
+    }
+
+    /// Flush the statement id list opened at `mark` (`ListBuf::flush_copy`).
+    #[inline]
+    pub(in crate::parser) fn flush_stmt_list(&mut self, mark: ListMark<StmtId>) -> Run<StmtId> {
+        let run = self
+            .stores
+            .stmt_list_scratch
+            .flush_copy(mark, &mut self.stores.stmt_lists);
+        #[cfg(feature = "_internal_ast_census")]
+        tsv_lang::ast_census_probe::mint::<StmtId>(run.len());
         run
     }
 
@@ -3983,17 +4006,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // out so a re-used parser starts from the goal's own seed again.
         let body = self.with_strict_scope(|p| {
             p.statement_list(1, |p, frame| {
-                let mut body = p.bvec();
+                let mark = p.stores.stmt_list_scratch.mark();
                 let mut in_prologue = true;
                 while p.current.kind != TokenKind::Eof {
                     let mut item = p.parse_module_item(statement::ModuleItemContext::TopLevel)?;
                     frame.next(p);
                     if in_prologue {
-                        in_prologue = p.note_directive(&mut item, &body)?;
+                        in_prologue = p.note_directive(&mut item, mark)?;
                     }
-                    body.push(item);
+                    let id = p.push_stmt(item);
+                    p.stores.stmt_list_scratch.push(id);
                 }
-                Ok(body)
+                Ok(p.flush_stmt_list(mark))
             })
         })?;
 
@@ -4001,7 +4025,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (_, end) = self.current_pos();
 
         Ok(Program {
-            body: body.into_bump_slice(),
+            body,
             comments: self.take_comments(),
             span: Span::new(start as u32, end as u32),
             goal: self.goal,

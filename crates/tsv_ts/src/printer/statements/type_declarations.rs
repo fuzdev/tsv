@@ -1726,7 +1726,7 @@ impl<'a> Printer<'a> {
                     // conformance_prettier_ts_comments.md §Comment relocation (Namespace/module
                     // body `{`).
                     let body = self.view.stmt_list(block.body);
-                    let first_stmt_start = self.view.stmt_slot(&body[0]).span().start;
+                    let first_stmt_start = self.view.stmt(body[0]).span().start;
                     let (brace_line_prefix, delimiter_pull_pos) =
                         self.delimiter_line_comment_prefix(block.span.start, first_stmt_start);
 

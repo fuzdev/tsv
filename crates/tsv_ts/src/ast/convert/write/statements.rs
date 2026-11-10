@@ -307,7 +307,7 @@ pub(super) fn write_module_declaration(
                 node_header(w, "TSModuleBlock", block.span, ctx);
                 w.raw(",\"body\":");
                 write_array(w, ctx.view.stmt_list(block.body), |w, s| {
-                    write_statement(w, ctx.view.stmt_slot(s), ctx);
+                    write_statement(w, ctx.view.stmt(*s), ctx);
                 });
                 close_node(w, "TSModuleBlock", block.span, ctx);
             }
@@ -325,13 +325,13 @@ pub(super) fn write_module_declaration(
 /// Emits a `BlockStatement` node.
 pub(super) fn write_block_statement(
     w: &mut JsonWriter,
-    block: &ast::BlockStatement<'_>,
+    block: &ast::BlockStatement,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "BlockStatement", block.span, ctx);
     w.raw(",\"body\":");
     super::write_body_array(w, ctx.view.stmt_list(block.body), ctx, |w, s| {
-        write_statement(w, ctx.view.stmt_slot(s), ctx);
+        write_statement(w, ctx.view.stmt(*s), ctx);
     });
     close_node(w, "BlockStatement", block.span, ctx);
 }

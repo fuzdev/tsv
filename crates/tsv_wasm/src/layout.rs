@@ -39,7 +39,7 @@ const _: () = assert!(size_of::<Property>() == 20);
 const _: () = assert!(size_of::<ObjectProperty>() == 20);
 const _: () = assert!(size_of::<ObjectPatternProperty<'static>>() == 28);
 const _: () = assert!(size_of::<VariableDeclarator>() == 20);
-const _: () = assert!(size_of::<SwitchCase<'static>>() == 20);
+const _: () = assert!(size_of::<SwitchCase>() == 20);
 // The ladders' return currency: an id word plus the pointer-sized `Error` is two words. See
 // the native pins in `tsv_ts`'s `parser/expression.rs` and `parser/types.rs`.
 const _: () = assert!(size_of::<Result<IdRet<Expr>, Error>>() == 2 * size_of::<usize>());

@@ -7,11 +7,12 @@
 //!
 //! ## Arena allocation
 //!
-//! AST nodes are allocated in a per-parse [`bumpalo::Bump`] supplied by the
-//! caller. Recursive children are `&'arena T<'arena>` (not `Box`), child
-//! collections are `&'arena [T<'arena>]` (not `Vec`), and decoded strings are
-//! `&'arena str` (not `String`) — so a whole parse is one bump-allocated graph,
-//! freed wholesale when the `Bump` drops, with no per-node `Drop`. The rare
+//! Expressions and statements are rows of per-document stores ([`AstStores`]), named by
+//! id and read through an [`AstView`]. The rest of the tree is allocated in a per-parse
+//! [`bumpalo::Bump`] supplied by the caller: its recursive children are `&'arena T<'arena>`
+//! (not `Box`), its child collections `&'arena [T<'arena>]` (not `Vec`), and decoded strings
+//! are `&'arena str` (not `String`) — freed wholesale when the `Bump` drops, with no
+//! per-node `Drop`. The rare
 //! escaped identifier name is one such `&'arena str` ([`IdentName::escaped`]),
 //! read directly at every consumer — the AST holds no interner and needs no
 //! interner lifetime.
@@ -34,7 +35,7 @@ pub(crate) use stores::ScratchMarks;
 pub use stores::{AstStores, Expr, ExprId, Parsed, Stmt, StmtId, with_stores};
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
-pub use view::{AstView, OptStmtEdge, ParsedRef, StmtEdge, StmtList, StmtSlot};
+pub use view::{AstView, ParsedRef};
 
 //
 // Re-exports from submodules
@@ -132,9 +133,9 @@ pub use expressions::{
 // The LIST-ELEMENT containers whose own width was inline `Expression`s —
 // `Property` (an object literal's `key: value`, and a destructuring pattern's),
 // `VariableDeclarator`, and every `Expression`-holding `Statement` head
-// (`ExpressionStatement` 16 B, `IfStatement` / `SwitchStatement` 24, `SwitchCase` 32,
-// `WhileStatement` / `DoWhileStatement` / `WithStatement` 16,
-// `ReturnStatement` / `ThrowStatement` 8)
+// (`ExpressionStatement` 8 B, `IfStatement` 12, `SwitchStatement` 24, `SwitchCase` 20,
+// `WhileStatement` / `DoWhileStatement` / `WithStatement` 8,
+// `ReturnStatement` / `ThrowStatement` 4)
 // — instead hold those slots by id, which is not the same trade: the parser's
 // expression spine already returns a pushed row's id, so an inline slot would be a COPY
 // OUT of the store rather than a place the node lives. Naming the slots by id removes
@@ -146,7 +147,10 @@ pub use expressions::{
 // nothing. The expression LISTS whose elements come off the spine hold ids — call and
 // `new` arguments and sequence and template expressions (`Run<ExprId>`), array-literal
 // and array-pattern elements (`Run<Option<ExprId>>`) — and the parameter lists are value
-// runs over the expression store itself (`Run<Expr>`), `CatchClause`'s case.
+// runs over the expression store itself (`Run<Expr>`), `CatchClause`'s case. The
+// statement lists — program, block, `case`, static-block and namespace bodies — hold ids
+// too (`Run<StmtId>`), as the single statement edges do (`StmtId`): every statement is a
+// row of the statement store.
 //
 // `Expression` and `Statement` are each a header over their variant (`span` +
 // `ExpressionKind` / `StatementKind`), so a span read is a field load rather than a
@@ -167,9 +171,9 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind<'
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Expression<'static>>>() == size_of::<Expression<'static>>());
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Statement<'static>>() == 72);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Statement<'static>>() == 64);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<StatementKind<'static>>() == 64);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<StatementKind<'static>>() == 56);
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Statement<'static>>>() == size_of::<Statement<'static>>());
 #[cfg(all(test, target_pointer_width = "64"))]
@@ -182,7 +186,7 @@ const _: () =
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<VariableDeclarator>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<SwitchCase<'static>>() == 32);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<SwitchCase>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType<'static>>() == 80);
 
@@ -198,7 +202,7 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType<'static>>
 /// satisfying bumpalo's no-`Drop` rule).
 #[derive(Debug, Clone)]
 pub struct Program<'arena> {
-    pub body: StmtList<'arena>,
+    pub body: Run<StmtId>,
     pub comments: &'arena [Comment],
     pub span: Span,
     /// The goal symbol this program was parsed against. Drives the public AST's

@@ -252,7 +252,7 @@ impl<'a> Printer<'a> {
     /// whole statement is grouped.
     fn build_if_head_and_consequent(
         &self,
-        stmt: &ast::IfStatement<'_>,
+        stmt: &ast::IfStatement,
         span: Span,
         ctx: StatementContext,
     ) -> DocBuf {
@@ -330,7 +330,7 @@ impl<'a> Printer<'a> {
     /// group either — [`Self::build_else_adjust_clause`] carries its own.
     pub(in crate::printer::statements) fn build_if_statement_doc(
         &self,
-        stmt: &ast::IfStatement<'_>,
+        stmt: &ast::IfStatement,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {

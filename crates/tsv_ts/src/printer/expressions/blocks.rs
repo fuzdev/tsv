@@ -510,7 +510,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn orphan_semi_slot(
         &self,
         stmt: &ast::Statement<'_>,
-        slots: &[ast::StmtSlot<'_>],
+        slots: &[ast::StmtId],
         index: usize,
         list_end: u32,
         tail_target: Option<u32>,
@@ -532,7 +532,7 @@ impl<'a> Printer<'a> {
         }
         let next_start = slots
             .get(index + 1)
-            .map_or(list_end, |s| self.view.stmt_slot(s).span().start);
+            .map_or(list_end, |s| self.view.stmt(*s).span().start);
         // A comment hugging the next printed statement's start leads it
         // (`a(); ; /* c */ b();`) — or, past the last one, the construct at `tail_target` (a
         // consequent's next `case` label). The orphan run must stop at the claim split so
@@ -590,7 +590,7 @@ impl<'a> Printer<'a> {
     /// directive-prologue eligible — see [`Printer::needs_avoid_directive_parens`].
     pub(in crate::printer) fn build_block_statement_doc(
         &self,
-        block: &ast::BlockStatement<'_>,
+        block: &ast::BlockStatement,
     ) -> DocId {
         self.build_block_statement_doc_core(block, false, true)
     }
@@ -600,7 +600,7 @@ impl<'a> Printer<'a> {
     /// Used in if/else contexts where empty blocks should not stay on one line.
     pub(in crate::printer) fn build_block_statement_expand_empty_doc(
         &self,
-        block: &ast::BlockStatement<'_>,
+        block: &ast::BlockStatement,
     ) -> DocId {
         self.build_block_statement_doc_core(block, true, true)
     }
@@ -614,7 +614,7 @@ impl<'a> Printer<'a> {
     /// see [`Printer::needs_avoid_directive_parens`].
     pub(in crate::printer) fn build_static_block_body_doc(
         &self,
-        block: &ast::BlockStatement<'_>,
+        block: &ast::BlockStatement,
     ) -> DocId {
         self.build_block_statement_doc_core(block, false, false)
     }
@@ -626,7 +626,7 @@ impl<'a> Printer<'a> {
     /// contained expression statements — see [`Printer::build_statement_doc`].
     fn build_block_statement_doc_core(
         &self,
-        block: &ast::BlockStatement<'_>,
+        block: &ast::BlockStatement,
         expand_empty: bool,
         in_program_or_block: bool,
     ) -> DocId {
@@ -644,7 +644,7 @@ impl<'a> Printer<'a> {
 
     fn build_block_statement_doc_inner(
         &self,
-        block: &ast::BlockStatement<'_>,
+        block: &ast::BlockStatement,
         expand_empty: bool,
         in_program_or_block: bool,
     ) -> DocId {
@@ -655,7 +655,7 @@ impl<'a> Printer<'a> {
     /// ([`Printer::push_dangling_comment_run`]). Only the run itself: the caller supplies
     /// the break before it (and any hoisted leading content above it) and the one before
     /// `}`.
-    fn build_inner_comments_for_empty_block(&self, block: &ast::BlockStatement<'_>) -> DocBuf {
+    fn build_inner_comments_for_empty_block(&self, block: &ast::BlockStatement) -> DocBuf {
         let block_start = block.span.start + 1; // After '{'
         let block_end = block.span.end - 1; // Before '}'
         let mut comment_parts = DocBuf::new();
@@ -671,7 +671,7 @@ impl<'a> Printer<'a> {
     /// This is the unified implementation for block statement doc building.
     fn build_block_body_doc(
         &self,
-        block: &ast::BlockStatement<'_>,
+        block: &ast::BlockStatement,
         expand_empty: bool,
         in_program_or_block: bool,
     ) -> DocId {
@@ -708,7 +708,7 @@ impl<'a> Printer<'a> {
         // line when the body expands (divergence from prettier, which relocates it
         // to its own line as the body's leading comment).
         // See conformance_prettier_ts_comments.md §Comment relocation (Block body `{`).
-        let first_stmt_start = self.view.stmt_slot(&body[0]).span().start;
+        let first_stmt_start = self.view.stmt(body[0]).span().start;
         let (brace_line_prefix, delimiter_pull_pos) =
             self.delimiter_line_comment_prefix(block.span.start, first_stmt_start);
 
@@ -787,7 +787,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_statement_list_docs_into(
         &self,
         body_parts: &mut DocBuf,
-        body: &[ast::StmtSlot<'_>],
+        body: &[ast::StmtId],
         body_span: Span,
         has_leading: bool,
         delimiter_pull_pos: Option<u32>,
@@ -825,7 +825,7 @@ impl<'a> Printer<'a> {
         let body_has_comments = self.has_comments_on_page_between(body_start, body_end);
 
         for (i, stmt) in body.iter().enumerate() {
-            let stmt = self.view.stmt_slot(stmt);
+            let stmt = self.view.stmt(*stmt);
             let stmt_start = stmt.span().start;
             let is_first = i == 0;
 

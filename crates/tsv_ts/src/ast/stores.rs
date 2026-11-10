@@ -1,6 +1,5 @@
-//! The stores a parse's expressions live in, and the statement stores that nothing fills yet,
-//! beside the arena that holds the rest of the tree, and the per-thread parking of their
-//! capacity.
+//! The stores a parse's expressions and statements live in, beside the arena that holds the
+//! rest of the tree, and the per-thread parking of their capacity.
 //!
 //! [`AstStores`] is one document's: every parse of a document, embedded islands included,
 //! appends to the same one, so an id means the same row wherever in the document it is
@@ -84,9 +83,6 @@ pub struct AstStores<'arena> {
     pub(crate) expr_scratch: ListBuf<Expression<'arena>>,
     pub(crate) expr_list_scratch: ListBuf<ExprId>,
     pub(crate) expr_opt_scratch: ListBuf<Option<ExprId>>,
-    // TODO: the statement stores ride the stores' lifecycle (`new`, `park`, the scratch marks)
-    // but nothing pushes a row or reads one yet: statements are still arena nodes. The parser's
-    // statement construction fills them and the view's statement accessors read them.
     pub(crate) stmts: Store<Statement<'arena>>,
     pub(crate) stmt_lists: Store<StmtId>,
     pub(crate) stmt_list_scratch: ListBuf<StmtId>,

@@ -44,7 +44,7 @@ use crate::ast::{
     TSModuleDeclarationKind, TSModuleName, TSParameterProperty, TSType, TSTypeAnnotation,
     TSTypeParameterDeclaration, TSTypeParameterInstantiation, VariableDeclaration,
 };
-use crate::ast::{AstView, StmtList};
+use crate::ast::{AstView, Run, StmtId};
 use crate::ast::{
     ExportAllDeclaration, ImportAttribute, ImportExpression, LiteralValue, TSEnumDeclaration,
     TSImportEqualsDeclaration, TSModuleReference, VariableDeclarationKind,
@@ -266,7 +266,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         let outer_end = self.statement_end;
         let outer_open = std::mem::replace(&mut self.open, Tail::Closed);
         for statement in self.view.stmt_list(program.body) {
-            let statement = self.view.stmt_slot(statement);
+            let statement = self.view.stmt(*statement);
             if self.collects() {
                 self.module_syntax |= is_module_declaration(statement);
             }
@@ -558,7 +558,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     // Statements
     //
 
-    fn statement_list(&mut self, list: StmtList<'_>, function_body: bool) {
+    fn statement_list(&mut self, list: Run<StmtId>, function_body: bool) {
         let outer_marked = self.marked_end;
         if function_body {
             self.marked_end = None;
@@ -566,7 +566,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         let outer_end = self.statement_end;
         let outer_open = std::mem::replace(&mut self.open, Tail::Closed);
         for statement in self.view.stmt_list(list) {
-            let statement = self.view.stmt_slot(statement);
+            let statement = self.view.stmt(*statement);
             self.statement_end = Some(statement.span.end);
             self.statement(statement, statement.span, Position::List);
         }
@@ -885,7 +885,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
     }
 
-    fn block(&mut self, block: &BlockStatement<'_>) {
+    fn block(&mut self, block: &BlockStatement) {
         self.statement_list(block.body, false);
         self.mark(block.span.end);
     }
@@ -2006,12 +2006,12 @@ struct FunctionView<'n, 'a> {
     /// The parameter list's `(`; `None` for a bare arrow parameter (`x => x`).
     params_open: Option<u32>,
     return_type: Option<&'n TSTypeAnnotation<'a>>,
-    body: FunctionBody<'n, 'a>,
+    body: FunctionBody<'n>,
     arrow: bool,
 }
 
-enum FunctionBody<'n, 'a> {
-    Block(&'n BlockStatement<'a>),
+enum FunctionBody<'n> {
+    Block(&'n BlockStatement),
     Expression(&'n Expression<'n>),
 }
 
@@ -2183,7 +2183,7 @@ fn namespace_holds_value(view: AstView<'_>, decl: &TSModuleDeclaration<'_>) -> b
         Some(TSModuleDeclarationBody::TSModuleBlock(block)) => view
             .stmt_list(block.body)
             .iter()
-            .any(|statement| namespace_member_holds_value(view, view.stmt_slot(statement))),
+            .any(|statement| namespace_member_holds_value(view, view.stmt(*statement))),
     }
 }
 

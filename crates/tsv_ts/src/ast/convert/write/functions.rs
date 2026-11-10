@@ -63,7 +63,7 @@ pub(super) fn write_arrow_function_expression(
     close_node(w, "ArrowFunctionExpression", span, ctx);
 }
 
-fn write_arrow_body(w: &mut JsonWriter, body: &ast::ArrowFunctionBody<'_>, ctx: &Ctx<'_>) {
+fn write_arrow_body(w: &mut JsonWriter, body: &ast::ArrowFunctionBody, ctx: &Ctx<'_>) {
     match body {
         ast::ArrowFunctionBody::Expression(expr) => write_expression(w, ctx.view.expr(*expr), ctx),
         ast::ArrowFunctionBody::BlockStatement(block) => write_block_statement(w, block, ctx),

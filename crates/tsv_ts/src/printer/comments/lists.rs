@@ -548,7 +548,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn statement_claim_end(
         &self,
         stmt: &ast::Statement<'_>,
-        slots: &[ast::StmtSlot<'_>],
+        slots: &[ast::StmtId],
         index: usize,
         tail_target: Option<u32>,
     ) -> u32 {
@@ -566,7 +566,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn statement_claim_end_with(
         &self,
         stmt: &ast::Statement<'_>,
-        slots: &[ast::StmtSlot<'_>],
+        slots: &[ast::StmtId],
         index: usize,
         tail_target: Option<u32>,
         emitted_end: impl FnOnce() -> u32,
@@ -606,7 +606,7 @@ impl<'a> Printer<'a> {
     fn statement_gap_scan_start(
         &self,
         stmt: &ast::Statement<'_>,
-        slots: &[ast::StmtSlot<'_>],
+        slots: &[ast::StmtId],
         index: usize,
         emitted_end: impl FnOnce() -> u32,
     ) -> u32 {
@@ -731,7 +731,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         stmt: &ast::Statement<'_>,
-        slots: &[ast::StmtSlot<'_>],
+        slots: &[ast::StmtId],
         index: usize,
         list_end: u32,
         frozen: bool,

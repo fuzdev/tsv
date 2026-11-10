@@ -1037,13 +1037,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 ambient,
                 |p| {
                     p.statement_list(1, |p, frame| {
-                        let mut body = p.bvec();
+                        let mark = p.stores.stmt_list_scratch.mark();
                         while !matches!(p.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
                             let stmt = p.parse_module_item(ModuleItemContext::NamespaceBody)?;
                             frame.next(p);
-                            body.push(stmt);
+                            let id = p.push_stmt(stmt);
+                            p.stores.stmt_list_scratch.push(id);
                         }
-                        Ok(body)
+                        Ok(p.flush_stmt_list(mark))
                     })
                 },
             )
@@ -1057,7 +1058,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?; // consume '}'
 
         Ok(TSModuleDeclarationBody::TSModuleBlock(TSModuleBlock {
-            body: body.into_bump_slice(),
+            body,
             span: Span::new(block_start as u32, block_end as u32),
         }))
     }
