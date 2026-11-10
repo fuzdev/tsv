@@ -16,9 +16,9 @@
 //! - [`dead`]: a site that strands a node already placed. Logged like a mint, so a rewind
 //!   over the site undoes the claim (the node it stranded survives the abandoned parse).
 //! - The scratch counters behind [`list_delta`]: the running total of open list prefixes per
-//!   element type and its peak, which `ast_census_vec!`'s list wrapper feeds. Rows of a list
-//!   that never flushes (a rewind drops it, or a parse error unwinds past it) reach no store
-//!   and are not minted.
+//!   element type and its peak, which [`ListBuf`](crate::store::ListBuf) and
+//!   `ast_census_vec!`'s list wrapper feed. Rows of a list that never flushes (a rewind drops
+//!   it, or a parse error unwinds past it) reach no store and are not minted.
 //!
 //! A row's type name is whatever `type_name` prints: an element type stored by value
 //! (`tsv_ts::ast::expressions::Expression`), a ref list's element (`&…Expression`), an

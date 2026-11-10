@@ -46,9 +46,8 @@
 //!   property's key and value). Informational, inside `live`.
 //! - `scratch_peak`: the largest total of open list prefixes of this type at any moment,
 //!   maximum over files, and the same per source byte (summed per-file peaks over bytes).
-//!   Counted only for lists built in the arena (the census's `BumpVec`); a list built on a
-//!   store's scratch (`ListBuf`: the expression, statement and type id lists, the parameter
-//!   value runs) is not seen, so its rows read 0 here.
+//!   Counted for lists built in the arena (the census's `BumpVec`) and on a store's scratch
+//!   (`ListBuf`: the expression, statement and type id lists, the parameter value runs).
 //! - `wire` / `delta`: the wire's count of the node named like the row, when the wire has
 //!   one, and `live - wire`. Rows with no wire name (`Expression`, `Statement`, `TSType`,
 //!   `ObjectProperty`, the id lists) leave it blank, and a row whose wire name is shared by a
@@ -684,6 +683,16 @@ mod tests {
         // two properties pushed, then the inner literal's two on top of them: the third
         // property is pushed only after its value's list flushes
         assert_eq!(properties.scratch_peak_max_for_test(), 4);
+    }
+
+    /// A list built on a store's scratch counts the same way: the inner call's arguments sit
+    /// on top of the outer call's first.
+    #[test]
+    fn a_store_scratch_counts_the_outer_prefix_under_a_nested_list() {
+        let census = census_of("f(a, g(b, c));", ParserType::TypeScript);
+        let ids = row(&census, "tsv_ts", "Id<Expr> (ids)");
+        assert_eq!(ids.minted, 4, "the outer call's two, the inner call's two");
+        assert_eq!(ids.scratch_peak_max_for_test(), 3);
     }
 
     #[test]
