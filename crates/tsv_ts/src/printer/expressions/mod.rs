@@ -465,13 +465,13 @@ impl<'a> Printer<'a> {
             }
             ExpressionKind::TSAsExpression(as_expr) => self.build_binary_cast_doc(
                 self.view.expr(as_expr.expression),
-                as_expr.type_annotation,
+                self.view.ty(as_expr.type_annotation),
                 "as",
                 expr.span.start,
             ),
             ExpressionKind::TSSatisfiesExpression(sat_expr) => self.build_binary_cast_doc(
                 self.view.expr(sat_expr.expression),
-                sat_expr.type_annotation,
+                self.view.ty(sat_expr.type_annotation),
                 "satisfies",
                 expr.span.start,
             ),
@@ -935,9 +935,9 @@ impl<'a> Printer<'a> {
         // under a surviving `|` strips a function-type member's shell and does not
         // reparse. `build_type_doc`, not the annotation's value builder: a union cast
         // type prints flat (see below).
-        let head = self.keyword_value_head(angle_end, type_assert.type_annotation);
+        let head = self.keyword_value_head(angle_end, self.view.ty(type_assert.type_annotation));
         let type_start = head.value_start;
-        let type_end = type_assert.type_annotation.span().end;
+        let type_end = self.view.ty(type_assert.type_annotation).span().end;
         let expr_start = expression.span().start;
         let close_angle = self.find_assertion_close_angle(type_end, expr_start);
         let type_doc = self.build_keyword_value_doc_with(&head, TrailingBlock::Inline, |value| {
@@ -1453,7 +1453,7 @@ impl<'a> Printer<'a> {
             // (`paren_inner_comment_flags == (false, false)`), so it can never reach one
             // the retain rule retains. Satisfying the precondition structurally is the
             // stronger form; a fourth path that peels a COMMENTED shell has to ask.
-            let inner = unwrap_parenthesized(type_annotation);
+            let inner = unwrap_parenthesized(self.view, type_annotation);
             if inner.span() != type_annotation.span()
                 && !self.paren_retains_for_trailing_run(type_annotation)
                 && self.has_comments_to_emit_between(inner.span().end, type_annotation.span().end)

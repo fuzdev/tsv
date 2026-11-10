@@ -86,12 +86,16 @@ fn is_hopefully_short_arg(view: AstView<'_>, expr: &Expression<'_>) -> bool {
 
         // Prettier: `isBinaryCastExpression(node) || node.type === "TypeCastExpression"` —
         // the `as` / `satisfies` pair (the Flow spellings have no tsv equivalent).
-        ExpressionKind::TSAsExpression(cast) => {
-            cast_is_hopefully_short(view, cast.type_annotation, view.expr(cast.expression))
-        }
-        ExpressionKind::TSSatisfiesExpression(cast) => {
-            cast_is_hopefully_short(view, cast.type_annotation, view.expr(cast.expression))
-        }
+        ExpressionKind::TSAsExpression(cast) => cast_is_hopefully_short(
+            view,
+            view.ty(cast.type_annotation),
+            view.expr(cast.expression),
+        ),
+        ExpressionKind::TSSatisfiesExpression(cast) => cast_is_hopefully_short(
+            view,
+            view.ty(cast.type_annotation),
+            view.expr(cast.expression),
+        ),
 
         // An angle-bracket assertion (`<T>x`) is NEVER short: prettier's
         // `isBinaryCastExpression` does not list `TSTypeAssertion`, so it falls past the cast
@@ -142,19 +146,19 @@ fn cast_is_hopefully_short(
     type_annotation: &TSType<'_>,
     expression: &Expression<'_>,
 ) -> bool {
-    let mut ty = unwrap_parenthesized(type_annotation);
+    let mut ty = unwrap_parenthesized(view, type_annotation);
     for _ in 0..2 {
         let TSType::Array(array) = ty else { break };
-        ty = unwrap_parenthesized(array.element_type);
+        ty = unwrap_parenthesized(view, view.ty(array.element_type));
     }
     if let TSType::TypeReference(reference) = ty
         && let Some(type_arguments) = &reference.type_arguments
-        && let [lone] = type_arguments.params
+        && let &[lone] = view.ty_list(type_arguments.params)
     {
-        ty = lone;
+        ty = view.ty(lone);
     }
 
-    is_simple_type(ty) && is_simple_call_argument(view, expression, 1)
+    is_simple_type(view, ty) && is_simple_call_argument(view, expression, 1)
 }
 
 /// The **call-like family** prettier's `isCallLikeExpression` names — a call, a `new`, or a
@@ -448,7 +452,7 @@ fn unwrap_ts_type_wrappers<'a>(
             ExpressionKind::TSAsExpression(cast) => view.expr(cast.expression),
             ExpressionKind::TSSatisfiesExpression(cast) => view.expr(cast.expression),
             ExpressionKind::TSTypeAssertion(cast) => {
-                leading_from = cast.type_annotation.span().end;
+                leading_from = view.ty(cast.type_annotation).span().end;
                 view.expr(cast.expression)
             }
             _ => return (expr, leading_from),

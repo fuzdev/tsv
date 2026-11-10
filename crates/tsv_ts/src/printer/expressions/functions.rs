@@ -560,11 +560,11 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
     match &param.kind {
         ast::ExpressionKind::Identifier(id) => {
             id.decorators().unwrap_or_default().is_empty()
-                && annotation_is_flat(id.type_annotation())
+                && annotation_is_flat(view, id.type_annotation())
         }
         ast::ExpressionKind::ObjectPattern(pattern) => {
             pattern.decorators.unwrap_or_default().is_empty()
-                && annotation_is_flat(pattern.type_annotation.as_ref())
+                && annotation_is_flat(view, pattern.type_annotation.as_ref())
                 && pattern.properties.iter().all(|property| match property {
                     ast::ObjectPatternProperty::Property(property) => {
                         !property.computed
@@ -580,7 +580,7 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
         }
         ast::ExpressionKind::ArrayPattern(pattern) => {
             pattern.decorators.unwrap_or_default().is_empty()
-                && annotation_is_flat(pattern.type_annotation.as_ref())
+                && annotation_is_flat(view, pattern.type_annotation.as_ref())
                 && view.opt_list(pattern.elements).iter().all(|element| {
                     element
                         .as_ref()
@@ -595,7 +595,7 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
         }
         ast::ExpressionKind::RestElement(rest) => {
             is_bare_identifier(view.expr(rest.argument))
-                && annotation_is_flat(rest.type_annotation.as_ref())
+                && annotation_is_flat(view, rest.type_annotation.as_ref())
         }
         ast::ExpressionKind::AssignmentPattern(default) => {
             default.decorators.unwrap_or_default().is_empty()
@@ -603,7 +603,7 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
                     &view.expr(default.left).kind,
                     ast::ExpressionKind::Identifier(id)
                         if id.decorators().unwrap_or_default().is_empty()
-                            && annotation_is_flat(id.type_annotation())
+                            && annotation_is_flat(view, id.type_annotation())
                 )
                 && matches!(
                     view.expr(default.right).kind,
@@ -625,13 +625,14 @@ fn is_bare_identifier(expr: &ast::Expression<'_>) -> bool {
 
 /// An absent annotation, or one whose type is flat ([`type_is_flat`]), a top-level union or
 /// intersection of flat members included.
-fn annotation_is_flat(annotation: Option<&ast::TSTypeAnnotation<'_>>) -> bool {
-    annotation.is_none_or(|annotation| match annotation.type_annotation {
-        ast::TSType::Union(ast::TSUnionType { types, .. })
-        | ast::TSType::Intersection(ast::TSIntersectionType { types, .. }) => {
-            types.iter().all(|member| type_is_flat(member))
-        }
-        other => type_is_flat(other),
+fn annotation_is_flat(view: AstView<'_>, annotation: Option<&ast::TSTypeAnnotation<'_>>) -> bool {
+    annotation.is_none_or(|annotation| match view.ty(annotation.type_annotation) {
+        &ast::TSType::Union(ast::TSUnionType { types, .. })
+        | &ast::TSType::Intersection(ast::TSIntersectionType { types, .. }) => view
+            .ty_list(types)
+            .iter()
+            .all(|&member| type_is_flat(view, view.ty(member))),
+        other => type_is_flat(view, other),
     })
 }
 
@@ -642,7 +643,7 @@ fn annotation_is_flat(annotation: Option<&ast::TSTypeAnnotation<'_>>) -> bool {
 /// admitted only at the annotation's top level ([`annotation_is_flat`]), so no type argument
 /// list here holds one. Template literal types (substitutions are arbitrary types), object
 /// types, function types, tuples and the rest are out.
-fn type_is_flat(ty: &ast::TSType<'_>) -> bool {
+fn type_is_flat(view: AstView<'_>, ty: &ast::TSType<'_>) -> bool {
     match ty {
         ast::TSType::Keyword(_)
         | ast::TSType::ThisType(_)
@@ -652,14 +653,20 @@ fn type_is_flat(ty: &ast::TSType<'_>) -> bool {
             | ast::TSLiteralType::BigInt(_)
             | ast::TSLiteralType::UnaryExpression(_),
         ) => true,
-        ast::TSType::TypeReference(reference) => reference
-            .type_arguments
-            .as_ref()
-            .is_none_or(|args| args.params.iter().all(|arg| type_is_flat(arg))),
-        ast::TSType::Array(array) => type_is_flat(array.element_type),
-        ast::TSType::TypeOperator(operator) => type_is_flat(operator.type_annotation),
+        ast::TSType::TypeReference(reference) => {
+            reference.type_arguments.as_ref().is_none_or(|args| {
+                view.ty_list(args.params)
+                    .iter()
+                    .all(|&arg| type_is_flat(view, view.ty(arg)))
+            })
+        }
+        ast::TSType::Array(array) => type_is_flat(view, view.ty(array.element_type)),
+        ast::TSType::TypeOperator(operator) => {
+            type_is_flat(view, view.ty(operator.type_annotation))
+        }
         ast::TSType::IndexedAccess(access) => {
-            type_is_flat(access.object_type) && type_is_flat(access.index_type)
+            type_is_flat(view, view.ty(access.object_type))
+                && type_is_flat(view, view.ty(access.index_type))
         }
         ast::TSType::TypeQuery(query) => query.type_arguments.is_none(),
         _ => false,
@@ -695,7 +702,7 @@ fn sole_param_object_type_start(
 /// list it admits, so `close` — the list's `)`, a source scan for most callers — is located
 /// only then. Both halves are pure reads, so the order is free.
 fn sole_param_object_type<'a>(
-    printer: &Printer<'_>,
+    printer: &Printer<'a>,
     params: &'a [ast::Expression<'a>],
     open: Option<u32>,
     close: impl FnOnce() -> Option<u32>,
@@ -709,7 +716,9 @@ fn sole_param_object_type<'a>(
         ast::ExpressionKind::ArrayPattern(pattern) => pattern.type_annotation.as_ref(),
         _ => None,
     }?;
-    let ast::TSType::TypeLiteral(literal) = unwrap_parenthesized(annotation.type_annotation) else {
+    let ast::TSType::TypeLiteral(literal) =
+        unwrap_parenthesized(printer.view, printer.view.ty(annotation.type_annotation))
+    else {
         return None;
     };
     printer
@@ -757,14 +766,17 @@ pub(in crate::printer) struct FlatSoleParamLiteral<'a> {
 ///
 /// `None` for any other return type: one that will break already ends the measured line at
 /// its own forced break, and one that does not group the parameters leaves the line to the body's.
-fn function_return_type_break(func: &ast::FunctionExpression<'_>) -> Option<AssumedBreak> {
+fn function_return_type_break(
+    view: AstView<'_>,
+    func: &ast::FunctionExpression<'_>,
+) -> Option<AssumedBreak> {
     let return_type = func.return_type.as_ref()?;
     if !crate::printer::types::function_types::type_params_allow_grouping(
         func.type_parameters.as_ref(),
     ) {
         return None;
     }
-    match unwrap_parenthesized(return_type.type_annotation) {
+    match unwrap_parenthesized(view, view.ty(return_type.type_annotation)) {
         ast::TSType::TypeLiteral(literal) => Some(AssumedBreak::TypeLiteral(literal.span.start)),
         ast::TSType::Mapped(mapped) => Some(AssumedBreak::MappedType(mapped.span.start)),
         _ => None,
@@ -803,7 +815,12 @@ pub(in crate::printer) fn flat_sole_param_literal<'a>(
                         .map(|after_paren| after_paren - 1)
                 },
             )?;
-            (literal, &func.body, false, function_return_type_break(func))
+            (
+                literal,
+                &func.body,
+                false,
+                function_return_type_break(printer.view, func),
+            )
         }
         _ => return None,
     };
@@ -871,7 +888,7 @@ pub(in crate::printer) fn function_return_hug_break(
     {
         return None;
     }
-    let return_type = func.return_type.as_ref()?.type_annotation;
+    let return_type = printer.view.ty(func.return_type.as_ref()?.type_annotation);
     let brk = return_type_hug_brace(printer, return_type)?;
     if crate::printer::is_brace_block_multiline(printer.source, return_type.span())
         || printer.has_comments_on_page_between(arg.span.start, func.body.span.start)
@@ -887,29 +904,33 @@ pub(in crate::printer) fn function_return_hug_break(
 /// cannot refuse a hug its stripped twin takes.
 fn return_type_hug_brace(printer: &Printer<'_>, ty: &ast::TSType<'_>) -> Option<AssumedBreak> {
     let member_brace = |union: &ast::TSUnionType<'_>| {
-        union
-            .types
+        printer
+            .view
+            .ty_list(union.types)
             .iter()
-            .find_map(|member| match unwrap_parenthesized(member) {
-                ast::TSType::TypeLiteral(literal) if !literal.members.is_empty() => {
-                    Some(AssumedBreak::TypeLiteral(literal.span.start))
-                }
-                _ => None,
-            })
+            .find_map(
+                |&member| match unwrap_parenthesized(printer.view, printer.view.ty(member)) {
+                    ast::TSType::TypeLiteral(literal) if !literal.members.is_empty() => {
+                        Some(AssumedBreak::TypeLiteral(literal.span.start))
+                    }
+                    _ => None,
+                },
+            )
     };
-    match unwrap_parenthesized(ty) {
+    match unwrap_parenthesized(printer.view, ty) {
         ast::TSType::TypeLiteral(literal) if !literal.members.is_empty() => {
             Some(AssumedBreak::TypeLiteral(literal.span.start))
         }
         ast::TSType::Mapped(mapped) => Some(AssumedBreak::MappedType(mapped.span.start)),
         ast::TSType::TypeReference(reference) => {
             let args = reference.type_arguments.as_ref()?;
-            if let [arg] = args.params {
-                let peeled = unwrap_parenthesized(arg);
+            if let &[arg] = printer.view.ty_list(args.params) {
+                let arg = printer.view.ty(arg);
+                let peeled = unwrap_parenthesized(printer.view, arg);
                 let is_shell = |ty: &ast::TSType<'_>| matches!(ty, ast::TSType::Parenthesized(_));
                 let shell = is_shell(arg)
                     || matches!(peeled, ast::TSType::Union(union)
-                        if union.types.iter().any(|member| is_shell(member)));
+                        if printer.view.ty_list(union.types).iter().any(|&member| is_shell(printer.view.ty(member))));
                 if shell {
                     return match peeled {
                         ast::TSType::TypeLiteral(literal) if !literal.members.is_empty() => {
@@ -1045,11 +1066,11 @@ pub(in crate::printer) fn callback_signature_refuses_hug(
 ///
 /// Shared with the signature-param path (`build_signature_params_doc`) — see
 /// `is_huggable_pattern`.
-fn has_huggable_type_annotation(expr: &ast::Expression<'_>) -> bool {
+fn has_huggable_type_annotation(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
     match &expr.kind {
         ast::ExpressionKind::Identifier(id) => id
             .type_annotation()
-            .is_some_and(|ann| is_huggable_type(ann.type_annotation)),
+            .is_some_and(|ann| is_huggable_type(view, view.ty(ann.type_annotation))),
         _ => false,
     }
 }
@@ -1170,7 +1191,7 @@ impl<'a> Printer<'a> {
     ) -> bool {
         params.len() == 1
             && (is_huggable_pattern(self.view, &params[0])
-                || has_huggable_type_annotation(&params[0]))
+                || has_huggable_type_annotation(self.view, &params[0]))
             && self.param_delimiter_gaps_empty(&params[0], open, close, comments_present)
             && !self.param_has_decorators(&params[0])
             && !self.param_annotation_holds_own_line_directive(&params[0])
@@ -1194,9 +1215,9 @@ impl<'a> Printer<'a> {
         };
         id.type_annotation().is_some_and(|ann| {
             let colon_end = ann.span.start + 1;
-            self.member_gap_frozen(colon_end, ann.type_annotation.span().start)
+            self.member_gap_frozen(colon_end, self.view.ty(ann.type_annotation).span().start)
                 || self
-                    .paren_interior_routed_inner(ann.type_annotation)
+                    .paren_interior_routed_inner(self.view.ty(ann.type_annotation))
                     .is_some()
         })
     }
@@ -3056,7 +3077,7 @@ impl<'a> Printer<'a> {
         // ((y: T) => T)`, `(x: T): (/* c */ (y: T) => T)`, `(x: T): ((y: T) => T /* c */)`
         // — reached no emitter and was DROPPED, at the one return-type position that has
         // no comment-aware twin to fall back to.
-        let inner_type = unwrap_parenthesized(annotation.type_annotation);
+        let inner_type = unwrap_parenthesized(self.view, self.view.ty(annotation.type_annotation));
         if !matches!(inner_type, ast::TSType::Function(_))
             && let Some(doc) = self.build_arrow_return_nested_tail_doc(annotation)
         {

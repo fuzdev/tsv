@@ -1810,7 +1810,7 @@ impl<'a> Printer<'a> {
     /// Example: `Map<string, Array<number>>` - Map has 2 params, second has nested generic
     pub(crate) fn id_has_complex_type_annotation(&self, expr: &ast::Expression<'_>) -> bool {
         crate::__private::pattern_type_annotation(expr)
-            .is_some_and(|ann| self.type_has_complex_annotation(ann.type_annotation))
+            .is_some_and(|ann| self.type_has_complex_annotation(self.view.ty(ann.type_annotation)))
     }
 
     /// Check if a type has complex nested type parameters
@@ -1820,10 +1820,10 @@ impl<'a> Printer<'a> {
     /// conditional directly, and a shell the output strips must not flip the layout
     /// (`(A extends B ? C : D)` as an argument, `(Map<…>)` around the annotation).
     fn type_has_complex_annotation(&self, ts_type: &ast::TSType<'_>) -> bool {
-        match unwrap_parenthesized(ts_type) {
+        match unwrap_parenthesized(self.view, ts_type) {
             ast::TSType::TypeReference(type_ref) => {
                 // Must have >1 type argument
-                let type_args = match &type_ref.type_arguments {
+                let &type_args = match &type_ref.type_arguments {
                     Some(args) => &args.params,
                     None => return false,
                 };
@@ -1833,9 +1833,10 @@ impl<'a> Printer<'a> {
                 }
 
                 // At least one arg must have nested generics or be a conditional type
-                type_args
+                self.view
+                    .ty_list(type_args)
                     .iter()
-                    .any(|param| self.type_has_nested_generics(param))
+                    .any(|&param| self.type_has_nested_generics(self.view.ty(param)))
             }
             _ => false,
         }
@@ -1843,7 +1844,7 @@ impl<'a> Printer<'a> {
 
     /// Check if a type has nested type parameters or is a conditional type
     fn type_has_nested_generics(&self, ts_type: &ast::TSType<'_>) -> bool {
-        match unwrap_parenthesized(ts_type) {
+        match unwrap_parenthesized(self.view, ts_type) {
             ast::TSType::TypeReference(type_ref) => {
                 // Has type arguments means nested generics
                 type_ref.type_arguments.is_some()

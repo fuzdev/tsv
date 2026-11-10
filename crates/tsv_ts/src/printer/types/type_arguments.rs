@@ -43,7 +43,7 @@ impl<'a> Printer<'a> {
         let mut ty = first;
         loop {
             ty = match ty {
-                TSType::Parenthesized(p) => p.type_annotation,
+                TSType::Parenthesized(p) => self.view.ty(p.type_annotation),
                 other => match self.transparent_sole_member(other) {
                     Some(member) => member,
                     None => break,
@@ -90,7 +90,7 @@ impl<'a> Printer<'a> {
         args: &ast::TSTypeParameterInstantiation<'_>,
         has_comments: bool,
     ) -> DocId {
-        let type_doc = self.build_type_doc(args.params[0]);
+        let type_doc = self.build_type_doc(self.view.ty(self.view.ty_list(args.params)[0]));
         self.build_single_type_arg_inline_with(args, has_comments, type_doc)
     }
 
@@ -106,7 +106,7 @@ impl<'a> Printer<'a> {
         type_doc: DocId,
     ) -> DocId {
         let d = self.d();
-        let param = args.params[0];
+        let param = self.view.ty(self.view.ty_list(args.params)[0]);
         // Rule A: an alone-on-line directive before the sole argument freezes it whole
         // (`//` spellings route to the expansion builder before this; an alone-on-line
         // block spelling can reach this inline path).
@@ -152,7 +152,7 @@ impl<'a> Printer<'a> {
         if !has_comments {
             return false;
         }
-        let param = args.params[0];
+        let param = self.view.ty(self.view.ty_list(args.params)[0]);
         // Read past a redundant shell carrying only leading comments
         // ([`Self::leading_paren_unwrapped`]): the shell strips, so its run is this gap's
         // — and exactly where the reparse reads it. Asked of the shell's `(` instead, the
@@ -199,8 +199,8 @@ impl<'a> Printer<'a> {
     /// after the `=` instead (`union_single_member_collapse_long`).
     pub(in crate::printer) fn type_arg_hugs(&self, gap_start: u32, ty: &TSType<'_>) -> bool {
         let ty = self.unwrap_redundant_parens(ty);
-        is_simple_type_arg(ty)
-            || is_huggable_type(ty)
+        is_simple_type_arg(self.view, ty)
+            || is_huggable_type(self.view, ty)
             || self.type_arg_union_prints_hugged(gap_start, ty)
     }
 
@@ -222,7 +222,7 @@ impl<'a> Printer<'a> {
         ty: &TSType<'_>,
     ) -> bool {
         matches!(self.unwrap_redundant_parens(ty), TSType::Union(u)
-            if !union_has_brace_member(u) && self.union_seam_hugs(gap_start, u))
+            if !union_has_brace_member(self.view, u) && self.union_seam_hugs(gap_start, u))
     }
 
     /// The `<…>` of a sole nullable reference union
@@ -355,9 +355,14 @@ impl<'a> Printer<'a> {
         // alone-on-line directive in that same gap, which is itself an expanding comment
         // — so both readings force expansion and the router cannot disagree with the
         // emitter (which does hold the per-item verdict).
-        let arg_span =
-            |ty: &&TSType<'_>| self.list_item_printed_span(false, self.leading_paren_unwrapped(ty));
-        self.has_expanding_comments_in_bracket_list(args.span, args.params, arg_span)
+        let arg_span = |&ty: &ast::TyEdge<'_>| {
+            self.list_item_printed_span(false, self.leading_paren_unwrapped(self.view.ty(ty)))
+        };
+        self.has_expanding_comments_in_bracket_list(
+            args.span,
+            self.view.ty_list(args.params),
+            arg_span,
+        )
     }
 
     /// Build doc for type arguments: `<T, U>`.
@@ -415,7 +420,10 @@ impl<'a> Printer<'a> {
         // the `<…>` a break point of its own — as does a hugging one whose comment run breaks
         // after ([`Self::single_type_arg_run_breaks_after`]).
         if args.params.len() == 1
-            && self.type_arg_hugs(args.span.start + 1, args.params[0])
+            && self.type_arg_hugs(
+                args.span.start + 1,
+                self.view.ty(self.view.ty_list(args.params)[0]),
+            )
             && !self.single_type_arg_run_breaks_after(args, has_comments)
         {
             return self.build_single_type_arg_inline(args, has_comments);
@@ -460,15 +468,20 @@ impl<'a> Printer<'a> {
         // The only layout that can glue the pair: the expansion builder starts every
         // argument on its own line, and a function type never takes the inline hug.
         let open_separated = rescan == ShiftRescan::Never
-            && self.angle_open_meets_angle(args.span.start + 1, args.params[0]);
+            && self.angle_open_meets_angle(
+                args.span.start + 1,
+                self.view.ty(self.view.ty_list(args.params)[0]),
+            );
         self.build_angle_list_doc(
             args.span,
             args.params.len(),
-            |i| args.params[i].span(),
+            |i| self.view.ty(self.view.ty_list(args.params)[i]).span(),
             |i, frozen, gap_start| {
                 if frozen {
-                    self.build_frozen_list_member_doc(args.params[i])
-                } else if let TSType::Union(u) = args.params[i] {
+                    self.build_frozen_list_member_doc(
+                        self.view.ty(self.view.ty_list(args.params)[i]),
+                    )
+                } else if let TSType::Union(u) = self.view.ty(self.view.ty_list(args.params)[i]) {
                     // The `<`/`,`→argument gap is this seam's: a block run glued to
                     // the union's first member is handed in (`build_union_value_doc`),
                     // declining the hug and landing after the pipe once the argument
@@ -476,11 +489,16 @@ impl<'a> Printer<'a> {
                     // emitter stopped at the claim below.
                     self.build_union_value_doc(gap_start, u).doc
                 } else {
-                    self.build_type_arg_doc(args.params[i], true)
+                    self.build_type_arg_doc(self.view.ty(self.view.ty_list(args.params)[i]), true)
                 }
             },
-            |i, gap_start| self.union_seam_run_handoff(gap_start, args.params[i]),
-            |i| self.frozen_list_member_multiline(args.params[i]),
+            |i, gap_start| {
+                self.union_seam_run_handoff(
+                    gap_start,
+                    self.view.ty(self.view.ty_list(args.params)[i]),
+                )
+            },
+            |i| self.frozen_list_member_multiline(self.view.ty(self.view.ty_list(args.params)[i])),
             has_comments,
             open_separated,
         )
@@ -500,7 +518,9 @@ impl<'a> Printer<'a> {
         args: &ast::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
         let is_multi = args.params.len() > 1;
-        let param_at = |i: usize| self.leading_paren_unwrapped(args.params[i]);
+        let param_at = |i: usize| {
+            self.leading_paren_unwrapped(self.view.ty(self.view.ty_list(args.params)[i]))
+        };
         // Rule A, asked on each argument's OWN span. It decides whether the printed span
         // may widen over a leading-edge shell, so it is resolved here rather than inside
         // the list core — reading it from the widened span would let a frozen argument

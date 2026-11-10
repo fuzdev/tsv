@@ -488,7 +488,11 @@ fn is_call_with_complex_type_arguments(
     // `f<(A | B)>()` as simple where the bare `f<A | B>()` was complex — one authoring of
     // one type reaching two layouts.
     let listed = matches!(
-        type_args.params.first().copied().map(unwrap_parenthesized),
+        printer
+            .view
+            .ty_list(type_args.params)
+            .first()
+            .map(|&arg| unwrap_parenthesized(printer.view, printer.view.ty(arg))),
         Some(TSType::TypeLiteral(_) | TSType::Union(_) | TSType::Intersection(_))
     );
     // The `willBreak` fallback for everything else, read off the call path's own doc. No
@@ -560,7 +564,10 @@ impl Printer<'_> {
             }
         };
         let type_args = call.type_arguments.as_ref()?;
-        let [ast::TSType::Mapped(mapped)] = type_args.params else {
+        let &[arg] = self.view.ty_list(type_args.params) else {
+            return None;
+        };
+        let ast::TSType::Mapped(mapped) = self.view.ty(arg) else {
             return None;
         };
         if !gap_comment_free() || call.optional {

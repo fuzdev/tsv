@@ -451,7 +451,7 @@ impl<'a> Printer<'a> {
             }
 
             // Special case: parenthesized union type
-            if let TSType::Union(union) = unwrap_parenthesized(ts_type) {
+            if let TSType::Union(union) = unwrap_parenthesized(self.view, ts_type) {
                 return self.build_parenthesized_union_doc(
                     union,
                     outermost_paren(ts_type),
@@ -539,7 +539,7 @@ impl<'a> Printer<'a> {
         // strips and to nothing that survives, so it takes its own line — the one-member
         // union's arm answers that (`single_member_union_shell_line_comment`), where the
         // required-pair fall-through would glue it to the outer `(`.
-        let inner = unwrap_parenthesized(ty);
+        let inner = unwrap_parenthesized(self.view, ty);
         let ((_, TSType::Union(u)) | (TSType::Union(u), TSType::Parenthesized(_))) =
             (inner, self.unwrap_redundant_parens(inner))
         else {
@@ -784,13 +784,14 @@ impl<'a> Printer<'a> {
         // every reparse-shaped audit — the meaning change is valid, idempotent and
         // comment-clean — so only the prettier differential sees them.
         let member_parens = union_member_parens(intersection.types.len());
-        let types_before_object = &intersection.types[..intersection.types.len() - 1];
-        for (i, t) in types_before_object.iter().enumerate() {
+        let types_before_object =
+            &self.view.ty_list(intersection.types)[..intersection.types.len() - 1];
+        for (i, &t) in types_before_object.iter().enumerate() {
             if i > 0 {
                 self.push_intersection_operator_gap_comments(
                     &mut opening_parts,
-                    types_before_object[i - 1].span().end,
-                    t.span().start,
+                    self.view.ty(types_before_object[i - 1]).span().end,
+                    self.view.ty(t).span().start,
                 );
             }
             // Only the FIRST member can carry the leading-edge shell the `(` gap widened
@@ -799,7 +800,7 @@ impl<'a> Printer<'a> {
             // which the gap above has already emitted.
             let member_claim = if i == 0 { claimed_shell } else { None };
             opening_parts.push(self.with_claimed_shell_leading_run(member_claim, || {
-                self.build_intersection_member_type_doc(t, member_parens)
+                self.build_intersection_member_type_doc(self.view.ty(t), member_parens)
             }));
         }
 
@@ -808,7 +809,7 @@ impl<'a> Printer<'a> {
         // this opening, so a comment after the `&` has to be emitted ahead of it here.
         // `aligned_trailing_object_shell` admits only a 2+-member intersection, so this
         // slice always has a last member and the `&` always has an operand on its left.
-        if let Some(prev) = types_before_object.last() {
+        if let Some(prev) = self.view.opt_ty(types_before_object.last().copied()) {
             self.push_intersection_operator_gap_comments(
                 &mut opening_parts,
                 prev.span().end,
@@ -1333,9 +1334,9 @@ impl<'a> Printer<'a> {
                 // the comment was dropped — a content-loss bug. A line comment defers
                 // to end-of-line and forces the type-argument list to break (via
                 // `break_parent`), matching prettier's expansion.
-                let inner = self.build_type_doc_for_type_arg(p.type_annotation);
-                let inner_start = p.type_annotation.span().start;
-                let inner_end = p.type_annotation.span().end;
+                let inner = self.build_type_doc_for_type_arg(self.view.ty(p.type_annotation));
+                let inner_start = self.view.ty(p.type_annotation).span().start;
+                let inner_end = self.view.ty(p.type_annotation).span().end;
                 let (has_leading, has_trailing) = self.paren_inner_comment_flags(p);
                 if !has_leading && !has_trailing {
                     return inner;

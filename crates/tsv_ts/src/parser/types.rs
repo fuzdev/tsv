@@ -283,7 +283,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // the pair the printer adds around a bare element / object that binds looser
             // than the suffix (`(typeof a)[]`, `(infer U)[K]`, `(-1)[]`), a level of the
             // output's nesting
-            if bare_type_takes_pair(result, TypePairPosition::Suffix) {
+            if bare_type_takes_pair(self.stores.view(), result, TypePairPosition::Suffix) {
                 self.printer_pair()?;
             }
             if matches!(self.peek_kind(), TokenKind::BracketClose) {
@@ -1625,7 +1625,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.spine_link(LINK_TYPE_SUFFIX)?;
             // the pair the printer adds around a bare element the `?` would rebind
             // (`[(A | B)?]`), a level of the output's nesting
-            if bare_type_takes_pair(inner_type, TypePairPosition::Optional) {
+            if bare_type_takes_pair(self.stores.view(), inner_type, TypePairPosition::Optional) {
                 self.printer_pair()?;
             }
             let end = self.prev_token_end();
@@ -1998,7 +1998,11 @@ enum TypePairPosition {
 /// level already, which the printer keeps or strips), and around a bare type its rule
 /// parenthesizes, read past a one-member union or intersection the printer prints as its
 /// member as well as at it, so the answer is the printer's or above it.
-fn bare_type_takes_pair(ts_type: &TSType<'_>, position: TypePairPosition) -> bool {
+fn bare_type_takes_pair<'a>(
+    view: AstView<'a>,
+    ts_type: &'a TSType<'a>,
+    position: TypePairPosition,
+) -> bool {
     if matches!(ts_type, TSType::Parenthesized(_)) {
         return false;
     }
@@ -2008,8 +2012,8 @@ fn bare_type_takes_pair(ts_type: &TSType<'_>, position: TypePairPosition) -> boo
             return true;
         }
         ty = match ty {
-            TSType::Union(u) if u.types.len() == 1 => u.types[0],
-            TSType::Intersection(i) if i.types.len() == 1 => i.types[0],
+            TSType::Union(u) if u.types.len() == 1 => view.ty(view.ty_list(u.types)[0]),
+            TSType::Intersection(i) if i.types.len() == 1 => view.ty(view.ty_list(i.types)[0]),
             _ => return false,
         };
     }
@@ -2050,7 +2054,7 @@ impl<'arena> Parser<'_, 'arena> {
     /// binds looser than its neighbours ([`TypePairPosition::Member`]), a level of the
     /// output's nesting.
     fn member_pair(&mut self, member: &TSType<'_>) -> Result<(), Error> {
-        if bare_type_takes_pair(member, TypePairPosition::Member) {
+        if bare_type_takes_pair(self.stores.view(), member, TypePairPosition::Member) {
             self.printer_pair()
         } else {
             Ok(())

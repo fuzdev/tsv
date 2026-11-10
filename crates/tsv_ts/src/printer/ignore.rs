@@ -71,7 +71,8 @@ use super::statement_tail::StatementTerminator;
 use super::types::TrailingBlock;
 use super::types::helpers::{TypeParenRule, outermost_paren, paren_shell_gaps};
 use super::unwrap_parenthesized;
-use crate::ast::{self, Comment, TSType};
+use crate::ast::AstView;
+use crate::ast::{self, Comment, TSType, TyEdge};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -180,9 +181,9 @@ impl FrozenOperandPair {
     }
 }
 
-pub(in crate::printer) fn is_freeze_target(child: &TSType<'_>) -> bool {
+pub(in crate::printer) fn is_freeze_target(view: AstView<'_>, child: &TSType<'_>) -> bool {
     !matches!(
-        unwrap_parenthesized(child),
+        unwrap_parenthesized(view, child),
         TSType::Union(_) | TSType::Intersection(_)
     )
 }
@@ -275,12 +276,14 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn composite_leading_run_freeze(
         &self,
         node_start: u32,
-        types: &[&TSType<'_>],
+        types: &[TyEdge<'_>],
     ) -> Option<LeadingRunFreeze> {
         if !self.has_format_ignore {
             return None;
         }
-        let first_inner = types.first().map(|t| unwrap_parenthesized(t).span());
+        let first_inner = types
+            .first()
+            .map(|&t| unwrap_parenthesized(self.view, self.view.ty(t)).span());
         self.leading_run_freeze(node_start, first_inner)
     }
 
@@ -424,7 +427,7 @@ impl<'a> Printer<'a> {
         if !self.has_format_ignore {
             return false;
         }
-        if !is_freeze_target(child) {
+        if !is_freeze_target(self.view, child) {
             return false;
         }
         self.member_gap_frozen(gap_start, child.span().start)
@@ -543,7 +546,10 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn paren_interior_routed_inner<'t>(
         &self,
         shell: &'t TSType<'t>,
-    ) -> Option<&'t TSType<'t>> {
+    ) -> Option<&'t TSType<'t>>
+    where
+        'a: 't,
+    {
         self.paren_shell_routed_inner(outermost_paren(shell)?)
     }
 
@@ -556,15 +562,18 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn paren_shell_routed_inner<'t>(
         &self,
         shell: &'t ast::TSParenthesizedType<'t>,
-    ) -> Option<&'t TSType<'t>> {
+    ) -> Option<&'t TSType<'t>>
+    where
+        'a: 't,
+    {
         if !self.has_format_ignore {
             return None;
         }
         // The window is [`paren_shell_gaps`]' deep leading half — redundant layers strip
         // as a unit, so an in-shell directive binds from the OUTERMOST `(`.
-        let (leading, _) = paren_shell_gaps(shell);
+        let (leading, _) = paren_shell_gaps(self.view, shell);
         self.member_gap_frozen(leading.start, leading.end)
-            .then(|| unwrap_parenthesized(shell.type_annotation))
+            .then(|| unwrap_parenthesized(self.view, self.view.ty(shell.type_annotation)))
     }
 
     /// [`Self::member_gap_frozen`] for list item `i`, the single home of the
@@ -1112,13 +1121,13 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn list_member_frozen(
         &self,
         container_start: u32,
-        types: &[&TSType<'_>],
+        types: &[TyEdge<'_>],
         i: usize,
         freeze_first: bool,
     ) -> bool {
         self.has_format_ignore
             && ((i == 0 && freeze_first)
-                || self.list_item_frozen(container_start, &|j| types[j].span(), i))
+                || self.list_item_frozen(container_start, &|j| self.view.ty(types[j]).span(), i))
     }
 
     //
@@ -1504,7 +1513,7 @@ impl<'a> Printer<'a> {
         slice: Span,
     ) -> DocId {
         let d = self.d();
-        let inner = unwrap_parenthesized(t);
+        let inner = unwrap_parenthesized(self.view, t);
         let frozen = self.raw_source_range(slice.start, slice.end);
         // Re-synthesize the parens only for a BARE member that needs them; a
         // source-parenthesized member's slice already covers its own parens.
@@ -1525,7 +1534,7 @@ impl<'a> Printer<'a> {
     /// - a kept, source-parenthesized member freezes whole-span (parens included); a
     ///   kept, bare member's slice is its own span (the caller re-synthesizes parens).
     fn frozen_member_slice_span(&self, t: &TSType<'_>, member_parens: TypeParenRule) -> Span {
-        let inner = unwrap_parenthesized(t);
+        let inner = unwrap_parenthesized(self.view, t);
         if self.frozen_paren_shell_has_comment(t) || member_parens(self, inner) {
             t.span()
         } else {
@@ -1606,7 +1615,7 @@ impl<'a> Printer<'a> {
     /// child — a composite declines the freeze here and applies Rule A inside via its own
     /// leading-run walk, while the head still owns the directive's own-line emission.
     pub(in crate::printer) fn build_routed_child_doc(&self, child: &TSType<'_>) -> DocId {
-        if is_freeze_target(child) {
+        if is_freeze_target(self.view, child) {
             self.build_frozen_single_child_doc(child)
         } else {
             self.build_type_doc(child)
@@ -1638,7 +1647,7 @@ impl<'a> Printer<'a> {
         let inner_doc = match scope {
             RoutedScope::Transparent => self.build_routed_child_doc(inner),
             RoutedScope::TransparentParens(member_parens) => {
-                if is_freeze_target(inner) {
+                if is_freeze_target(self.view, inner) {
                     self.build_frozen_head_doc(inner, member_parens)
                 } else {
                     self.build_type_doc_maybe_parens(inner, member_parens)
@@ -1662,7 +1671,7 @@ impl<'a> Printer<'a> {
         };
         // Both halves from [`paren_shell_gaps`]: a doubly-nested shell freezes as one
         // slice, so the comment between its two `(`s belongs to it.
-        let (leading, trailing) = paren_shell_gaps(shell);
+        let (leading, trailing) = paren_shell_gaps(self.view, shell);
         self.comments_in_source_between(leading.start, leading.end)
             .next()
             .is_some()
@@ -1682,7 +1691,7 @@ impl<'a> Printer<'a> {
         member_parens: TypeParenRule,
     ) -> DocId {
         let d = self.d();
-        let inner = unwrap_parenthesized(t);
+        let inner = unwrap_parenthesized(self.view, t);
         // A BARE object member supplies its own layout → verbatim, no offset. A
         // parenthesized object with a shell comment routes through `build_frozen_member_doc`
         // (whole-span freeze) so the shell comment is not dropped.

@@ -102,23 +102,27 @@ impl<'a> Printer<'a> {
         &self,
         template: &TemplateLiteralType<'_>,
     ) -> bool {
-        template.types.iter().enumerate().any(|(i, t)| {
-            // The same peel the builder applies ([`Self::build_template_literal_type_doc`]),
-            // so the two read one `${`→type gap: a transparent composite's head gap is the
-            // interpolation's, and a `//` there hangs the type exactly as one written
-            // after a bare `${` does.
-            let t = self.transparent_value(t);
-            let dollar_brace_end = Self::interp_dollar_brace_end(&template.quasis[i]);
-            // The builder's own widening over a routed paren shell
-            // ([`Self::interp_type_and_freeze`]) — the gap this gate measures is the one it
-            // moves.
-            let (t, _) = self.interp_type_and_freeze(dollar_brace_end, t);
-            self.comments_force_own_line_between(dollar_brace_end, t.span().start)
-                || self.interp_trailing_gap_forces_break(
-                    t.span().end,
-                    template.quasis[i + 1].span.start,
-                )
-        })
+        self.view
+            .ty_list(template.types)
+            .iter()
+            .enumerate()
+            .any(|(i, &t)| {
+                // The same peel the builder applies ([`Self::build_template_literal_type_doc`]),
+                // so the two read one `${`→type gap: a transparent composite's head gap is the
+                // interpolation's, and a `//` there hangs the type exactly as one written
+                // after a bare `${` does.
+                let t = self.transparent_value(self.view.ty(t));
+                let dollar_brace_end = Self::interp_dollar_brace_end(&template.quasis[i]);
+                // The builder's own widening over a routed paren shell
+                // ([`Self::interp_type_and_freeze`]) — the gap this gate measures is the one it
+                // moves.
+                let (t, _) = self.interp_type_and_freeze(dollar_brace_end, t);
+                self.comments_force_own_line_between(dollar_brace_end, t.span().start)
+                    || self.interp_trailing_gap_forces_break(
+                        t.span().end,
+                        template.quasis[i + 1].span.start,
+                    )
+            })
     }
 
     /// One interpolation's effective type and freeze verdict: `(type, frozen)`.
@@ -151,12 +155,15 @@ impl<'a> Printer<'a> {
         &self,
         dollar_brace_end: u32,
         t: &'t TSType<'t>,
-    ) -> (&'t TSType<'t>, bool) {
+    ) -> (&'t TSType<'t>, bool)
+    where
+        'a: 't,
+    {
         if self.single_child_frozen(dollar_brace_end, t) {
             return (t, true);
         }
         match self.paren_interior_routed_inner(t) {
-            Some(inner) => (inner, is_freeze_target(inner)),
+            Some(inner) => (inner, is_freeze_target(self.view, inner)),
             None => (t, false),
         }
     }
@@ -262,7 +269,7 @@ impl<'a> Printer<'a> {
                 // the `&` spelling's indent shell broke the literal after `=` on pass 1
                 // only — two fixed points for one program
                 // (`template_literal_interp_single_member_head_line_comment`).
-                let t = self.transparent_value(template.types[i]);
+                let t = self.transparent_value(self.view.ty(self.view.ty_list(template.types)[i]));
                 let dollar_brace_end = Self::interp_dollar_brace_end(quasi);
                 // The freeze verdict and the (possibly paren-stripped) type, from the one
                 // resolver the break gate above also reads.

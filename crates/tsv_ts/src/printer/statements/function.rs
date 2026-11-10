@@ -129,6 +129,7 @@ impl<'a> Printer<'a> {
             return_type.map(|rt| self.build_function_return_type_doc(close_paren_after, rt));
 
         let params_doc = group_params_if_should(
+            self.view,
             params_doc,
             params,
             type_parameters,

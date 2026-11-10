@@ -7,6 +7,7 @@
 
 use super::helpers::{TypeParenRule, type_args_should_wrap_for_return_type, unwrap_parenthesized};
 use super::{CommentSpacing, Printer, ShiftRescan, TrailingBlock, UnionValueDoc};
+use crate::ast::AstView;
 use crate::ast::{self, TSType};
 use crate::printer::ignore::RoutedScope;
 use smallvec::smallvec;
@@ -50,8 +51,8 @@ pub(in crate::printer) enum AnnotationParens {
 /// [`Printer::build_required_paren_pair_operand_doc`] takes. Reads through the author's
 /// shell: `(x: T): ((y: T) => T) =>` needs the pair just as the shell-less spelling does,
 /// and the shell is redundant *as a type* — only this position requires it.
-fn arrow_return_needs_parens(_: &Printer<'_>, ty: &TSType<'_>) -> bool {
-    matches!(unwrap_parenthesized(ty), TSType::Function(_))
+fn arrow_return_needs_parens(printer: &Printer<'_>, ty: &TSType<'_>) -> bool {
+    matches!(unwrap_parenthesized(printer.view, ty), TSType::Function(_))
 }
 
 /// Never — the annotation `:` gap's ordinary answer to "does this frozen child need a
@@ -167,7 +168,7 @@ impl<'a> Printer<'a> {
         // A shell one SUFFIX down (`: (⏎// c⏎A)[]`) widens the window too, but hands the
         // value back whole — there is nothing to substitute — and names its own leading
         // run as this gap's to emit (`hang.claimed_shell`).
-        let hang = self.keyword_value_stripped_paren_hang(annotation.type_annotation);
+        let hang = self.keyword_value_stripped_paren_hang(self.view.ty(annotation.type_annotation));
         let (type_start, ty) = (hang.value_start, hang.value_type);
 
         // Zero-comment gate over the `:`→type gap, computed once and reused by every
@@ -192,10 +193,12 @@ impl<'a> Printer<'a> {
             // in-shell directive (`: (⏎// prettier-ignore⏎ T)`) routes the same way —
             // the shell strips and the paren-stripped inner freezes
             // (`paren_interior_routed_inner`).
-            if self.member_gap_frozen(colon_end, annotation.type_annotation.span().start)
-                || self
-                    .paren_interior_routed_inner(annotation.type_annotation)
-                    .is_some()
+            if self.member_gap_frozen(
+                colon_end,
+                self.view.ty(annotation.type_annotation).span().start,
+            ) || self
+                .paren_interior_routed_inner(self.view.ty(annotation.type_annotation))
+                .is_some()
             {
                 return self.build_annotation_own_line_directive_doc(annotation, parens);
             }
@@ -218,7 +221,7 @@ impl<'a> Printer<'a> {
             // inline before the terminator.
             let type_doc = self.with_stripped_shell_value(
                 hang.claimed_shell,
-                annotation.type_annotation,
+                self.view.ty(annotation.type_annotation),
                 ty,
                 TrailingBlock::Inline,
                 || self.build_annotation_value_doc(ty, parens),
@@ -244,7 +247,7 @@ impl<'a> Printer<'a> {
             // annotation that stripped nothing.
             self.with_stripped_shell_value(
                 hang.claimed_shell,
-                annotation.type_annotation,
+                self.view.ty(annotation.type_annotation),
                 ty,
                 TrailingBlock::Inline,
                 || match value_type {
@@ -298,7 +301,7 @@ impl<'a> Printer<'a> {
         parens: AnnotationParens,
     ) -> DocId {
         let colon_end = annotation.span.start + 1;
-        let child = annotation.type_annotation;
+        let child = self.view.ty(annotation.type_annotation);
         let (gap_end, value_doc) = if self.single_child_frozen(colon_end, child) {
             (
                 child.span().start,
@@ -621,22 +624,22 @@ impl<'a> Printer<'a> {
         annotation: &ast::TSTypeAnnotation<'_>,
     ) -> Option<DocId> {
         let d = self.d();
-        let TSType::Parenthesized(p) = annotation.type_annotation else {
+        let TSType::Parenthesized(p) = self.view.ty(annotation.type_annotation) else {
             return None;
         };
         if !self.has_comments_to_emit_between(p.span.start, p.span.end) {
             return None;
         }
-        let core = unwrap_parenthesized(p.type_annotation);
+        let core = unwrap_parenthesized(self.view, self.view.ty(p.type_annotation));
         let colon_end = annotation.span.start + 1;
         // An own-line format-ignore directive in the `:`→type gap that freezes the type
         // verbatim is the ordinary emitter's to print: the author's pairs are its slice, so
         // the frozen form parses wherever the input did. A composite the directive does not
         // freeze whole stays here, where its comment keeps a pair.
-        if self.single_child_frozen(colon_end, annotation.type_annotation) {
+        if self.single_child_frozen(colon_end, self.view.ty(annotation.type_annotation)) {
             return None;
         }
-        if !type_has_paren_form(core) {
+        if !type_has_paren_form(self.view, core) {
             // Two pairs: the type in a tight pair of its own (a lone pair would read as a
             // function type's parameter list) inside the authored outer shell, which holds
             // every comment of the stripped shells in source order.
@@ -648,7 +651,7 @@ impl<'a> Printer<'a> {
             // `((C⏎) // x⏎)` keeps `// x` trailing the `)`, as `((C) // x⏎)` does. With a
             // comment inside them, the run is read from the type's end, which keeps a
             // comment after that `)` off the inner comment's line.
-            let inner_end = p.type_annotation.span().end;
+            let inner_end = self.view.ty(p.type_annotation).span().end;
             let trailing_start = if self.has_comments_to_emit_between(core.span().end, inner_end) {
                 core.span().end
             } else {
@@ -675,7 +678,7 @@ impl<'a> Printer<'a> {
             return Some(d.concat(&parts));
         }
         let spine_end = self.type_right_spine_printed_end(core);
-        let inner_end = p.type_annotation.span().end;
+        let inner_end = self.view.ty(p.type_annotation).span().end;
         if spine_end >= inner_end
             || !self.has_line_spanning_comments_to_emit_between(spine_end, inner_end)
         {
@@ -716,25 +719,33 @@ impl<'a> Printer<'a> {
             // directive there may freeze the child, and a frozen slice prints the comments
             // inside it itself, so the walk stops before it.
             let (next, gap): (&TSType<'_>, Option<u32>) = match ty {
-                TSType::Union(ast::TSUnionType { types, .. })
-                | TSType::Intersection(ast::TSIntersectionType { types, .. }) => match types {
-                    [.., prev, last] => (*last, Some(prev.span().end)),
-                    [last] => (*last, Some(ty.span().start)),
+                &TSType::Union(ast::TSUnionType { types, .. })
+                | &TSType::Intersection(ast::TSIntersectionType { types, .. }) => match self
+                    .view
+                    .ty_list(types)
+                {
+                    &[.., prev, last] => (self.view.ty(last), Some(self.view.ty(prev).span().end)),
+                    &[last] => (self.view.ty(last), Some(ty.span().start)),
                     [] => return ty.span().end,
                 },
-                TSType::Conditional(c) => (c.false_type, Some(c.true_type.span().end)),
-                TSType::TypeOperator(o) => (o.type_annotation, Some(o.span.start)),
+                TSType::Conditional(c) => (
+                    self.view.ty(c.false_type),
+                    Some(self.view.ty(c.true_type).span().end),
+                ),
+                TSType::TypeOperator(o) => (self.view.ty(o.type_annotation), Some(o.span.start)),
                 // A directive ahead of a constructor type's return type freezes the type
                 // inside its shell, leaving the shell's comments to the walk's claimer.
-                TSType::Constructor(c) => (c.return_type.type_annotation, None),
+                TSType::Constructor(c) => (self.view.ty(c.return_type.type_annotation), None),
                 TSType::Parenthesized(p)
-                    if type_never_needs_parens(unwrap_parenthesized(p.type_annotation))
-                        || matches!(
-                            unwrap_parenthesized(p.type_annotation),
-                            TSType::TypeOperator(_)
-                        ) =>
+                    if type_never_needs_parens(unwrap_parenthesized(
+                        self.view,
+                        self.view.ty(p.type_annotation),
+                    )) || matches!(
+                        unwrap_parenthesized(self.view, self.view.ty(p.type_annotation)),
+                        TSType::TypeOperator(_)
+                    ) =>
                 {
-                    (p.type_annotation, None)
+                    (self.view.ty(p.type_annotation), None)
                 }
                 _ => return ty.span().end,
             };
@@ -760,7 +771,7 @@ impl<'a> Printer<'a> {
         // A transparent one-member composite is its member here, the `|` dropped and its
         // head gap folded into the `:`→type gap ([`Printer::transparent_value`]); every
         // read below is of the member.
-        let value = self.transparent_value(annotation.type_annotation);
+        let value = self.transparent_value(self.view.ty(annotation.type_annotation));
         let type_start = value.span().start;
 
         // One window search over the whole annotation gates every comment query below.
@@ -813,7 +824,7 @@ impl<'a> Printer<'a> {
         // Handle TypeReference with type arguments - use wrapping version when appropriate
         if let TSType::TypeReference(r) = value
             && let Some(type_args) = &r.type_arguments
-            && (always_wrap || type_args_should_wrap_for_return_type(type_args))
+            && (always_wrap || type_args_should_wrap_for_return_type(self.view, type_args))
         {
             let mut parts: DocBuf = smallvec![d.text(": ")];
             // Comments between `:` and the type (e.g., `: /* c */ Promise<string>`)
@@ -903,7 +914,11 @@ impl<'a> Printer<'a> {
         // Single type - just use the normal intersection doc
         // Extract comments between `:` and the type (e.g., `: & /* c */ A`)
         if intersection.types.len() == 1 {
-            let first_type_start = intersection.types[0].span().start;
+            let first_type_start = self
+                .view
+                .ty(self.view.ty_list(intersection.types)[0])
+                .span()
+                .start;
             // A LINE comment in the `:`→member window (it sits in the intersection's
             // leading-`&` gap — a comment before the span would have routed to
             // `build_type_annotation_doc`'s line-comment branch instead): emit the
@@ -919,7 +934,7 @@ impl<'a> Printer<'a> {
             // one-member composite before this arm is asked; delete once a planted panic
             // here also survives `ignore:audit` and `gaps:audit`.
             if self.has_line_comments_between(colon_end, first_type_start) {
-                let child = intersection.types[0];
+                let child = self.view.ty(self.view.ty_list(intersection.types)[0]);
                 let value_doc = if self.single_child_frozen(colon_end, child) {
                     self.build_frozen_single_child_doc(child)
                 } else {
@@ -933,7 +948,7 @@ impl<'a> Printer<'a> {
             {
                 parts.push(comments_doc);
             }
-            parts.push(self.build_type_doc(intersection.types[0]));
+            parts.push(self.build_type_doc(self.view.ty(self.view.ty_list(intersection.types)[0])));
             return d.concat(&parts);
         }
 
@@ -966,13 +981,13 @@ impl<'a> Printer<'a> {
 /// `readonly` and the pairs around its operand. Every keyword type answers `false`,
 /// `void` / `null` / `true` included: tsc reads those as a parenthesized type, but tsv's
 /// own parser does not, so they take the two pairs it can reread.
-fn type_has_paren_form(ty: &TSType<'_>) -> bool {
+fn type_has_paren_form(view: AstView<'_>, ty: &TSType<'_>) -> bool {
     match ty {
         TSType::TypeReference(r) => {
             r.type_arguments.is_some() || !matches!(r.type_name, ast::TSEntityName::Identifier(_))
         }
         TSType::TypeOperator(o) if o.operator == ast::TSTypeOperatorKind::Readonly => {
-            type_has_paren_form(unwrap_parenthesized(o.type_annotation))
+            type_has_paren_form(view, unwrap_parenthesized(view, view.ty(o.type_annotation)))
         }
         TSType::Keyword(_)
         | TSType::ThisType(_)
