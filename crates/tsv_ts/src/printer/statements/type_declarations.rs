@@ -65,14 +65,14 @@ fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType<'_>) -> bo
         | TSType::Mapped(_)
         | TSType::Tuple(_)
         | TSType::Function(_)
-        | TSType::Constructor(_)
+        | TSType::Constructor(..)
         // `import(...)` hugs the `=` like a call — its specifier path doesn't
         // break, and any comments expand the parens internally.
-        | TSType::Import(_) => true,
+        | TSType::Import(..) => true,
         // `typeof import(...)` hugs the `=` for the same reason — the import
         // call inside the type query provides the internal break.
         TSType::TypeQuery(q) => {
-            matches!(q.expr_name, ast::TSTypeQueryExprName::Import(_))
+            matches!(q.expr_name, ast::TSTypeQueryExprName::Import(..))
         }
         // TypeReference with type arguments has internal breaking via `<>`
         TSType::TypeReference(r) => r.type_arguments.is_some(),

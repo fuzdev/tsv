@@ -732,7 +732,7 @@ impl<'a> Printer<'a> {
                 TSType::TypeOperator(o) => (self.view.ty(o.type_annotation), Some(o.span.start)),
                 // A directive ahead of a constructor type's return type freezes the type
                 // inside its shell, leaving the shell's comments to the walk's claimer.
-                TSType::Constructor(c) => (self.view.ty(c.return_type.type_annotation), None),
+                TSType::Constructor(_, c) => (self.view.ty(c.return_type.type_annotation), None),
                 TSType::Parenthesized(p)
                     if type_never_needs_parens(unwrap_parenthesized(
                         self.view,

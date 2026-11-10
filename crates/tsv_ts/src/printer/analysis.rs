@@ -348,14 +348,14 @@ pub(crate) fn is_multiline_template_expression(expr: &ast::Expression<'_>) -> bo
 pub(crate) fn build_entity_name_doc(printer: &Printer<'_>, name: &ast::TSEntityName<'_>) -> DocId {
     let qn = match name {
         ast::TSEntityName::Identifier(id) => return printer.identifier_name_doc(id),
-        ast::TSEntityName::QualifiedName(qn) => qn,
+        ast::TSEntityName::QualifiedName(_, qn) => qn,
     };
     let mut spine: SmallVec<[&ast::TSQualifiedName<'_>; 8]> = SmallVec::new();
     let mut node: &ast::TSQualifiedName<'_> = qn;
     let base = loop {
         spine.push(node);
         match &node.left {
-            ast::TSEntityName::QualifiedName(left) => node = left,
+            ast::TSEntityName::QualifiedName(_, left) => node = left,
             ast::TSEntityName::Identifier(id) => break id,
         }
     };

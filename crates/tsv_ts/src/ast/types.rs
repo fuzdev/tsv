@@ -30,13 +30,14 @@ pub struct TSTypeAnnotation {
 /// Three variants are arena-boxed rather than inline — `Import`, `Constructor` and
 /// `Infer` — for the density reason `Statement` and `Expression` take: each is wide
 /// enough to set the enum's size on its own and rare enough that the allocation is free,
-/// while the width is paid by every row of the type store. That row is the only place a
-/// `TSType` lives: no AST field holds one by value — every holder, lists included (union /
-/// intersection members, tuple elements, type arguments, template-literal types, as
-/// `Run<TyId>`), names by its [`TyId`] the row the type parser's precedence ladder already
-/// pushed, since each level returns one (see `Parser::parse_type`). The widest inline
-/// variants are `TSTypeReference` / `TSTypeQuery` / `TSMappedType` / `TSFunctionType`, and
-/// `TSTypeReference` is the common case, so the ladder stops there.
+/// while the width is paid by every row of the type store. Each carries its span inline
+/// beside the reference, so [`TSType::span`] reads every variant without leaving the row.
+/// A type-store row is the only place a `TSType` lives: no AST field holds one by value — every
+/// holder, lists included (union / intersection members, tuple elements, type arguments,
+/// template-literal types, as `Run<TyId>`), names by its [`TyId`] the row the type parser's
+/// precedence ladder already pushed, since each level returns one (see `Parser::parse_type`).
+/// The widest inline variants are `TSTypeReference` / `TSTypeQuery` / `TSMappedType` /
+/// `TSFunctionType`, and `TSTypeReference` is the common case, so the ladder stops there.
 #[derive(Debug, Clone)]
 pub enum TSType<'arena> {
     /// Primitive type keywords (number, string, boolean, etc.)
@@ -56,7 +57,7 @@ pub enum TSType<'arena> {
     /// Function types: `(x: T) => U`
     Function(TSFunctionType<'arena>),
     /// Constructor types: `new () => T` or `abstract new <T>() => T`
-    Constructor(&'arena TSConstructorType<'arena>),
+    Constructor(Span, &'arena TSConstructorType<'arena>),
     /// Tuple types: `[T, U]`
     Tuple(TSTupleType),
     /// Parenthesized types: `(T)`
@@ -70,7 +71,7 @@ pub enum TSType<'arena> {
     /// Type operators: `keyof T`, `unique symbol`, `readonly T`
     TypeOperator(TSTypeOperator),
     /// Import types: `import('module')` or `import('module').Foo<T>`
-    Import(&'arena TSImportType<'arena>),
+    Import(Span, &'arena TSImportType<'arena>),
     /// Type query: `typeof x`, `typeof Foo.bar`, `typeof import("module")`
     TypeQuery(TSTypeQuery<'arena>),
     /// Indexed access types: `T[K]`, `Obj["key"]`, `T[keyof T]`
@@ -82,7 +83,7 @@ pub enum TSType<'arena> {
     /// Named tuple member: `label: T` or `label?: T`
     NamedTupleMember(TSNamedTupleMember<'arena>),
     /// Infer type: `infer U` (in conditional types)
-    Infer(&'arena TSInferType<'arena>),
+    Infer(Span, &'arena TSInferType<'arena>),
     /// This type: `this` (in type position)
     ThisType(TSThisType),
 }
@@ -99,20 +100,20 @@ impl<'arena> TSType<'arena> {
             TSType::TypeReference(r) => r.span,
             TSType::TypeLiteral(t) => t.span,
             TSType::Function(f) => f.span,
-            TSType::Constructor(c) => c.span,
+            TSType::Constructor(span, _) => *span,
             TSType::Tuple(t) => t.span,
             TSType::Parenthesized(p) => p.span,
             TSType::TypePredicate(p) => p.span,
             TSType::Conditional(c) => c.span,
             TSType::Mapped(m) => m.span,
             TSType::TypeOperator(o) => o.span,
-            TSType::Import(i) => i.span,
+            TSType::Import(span, _) => *span,
             TSType::TypeQuery(q) => q.span,
             TSType::IndexedAccess(i) => i.span,
             TSType::Rest(r) => r.span,
             TSType::Optional(o) => o.span,
             TSType::NamedTupleMember(n) => n.span,
-            TSType::Infer(i) => i.span,
+            TSType::Infer(span, _) => *span,
             TSType::ThisType(t) => t.span,
         }
     }
@@ -368,14 +369,16 @@ pub struct TSTypeReference<'arena> {
 #[derive(Debug, Clone)]
 pub enum TSEntityName<'arena> {
     Identifier(Identifier<'arena>),
-    QualifiedName(&'arena TSQualifiedName<'arena>),
+    /// The qualified name's span inline beside the reference, so [`TSEntityName::span`]
+    /// reads it without the hop.
+    QualifiedName(Span, &'arena TSQualifiedName<'arena>),
 }
 
 impl<'arena> TSEntityName<'arena> {
     pub fn span(&self) -> Span {
         match self {
             TSEntityName::Identifier(id) => id.span,
-            TSEntityName::QualifiedName(qn) => qn.span,
+            TSEntityName::QualifiedName(span, _) => *span,
         }
     }
 }
@@ -804,15 +807,15 @@ pub struct TSImportType<'arena> {
 pub enum TSTypeQueryExprName<'arena> {
     /// Entity name (Identifier or QualifiedName): `typeof x`, `typeof Foo.bar`
     EntityName(TSEntityName<'arena>),
-    /// Import type: `typeof import("module")`
-    Import(&'arena TSImportType<'arena>),
+    /// Import type: `typeof import("module")`, its span inline beside the reference.
+    Import(Span, &'arena TSImportType<'arena>),
 }
 
 impl<'arena> TSTypeQueryExprName<'arena> {
     pub fn span(&self) -> Span {
         match self {
             TSTypeQueryExprName::EntityName(e) => e.span(),
-            TSTypeQueryExprName::Import(i) => i.span,
+            TSTypeQueryExprName::Import(span, _) => *span,
         }
     }
 }

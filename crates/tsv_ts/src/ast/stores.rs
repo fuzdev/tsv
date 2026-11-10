@@ -535,14 +535,14 @@ try {
                         aliased = true;
                     }
                     match view.ty(x.type_annotation) {
-                        TSType::Constructor(t) => push!(ctor_types, *t),
-                        TSType::Import(t) => push!(import_types, *t),
+                        TSType::Constructor(_, t) => push!(ctor_types, *t),
+                        TSType::Import(_, t) => push!(import_types, *t),
                         TSType::Conditional(c) => match view.ty(c.extends_type) {
-                            TSType::Infer(t) => push!(infer_types, *t),
+                            TSType::Infer(_, t) => push!(infer_types, *t),
                             other => panic!("an unexpected extends type: {other:?}"),
                         },
                         TSType::TypeReference(r) => match &r.type_name {
-                            TSEntityName::QualifiedName(q) => push!(qual_names, *q),
+                            TSEntityName::QualifiedName(_, q) => push!(qual_names, *q),
                             other => panic!("an unexpected type name: {other:?}"),
                         },
                         other => panic!("an unexpected type: {other:?}"),
