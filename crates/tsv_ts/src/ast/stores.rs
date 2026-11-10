@@ -18,10 +18,7 @@ use std::ops::Deref;
 
 use tsv_lang::store::{Id, ListBuf, ListMark, Row, Store};
 
-use super::{
-    EmptyStatement, Expression, ExpressionKind, Program, Span, Statement, StatementKind,
-    TSThisType, TSType, ThisExpression,
-};
+use super::{Expression, Program, Statement, TSType};
 
 /// The family tag of [`Expression`] rows, naming them without their lifetime.
 pub enum Expr {}
@@ -39,12 +36,6 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<ExprId>() == 4);
     assert!(STORE_CHECK || size_of::<Option<ExprId>>() == 4);
     assert!(STORE_CHECK || size_of::<Run<ExprId>>() == 8);
-};
-
-/// Slot 0 of the expression store. No id reaches it, so its contents are never read.
-const EXPR_SENTINEL: Expression<'static> = Expression {
-    span: Span { start: 0, end: 0 },
-    kind: ExpressionKind::ThisExpression(ThisExpression),
 };
 
 /// The family tag of [`Statement`] rows, naming them without their lifetime.
@@ -65,12 +56,6 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Run<StmtId>>() == 8);
 };
 
-/// Slot 0 of the statement store. No id reaches it, so its contents are never read.
-const STMT_SENTINEL: Statement<'static> = Statement {
-    span: Span { start: 0, end: 0 },
-    kind: StatementKind::EmptyStatement(EmptyStatement),
-};
-
 /// The family tag of [`TSType`] rows, naming them without their lifetime.
 pub enum Ty {}
 
@@ -89,16 +74,11 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Run<TyId>>() == 8);
 };
 
-/// Slot 0 of the type store. No id reaches it, so its contents are never read.
-const TY_SENTINEL: TSType<'static> = TSType::ThisType(TSThisType {
-    span: Span { start: 0, end: 0 },
-});
-
 /// One document's expression, statement and type stores and the scratch stacks that build
 /// their lists.
 ///
-/// A fresh one allocates one one-row buffer per store, for its sentinel, and nothing for the
-/// scratch stacks.
+/// A fresh one allocates nothing: a store's buffer is allocated by its first write, and a
+/// scratch stack's by its first push.
 pub struct AstStores<'arena> {
     pub(crate) exprs: Store<Expression<'arena>>,
     pub(crate) expr_lists: Store<ExprId>,
@@ -164,17 +144,17 @@ impl AstStores<'_> {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            exprs: Store::new(EXPR_SENTINEL),
-            expr_lists: Store::new(Id::SENTINEL),
-            expr_opt_lists: Store::new(None),
+            exprs: Store::new(),
+            expr_lists: Store::new(),
+            expr_opt_lists: Store::new(),
             expr_scratch: ListBuf::new(),
             expr_list_scratch: ListBuf::new(),
             expr_opt_scratch: ListBuf::new(),
-            stmts: Store::new(STMT_SENTINEL),
-            stmt_lists: Store::new(Id::SENTINEL),
+            stmts: Store::new(),
+            stmt_lists: Store::new(),
             stmt_list_scratch: ListBuf::new(),
-            tys: Store::new(TY_SENTINEL),
-            ty_lists: Store::new(Id::SENTINEL),
+            tys: Store::new(),
+            ty_lists: Store::new(),
             ty_list_scratch: ListBuf::new(),
         }
     }
@@ -209,16 +189,16 @@ impl AstStores<'_> {
         ty_lists.reset();
         ty_list_scratch.reset();
         AstStores {
-            exprs: exprs.recycle(EXPR_SENTINEL),
+            exprs: exprs.recycle(),
             expr_lists,
             expr_opt_lists,
             expr_scratch: expr_scratch.recycle(),
             expr_list_scratch,
             expr_opt_scratch,
-            stmts: stmts.recycle(STMT_SENTINEL),
+            stmts: stmts.recycle(),
             stmt_lists,
             stmt_list_scratch,
-            tys: tys.recycle(TY_SENTINEL),
+            tys: tys.recycle(),
             ty_lists,
             ty_list_scratch,
         }
@@ -276,9 +256,32 @@ pub fn with_stores<'arena, R>(f: impl FnOnce(&mut AstStores<'arena>) -> R) -> R 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::{
+        EmptyStatement, ExpressionKind, Span, StatementKind, TSThisType, ThisExpression,
+    };
+
+    const SPAN: Span = Span { start: 0, end: 0 };
+
+    fn an_expr() -> Expression<'static> {
+        Expression {
+            span: SPAN,
+            kind: ExpressionKind::ThisExpression(ThisExpression),
+        }
+    }
+
+    fn a_stmt() -> Statement<'static> {
+        Statement {
+            span: SPAN,
+            kind: StatementKind::EmptyStatement(EmptyStatement),
+        }
+    }
+
+    fn a_ty() -> TSType<'static> {
+        TSType::ThisType(TSThisType { span: SPAN })
+    }
 
     fn with_a_row(stores: &mut AstStores<'_>) -> usize {
-        stores.exprs.push(EXPR_SENTINEL).index()
+        stores.exprs.push(an_expr()).index()
     }
 
     #[test]
@@ -299,37 +302,27 @@ mod tests {
     #[test]
     fn a_park_rewinds_the_statement_stores() {
         let mut stores = AstStores::new();
-        stores.stmts.push(STMT_SENTINEL);
-        stores.stmts.push(STMT_SENTINEL);
-        stores.stmt_lists.push(Id::SENTINEL);
-        stores.stmt_lists.push(Id::SENTINEL);
+        let id = stores.stmts.push(a_stmt());
+        stores.stmts.push(a_stmt());
+        stores.stmt_lists.push(id);
+        stores.stmt_lists.push(id);
         let mut stores = stores.park();
-        assert_eq!(
-            stores.stmts.push(STMT_SENTINEL).index(),
-            1,
-            "the rows rewind"
-        );
-        assert_eq!(
-            stores.stmt_lists.push(Id::SENTINEL).index(),
-            1,
-            "the id lists rewind"
-        );
+        let id = stores.stmts.push(a_stmt());
+        assert_eq!(id.index(), 1, "the rows rewind");
+        assert_eq!(stores.stmt_lists.push(id).index(), 1, "the id lists rewind");
     }
 
     #[test]
     fn a_park_rewinds_the_type_stores() {
         let mut stores = AstStores::new();
-        stores.tys.push(TY_SENTINEL);
-        stores.tys.push(TY_SENTINEL);
-        stores.ty_lists.push(Id::SENTINEL);
-        stores.ty_lists.push(Id::SENTINEL);
+        let id = stores.tys.push(a_ty());
+        stores.tys.push(a_ty());
+        stores.ty_lists.push(id);
+        stores.ty_lists.push(id);
         let mut stores = stores.park();
-        assert_eq!(stores.tys.push(TY_SENTINEL).index(), 1, "the rows rewind");
-        assert_eq!(
-            stores.ty_lists.push(Id::SENTINEL).index(),
-            1,
-            "the id lists rewind"
-        );
+        let id = stores.tys.push(a_ty());
+        assert_eq!(id.index(), 1, "the rows rewind");
+        assert_eq!(stores.ty_lists.push(id).index(), 1, "the id lists rewind");
     }
 
     #[test]
