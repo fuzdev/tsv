@@ -2530,7 +2530,9 @@ impl<'a> Printer<'a> {
             ast::TSTypeQueryExprName::EntityName(entity) => self.build_entity_name_doc(entity),
             // `typeof import(...)` — identical to `TSType::Import`, including comment
             // preservation around the specifier, qualifier, and type arguments.
-            ast::TSTypeQueryExprName::Import(_, i) => self.build_import_type_doc(i),
+            &ast::TSTypeQueryExprName::Import(_, i) => {
+                self.build_import_type_doc(self.view.import_type(i))
+            }
         }
     }
 }

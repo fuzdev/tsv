@@ -126,8 +126,9 @@ pub(super) fn try_expand_last_arg(
             span: arrow_span,
             kind: ast::ExpressionKind::ArrowFunctionExpression(arrow),
         }) => {
-            could_expand_arrow_chain(printer.view, printer.view.arrow_fn(arrow))
-                || match &printer.view.arrow_fn(arrow).body {
+            let arrow = printer.view.arrow_fn(arrow);
+            could_expand_arrow_chain(printer.view, arrow)
+                || match &arrow.body {
                     ast::ArrowFunctionBody::Expression(body_expr) => {
                         (arrow_body_is_call_through_non_null(
                             printer.view,
@@ -136,7 +137,7 @@ pub(super) fn try_expand_last_arg(
                             && !(has_comments
                                 && arrow_hug_refused_by_comments(
                                     printer,
-                                    printer.view.arrow_fn(arrow),
+                                    arrow,
                                     arrow_span,
                                     printer.view.expr(*body_expr),
                                 ))
