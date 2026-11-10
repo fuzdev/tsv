@@ -711,6 +711,48 @@ impl<F> fmt::Debug for ListMark<F> {
     }
 }
 
+/// One overflow check for the marks of a group of [`ListBuf`]s, rather than one per buffer:
+/// [`ListBuf::mark_in`] marks a buffer and folds its height into the group, and
+/// [`MarkGroup::check`] then checks every folded height at once.
+///
+/// A mark holds its buffer's height as a `u32`, so a height past `u32::MAX` must end in the
+/// overflow path rather than truncate. The group keeps the bitwise OR of its heights, which is
+/// past `u32::MAX` exactly when one of the heights is: a height fits a `u32` exactly when its
+/// bits above the 32nd are all clear, and the OR clears those bits only when every height
+/// does. On a 32-bit target every height fits and the check folds away.
+///
+/// A mark taken into a group is unchecked until the group is: the caller hands no mark on
+/// before [`MarkGroup::check`] returns, and a debug build also checks each mark as it is taken.
+/// Checking after the marks rather than before lets each height be read, folded and stored in
+/// one pass, rather than held across the check.
+#[must_use]
+pub struct MarkGroup {
+    heights: usize,
+}
+
+impl MarkGroup {
+    /// An empty group.
+    #[inline]
+    pub const fn new() -> Self {
+        Self { heights: 0 }
+    }
+
+    /// Ends in the store's overflow path when a height folded into the group is past
+    /// `u32::MAX`, which makes every mark taken into it a faithful one.
+    #[inline]
+    pub fn check(self) {
+        if u32::try_from(self.heights).is_err() {
+            store_overflow();
+        }
+    }
+}
+
+impl Default for MarkGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// The scratch stack that builds child lists: one buffer shared by every open frame of the same
 /// element type, each frame flushing as one contiguous run.
 ///
@@ -778,14 +820,28 @@ impl<T: Row> ListBuf<T> {
     /// Opens a frame at the current top of the stack.
     #[inline]
     pub fn mark(&self) -> ListMark<T::Family> {
-        match u32::try_from(self.items.len()) {
-            Ok(top) => ListMark {
-                top,
-                #[cfg(feature = "_internal_store_check")]
-                seq: self.live.open(),
-                family: PhantomData,
-            },
-            Err(_) => store_overflow(),
+        let mut group = MarkGroup::new();
+        let mark = self.mark_in(&mut group);
+        group.check();
+        mark
+    }
+
+    /// Opens a frame at the current top of the stack, its height left for `group` to check (see
+    /// [`MarkGroup`]): the mark is faithful only once [`MarkGroup::check`] has returned, so hand
+    /// it on after that, never before.
+    #[inline]
+    pub fn mark_in(&self, group: &mut MarkGroup) -> ListMark<T::Family> {
+        let height = self.items.len();
+        debug_assert!(
+            u32::try_from(height).is_ok(),
+            "store overflow: more rows than a u32 index can name"
+        );
+        group.heights |= height;
+        ListMark {
+            top: height as u32,
+            #[cfg(feature = "_internal_store_check")]
+            seq: self.live.open(),
+            family: PhantomData,
         }
     }
 
@@ -1404,6 +1460,55 @@ mod tests {
 
     // The refused arms on a written store are the overflow: a mint refuses a written store only
     // past the last index, which a test cannot allocate, so these call the arms directly.
+    #[test]
+    fn a_mark_group_admits_heights_up_to_the_last_u32() {
+        MarkGroup { heights: 0 }.check();
+        MarkGroup {
+            heights: u32::MAX as usize,
+        }
+        .check();
+    }
+
+    // one height past the last `u32` among small ones, which a test cannot allocate, so the
+    // group is built with the OR its marks would fold
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    #[should_panic(expected = "store overflow")]
+    fn a_mark_group_refuses_one_height_past_the_last_u32() {
+        MarkGroup {
+            heights: 5 | 1 << 32 | 2,
+        }
+        .check();
+    }
+
+    #[test]
+    fn a_group_mark_is_the_checked_mark() {
+        let mut scratch: ListBuf<Node<'_>> = ListBuf::new();
+        scratch.push(Node("a"));
+        let mut deeper: ListBuf<Node<'_>> = ListBuf::new();
+        deeper.push(Node("b"));
+        deeper.push(Node("c"));
+        let mut group = MarkGroup::new();
+        let (shallow, deep) = (scratch.mark_in(&mut group), deeper.mark_in(&mut group));
+        assert_eq!(group.heights, 1 | 2);
+        group.check();
+        assert_eq!(shallow.index(), scratch.mark().index());
+        assert_eq!(deep.index(), 2);
+        assert_eq!(deeper.len_since(deep), 0);
+    }
+
+    #[test]
+    fn a_group_mark_keeps_a_height_past_sixteen_bits() {
+        let mut scratch: ListBuf<Node<'_>> = ListBuf::new();
+        for _ in 0..=u16::MAX {
+            scratch.push(Node("a"));
+        }
+        let mut group = MarkGroup::new();
+        let mark = scratch.mark_in(&mut group);
+        group.check();
+        assert_eq!(mark.index(), 1 << 16);
+    }
+
     #[test]
     #[should_panic(expected = "store overflow")]
     fn a_refused_push_on_a_written_store_overflows() {
