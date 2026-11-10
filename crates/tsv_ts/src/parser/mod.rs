@@ -12,7 +12,7 @@ use bumpalo::collections::Vec as BumpVec;
 use census_vec::BumpVec;
 use std::collections::BTreeSet;
 use std::ops::ControlFlow;
-use tsv_lang::store::{Id, IdRet, ListMark, Row, Store};
+use tsv_lang::store::{Id, IdRet, ListBuf, ListMark, Row, Store};
 use tsv_lang::{DepthBudget, DepthLimit, Error, Span, SpineCount};
 
 /// What the expression ladder's parse functions return: see §The expression ladder's return
@@ -523,6 +523,26 @@ pub(crate) fn push_row<T: Row + Clone>(store: &mut Store<T>, row: T) -> Id<T::Fa
     #[cfg(feature = "_internal_ast_census")]
     tsv_lang::ast_census_probe::mint::<T>(1);
     store.push(row)
+}
+
+/// Flush the list opened at `mark` on `scratch` into `store` and mint its run: where a list
+/// built by value becomes rows. A free function over the two field paths, as [`push_row`] is,
+/// so a caller can flush while it holds a disjoint borrow of the other stores.
+// TODO: unread until the value-run lists are runs; their builders flush here then.
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "the value-run lists are still built in the arena")
+)]
+#[inline]
+pub(crate) fn flush_run<T: Row + Clone>(
+    scratch: &mut ListBuf<T>,
+    store: &mut Store<T>,
+    mark: ListMark<T::Family>,
+) -> Run<T::Family> {
+    let run = scratch.flush_move(mark, store);
+    #[cfg(feature = "_internal_ast_census")]
+    tsv_lang::ast_census_probe::mint::<T>(run.len());
+    run
 }
 
 /// [`push_row`] for a payload that keeps a span of its own, read by `span_of`: returns that
@@ -2714,7 +2734,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.spine = spine;
         self.lt_regions = lt_regions;
         self.abandoned_type_arguments_error = abandoned_type_arguments_error;
-        self.stores.truncate_scratch(scratch_marks);
+        self.stores.truncate_scratch(&scratch_marks);
         // Whatever the abandoned parse's type grammar was handing to itself is not
         // for the re-parse to receive (`checkpoint` asserts it was empty).
         self.pending_conditional_extends = None;
@@ -4323,10 +4343,10 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     if !parser.gave_up_list_to_tsc_follower
         || (first.is_ok() && !parser.kept_list_past_tsc_follower)
     {
-        return finish_driver_parse(stores, scratch_marks, first.map_err(|(error, _)| error));
+        return finish_driver_parse(stores, &scratch_marks, first.map_err(|(error, _)| error));
     }
     if first.is_err() {
-        stores.truncate_scratch(scratch_marks);
+        stores.truncate_scratch(&scratch_marks);
     }
     #[cfg(feature = "_internal_ast_census")]
     let ast_census_retry_mark = tsv_lang::ast_census_probe::mark();
@@ -4342,7 +4362,7 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
         .and_then(|parsed| checked(retry.stores.view(), parsed));
     // A failed re-read leaves its open frames behind whichever parse is kept.
     if second.is_err() {
-        stores.truncate_scratch(scratch_marks);
+        stores.truncate_scratch(&scratch_marks);
     }
     // the parse kept is the second if it succeeded, else the first; the other's rows are
     // abandoned
@@ -4359,7 +4379,7 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
         (Err((_, false)), Err((error, false))) if !embedded => Err(error),
         (Err((error, _)), Err(_)) => Err(error),
     };
-    finish_driver_parse(stores, scratch_marks, outcome)
+    finish_driver_parse(stores, &scratch_marks, outcome)
 }
 
 /// The driver's exit: a failed parse leaves no open scratch frame behind it, for whatever
@@ -4367,7 +4387,7 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
 #[inline]
 fn finish_driver_parse<'arena, T>(
     stores: &mut AstStores<'arena>,
-    marks: ScratchMarks,
+    marks: &ScratchMarks,
     outcome: Result<T, Error>,
 ) -> Result<T, Error> {
     if outcome.is_err() {

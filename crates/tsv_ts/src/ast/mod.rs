@@ -34,14 +34,18 @@ mod view;
 
 pub(crate) use stores::ScratchMarks;
 pub use stores::{
-    ArrowFn, ArrowFnId, AstStores, Catch, CatchId, ClassDecl, ClassDeclId, ClassExpr, ClassExprId,
-    CtorType, CtorTypeId, DeclareFn, DeclareFnId, EnumDecl, EnumDeclId, ExportAll, ExportAllId,
-    ExportAssign, ExportAssignId, ExportDefault, ExportDefaultId, ExportNamed, ExportNamedId, Expr,
-    ExprId, FnDecl, FnDeclId, FnExpr, FnExprId, ForHead, ForHeadId, ForLeft, ForLeftId, ImportDecl,
-    ImportDeclId, ImportEquals, ImportEqualsId, ImportType, ImportTypeId, InferType, InferTypeId,
-    InterfaceDecl, InterfaceDeclId, MetaProp, MetaPropId, ModuleDecl, ModuleDeclId, ParamExtra,
-    ParamExtraId, Parsed, QualName, QualNameId, Stmt, StmtId, TaggedTpl, TaggedTplId, Ty, TyId,
-    TypeAlias, TypeAliasId, with_stores,
+    ArrowFn, ArrowFnId, AstStores, Case, CaseList, Catch, CatchId, ClassDecl, ClassDeclId,
+    ClassExpr, ClassExprId, ClassMem, ClassMemList, CtorType, CtorTypeId, Declarator,
+    DeclaratorList, DeclareFn, DeclareFnId, Deco, DecoList, EnumDecl, EnumDeclId, EnumMem,
+    EnumMemList, ExportAll, ExportAllId, ExportAssign, ExportAssignId, ExportDefault,
+    ExportDefaultId, ExportNamed, ExportNamedId, ExportSpec, ExportSpecList, Expr, ExprId, FnDecl,
+    FnDeclId, FnExpr, FnExprId, ForHead, ForHeadId, ForLeft, ForLeftId, Heritage, HeritageList,
+    ImportAttr, ImportAttrList, ImportDecl, ImportDeclId, ImportEquals, ImportEqualsId, ImportSpec,
+    ImportSpecList, ImportType, ImportTypeId, IndexParam, IndexParamList, InferType, InferTypeId,
+    InterfaceDecl, InterfaceDeclId, MetaProp, MetaPropId, ModuleDecl, ModuleDeclId, ObjProp,
+    ObjPropList, ParamExtra, ParamExtraId, Parsed, PatProp, PatPropList, QualName, QualNameId,
+    Quasi, QuasiList, Stmt, StmtId, TaggedTpl, TaggedTplId, Ty, TyId, TypeAlias, TypeAliasId,
+    TypeMember, TypeMemberList, TypeParam, TypeParamList, with_stores,
 };
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
