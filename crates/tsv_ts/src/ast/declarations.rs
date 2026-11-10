@@ -6,8 +6,9 @@
 use tsv_lang::Span;
 
 use super::{
-    AstView, Expr, ExprId, Identifier, Literal, ModuleDeclId, Run, StmtId, TSEntityName,
-    TSTypeAnnotation, TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
+    AstView, EnumMemList, Expr, ExprId, HeritageList, Identifier, Literal, ModuleDeclId, Run,
+    StmtId, TSEntityName, TSTypeAnnotation, TSTypeParameterDeclaration,
+    TSTypeParameterInstantiation, TypeMemberList,
 };
 
 /// Interface declaration: `interface Foo { ... }` or `interface Foo extends Bar { ... }`
@@ -15,7 +16,7 @@ use super::{
 pub struct TSInterfaceDeclaration<'arena> {
     pub id: Identifier<'arena>,
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
-    pub extends: &'arena [TSInterfaceHeritage<'arena>],
+    pub extends: HeritageList<'arena>,
     pub body: TSInterfaceBody<'arena>,
     pub declare: bool,
     pub span: Span,
@@ -32,7 +33,7 @@ pub struct TSInterfaceHeritage<'arena> {
 /// Interface body: `{ members }`
 #[derive(Debug, Clone)]
 pub struct TSInterfaceBody<'arena> {
-    pub body: &'arena [TSTypeElement<'arena>],
+    pub body: TypeMemberList<'arena>,
     pub span: Span,
 }
 
@@ -68,7 +69,7 @@ pub struct TSEnumDeclaration<'arena> {
     /// Enum name
     pub id: Identifier<'arena>,
     /// Enum members
-    pub members: &'arena [TSEnumMember<'arena>],
+    pub members: EnumMemList<'arena>,
     /// Whether this is a const enum
     pub r#const: bool,
     /// Whether this is an ambient declaration (declare enum)

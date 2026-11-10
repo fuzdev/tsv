@@ -140,13 +140,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse optional extends clause
-        let extends: &'arena [TSInterfaceHeritage<'arena>] =
-            if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
-                self.advance()?;
-                self.parse_interface_heritage_list()?.into_bump_slice()
-            } else {
-                &[]
-            };
+        let extends: HeritageList<'arena> = if self.check(&TokenKind::Keyword(KeywordKind::Extends))
+        {
+            self.advance()?;
+            self.parse_interface_heritage_list()?.into_bump_slice()
+        } else {
+            &[]
+        };
 
         // Parse interface body
         let body = self.parse_interface_body()?;

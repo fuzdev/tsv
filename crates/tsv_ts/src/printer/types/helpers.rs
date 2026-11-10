@@ -763,8 +763,7 @@ pub(in crate::printer) fn type_literal_members_hold_brace_type(
     view: AstView<'_>,
     literal: &ast::TSTypeLiteral<'_>,
 ) -> bool {
-    literal
-        .members
+    view.type_members(literal.members)
         .iter()
         .any(|member| type_element_holds_brace_type(view, member))
 }
@@ -796,7 +795,8 @@ fn type_element_holds_brace_type(view: AstView<'_>, member: &ast::TSTypeElement<
         ),
         TSTypeElement::IndexSignature(i) => {
             annotation_holds_brace_type(view, i.type_annotation.as_ref())
-                || i.parameters
+                || view
+                    .index_params(i.parameters)
                     .iter()
                     .any(|param| annotation_holds_brace_type(view, param.type_annotation(view)))
         }
@@ -827,7 +827,7 @@ fn type_parameters_hold_brace_type(
     view: AstView<'_>,
     decl: &ast::TSTypeParameterDeclaration<'_>,
 ) -> bool {
-    decl.params
+    view.type_params(decl.params)
         .iter()
         .any(|param| type_parameter_holds_brace_type(view, param))
 }

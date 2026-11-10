@@ -76,8 +76,14 @@ impl<'a> Printer<'a> {
     fn has_frozen_multiline_type_param(&self, decl: &TSTypeParameterDeclaration<'_>) -> bool {
         self.has_format_ignore
             && (0..decl.params.len()).any(|i| {
-                self.list_item_frozen(decl.span.start + 1, &|j| decl.params[j].span, i)
-                    && !self.is_same_line(decl.params[i].span.start, decl.params[i].span.end)
+                self.list_item_frozen(
+                    decl.span.start + 1,
+                    &|j| self.view.type_params(decl.params)[j].span,
+                    i,
+                ) && !self.is_same_line(
+                    self.view.type_params(decl.params)[i].span.start,
+                    self.view.type_params(decl.params)[i].span.end,
+                )
             })
     }
 
@@ -122,10 +128,17 @@ impl<'a> Printer<'a> {
         self.build_angle_list_doc(
             decl.span,
             decl.params.len(),
-            |i| decl.params[i].span,
-            |i, frozen, _| self.build_type_parameter_item_doc(&decl.params[i], frozen),
+            |i| self.view.type_params(decl.params)[i].span,
+            |i, frozen, _| {
+                self.build_type_parameter_item_doc(&self.view.type_params(decl.params)[i], frozen)
+            },
             |_, _| None,
-            |i| !self.is_same_line(decl.params[i].span.start, decl.params[i].span.end),
+            |i| {
+                !self.is_same_line(
+                    self.view.type_params(decl.params)[i].span.start,
+                    self.view.type_params(decl.params)[i].span.end,
+                )
+            },
             has_comments,
             false, // a type parameter never opens with `<`
         )
@@ -150,13 +163,15 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         // Type parameters are declarations, never types, so no leading-edge paren shell
         // can widen an item span here — Rule A reads the params' own spans directly.
-        let item_span = |i: usize| decl.params[i].span;
+        let item_span = |i: usize| self.view.type_params(decl.params)[i].span;
         self.build_angle_list_with_line_comments(
             decl.span,
             decl.params.len(),
             |i| self.list_item_frozen(decl.span.start + 1, &item_span, i),
             item_span,
-            |i, frozen| self.build_type_parameter_item_doc(&decl.params[i], frozen),
+            |i, frozen| {
+                self.build_type_parameter_item_doc(&self.view.type_params(decl.params)[i], frozen)
+            },
         )
     }
 
@@ -174,16 +189,20 @@ impl<'a> Printer<'a> {
         if !self.has_comments_on_page_between(decl.span.start, decl.span.end) {
             return false;
         }
-        self.has_expanding_comments_in_bracket_list(decl.span, decl.params, |p| p.span)
-            || decl
-                .params
-                .iter()
-                // A line comment or multiline block in a param's constraint/default gap
-                // (`<T extends⏎// c⏎U>`) forces the whole `<…>` to expand, so the hang
-                // renders inside the broken list; a single-line block comment collapses
-                // inline and keeps `<…>` collapsed. The type parameter's own question,
-                // which the shared list clauses don't ask.
-                .any(|p| self.comments_force_own_line_between(p.span.start, p.span.end))
+        self.has_expanding_comments_in_bracket_list(
+            decl.span,
+            self.view.type_params(decl.params),
+            |p| p.span,
+        ) || self
+            .view
+            .type_params(decl.params)
+            .iter()
+            // A line comment or multiline block in a param's constraint/default gap
+            // (`<T extends⏎// c⏎U>`) forces the whole `<…>` to expand, so the hang
+            // renders inside the broken list; a single-line block comment collapses
+            // inline and keeps `<…>` collapsed. The type parameter's own question,
+            // which the shared list clauses don't ask.
+            .any(|p| self.comments_force_own_line_between(p.span.start, p.span.end))
     }
 
     /// Build enriched param docs with surrounding block comments from the declaration.
@@ -200,7 +219,8 @@ impl<'a> Printer<'a> {
     ) -> DocBuf {
         let d = self.d();
         let mut prev_end = decl.span.start + 1; // After `<`
-        decl.params
+        self.view
+            .type_params(decl.params)
             .iter()
             .enumerate()
             .map(|(i, param)| {
@@ -216,13 +236,16 @@ impl<'a> Printer<'a> {
                 // parameter (the always-inline path; most such spellings route to
                 // the expansion builder via
                 // `has_expanding_comments_in_type_param_declaration` first).
-                let frozen =
-                    self.list_item_frozen(decl.span.start + 1, &|j| decl.params[j].span, i);
+                let frozen = self.list_item_frozen(
+                    decl.span.start + 1,
+                    &|j| self.view.type_params(decl.params)[j].span,
+                    i,
+                );
                 parts.push(self.build_type_parameter_item_doc(param, frozen));
 
                 if i + 1 < decl.params.len() {
                     // Find comma between this param and next
-                    let next_start = decl.params[i + 1].span.start;
+                    let next_start = self.view.type_params(decl.params)[i + 1].span.start;
                     let comma_pos = self.find_list_comma(param.span.end, next_start);
                     // Trailing block comments: only the run that follows content on its
                     // line: the rest leads the next param, so the leading scan resumes at

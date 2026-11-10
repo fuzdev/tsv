@@ -1866,7 +1866,7 @@ impl<'a> Printer<'a> {
         type_params: Option<&ast::TSTypeParameterDeclaration<'_>>,
     ) -> bool {
         let params = match type_params {
-            Some(p) => &p.params,
+            Some(p) => self.view.type_params(p.params),
             None => return false,
         };
 

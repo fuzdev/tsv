@@ -100,7 +100,7 @@ impl<'a> Printer<'a> {
             decl.type_parameters.as_ref(),
             super_class,
             decl.super_type_parameters.as_ref(),
-            decl.implements,
+            self.view.heritages(decl.implements),
         );
 
         // Heritage layout (shared with the class-expression printer).
@@ -108,7 +108,7 @@ impl<'a> Printer<'a> {
             &positions,
             super_class,
             decl.super_type_parameters.as_ref(),
-            decl.implements,
+            self.view.heritages(decl.implements),
         );
 
         let mut parts = smallvec![];
@@ -160,7 +160,7 @@ impl<'a> Printer<'a> {
             positions.extends_keyword_start,
         );
         let implements_doc = self.build_class_implements_doc(
-            decl.implements,
+            self.view.heritages(decl.implements),
             layout.is_group(),
             positions.implements_keyword_start,
         );
@@ -195,7 +195,7 @@ impl<'a> Printer<'a> {
                 &positions,
                 extends_doc,
                 implements_doc,
-                decl.implements,
+                self.view.heritages(decl.implements),
                 header_options,
             );
             let continuation = d.concat(&[
@@ -224,7 +224,7 @@ impl<'a> Printer<'a> {
             &positions,
             extends_doc,
             implements_doc,
-            decl.implements,
+            self.view.heritages(decl.implements),
             header_options,
         );
 
@@ -283,7 +283,7 @@ impl<'a> Printer<'a> {
         // it to its own line as the first member's leading comment). Same
         // mechanism as block/namespace bodies. See conformance_prettier_ts_comments.md
         // §Comment relocation (Class/interface/enum body `{`).
-        let first_member_start = body.body[0].span().start;
+        let first_member_start = self.view.class_members(body.body)[0].span().start;
         let (brace_line_prefix, delimiter_pull_pos) =
             self.delimiter_line_comment_prefix(body.span.start, first_member_start);
 
@@ -304,7 +304,7 @@ impl<'a> Printer<'a> {
         let mut member_parts = d.pooled_docbuf();
         self.build_member_list_docs_into(
             &mut member_parts,
-            body.body,
+            self.view.class_members(body.body),
             MemberBody {
                 span: body.span,
                 has_comments: self.has_comments_on_page_between(body.span.start, body.span.end),

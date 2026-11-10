@@ -53,6 +53,7 @@ fn get_type_literal_from_identifier<'a>(
 /// Returns true when there are 0 type params, or exactly 1 without constraints/defaults.
 /// Shared between function declarations and function/constructor types.
 pub(in crate::printer) fn type_params_allow_grouping(
+    view: AstView<'_>,
     type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
 ) -> bool {
     let Some(tp) = type_parameters else {
@@ -61,7 +62,7 @@ pub(in crate::printer) fn type_params_allow_grouping(
     if tp.params.len() > 1 {
         return false;
     }
-    tp.params
+    view.type_params(tp.params)
         .first()
         .is_none_or(|p| p.constraint.is_none() && p.default.is_none())
 }
@@ -101,7 +102,7 @@ pub(in crate::printer) fn should_group_function_parameters(
     let Some(rt_doc) = return_type_doc else {
         return false;
     };
-    if !type_params_allow_grouping(type_parameters) {
+    if !type_params_allow_grouping(view, type_parameters) {
         return false;
     }
     return_type.is_some_and(|rt| return_type_triggers_grouping(view, rt, rt_doc, d))

@@ -7,8 +7,9 @@ use crate::lexer::KeywordKind;
 use tsv_lang::Span;
 
 use super::{
-    CtorTypeId, Decorator, Expr, ExprId, IdentName, Identifier, ImportTypeId, InferTypeId, Literal,
-    MethodKind, QualNameId, QuasiList, Run, TyId, UnaryExpression,
+    CtorTypeId, Decorator, Expr, ExprId, IdentName, Identifier, ImportTypeId, IndexParamList,
+    InferTypeId, Literal, MethodKind, QualNameId, QuasiList, Run, TyId, TypeMemberList,
+    TypeParamList, UnaryExpression,
 };
 
 /// TypeScript type annotation node (e.g., `: number` in `const a: number = 5`)
@@ -402,7 +403,7 @@ pub struct TSTypeParameterInstantiation {
 /// Type parameter declaration: `<T, U>` (for declaring type parameters)
 #[derive(Debug, Clone)]
 pub struct TSTypeParameterDeclaration<'arena> {
-    pub params: &'arena [TSTypeParameter<'arena>],
+    pub params: TypeParamList<'arena>,
     /// Position of trailing comma if present (e.g., `<T,>`)
     pub trailing_comma: Option<u32>,
     pub span: Span,
@@ -491,7 +492,7 @@ pub struct TSTypeParameter<'arena> {
 /// Type literal (object type): `{ prop: T; method(): U }`
 #[derive(Debug, Clone)]
 pub struct TSTypeLiteral<'arena> {
-    pub members: &'arena [TSTypeElement<'arena>],
+    pub members: TypeMemberList<'arena>,
     pub span: Span,
 }
 
@@ -595,7 +596,7 @@ pub struct TSConstructSignatureDeclaration<'arena> {
 /// (TS1021), not a parse error; acorn parses it and omits `typeAnnotation`).
 #[derive(Debug, Clone)]
 pub struct TSIndexSignature<'arena> {
-    pub parameters: &'arena [Identifier<'arena>],
+    pub parameters: IndexParamList<'arena>,
     pub type_annotation: Option<TSTypeAnnotation>,
     /// Decorators in front of a class index signature (`@a [k: string]: T;`).
     /// No decorator grammar reaches one (tsc's checker reports TS1206); acorn keeps

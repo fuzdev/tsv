@@ -778,6 +778,7 @@ fn function_return_type_break(
 ) -> Option<AssumedBreak> {
     let return_type = func.return_type.as_ref()?;
     if !crate::printer::types::function_types::type_params_allow_grouping(
+        view,
         func.type_parameters.as_ref(),
     ) {
         return None;
@@ -892,6 +893,7 @@ pub(in crate::printer) fn function_return_hug_break(
     let func = printer.view.fn_expr(func);
     if func.params.len() > 1
         || !crate::printer::types::function_types::type_params_allow_grouping(
+            printer.view,
             func.type_parameters.as_ref(),
         )
     {
@@ -4723,7 +4725,7 @@ impl<'a> Printer<'a> {
             class_expr.type_parameters.as_ref(),
             super_class,
             class_expr.super_type_parameters.as_ref(),
-            class_expr.implements,
+            self.view.heritages(class_expr.implements),
         );
 
         // Heritage layout (shared with the class-declaration printer).
@@ -4731,7 +4733,7 @@ impl<'a> Printer<'a> {
             &positions,
             super_class,
             class_expr.super_type_parameters.as_ref(),
-            class_expr.implements,
+            self.view.heritages(class_expr.implements),
         );
 
         let mut parts = DocBuf::new();
@@ -4787,7 +4789,7 @@ impl<'a> Printer<'a> {
             positions.extends_keyword_start,
         );
         let implements_doc = self.build_class_implements_doc(
-            class_expr.implements,
+            self.view.heritages(class_expr.implements),
             layout.is_group(),
             positions.implements_keyword_start,
         );
@@ -4802,7 +4804,7 @@ impl<'a> Printer<'a> {
             &positions,
             extends_doc,
             implements_doc,
-            class_expr.implements,
+            self.view.heritages(class_expr.implements),
             ClassHeaderOptions {
                 body_is_empty: class_expr.body.body.is_empty(),
                 body_start: class_expr.body.span.start,
