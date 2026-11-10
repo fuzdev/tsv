@@ -167,7 +167,7 @@ mod printer;
 mod strip;
 
 use __private::{PrinterInputs, format_folded_in, parse_folded_into};
-use ast::{AstStores, ExprView, ParsedRef, Program};
+use ast::{AstStores, AstView, ParsedRef, Program};
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
@@ -543,7 +543,7 @@ fn with_embedding_parser<'arena, T>(
     arena: &'arena bumpalo::Bump,
     stores: &mut AstStores<'arena>,
     f: impl Fn(&mut parser::Parser<'_, 'arena>) -> std::result::Result<T, Error>,
-    host_check: impl Fn(ExprView<'_>, &T) -> std::result::Result<(), Error>,
+    host_check: impl Fn(AstView<'_>, &T) -> std::result::Result<(), Error>,
 ) -> Result<T> {
     parser::parse_retrying_acorn_followers(
         source,
@@ -565,7 +565,7 @@ fn with_embedding_parser<'arena, T>(
 fn with_program_printer<R>(
     arena: &DocArena,
     program: &Program<'_>,
-    view: ExprView<'_>,
+    view: AstView<'_>,
     source: &str,
     line_table: LineTable<'_>,
     embed: EmbedContext,

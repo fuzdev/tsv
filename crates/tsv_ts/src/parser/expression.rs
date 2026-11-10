@@ -1,15 +1,15 @@
 // Expression parsing using Pratt parser for operator precedence
 
 use crate::ast::{
-    AssignmentExpression, AssignmentOperator, AwaitExpression, BinaryExpression, BinaryOperator,
-    BlockStatement, CallExpression, CommentBoundPair, CommentBoundPairKind, ConditionalExpression,
-    ExprId, ExprView, Expression, ExpressionKind, IdentName, Identifier, ImportExpression,
-    ImportPhase, Literal, LiteralValue, MemberExpression, MetaProperty, NewExpression,
-    ParenthesizedExpression, RegexLiteral, Run, SequenceExpression, SpreadElement, Statement,
-    Super, TSAsExpression, TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression,
-    TSTypeAssertion, TSTypeParameterInstantiation, TaggedTemplateExpression, TemplateLiteral,
-    ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
-    YieldExpression,
+    AssignmentExpression, AssignmentOperator, AstView, AwaitExpression, BinaryExpression,
+    BinaryOperator, BlockStatement, CallExpression, CommentBoundPair, CommentBoundPairKind,
+    ConditionalExpression, ExprId, Expression, ExpressionKind, IdentName, Identifier,
+    ImportExpression, ImportPhase, Literal, LiteralValue, MemberExpression, MetaProperty,
+    NewExpression, ParenthesizedExpression, RegexLiteral, Run, SequenceExpression, SpreadElement,
+    Statement, Super, TSAsExpression, TSInstantiationExpression, TSNonNullExpression,
+    TSSatisfiesExpression, TSTypeAssertion, TSTypeParameterInstantiation, TaggedTemplateExpression,
+    TemplateLiteral, ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression,
+    UpdateOperator, YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::printer::ParenContext;
@@ -112,7 +112,7 @@ const _: () = assert!(
 /// release builds — the operands are read only inside the `debug_assert!`.
 #[inline]
 pub(in crate::parser) fn debug_assert_encloses(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     start: u32,
     end: u32,
     first: ExprId,

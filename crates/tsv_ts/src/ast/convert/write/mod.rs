@@ -263,7 +263,7 @@ pub struct EmbedWriter<'a> {
     pub source: &'a str,
     pub positions: WirePositions<'a>,
     /// Reads the expressions of the tree being written.
-    pub view: ast::ExprView<'a>,
+    pub view: ast::AstView<'a>,
     pub comments: CommentMode<'a>,
     /// The canonical parser for this document — see `Ctx::vanilla_acorn`. It is
     /// component-global, so an island carries the same variant as the
@@ -284,7 +284,7 @@ pub(super) struct Ctx<'a> {
     pub(super) source: &'a str,
     pub(super) positions: WirePositions<'a>,
     /// Reads the expressions of the tree being written.
-    pub(super) view: ast::ExprView<'a>,
+    pub(super) view: ast::AstView<'a>,
     /// The span of a Svelte block pattern's **top-level** `TSTypeAnnotation` — the
     /// one Svelte reads with a *second* acorn parse (`read_type_annotation`'s `_ as `
     /// trick), which therefore emits under `annotation_comments`.
@@ -333,7 +333,7 @@ impl<'a> Ctx<'a> {
         source: &'a str,
         positions: WirePositions<'a>,
         comments: CommentMode<'a>,
-        view: ast::ExprView<'a>,
+        view: ast::AstView<'a>,
     ) -> Self {
         Ctx {
             source,
@@ -1121,7 +1121,7 @@ mod tests {
 
     /// The sole statement of `source` as the `Identifier` its expression is.
     fn sole_identifier<'a>(
-        view: ast::ExprView<'a>,
+        view: ast::AstView<'a>,
         program: &'a ast::Program<'a>,
     ) -> &'a ast::Identifier<'a> {
         let [statement] = program.body else {

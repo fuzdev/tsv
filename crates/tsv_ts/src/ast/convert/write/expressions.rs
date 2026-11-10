@@ -17,7 +17,7 @@ use super::{
     write_name_field, write_type_annotation_field, write_type_arguments_field,
 };
 use crate::ast;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use smallvec::SmallVec;
 use tsv_lang::Span;
 
@@ -744,7 +744,7 @@ fn open_chain_link(
 ///
 /// Only an [`ChainState::Unresolved`] node walks: the other two states are the
 /// parent handing down an answer already established.
-fn needs_chain_wrap(view: ExprView<'_>, expr: &ast::Expression<'_>, flags: ExprFlags) -> bool {
+fn needs_chain_wrap(view: AstView<'_>, expr: &ast::Expression<'_>, flags: ExprFlags) -> bool {
     flags.chain == ChainState::Unresolved && expr.has_optional_in_chain(view)
 }
 

@@ -12,7 +12,7 @@ use tsv_lang::{Comment, DepthBudget, DepthLimit, Error, Span};
 use tsv_ts::__private::TopLevelAs;
 use tsv_ts::__private::{is_id_continue, is_id_start};
 use tsv_ts::ast::TSTypeAnnotation;
-use tsv_ts::ast::{AstStores, ExprId, ExprView, Expression};
+use tsv_ts::ast::{AstStores, AstView, ExprId, Expression};
 
 /// Build an expression `Comment` from its already-shifted `span` / `content_span`.
 /// `content` is the comment body, read only to compute the `multiline` flag (whether
@@ -256,7 +256,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// The view reading the document's expressions outside an island parse.
     #[expect(clippy::expect_used)]
     #[inline]
-    pub(crate) fn ts_view(&self) -> ExprView<'_> {
+    pub(crate) fn ts_view(&self) -> AstView<'_> {
         self.stores
             .as_deref()
             .expect("the island stores are out only while a `&Self` is held")
@@ -731,7 +731,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
         end: &str,
-        host_check: impl Fn(&Self, ExprView<'_>, ExprId) -> Result<(), Error>,
+        host_check: impl Fn(&Self, AstView<'_>, ExprId) -> Result<(), Error>,
     ) -> Result<ExprId, Error> {
         let (expr, comments) = self.with_island_stores(|this, stores| {
             tsv_ts::__private::parse_expression_with_comments(
@@ -770,7 +770,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
         top_level_as: TopLevelAs,
-        host_check: impl Fn(&Self, ExprView<'_>, ExprId, usize) -> Result<(), Error>,
+        host_check: impl Fn(&Self, AstView<'_>, ExprId, usize) -> Result<(), Error>,
     ) -> Result<(ExprId, usize), Error> {
         let (expr, end_pos, comments) = self.with_island_stores(|this, stores| {
             tsv_ts::__private::parse_expression_partial_with_comments(
@@ -883,7 +883,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-        host_check: impl Fn(&Self, ExprView<'_>, &tsv_ts::ast::Statement<'arena>) -> Result<(), Error>,
+        host_check: impl Fn(&Self, AstView<'_>, &tsv_ts::ast::Statement<'arena>) -> Result<(), Error>,
     ) -> Result<tsv_ts::ast::Statement<'arena>, Error> {
         let (stmt, comments) = self.with_island_stores(|this, stores| {
             tsv_ts::__private::parse_statement_with_comments(

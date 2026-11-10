@@ -29,8 +29,7 @@ use std::borrow::Cow;
 use tsv_css::ast::CssStyleSheet;
 pub use tsv_lang::{Comment, Span};
 use tsv_ts::ast::{
-    AstStores, Expr, ExprId, ExprView, Program, Run, TSTypeParameterDeclaration,
-    VariableDeclaration,
+    AstStores, AstView, Expr, ExprId, Program, Run, TSTypeParameterDeclaration, VariableDeclaration,
 };
 
 /// A parsed Svelte document and the stores its handles index.
@@ -48,7 +47,7 @@ pub struct ParsedRoot<'arena> {
 impl<'arena> ParsedRoot<'arena> {
     /// The view reading this tree's expressions.
     #[inline]
-    pub fn view(&self) -> ExprView<'_> {
+    pub fn view(&self) -> AstView<'_> {
         self.stores.view()
     }
 }
@@ -60,7 +59,7 @@ pub struct ParsedRootRef<'a> {
     /// The tree.
     pub root: &'a Root<'a>,
     /// The view over the stores the tree's edges index.
-    pub view: ExprView<'a>,
+    pub view: AstView<'a>,
 }
 
 impl<'a, 'arena: 'a> From<&'a ParsedRoot<'arena>> for ParsedRootRef<'a> {
@@ -699,7 +698,7 @@ impl<'arena> SpecialThis<'arena> {
     /// Span of the bound value: the braced form's expression, or the plain form's text.
     /// Both sit hard against whatever delimits them, so this is the region a comment can
     /// be adjacent to.
-    pub fn span(&self, view: ExprView<'_>) -> Span {
+    pub fn span(&self, view: AstView<'_>) -> Span {
         match self {
             Self::Braced(tag) => view.expr(tag.expression).span(),
             Self::Plain { span, .. } => *span,

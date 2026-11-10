@@ -17,7 +17,7 @@
 //! parser cannot answer "is this a comment context" for Svelte markup.
 
 use tsv_cli::cli::input::ParserType;
-use tsv_ts::ast::ExprView;
+use tsv_ts::ast::AstView;
 
 use crate::audit::properties::{Utf16ToByte, tsv_parse_to_value};
 
@@ -196,7 +196,7 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
         }
     }
 
-    fn walk(view: ExprView<'_>, frag: &Fragment<'_>, out: &mut Vec<(usize, usize)>) {
+    fn walk(view: AstView<'_>, frag: &Fragment<'_>, out: &mut Vec<(usize, usize)>) {
         for node in frag.nodes {
             match node {
                 FragmentNode::IfBlock(b) => {

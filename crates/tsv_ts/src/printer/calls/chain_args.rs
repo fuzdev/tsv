@@ -36,7 +36,7 @@ use super::arg_wrapping::{
     prepend_arrow_body_comments, prepend_hugged_arrow_body_comments, should_expand_first_arg,
     sole_template_on_its_own_line, try_hook_deps_args_doc,
 };
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{self, Expression, ExpressionKind};
 use crate::printer::expressions::functions::{
     arrow_signature_refuses_hug, callback_signature_refuses_hug, prepend_leading,
@@ -219,7 +219,7 @@ pub(super) fn build_call_args_doc_for_chain(
 /// (an expandable literal, or the breakable call / ternary that takes the
 /// `(sig =>\n body,\n)` layout even when the chain forces expansion).
 fn single_arrow_expression_body<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     call: &'a ast::CallExpression<'a>,
 ) -> Option<(
     &'a ast::ArrowFunctionExpression<'a>,

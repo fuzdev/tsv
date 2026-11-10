@@ -33,7 +33,7 @@ use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use smallvec::SmallVec;
 
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{
     ArrowFunctionBody, ArrowFunctionExpression, BinaryExpression, BinaryOperator, BlockStatement,
     ClassBody, ClassDeclaration, ClassExpression, ClassMember, Decorator, ExportDefaultDeclaration,
@@ -84,7 +84,7 @@ pub(crate) enum Mode {
 pub(crate) struct Walk<'s, 'b> {
     src: Source<'s>,
     /// Reads the expressions of the tree being walked.
-    view: ExprView<'b>,
+    view: AstView<'b>,
     /// What the walk collects ([`Self::collects`]) and whether the subtrees the strip
     /// refuses are walked ([`Self::walks_refused`]).
     mode: Mode,
@@ -157,7 +157,7 @@ impl Tail {
 }
 
 impl<'s, 'b> Walk<'s, 'b> {
-    pub(crate) fn new(source: &'s str, arena: &'b Bump, mode: Mode, view: ExprView<'b>) -> Self {
+    pub(crate) fn new(source: &'s str, arena: &'b Bump, mode: Mode, view: AstView<'b>) -> Self {
         Self {
             src: Source::new(source),
             view,
@@ -2010,7 +2010,7 @@ enum FunctionBody<'n, 'a> {
 }
 
 impl<'n, 'a> FunctionView<'n, 'a> {
-    fn declaration(view: ExprView<'n>, func: &'n FunctionDeclaration<'a>) -> Self {
+    fn declaration(view: AstView<'n>, func: &'n FunctionDeclaration<'a>) -> Self {
         Self {
             type_parameters: func.type_parameters.as_ref(),
             params: view.run(func.params),
@@ -2021,7 +2021,7 @@ impl<'n, 'a> FunctionView<'n, 'a> {
         }
     }
 
-    fn expression(view: ExprView<'n>, func: &'n FunctionExpression<'a>) -> Self {
+    fn expression(view: AstView<'n>, func: &'n FunctionExpression<'a>) -> Self {
         Self {
             type_parameters: func.type_parameters.as_ref(),
             params: view.run(func.params),
@@ -2032,7 +2032,7 @@ impl<'n, 'a> FunctionView<'n, 'a> {
         }
     }
 
-    fn arrow(view: ExprView<'n>, arrow: &'n ArrowFunctionExpression<'a>) -> Self {
+    fn arrow(view: AstView<'n>, arrow: &'n ArrowFunctionExpression<'a>) -> Self {
         Self {
             type_parameters: arrow.type_parameters.as_ref(),
             params: view.run(arrow.params),
@@ -2059,7 +2059,7 @@ struct ClassView<'n, 'a> {
 }
 
 impl<'n, 'a> ClassView<'n, 'a> {
-    fn declaration(view: ExprView<'n>, class: &'n ClassDeclaration<'a>) -> Self {
+    fn declaration(view: AstView<'n>, class: &'n ClassDeclaration<'a>) -> Self {
         Self {
             decorators: class.decorators,
             r#abstract: class.r#abstract,
@@ -2071,7 +2071,7 @@ impl<'n, 'a> ClassView<'n, 'a> {
         }
     }
 
-    fn expression(view: ExprView<'n>, class: &'n ClassExpression<'a>) -> Self {
+    fn expression(view: AstView<'n>, class: &'n ClassExpression<'a>) -> Self {
         Self {
             decorators: class.decorators,
             r#abstract: class.r#abstract,
@@ -2087,7 +2087,7 @@ impl<'n, 'a> ClassView<'n, 'a> {
 /// How expression `e` ends when it closes a statement or field ending at `end`
 /// (`Walk::open`). Its rightmost operand decides — unless a paren the parser stripped closes
 /// it (its span ends short of `end`), which any continuation extends.
-fn expression_tail(view: ExprView<'_>, e: &Expression<'_>, end: u32) -> Tail {
+fn expression_tail(view: AstView<'_>, e: &Expression<'_>, end: u32) -> Tail {
     if e.span.end != end {
         return Tail::Open;
     }

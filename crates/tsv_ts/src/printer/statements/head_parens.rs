@@ -14,7 +14,7 @@
 // source paren is still stripped and any number collapse to exactly one.
 
 use super::Printer;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{self, Expression, ExpressionKind};
 use crate::printer::is_string_literal;
 use crate::printer::needs_parens::{
@@ -29,7 +29,7 @@ use tsv_lang::Span;
 /// through member/call heads (`type.foo` is unambiguous), so it fires only for a
 /// bare-identifier operand of a cast chain.
 fn strip_statement_casts<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     expr: &'a Expression<'a>,
 ) -> Option<&'a Expression<'a>> {
     let mut cur = expr;

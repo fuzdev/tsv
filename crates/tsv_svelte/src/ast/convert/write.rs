@@ -180,7 +180,7 @@ pub(crate) fn write_root_bytes(
 struct Ctx<'a> {
     source: &'a str,
     /// Reads the expressions of the tree being written.
-    view: tsv_ts::ast::ExprView<'a>,
+    view: tsv_ts::ast::AstView<'a>,
     /// The document's positions: the byte→UTF-16 map, and — on the wire that carries
     /// `loc` — its one line table, which every node, `name_loc`, root comment,
     /// embedded island and `<style>` node reads.

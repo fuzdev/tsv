@@ -8,7 +8,7 @@ use super::helpers::{TypeParenRule, is_simple_type_arg, unwrap_parenthesized};
 use super::{
     BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, ShiftRescan, TrailingBlock,
 };
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{
     self, TSType, TSTypeParameter, TSTypeParameterDeclaration, TSTypeParameterModifier,
 };
@@ -881,7 +881,7 @@ impl<'a> Printer<'a> {
     /// than two calls) keeps its caller's layout
     /// ([`Self::value_with_nullable_union_broken`]).
     pub(in crate::printer) fn value_type_arguments<'v>(
-        view: ExprView<'v>,
+        view: AstView<'v>,
         value: &'v ast::Expression<'v>,
     ) -> Option<&'v ast::TSTypeParameterInstantiation<'v>> {
         use ast::ExpressionKind as Kind;

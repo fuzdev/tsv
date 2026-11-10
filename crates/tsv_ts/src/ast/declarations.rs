@@ -6,7 +6,7 @@
 use tsv_lang::Span;
 
 use super::{
-    Expr, ExprId, ExprView, Identifier, Literal, Run, Statement, TSEntityName, TSTypeAnnotation,
+    AstView, Expr, ExprId, Identifier, Literal, Run, Statement, TSEntityName, TSTypeAnnotation,
     TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 
@@ -103,7 +103,7 @@ impl<'arena> TSEnumMember<'arena> {
     /// seam anchored at `span.end` therefore starts past the shell's interior,
     /// where nothing else emits — a DROPPED comment
     /// (`docs/comments.md` §The element-comma seam).
-    pub fn printed_end(&self, view: ExprView<'_>) -> u32 {
+    pub fn printed_end(&self, view: AstView<'_>) -> u32 {
         view.opt(self.initializer)
             .map_or_else(|| self.id.span().end, |e| e.printed_end(view))
     }

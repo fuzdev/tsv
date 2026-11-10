@@ -6,7 +6,7 @@
 use super::super::Printer;
 use super::arg_comments::has_inter_argument_comments_slice;
 use super::call_paren_open;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{self, IdentName};
 use smallvec::SmallVec;
 use tsv_lang::Span;
@@ -112,7 +112,7 @@ pub(super) fn build_test_callee_flat_doc(
 /// stack contract prices per link.
 #[inline(never)]
 fn get_member_chain_parts<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     expr: &ast::Expression<'a>,
 ) -> Option<SmallVec<[(IdentName<'a>, u32, u32); 8]>> {
     let mut parts: SmallVec<[(IdentName<'a>, u32, u32); 8]> = SmallVec::new();
@@ -294,7 +294,7 @@ pub(super) fn is_test_call(call: &ast::CallExpression<'_>, printer: &Printer<'_>
 /// (an escaped `te\u0073t` is `test`). The same callees qualify as for the flat callee doc
 /// ([`build_test_callee_flat_doc`], over [`get_member_chain_parts`]): an identifier root and
 /// identifier properties only.
-fn callee_is_test_pattern(view: ExprView<'_>, callee: &ast::Expression<'_>, source: &str) -> bool {
+fn callee_is_test_pattern(view: AstView<'_>, callee: &ast::Expression<'_>, source: &str) -> bool {
     let mut names = [""; TEST_PATTERN_MAX_DEPTH];
     let mut depth = 0;
     let mut expr = callee;

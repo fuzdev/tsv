@@ -17,7 +17,7 @@
 //   `parentNeedsParentheses` (`parentheses/parent-needs-parentheses.js`)
 // - `printPathNoParens`'s caller (`print/index.js`, the application layer)
 
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{
     ArrowFunctionBody, AssignmentOperator, BinaryExpression, BinaryOperator, CallExpression,
     Expression, ExpressionKind, LiteralValue, UnaryOperator, UpdateOperator,
@@ -240,7 +240,7 @@ pub(crate) enum SecondTypeArgs {
 /// rejecting it as it did the input. A heritage's list is outside the exception: nothing
 /// follows it for the pair to cut away from the chain.
 pub(crate) fn instantiation_keeps_pair_before_type_args(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     source: &str,
     head: &Expression<'_>,
     follow: SecondTypeArgs,
@@ -263,7 +263,7 @@ pub(crate) fn instantiation_keeps_pair_before_type_args(
 /// acorn-typescript — whose tree Svelte compiles — reads them as two trees
 /// (`((a?.b)<T>)?.()` printed `a?.b<T>?.()` is one chain where the author wrote two).
 pub(crate) fn instantiation_operand_is_sealed_chain(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     inst_start: u32,
     operand: &Expression<'_>,
 ) -> bool {
@@ -273,7 +273,7 @@ pub(crate) fn instantiation_operand_is_sealed_chain(
 
 /// Whether the instantiation chain `head` is built on an optional chain no authored pair
 /// has sealed (`a?.b<T>`, not `(a?.b)<T>`).
-fn ends_open_optional_chain(view: ExprView<'_>, head: &Expression<'_>) -> bool {
+fn ends_open_optional_chain(view: AstView<'_>, head: &Expression<'_>) -> bool {
     let mut level = head;
     while let ExpressionKind::TSInstantiationExpression(inst) = &level.kind {
         if level.span().start < view.expr(inst.expression).span().start {
@@ -303,7 +303,7 @@ impl ParenContext {
 /// a parameter rather than read from a context because parenthesization is a pure
 /// function of the node and its surroundings.
 pub(super) fn needs_parens(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &Expression<'_>,
     ctx: ParenContext,
     in_for_init: bool,
@@ -702,7 +702,7 @@ pub(super) fn needs_parens(
 /// `isCallExpression(stripChainElementWrappers(body))` — `=> fn()!` is a call body
 /// that hugs the open paren).
 pub(in crate::printer) fn strip_non_null_wrappers<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     mut expr: &'a Expression<'a>,
 ) -> &'a Expression<'a> {
     while let ExpressionKind::TSNonNullExpression(non_null) = &expr.kind {
@@ -871,7 +871,7 @@ pub(in crate::printer) const fn joins_a_trailing_angle_bracket(op: BinaryOperato
 /// broken it prints it bare — so the walk takes the broken answer, which costs a
 /// redundant outer pair in the flat layout and is sound in both.
 pub(crate) fn ends_with_instantiation_close(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &Expression<'_>,
     in_for_init: bool,
 ) -> bool {
@@ -975,7 +975,7 @@ fn is_numeric_literal(expr: &Expression<'_>) -> bool {
 /// declaration, or class declaration. `({...});`, `(function () {});`,
 /// `(class {});` — matches prettier's "statement starts with `{`/`function`/`class`"
 /// rule (parentheses/needs-parentheses.js).
-fn needs_parens_expression_statement(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+fn needs_parens_expression_statement(view: AstView<'_>, expr: &Expression<'_>) -> bool {
     match &expr.kind {
         // Object expression: `({...});` needs parens to avoid being parsed as a block
         ExpressionKind::ObjectExpression(_) => true,
@@ -1010,7 +1010,7 @@ fn needs_parens_expression_statement(view: ExprView<'_>, expr: &Expression<'_>) 
 /// positions that print first (`.left`, `.object`, `.callee`, `.test`, …) and
 /// stops at IIFE callees/tags (already parenthesized) to match prettier.
 pub(crate) fn leftmost_no_lookahead<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     expr: &'a Expression<'a>,
 ) -> &'a Expression<'a> {
     leftmost_no_lookahead_reached(view, expr, LeftmostText::Printed).0
@@ -1049,14 +1049,14 @@ impl LeftmostText {
 /// the leftmost node the step that reached it is gone. One walk answers both questions
 /// so the two readings can't drift.
 pub(crate) fn leftmost_no_lookahead_reached<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     expr: &'a Expression<'a>,
     text: LeftmostText,
 ) -> (&'a Expression<'a>, bool) {
     // A loop down the leftmost spine, not a recursion: a chain is as long as the spine
     // limit lets it be, and a frame per link is what the stack contract prices
     fn walk<'a>(
-        view: ExprView<'a>,
+        view: AstView<'a>,
         mut expr: &'a Expression<'a>,
         text: LeftmostText,
         mut computed_member_object: bool,
@@ -1159,7 +1159,7 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
 /// (conditional test, cast operand, …) print the keyword bare, so they recurse
 /// unconditionally like `leftmost_no_lookahead`.
 pub(crate) fn export_default_needs_parens(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &Expression<'_>,
     text: LeftmostText,
 ) -> bool {
@@ -1190,7 +1190,7 @@ fn assignment_value_needs_parens(expr: &Expression<'_>) -> bool {
 }
 
 fn export_default_leftmost<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     mut expr: &'a Expression<'a>,
     text: LeftmostText,
 ) -> &'a Expression<'a> {
@@ -1326,7 +1326,7 @@ fn export_default_leftmost<'a>(
 /// where parens are decided, and the follow token past the `)` is read the same way at every
 /// width — so the pair stands at every width.
 fn relational_region_opens_on_a_kept_shell(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     operand: &Expression<'_>,
     in_for_init: bool,
 ) -> bool {
@@ -1401,7 +1401,7 @@ fn relational_region_opens_on_a_kept_shell(
 /// arrow function, a unary operand that ends on a call (`(a ? b : c)<C>`, `(a = b)<C>`,
 /// `(a < b)<C>`, `(<B>a)<C>`, `(typeof a())<C>`). Those chains print bare, and a width
 /// that ends a line on their `>` prints a region the parser then claims and rejects.
-fn shell_content_may_read_as_a_type(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+fn shell_content_may_read_as_a_type(view: AstView<'_>, expr: &Expression<'_>) -> bool {
     match &expr.kind {
         ExpressionKind::UnaryExpression(unary) => match unary.operator {
             UnaryOperator::Typeof | UnaryOperator::Bang => {
@@ -1422,7 +1422,7 @@ fn shell_content_may_read_as_a_type(view: ExprView<'_>, expr: &Expression<'_>) -
 /// the lookahead's reading: a name or qualified name, `this`, a literal, an object or
 /// array, a group, a member of one, or one of those under `typeof` / `!` or ahead of a
 /// non-null `!`.
-fn ends_like_a_type_operand(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+fn ends_like_a_type_operand(view: AstView<'_>, expr: &Expression<'_>) -> bool {
     let mut expr = expr;
     // A loop down the spine, not a recursion: a chain is as long as the spine limit lets it
     // be, and a frame per link is what the stack contract prices. Each link's own conditions
@@ -1537,7 +1537,7 @@ fn is_function_dividend(expr: &Expression<'_>, parent_op: BinaryOperator) -> boo
 /// which the spans say: the division's begins at the `(` the parser erased from its left
 /// operand, so a dividend starting later than its division sits inside one.
 fn dividend_opens_on_its_pair(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &Expression<'_>,
     binary: &BinaryExpression,
     text: LeftmostText,
@@ -1573,7 +1573,7 @@ pub(in crate::printer) enum OperandPair {
 /// for-init flag, read only by the instantiation-tail walk below (it asks the
 /// printed shape of the operand's own children).
 fn needs_parens_binary_operand(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &Expression<'_>,
     parent_op: BinaryOperator,
     is_right: bool,
@@ -1622,7 +1622,7 @@ pub(crate) fn flattened_left_operand<'e>(
 /// [`fn@needs_parens`] and the parser's own reading of the `for`-header flag
 /// (`in_for_init`: inside a header's init, where every `in` binary takes a pair).
 pub(crate) fn binary_left_operand_reenters(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     parent_op: BinaryOperator,
     left: &Expression<'_>,
     in_for_init: bool,
@@ -1658,7 +1658,7 @@ pub(crate) fn binary_left_operand_reenters(
 /// rest take [`fn@needs_parens`] out of line.
 #[inline]
 pub(crate) fn printer_adds_operand_pair(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     operand: &Expression<'_>,
     ctx: ParenContext,
     in_for_header: bool,
@@ -1738,7 +1738,7 @@ pub(crate) const fn operator_operand_takes_no_pair(operand: &Expression<'_>) -> 
 /// [`printer_adds_operand_pair`] past its kind test.
 #[inline(never)]
 fn printer_adds_operand_pair_by_rule(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     operand: &Expression<'_>,
     ctx: ParenContext,
     in_for_header: bool,
@@ -1749,10 +1749,7 @@ fn printer_adds_operand_pair_by_rule(
 /// Whether the printer writes a pair around `object` as a member access's object — a
 /// numeric literal (`(1).toString()`) where it is the head the parser asks about
 /// (`Parser::chain_base_pair`).
-pub(crate) fn printer_parenthesizes_chain_base(
-    view: ExprView<'_>,
-    object: &Expression<'_>,
-) -> bool {
+pub(crate) fn printer_parenthesizes_chain_base(view: AstView<'_>, object: &Expression<'_>) -> bool {
     needs_parens(view, object, ParenContext::ChainBase, false)
 }
 
@@ -1763,7 +1760,7 @@ pub(crate) fn printer_parenthesizes_chain_base(
 /// withheld: `(await f<T>) + 1` is owed by the `>` its `await` operand ends on, though
 /// the `await` alone would take a clarity pair there.
 pub(in crate::printer) fn binary_operand_pair(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &Expression<'_>,
     parent_op: BinaryOperator,
     is_right: bool,
@@ -2027,7 +2024,7 @@ fn binary_child_pair(
 // synthesized where no authored pair is present. A comma-list owner retains an
 // authored whole-element pair, which does not answer this invented-pair gap.
 pub(in crate::printer) fn clarity_pairs_behind_region_close(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     close: &BinaryExpression,
     in_for_init: bool,
     source_holds_pair: impl Fn(&Expression<'_>) -> bool,
@@ -2096,7 +2093,7 @@ pub(in crate::printer) fn is_called_function(expr: &Expression<'_>) -> bool {
 /// keyword for a statement's (`Printer::mark_dividend_tail`, whose walk this mirrors
 /// through `await`, the one kind that walk never meets bare).
 fn ends_on_a_function_or_class_body(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &Expression<'_>,
     in_for_init: bool,
 ) -> bool {

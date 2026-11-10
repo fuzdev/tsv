@@ -33,7 +33,7 @@
 use super::analysis::{child_stops_optional_chain, member_lookup_node};
 use super::printing::{member_lookup_group, print_node};
 use super::types::{ChainGroup, ChainNode};
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{Expression, ExpressionKind, MemberExpression};
 use crate::printer::Printer;
 use std::cell::Cell;
@@ -152,7 +152,7 @@ pub(crate) fn build_lookup_after_operand_doc(
 }
 
 /// `expr` with every `!` peeled off.
-fn strip_non_null<'e>(view: ExprView<'e>, mut expr: &'e Expression<'e>) -> &'e Expression<'e> {
+fn strip_non_null<'e>(view: AstView<'e>, mut expr: &'e Expression<'e>) -> &'e Expression<'e> {
     while let ExpressionKind::TSNonNullExpression(non_null) = &expr.kind {
         expr = view.expr(non_null.expression);
     }
@@ -166,7 +166,7 @@ fn strip_non_null<'e>(view: ExprView<'e>, mut expr: &'e Expression<'e>) -> &'e E
 /// The walk stops at a sealed optional chain (`(a?.b).c` — [`child_stops_optional_chain`]):
 /// that is a nested `ChainExpression`, the OBJECT of the chain `member` ends rather than
 /// one of its links, as the linearizer's sealed base is for the chain root.
-fn spine_has_optional_link(view: ExprView<'_>, member: &MemberExpression, span: Span) -> bool {
+fn spine_has_optional_link(view: AstView<'_>, member: &MemberExpression, span: Span) -> bool {
     if member.optional {
         return true;
     }

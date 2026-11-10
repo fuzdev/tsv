@@ -1,7 +1,7 @@
 //! Call-argument and arrow shape predicates shared by the call, new, and chain printers.
 
+use crate::ast::AstView;
 use crate::ast::ExprId;
-use crate::ast::ExprView;
 use crate::ast::{self, Expression, ExpressionKind, TSType};
 use crate::printer::Printer;
 use crate::printer::expressions::functions::{arrow_token_end, has_leftmost_arrow_body_parens};
@@ -72,7 +72,7 @@ pub(super) fn mark_boolean_coercion_argument(
 ///   case, which is what keeps the transparency one level deep)
 ///
 /// Used to determine if tail args can stay inline after a function callback.
-fn is_hopefully_short_arg(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+fn is_hopefully_short_arg(view: AstView<'_>, expr: &Expression<'_>) -> bool {
     match &expr.kind {
         // Prettier: if (node.type === "ParenthesizedExpression") recurse into node.expression.
         // A JSDoc cast is prettier's retained `ParenthesizedExpression` — its annotation
@@ -138,7 +138,7 @@ fn is_hopefully_short_arg(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
 /// Parens are unwrapped at each step because prettier's TS AST has no
 /// `TSParenthesizedType` node — `(T)[]` reaches its check already as `T[]`.
 fn cast_is_hopefully_short(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     type_annotation: &TSType<'_>,
     expression: &Expression<'_>,
 ) -> bool {
@@ -181,7 +181,7 @@ enum CallLikeArguments<'a> {
 
 impl<'a> CallLikeArguments<'a> {
     /// The call-like reading of `expr`, or `None` when it is not call-like.
-    fn of(view: ExprView<'a>, expr: &'a Expression<'a>) -> Option<Self> {
+    fn of(view: AstView<'a>, expr: &'a Expression<'a>) -> Option<Self> {
         match &expr.kind {
             ExpressionKind::CallExpression(call) => Some(Self::Called {
                 callee: view.expr(call.callee),
@@ -216,11 +216,7 @@ impl<'a> CallLikeArguments<'a> {
     }
 
     /// Whether every argument satisfies `predicate`.
-    fn all(
-        self,
-        view: ExprView<'a>,
-        mut predicate: impl FnMut(&'a Expression<'a>) -> bool,
-    ) -> bool {
+    fn all(self, view: AstView<'a>, mut predicate: impl FnMut(&'a Expression<'a>) -> bool) -> bool {
         match self {
             Self::Called { arguments, .. } => {
                 arguments.iter().all(|arg| predicate(view.expr(*arg)))
@@ -244,7 +240,7 @@ impl<'a> CallLikeArguments<'a> {
 /// on-page axis, since `hasComment` is a pure layout question that an owned annotation
 /// satisfies. Callers pass `printer.has_comments_on_page_between`.
 pub(super) fn is_short_second_arg_for_expand_first<F>(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     arg: &Expression<'_>,
     leading_gap_start: u32,
     has_comments: F,
@@ -284,7 +280,7 @@ where
 /// non-empty one. The transparency a cast does get is in [`is_hopefully_short_arg`] —
 /// pinned by `calls/expand_first_jsdoc_cast_second_arg`.
 fn could_expand_collection_arg<F>(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     arg: &Expression<'_>,
     leading_gap_start: u32,
     has_comments: &F,
@@ -319,7 +315,7 @@ where
 /// `couldExpandArg`: `(x) => fn()` and `(x) => fn()!` are both call bodies, so the
 /// arrow hugs the call's open paren rather than breaking at it.
 pub(super) fn arrow_body_is_call_through_non_null(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     body: &Expression<'_>,
 ) -> bool {
     matches!(
@@ -443,7 +439,7 @@ pub(super) fn is_array_or_object_unwrapped(expr: &Expression<'_>, printer: &Prin
 /// that gap opens — see [`could_expand_collection_arg`] and
 /// [`is_array_or_object_unwrapped`], which answer it differently and say why.
 fn unwrap_ts_type_wrappers<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     mut expr: &'a Expression<'a>,
 ) -> (&'a Expression<'a>, u32) {
     let mut leading_from = expr.span().start;
@@ -493,7 +489,7 @@ pub(super) fn is_block_function(expr: &Expression<'_>) -> bool {
 /// ON-PAGE axis, since an owned annotation glued to an argument is a comment prettier's
 /// `hasComment` sees.
 pub(super) fn is_react_hook_call_with_deps_array<F>(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     args: &[ExprId],
     arg_gap_has_comment: F,
 ) -> bool
@@ -545,7 +541,7 @@ pub(super) fn is_hook_callback_with_deps(callback: &Expression<'_>, deps: &Expre
 ///
 /// Reference: prettier's `isSimpleCallArgument` (`utilities/is-simple-call-argument.js`)
 pub(crate) fn is_simple_call_argument(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &Expression<'_>,
     depth: usize,
 ) -> bool {
@@ -702,7 +698,7 @@ pub(crate) fn is_simple_call_argument(
 /// argument can be asked about. The other half of its gate is `isCallExpression(parent)`,
 /// which a `new` is not — so the `new` printer passes `false` to
 /// [`super::arg_wrapping::ArgOpener::lone_hug_ladder`] rather than asking this.
-pub(super) fn lone_arg_params_render_flat(view: ExprView<'_>, arg: &Expression<'_>) -> bool {
+pub(super) fn lone_arg_params_render_flat(view: AstView<'_>, arg: &Expression<'_>) -> bool {
     matches!(&arg.kind, ExpressionKind::FunctionExpression(func) if view.run(func.params).iter().all(|param| {
         matches!(&param.kind, ExpressionKind::Identifier(id) if id.type_annotation().is_none())
     }))
@@ -716,7 +712,7 @@ pub(super) fn lone_arg_params_render_flat(view: ExprView<'_>, arg: &Expression<'
 ///   any argument is a call expression containing a function/arrow argument
 ///
 /// This triggers `allArgsBrokenOut()` in Prettier to expand all arguments.
-pub(super) fn is_function_composition_args(view: ExprView<'_>, arguments: &[ExprId]) -> bool {
+pub(super) fn is_function_composition_args(view: AstView<'_>, arguments: &[ExprId]) -> bool {
     if arguments.len() <= 1 {
         return false;
     }
@@ -759,7 +755,7 @@ mod tests {
     /// view of the stores it was parsed into.
     fn with_parsed<R>(
         src: &str,
-        f: impl for<'a> FnOnce(ExprView<'a>, &'a Expression<'a>) -> R,
+        f: impl for<'a> FnOnce(AstView<'a>, &'a Expression<'a>) -> R,
     ) -> R {
         let arena = Bump::new();
         let mut stores = ast::AstStores::new();
@@ -778,7 +774,7 @@ mod tests {
     }
 
     /// Run `f` over the argument list of a parsed call expression.
-    fn with_args<R>(src: &str, f: impl for<'a> FnOnce(ExprView<'a>, &'a [ExprId]) -> R) -> R {
+    fn with_args<R>(src: &str, f: impl for<'a> FnOnce(AstView<'a>, &'a [ExprId]) -> R) -> R {
         with_parsed(src, |view, expr| match expr {
             Expression {
                 kind: ExpressionKind::CallExpression(call),

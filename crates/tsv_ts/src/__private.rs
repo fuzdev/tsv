@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::ast::{
-    AstStores, ExprId, ExprView, Expression, ExpressionKind, Parsed, ParsedRef, Run, Statement,
+    AstStores, AstView, ExprId, Expression, ExpressionKind, Parsed, ParsedRef, Run, Statement,
     TSTypeAnnotation, TSTypeParameterDeclaration, VariableDeclaration,
 };
 use tsv_lang::Span;
@@ -29,7 +29,7 @@ pub struct PrinterInputs<'a> {
     /// Detached comment buffer for the document.
     pub comments: &'a [ast::Comment],
     /// Reads the expressions of the tree being printed.
-    pub view: ExprView<'a>,
+    pub view: AstView<'a>,
     /// The document's line-break table with its verdict (`tsv_lang::printing::LineBreaks`):
     /// when every line terminator is a `\n` the printer's three line questions
     /// (`is_same_line` and siblings) read the source bytes and the table is never built;
@@ -84,7 +84,7 @@ impl<'a> PrinterInputs<'a> {
     pub fn for_document(
         source: &'a str,
         comments: &'a [ast::Comment],
-        view: ExprView<'a>,
+        view: AstView<'a>,
         line_table: LineTable<'a>,
     ) -> Self {
         PrinterInputs {
@@ -348,7 +348,7 @@ pub fn parse_expression_with_comments<'arena>(
     arena: &'arena bumpalo::Bump,
     stores: &mut AstStores<'arena>,
     end: &str,
-    host_check: impl Fn(ExprView<'_>, ExprId) -> Result<()>,
+    host_check: impl Fn(AstView<'_>, ExprId) -> Result<()>,
 ) -> Result<(ExprId, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
@@ -659,7 +659,7 @@ pub fn parse_expression_partial_with_comments<'arena>(
     arena: &'arena bumpalo::Bump,
     stores: &mut AstStores<'arena>,
     top_level_as: TopLevelAs,
-    host_check: impl Fn(ExprView<'_>, ExprId, usize) -> Result<()>,
+    host_check: impl Fn(AstView<'_>, ExprId, usize) -> Result<()>,
 ) -> Result<(ExprId, usize, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
@@ -738,7 +738,7 @@ pub fn parse_statement_with_comments<'arena>(
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
     stores: &mut AstStores<'arena>,
-    host_check: impl Fn(ExprView<'_>, &Statement<'arena>) -> Result<()>,
+    host_check: impl Fn(AstView<'_>, &Statement<'arena>) -> Result<()>,
 ) -> Result<(Statement<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(
         source,
@@ -834,7 +834,7 @@ pub fn build_expression_doc(
 /// as its own source bytes). The marks read only the tree and the source, so an operand
 /// the host builds is still counted in the list.
 pub fn build_bare_sequence_operand_docs(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     arena: &DocArena,
     sequence: &ast::SequenceExpression,
     inputs: &PrinterInputs<'_>,
@@ -1022,7 +1022,7 @@ pub fn build_broke_after_operator_rhs_doc(
 /// its operator ([`build_assignment_value_expression_doc`]'s `value_gap_start`), whether
 /// the chain owns that break or its heads force it
 /// ([`curried_chain_breaks_after_operator`]).
-pub fn is_curried_arrow_chain(view: ExprView<'_>, expression: &Expression<'_>) -> bool {
+pub fn is_curried_arrow_chain(view: AstView<'_>, expression: &Expression<'_>) -> bool {
     printer::is_curried_arrow_chain(view, expression)
 }
 
@@ -1031,10 +1031,7 @@ pub fn is_curried_arrow_chain(view: ExprView<'_>, expression: &Expression<'_>) -
 /// its `chooseLayout` site (`chain-tail-arrow-chain`): a head with type parameters, a
 /// return type over parameters, or a non-identifier parameter. The host owes such a value a
 /// mandatory break after its operator; the heads then stack under it.
-pub fn curried_chain_breaks_after_operator(
-    view: ExprView<'_>,
-    expression: &Expression<'_>,
-) -> bool {
+pub fn curried_chain_breaks_after_operator(view: AstView<'_>, expression: &Expression<'_>) -> bool {
     printer::is_curried_arrow_chain_that_breaks(view, expression)
 }
 
@@ -1139,7 +1136,7 @@ pub fn build_type_annotation_doc(
 pub fn build_program_doc(
     arena: &DocArena,
     program: &Program<'_>,
-    view: ExprView<'_>,
+    view: AstView<'_>,
     source: &str,
     line_table: LineTable<'_>,
     embed: EmbedContext,
@@ -1163,7 +1160,7 @@ pub fn build_program_doc(
 pub fn build_program_body_doc(
     arena: &DocArena,
     program: &Program<'_>,
-    view: ExprView<'_>,
+    view: AstView<'_>,
     source: &str,
     line_table: LineTable<'_>,
     embed: EmbedContext,
@@ -1193,7 +1190,7 @@ pub use crate::printer::{conditional_should_break_after_op, should_inline_logica
 /// `true`, the block-head twin of the pair the left of `as` / `satisfies` keeps.
 #[must_use]
 pub fn prints_ending_on_instantiation_close(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expression: &Expression<'_>,
 ) -> bool {
     printer::ends_with_instantiation_close(view, expression, false)
@@ -1209,7 +1206,7 @@ pub fn prints_ending_on_instantiation_close(
 /// wraps such a tag's expression in a pair, the text-position twin of the pair
 /// [`prints_ending_on_instantiation_close`] answers for a block head.
 #[must_use]
-pub fn leading_regex_start(view: ExprView<'_>, expression: &Expression<'_>) -> Option<u32> {
+pub fn leading_regex_start(view: AstView<'_>, expression: &Expression<'_>) -> Option<u32> {
     printer::leading_regex_start(view, expression)
 }
 

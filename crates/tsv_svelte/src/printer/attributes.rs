@@ -16,7 +16,7 @@ use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::printing::next_width_relevant_in;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, Span};
-use tsv_ts::ast::ExprView;
+use tsv_ts::ast::AstView;
 use tsv_ts::ast::{Expression, ExpressionKind};
 
 /// How a directive prints its expression value — the only axis the expression-valued
@@ -1705,7 +1705,7 @@ impl<'a> Printer<'a> {
     /// the path is the `{`, so it owns no comment either. What the general builder adds
     /// around a value never applies: the clarity pair is an assignment's, and the regex
     /// pair a regex-led value's. Every byte of the tag is then plain ASCII.
-    fn tag_is_plain_path(view: ExprView<'_>, tag: &ast::ExpressionTag) -> bool {
+    fn tag_is_plain_path(view: AstView<'_>, tag: &ast::ExpressionTag) -> bool {
         super::plain_path_span(view, view.expr(tag.expression))
             .is_some_and(|path| path.start == tag.span.start + 1 && path.end + 1 == tag.span.end)
     }

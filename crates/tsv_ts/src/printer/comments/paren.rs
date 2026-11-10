@@ -8,7 +8,7 @@
 
 use super::{CommentSpacing, CommentVec, LeadingGlue, Printer, RunLeadingBlank, ShareSite};
 use crate::ast;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::printer::ParenContext;
 use crate::printer::chain::{
     chain_mid_chain_paren_gaps, chain_paren_leading_gap, tag_paren_leading_start,
@@ -113,7 +113,7 @@ pub(crate) struct ParenLeadingValue {
 /// their operand only where it prints first and bare — a question about the printed form,
 /// answered by `Printer::bare_cast_operand`, not by this structural table.
 fn left_side_child<'e>(
-    view: ExprView<'e>,
+    view: AstView<'e>,
     expr: &'e ast::Expression<'e>,
 ) -> Option<&'e ast::Expression<'e>> {
     use ast::ExpressionKind;
@@ -149,7 +149,7 @@ fn left_side_child<'e>(
 /// A sequence answers `false`: its operands ride the sequence's OWN envelope, so an operand
 /// never prints a pair of its own — the sequence's envelope is the CALLER's to notice.
 fn left_side_child_is_parenthesized(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &ast::Expression<'_>,
     child: &ast::Expression<'_>,
     in_for_init: bool,
@@ -183,7 +183,7 @@ fn left_side_child_is_parenthesized(
 ///
 /// An embedder asks it where its own syntax gives a leading `/` another meaning: a Svelte
 /// `{…}` tag in text position reads `{/` as a block close, so `{/a/.test(s)}` does not parse.
-pub(crate) fn leading_regex_start(view: ExprView<'_>, expr: &ast::Expression<'_>) -> Option<u32> {
+pub(crate) fn leading_regex_start(view: AstView<'_>, expr: &ast::Expression<'_>) -> Option<u32> {
     use ast::ExpressionKind;
     let mut node = expr;
     loop {
@@ -213,7 +213,7 @@ pub(crate) fn leading_regex_start(view: ExprView<'_>, expr: &ast::Expression<'_>
 /// ([`Printer::yield_operand_class_pair_target`]): a pair the operand prints anyway ahead of
 /// the `@` already guards it, so the class takes none of its own there.
 pub(in crate::printer) fn leading_decorated_class<'e>(
-    view: ExprView<'e>,
+    view: AstView<'e>,
     expr: &'e ast::Expression<'e>,
 ) -> Option<&'e ast::Expression<'e>> {
     use ast::ExpressionKind;
@@ -248,7 +248,7 @@ pub(in crate::printer) fn leading_decorated_class<'e>(
 /// [`leading_regex_start`], and the relational-chain rule's search for a kept shell
 /// (`needs_parens`'s `relational_region_opens_on_a_kept_shell`).
 pub(in crate::printer) fn printed_left_spine_step<'e>(
-    view: ExprView<'e>,
+    view: AstView<'e>,
     node: &'e ast::Expression<'e>,
     in_for_init: bool,
 ) -> Option<(&'e ast::Expression<'e>, bool)> {
@@ -323,7 +323,7 @@ pub(in crate::printer) fn printed_left_spine_step<'e>(
 /// an object value or a call argument whose value is a sequence has no emitter for the shell
 /// erased from its LAST operand, so the comment written there floats out of the pair
 /// (`[(x, (y /* t */))]` → `[(x, y) /* t */]`).
-fn shell_content_end(view: ExprView<'_>, expr: &ast::Expression<'_>) -> u32 {
+fn shell_content_end(view: AstView<'_>, expr: &ast::Expression<'_>) -> u32 {
     match &expr.kind {
         ast::ExpressionKind::SequenceExpression(seq) => view
             .list(seq.expressions)

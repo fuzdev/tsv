@@ -7,7 +7,7 @@
 // - String key normalization (unquote valid identifiers)
 // - Blank line preservation between properties
 
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{self, Expression, ExpressionKind, Literal, LiteralValue};
 use crate::printer::comments::ValueGap;
 use crate::printer::expressions::assignment::{AssignmentLeft, RhsCommentInfo};
@@ -56,7 +56,7 @@ impl LiteralRole {
     /// leaves the shell's comments to nobody, and anchoring inside in the other prints them
     /// twice. A frozen element or value is read through its slice instead
     /// ([`Printer::element_claim_anchor`]): the slice prints the shell itself.
-    pub(in crate::printer) fn printed_end(self, view: ExprView<'_>, expr: &Expression<'_>) -> u32 {
+    pub(in crate::printer) fn printed_end(self, view: AstView<'_>, expr: &Expression<'_>) -> u32 {
         match (self, &expr.kind) {
             (Self::CompoundTarget, ExpressionKind::AssignmentExpression(assign))
                 if assign.operator == ast::AssignmentOperator::Assign =>
@@ -71,7 +71,7 @@ impl LiteralRole {
     /// with the value read in this role.
     pub(in crate::printer) fn property_printed_end(
         self,
-        view: ExprView<'_>,
+        view: AstView<'_>,
         prop: &ast::ObjectProperty,
     ) -> u32 {
         match prop {
@@ -99,7 +99,7 @@ pub(in crate::printer) fn is_compound_target_value(expr: &Expression<'_>) -> boo
 /// Whether a [`LiteralRole::CompoundTarget`] object breaks for a nested pattern —
 /// prettier's `shouldBreak` for an `ObjectPattern` (`print/object.js`): some property's
 /// value is directly an object or array pattern. A default (`a: [b] = c`) is not one.
-fn compound_target_object_breaks(view: ExprView<'_>, obj: &ast::ObjectExpression<'_>) -> bool {
+fn compound_target_object_breaks(view: AstView<'_>, obj: &ast::ObjectExpression<'_>) -> bool {
     obj.properties.iter().any(|prop| {
         matches!(
             prop,

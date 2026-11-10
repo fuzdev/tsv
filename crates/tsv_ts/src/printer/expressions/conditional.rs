@@ -3,7 +3,7 @@
 // Handles: a ? b : c, nested ternaries, comments in ternaries
 
 use crate::ast;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::printer::comments::ConditionalBranchPlacement;
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::{Printer, template_literal_has_newlines};
@@ -104,7 +104,7 @@ fn is_multiline_template_literal(expr: &ast::Expression<'_>) -> bool {
 /// guard is not an edge case to smooth over: it is exactly why a bare
 /// `!(cond ? a : b)` keeps the hanging form in both formatters, while
 /// `!((cond ? a : b) as T)` expands.
-fn extra_indent_ternary_span(view: ExprView<'_>, value: &ast::Expression<'_>) -> Option<Span> {
+fn extra_indent_ternary_span(view: AstView<'_>, value: &ast::Expression<'_>) -> Option<Span> {
     let (span, stepped) = spine_ternary(view, value)?;
     stepped.then_some(span)
 }
@@ -114,7 +114,7 @@ fn extra_indent_ternary_span(view: ExprView<'_>, value: &ast::Expression<'_>) ->
 /// the chain-base query (which does not — a *sealed* base like `(c ? a : b)!` holds the
 /// wrapper inside its own parens, so the ternary is already one step down when the base
 /// is handed over).
-fn spine_ternary(view: ExprView<'_>, expr: &ast::Expression<'_>) -> Option<(Span, bool)> {
+fn spine_ternary(view: AstView<'_>, expr: &ast::Expression<'_>) -> Option<(Span, bool)> {
     let mut child = expr;
     let mut stepped = false;
     loop {

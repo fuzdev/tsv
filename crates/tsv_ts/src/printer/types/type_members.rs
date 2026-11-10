@@ -9,7 +9,7 @@
 
 use super::CommentSpacing;
 use super::Printer;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{self, TSTypeElement};
 use crate::printer::LeadingGlue;
 use crate::printer::analysis::skip_identifier_at;
@@ -785,7 +785,7 @@ impl<'a> Printer<'a> {
 /// (`Printer::string_key_unquotes` refuses it). A property signature, a class or object
 /// method and every other key unquote through `Printer::build_type_member_key_doc` as usual.
 fn method_signature_new_key<'m>(
-    view: ExprView<'m>,
+    view: AstView<'m>,
     method: &'m ast::TSMethodSignature<'m>,
     source: &str,
 ) -> Option<&'m ast::Literal<'m>> {

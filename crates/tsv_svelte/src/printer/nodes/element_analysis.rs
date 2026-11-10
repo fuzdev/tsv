@@ -9,7 +9,7 @@
 use crate::ast::{FragmentNode, trim_end_collapsible_ws, trim_start_collapsible_ws};
 use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
-use tsv_ts::ast::ExprView;
+use tsv_ts::ast::AstView;
 use tsv_ts::ast::{Expression, ExpressionKind};
 
 use super::element_doc::{
@@ -90,7 +90,7 @@ impl<'a> Printer<'a> {
     /// child is a single expression tag WITHOUT break points takes the
     /// `>`-dangle hug, while break-capable content uses normal flow so the
     /// expression breaks internally first.
-    pub(super) fn expression_has_break_points(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+    pub(super) fn expression_has_break_points(view: AstView<'_>, expr: &Expression<'_>) -> bool {
         match &expr.kind {
             // Ternary always has break points
             ExpressionKind::ConditionalExpression(_) => true,

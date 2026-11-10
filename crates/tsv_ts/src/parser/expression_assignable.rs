@@ -3,7 +3,7 @@
 // rewriting — no token consumption.
 
 use crate::ast::{
-    ArrayPattern, AssignmentOperator, AssignmentPattern, ExprId, ExprView, Expression,
+    ArrayPattern, AssignmentOperator, AssignmentPattern, AstView, ExprId, Expression,
     ExpressionKind, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, PropertyKind,
     RestElement, Run,
 };
@@ -96,7 +96,7 @@ enum CoverShape<'arena> {
 impl<'arena> CoverHead<'arena> {
     /// Reads `expr` into its pieces, asking the two questions that walk the node's own
     /// subtree here, while the read is free.
-    fn of(view: ExprView<'_>, expr: &Expression<'arena>, context: AssignableContext) -> Self {
+    fn of(view: AstView<'_>, expr: &Expression<'arena>, context: AssignableContext) -> Self {
         let for_head_chain = matches!(context, AssignableContext::ForHead)
             && expr.skip_type_assertions(view).has_optional_in_chain(view);
         let shape = match &expr.kind {

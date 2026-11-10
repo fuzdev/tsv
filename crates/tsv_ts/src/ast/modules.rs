@@ -3,7 +3,7 @@
 //! Contains all import and export declaration types, specifiers,
 //! and TypeScript module reference types.
 
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use tsv_lang::Span;
 
 use super::{
@@ -77,7 +77,7 @@ pub enum ExportDefaultValue<'arena> {
 impl ExportDefaultValue<'_> {
     /// The exported value's own span — where the `export default` keyword's gap ends,
     /// whichever form follows it.
-    pub fn span(&self, view: ExprView<'_>) -> Span {
+    pub fn span(&self, view: AstView<'_>) -> Span {
         match self {
             ExportDefaultValue::Expression(expr) => view.expr(*expr).span(),
             ExportDefaultValue::FunctionDeclaration(func) => func.span,

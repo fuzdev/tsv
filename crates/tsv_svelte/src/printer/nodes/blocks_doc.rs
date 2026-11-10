@@ -12,7 +12,7 @@ use crate::printer::{HeadExpr, Printer};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_ts::ast::ExprView;
+use tsv_ts::ast::AstView;
 
 use super::fragment_doc::LeadingEdge;
 use super::helpers::{HeadTail, each_expr_comment_end};
@@ -99,12 +99,12 @@ pub(super) struct AwaitPieces {
 /// False for a binary/logical chain (ends on an operand), a multi-segment member chain (a
 /// `.method(...)` segment, not a bare `)`), a sequence (its `)` is glued to the last operand
 /// one indent in, not at base), and an `as` / `satisfies` cast (ends on the type).
-fn ends_at_base_closer(view: ExprView<'_>, expr: &tsv_ts::ast::Expression<'_>) -> bool {
+fn ends_at_base_closer(view: AstView<'_>, expr: &tsv_ts::ast::Expression<'_>) -> bool {
     use tsv_ts::ast::ArrowFunctionBody;
     use tsv_ts::ast::ExpressionKind as E;
     // A callee with no nested call means the only `(` belongs to this call, so its
     // `)` lands at the tag base when the args wrap (vs. a chain, whose segments indent).
-    fn callee_has_no_call(view: ExprView<'_>, e: &tsv_ts::ast::Expression<'_>) -> bool {
+    fn callee_has_no_call(view: AstView<'_>, e: &tsv_ts::ast::Expression<'_>) -> bool {
         let mut e = e;
         // A loop down the spine, not a recursion: a frame per link is what the stack
         // contract prices
@@ -319,7 +319,7 @@ fn await_shorthand(block: &ast::AwaitBlock<'_>, ws: SectionWhitespace) -> AwaitS
 /// always written in its own head; a third narrowing here owes the same argument.
 /// Pinned by `svelte/blocks/await/catch_shorthand_body_comment_prettier_divergence`.
 pub(super) fn await_expr_comment_end(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     block: &ast::AwaitBlock<'_>,
     shorthand: AwaitShorthand,
 ) -> u32 {

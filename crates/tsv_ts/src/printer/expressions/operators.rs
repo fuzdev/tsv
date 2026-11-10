@@ -4,7 +4,7 @@
 // - Operator precedence and parenthesization
 // - Clarity-based parens (mixing logical operators, etc.)
 
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::ast::{self, BinaryOperator, Expression, ExpressionKind};
 use crate::printer::comments::{
     AsiOperandShell, CommentSpacing, leading_decorated_class, left_spine_shell_is_comment_free,
@@ -210,10 +210,7 @@ pub(in crate::printer) enum SeqLayout {
 ///
 /// Both ends were re-derived at three sites apiece, in two parallel builders and their shared
 /// envelope. That is the shape such a pair drifts through, so the ends are named here once.
-pub(super) fn sequence_operand_run(
-    view: ExprView<'_>,
-    seq: &ast::SequenceExpression,
-) -> (u32, u32) {
+pub(super) fn sequence_operand_run(view: AstView<'_>, seq: &ast::SequenceExpression) -> (u32, u32) {
     let operands = view.list(seq.expressions);
     (
         view.expr(operands[0]).span().start,
@@ -1070,7 +1067,7 @@ impl<'a> Printer<'a> {
     /// operand prettier would rebalance away is same-category by definition, and the
     /// rebalanced tree's LEFT is then same-category too — so both trees answer false.
     pub(in crate::printer) fn should_group_binary_continuation(
-        view: ExprView<'_>,
+        view: AstView<'_>,
         binary: &ast::BinaryExpression,
     ) -> bool {
         let current_is_logical = binary.operator.is_logical();

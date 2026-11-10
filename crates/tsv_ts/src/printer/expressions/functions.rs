@@ -7,7 +7,7 @@
 // Note: Block statements are in blocks.rs as a reusable utility
 
 use crate::ast;
-use crate::ast::ExprView;
+use crate::ast::AstView;
 use crate::printer::ArrowChainContext;
 use crate::printer::AssumedBreak;
 use crate::printer::LeadingGlue;
@@ -93,7 +93,7 @@ fn arrow_body_always_hugs(expr: &ast::Expression<'_>, source: &str) -> bool {
 /// Returns the node's span so the printer wraps exactly it (keyed by span, robust to a
 /// chain rebuilding its base across conditional-group variants) and never a same-shaped
 /// node nested deeper.
-fn leftmost_arrow_body_parens_span(view: ExprView<'_>, expr: &ast::Expression<'_>) -> Option<Span> {
+fn leftmost_arrow_body_parens_span(view: AstView<'_>, expr: &ast::Expression<'_>) -> Option<Span> {
     if matches!(
         expr.kind,
         ast::ExpressionKind::AssignmentExpression(_) | ast::ExpressionKind::SequenceExpression(_)
@@ -207,7 +207,7 @@ fn ternary_body_parens_group_spaced(d: &DocArena, body: DocId) -> DocId {
 /// must visit the same heads and the same gaps — a copied traversal that stopped one head
 /// short would leave a region unclaimed by either, which is a DROPPED comment.
 fn walk_arrow_chain<'a>(
-    view: ExprView<'a>,
+    view: AstView<'a>,
     head: &'a ast::ArrowFunctionExpression<'a>,
     head_span: Span,
     mut visit: impl FnMut(&'a ast::ArrowFunctionExpression<'a>, Span, Option<u32>),
@@ -234,7 +234,7 @@ fn walk_arrow_chain<'a>(
 /// Whether an expression's leftmost position holds a node an arrow body must
 /// parenthesize. See [`leftmost_arrow_body_parens_span`].
 pub(in crate::printer) fn has_leftmost_arrow_body_parens(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     expr: &ast::Expression<'_>,
 ) -> bool {
     leftmost_arrow_body_parens_span(view, expr).is_some()
@@ -242,7 +242,7 @@ pub(in crate::printer) fn has_leftmost_arrow_body_parens(
 
 /// Whether the node at an arrow body's leftmost position that takes a pair is the body
 /// itself (a bare object, a bare decorated class) rather than a node inside it.
-fn arrow_body_is_its_own_leftmost_pair(view: ExprView<'_>, expr: &ast::Expression<'_>) -> bool {
+fn arrow_body_is_its_own_leftmost_pair(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
     leftmost_arrow_body_parens_span(view, expr) == Some(expr.span())
 }
 
@@ -259,7 +259,7 @@ fn arrow_body_is_its_own_leftmost_pair(view: ExprView<'_>, expr: &ast::Expressio
 /// Shared with the signature-param path (`build_signature_params_doc`) so bodyless
 /// declarations (declare / overload) and type-member signatures (method / call /
 /// construct) hug the lone param exactly like value-param functions do.
-fn is_huggable_pattern(view: ExprView<'_>, expr: &ast::Expression<'_>) -> bool {
+fn is_huggable_pattern(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
     match &expr.kind {
         ast::ExpressionKind::ObjectPattern(_) | ast::ExpressionKind::ArrayPattern(_) => true,
         ast::ExpressionKind::AssignmentPattern(ap) => {
@@ -298,7 +298,7 @@ pub(in crate::printer) fn arrow_token_end(arrow: &ast::ArrowFunctionExpression<'
 /// Read only by [`Printer::build_arrow_params_doc_ungrouped`], to suppress the parameter's
 /// duplicate owned-comment claim; see the ⚠️ there.
 fn bare_param_sharing_arrow_start(
-    view: ExprView<'_>,
+    view: AstView<'_>,
     arrow: &ast::ArrowFunctionExpression<'_>,
     span: Span,
 ) -> Option<u32> {
@@ -556,7 +556,7 @@ fn params_cannot_force_break(
 /// - a rest element `...a` over a bare identifier, with a flat annotation or none;
 /// - a default `a = x` whose binding is such an identifier and whose value is a single
 ///   literal or identifier token.
-fn param_is_flat(view: ExprView<'_>, param: &ast::Expression<'_>) -> bool {
+fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
     match &param.kind {
         ast::ExpressionKind::Identifier(id) => {
             id.decorators().unwrap_or_default().is_empty()
