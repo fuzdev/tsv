@@ -326,10 +326,15 @@ pub(crate) fn template_literal_has_newlines(template: &ast::TemplateLiteral<'_>)
 ///
 /// Combines the TemplateLiteral/TaggedTemplateExpression dispatch with the newline check.
 /// Used by call_formatting, new_expression, and arrow body formatting.
-pub(crate) fn is_multiline_template_expression(expr: &ast::Expression<'_>) -> bool {
+pub(crate) fn is_multiline_template_expression(
+    view: AstView<'_>,
+    expr: &ast::Expression<'_>,
+) -> bool {
     match &expr.kind {
         ast::ExpressionKind::TemplateLiteral(t) => template_literal_has_newlines(t),
-        ast::ExpressionKind::TaggedTemplateExpression(t) => template_literal_has_newlines(&t.quasi),
+        &ast::ExpressionKind::TaggedTemplateExpression(t) => {
+            template_literal_has_newlines(&view.tagged_tpl(t).quasi)
+        }
         _ => false,
     }
 }

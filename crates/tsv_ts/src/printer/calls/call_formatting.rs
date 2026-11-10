@@ -907,11 +907,16 @@ fn try_single_arg_hug(
         // Expandable arrow chains: `() => () => { block }`, `() => () => ({obj})`
         // are treated identically to block-body arrows. Matches prettier's
         // couldExpandArg recursive check with arrowChainRecursion=true.
-        ast::ExpressionKind::ArrowFunctionExpression(arrow)
-            if !arrow.body.is_expression() || could_expand_arrow_chain(printer.view, arrow) =>
+        &ast::ExpressionKind::ArrowFunctionExpression(arrow)
+            if !printer.view.arrow_fn(arrow).body.is_expression()
+                || could_expand_arrow_chain(printer.view, printer.view.arrow_fn(arrow)) =>
         {
             return Some(build_block_arrow_hug_states(
-                printer, callee, arrow, arg.span, arg,
+                printer,
+                callee,
+                printer.view.arrow_fn(arrow),
+                arg.span,
+                arg,
             ));
         }
 
@@ -961,7 +966,8 @@ fn try_single_arg_hug(
         // body cannot reach here, since [`could_expand_arrow_chain`] claims it for the first
         // arm above. (Probed: 0 hits over 15.5k real files and the whole fixture suite, which
         // is what the guard's complement already says.)
-        ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
+        &ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
+            let arrow = printer.view.arrow_fn(arrow);
             if let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
                 // Expandable body (ternary): use conditional parens
                 // Prettier's "expand last arg" pattern:
@@ -1003,9 +1009,10 @@ fn try_single_arg_hug(
     }
 
     // Wrap callback with width-aware breaking
-    if let ast::ExpressionKind::ArrowFunctionExpression(arrow) =
+    if let &ast::ExpressionKind::ArrowFunctionExpression(arrow) =
         &printer.view.expr(arguments[0]).kind
     {
+        let arrow = printer.view.arrow_fn(arrow);
         if let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
             // Prettier keeps `fn((x) =>` together (sig on opening line) when the
             // body is a call expression (looking through a trailing non-null `!`,

@@ -598,7 +598,7 @@ pub(super) fn needs_parens(
             // undecorated `class {}` opens one fine and stays bare, as prettier keeps it.
             // The same leftmost-token question a composite body asks through
             // `leftmost_arrow_body_parens_span`, at the body's own root.
-            ExpressionKind::ClassExpression(c) => class_expr_has_decorators(c),
+            &ExpressionKind::ClassExpression(c) => class_expr_has_decorators(view.class_expr(c)),
             _ => false,
         },
 
@@ -635,7 +635,7 @@ pub(super) fn needs_parens(
                 // expression stays unwrapped (prettier keeps `extends class {}`).
                 || matches!(
                     &stripped.kind,
-                    ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c)
+                    &ExpressionKind::ClassExpression(c) if class_expr_has_decorators(view.class_expr(c))
                 )
         }
 
@@ -885,7 +885,7 @@ pub(crate) fn ends_with_instantiation_close(
                     in_for_init,
                 )
         }
-        ExpressionKind::ArrowFunctionExpression(arrow) => match arrow.body {
+        &ExpressionKind::ArrowFunctionExpression(arrow) => match view.arrow_fn(arrow).body {
             // A sequence body prints its own pair; a conditional one takes the arrow's
             // pair only when flat (see above), so it counts as bare.
             ArrowFunctionBody::Expression(body) => {
@@ -1112,7 +1112,8 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
                     }
                     (view.expr(call.callee), false)
                 }
-                ExpressionKind::TaggedTemplateExpression(t) => {
+                &ExpressionKind::TaggedTemplateExpression(t) => {
+                    let t = view.tagged_tpl(t);
                     if matches!(view.expr(t.tag).kind, ExpressionKind::FunctionExpression(_)) {
                         return (expr, computed_member_object);
                     }
@@ -1236,15 +1237,15 @@ fn export_default_leftmost<'a>(
             {
                 view.expr(call.callee)
             }
-            ExpressionKind::TaggedTemplateExpression(t)
+            &ExpressionKind::TaggedTemplateExpression(t)
                 if !needs_parens(
                     view,
-                    view.expr(t.tag),
+                    view.expr(view.tagged_tpl(t).tag),
                     ParenContext::TaggedTemplateTag,
                     false,
                 ) =>
             {
-                view.expr(t.tag)
+                view.expr(view.tagged_tpl(t).tag)
             }
             _ => return expr,
         };
@@ -1353,7 +1354,7 @@ fn relational_region_opens_on_a_kept_shell(
         let Some((child, parenthesized)) = printed_left_spine_step(view, node, in_for_init) else {
             return false;
         };
-        let hop = RegionHop::of(node);
+        let hop = RegionHop::of(view, node);
         if prints_its_own_paren_pair(child) || parenthesized {
             return match hop {
                 RegionHop::Index => open,
@@ -1486,7 +1487,7 @@ enum RegionHop {
 }
 
 impl RegionHop {
-    fn of(node: &Expression<'_>) -> Self {
+    fn of(view: AstView<'_>, node: &Expression<'_>) -> Self {
         match &node.kind {
             ExpressionKind::MemberExpression(member) if member.computed && !member.optional => {
                 Self::Index
@@ -1496,7 +1497,9 @@ impl RegionHop {
             {
                 Self::List
             }
-            ExpressionKind::TaggedTemplateExpression(tagged) if tagged.type_arguments.is_some() => {
+            &ExpressionKind::TaggedTemplateExpression(tagged)
+                if view.tagged_tpl(tagged).type_arguments.is_some() =>
+            {
                 Self::List
             }
             ExpressionKind::TSInstantiationExpression(_) => Self::List,

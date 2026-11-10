@@ -58,8 +58,8 @@ fn array_pattern_gap_end(
 /// Check if an arrow function has a nested arrow function as its body
 /// Used for chain-tail-arrow-chain detection: `(x) => (y) => x + y`
 fn is_nested_arrow_function(view: AstView<'_>, expr: &Expression<'_>) -> bool {
-    if let ExpressionKind::ArrowFunctionExpression(arrow) = &expr.kind
-        && let ArrowFunctionBody::Expression(body_expr) = &arrow.body
+    if let &ExpressionKind::ArrowFunctionExpression(arrow) = &expr.kind
+        && let ArrowFunctionBody::Expression(body_expr) = &view.arrow_fn(arrow).body
     {
         return matches!(
             view.expr(*body_expr).kind,

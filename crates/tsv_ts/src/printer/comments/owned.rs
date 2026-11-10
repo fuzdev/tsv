@@ -47,7 +47,7 @@ fn left_spine_child<'x>(view: AstView<'x>, expr: &'x Expression<'x>) -> Option<&
         // pattern's twin never showed it: its property builder prints a shorthand key
         // directly instead of routing the `AssignmentPattern` through the seam.
         ExpressionKind::AssignmentPattern(a) => view.expr(a.left),
-        ExpressionKind::TaggedTemplateExpression(t) => view.expr(t.tag),
+        &ExpressionKind::TaggedTemplateExpression(t) => view.expr(view.tagged_tpl(t).tag),
         ExpressionKind::SequenceExpression(s) => view.expr(*view.list(s.expressions).first()?),
         ExpressionKind::TSNonNullExpression(n) => view.expr(n.expression),
         ExpressionKind::TSAsExpression(a) => view.expr(a.expression),

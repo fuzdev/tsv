@@ -696,7 +696,8 @@ impl<'a> Printer<'a> {
         // Handle getter/setter vs method vs regular property
         if matches!(prop.kind, ast::PropertyKind::Get | ast::PropertyKind::Set) {
             // Getter/setter: `get x() {}` or `set x(v) {}`
-            if let ExpressionKind::FunctionExpression(func) = &value.kind {
+            if let &ExpressionKind::FunctionExpression(func) = &value.kind {
+                let func = self.view.fn_expr(func);
                 let func_doc = self.build_function_doc_body(func);
                 // Comments between key and type params/parens: `get [x] /* c */() {}`
                 // or `get x/* c */ <T>() {}`
@@ -713,7 +714,8 @@ impl<'a> Printer<'a> {
             }
         } else if prop.method {
             // Method shorthand: `foo() {}`, `async foo() {}`, `*gen() {}`, or `async *gen() {}`
-            if let ExpressionKind::FunctionExpression(func) = &value.kind {
+            if let &ExpressionKind::FunctionExpression(func) = &value.kind {
+                let func = self.view.fn_expr(func);
                 let func_doc = self.build_function_doc_body(func);
                 // Build prefix: async? + *?, preserving comments after `async`
                 // (e.g., `async /* c */ m()`)

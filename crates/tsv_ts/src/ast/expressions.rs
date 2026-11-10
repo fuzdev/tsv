@@ -7,9 +7,10 @@ use crate::ast::AstView;
 use tsv_lang::{Comment, Span};
 
 use super::{
-    ArrayPattern, AssignmentPattern, BlockStatement, ClassExpression, Expr, ExprId, Identifier,
-    Literal, ObjectPattern, PrivateIdentifier, RestElement, Run, TSParameterProperty,
-    TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation, TyId,
+    ArrayPattern, ArrowFnEdge, AssignmentPattern, BlockStatement, ClassExprEdge, Expr, ExprId,
+    FnExprEdge, Identifier, Literal, MetaPropEdge, ObjectPattern, PrivateIdentifier, RestElement,
+    Run, TSParameterProperty, TSTypeAnnotation, TSTypeParameterDeclaration,
+    TSTypeParameterInstantiation, TaggedTplEdge, TyId,
 };
 
 /// Expression node: the span every variant shares, beside the variant itself.
@@ -53,12 +54,12 @@ pub enum ExpressionKind<'arena> {
     // The pointer chase this adds is on the rare read, and the parser's recursion is
     // unaffected either way — it threads expressions by id (every `parse_*` on its
     // ladder returns an `ExprRet`).
-    ArrowFunctionExpression(&'arena ArrowFunctionExpression<'arena>),
-    FunctionExpression(&'arena FunctionExpression<'arena>),
-    ClassExpression(&'arena ClassExpression<'arena>),
+    ArrowFunctionExpression(ArrowFnEdge<'arena>),
+    FunctionExpression(FnExprEdge<'arena>),
+    ClassExpression(ClassExprEdge<'arena>),
     SpreadElement(SpreadElement),
     TemplateLiteral(TemplateLiteral<'arena>),
-    TaggedTemplateExpression(&'arena TaggedTemplateExpression<'arena>),
+    TaggedTemplateExpression(TaggedTplEdge<'arena>),
     AwaitExpression(AwaitExpression),
     YieldExpression(YieldExpression),
     SequenceExpression(SequenceExpression),
@@ -84,7 +85,7 @@ pub enum ExpressionKind<'arena> {
     // Dynamic import: import('...')
     ImportExpression(ImportExpression),
     // Meta property: import.meta, new.target (two inline Identifiers)
-    MetaProperty(&'arena MetaProperty<'arena>),
+    MetaProperty(MetaPropEdge<'arena>),
     // A grouping pair bound to the comment before its `(` — the JSDoc type cast
     // `/** @type {T} */ (inner)`, or a glued block whose pair opens with a line comment
     // (`/* c */ (⏎// d⏎inner)`). Internal-only, never serialized

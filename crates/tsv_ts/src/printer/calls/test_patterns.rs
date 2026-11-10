@@ -271,9 +271,12 @@ pub(super) fn is_test_call(call: &ast::CallExpression, printer: &Printer<'_>) ->
     // runs past print width in a position where prettier breaks every argument out and holds
     // 100 — tsv over-width exactly where prettier is not. Pinned by
     // `tests/fixtures/typescript/expressions/calls/test_functions_timeout`.
-    let callback_ok = match &printer.view.expr(arguments[1]).kind {
-        ast::ExpressionKind::FunctionExpression(func) => arg_count == 2 || func.params.len() <= 1,
+    let callback_ok = match printer.view.expr(arguments[1]).kind {
+        ast::ExpressionKind::FunctionExpression(func) => {
+            arg_count == 2 || printer.view.fn_expr(func).params.len() <= 1
+        }
         ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
+            let arrow = printer.view.arrow_fn(arrow);
             arg_count == 2 || (!arrow.body.is_expression() && arrow.params.len() <= 1)
         }
         _ => false,

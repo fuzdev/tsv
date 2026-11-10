@@ -1374,9 +1374,10 @@ fn build_arrow_comment_line_state<'a>(
     let arg = printer
         .view
         .expr(*printer.view.list(call.arguments).last()?);
-    let ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind else {
+    let &ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind else {
         return None;
     };
+    let arrow = printer.view.arrow_fn(arrow);
     let ArrowFunctionBody::Expression(body) = &arrow.body else {
         return None;
     };
@@ -1534,8 +1535,8 @@ fn last_group_single_argument<'a>(
 fn is_arrow_with_paren_object_body(view: AstView<'_>, arg: &Expression<'_>) -> bool {
     matches!(
         &arg.kind,
-        ExpressionKind::ArrowFunctionExpression(arrow) if matches!(
-            &arrow.body,
+        &ExpressionKind::ArrowFunctionExpression(arrow) if matches!(
+            &view.arrow_fn(arrow).body,
             ArrowFunctionBody::Expression(body)
                 if matches!(view.expr(*body).kind, ExpressionKind::ObjectExpression(_))
         )

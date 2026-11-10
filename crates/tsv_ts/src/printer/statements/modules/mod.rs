@@ -730,14 +730,18 @@ impl<'a> Printer<'a> {
             return None;
         };
         let value = self.view.expr(*value);
-        let ast::Expression {
+        let &ast::Expression {
             span: class_span,
             kind: ast::ExpressionKind::ClassExpression(class_expr),
         } = value
         else {
             return None;
         };
-        let decorators = class_expr.decorators.filter(|dec| !dec.is_empty())?;
+        let decorators = self
+            .view
+            .class_expr(class_expr)
+            .decorators
+            .filter(|dec| !dec.is_empty())?;
         // An authored pair makes the class an expression where the bare spelling is a
         // declaration to tsc (an export assignment, which binds no name in the module
         // scope), so the pair is kept: the keyword→value path prints it, broken open.
@@ -759,7 +763,7 @@ impl<'a> Printer<'a> {
         // directive's line, which the inline emitter below would take away: a
         // keyword-trailing placement is inert under the floor, so the relocated form
         // would lose the freeze on the second pass.
-        if let Some(frozen) = self.value_head_frozen_span(keyword_end, *class_span) {
+        if let Some(frozen) = self.value_head_frozen_span(keyword_end, class_span) {
             self.append_keyword_value_line_comments(
                 &mut parts,
                 keyword_end,
@@ -784,7 +788,7 @@ impl<'a> Printer<'a> {
         // runs for it — the comment must be claimed here or nothing prints it.
         parts.push(self.prepend_owned_leading_comment_at(
             class_span.start,
-            self.build_class_expression_doc(class_expr, *class_span),
+            self.build_class_expression_doc(self.view.class_expr(class_expr), class_span),
         ));
         Some(d.concat(&parts))
     }

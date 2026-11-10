@@ -462,11 +462,11 @@ fn unwrap_ts_type_wrappers<'a>(
 /// Matches arrow functions with block bodies (`() => { ... }`) and
 /// function expressions (`function() { ... }`). These contain hardlines.
 #[inline]
-pub(super) fn is_block_function(expr: &Expression<'_>) -> bool {
+pub(super) fn is_block_function(view: AstView<'_>, expr: &Expression<'_>) -> bool {
     matches!(
         &expr.kind,
-        ExpressionKind::ArrowFunctionExpression(arrow)
-            if matches!(arrow.body, ast::ArrowFunctionBody::BlockStatement(_))
+        &ExpressionKind::ArrowFunctionExpression(arrow)
+            if matches!(view.arrow_fn(arrow).body, ast::ArrowFunctionBody::BlockStatement(_))
     ) || matches!(expr.kind, ExpressionKind::FunctionExpression(_))
 }
 
@@ -503,7 +503,7 @@ where
         _ => return false,
     };
 
-    is_hook_callback_with_deps(view.expr(args[base]), view.expr(args[base + 1]))
+    is_hook_callback_with_deps(view, view.expr(args[base]), view.expr(args[base + 1]))
         && !arg_gap_has_comment()
 }
 
@@ -514,12 +514,16 @@ where
 /// Split out for `import(…)`, whose AST carries `source` + `options` rather than an argument
 /// slice; prettier reaches it through the same `printCallArguments` (`ImportExpression` is in
 /// that printer's header list), so the shape question must have one answer for both.
-pub(super) fn is_hook_callback_with_deps(callback: &Expression<'_>, deps: &Expression<'_>) -> bool {
+pub(super) fn is_hook_callback_with_deps(
+    view: AstView<'_>,
+    callback: &Expression<'_>,
+    deps: &Expression<'_>,
+) -> bool {
     matches!(
-        &callback.kind,
+        callback.kind,
         ExpressionKind::ArrowFunctionExpression(arrow)
-            if arrow.params.is_empty()
-                && matches!(arrow.body, ast::ArrowFunctionBody::BlockStatement(_))
+            if view.arrow_fn(arrow).params.is_empty()
+                && matches!(view.arrow_fn(arrow).body, ast::ArrowFunctionBody::BlockStatement(_))
     ) && matches!(deps.kind, ExpressionKind::ArrayExpression(_))
 }
 
@@ -700,7 +704,7 @@ pub(crate) fn is_simple_call_argument(
 /// which a `new` is not — so the `new` printer passes `false` to
 /// [`super::arg_wrapping::ArgOpener::lone_hug_ladder`] rather than asking this.
 pub(super) fn lone_arg_params_render_flat(view: AstView<'_>, arg: &Expression<'_>) -> bool {
-    matches!(&arg.kind, ExpressionKind::FunctionExpression(func) if view.run(func.params).iter().all(|param| {
+    matches!(&arg.kind, &ExpressionKind::FunctionExpression(func) if view.run(view.fn_expr(func).params).iter().all(|param| {
         matches!(&param.kind, ExpressionKind::Identifier(id) if id.type_annotation().is_none())
     }))
 }

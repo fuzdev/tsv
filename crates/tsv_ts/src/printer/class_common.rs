@@ -408,7 +408,7 @@ impl<'a> Printer<'a> {
             // stays inline in flat parens.
             if matches!(
                 &super_class.kind,
-                ast::ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c)
+                &ast::ExpressionKind::ClassExpression(c) if class_expr_has_decorators(self.view.class_expr(c))
             ) {
                 self.build_break_open_parens(doc)
             } else {

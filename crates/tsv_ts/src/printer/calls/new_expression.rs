@@ -424,10 +424,12 @@ impl<'a> Printer<'a> {
                         .lone_hug_ladder(d, arg_doc, false);
                 }
                 // Block arrow (or expandable arrow chain): use conditional_group to let Doc decide hug vs wrap
-                ast::Expression {
+                &ast::Expression {
                     kind: ast::ExpressionKind::ArrowFunctionExpression(arrow),
                     ..
-                } if !arrow.body.is_expression() || could_expand_arrow_chain(self.view, arrow) => {
+                } if !self.view.arrow_fn(arrow).body.is_expression()
+                    || could_expand_arrow_chain(self.view, self.view.arrow_fn(arrow)) =>
+                {
                     let arg0 = &arguments[0];
                     let build = || self.build_expression_doc(self.view.expr(*arg0));
 
@@ -452,8 +454,11 @@ impl<'a> Printer<'a> {
 
                     // A signature that will break, or a leading comment, forces the wrapped
                     // state.
-                    let signature_refuses =
-                        arrow_signature_refuses_hug(self, arrow, self.view.expr(arguments[0]).span);
+                    let signature_refuses = arrow_signature_refuses_hug(
+                        self,
+                        self.view.arrow_fn(arrow),
+                        self.view.expr(arguments[0]).span,
+                    );
 
                     // ⚠️ Both refusals are asked BEFORE the printing pair below and read only
                     // the `printedArguments` one — the pair is a second build of the argument
@@ -469,7 +474,12 @@ impl<'a> Printer<'a> {
                         let printed = prepend_leading(
                             d,
                             glued,
-                            build_arrow_hug_printed_doc(self, self.view.expr(*arg0), arrow, build),
+                            build_arrow_hug_printed_doc(
+                                self,
+                                self.view.expr(*arg0),
+                                self.view.arrow_fn(arrow),
+                                build,
+                            ),
                         );
                         return wrap_call_with_will_break_guard(d, callee_with_types, printed);
                     }
@@ -484,18 +494,20 @@ impl<'a> Printer<'a> {
                         self,
                         ArgOpener::callee(d, callee_with_types),
                         self.view.expr(*arg0),
-                        arrow,
+                        self.view.arrow_fn(arrow),
                         glued,
                         build,
                     );
                 }
                 // Expression-body arrow: break at => not at (
                 // Mirrors call_formatting.rs expression arrow handling
-                ast::Expression {
+                &ast::Expression {
                     kind: ast::ExpressionKind::ArrowFunctionExpression(arrow),
                     ..
-                } if arrow.body.is_expression() => {
-                    if let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
+                } if self.view.arrow_fn(arrow).body.is_expression() => {
+                    if let ast::ArrowFunctionBody::Expression(body_expr) =
+                        &self.view.arrow_fn(arrow).body
+                    {
                         // Expandable body (ternary): conditional parens
                         // Flat: `new Xy((x) => (x ? y : z))`
                         // Break: `new Xy((x) =>\n  x ? y : z,\n)`
@@ -509,18 +521,21 @@ impl<'a> Printer<'a> {
                             && !(new_has_comments
                                 && arrow_hug_refused_by_comments(
                                     self,
-                                    arrow,
+                                    self.view.arrow_fn(arrow),
                                     self.view.expr(arguments[0]).span,
                                     self.view.expr(*body_expr),
                                 ))
                             && !arrow_signature_refuses_hug(
                                 self,
-                                arrow,
+                                self.view.arrow_fn(arrow),
                                 self.view.expr(arguments[0]).span,
                             )
                         {
-                            let sig_doc =
-                                build_arrow_sig_doc(self, arrow, self.view.expr(arguments[0]).span);
+                            let sig_doc = build_arrow_sig_doc(
+                                self,
+                                self.view.arrow_fn(arrow),
+                                self.view.expr(arguments[0]).span,
+                            );
                             let body_doc =
                                 self.build_arrow_arg_body_doc(self.view.expr(*body_expr));
 
@@ -529,7 +544,7 @@ impl<'a> Printer<'a> {
                             return build_ternary_arrow_hug_ladder(
                                 self,
                                 ArgOpener::callee(d, callee_with_types),
-                                arrow,
+                                self.view.arrow_fn(arrow),
                                 self.view.expr(*body_expr),
                                 sig_doc,
                                 body_doc,
@@ -543,7 +558,7 @@ impl<'a> Printer<'a> {
                         if arrow_body_is_call_through_non_null(self.view, self.view.expr(*body_expr))
                             // Same refusal pair as the ternary arm above.
                             && !(new_has_comments
-                                && arrow_hug_refused_by_comments(self, arrow, self.view.expr(arguments[0]).span, self.view.expr(*body_expr)))
+                                && arrow_hug_refused_by_comments(self, self.view.arrow_fn(arrow), self.view.expr(arguments[0]).span, self.view.expr(*body_expr)))
                             // The body is built once and shared by every state (see the
                             // ladder's doc) — last, because it builds.
                             && let Some(body_reuse) =
@@ -554,7 +569,7 @@ impl<'a> Printer<'a> {
                                 self,
                                 ArgOpener::callee(d, callee_with_types),
                                 self.view.expr(arg0),
-                                arrow,
+                                self.view.arrow_fn(arrow),
                                 self.view.expr(*body_expr),
                                 body_reuse,
                                 || self.build_expression_doc(self.view.expr(arg0)),
@@ -916,7 +931,8 @@ impl<'a> Printer<'a> {
                         && !non_null.seals_optional_chain(self.view, callee.span),
                     non_null.expression,
                 ),
-                E::TaggedTemplateExpression(tagged) => {
+                &E::TaggedTemplateExpression(tagged) => {
+                    let tagged = self.view.tagged_tpl(tagged);
                     let list = tagged.type_arguments.as_ref();
                     let keeps_pair = self
                         .needs_parens(self.view.expr(tagged.tag), ParenContext::TaggedTemplateTag)

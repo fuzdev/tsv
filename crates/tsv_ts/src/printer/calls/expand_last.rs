@@ -57,8 +57,8 @@ impl ArgOwner {
         match self {
             Self::Call => callback_signature_refuses_hug(printer, arg, arg_count),
             Self::New => match &arg.kind {
-                ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
-                    arrow_signature_refuses_hug(printer, arrow, arg.span)
+                &ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
+                    arrow_signature_refuses_hug(printer, printer.view.arrow_fn(arrow), arg.span)
                 }
                 _ => false,
             },
@@ -122,12 +122,12 @@ pub(super) fn try_expand_last_arg(
     }
 
     let hug_eligible = match last_arg {
-        Some(ast::Expression {
+        Some(&ast::Expression {
             span: arrow_span,
             kind: ast::ExpressionKind::ArrowFunctionExpression(arrow),
         }) => {
-            could_expand_arrow_chain(printer.view, arrow)
-                || match &arrow.body {
+            could_expand_arrow_chain(printer.view, printer.view.arrow_fn(arrow))
+                || match &printer.view.arrow_fn(arrow).body {
                     ast::ArrowFunctionBody::Expression(body_expr) => {
                         (arrow_body_is_call_through_non_null(
                             printer.view,
@@ -136,8 +136,8 @@ pub(super) fn try_expand_last_arg(
                             && !(has_comments
                                 && arrow_hug_refused_by_comments(
                                     printer,
-                                    arrow,
-                                    *arrow_span,
+                                    printer.view.arrow_fn(arrow),
+                                    arrow_span,
                                     printer.view.expr(*body_expr),
                                 ))
                     }
@@ -269,16 +269,17 @@ pub(super) fn try_expand_last_arg(
     if last_is_function {
         // Expression arrow with a call / conditional body: the head arguments stay inline and
         // only the body breaks after `=>` (`fn({ a: 1 }, (x) =>⏎\tcall(x, …)⏎)`).
-        if let Some(ast::Expression { span: arrow_span, kind: ast::ExpressionKind::ArrowFunctionExpression(arrow) }) = last_arg
-            && let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+        if let Some(&ast::Expression { span: arrow_span, kind: ast::ExpressionKind::ArrowFunctionExpression(arrow) }) = last_arg
+            && let ast::ArrowFunctionBody::Expression(body_expr) = &printer.view.arrow_fn(arrow).body
             && (arrow_body_is_call_through_non_null(printer.view, printer.view.expr(*body_expr))
                 || matches!(printer.view.expr(*body_expr).kind, ast::ExpressionKind::ConditionalExpression(_)))
             // The reassembling arm's refusal pair, which holds at every one of these states —
             // and the same question the eligibility gate above already answered to let this
             // block be entered at all.
-            && !(has_comments && arrow_hug_refused_by_comments(printer, arrow, *arrow_span, printer.view.expr(*body_expr)))
+            && !(has_comments && arrow_hug_refused_by_comments(printer, printer.view.arrow_fn(arrow), arrow_span, printer.view.expr(*body_expr)))
         {
-            let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, *arrow_span);
+            let sig_doc =
+                build_hugged_arrow_sig_doc(printer, printer.view.arrow_fn(arrow), arrow_span);
             // Reuse the pre-built call body (see above); conditional bodies build fresh.
             let body_doc = body_reuse.map_or_else(
                 || printer.build_arrow_arg_body_doc(printer.view.expr(*body_expr)),
@@ -286,7 +287,7 @@ pub(super) fn try_expand_last_arg(
             );
             let body_doc = prepend_arrow_body_comments(
                 printer,
-                arrow,
+                printer.view.arrow_fn(arrow),
                 printer.view.expr(*body_expr).span().start,
                 body_doc,
             );
@@ -298,7 +299,11 @@ pub(super) fn try_expand_last_arg(
                 &head_parts,
                 sig_doc,
                 body_doc,
-                arrow_body_breaks_after_space(printer, arrow, printer.view.expr(*body_expr)),
+                arrow_body_breaks_after_space(
+                    printer,
+                    printer.view.arrow_fn(arrow),
+                    printer.view.expr(*body_expr),
+                ),
                 last_arg_doc,
                 all_args_broken,
             ));
@@ -309,7 +314,8 @@ pub(super) fn try_expand_last_arg(
         // curried heads (`fn(arg, (x) => (y) => ({⏎\ta: x⏎}))`). `couldExpandArg` keys only on
         // the terminal's type, so a typed arrow expands the same way.
         if let Some(arg) = last_arg
-            && let ast::ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
+            && let &ast::ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
+            && let arrow = printer.view.arrow_fn(arrow)
             && arrow_body_expands_internally(printer.view, arrow)
             // A break inside the signature — the hug renders the callee and the signature
             // run on one line. NOT the body-tail question its reassembling siblings ask

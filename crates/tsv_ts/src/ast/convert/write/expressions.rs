@@ -328,14 +328,14 @@ fn write_expression_full_dispatch(
         ast::ExpressionKind::BinaryExpression(binary) => {
             write_binary_chain(w, binary, expr.span, ctx);
         }
-        ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
-            write_arrow_function_expression(w, arrow, expr.span, ctx);
+        &ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
+            write_arrow_function_expression(w, ctx.view.arrow_fn(arrow), expr.span, ctx);
         }
-        ast::ExpressionKind::FunctionExpression(func) => {
-            write_function_expression(w, func, ctx, false);
+        &ast::ExpressionKind::FunctionExpression(func) => {
+            write_function_expression(w, ctx.view.fn_expr(func), ctx, false);
         }
-        ast::ExpressionKind::ClassExpression(class_expr) => {
-            write_class_expression(w, class_expr, expr.span, ctx);
+        &ast::ExpressionKind::ClassExpression(class_expr) => {
+            write_class_expression(w, ctx.view.class_expr(class_expr), expr.span, ctx);
         }
         ast::ExpressionKind::SpreadElement(spread) => {
             node_header(w, "SpreadElement", spread.span, ctx);
@@ -355,7 +355,8 @@ fn write_expression_full_dispatch(
         ast::ExpressionKind::TemplateLiteral(template) => {
             write_template_literal(w, template, ctx);
         }
-        ast::ExpressionKind::TaggedTemplateExpression(tagged) => {
+        &ast::ExpressionKind::TaggedTemplateExpression(tagged) => {
+            let tagged = ctx.view.tagged_tpl(tagged);
             node_header(w, "TaggedTemplateExpression", expr.span, ctx);
             w.raw(",\"tag\":");
             write_expression(w, ctx.view.expr(tagged.tag), ctx);
@@ -512,7 +513,8 @@ fn write_expression_full_dispatch(
             }
             close_node(w, "ImportExpression", expr.span, ctx);
         }
-        ast::ExpressionKind::MetaProperty(meta) => {
+        &ast::ExpressionKind::MetaProperty(meta) => {
+            let meta = ctx.view.meta_prop(meta);
             node_header(w, "MetaProperty", expr.span, ctx);
             w.raw(",\"meta\":");
             write_identifier_plain(w, &meta.meta, ctx);

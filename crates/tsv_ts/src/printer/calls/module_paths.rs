@@ -94,8 +94,9 @@ pub(super) fn get_module_path_chain_break<'a>(
 
     // Check for `import.meta.resolve()`
     if is_resolve
-        && let ast::ExpressionKind::MetaProperty(meta) = &printer.view.expr(member.object).kind
+        && let &ast::ExpressionKind::MetaProperty(meta) = &printer.view.expr(member.object).kind
     {
+        let meta = printer.view.meta_prop(meta);
         let is_import_meta = printer.with_ident_name(&meta.meta, |m| m == "import")
             && printer.with_ident_name(&meta.property, |p| p == "meta");
         if is_import_meta {

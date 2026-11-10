@@ -432,7 +432,7 @@ fn build_import_args_doc(
     // same `printCallArguments` as a call: a zero-parameter block arrow plus an array
     // literal stays flat. The comment conjunct is asked of the `(`→specifier gap only —
     // every other gap's comment already routed through the shared comment layout above.
-    if is_hook_callback_with_deps(source, printer.view.expr(*options))
+    if is_hook_callback_with_deps(printer.view, source, printer.view.expr(*options))
         && !printer.has_comments_on_page_between(leading_scan_start, source_start)
     {
         return d.concat(&[open, source_doc, d.text(", "), options_doc, d.text(")")]);
