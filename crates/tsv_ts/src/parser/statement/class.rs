@@ -9,6 +9,7 @@ use crate::ast::{
     TSTypeParameterInstantiation,
 };
 use crate::lexer::{KeywordKind, TokenKind};
+use crate::parser::{push_row, push_spanned};
 use crate::printer::ParenContext;
 use tsv_lang::{Error, Span};
 
@@ -95,9 +96,8 @@ struct ClassHead<'arena> {
 impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_class_declaration(&mut self) -> Result<Statement<'arena>, Error> {
         let class = self.parse_class_declaration_inner(true, false)?;
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ClassDeclaration<'_>>(1);
-        Ok(Statement::from_class_declaration(self.arena.alloc(class)))
+        let (span, class) = push_spanned(&mut self.stores.payloads.class_decls, class, |x| x.span);
+        Ok(Statement::from_class_declaration(span, class))
     }
 
     /// Parse an abstract class declaration: `abstract class Foo { ... }`
@@ -120,9 +120,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let class =
             self.parse_class_declaration_inner_with_start(true, true, abstract_start, false)?;
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ClassDeclaration<'_>>(1);
-        Ok(Statement::from_class_declaration(self.arena.alloc(class)))
+        let (span, class) = push_spanned(&mut self.stores.payloads.class_decls, class, |x| x.span);
+        Ok(Statement::from_class_declaration(span, class))
     }
 
     /// Parse a decorated class: `@decorator class Foo { }`
@@ -176,11 +175,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if is_export {
             if is_default {
                 let end = class.span.end;
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<ExportDefaultDeclaration<'_>>(1);
                 Ok(Statement {
                     span: Span::new(start as u32, end),
-                    kind: StatementKind::ExportDefaultDeclaration(self.arena.alloc(
+                    kind: StatementKind::ExportDefaultDeclaration(push_row(
+                        &mut self.stores.payloads.export_defaults,
                         ExportDefaultDeclaration {
                             declaration: ExportDefaultValue::ClassDeclaration(class),
                         },
@@ -195,15 +193,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 } else {
                     ExportKind::Value
                 };
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<ClassDeclaration<'_>>(1);
-                let class_decl = Statement::from_class_declaration(self.arena.alloc(class));
+                let (span, class) =
+                    push_spanned(&mut self.stores.payloads.class_decls, class, |x| x.span);
+                let class_decl = Statement::from_class_declaration(span, class);
                 let class_decl = self.push_stmt(class_decl);
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<ExportNamedDeclaration<'_>>(1);
                 Ok(Statement {
                     span: Span::new(start as u32, end),
-                    kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(
+                    kind: StatementKind::ExportNamedDeclaration(push_row(
+                        &mut self.stores.payloads.export_nameds,
                         ExportNamedDeclaration {
                             declaration: Some(class_decl),
                             specifiers: &[],
@@ -215,9 +212,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 })
             }
         } else {
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::mint::<ClassDeclaration<'_>>(1);
-            Ok(Statement::from_class_declaration(self.arena.alloc(class)))
+            let (span, class) =
+                push_spanned(&mut self.stores.payloads.class_decls, class, |x| x.span);
+            Ok(Statement::from_class_declaration(span, class))
         }
     }
 
@@ -581,11 +578,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } = self.parse_class_head_and_body(false)?;
         let end = body.span.end;
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ClassExpression<'_>>(1);
-        Ok(self.push_ret(Expression {
-            span: Span::new(start as u32, end),
-            kind: ExpressionKind::ClassExpression(self.arena.alloc(ClassExpression {
+        let class = push_row(
+            &mut self.stores.payloads.class_exprs,
+            ClassExpression {
                 decorators,
                 id,
                 super_class,
@@ -594,7 +589,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 body,
                 r#abstract,
                 type_parameters,
-            })),
+            },
+        );
+        Ok(self.push_ret(Expression {
+            span: Span::new(start as u32, end),
+            kind: ExpressionKind::ClassExpression(class),
         }))
     }
 

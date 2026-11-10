@@ -6,6 +6,7 @@ use crate::ast::{
     ArrowFunctionBody, ArrowFunctionExpression, Expr, Expression, ExpressionKind, Identifier, Run,
 };
 use crate::lexer::TokenKind;
+use crate::parser::push_row;
 use tsv_lang::{Error, Span};
 
 use super::expression_lookahead::{ArrowHead, scan_angle_brackets, scan_arrow_after_identifier};
@@ -211,21 +212,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             "an arrow's extent encloses its body"
         );
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ArrowFunctionExpression<'_>>(1);
+        let arrow = push_row(
+            &mut self.stores.payloads.arrow_fns,
+            ArrowFunctionExpression {
+                type_parameters: Some(type_parameters),
+                params,
+                body,
+                return_type,
+                r#async: false,
+                params_start: Some(params_start as u32),
+                arrow_token,
+            },
+        );
         Ok(self.push_ret(Expression {
             span: Span::new(start as u32, end),
-            kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
-                ArrowFunctionExpression {
-                    type_parameters: Some(type_parameters),
-                    params,
-                    body,
-                    return_type,
-                    r#async: false,
-                    params_start: Some(params_start as u32),
-                    arrow_token,
-                },
-            )),
+            kind: ExpressionKind::ArrowFunctionExpression(arrow),
         }))
     }
 
@@ -303,21 +304,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             "an arrow's extent encloses its body"
         );
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ArrowFunctionExpression<'_>>(1);
+        let arrow = push_row(
+            &mut self.stores.payloads.arrow_fns,
+            ArrowFunctionExpression {
+                type_parameters: None, // Generic arrows like <T>() => {} are handled by parse_generic_arrow_function()
+                params,
+                body,
+                return_type,
+                r#async: false, // Non-async arrow function; async ones are parsed via parse_async_arrow_function
+                params_start: Some(params_start as u32),
+                arrow_token,
+            },
+        );
         Ok(self.push_ret(Expression {
             span: Span::new(start as u32, end),
-            kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
-                ArrowFunctionExpression {
-                    type_parameters: None, // Generic arrows like <T>() => {} are handled by parse_generic_arrow_function()
-                    params,
-                    body,
-                    return_type,
-                    r#async: false, // Non-async arrow function; async ones are parsed via parse_async_arrow_function
-                    params_start: Some(params_start as u32),
-                    arrow_token,
-                },
-            )),
+            kind: ExpressionKind::ArrowFunctionExpression(arrow),
         }))
     }
 
@@ -353,21 +354,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             "an arrow's extent encloses its body"
         );
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ArrowFunctionExpression<'_>>(1);
+        let arrow = push_row(
+            &mut self.stores.payloads.arrow_fns,
+            ArrowFunctionExpression {
+                type_parameters: None,
+                params,
+                body,
+                return_type: None, // Single-param without parens can't have return type
+                r#async: false,
+                params_start: None, // No parens for single-param arrows
+                arrow_token,
+            },
+        );
         Ok(self.push_ret(Expression {
             span: Span::new(start as u32, end),
-            kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
-                ArrowFunctionExpression {
-                    type_parameters: None,
-                    params,
-                    body,
-                    return_type: None, // Single-param without parens can't have return type
-                    r#async: false,
-                    params_start: None, // No parens for single-param arrows
-                    arrow_token,
-                },
-            )),
+            kind: ExpressionKind::ArrowFunctionExpression(arrow),
         }))
     }
 
@@ -421,21 +422,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             "an arrow's extent encloses its body"
         );
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ArrowFunctionExpression<'_>>(1);
+        let arrow = push_row(
+            &mut self.stores.payloads.arrow_fns,
+            ArrowFunctionExpression {
+                type_parameters,
+                params,
+                body,
+                return_type,
+                r#async: true,
+                params_start,
+                arrow_token,
+            },
+        );
         Ok(self.push_ret(Expression {
             span: Span::new(start as u32, end),
-            kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
-                ArrowFunctionExpression {
-                    type_parameters,
-                    params,
-                    body,
-                    return_type,
-                    r#async: true,
-                    params_start,
-                    arrow_token,
-                },
-            )),
+            kind: ExpressionKind::ArrowFunctionExpression(arrow),
         }))
     }
 }

@@ -5,13 +5,14 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
+use crate::parser::{push_row, push_spanned};
 use tsv_lang::{Error, Span};
 
 use super::super::Parser;
 use super::ModuleItemContext;
 
 /// End offset of a module declaration body (block or nested declaration).
-fn module_body_end<'a>(view: AstView<'a>, body: &TSModuleDeclarationBody<'a>) -> u32 {
+fn module_body_end<'a>(view: AstView<'a>, body: &TSModuleDeclarationBody) -> u32 {
     match body {
         TSModuleDeclarationBody::TSModuleBlock(b) => b.span.end,
         &TSModuleDeclarationBody::TSModuleDeclaration(n) => view.module_decl(n).span.end,
@@ -73,16 +74,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let type_annotation = self.parse_type()?.id();
         let end = self.semicolon_end()?;
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<TSTypeAliasDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start as u32, end),
-            kind: StatementKind::TSTypeAliasDeclaration(self.arena.alloc(TSTypeAliasDeclaration {
-                id,
-                type_parameters,
-                type_annotation,
-                declare,
-            })),
+            kind: StatementKind::TSTypeAliasDeclaration(push_row(
+                &mut self.stores.payloads.type_aliases,
+                TSTypeAliasDeclaration {
+                    id,
+                    type_parameters,
+                    type_annotation,
+                    declare,
+                },
+            )),
         })
     }
 
@@ -111,11 +113,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         declare: bool,
     ) -> Result<Statement<'arena>, Error> {
         let decl = self.parse_interface_declaration_struct(start, declare)?;
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<TSInterfaceDeclaration<'_>>(1);
-        Ok(Statement::from_ts_interface_declaration(
-            self.arena.alloc(decl),
-        ))
+        let (span, decl) =
+            push_spanned(&mut self.stores.payloads.interface_decls, decl, |x| x.span);
+        Ok(Statement::from_ts_interface_declaration(span, decl))
     }
 
     /// Parse an interface declaration into its struct, without wrapping in
@@ -465,9 +465,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<TSDeclareFunction<'_>>(1);
-        Ok(Statement::from_ts_declare_function(self.arena.alloc(
+        let (span, func) = push_spanned(
+            &mut self.stores.payloads.declare_fns,
             TSDeclareFunction {
                 id,
                 type_parameters,
@@ -478,7 +477,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 generator: is_generator,
                 span: Span::new(start as u32, end),
             },
-        )))
+            |x| x.span,
+        );
+        Ok(Statement::from_ts_declare_function(span, func))
     }
 
     /// The current token read as a type predicate's SUBJECT — an identifier or
@@ -629,9 +630,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<Statement<'arena>, Error> {
         let class =
             self.parse_class_declaration_inner_with_start(true, is_abstract, start, true)?;
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ClassDeclaration<'_>>(1);
-        Ok(Statement::from_class_declaration(self.arena.alloc(class)))
+        let (span, class) = push_spanned(&mut self.stores.payloads.class_decls, class, |x| x.span);
+        Ok(Statement::from_class_declaration(span, class))
     }
 
     //
@@ -695,16 +695,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<TSEnumDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start as u32, end as u32),
-            kind: StatementKind::TSEnumDeclaration(self.arena.alloc(TSEnumDeclaration {
-                id,
-                members: members.into_bump_slice(),
-                r#const: is_const,
-                declare: is_declare,
-            })),
+            kind: StatementKind::TSEnumDeclaration(push_row(
+                &mut self.stores.payloads.enum_decls,
+                TSEnumDeclaration {
+                    id,
+                    members: members.into_bump_slice(),
+                    r#const: is_const,
+                    declare: is_declare,
+                },
+            )),
         })
     }
 
@@ -843,9 +844,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             (Some(block), end)
         };
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<TSModuleDeclaration<'_>>(1);
-        Ok(Statement::from_ts_module_declaration(self.arena.alloc(
+        let (span, decl) = push_spanned(
+            &mut self.stores.payloads.module_decls,
             TSModuleDeclaration {
                 id,
                 body,
@@ -854,7 +854,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 global: false,
                 span: Span::new(start as u32, end),
             },
-        )))
+            |x| x.span,
+        );
+        Ok(Statement::from_ts_module_declaration(span, decl))
     }
 
     /// Parse a global augmentation: `declare global { … }` / `global { … }`, or the
@@ -912,9 +914,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             (None, self.semicolon_end()?)
         };
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<TSModuleDeclaration<'_>>(1);
-        Ok(Statement::from_ts_module_declaration(self.arena.alloc(
+        let (span, decl) = push_spanned(
+            &mut self.stores.payloads.module_decls,
             TSModuleDeclaration {
                 id,
                 body,
@@ -923,7 +924,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 global: true,
                 span: Span::new(start as u32, end),
             },
-        )))
+            |x| x.span,
+        );
+        Ok(Statement::from_ts_module_declaration(span, decl))
     }
 
     /// Parse nested module declaration: `namespace Outer.Inner { }`
@@ -942,12 +945,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let nested = self.nested(1, |p| {
             p.parse_module_declaration_inner(nested_start as u32, kind)
         })?;
-        let body = TSModuleDeclarationBody::TSModuleDeclaration(self.alloc(nested));
+        let body = TSModuleDeclarationBody::TSModuleDeclaration(push_row(
+            &mut self.stores.payloads.module_decls,
+            nested,
+        ));
         let end = module_body_end(self.stores.view(), &body);
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<TSModuleDeclaration<'_>>(1);
-        Ok(Statement::from_ts_module_declaration(self.arena.alloc(
+        let (span, decl) = push_spanned(
+            &mut self.stores.payloads.module_decls,
             TSModuleDeclaration {
                 id: TSModuleName::Identifier(outer_id),
                 body: Some(body),
@@ -956,7 +961,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 global: false,
                 span: Span::new(start, end),
             },
-        )))
+            |x| x.span,
+        );
+        Ok(Statement::from_ts_module_declaration(span, decl))
     }
 
     /// Inner helper for parsing nested module declarations
@@ -981,7 +988,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let nested = self.nested(1, |p| {
                 p.parse_module_declaration_inner(nested_start as u32, kind)
             })?;
-            TSModuleDeclarationBody::TSModuleDeclaration(self.alloc(nested))
+            TSModuleDeclarationBody::TSModuleDeclaration(push_row(
+                &mut self.stores.payloads.module_decls,
+                nested,
+            ))
         } else {
             // Parse block body: `{ statements }`
             // A nested part is never itself `declare`; it inherits any enclosing
@@ -1010,10 +1020,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (e.g. rest-parameter trailing commas) but does NOT force functions bodiless — a
     /// plain `function f() {}` here is an ordinary `FunctionDeclaration`, while a
     /// `;`-terminated `function f();` is a bodiless `TSDeclareFunction` overload.
-    fn parse_module_block(
-        &mut self,
-        is_ambient: bool,
-    ) -> Result<TSModuleDeclarationBody<'arena>, Error> {
+    fn parse_module_block(&mut self, is_ambient: bool) -> Result<TSModuleDeclarationBody, Error> {
         // Expect opening brace
         if !matches!(self.current_kind(), TokenKind::BraceOpen) {
             return Err(self.error_expected("'{' to open namespace body"));

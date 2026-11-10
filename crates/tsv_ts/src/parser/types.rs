@@ -7,6 +7,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
+use crate::parser::push_row;
 use tsv_lang::{Error, Span};
 
 use super::expression_lookahead::{generic_function_type_arrow_end, paren_starts_function_type};
@@ -594,20 +595,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
         }
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<TSInferType<'_>>(1);
         let span = Span::new(start as u32, end);
-        let infer = self.arena.alloc(TSInferType {
-            type_parameter: TSTypeParameter {
-                name,
-                constraint,
-                default: None,
-                // `infer T` takes no modifiers.
-                modifiers: TSTypeParameterModifiers::default(),
-                span: Span::new(name_start, end),
+        let infer = push_row(
+            &mut self.stores.payloads.infer_types,
+            TSInferType {
+                type_parameter: TSTypeParameter {
+                    name,
+                    constraint,
+                    default: None,
+                    // `infer T` takes no modifiers.
+                    modifiers: TSTypeParameterModifiers::default(),
+                    span: Span::new(name_start, end),
+                },
+                span,
             },
-            span,
-        });
+        );
         Ok(self.push_ty_ret(TSType::Infer(span, infer)))
     }
 
@@ -708,10 +710,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'import'
         let import = self.parse_import_type_body(start)?;
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<TSImportType<'_>>(1);
         let span = import.span;
-        let import = self.arena.alloc(import);
+        let import = push_row(&mut self.stores.payloads.import_types, import);
         Ok(self.push_ty_ret(TSType::Import(span, import)))
     }
 
@@ -782,7 +782,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let import_start = self.current_pos().0;
             self.advance()?; // consume 'import'
             let import = self.parse_import_type_body(import_start)?;
-            TSTypeQueryExprName::Import(import.span, self.alloc(import))
+            TSTypeQueryExprName::Import(
+                import.span,
+                push_row(&mut self.stores.payloads.import_types, import),
+            )
         } else {
             // Parse entity name: identifier or qualified name
             let entity_name = self.parse_type_entity_name()?;
@@ -899,11 +902,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let span = Span::new(id_start as u32, right_end as u32);
             result = TSEntityName::QualifiedName(
                 span,
-                self.alloc(TSQualifiedName {
-                    left: result,
-                    right,
-                    span,
-                }),
+                push_row(
+                    &mut self.stores.payloads.qual_names,
+                    TSQualifiedName {
+                        left: result,
+                        right,
+                        span,
+                    },
+                ),
             );
         }
 
@@ -1119,16 +1125,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let return_type = self.nested(2, |p| p.parse_return_type_inner(arrow_start))?;
         let end = return_type.span.end;
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<TSConstructorType<'_>>(1);
         let span = Span::new(start as u32, end);
-        let constructor = self.arena.alloc(TSConstructorType {
-            abstract_: is_abstract,
-            type_parameters,
-            params,
-            return_type,
-            span,
-        });
+        let constructor = push_row(
+            &mut self.stores.payloads.ctor_types,
+            TSConstructorType {
+                abstract_: is_abstract,
+                type_parameters,
+                params,
+                return_type,
+                span,
+            },
+        );
         Ok(self.push_ty_ret(TSType::Constructor(span, constructor)))
     }
 

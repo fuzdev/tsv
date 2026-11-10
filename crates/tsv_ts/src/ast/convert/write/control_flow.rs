@@ -30,7 +30,7 @@ pub(super) fn write_if_statement(
 /// Emits a `ForStatement` node. `init`/`test`/`update` are nullable.
 pub(super) fn write_for_statement(
     w: &mut JsonWriter,
-    for_stmt: &ast::ForStatement<'_>,
+    for_stmt: &ast::ForStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -69,7 +69,7 @@ fn write_for_in_of_left(w: &mut JsonWriter, left: &ast::ForInOfLeft<'_>, ctx: &C
 /// Emits a `ForInStatement` node.
 pub(super) fn write_for_in_statement(
     w: &mut JsonWriter,
-    for_in: &ast::ForInStatement<'_>,
+    for_in: &ast::ForInStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -87,7 +87,7 @@ pub(super) fn write_for_in_statement(
 /// `body`.
 pub(super) fn write_for_of_statement(
     w: &mut JsonWriter,
-    for_of: &ast::ForOfStatement<'_>,
+    for_of: &ast::ForOfStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -179,7 +179,7 @@ pub(super) fn write_switch_statement(
 /// `finalizer` are nullable, as is the catch clause's `param`.
 pub(super) fn write_try_statement(
     w: &mut JsonWriter,
-    try_stmt: &ast::TryStatement<'_>,
+    try_stmt: &ast::TryStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {

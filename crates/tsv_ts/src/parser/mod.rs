@@ -12,7 +12,7 @@ use bumpalo::collections::Vec as BumpVec;
 use census_vec::BumpVec;
 use std::collections::BTreeSet;
 use std::ops::ControlFlow;
-use tsv_lang::store::{IdRet, ListMark};
+use tsv_lang::store::{Id, IdRet, ListMark, Row, Store};
 use tsv_lang::{DepthBudget, DepthLimit, Error, Span, SpineCount};
 
 /// What the expression ladder's parse functions return: see §The expression ladder's return
@@ -515,19 +515,48 @@ pub(super) struct Checkpoint<'arena> {
     ast_census_mark: u32,
 }
 
+/// Push `row` into its payload store and mint its id: where a payload too rare to sit inline
+/// becomes a row. A free function over the store's field path, so a caller can push while it
+/// holds a disjoint borrow of the other stores.
+#[inline]
+pub(crate) fn push_row<T: Row + Clone>(store: &mut Store<T>, row: T) -> Id<T::Family> {
+    #[cfg(feature = "_internal_ast_census")]
+    tsv_lang::ast_census_probe::mint::<T>(1);
+    store.push(row)
+}
+
+/// [`push_row`] for a payload that keeps a span of its own, read by `span_of`: returns that
+/// span, read before the push, beside the id, for the header of the node that wraps the id
+/// (`Statement::from_variable_declaration`). A debug build re-reads the stored row, which
+/// checks only that storing the row kept its span.
+#[inline]
+pub(crate) fn push_spanned<T: Row + Clone>(
+    store: &mut Store<T>,
+    row: T,
+    span_of: fn(&T) -> Span,
+) -> (Span, Id<T::Family>) {
+    let span = span_of(&row);
+    let id = push_row(store, row);
+    debug_assert_eq!(
+        span,
+        span_of(store.get(id)),
+        "a wrapped payload's span disagrees with its header"
+    );
+    (span, id)
+}
+
 #[expect(clippy::struct_excessive_bools)]
 pub(crate) struct Parser<'a, 'arena> {
-    /// Bump arena that owns every AST node this parser allocates. Supplied by
-    /// the caller (caller-owns-`Bump`); the returned `Program<'arena>` borrows
-    /// from it. `&'arena Bump` is `Copy`, so `self.alloc(owned)` and
-    /// `self.arena.alloc(self.parse_x()?)` (even while `&mut self` is held — the
-    /// field read borrows the `Bump`, not `self`) both work directly; lift it into a
-    /// local (`let arena = self.arena;`) only when several allocations in one method
-    /// share it.
+    /// Bump arena that owns the tree's by-value lists, its decoded strings and its comments.
+    /// Supplied by the caller (caller-owns-`Bump`); the returned `Program<'arena>` borrows
+    /// from it. `&'arena Bump` is `Copy`, so a [`Parser::bvec`] or `self.arena.alloc_str(…)`
+    /// works even while `&mut self` is held (the field read borrows the `Bump`, not `self`);
+    /// lift it into a local (`let arena = self.arena;`) only when several allocations in one
+    /// method share it.
     arena: &'arena Bump,
-    /// The document's expression, statement and type stores, shared by every parser of the
-    /// document. `'a` is the source's lifetime, which the `&mut` takes as covariantly as the
-    /// `&str`.
+    /// The document's expression, statement, type and payload stores, shared by every parser
+    /// of the document. `'a` is the source's lifetime, which the `&mut` takes as covariantly
+    /// as the `&str`.
     stores: &'a mut AstStores<'arena>,
     source: &'a str,
     lexer: Lexer<'a>,
@@ -997,16 +1026,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.stores.tys.get(id)
     }
 
-    /// Allocate a single AST node in the arena, returning a shared `&'arena`
-    /// reference (replaces `Box::new`). Zero-copy: `Bump::alloc` moves the value
-    /// into arena memory; the mut→shared reborrow is implicit.
-    #[inline]
-    fn alloc<T>(&self, val: T) -> &'arena T {
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<T>(1);
-        self.arena.alloc(val)
-    }
-
     /// A growable vector that builds AST-node collections **directly in the
     /// arena** — the preferred way to gather children. Build it in the parse
     /// loop, then `.into_bump_slice()` to store the field (zero-copy: the buffer
@@ -1046,17 +1065,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .map(|s| -> &'arena str { self.arena.alloc_str(s) })
     }
 
-    /// Allocate the binding `extra` for a typed identifier carrying `ta`: a type
+    /// Push the binding `extra` for a typed identifier carrying `ta`: a type
     /// annotation and no decorators. Callers thread the optionality
     /// (`type_annotation.map(|ta| self.typed_extra(ta))`); decorators, when
     /// present, are folded in separately by the parameter-list caller
     /// (`attach_param_decorators`).
     #[inline]
-    fn typed_extra(&self, ta: TSTypeAnnotation) -> ParamExtraEdge<'arena> {
-        self.alloc(IdentifierParamExtra {
-            type_annotation: Some(ta),
-            decorators: None,
-        })
+    fn typed_extra(&mut self, ta: TSTypeAnnotation) -> ParamExtraId {
+        push_row(
+            &mut self.stores.payloads.param_extras,
+            IdentifierParamExtra {
+                type_annotation: Some(ta),
+                decorators: None,
+            },
+        )
     }
 
     /// Create a parser of `source` at `base_offset` against `goal`, not yet

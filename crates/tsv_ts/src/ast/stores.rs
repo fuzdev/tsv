@@ -1,11 +1,12 @@
-//! The stores a parse's expressions, statements and types live in, beside the arena that holds
-//! the rest of the tree, and the per-thread parking of their capacity.
+//! The stores a parse's expressions, statements, types and payloads live in, beside the arena
+//! that holds the tree's by-value lists and decoded strings, and the per-thread parking of
+//! their capacity.
 //!
-//! Beside those three families, [`PayloadStores`] holds one store per payload too rare to sit
+//! Beside the three families, [`PayloadStores`] holds one store per payload too rare to sit
 //! inline in the node that refers to it: the function, class and declaration payloads, the
 //! constructor, import and `infer` types, qualified names, a `for` head, a `for … in` / `for …
 //! of` left side, a catch clause and a parameter name's extras. One macro declares each such
-//! store with its family tag, its id, the edge the tree holds and its view accessor.
+//! store with its family tag, the id the tree holds and its view accessor.
 //!
 //! [`AstStores`] is one document's: every parse of a document, embedded islands included,
 //! appends to the same one, so an id means the same row wherever in the document it is
@@ -88,17 +89,15 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Run<TyId>>() == 8);
 };
 
-/// Declares the payload stores. Per entry: the row type's family tag and id, the edge alias the
-/// tree holds, a [`PayloadStores`] field, that field's lines in `new` and `park`, and the
-/// [`AstView`] accessor that resolves one edge. The entry's doc comment documents the field and
-/// the tag.
-// TODO: each edge alias becomes its id, and its accessor the store read.
+/// Declares the payload stores. Per entry: the row type's family tag and the id the tree holds,
+/// a [`PayloadStores`] field, that field's lines in `new` and `park`, and the [`AstView`]
+/// accessor that resolves one id. The entry's doc comment documents the field and the tag.
 macro_rules! payload_stores {
     (
         $(
             $(#[$m:meta])*
             $field:ident : $Row:ident $(<$lt:lifetime>)?
-                => $Tag:ident, $Id:ident, $Edge:ident, $acc:ident;
+                => $Tag:ident, $Id:ident, $acc:ident;
         )*
     ) => {
         $(
@@ -111,14 +110,11 @@ macro_rules! payload_stores {
                 type Family = $Tag;
             }
 
-            #[doc = concat!("A handle to one [`", stringify!($Tag), "`] row.")]
-            pub type $Id = Id<$Tag>;
-
             #[doc = concat!(
-                "One edge to a [`", stringify!($Row), "`] held in the tree, read through [`AstView::",
+                "A handle to one [`", stringify!($Tag), "`] row, read through [`AstView::",
                 stringify!($acc), "`]."
             )]
-            pub type $Edge<'arena> = &'arena $Row$(<$lt>)?;
+            pub type $Id = Id<$Tag>;
         )*
 
         /// The stores of the payloads too rare to sit inline in the node that refers to them,
@@ -149,13 +145,12 @@ macro_rules! payload_stores {
         impl<'arena> AstView<'arena> {
             $(
                 #[doc = concat!(
-                    "The [`", stringify!($Row), "`] `edge` names: once edges are ids, the row of ",
-                    "the [`", stringify!($Tag), "`] store it indexes, a miss ending in the store's ",
-                    "shared cold path."
+                    "The [`", stringify!($Row), "`] `id` names. A miss ends in the store's shared ",
+                    "cold path."
                 )]
                 #[inline]
-                pub fn $acc(self, edge: $Edge<'arena>) -> &'arena $Row$(<$lt>)? {
-                    edge
+                pub fn $acc(self, id: $Id) -> &'arena $Row$(<$lt>)? {
+                    self.payloads().$field.get(id)
                 }
             )*
         }
@@ -168,68 +163,76 @@ macro_rules! payload_stores {
 
 payload_stores! {
     /// Arrow functions, `() => …`: [`ArrowFunctionExpression`] rows.
-    arrow_fns: ArrowFunctionExpression<'arena> => ArrowFn, ArrowFnId, ArrowFnEdge, arrow_fn;
+    arrow_fns: ArrowFunctionExpression<'arena> => ArrowFn, ArrowFnId, arrow_fn;
     /// Function expressions, `function () {}`: [`FunctionExpression`] rows.
-    fn_exprs: FunctionExpression<'arena> => FnExpr, FnExprId, FnExprEdge, fn_expr;
+    fn_exprs: FunctionExpression<'arena> => FnExpr, FnExprId, fn_expr;
     /// Class expressions, `class {}`: [`ClassExpression`] rows.
-    class_exprs: ClassExpression<'arena> => ClassExpr, ClassExprId, ClassExprEdge, class_expr;
+    class_exprs: ClassExpression<'arena> => ClassExpr, ClassExprId, class_expr;
     /// Tagged templates, ``tag`…` ``: [`TaggedTemplateExpression`] rows.
     tagged_tpls: TaggedTemplateExpression<'arena>
-        => TaggedTpl, TaggedTplId, TaggedTplEdge, tagged_tpl;
+        => TaggedTpl, TaggedTplId, tagged_tpl;
     /// Meta properties, `import.meta` and `new.target`: [`MetaProperty`] rows.
-    meta_props: MetaProperty<'arena> => MetaProp, MetaPropId, MetaPropEdge, meta_prop;
+    meta_props: MetaProperty<'arena> => MetaProp, MetaPropId, meta_prop;
     /// Type aliases, `type T = …`: [`TSTypeAliasDeclaration`] rows.
     type_aliases: TSTypeAliasDeclaration<'arena>
-        => TypeAlias, TypeAliasId, TypeAliasEdge, type_alias;
+        => TypeAlias, TypeAliasId, type_alias;
     /// Interfaces, `interface I {}`: [`TSInterfaceDeclaration`] rows.
     interface_decls: TSInterfaceDeclaration<'arena>
-        => InterfaceDecl, InterfaceDeclId, InterfaceDeclEdge, interface_decl;
+        => InterfaceDecl, InterfaceDeclId, interface_decl;
     /// Bodiless function declarations, `declare function f(): T`: [`TSDeclareFunction`] rows.
-    declare_fns: TSDeclareFunction<'arena> => DeclareFn, DeclareFnId, DeclareFnEdge, declare_fn;
+    declare_fns: TSDeclareFunction<'arena> => DeclareFn, DeclareFnId, declare_fn;
     /// Enums, `enum E {}`: [`TSEnumDeclaration`] rows.
-    enum_decls: TSEnumDeclaration<'arena> => EnumDecl, EnumDeclId, EnumDeclEdge, enum_decl;
+    enum_decls: TSEnumDeclaration<'arena> => EnumDecl, EnumDeclId, enum_decl;
     /// Namespaces and modules, `namespace N {}`: [`TSModuleDeclaration`] rows.
     module_decls: TSModuleDeclaration<'arena>
-        => ModuleDecl, ModuleDeclId, ModuleDeclEdge, module_decl;
+        => ModuleDecl, ModuleDeclId, module_decl;
     /// Function declarations, `function f() {}`: [`FunctionDeclaration`] rows.
-    fn_decls: FunctionDeclaration<'arena> => FnDecl, FnDeclId, FnDeclEdge, fn_decl;
+    fn_decls: FunctionDeclaration<'arena> => FnDecl, FnDeclId, fn_decl;
     /// Class declarations, `class C {}`: [`ClassDeclaration`] rows.
-    class_decls: ClassDeclaration<'arena> => ClassDecl, ClassDeclId, ClassDeclEdge, class_decl;
+    class_decls: ClassDeclaration<'arena> => ClassDecl, ClassDeclId, class_decl;
     /// Named exports, `export { a }`: [`ExportNamedDeclaration`] rows.
     export_nameds: ExportNamedDeclaration<'arena>
-        => ExportNamed, ExportNamedId, ExportNamedEdge, export_named;
+        => ExportNamed, ExportNamedId, export_named;
     /// Default exports, `export default …`: [`ExportDefaultDeclaration`] rows.
     export_defaults: ExportDefaultDeclaration<'arena>
-        => ExportDefault, ExportDefaultId, ExportDefaultEdge, export_default;
+        => ExportDefault, ExportDefaultId, export_default;
     /// Star exports, `export * from 'm'`: [`ExportAllDeclaration`] rows.
-    export_alls: ExportAllDeclaration<'arena> => ExportAll, ExportAllId, ExportAllEdge, export_all;
+    export_alls: ExportAllDeclaration<'arena> => ExportAll, ExportAllId, export_all;
     /// Export assignments, `export = a`: [`TSExportAssignment`] rows.
     export_assigns: TSExportAssignment
-        => ExportAssign, ExportAssignId, ExportAssignEdge, export_assign;
+        => ExportAssign, ExportAssignId, export_assign;
     /// Imports, `import a from 'm'`: [`ImportDeclaration`] rows.
     import_decls: ImportDeclaration<'arena>
-        => ImportDecl, ImportDeclId, ImportDeclEdge, import_decl;
+        => ImportDecl, ImportDeclId, import_decl;
     /// Import-equals declarations, `import a = require('m')`: [`TSImportEqualsDeclaration`] rows.
     import_equals: TSImportEqualsDeclaration<'arena>
-        => ImportEquals, ImportEqualsId, ImportEqualsEdge, import_equals;
+        => ImportEquals, ImportEqualsId, import_equals;
     /// Constructor types, `new () => T`: [`TSConstructorType`] rows.
-    ctor_types: TSConstructorType<'arena> => CtorType, CtorTypeId, CtorTypeEdge, ctor_type;
+    ctor_types: TSConstructorType<'arena> => CtorType, CtorTypeId, ctor_type;
     /// Import types, `import('m')`: [`TSImportType`] rows.
-    import_types: TSImportType<'arena> => ImportType, ImportTypeId, ImportTypeEdge, import_type;
+    import_types: TSImportType<'arena> => ImportType, ImportTypeId, import_type;
     /// Inferred types, `infer T`: [`TSInferType`] rows.
-    infer_types: TSInferType<'arena> => InferType, InferTypeId, InferTypeEdge, infer_type;
+    infer_types: TSInferType<'arena> => InferType, InferTypeId, infer_type;
     /// Qualified names, `A.B`: [`TSQualifiedName`] rows.
-    qual_names: TSQualifiedName<'arena> => QualName, QualNameId, QualNameEdge, qual_name;
+    qual_names: TSQualifiedName<'arena> => QualName, QualNameId, qual_name;
     /// The head of a `for (…; …; …)` statement: [`ForInit`] rows.
-    for_heads: ForInit<'arena> => ForHead, ForHeadId, ForHeadEdge, for_head;
+    for_heads: ForInit<'arena> => ForHead, ForHeadId, for_head;
     /// The left side of a `for … in` or `for … of`: [`ForInOfLeft`] rows.
-    for_lefts: ForInOfLeft<'arena> => ForLeft, ForLeftId, ForLeftEdge, for_left;
+    for_lefts: ForInOfLeft<'arena> => ForLeft, ForLeftId, for_left;
     /// Catch clauses, `catch (e) {}`: [`CatchClause`] rows.
-    catches: CatchClause<'arena> => Catch, CatchId, CatchEdge, catch;
+    catches: CatchClause<'arena> => Catch, CatchId, catch;
     /// A parameter name's type annotation and decorators: [`IdentifierParamExtra`] rows.
     param_extras: IdentifierParamExtra<'arena>
-        => ParamExtra, ParamExtraId, ParamExtraEdge, param_extra;
+        => ParamExtra, ParamExtraId, param_extra;
 }
+
+// Every payload id is an `Id<F>`, which lays out alike for every family `F`.
+#[cfg(test)]
+const _: () = {
+    use tsv_lang::store::STORE_CHECK;
+    assert!(STORE_CHECK || size_of::<ParamExtraId>() == 4);
+    assert!(STORE_CHECK || size_of::<Option<ParamExtraId>>() == 4);
+};
 
 /// One document's expression, statement, type and payload stores and the scratch stacks that
 /// build their lists.
@@ -249,29 +252,24 @@ pub struct AstStores<'arena> {
     pub(crate) tys: Store<TSType<'arena>>,
     pub(crate) ty_lists: Store<TyId>,
     pub(crate) ty_list_scratch: ListBuf<TyId>,
-    // TODO: unread. Nothing pushes or reads these stores until the payload edges move onto
-    // their ids.
     pub(crate) payloads: PayloadStores<'arena>,
 }
 
 impl<'arena> AstStores<'arena> {
-    /// The function declaration `edge` names, its fields at the arena's lifetime rather than
+    /// The function declaration `id` names, its fields at the arena's lifetime rather than
     /// a view's: for the crate's own read of a row whose parts a host keeps
     /// ([`crate::__private::first_function_declaration`]).
     #[inline]
-    pub(crate) fn fn_decl_row(&self, edge: FnDeclEdge<'arena>) -> &FunctionDeclaration<'arena> {
-        edge
+    pub(crate) fn fn_decl_row(&self, id: FnDeclId) -> &FunctionDeclaration<'arena> {
+        self.payloads.fn_decls.get(id)
     }
 
-    /// A parameter name's extras, its fields at the arena's lifetime rather than a view's:
+    /// A parameter name's extras, their fields at the arena's lifetime rather than a view's:
     /// for the crate's own read of a row it rebuilds while appending to the stores
     /// ([`crate::__private::attach_pattern_type_annotation`]).
     #[inline]
-    pub(crate) fn param_extra_row(
-        &self,
-        edge: ParamExtraEdge<'arena>,
-    ) -> &IdentifierParamExtra<'arena> {
-        edge
+    pub(crate) fn param_extra_row(&self, id: ParamExtraId) -> &IdentifierParamExtra<'arena> {
+        self.payloads.param_extras.get(id)
     }
 }
 

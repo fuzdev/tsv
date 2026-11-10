@@ -804,9 +804,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // (`{#each xs as x: T /* c */}` → `expected_token`), and accepting it here
         // would drop the comment.
         let annotation_end = ta.span.end as usize;
-        let arena = self.arena;
         let attached = self.with_island_stores(|_, stores| {
-            tsv_ts::__private::attach_pattern_type_annotation(stores, expr, ta, arena)
+            tsv_ts::__private::attach_pattern_type_annotation(stores, expr, ta)
         })?;
         Ok((attached, annotation_end))
     }

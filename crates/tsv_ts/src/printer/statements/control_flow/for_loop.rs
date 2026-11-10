@@ -221,7 +221,7 @@ impl<'a> Printer<'a> {
     /// This includes the body in the doc so the width calculation accounts for ` {`.
     fn build_for_statement_with_body_doc(
         &self,
-        stmt: &ast::ForStatement<'_>,
+        stmt: &ast::ForStatement,
         span: Span,
         parens: ForParens,
         ctx: StatementContext,
@@ -272,12 +272,7 @@ impl<'a> Printer<'a> {
     /// `parens.close` is depth-tracked, so redundant parens or parens inside a clause
     /// don't yield a premature match; the last clause's end is the fallback when the
     /// header has no locatable `)`.
-    fn get_for_header_end(
-        &self,
-        stmt: &ast::ForStatement<'_>,
-        span: Span,
-        parens: ForParens,
-    ) -> u32 {
+    fn get_for_header_end(&self, stmt: &ast::ForStatement, span: Span, parens: ForParens) -> u32 {
         // `map_or_else` so the located-paren path — every well-formed header — costs one map
         // and never walks the clause spans for a fallback it discards.
         parens.close.map_or_else(
@@ -318,7 +313,7 @@ impl<'a> Printer<'a> {
     /// separator rules above, which only make sense when the parens hold nothing else.
     fn build_for_empty_with_comments(
         &self,
-        stmt: &ast::ForStatement<'_>,
+        stmt: &ast::ForStatement,
         parens: ForParens,
         for_open: DocId,
     ) -> DocId {
@@ -435,7 +430,7 @@ impl<'a> Printer<'a> {
     /// `parens` is the header's paren pair, located once per statement ([`ForParens`]).
     fn build_for_header_doc(
         &self,
-        stmt: &ast::ForStatement<'_>,
+        stmt: &ast::ForStatement,
         span: Span,
         parens: ForParens,
         keyword_comments: Option<DocId>,
@@ -910,7 +905,7 @@ impl<'a> Printer<'a> {
     /// keeps the scan O(header) rather than O(rest of file).
     fn find_for_semicolons(
         &self,
-        stmt: &ast::ForStatement<'_>,
+        stmt: &ast::ForStatement,
         open_paren: u32,
         close_paren: Option<u32>,
     ) -> (Option<u32>, Option<u32>) {
@@ -928,7 +923,7 @@ impl<'a> Printer<'a> {
     /// The end positions of the `init` and `test` clauses — the AST anchors the header's
     /// `;` separators are located from (see [`Self::find_for_semicolons`]). Derived in one
     /// place so the two scan call sites and the `ForHeaderSpans` build cannot disagree.
-    fn for_clause_ends(&self, stmt: &ast::ForStatement<'_>) -> (Option<u32>, Option<u32>) {
+    fn for_clause_ends(&self, stmt: &ast::ForStatement) -> (Option<u32>, Option<u32>) {
         (
             self.view
                 .opt_for_head(stmt.init)
@@ -1346,7 +1341,7 @@ impl<'a> Printer<'a> {
     /// Build a complete for-in statement doc including the body
     pub(in crate::printer::statements) fn build_for_in_statement_doc(
         &self,
-        stmt: &ast::ForInStatement<'_>,
+        stmt: &ast::ForInStatement,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {
@@ -1364,7 +1359,7 @@ impl<'a> Printer<'a> {
     /// Build a complete for-of statement doc including the body
     pub(in crate::printer::statements) fn build_for_of_statement_doc(
         &self,
-        stmt: &ast::ForOfStatement<'_>,
+        stmt: &ast::ForOfStatement,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {
@@ -1889,7 +1884,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_for_statement_doc(
         &self,
-        stmt: &ast::ForStatement<'_>,
+        stmt: &ast::ForStatement,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {

@@ -356,7 +356,7 @@ The `doc` module implements a declarative document builder inspired by prettier'
 
 ### Core Types (Arena-Based)
 
-Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is arena- and store-allocated — `Expression` and `Statement` nodes sit in per-document stores indexed by `ExprId` and `StmtId`, the other families in the bump arena behind `&'arena` references — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
+Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is store- and arena-allocated — `Expression`, `Statement` and `TSType` nodes and the payloads too rare to sit inline sit in per-document stores indexed by typed ids (`ExprId`, `StmtId`, `TyId`, one id per payload type), the by-value lists, decoded strings and comments in the bump arena — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
 
 ```rust
 pub enum DocNode {
@@ -869,7 +869,7 @@ Native tsv runs on the system allocator — no `#[global_allocator]`, no alterna
 
 **Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a small POD (16 B; tsv_svelte's 12 B) that a byte cursor over the source emits. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied into the AST arena at receipt) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied. On the parser's hot path (`advance`, plus the CSS and Svelte lookaheads) the lexers write the token in place into the parser's slot (`next_token_into`) rather than returning a by-value `Result<Token, Error>` through a stack slot the parser would reload and re-scatter; other TS and CSS callers take it by value (`next_token`); the Svelte lexer has no by-value form.
 
-**Internal AST — bump-arena nested ownership, span-identity names, no raw text.** Nodes are allocated in a per-parse bump arena: recursive children are `&'arena T` and child collections `&'arena [T]` (not `Box`/`Vec`), with small children kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form as an `&'arena str`. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, arena-allocated as `&'arena str`.
+**Internal AST — bump-arena nested ownership, span-identity names, no raw text.** Expressions, statements, types and the rare wide payloads are rows of per-document stores named by typed ids; the rest is allocated in a per-parse bump arena, child collections as `&'arena [T]` (not `Vec`), with small children kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form as an `&'arena str`. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, arena-allocated as `&'arena str`.
 
 **Svelte template nodes — contiguous storage.** Fragment children are an `&'arena [FragmentNode]` slice of enum values rather than boxed nodes, keeping siblings contiguous in arena memory for the printer's traversal loops.
 
@@ -971,14 +971,13 @@ Decisions made during development with rationale preserved for future reference.
 
 ### Nested AST (Bump-Arena, Not Flat/Indexed)
 
-tsv keeps the nested ownership model — not flat array layouts with index-based
-references — but allocates the nodes in a **per-parse bump arena** (`bumpalo`)
-tied to the program lifetime. Recursive children are `&'arena T<'arena>` (not
-`Box`), child collections are `&'arena [T<'arena>]` (not `Vec`), and decoded
-strings are `&'arena str`, so a whole parse is one bump-allocated graph freed
-wholesale when the arena drops, with no per-node `Drop`.
+tsv's nodes live in per-document stores named by typed ids (below); a **per-parse
+bump arena** (`bumpalo`), tied to the program lifetime, holds the rest. By-value
+child collections are `&'arena [T<'arena>]`
+(not `Vec`) and decoded strings are `&'arena str`, freed wholesale when the arena
+drops, with no per-node `Drop`.
 
-**`Expression`, `Statement` and `TSType` nodes are the exceptions: they live in `AstStores`**
+**`Expression`, `Statement` and `TSType` nodes and the rare payloads are the exceptions: they live in `AstStores`**
 (`ast/stores.rs`), one per document, kept beside the tree in a `Parsed` and shared across a Svelte component's
 embedded islands. An edge to an expression is an `ExprId`, an index into the
 `Store<Expression>`; a child list is a `Run` over a store of ids (`Run<ExprId>`: call and
@@ -991,10 +990,12 @@ and intersection members, tuple elements, type arguments, template-literal types
 `Run<TyId>`. A reader reaches them through an `AstView`, one word holding a
 reference to the stores; a store row, once pushed, is never edited or truncated, so a parser
 that replaces a node (a cover-grammar conversion, an annotated binding pattern) appends the
-new row and the old one is orphaned. The boxed expression, statement and type payloads
-(`ArrowFunctionExpression`, `FunctionDeclaration`, `TSImportType` and their fellows) remain
-arena nodes. The rest of this section describes the arena-held layout the stores were built
-to keep.
+new row and the old one is orphaned. The payloads too rare to sit inline in the node that
+refers to them (`ArrowFunctionExpression`, `FunctionDeclaration`, `TSImportType` and their
+fellows, a `for` head, a catch clause, a parameter name's extras) are rows too, one store per
+payload type, each named by an id of its own type (`ArrowFnId`, `FnDeclId`, `ImportTypeId`,
+…). What the arena still holds is the tree's by-value lists, its decoded strings and its
+comments. The rest of this section describes the layout the stores were built to keep.
 
 
 ```rust
@@ -1028,7 +1029,8 @@ parse/format, and no name-table lifetime lands on the AST or the parser.
 
 **Inline-by-value layout, size-minimized only at the variants that set an enum's
 width.** A node holds its children inline by value where they were owned inline
-before; only genuinely recursive children sit behind `&'arena`. Inline fields are
+before; only genuinely recursive children and the rare wide payloads sit behind an id.
+Inline fields are
 *not* indirected to shrink node size in general — the formatter is traversal-bound,
 and the extra pointer-chases that size-minimization adds on hot traversal paths cost
 more than the cache-density they buy. (The arena allocation itself is the win; the
@@ -1038,12 +1040,12 @@ node *layout* favors traversal locality over byte size.)
 ELEMENT width of everything that holds one.** An `Expression` slot is paid on every element of every `&[Expression]`; a
 `Statement` slot on every row of the statement store and every
 `?`-propagation copy out of the parser. So a variant wide enough to set its enum's
-size on its own taxes the whole tree, while a pointer chase is paid only where that
-variant is actually spelled. Where such a variant is also **rare**, it holds its
-payload by `&'arena` reference:
+size on its own taxes the whole tree, while the hop to a stored payload is paid only
+where that variant is actually spelled. Where such a variant is also **rare**, it holds
+its payload by id, a row of a store of that payload's own type:
 
 - `Expression` is **56 B**, not 176 — `ClassExpression`, `FunctionExpression`,
-  `ArrowFunctionExpression`, `MetaProperty` and `TaggedTemplateExpression` are boxed.
+  `ArrowFunctionExpression`, `MetaProperty` and `TaggedTemplateExpression` are stored.
   Together they are ~3% of expressions in real source (the two widest, ~0.02%). The
   next-widest variant is `CallExpression`, and it is 14–21% of expressions, which is
   where the ladder stops. `Expression` is a header over its variant —
@@ -1059,22 +1061,21 @@ payload by `&'arena` reference:
   the parameter parser), which lands on array and object patterns, carrying no second span.
   On wasm32 `Expression` is 48 B.
 - `TSType` is **72 B** — `TSImportType`, `TSConstructorType` and `TSInferType` are
-  boxed. No field holds a `TSType` by value: the type parser's deep precedence ladder
+  stored. No field holds a `TSType` by value: the type parser's deep precedence ladder
   pushes each type to the type store at its builder's tail and returns the row's id
   (`Parser::parse_type`) — the second rule below, applied to a return instead of a
   field — and every holder keeps that id, the lists included (union and intersection
   members, tuple elements, type arguments and template-literal types are `Run<TyId>`, a
   4 B element on both targets, where a by-value one would be the whole node), so the
   width is paid once per type, by its row.
-- `Statement`'s rare declaration heads are boxed for the same reason
+- `Statement`'s rare declaration heads are stored for the same reason
   (`TSTypeAliasDeclaration`, `ExportDefaultDeclaration`, `ClassDeclaration`,
   `FunctionDeclaration`, `TSInterfaceDeclaration`, `TSDeclareFunction`,
   `ExportAllDeclaration`, `TSImportEqualsDeclaration`, `TSEnumDeclaration`,
   `TSModuleDeclaration`, `TSExportAssignment`), and one level down `ForStatement`,
-  `ForOfStatement`, `ForInStatement` and `TryStatement` hold their heads as
-  references. Each of those heads is ≤0.2% of statements on real source and a classic
+  `ForOfStatement`, `ForInStatement` and `TryStatement` hold their heads by id. Each of those heads is ≤0.2% of statements on real source and a classic
   `for (;;)` is 0.05–0.22%. Rarity carries the enum from 544 B down to 96; the second rule below,
-  plus its one deliberate exception, takes it to **64 B**.
+  plus its one deliberate exception, takes it to **56 B**.
 
 All three widths are pinned by `const` asserts in `ast/mod.rs`, so a variant
 that widens any of these enums fails the test build rather than silently fattening every
@@ -1082,8 +1083,8 @@ slice element and thinning the depth limits' margin. The pins are rustc's layout
 guarantee, so they compile under `cfg(test)` only and a toolchain that lays a type out
 differently never breaks a consumer's build; the wasm32 widths are pinned in `tsv_wasm`,
 which `npm run build:packages` compiles for that target. **Rarity is normally the whole of the
-argument for this rule** — boxing a *common* variant buys density and pays an
-allocation plus a pointer chase on the majority of the traffic, so it has to be
+argument for this rule** — storing a *common* variant buys density and pays a row
+push plus a hop on the majority of the traffic, so it has to be
 measured rather than assumed (`Statement`'s last two heads are the one place it was,
 and paid).
 
@@ -1097,7 +1098,7 @@ whose own width was two such slots take it:
 
 - `Property` (an object literal's `key: value`, and a destructuring pattern's, which
   reuses the same struct) is **20 B**, not 160 — so `ObjectProperty` is 20 and
-  `ObjectPatternProperty` 32 (its `RestElement` arm sets that one).
+  `ObjectPatternProperty` 28 (its `RestElement` arm sets that one).
 - `VariableDeclarator` is **20 B**, not 160.
 - every `Expression`-holding `Statement` head takes it too, an `ExprId` costing 4 B where the
   value would cost the node: `ExpressionStatement` holds its id alone, `IfStatement`
@@ -1105,10 +1106,9 @@ whose own width was two such slots take it:
   slice, `SwitchCase` (which keeps its own span) **20**,
   and `ReturnStatement` / `ThrowStatement` an `Option<ExprId>` (their spans now on
   `Statement`'s header). `CatchClause` is the one that does *not*: its `param`
-  is built by the parser as an owned value rather than through the spine, so a
-  reference there would add an allocation instead of removing a copy — and
-  `CatchClause` is reached only through `Option<&CatchClause>`, so its width sets
-  nothing.
+  is built by the parser as an owned value rather than through the spine, so an
+  id there would add a row instead of removing a copy — and `CatchClause` is reached
+  only through an `Option<CatchId>`, so its width sets nothing.
 - the Svelte AST's embedded expressions take it too: a template `{expr}`, every block head
   (`{#if}`'s test, `{#each}`'s iterable, context and key, `{#await}`'s expression and its
   `{:then}` / `{:catch}` bindings, `{#key}`, `{#snippet}`'s name), the `{@html}` /
@@ -1123,13 +1123,13 @@ whose own width was two such slots take it:
   `FragmentNode` and `AttributeNode`, which are slice elements and are built by value at
   every level of the recursive parse (the block and tag parsers return
   `Result<FragmentNode>`, and `parse_children` wraps each parsed element in one), where
-  `CatchClause`'s width reaches nothing past its `Option<&>`. `{#snippet}`'s parameters
+  `CatchClause`'s width reaches nothing past its `Option<CatchId>`. `{#snippet}`'s parameters
   are a value run, and `{@debug}`'s identifiers an id list.
 - the expression LISTS whose elements come off the ladder take it per element: call and
   `new` arguments, sequence and template-literal expressions are `Run<ExprId>`, and
   array-literal and array-pattern elements `Run<Option<ExprId>>` (a hole stays `None`; the
   `Option` is niche-packed) — a 4 B element where a by-value one is the whole `Expression`
-  (64 B native, 48 on wasm32). A spread element, built fresh rather than returned by
+  (56 B native, 48 on wasm32). A spread element, built fresh rather than returned by
   the ladder, is pushed once to join them. The parameter lists are value runs (`Run<Expr>`),
   which are rows of the expression store: their elements are built by the parser as
   values (a binding pattern, or an expression converted to one), so an id list would add
@@ -1144,23 +1144,26 @@ whose own width was two such slots take it:
 **The one exception to "rarity is the whole of the argument".** Once those heads
 narrowed, the only variants left setting `Statement`'s width were `ImportDeclaration`
 (6.8–11.7% of statements) and `ExportNamedDeclaration` (2.4–4.0%) — common, not rare.
-They are boxed anyway, because a boxed head's construction copies the same bytes into
-the arena that it would otherwise have moved into the enum, so the cost is one bump
-pointer and the return is 24 bytes off *every other* statement slot. That took
-`Statement` to 72 B, and the id edges took it to **64 B**; its widest inline variant is
-`LabeledStatement`, which is where the ladder stops. The trade is settled by measurement, not by rarity — the
+They are stored anyway, because a stored head's construction copies the same bytes into
+its store that it would otherwise have moved into the enum, so the cost is one row push
+and the return is 24 bytes off *every other* statement slot. That took `Statement` to
+72 B, and the id edges and a narrower `Identifier` (its binding extras named by a 4 B id)
+took it to **56 B**; its widest inline variant is `LabeledStatement`, which is where the
+ladder stops. The trade is settled by measurement, not by rarity — the
 only place in the three enums where rarity is not the argument.
 
 `Statement` is a header over its variant, as `Expression` is —
-`struct Statement { span, kind: StatementKind }` (`StatementKind` 56 B, set by
-`LabeledStatement` at 48) — with the same span rule: a variant struct carries no span of
+`struct Statement { span, kind: StatementKind }` (`StatementKind` 48 B, set by
+`LabeledStatement` at 40) — with the same span rule: a variant struct carries no span of
 its own unless some node also holds that type outside a `Statement` (`VariableDeclaration`, `BlockStatement`,
 `FunctionDeclaration`, `TSDeclareFunction`, `ClassDeclaration`,
 `TSInterfaceDeclaration`, `TSModuleDeclaration`); those are wrapped only through the
 `Statement::from_*` constructors, which take the header's span from the node's own. Both
 spans are `pub`; they stay equal because that is the only way the wrapped form is built
-and no span write reaches one of those payloads after it is wrapped, and a debug build
-asserts the agreement on every `Statement::span()` read. On wasm32 `Statement` is 48 B.
+and no span write reaches one of those payloads after it is wrapped. A debug build
+asserts the agreement on every `Statement::span()` read for the two held inline; the five
+held in a store take the header span from the same value their row is pushed from. On wasm32
+`Statement` is 48 B.
 
 `parse_expression` / `parse_assignment_expression` are the entry points these fields are
 filled from. The read side does pay one indexed load per `prop.key` / `decl.init`, which is why the trade is settled by

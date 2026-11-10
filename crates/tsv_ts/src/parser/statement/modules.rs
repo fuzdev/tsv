@@ -2,6 +2,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
+use crate::parser::{push_row, push_spanned};
 use tsv_lang::{Error, Span};
 
 use super::super::Parser;
@@ -67,17 +68,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Statement<'arena> {
         let end = declaration.span().end;
         let declaration = self.push_stmt(declaration);
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ExportNamedDeclaration<'_>>(1);
         Statement {
             span: Span::new(start as u32, end),
-            kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(ExportNamedDeclaration {
-                declaration: Some(declaration),
-                specifiers: &[],
-                source: None,
-                attributes: None,
-                export_kind,
-            })),
+            kind: StatementKind::ExportNamedDeclaration(push_row(
+                &mut self.stores.payloads.export_nameds,
+                ExportNamedDeclaration {
+                    declaration: Some(declaration),
+                    specifiers: &[],
+                    source: None,
+                    attributes: None,
+                    export_kind,
+                },
+            )),
         }
     }
 
@@ -104,13 +106,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?; // consume '='
                 let expression = self.parse_expression()?.id();
                 let end = self.semicolon_end()?;
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<TSExportAssignment>(1);
                 Ok(Statement {
                     span: Span::new(start as u32, end),
-                    kind: StatementKind::TSExportAssignment(
-                        self.arena.alloc(TSExportAssignment { expression }),
-                    ),
+                    kind: StatementKind::TSExportAssignment(push_row(
+                        &mut self.stores.payloads.export_assigns,
+                        TSExportAssignment { expression },
+                    )),
                 })
             }
             // export import X = ... (TypeScript import-equals re-export). The only
@@ -273,9 +274,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     decorators,
                     DecoratedClassExport::BeforeOrAbsent,
                 )?;
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<ClassDeclaration<'_>>(1);
-                let class = Statement::from_class_declaration(self.arena.alloc(class));
+                let (span, class) =
+                    push_spanned(&mut self.stores.payloads.class_decls, class, |x| x.span);
+                let class = Statement::from_class_declaration(span, class);
                 Ok(self.export_named(start, class, ExportKind::Value))
             }
             // export type X = T or export interface X { } or export declare function/class
@@ -504,11 +505,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     } else {
                         self.expr(class).span.end
                     };
-                    #[cfg(feature = "_internal_ast_census")]
-                    tsv_lang::ast_census_probe::mint::<ExportDefaultDeclaration<'_>>(1);
                     return Ok(Statement {
                         span: Span::new(start, end),
-                        kind: StatementKind::ExportDefaultDeclaration(self.arena.alloc(
+                        kind: StatementKind::ExportDefaultDeclaration(push_row(
+                            &mut self.stores.payloads.export_defaults,
                             ExportDefaultDeclaration {
                                 declaration: ExportDefaultValue::Expression(class),
                             },
@@ -517,11 +517,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 let expr = self.parse_expression()?.id();
                 let end = self.semicolon_end()?;
-                #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::mint::<ExportDefaultDeclaration<'_>>(1);
                 return Ok(Statement {
                     span: Span::new(start, end),
-                    kind: StatementKind::ExportDefaultDeclaration(self.arena.alloc(
+                    kind: StatementKind::ExportDefaultDeclaration(push_row(
+                        &mut self.stores.payloads.export_defaults,
                         ExportDefaultDeclaration {
                             declaration: ExportDefaultValue::Expression(expr),
                         },
@@ -530,13 +529,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
         };
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ExportDefaultDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start, end),
-            kind: StatementKind::ExportDefaultDeclaration(
-                self.arena.alloc(ExportDefaultDeclaration { declaration }),
-            ),
+            kind: StatementKind::ExportDefaultDeclaration(push_row(
+                &mut self.stores.payloads.export_defaults,
+                ExportDefaultDeclaration { declaration },
+            )),
         })
     }
 
@@ -784,16 +782,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let attributes = self.parse_import_attributes()?;
         let end = self.semicolon_end()?;
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ExportAllDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start, end),
-            kind: StatementKind::ExportAllDeclaration(self.arena.alloc(ExportAllDeclaration {
-                exported,
-                source,
-                attributes,
-                export_kind,
-            })),
+            kind: StatementKind::ExportAllDeclaration(push_row(
+                &mut self.stores.payloads.export_alls,
+                ExportAllDeclaration {
+                    exported,
+                    source,
+                    attributes,
+                    export_kind,
+                },
+            )),
         })
     }
 
@@ -882,17 +881,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ExportNamedDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start, end),
-            kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(ExportNamedDeclaration {
-                declaration: None,
-                specifiers: specifiers.into_bump_slice(),
-                source,
-                attributes,
-                export_kind,
-            })),
+            kind: StatementKind::ExportNamedDeclaration(push_row(
+                &mut self.stores.payloads.export_nameds,
+                ExportNamedDeclaration {
+                    declaration: None,
+                    specifiers: specifiers.into_bump_slice(),
+                    source,
+                    attributes,
+                    export_kind,
+                },
+            )),
         })
     }
 
@@ -1079,17 +1079,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let attributes = self.parse_import_attributes()?;
             let end = self.semicolon_end()?;
 
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::mint::<ImportDeclaration<'_>>(1);
             return Ok(Statement {
                 span: Span::new(start as u32, end),
-                kind: StatementKind::ImportDeclaration(self.arena.alloc(ImportDeclaration {
-                    specifiers: &[],
-                    source,
-                    attributes,
-                    import_kind: ImportKind::Value,
-                    phase,
-                })),
+                kind: StatementKind::ImportDeclaration(push_row(
+                    &mut self.stores.payloads.import_decls,
+                    ImportDeclaration {
+                        specifiers: &[],
+                        source,
+                        attributes,
+                        import_kind: ImportKind::Value,
+                        phase,
+                    },
+                )),
             });
         }
 
@@ -1307,17 +1308,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<ImportDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start as u32, end),
-            kind: StatementKind::ImportDeclaration(self.arena.alloc(ImportDeclaration {
-                specifiers: specifiers.into_bump_slice(),
-                source,
-                attributes,
-                import_kind,
-                phase,
-            })),
+            kind: StatementKind::ImportDeclaration(push_row(
+                &mut self.stores.payloads.import_decls,
+                ImportDeclaration {
+                    specifiers: specifiers.into_bump_slice(),
+                    source,
+                    attributes,
+                    import_kind,
+                    phase,
+                },
+            )),
         })
     }
 
@@ -1515,11 +1517,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<TSImportEqualsDeclaration<'_>>(1);
         Ok(Statement {
             span: Span::new(start as u32, end),
-            kind: StatementKind::TSImportEqualsDeclaration(self.arena.alloc(
+            kind: StatementKind::TSImportEqualsDeclaration(push_row(
+                &mut self.stores.payloads.import_equals,
                 TSImportEqualsDeclaration {
                     id,
                     module_reference,
