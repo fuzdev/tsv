@@ -27,9 +27,9 @@
 //! `_internal_store_check` feature catches both, by stamping an instance and a generation on
 //! stores, pools and the handles they mint and comparing them on each read and each equality
 //! test. It also keeps a shadow stack of live marks on each `ListBuf`, so a mark already flushed,
-//! rewound past or reset fails at the flush or truncate it reaches. It widens every handle and
-//! changes layout and codegen, so a build carrying it never supplies a performance number. Off,
-//! the stamps do not exist: no field, no comparison.
+//! rewound past or reset fails at the flush, truncate or frame read it reaches. It widens every
+//! handle and changes layout and codegen, so a build carrying it never supplies a performance
+//! number. Off, the stamps do not exist: no field, no comparison.
 //!
 //! Every failed read ends in one zero-argument `#[cold]` function, never in `[]`, so that an
 //! inlined accessor carries no panic setup of its own at each site.
@@ -194,6 +194,16 @@ mod stamp {
                 }
             }
             stale_mark();
+        }
+
+        /// A read of an open frame: requires the mark and pops nothing.
+        pub(super) fn require(&self, seq: u64) {
+            let live = self.stack.take();
+            let found = live.contains(&seq);
+            self.stack.set(live);
+            if !found {
+                stale_mark();
+            }
         }
 
         /// A rewind: requires the mark and pops the marks above it, leaving it live, since a
@@ -706,11 +716,24 @@ impl<T: Row> ListBuf<T> {
 
     /// The number of elements above `mark`. A mark above the top of the stack misses. A stale
     /// mark at or below the top is not detected here; the check build catches it at the
-    /// flush or truncate it reaches.
+    /// flush, truncate or frame read it reaches.
     #[inline]
     pub fn len_since(&self, mark: ListMark<T::Family>) -> usize {
         match self.items.len().checked_sub(mark.index()) {
             Some(count) => count,
+            None => store_miss(),
+        }
+    }
+
+    /// The elements above `mark`: the open frame it starts, read while the frame is still being
+    /// built, as [`ListBuf::len_since`] counts it. A mark above the top of the stack misses; the
+    /// check build also refuses a stale one, as [`ListBuf::truncate`] does.
+    #[inline]
+    pub fn frame(&self, mark: ListMark<T::Family>) -> &[T] {
+        #[cfg(feature = "_internal_store_check")]
+        self.live.require(mark.seq);
+        match self.items.get(mark.index()..) {
+            Some(frame) => frame,
             None => store_miss(),
         }
     }
@@ -1188,6 +1211,69 @@ mod tests {
     }
 
     #[test]
+    fn an_empty_frame_reads_as_an_empty_slice() {
+        let mut scratch = ListBuf::new();
+        let first = scratch.mark();
+        assert_eq!(scratch.frame(first), &[]);
+        scratch.push(Node("below"));
+        let above = scratch.mark();
+        assert_eq!(scratch.frame(above), &[]);
+        assert_eq!(scratch.frame(first), [Node("below")]);
+    }
+
+    #[test]
+    fn a_frame_reads_its_own_elements_and_every_inner_frame_open_above_it() {
+        let mut nodes = store();
+        let mut scratch = ListBuf::new();
+        let outer = scratch.mark();
+        scratch.push(Node("a"));
+        let inner = scratch.mark();
+        scratch.push(Node("b"));
+        scratch.push(Node("c"));
+        assert_eq!(scratch.frame(inner), [Node("b"), Node("c")]);
+        assert_eq!(scratch.frame(outer), [Node("a"), Node("b"), Node("c")]);
+
+        let inner_run = scratch.flush_copy(inner, &mut nodes);
+        scratch.push(Node("d"));
+        assert_eq!(scratch.frame(outer), [Node("a"), Node("d")]);
+        assert_eq!(texts(&nodes, inner_run), ["b", "c"]);
+    }
+
+    #[test]
+    fn a_frame_after_a_truncate_reads_what_the_rewind_kept() {
+        let mut scratch = ListBuf::new();
+        let frame = scratch.mark();
+        scratch.push(Node("a"));
+        let checkpoint = scratch.mark();
+        scratch.push(Node("spec"));
+        assert_eq!(scratch.frame(frame), [Node("a"), Node("spec")]);
+        scratch.truncate(checkpoint);
+        assert_eq!(scratch.frame(frame), [Node("a")]);
+        // The checkpoint stays live, so its own frame reads too.
+        assert_eq!(scratch.frame(checkpoint), &[]);
+        scratch.push(Node("kept"));
+        assert_eq!(scratch.frame(frame), [Node("a"), Node("kept")]);
+    }
+
+    #[test]
+    #[cfg_attr(
+        not(feature = "_internal_store_check"),
+        should_panic(expected = "store miss")
+    )]
+    #[cfg_attr(
+        feature = "_internal_store_check",
+        should_panic(expected = "stale list mark")
+    )]
+    fn a_frame_read_at_a_mark_above_the_top_is_refused() {
+        let mut scratch = ListBuf::new();
+        let low = scratch.mark();
+        scratch.push(Node("a"));
+        let high = scratch.mark();
+        scratch.truncate(low);
+        let _ = scratch.frame(high);
+    }
+
+    #[test]
     fn a_checkpoint_can_be_rewound_to_more_than_once() {
         let mut nodes = store();
         let mut scratch = ListBuf::new();
@@ -1479,6 +1565,18 @@ mod tests {
             scratch.push(Node("p"));
             scratch.push(Node("q"));
             scratch.flush_move(inner, &mut nodes);
+        }
+
+        #[test]
+        #[should_panic(expected = "stale list mark")]
+        fn a_frame_read_at_a_flushed_mark_is_rejected_after_regrowth() {
+            let mut nodes = store();
+            let mut scratch = ListBuf::new();
+            let inner = scratch.mark();
+            scratch.push(Node("b"));
+            scratch.flush_move(inner, &mut nodes);
+            scratch.push(Node("c"));
+            let _ = scratch.frame(inner);
         }
 
         #[test]
