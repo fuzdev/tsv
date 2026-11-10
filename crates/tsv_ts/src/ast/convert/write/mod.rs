@@ -133,8 +133,8 @@ fn write_identifier_expression_with_character_in(
             id.span,
             id.ident_name(),
             id.optional,
-            id.type_annotation(),
-            id.decorators(),
+            id.type_annotation(ctx.view),
+            id.decorators(ctx.view),
             ctx,
         );
     } else {
@@ -162,7 +162,7 @@ pub fn write_pattern_embedded(
     env: EmbedWriter<'_>,
 ) {
     let mut ctx = Ctx::from_embed(env);
-    if let Some(ann) = crate::__private::pattern_type_annotation(expr) {
+    if let Some(ann) = crate::__private::pattern_type_annotation(ctx.view, expr) {
         ctx.pattern_ann_span = ann.span;
     }
     match &expr.kind {
@@ -173,8 +173,8 @@ pub fn write_pattern_embedded(
                 id.span,
                 id.ident_name(),
                 id.optional,
-                id.type_annotation(),
-                id.decorators(),
+                id.type_annotation(ctx.view),
+                id.decorators(ctx.view),
                 &ctx,
             );
         }

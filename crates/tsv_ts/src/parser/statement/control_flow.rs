@@ -340,7 +340,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         await_at: Option<usize>,
-        init: Option<&'arena ForInit<'arena>>,
+        init: Option<ForHeadEdge<'arena>>,
     ) -> Result<Statement<'arena>, Error> {
         self.reject_for_await_without_of(await_at)?;
         self.expect(&TokenKind::Semicolon)?;
@@ -354,7 +354,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_for_standard(
         &mut self,
         start: usize,
-        init: Option<&'arena ForInit<'arena>>,
+        init: Option<ForHeadEdge<'arena>>,
     ) -> Result<Statement<'arena>, Error> {
         // Parse test (optional)
         let test = if self.check(&TokenKind::Semicolon) {
@@ -399,7 +399,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         await_at: Option<usize>,
-        left: &'arena ForInOfLeft<'arena>,
+        left: ForLeftEdge<'arena>,
     ) -> Result<Statement<'arena>, Error> {
         self.reject_for_await_without_of(await_at)?;
 
@@ -420,7 +420,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_for_of(
         &mut self,
         start: usize,
-        left: &'arena ForInOfLeft<'arena>,
+        left: ForLeftEdge<'arena>,
         r#await: bool,
     ) -> Result<Statement<'arena>, Error> {
         let right = self.parse_expression()?.id();
@@ -648,14 +648,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let block = self.parse_block_statement()?;
 
         // Parse optional catch clause
-        let handler = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Catch)) {
-            // one wire level: the `CatchClause` over its parameter and block
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::mint::<CatchClause<'_>>(1);
-            Some(&*self.arena.alloc(self.nested(1, Self::parse_catch_clause)?))
-        } else {
-            None
-        };
+        let handler: Option<CatchEdge<'arena>> =
+            if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Catch)) {
+                // one wire level: the `CatchClause` over its parameter and block
+                #[cfg(feature = "_internal_ast_census")]
+                tsv_lang::ast_census_probe::mint::<CatchClause<'_>>(1);
+                Some(self.arena.alloc(self.nested(1, Self::parse_catch_clause)?))
+            } else {
+                None
+            };
 
         // Parse optional finally clause
         let finalizer = if matches!(
@@ -674,7 +675,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let end = finalizer.as_ref().map_or_else(
-            || handler.map_or(block.span.end, |h| h.span.end),
+            || handler.map_or(block.span.end, |h| self.stores.view().catch(h).span.end),
             |f| f.span.end,
         );
 

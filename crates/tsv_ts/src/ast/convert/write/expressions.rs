@@ -172,8 +172,8 @@ fn write_expression_identifier(
         id.span,
         id.ident_name(),
         id.optional || force_optional,
-        id.type_annotation(),
-        id.decorators(),
+        id.type_annotation(ctx.view),
+        id.decorators(ctx.view),
         ctx,
     );
 }
@@ -537,7 +537,7 @@ fn write_expression_full_dispatch(
                     .unwrap_comment_bound_pairs(ctx.view)
                     .kind
                 {
-                    ast::ExpressionKind::Identifier(id) => id.type_annotation().is_some(),
+                    ast::ExpressionKind::Identifier(id) => id.type_annotation(ctx.view).is_some(),
                     ast::ExpressionKind::ArrayPattern(arr) => arr.type_annotation.is_some(),
                     ast::ExpressionKind::ObjectPattern(obj) => obj.type_annotation.is_some(),
                     _ => false,

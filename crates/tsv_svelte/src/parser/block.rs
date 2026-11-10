@@ -1567,7 +1567,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // signature to give, so it refuses.
             let signature_error =
                 || Self::error_expected_at("snippet signature", content_offset + head_start);
-            let (program, func) = if preserved_a_paren {
+            // The declaration's row borrows the stores, so what the block keeps of it is copied
+            // out at each read, ahead of the pushes below: its parameter run and its type-parameter
+            // header, a list header cloned at each read.
+            let (program, (signature_type_parameters, signature_parameters)) = if preserved_a_paren
+            {
                 // Grouping parens change no production the grammar accepts, so a head the
                 // preserved parse read reads paren-free too. If it does not, that is a
                 // parser bug, and it surfaces as the paren-free parse's own error rather
@@ -1610,21 +1614,22 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     .params;
                 let func = first_function_declaration(self.ts_stores(), &plain)
                     .ok_or_else(signature_error)?;
+                let signature = (func.type_parameters.clone(), func.params);
                 self.snippet_wire_parameters.push(SnippetWireParameters {
                     snippet_start: start as u32,
                     parameters: wire,
                 });
-                (plain, func)
+                (plain, signature)
             } else {
                 let func = first_function_declaration(self.ts_stores(), &preserved)
                     .ok_or_else(signature_error)?;
-                (preserved, func)
+                (preserved, (func.type_parameters.clone(), func.params))
             };
             // The comments (and their `owned_by_node` claims) are the paren-free tree's —
             // the tree the printer walks — and are merged once.
             self.expression_comments.extend_from_slice(program.comments);
-            type_parameters.clone_from(&func.type_parameters);
-            parameters = func.params;
+            type_parameters = signature_type_parameters;
+            parameters = signature_parameters;
         }
 
         // Parse body

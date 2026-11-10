@@ -450,19 +450,20 @@ pub fn push_expression<'arena>(stores: &mut AstStores<'arena>, expr: Expression<
     stores.exprs.push(expr)
 }
 
-/// The `FunctionDeclaration` `program`'s first statement is, at the arena's lifetime — for a
-/// host that keeps parts of it (a `{#snippet}` head's wrapper, whose parameters and type
-/// parameters the block takes).
+/// The `FunctionDeclaration` `program`'s first statement is, its fields at the arena's
+/// lifetime — for a host that keeps parts of it (a `{#snippet}` head's wrapper, whose
+/// parameters and type parameters the block takes).
 ///
-/// A read, not a view: a view's reads end at its own borrow of `stores`, and the host's
-/// fields outlive it.
-pub fn first_function_declaration<'arena>(
-    stores: &AstStores<'arena>,
+/// A read, not a view: a view's rows are typed at its own borrow of `stores`, and the host's
+/// fields outlive it. The row itself borrows `stores`, so a host that appends to them copies
+/// the fields it keeps out first.
+pub fn first_function_declaration<'s, 'arena>(
+    stores: &'s AstStores<'arena>,
     program: &Program<'arena>,
-) -> Option<&'arena FunctionDeclaration<'arena>> {
+) -> Option<&'s FunctionDeclaration<'arena>> {
     let &first = stores.stmt_lists.slice(program.body).first()?;
     match stores.stmts.get(first).kind {
-        StatementKind::FunctionDeclaration(func) => Some(func),
+        StatementKind::FunctionDeclaration(func) => Some(stores.fn_decl_row(func)),
         _ => None,
     }
 }
@@ -512,7 +513,9 @@ pub fn attach_pattern_type_annotation<'arena>(
         ExpressionKind::Identifier(id) => {
             // Re-bind the identifier's binding extra with the parsed type
             // annotation (preserving any decorators already present).
-            let decorators = id.decorators();
+            let decorators = id
+                .extra
+                .and_then(|extra| stores.param_extra_row(extra).decorators);
             #[cfg(feature = "_internal_ast_census")]
             tsv_lang::ast_census_probe::mint::<ast::IdentifierParamExtra<'_>>(1);
             ExpressionKind::Identifier(ast::Identifier {
@@ -575,11 +578,12 @@ pub fn attach_pattern_type_annotation<'arena>(
 /// annotation is its own comment island. That is why the wire writer and the Svelte
 /// parser both ask *this* function rather than matching the three kinds again; a block
 /// pattern's root is always an identifier or a destructure, so no other root can carry one.
-pub fn pattern_type_annotation<'a, 'arena>(
-    pattern: &'a Expression<'arena>,
+pub fn pattern_type_annotation<'a>(
+    view: AstView<'a>,
+    pattern: &'a Expression<'a>,
 ) -> Option<&'a TSTypeAnnotation> {
     match &pattern.kind {
-        ExpressionKind::Identifier(id) => id.type_annotation(),
+        ExpressionKind::Identifier(id) => id.type_annotation(view),
         ExpressionKind::ObjectPattern(obj) => obj.type_annotation.as_ref(),
         ExpressionKind::ArrayPattern(arr) => arr.type_annotation.as_ref(),
         _ => None,
@@ -598,9 +602,9 @@ pub fn pattern_type_annotation<'a, 'arena>(
 /// and the wire attach each read the bare end, and each duplicated an annotation's comment
 /// (once onto a `{@const}` init, once inside an `ArrayPattern`'s brackets). One function so
 /// the two cannot answer it differently again.
-pub fn pattern_binding_end(pattern: &Expression<'_>) -> u32 {
+pub fn pattern_binding_end(view: AstView<'_>, pattern: &Expression<'_>) -> u32 {
     let bare_end = pattern.span().end;
-    pattern_type_annotation(pattern).map_or(bare_end, |t| t.span.end)
+    pattern_type_annotation(view, pattern).map_or(bare_end, |t| t.span.end)
 }
 
 /// Parse a type annotation (`: Type`) and return it with the comments it collected.

@@ -27,7 +27,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let param_type = self.nested(2, Self::parse_type)?.id();
         let param_type_end = self.ty(param_type).span().end;
 
-        let extra: &'arena IdentifierParamExtra<'arena> = self.alloc(IdentifierParamExtra {
+        let extra: ParamExtraEdge<'arena> = self.alloc(IdentifierParamExtra {
             type_annotation: Some(TSTypeAnnotation {
                 type_annotation: param_type,
                 span: Span::new(param_colon_start as u32, param_type_end),

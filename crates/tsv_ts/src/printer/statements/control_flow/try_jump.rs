@@ -143,7 +143,7 @@ impl<'a> Printer<'a> {
         // Try block expands empty: `try {\n}` not `try {}`
         parts.push(self.build_block_statement_expand_empty_doc(&stmt.block));
 
-        if let Some(handler) = &stmt.handler {
+        if let Some(handler) = self.view.opt_catch(stmt.handler) {
             // `handler.span.start` is the position of the "catch" keyword. A frozen clause
             // rides out whole in the verbatim slice — keyword, binding and body — so the
             // per-part emission is skipped entirely for it.
@@ -160,9 +160,9 @@ impl<'a> Printer<'a> {
         }
         if let Some(finalizer) = &stmt.finalizer {
             // Check for comments before finally (after catch block or try block)
-            let prev_end = stmt
-                .handler
-                .as_ref()
+            let prev_end = self
+                .view
+                .opt_catch(stmt.handler)
                 .map_or(stmt.block.span.end, |h| h.body.span.end);
             // The finalizer span starts at the "finally" block `{`; the keyword sits
             // in the gap after the previous block. It's the only real keyword there,

@@ -311,7 +311,9 @@ impl<'a> Printer<'a> {
         id: &ast::Identifier<'_>,
     ) -> u32 {
         parts.push(self.identifier_name_doc(id));
-        let search_end = id.type_annotation().map_or(id.span.end, |ta| ta.span.start);
+        let search_end = id
+            .type_annotation(self.view)
+            .map_or(id.span.end, |ta| ta.span.start);
         let name_end = analysis::skip_identifier_at(
             self.source.as_bytes(),
             id.span.start as usize,

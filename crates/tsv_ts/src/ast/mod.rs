@@ -437,8 +437,8 @@ pub struct Identifier<'arena> {
     /// id, catch param, index-signature param, or `{#snippet}` param. `None` for
     /// every variable *reference* (the overwhelming majority). Folded behind one
     /// arena pointer so `Identifier` stays ~24 B: it is an *inline* `Expression`
-    /// variant, so its size drives `sizeof(Expression)`. Read via the
-    /// `type_annotation()` / `decorators()` accessors.
+    /// variant, so its size drives `sizeof(Expression)`. Read through a view, via the
+    /// [`Self::type_annotation`] / [`Self::decorators`] accessors.
     ///
     /// ⚠️ Every field of `Identifier` beyond the name is `optional` or behind `extra`: the
     /// three expression-position fast paths (the printer's `build_identifier_expression_doc`,
@@ -446,7 +446,7 @@ pub struct Identifier<'arena> {
     /// (the wire's also its `force_optional` context flag), and `build_identifier_doc_inner`'s
     /// fast path tests `optional` plus each accessor — a new `Identifier` field must join all
     /// four, a new `IdentifierParamExtra` field the last.
-    pub extra: Option<&'arena IdentifierParamExtra<'arena>>,
+    pub extra: Option<ParamExtraEdge<'arena>>,
     pub span: Span,
 }
 
@@ -461,16 +461,19 @@ pub struct IdentifierParamExtra<'arena> {
 }
 
 impl<'arena> Identifier<'arena> {
-    /// The type annotation, if this is a typed binding (`None` for a reference).
+    /// The type annotation, if this is a typed binding (`None` for a reference), its extras
+    /// read through `view`.
     #[inline]
-    pub fn type_annotation(&self) -> Option<&TSTypeAnnotation> {
-        self.extra.and_then(|e| e.type_annotation.as_ref())
+    pub fn type_annotation(&self, view: AstView<'arena>) -> Option<&'arena TSTypeAnnotation> {
+        view.opt_param_extra(self.extra)
+            .and_then(|e| e.type_annotation.as_ref())
     }
 
-    /// The parameter decorators, if any (`None` for a reference).
+    /// The parameter decorators, if any (`None` for a reference), its extras read through
+    /// `view`.
     #[inline]
-    pub fn decorators(&self) -> Option<&'arena [Decorator]> {
-        self.extra.and_then(|e| e.decorators)
+    pub fn decorators(&self, view: AstView<'arena>) -> Option<&'arena [Decorator]> {
+        view.opt_param_extra(self.extra).and_then(|e| e.decorators)
     }
 
     /// The name channel, reassembled from the flattened fields.

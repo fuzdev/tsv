@@ -2340,9 +2340,10 @@ impl<'a> Printer<'a> {
         // property with them below.
         let parameter = self.view.expr(param_prop.parameter);
         let (inner_doc, decorators) = match &parameter.kind {
-            ExpressionKind::Identifier(id) => {
-                (self.build_identifier_doc_no_decorators(id), id.decorators())
-            }
+            ExpressionKind::Identifier(id) => (
+                self.build_identifier_doc_no_decorators(id),
+                id.decorators(self.view),
+            ),
             ExpressionKind::AssignmentPattern(ap) => (
                 self.build_assignment_pattern_doc(ap, parameter.span),
                 ap.decorators,

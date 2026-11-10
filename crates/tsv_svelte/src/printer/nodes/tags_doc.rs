@@ -147,7 +147,7 @@ impl<'a> Printer<'a> {
 
         // Both questions below scan the `=` gap forward from the binding, so they anchor past
         // its `: T` — which `id_doc` has already printed, and which the bare span excludes.
-        let binding_end = tsv_ts::__private::pattern_binding_end(id);
+        let binding_end = tsv_ts::__private::pattern_binding_end(self.view, id);
 
         // The layout verdict is taken BEFORE the init is built, because it is also the
         // [`Printer::trailing_comment_docs`] `closer_owns_break` answer: only the

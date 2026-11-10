@@ -511,7 +511,7 @@ impl<'a> Printer<'a> {
         // Type assertion calls with LHS type annotation need special fluid handling
         // (handled separately below because they need non-wrapping LHS type)
         let is_type_assertion_with_lhs_type = is_type_assertion_call(self.view, init, self.source)
-            && matches!(&self.view.expr(declarator.id).kind, ExpressionKind::Identifier(id) if id.type_annotation().is_some());
+            && matches!(&self.view.expr(declarator.id).kind, ExpressionKind::Identifier(id) if id.type_annotation(self.view).is_some());
 
         // Answered per declarator, exactly as prettier's `printAssignment` is: a
         // multi-declarator list does NOT withhold the width-decided break at `=` from its
@@ -796,9 +796,10 @@ impl<'a> Printer<'a> {
         let ExpressionKind::Identifier(ident) = &self.view.expr(declarator.id).kind else {
             return None;
         };
-        let args = match self
-            .unwrap_redundant_parens(self.view.ty(ident.type_annotation()?.type_annotation))
-        {
+        let args = match self.unwrap_redundant_parens(
+            self.view
+                .ty(ident.type_annotation(self.view)?.type_annotation),
+        ) {
             ast::TSType::TypeReference(reference) => reference.type_arguments.as_ref(),
             ast::TSType::TypeQuery(query) => query.type_arguments.as_ref(),
             &ast::TSType::Import(_, import) => {
@@ -850,7 +851,7 @@ impl<'a> Printer<'a> {
 
         // Compute name_end for comment extraction
         let search_end = ident
-            .type_annotation()
+            .type_annotation(self.view)
             .map_or(ident.span.end, |ta| ta.span.start);
         let raw_name_end = analysis::skip_identifier_at(
             self.source.as_bytes(),
@@ -865,7 +866,7 @@ impl<'a> Printer<'a> {
         if ident.optional {
             after_modifier = self.push_modifier_marker_doc(&mut parts, after_modifier, b'?');
         }
-        if let Some(type_ann) = ident.type_annotation() {
+        if let Some(type_ann) = ident.type_annotation(self.view) {
             // `: type` annotation, handling a before-`:` comment between the binding
             // name (and any `!`/`?`) and `:` — line → indented continuation, block →
             // inline before `:`.
@@ -1097,7 +1098,7 @@ impl<'a> Printer<'a> {
                 // `!` (already emitted inside the id doc) aren't re-emitted before `=`.
                 if declarator.definite
                     && let ExpressionKind::Identifier(ident) = &self.view.expr(declarator.id).kind
-                    && ident.type_annotation().is_none()
+                    && ident.type_annotation(self.view).is_none()
                     && let Some(bang_pos) =
                         self.find_char_outside_comments(id_end, init_start, b'!')
                 {

@@ -254,6 +254,27 @@ pub struct AstStores<'arena> {
     pub(crate) payloads: PayloadStores<'arena>,
 }
 
+impl<'arena> AstStores<'arena> {
+    /// The function declaration `edge` names, its fields at the arena's lifetime rather than
+    /// a view's: for the crate's own read of a row whose parts a host keeps
+    /// ([`crate::__private::first_function_declaration`]).
+    #[inline]
+    pub(crate) fn fn_decl_row(&self, edge: FnDeclEdge<'arena>) -> &FunctionDeclaration<'arena> {
+        edge
+    }
+
+    /// A parameter name's extras, its fields at the arena's lifetime rather than a view's:
+    /// for the crate's own read of a row it rebuilds while appending to the stores
+    /// ([`crate::__private::attach_pattern_type_annotation`]).
+    #[inline]
+    pub(crate) fn param_extra_row(
+        &self,
+        edge: ParamExtraEdge<'arena>,
+    ) -> &IdentifierParamExtra<'arena> {
+        edge
+    }
+}
+
 /// The tops of the scratch stacks, taken together: a speculation's or a discarded parse's
 /// restore point.
 #[derive(Clone, Copy)]
@@ -584,9 +605,9 @@ try {
                     push!(fn_decls, *x);
                     for param in view.run(x.params) {
                         if let ExpressionKind::Identifier(name) = &param.kind
-                            && let Some(extra) = name.extra
+                            && let Some(extra) = view.opt_param_extra(name.extra)
                         {
-                            push!(param_extras, extra);
+                            push!(param_extras, *extra);
                         }
                     }
                 }
@@ -606,11 +627,11 @@ try {
                     push!(import_equals, *view.import_equals(x));
                 }
                 StatementKind::ForStatement(x) => {
-                    push!(for_heads, x.init.expect("a `for` head"));
+                    push!(for_heads, *view.opt_for_head(x.init).expect("a `for` head"));
                 }
-                StatementKind::ForInStatement(x) => push!(for_lefts, x.left),
+                StatementKind::ForInStatement(x) => push!(for_lefts, *view.for_left(x.left)),
                 StatementKind::TryStatement(x) => {
-                    push!(catches, x.handler.expect("a catch clause"));
+                    push!(catches, *view.opt_catch(x.handler).expect("a catch clause"));
                 }
                 other => panic!("an unexpected statement: {other:?}"),
             }
