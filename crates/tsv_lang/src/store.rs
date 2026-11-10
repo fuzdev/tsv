@@ -713,6 +713,10 @@ impl<F> fmt::Debug for ListMark<F> {
 
 /// The scratch stack that builds child lists: one buffer shared by every open frame of the same
 /// element type, each frame flushing as one contiguous run.
+///
+/// Under the `_internal_ast_census` feature, every change to the stack's length moves the
+/// census's open-list total of `T` (`ast_census_probe::list_delta`): a push adds one, and a
+/// flush, a truncate, a reset or a recycle takes back what it removes.
 pub struct ListBuf<T> {
     items: Vec<T>,
     #[cfg(feature = "_internal_store_check")]
@@ -744,11 +748,15 @@ impl<T> ListBuf<T> {
     #[inline]
     pub fn push(&mut self, item: T) {
         self.items.push(item);
+        #[cfg(feature = "_internal_ast_census")]
+        crate::ast_census_probe::list_delta::<T>(1);
     }
 
     /// Empties the stack between parses, keeping capacity.
     #[inline]
     pub fn reset(&mut self) {
+        #[cfg(feature = "_internal_ast_census")]
+        crate::ast_census_probe::list_delta::<T>(-(self.items.len() as isize));
         self.items.clear();
         #[cfg(feature = "_internal_store_check")]
         self.live.clear();
@@ -756,6 +764,8 @@ impl<T> ListBuf<T> {
 
     /// Reuses this buffer's capacity under another element type, as [`Store::recycle`] does.
     pub fn recycle<U>(self) -> ListBuf<U> {
+        #[cfg(feature = "_internal_ast_census")]
+        crate::ast_census_probe::list_delta::<T>(-(self.items.len() as isize));
         ListBuf {
             items: recycle_vec(self.items),
             #[cfg(feature = "_internal_store_check")]
@@ -809,7 +819,10 @@ impl<T: Row> ListBuf<T> {
     pub fn truncate(&mut self, mark: ListMark<T::Family>) {
         #[cfg(feature = "_internal_store_check")]
         self.live.pop_above(mark.seq);
+        #[cfg(not(feature = "_internal_ast_census"))]
         let _ = self.len_since(mark);
+        #[cfg(feature = "_internal_ast_census")]
+        crate::ast_census_probe::list_delta::<T>(-(self.len_since(mark) as isize));
         self.items.truncate(mark.index());
     }
 
@@ -832,6 +845,8 @@ impl<T: Row> ListBuf<T> {
         let run = into.mint_run(count, || frame.first());
         into.rows.extend_from_slice(frame);
         self.items.truncate(mark.index());
+        #[cfg(feature = "_internal_ast_census")]
+        crate::ast_census_probe::list_delta::<T>(-(count as isize));
         run
     }
 
@@ -850,6 +865,8 @@ impl<T: Row> ListBuf<T> {
         }
         let run = into.mint_run(count, || self.items.get(mark.index()));
         into.rows.extend(self.items.drain(mark.index()..));
+        #[cfg(feature = "_internal_ast_census")]
+        crate::ast_census_probe::list_delta::<T>(-(count as isize));
         run
     }
 }
@@ -1023,6 +1040,60 @@ mod tests {
         assert!(size_of::<Option<Run<Alpha>>>() == size_of::<Run<Alpha>>());
         assert!(size_of::<Option<PoolText>>() == size_of::<PoolText>());
     };
+
+    /// Under the census, the open-list total follows the stack's length: a push adds one, and a
+    /// flush, a truncate, a reset and a recycle each take back what they remove, so a nested
+    /// frame's peak sits on top of the outer frame's live prefix. A shrink that leaked would lift
+    /// every later peak; none mints, the flush's caller does.
+    #[cfg(feature = "_internal_ast_census")]
+    #[test]
+    fn the_census_follows_the_open_prefixes_of_a_scratch_stack() {
+        use crate::ast_census_probe;
+
+        ast_census_probe::arm();
+        let mut nodes = store();
+        let mut scratch = ListBuf::new();
+        let outer = scratch.mark();
+        scratch.push(Node("a"));
+        scratch.push(Node("b"));
+        let inner = scratch.mark();
+        for _ in 0..3 {
+            scratch.push(Node("c"));
+        }
+        // the peak so far: the outer two under the inner three
+        scratch.flush_move(inner, &mut nodes);
+        scratch.push(Node("d"));
+        let speculation = scratch.mark();
+        scratch.push(Node("e"));
+        scratch.truncate(speculation);
+        scratch.flush_copy(outer, &mut nodes);
+        for _ in 0..6 {
+            scratch.push(Node("f"));
+        }
+        scratch.reset();
+        for _ in 0..7 {
+            scratch.push(Node("g"));
+        }
+        let mut scratch: ListBuf<Node<'static>> = scratch.recycle();
+        for _ in 0..8 {
+            scratch.push(Node("h"));
+        }
+        scratch.reset();
+
+        // a recycle into another element type takes the open prefix back from the old one
+        scratch.push(Node("i"));
+        let mut other: ListBuf<[usize; 2]> = scratch.recycle();
+        other.push([0, 0]);
+        other.reset();
+        let tally = ast_census_probe::disarm();
+        let (_, row) = tally
+            .rows
+            .iter()
+            .find(|(name, _)| name.contains("::Node"))
+            .expect("a row for the element type");
+        assert_eq!(row.scratch_peak, 8, "each shrink took back what it removed");
+        assert_eq!(row.minted, 0, "a flush mints nothing of its own");
+    }
 
     #[test]
     fn a_new_store_is_empty_and_allocates_nothing() {
