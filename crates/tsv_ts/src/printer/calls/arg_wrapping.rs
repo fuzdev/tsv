@@ -2257,7 +2257,7 @@ pub(super) fn build_expand_last_obj_array_doc(
 fn shared_callback_body_doc(
     printer: &Printer<'_>,
     arg: &ast::Expression<'_>,
-    body: &ast::BlockStatement<'_>,
+    body: &ast::BlockStatement,
     is_arrow: bool,
 ) -> DocId {
     let key = printer.chain_share_key(arg, ShareTag::AssumedHugBody);

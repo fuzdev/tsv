@@ -6,7 +6,7 @@
 use tsv_lang::Span;
 
 use super::{
-    AstView, Expr, ExprId, Identifier, Literal, Run, StmtList, TSEntityName, TSTypeAnnotation,
+    AstView, Expr, ExprId, Identifier, Literal, Run, StmtId, TSEntityName, TSTypeAnnotation,
     TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 
@@ -178,15 +178,15 @@ pub enum TSModuleDeclarationKind {
 #[derive(Debug, Clone)]
 pub enum TSModuleDeclarationBody<'arena> {
     /// Block body with statements: `namespace A { ... }`
-    TSModuleBlock(TSModuleBlock<'arena>),
+    TSModuleBlock(TSModuleBlock),
     /// Nested module declaration: `namespace A.B { ... }` - the B part
     TSModuleDeclaration(&'arena TSModuleDeclaration<'arena>),
 }
 
 /// TypeScript module block: the `{ ... }` part of a namespace/module declaration
 #[derive(Debug, Clone)]
-pub struct TSModuleBlock<'arena> {
+pub struct TSModuleBlock {
     /// Statements inside the module block
-    pub body: StmtList<'arena>,
+    pub body: Run<StmtId>,
     pub span: Span,
 }

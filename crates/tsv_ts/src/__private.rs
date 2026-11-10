@@ -456,13 +456,13 @@ pub fn push_expression<'arena>(stores: &mut AstStores<'arena>, expr: Expression<
 ///
 /// A read, not a view: a view's reads end at its own borrow of `stores`, and the host's
 /// fields outlive it.
-// TODO: read the statement row through `stores.stmts` once `Program.body` holds ids.
 pub fn first_function_declaration<'arena>(
-    _stores: &AstStores<'arena>,
+    stores: &AstStores<'arena>,
     program: &Program<'arena>,
 ) -> Option<&'arena FunctionDeclaration<'arena>> {
-    match program.body.first().map(|stmt| &stmt.kind) {
-        Some(StatementKind::FunctionDeclaration(func)) => Some(*func),
+    let &first = stores.stmt_lists.slice(program.body).first()?;
+    match stores.stmts.get(first).kind {
+        StatementKind::FunctionDeclaration(func) => Some(func),
         _ => None,
     }
 }

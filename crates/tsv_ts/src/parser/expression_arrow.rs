@@ -234,7 +234,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The body is one wire level below the arrow (the depth limit's count,
     /// [`Parser::nested`]): the recursion `a => b => c` passes no grouping delimiter. A block
     /// body enters it with the body's own levels, in one count.
-    fn parse_arrow_body(&mut self) -> Result<ArrowFunctionBody<'arena>, Error> {
+    fn parse_arrow_body(&mut self) -> Result<ArrowFunctionBody, Error> {
         if self.check(&TokenKind::BraceOpen) {
             // A block body is a `FunctionBody` (`[+In]`) — `in` is the binary
             // operator even when this arrow sits in a for-header init — and a fresh

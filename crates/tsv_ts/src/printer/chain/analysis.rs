@@ -2273,7 +2273,7 @@ mod tests {
             let mut roots = Vec::new();
             for statement in view.stmt_list(program.body) {
                 if let ast::StatementKind::ExpressionStatement(statement) =
-                    &view.stmt_slot(statement).kind
+                    &view.stmt(*statement).kind
                 {
                     chain_roots(view, view.expr(statement.expression), &mut roots);
                 }

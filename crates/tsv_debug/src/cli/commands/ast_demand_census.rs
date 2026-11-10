@@ -46,6 +46,9 @@
 //!   property's key and value). Informational, inside `live`.
 //! - `scratch_peak`: the largest total of open list prefixes of this type at any moment,
 //!   maximum over files, and the same per source byte (summed per-file peaks over bytes).
+//!   Counted only for lists built in the arena (the census's `BumpVec`); a list built on a
+//!   store's scratch (`ListBuf`: the expression and statement id lists, the parameter value
+//!   runs) is not seen, so its rows read 0 here.
 //! - `wire` / `delta`: the wire's count of the node named like the row, when the wire has
 //!   one, and `live - wire`. Rows with no wire name (`Expression`, `Statement`, `TSType`,
 //!   `ObjectProperty`, the id lists) leave it blank, and a row whose wire name is shared by a
@@ -672,15 +675,15 @@ mod tests {
     }
 
     /// Scratch counts the longest total of open lists, not the longest list: a nested
-    /// statement list's peak sits on top of the outer list's live prefix.
+    /// object literal's peak sits on top of the outer literal's live prefix.
     #[test]
     fn scratch_counts_the_outer_prefix_under_a_nested_list() {
-        let census = census_of("a; b; { c; d; }", ParserType::TypeScript);
-        let stmts = row(&census, "tsv_ts", "Statement");
-        assert_eq!(stmts.minted, 5, "two, the block, its two");
-        // two statements pushed, then the inner block's two on top of them: the block's own
-        // `Statement` is pushed only after its inner list flushes
-        assert_eq!(stmts.scratch_peak_max_for_test(), 4);
+        let census = census_of("x = { a, b, c: { d, e } };", ParserType::TypeScript);
+        let properties = row(&census, "tsv_ts", "ObjectProperty");
+        assert_eq!(properties.minted, 5, "two, the third, its value's two");
+        // two properties pushed, then the inner literal's two on top of them: the third
+        // property is pushed only after its value's list flushes
+        assert_eq!(properties.scratch_peak_max_for_test(), 4);
     }
 
     #[test]

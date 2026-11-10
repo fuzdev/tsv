@@ -47,8 +47,8 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// local (`let arena = self.arena;`) only when several allocations in one method
     /// share it.
     pub(crate) arena: &'arena Bump,
-    /// The document's expression stores, one instance across the template and every
-    /// embedded island. Empty only inside [`Self::with_island_stores`], the one reader:
+    /// The document's expression and statement stores, one instance across the template and
+    /// every embedded island. Empty only inside [`Self::with_island_stores`], the one reader:
     /// a host check runs during the embedded parse and borrows the whole parser, so the
     /// `&mut` the parse takes has to be out of the parser first.
     stores: Option<&'a mut AstStores<'arena>>,

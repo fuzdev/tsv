@@ -44,7 +44,7 @@ impl<'a> Printer<'a> {
     /// when the `while (condition)` line exceeds print width.
     pub(in crate::printer::statements) fn build_while_statement_doc(
         &self,
-        stmt: &ast::WhileStatement<'_>,
+        stmt: &ast::WhileStatement,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {
@@ -72,7 +72,7 @@ impl<'a> Printer<'a> {
     ///   `print/binaryish.js`).
     pub(in crate::printer::statements) fn build_with_statement_doc(
         &self,
-        stmt: &ast::WithStatement<'_>,
+        stmt: &ast::WithStatement,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {
@@ -138,7 +138,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_do_while_statement_doc(
         &self,
-        stmt: &ast::DoWhileStatement<'_>,
+        stmt: &ast::DoWhileStatement,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {

@@ -59,18 +59,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Wrap a declaration statement in an `ExportNamedDeclaration` with no
     /// specifiers or source (`export <declaration>`).
     fn export_named(
-        &self,
+        &mut self,
         start: usize,
         declaration: Statement<'arena>,
         export_kind: ExportKind,
     ) -> Statement<'arena> {
         let end = declaration.span().end;
+        let declaration = self.push_stmt(declaration);
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<ExportNamedDeclaration<'_>>(1);
         Statement {
             span: Span::new(start as u32, end),
             kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(ExportNamedDeclaration {
-                declaration: Some(self.alloc(declaration)),
+                declaration: Some(declaration),
                 specifiers: &[],
                 source: None,
                 attributes: None,

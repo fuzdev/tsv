@@ -7,18 +7,18 @@ use tsv_ts::ast::AstStores;
 /// Formats many Svelte sources on one thread, reusing its allocations from one source to the
 /// next.
 ///
-/// [`format()`](crate::format) allocates a fresh AST arena, doc arena and expression stores
-/// for every call and drops them before returning. A `Formatter` owns all three and rewinds
-/// them instead, keeping what they have grown (the AST arena keeps its largest block, the doc
-/// arena and the stores their whole capacity), so after the first few sources the work allocates almost nothing
-/// new — the shape of a driver that formats a directory, or an editor that formats on
-/// every save. The output is exactly
+/// [`format()`](crate::format) allocates a fresh AST arena, doc arena and expression and
+/// statement stores for every call and drops them before returning. A `Formatter` owns all
+/// three and rewinds them instead, keeping what they have grown (the AST arena keeps its
+/// largest block, the doc arena and the stores their whole capacity), so after the first few
+/// sources the work allocates almost nothing new — the shape of a driver that formats a
+/// directory, or an editor that formats on every save. The output is exactly
 /// [`format()`](crate::format)'s for the same source.
 ///
 /// **The arenas rewind at the start of every call**, so nothing one call leaves behind
 /// reaches the next — including a call that never returned because it panicked and the
 /// panic was caught: the next call starts from a clean arena all the same, and from new
-/// expression stores, the old ones having been out of the `Formatter` while the call ran.
+/// stores, the old ones having been out of the `Formatter` while the call ran.
 /// The AST arena is rewound once more as each call returns, which releases every block but
 /// the largest while the `Formatter` sits idle; the stores keep their capacity.
 ///
@@ -44,7 +44,7 @@ use tsv_ts::ast::AstStores;
 pub struct Formatter {
     ast: bumpalo::Bump,
     doc: DocArena,
-    /// The expression stores between calls, out of the slot while one runs.
+    /// The expression and statement stores between calls, out of the slot while one runs.
     stores: Option<AstStores<'static>>,
 }
 

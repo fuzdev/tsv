@@ -6,7 +6,7 @@ use crate::ast::{
     ConditionalExpression, ExprId, Expression, ExpressionKind, IdentName, Identifier,
     ImportExpression, ImportPhase, Literal, LiteralValue, MemberExpression, MetaProperty,
     NewExpression, ParenthesizedExpression, RegexLiteral, Run, SequenceExpression, SpreadElement,
-    Statement, Super, TSAsExpression, TSInstantiationExpression, TSNonNullExpression,
+    StmtId, Super, TSAsExpression, TSInstantiationExpression, TSNonNullExpression,
     TSSatisfiesExpression, TSTypeAssertion, TSTypeParameterInstantiation, TaggedTemplateExpression,
     TemplateLiteral, ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression,
     UpdateOperator, YieldExpression,
@@ -3722,7 +3722,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// parsed by the caller under the *outer* mode, which is correct — acorn does
     /// the same, and the rule against a directive in a non-simple-parameter function
     /// is a deferred early error.
-    pub(super) fn parse_function_body(&mut self) -> Result<BlockStatement<'arena>, Error> {
+    pub(super) fn parse_function_body(&mut self) -> Result<BlockStatement, Error> {
         // two wire levels: the body's `BlockStatement` and its statements
         self.parse_function_body_levels(2)
     }
@@ -3733,35 +3733,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_function_body_levels(
         &mut self,
         levels: u32,
-    ) -> Result<BlockStatement<'arena>, Error> {
+    ) -> Result<BlockStatement, Error> {
         self.with_strict_scope(|p| {
             let (body, span) = p.parse_block_body(DirectivePrologue::Present, levels)?;
-            Ok(BlockStatement {
-                body: body.into_bump_slice(),
-                span,
-            })
+            Ok(BlockStatement { body, span })
         })
     }
 
     /// A block that is a wire level of its own below the statement holding it — a `try`'s
     /// block, a `catch` or `finally` clause's ([`Parser::nested`]). A block STATEMENT is
     /// counted as the statement it is ([`Parser::parse_bare_block_statement`]).
-    pub(super) fn parse_block_statement(&mut self) -> Result<BlockStatement<'arena>, Error> {
+    pub(super) fn parse_block_statement(&mut self) -> Result<BlockStatement, Error> {
         self.nested(1, Self::parse_bare_block_statement)
     }
 
     /// A `{ … }` block, with no depth level of its own: a block statement, whose level
     /// is the statement's.
-    pub(super) fn parse_bare_block_statement(&mut self) -> Result<BlockStatement<'arena>, Error> {
+    pub(super) fn parse_bare_block_statement(&mut self) -> Result<BlockStatement, Error> {
         let (body, span) = self.parse_block_body(DirectivePrologue::Absent, 1)?;
-        Ok(BlockStatement {
-            body: body.into_bump_slice(),
-            span,
-        })
+        Ok(BlockStatement { body, span })
     }
 
-    /// Parse a `{ … }` block's statements into an arena buffer plus the block's
-    /// span. Shared by `parse_block_statement` and `parse_function_body`;
+    /// Parse a `{ … }` block's statements into an id list plus the block's span. Shared by
+    /// `parse_block_statement` and `parse_function_body`;
     /// `prologue` is what tells the two apart — only a function body carries a
     /// directive prologue, so a `"use strict"` heading a plain nested block is an
     /// ordinary expression statement that turns nothing on.
@@ -3769,13 +3763,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         prologue: DirectivePrologue,
         levels: u32,
-    ) -> Result<(crate::parser::BumpVec<'arena, Statement<'arena>>, Span), Error> {
+    ) -> Result<(Run<StmtId>, Span), Error> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
 
         // Parse statements until we hit '}', `levels` wire levels deep
-        let mut body = self.bvec();
-        self.statement_list(levels, |p, frame| {
+        let body = self.statement_list(levels, |p, frame| {
+            let mark = p.stores.stmt_list_scratch.mark();
             let mut in_prologue = prologue == DirectivePrologue::Present;
             while !p.check(&TokenKind::BraceClose) {
                 if p.check(&TokenKind::Eof) {
@@ -3785,11 +3779,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let mut stmt = p.parse_statement()?;
                 frame.next(p);
                 if in_prologue {
-                    in_prologue = p.note_directive(&mut stmt, &body)?;
+                    in_prologue = p.note_directive(&mut stmt, mark)?;
                 }
-                body.push(stmt);
+                let id = p.push_stmt(stmt);
+                p.stores.stmt_list_scratch.push(id);
             }
-            Ok(())
+            Ok(p.flush_stmt_list(mark))
         })?;
 
         let (_, end) = self.current_pos();

@@ -211,7 +211,7 @@ fn walk_arrow_chain<'a>(
     head: &'a ast::ArrowFunctionExpression<'a>,
     head_span: Span,
     mut visit: impl FnMut(&'a ast::ArrowFunctionExpression<'a>, Span, Option<u32>),
-) -> &'a ast::ArrowFunctionBody<'a> {
+) -> &'a ast::ArrowFunctionBody {
     let mut current = head;
     let mut current_span = head_span;
     let mut gap_start = None;
@@ -737,7 +737,7 @@ pub(in crate::printer) struct FlatSoleParamLiteral<'a> {
     /// The literal's span start — the [`AssumedBreak::TypeLiteral`] position.
     pub(in crate::printer) literal: u32,
     /// The callback's block body, which every printing of the callback shares.
-    pub(in crate::printer) body: &'a ast::BlockStatement<'a>,
+    pub(in crate::printer) body: &'a ast::BlockStatement,
     /// Whether the callback is an arrow (its body builds through
     /// `Printer::arrow_block_body_doc`) rather than a `function`.
     pub(in crate::printer) is_arrow: bool,
@@ -2135,7 +2135,7 @@ impl<'a> Printer<'a> {
     /// A block body terminates any curried-arrow chain — arrows nested inside it (callbacks,
     /// object-property arrows) are NOT part of the chain, so the stacked-chain flag is cleared
     /// so they aren't force-broken after `=>`. Mirrors the innermost expression-body case.
-    pub(crate) fn arrow_block_body_doc(&self, block: &ast::BlockStatement<'_>) -> DocId {
+    pub(crate) fn arrow_block_body_doc(&self, block: &ast::BlockStatement) -> DocId {
         if let Some((span, doc)) = self.arrow_body_inject.get()
             && span == block.span.start
         {
@@ -2147,7 +2147,7 @@ impl<'a> Printer<'a> {
     fn build_arrow_block_body(
         &self,
         parts: &mut DocBuf,
-        block: &ast::BlockStatement<'_>,
+        block: &ast::BlockStatement,
         arrow_end: u32,
     ) {
         let d = self.d();
@@ -2994,7 +2994,7 @@ impl<'a> Printer<'a> {
     /// parens open.
     fn arrow_chain_body_stays_on_head_line(
         &self,
-        terminal: &ast::ArrowFunctionBody<'_>,
+        terminal: &ast::ArrowFunctionBody,
         terminal_gap_start: u32,
         should_break_chain: bool,
     ) -> bool {

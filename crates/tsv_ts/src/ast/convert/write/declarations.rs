@@ -270,7 +270,7 @@ fn write_class_body(w: &mut JsonWriter, body: &ast::ClassBody<'_>, ctx: &Ctx<'_>
             node_header(w, "StaticBlock", block.span, ctx);
             w.raw(",\"body\":");
             write_array(w, ctx.view.stmt_list(block.body), |w, s| {
-                write_statement(w, ctx.view.stmt_slot(s), ctx);
+                write_statement(w, ctx.view.stmt(*s), ctx);
             });
             // acorn-typescript attaches a member's decorators once it has built it,
             // so a static block's list follows its `body`.

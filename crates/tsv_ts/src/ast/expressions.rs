@@ -860,7 +860,7 @@ pub struct ArrowFunctionExpression<'arena> {
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Run<Expr>,
-    pub body: ArrowFunctionBody<'arena>,
+    pub body: ArrowFunctionBody,
     /// Return type annotation (TypeScript): (): number => ...
     pub return_type: Option<TSTypeAnnotation<'arena>>,
     /// Whether this is an async arrow function: `async () => ...`
@@ -877,14 +877,14 @@ pub struct ArrowFunctionExpression<'arena> {
 
 /// Arrow function body - either an expression or a block statement
 #[derive(Debug, Clone)]
-pub enum ArrowFunctionBody<'arena> {
+pub enum ArrowFunctionBody {
     /// Expression body: `() => expr`
     Expression(ExprId),
     /// Block body: `() => { stmts }`
-    BlockStatement(BlockStatement<'arena>),
+    BlockStatement(BlockStatement),
 }
 
-impl<'arena> ArrowFunctionBody<'arena> {
+impl ArrowFunctionBody {
     pub fn span(&self, view: AstView<'_>) -> Span {
         match self {
             ArrowFunctionBody::Expression(expr) => view.expr(*expr).span(),
@@ -915,7 +915,7 @@ pub struct FunctionExpression<'arena> {
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
     pub return_type: Option<TSTypeAnnotation<'arena>>,
     /// Function body (block statement with statements)
-    pub body: BlockStatement<'arena>,
+    pub body: BlockStatement,
     /// Whether this is a generator function (`function*`)
     pub generator: bool,
     /// Whether this is an async function (`async function`)

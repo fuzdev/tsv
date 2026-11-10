@@ -245,7 +245,7 @@ impl<'a> Printer<'a> {
     /// Where the case's head ends — past the test expression, or past the `default`
     /// keyword — which is where the head→`:` gap opens. The one anchor both the label
     /// scan and the label emitter measure that gap from.
-    fn case_head_end(view: AstView<'_>, case: &ast::SwitchCase<'_>) -> u32 {
+    fn case_head_end(view: AstView<'_>, case: &ast::SwitchCase) -> u32 {
         case.test.as_ref().map_or_else(
             || case.span.start + "default".len() as u32,
             |test| view.expr(*test).span().end,
@@ -253,7 +253,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the end position of a case label (position after the colon)
-    fn get_case_label_end(&self, case: &ast::SwitchCase<'_>) -> u32 {
+    fn get_case_label_end(&self, case: &ast::SwitchCase) -> u32 {
         // Find the label ':' after the head, skipping any ':' inside a comment in the gap
         // (`case 1 /* : */:`, `default /* : */:`). With no comment the colon follows the
         // head immediately, which is also the fallback if the scan finds nothing.
@@ -284,7 +284,7 @@ impl<'a> Printer<'a> {
     /// nothing leads and the claim stays whole.
     fn build_switch_case_doc_inner(
         &self,
-        case: &ast::SwitchCase<'_>,
+        case: &ast::SwitchCase,
         inline_comment_boundary: u32,
         next_case_start: Option<u32>,
         body_has_comments: bool,
@@ -441,16 +441,14 @@ impl<'a> Printer<'a> {
         // CONSEQUENT statement is deliberately not on that rule — the label keeps the
         // hug (`case 7: /* block */ {`, the cataloged divergence), so the bound applies
         // only where no consequent exists and the "next" is a sibling label.
-        let first_stmt_start = consequent
-            .first()
-            .map(|s| self.view.stmt_slot(s).span().start);
+        let first_stmt_start = consequent.first().map(|s| self.view.stmt(*s).span().start);
         // The hug below is prettier's `printSwitchCase` rule: the case keeps its block on the
         // label line only when that block is the consequent's ONLY printed statement (the
         // dropped `;`s do not count). A block followed by anything else is one statement of a
         // list, which takes the consequent's own indented lines like every other.
         let printed_statements = consequent
             .iter()
-            .map(|s| self.view.stmt_slot(s))
+            .map(|s| self.view.stmt(*s))
             .filter(|s| !matches!(&s.kind, StatementKind::EmptyStatement(_)))
             .count();
         // Such a block leaves the label's line, and a run of block comments the author glued
@@ -462,7 +460,7 @@ impl<'a> Printer<'a> {
         let glued_run_leads_block = printed_statements > 1
             && first_stmt_start.is_some_and(|start| {
                 matches!(
-                    consequent.first().map(|s| &self.view.stmt_slot(s).kind),
+                    consequent.first().map(|s| &self.view.stmt(*s).kind),
                     Some(StatementKind::BlockStatement(_))
                 ) && {
                     let mut gap_start = case_label_end;
@@ -530,7 +528,7 @@ impl<'a> Printer<'a> {
         let label_parts_len = parts.len();
 
         for (i, stmt) in consequent.iter().enumerate() {
-            let stmt = self.view.stmt_slot(stmt);
+            let stmt = self.view.stmt(*stmt);
             let stmt_start = stmt.span().start;
 
             // Standalone EmptyStatements are dropped entirely (Prettier's

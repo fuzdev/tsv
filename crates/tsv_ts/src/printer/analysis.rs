@@ -48,13 +48,9 @@ pub(crate) fn skip_identifier_at(bytes: &[u8], pos: usize, end: usize) -> usize 
 /// are picked up separately, by scanning the full brace range rather than the
 /// statement list). Used by block-statement and namespace/module bodies to
 /// decide between the empty-body and normal rendering paths.
-pub(crate) fn is_effectively_empty_body(view: AstView<'_>, body: &[ast::StmtSlot<'_>]) -> bool {
-    body.iter().all(|s| {
-        matches!(
-            &view.stmt_slot(s).kind,
-            ast::StatementKind::EmptyStatement(_)
-        )
-    })
+pub(crate) fn is_effectively_empty_body(view: AstView<'_>, body: &[ast::StmtId]) -> bool {
+    body.iter()
+        .all(|s| matches!(&view.stmt(*s).kind, ast::StatementKind::EmptyStatement(_)))
 }
 
 /// The start of the next statement after `index` that will actually be printed
@@ -69,7 +65,7 @@ pub(crate) fn is_effectively_empty_body(view: AstView<'_>, body: &[ast::StmtSlot
 /// leading-comment collection claims it) and silently drop it.
 pub(crate) fn next_printed_stmt_start(
     view: AstView<'_>,
-    body: &[ast::StmtSlot<'_>],
+    body: &[ast::StmtId],
     index: usize,
     body_end: u32,
 ) -> u32 {
@@ -83,12 +79,12 @@ pub(crate) fn next_printed_stmt_start(
 /// statement — a comment hugging the body's `}` still trails).
 pub(crate) fn next_printed_stmt<'s>(
     view: AstView<'s>,
-    body: &'s [ast::StmtSlot<'s>],
+    body: &'s [ast::StmtId],
     index: usize,
 ) -> Option<&'s ast::Statement<'s>> {
     body[index + 1..]
         .iter()
-        .map(|s| view.stmt_slot(s))
+        .map(|s| view.stmt(*s))
         .find(|s| !matches!(&s.kind, ast::StatementKind::EmptyStatement(_)))
 }
 
@@ -101,12 +97,12 @@ pub(crate) fn next_printed_stmt<'s>(
 pub(crate) fn statement_gap_floor(
     view: AstView<'_>,
     stmt: &ast::Statement<'_>,
-    slots: &[ast::StmtSlot<'_>],
+    slots: &[ast::StmtId],
     index: usize,
 ) -> u32 {
     slots[index + 1..]
         .iter()
-        .map(|s| view.stmt_slot(s))
+        .map(|s| view.stmt(*s))
         .take_while(|s| matches!(&s.kind, ast::StatementKind::EmptyStatement(_)))
         .last()
         .map_or_else(|| stmt.span().end, |s| s.span().end)
