@@ -160,7 +160,7 @@ pub(super) fn write_switch_statement(
     write_expression(w, ctx.view.expr(switch_stmt.discriminant), ctx);
     w.raw(",\"cases\":");
     // acorn initializes `consequent` before parsing `test`, so it serializes first.
-    write_array(w, switch_stmt.cases, |w, case| {
+    write_array(w, ctx.view.cases(switch_stmt.cases), |w, case| {
         node_header(w, "SwitchCase", case.span, ctx);
         w.raw(",\"consequent\":");
         write_array(w, ctx.view.stmt_list(case.consequent), |w, s| {

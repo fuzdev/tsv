@@ -78,7 +78,7 @@ impl<'a> Printer<'a> {
         // consequents is independent of comments and is NOT gated.
         let switch_body_end = span.end - 1; // before '}'
         let body_has_comments = self.has_comments_on_page_between(brace_start + 1, switch_body_end);
-        for (i, case) in stmt.cases.iter().enumerate() {
+        for (i, case) in self.view.cases(stmt.cases).iter().enumerate() {
             // Own-line comments between the previous case and this one. Same-line
             // trailing comments on the previous case's last statement — and a
             // fallthrough case's own label comment (`case 3: // fallthrough`) — were
@@ -134,7 +134,7 @@ impl<'a> Printer<'a> {
 
             // Determine the end boundary for inline comments on this case
             // For empty cases (fallthrough), we need to look ahead to the next case
-            let next_case_start = stmt.cases.get(i + 1).map(|c| c.span.start);
+            let next_case_start = self.view.cases(stmt.cases).get(i + 1).map(|c| c.span.start);
             let inline_comment_boundary = next_case_start.unwrap_or(span.end - 1);
 
             // The case-gap claim split: a comment hugging the next case's label leads it

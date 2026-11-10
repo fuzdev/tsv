@@ -1848,8 +1848,9 @@ impl<'a> Printer<'a> {
     /// not — see `for_in_of_header_gap_comment_forces_break`.
     fn get_for_in_of_binding_start(&self, left: &ast::ForInOfLeft<'_>) -> u32 {
         match left {
-            ast::ForInOfLeft::VariableDeclaration(decl) => decl
-                .declarations
+            ast::ForInOfLeft::VariableDeclaration(decl) => self
+                .view
+                .declarators(decl.declarations)
                 .first()
                 .map_or(decl.span.start, |declarator| {
                     self.view.expr(declarator.id).span().start
@@ -2125,13 +2126,13 @@ impl<'a> Printer<'a> {
                 // i = 0; …)`) that must not be dropped — see `build_for_decl_keyword_gap`.
                 // Built here rather than through that helper because the declarator loop
                 // needs the keyword's end as its Rule A anchor for the first declarator.
-                let first_decl_start = decl.declarations[0].span.start;
+                let first_decl_start = self.view.declarators(decl.declarations)[0].span.start;
                 let (keyword_doc, keyword_end) = self.build_keyword_words_doc(
                     decl.kind.words(),
                     decl.span.start,
                     first_decl_start,
                 );
-                let item_span = |j: usize| decl.declarations[j].span;
+                let item_span = |j: usize| self.view.declarators(decl.declarations)[j].span;
 
                 // Build each declarator's `id = value` doc.
                 let mut decl_docs: DocBuf = DocBuf::new();
@@ -2142,7 +2143,7 @@ impl<'a> Printer<'a> {
                 // j`) rather than the value's own emitters deferring them past every later
                 // declarator and the clause's `;`.
                 let mut prev_gap = 0;
-                for (i, declarator) in decl.declarations.iter().enumerate() {
+                for (i, declarator) in self.view.declarators(decl.declarations).iter().enumerate() {
                     if i > 0 {
                         self.push_for_clause_comma_gap(
                             &mut decl_docs,
@@ -2413,7 +2414,7 @@ impl<'a> Printer<'a> {
         }
         match left {
             ast::ForInOfLeft::VariableDeclaration(decl) => {
-                let Some(declarator) = decl.declarations.first() else {
+                let Some(declarator) = self.view.declarators(decl.declarations).first() else {
                     // A for-in/of head always binds something (`for (const of x)` is a
                     // parse error), so there is no declarator to bound a gap search at
                     // and nothing to print but the kind. `as_str()` is the joined text —

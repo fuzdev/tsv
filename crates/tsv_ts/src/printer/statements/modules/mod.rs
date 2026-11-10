@@ -263,7 +263,11 @@ impl<'a> Printer<'a> {
             } else {
                 // Named specifiers: comment-aware braced list. `close_brace_end`
                 // is the offset past `}`, for the trailing pre-`;` comment scan.
-                let kw_end = self.export_header_end(decl, span, decl.specifiers[0].span.start);
+                let kw_end = self.export_header_end(
+                    decl,
+                    span,
+                    self.view.export_specs(decl.specifiers)[0].span.start,
+                );
                 let bound = decl.source.as_ref().map_or(span.end, |s| s.span.start);
                 // Export named specifiers always have the `{` directly after the
                 // header (no default/namespace binding), so the keyword→`{` comment
@@ -272,7 +276,7 @@ impl<'a> Printer<'a> {
                 // comment on the specifier still restores breaking — `can_break`).
                 close_brace_end = self.push_braced_specifier_list(
                     &mut parts,
-                    decl.specifiers,
+                    self.view.export_specs(decl.specifiers),
                     SpecifierListSpans {
                         header_start: span.start,
                         kw_end,
@@ -313,7 +317,7 @@ impl<'a> Printer<'a> {
                 // Import attributes: `export { x } from "y" with { type: "json" }`
                 self.push_import_attributes_clause(
                     &mut parts,
-                    decl.attributes,
+                    decl.attributes.map(|a| self.view.import_attrs(a)),
                     source.span.end,
                     span.end,
                 )
@@ -849,7 +853,7 @@ impl<'a> Printer<'a> {
         // pre-`;` comment scan, preserved in place.
         let content_end = self.push_import_attributes_clause(
             &mut parts,
-            decl.attributes,
+            decl.attributes.map(|a| self.view.import_attrs(a)),
             decl.source.span.end,
             span.end,
         );
@@ -917,7 +921,7 @@ impl<'a> Printer<'a> {
         let mut default_spec_end = 0u32;
         let mut namespace_spec: Option<&ast::ImportNamespaceSpecifier<'_>> = None;
 
-        for spec in decl.specifiers {
+        for spec in self.view.import_specs(decl.specifiers) {
             match spec {
                 ast::ImportSpecifier::Default(default_spec) => {
                     has_default = true;
@@ -1137,7 +1141,7 @@ impl<'a> Printer<'a> {
         // Emitted outside the content group (see export above).
         let content_end = self.push_import_attributes_clause(
             &mut parts,
-            decl.attributes,
+            decl.attributes.map(|a| self.view.import_attrs(a)),
             decl.source.span.end,
             span.end,
         );

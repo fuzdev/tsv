@@ -796,10 +796,10 @@ pub fn parse_statement_with_comments<'arena>(
 /// A declaration with no declarators — which the grammar does not admit — yields the empty
 /// span at the declaration's end, so a caller emits its bare terminator through the same
 /// path rather than a defensive arm of its own.
-pub fn declaration_terminator_gap(decl: &VariableDeclaration<'_>) -> Span {
+pub fn declaration_terminator_gap(view: AstView<'_>, decl: &VariableDeclaration<'_>) -> Span {
     Span {
-        start: decl
-            .declarations
+        start: view
+            .declarators(decl.declarations)
             .last()
             .map_or(decl.span.end, |last| last.span.end),
         end: decl.span.end,

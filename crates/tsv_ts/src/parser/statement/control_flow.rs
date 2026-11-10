@@ -147,7 +147,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // forms reject, as acorn and prettier do. The initializer's own `[~In]`
             // (`DeclaratorSite::ForHead`) is what brings a for-in head here at all
             // rather than letting the initializer swallow the `in`.
-            if var_decl.declarations[0].init.is_some() {
+            if self
+                .stores
+                .view()
+                .declarators(var_decl.declarations)
+                .first()
+                .is_some_and(|declarator| declarator.init.is_some())
+            {
                 return Err(self.error_msg(&format!(
                     "{} loop variable declaration may not have an initializer",
                     form.loop_name()
