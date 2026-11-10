@@ -1,11 +1,14 @@
 //! Contiguous stores of parsed rows, the typed handles that index them, and the scratch stack
 //! that builds their child lists.
 //!
-//! A [`Store`] is a `Vec` holding the rows of one family. Slot 0 of every store is a sentinel
-//! row that no id names, so an [`Id`] carries its row index directly: `Option<Id>` takes its
-//! niche from `NonZero`, and a read decodes nothing. Rows are immutable once pushed. The API
-//! offers no way to edit a row, and no way to walk one: a store also holds rows the parse left
-//! orphaned, so the tree is what is reachable from its root, never the store's contents.
+//! A [`Store`] is a `Vec` holding the rows of one family. Slot 0 of a written store holds a row
+//! that no id names, so an [`Id`] carries its row index directly: `Option<Id>` takes its niche
+//! from `NonZero`, and a read decodes nothing. A store allocates nothing until its first write,
+//! which writes its first row twice, into slot 0 and slot 1, so no row type needs a sentinel
+//! value and a store a document never writes costs nothing. Rows are immutable once pushed.
+//! The API offers no way to edit a row, and no way to walk one: a store also holds rows the
+//! parse left orphaned, so the tree is what is reachable from its root, never the store's
+//! contents.
 //!
 //! A [`Run`] names consecutive rows. [`ListBuf`] builds a run: list elements go on a scratch
 //! stack, one shared by every open list of the same element type, and a flush copies one
@@ -75,28 +78,33 @@ fn store_overflow() -> ! {
     panic!("store overflow: more rows than a u32 index can name");
 }
 
-/// The id of a row about to be pushed at slot `len`.
+/// The id of a row about to be pushed at slot `len`, or `None` when slot `len` cannot take
+/// one: past the last index, or slot 0, which a store's first write fills instead.
 ///
 /// The guard is the mint's only arithmetic, kept beside the store rather than inlined in
-/// `push` so a test can reach the top of the index space without allocating it.
+/// `push` so a test can reach the top of the index space without allocating it. Both refusals
+/// share one answer so a push pays no compare beyond the two the guard needs: the caller's
+/// one cold arm tells a store never written from one past the top.
 #[inline]
-fn mint_index(len: usize) -> NonZeroU32 {
+fn mint_index(len: usize) -> Option<NonZeroU32> {
     match NonZeroU32::new(len as u32) {
-        Some(index) if len < SLOT_LIMIT => index,
-        _ => store_overflow(),
+        Some(index) if len < SLOT_LIMIT => Some(index),
+        _ => None,
     }
 }
 
-/// The start and length of `count` rows appended behind `len` existing slots.
+/// The start and length of `count` rows appended behind `len` existing slots, or `None` when
+/// the run would not fit the index space or would start at slot 0, which a store's first
+/// write fills instead.
 ///
 /// Every run a store holds has an end that fits a `u32`, which is what keeps a later
 /// `start + len` from overflowing a wasm32 `usize`.
 #[inline]
-fn mint_range(len: usize, count: usize) -> (NonZeroU32, u32) {
+fn mint_range(len: usize, count: usize) -> Option<(NonZeroU32, u32)> {
     let fits = matches!(len.checked_add(count), Some(end) if end <= SLOT_LIMIT);
     match NonZeroU32::new(len as u32) {
-        Some(start) if fits => (start, count as u32),
-        _ => store_overflow(),
+        Some(start) if fits => Some((start, count as u32)),
+        _ => None,
     }
 }
 
@@ -127,7 +135,7 @@ mod stamp {
 
     impl Stamp {
         /// The stamp of a handle no store minted: the empty run and span, which an empty read
-        /// answers before the check, and an id list's sentinel, which no read reaches.
+        /// answers before the check.
         pub(super) const NONE: Self = Self {
             instance: 0,
             generation: 0,
@@ -286,15 +294,6 @@ pub struct Id<F> {
 }
 
 impl<F> Id<F> {
-    /// The value an id list keeps in its own slot 0. No mint reaches this index, so it equals
-    /// no minted id and a read through it misses: only ever a sentinel, never an edge.
-    pub const SENTINEL: Self = Self {
-        index: NonZeroU32::MAX,
-        #[cfg(feature = "_internal_store_check")]
-        stamp: stamp::Stamp::NONE,
-        family: PhantomData,
-    };
-
     /// The row index this id carries; a store's first row is `1`.
     #[inline]
     pub fn index(self) -> usize {
@@ -412,7 +411,8 @@ pub struct Run<F> {
 }
 
 impl<F> Run<F> {
-    /// The empty run. Its range is readable in every store, because slot 0 always exists.
+    /// The empty run. A read of it answers empty before it reaches the rows, so it reads in
+    /// every store, one never written included.
     pub const EMPTY: Self = Self {
         start: NonZeroU32::MIN,
         len: 0,
@@ -468,35 +468,50 @@ impl<F> fmt::Debug for Run<F> {
     }
 }
 
-/// A contiguous store of rows, slot 0 a sentinel, keeping its capacity across [`Store::reset`].
+/// A contiguous store of rows, keeping its capacity across [`Store::reset`].
+///
+/// Slot 0 holds a row no id names. A store holds no rows until its first write, which writes
+/// its first row twice, into slot 0 and slot 1; ids are 1-based either way.
 pub struct Store<T> {
     rows: Vec<T>,
     #[cfg(feature = "_internal_store_check")]
     stamp: stamp::Stamp,
 }
 
+impl<T: Row> Default for Store<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Row> Store<T> {
-    /// An empty store holding only `sentinel`.
-    pub fn new(sentinel: T) -> Self {
-        Self::with_capacity(sentinel, 0)
+    /// An empty store. Allocates nothing until its first write.
+    pub fn new() -> Self {
+        Self::with_capacity(0)
     }
 
-    /// An empty store pre-sized for `rows` rows beyond its sentinel.
-    pub fn with_capacity(sentinel: T, rows: usize) -> Self {
-        let mut slots = Vec::with_capacity(rows + 1);
-        slots.push(sentinel);
+    /// An empty store pre-sized for `rows` slots, slot 0 among them.
+    pub fn with_capacity(rows: usize) -> Self {
         Self {
-            rows: slots,
+            rows: Vec::with_capacity(rows),
             #[cfg(feature = "_internal_store_check")]
             stamp: stamp::Stamp::fresh(),
         }
     }
 
-    /// Appends `row` and mints its id.
+    /// Appends `row` and mints its id. On a store's first write `row` lands in slot 0 and its
+    /// clone in slot 1, the slot the id names.
     #[inline]
-    pub fn push(&mut self, row: T) -> Id<T::Family> {
+    pub fn push(&mut self, row: T) -> Id<T::Family>
+    where
+        T: Clone,
+    {
         let index = mint_index(self.rows.len());
         self.rows.push(row);
+        let index = match index {
+            Some(index) => index,
+            None => self.prime_after_first_push(),
+        };
         Id {
             index,
             #[cfg(feature = "_internal_store_check")]
@@ -527,7 +542,7 @@ impl<T: Row> Store<T> {
         }
     }
 
-    /// Discards every row but the sentinel, keeping capacity. Every id and run minted so far is
+    /// Discards every row but slot 0, keeping capacity. Every id and run minted so far is
     /// invalid from here on.
     #[inline]
     pub fn reset(&mut self) {
@@ -541,25 +556,75 @@ impl<T: Row> Store<T> {
     /// Reuses this store's capacity for a store of the same family under another lifetime,
     /// which lets a store be parked in a `'static` slot between parses and taken back.
     ///
-    /// Takes a new sentinel because the old one is of the wrong lifetime. Every id and run
-    /// minted so far is invalid from here on, as across a reset.
-    pub fn recycle<U>(self, sentinel: U) -> Store<U>
+    /// The recycled store holds no rows, slot 0 included, since its old row is of the wrong
+    /// lifetime: its next write fills slot 0 again, as a new store's first does. Every id and
+    /// run minted so far is invalid from here on, as across a reset.
+    pub fn recycle<U>(self) -> Store<U>
     where
         U: Row<Family = T::Family>,
     {
-        let mut rows: Vec<U> = recycle_vec(self.rows);
-        rows.push(sentinel);
         Store {
-            rows,
+            rows: recycle_vec(self.rows),
             #[cfg(feature = "_internal_store_check")]
             stamp: self.stamp.next_generation(),
         }
     }
 
-    /// Mints the run that `count` rows about to be appended will occupy.
+    /// The refused arm of a push's mint, taken after the row is appended so the row itself
+    /// never has its address taken: a store whose only row is the one just pushed (it was not
+    /// yet written) appends a clone of it, so slot 0 holds the original and index 1 its clone;
+    /// a store already written is past the last index. Out of line and cold, reading only the
+    /// store, so a push's inlined tail keeps the base shape: the row is stored straight into
+    /// its slot, and nothing is held across a call.
+    #[cold]
+    #[inline(never)]
+    fn prime_after_first_push(&mut self) -> NonZeroU32
+    where
+        T: Clone,
+    {
+        let first = match self.rows.as_slice() {
+            [only] => only.clone(),
+            _ => store_overflow(),
+        };
+        self.rows.push(first);
+        NonZeroU32::MIN
+    }
+
+    /// The refused arm of a flush's mint, as [`Store::prime_after_first_push`] is a push's: a
+    /// store not yet written fills slot 0 with a clone of `first`, the frame's first row, and
+    /// mints the run behind it; a store already written, or a run that cannot fit, overflows.
+    #[cold]
+    #[inline(never)]
+    fn prime_range(&mut self, first: Option<&T>, count: usize) -> (NonZeroU32, u32)
+    where
+        T: Clone,
+    {
+        match first {
+            Some(first) if self.rows.is_empty() => self.rows.push(first.clone()),
+            _ => store_overflow(),
+        }
+        match mint_range(self.rows.len(), count) {
+            Some(range) => range,
+            None => store_overflow(),
+        }
+    }
+
+    /// Mints the run that `count` rows about to be appended will occupy, priming slot 0 first
+    /// from the row `first` names when the store is not yet written. `first` is asked only
+    /// then.
     #[inline]
-    fn mint_run(&self, count: usize) -> Run<T::Family> {
-        let (start, len) = mint_range(self.rows.len(), count);
+    fn mint_run<'r>(
+        &mut self,
+        count: usize,
+        first: impl FnOnce() -> Option<&'r T>,
+    ) -> Run<T::Family>
+    where
+        T: Clone + 'r,
+    {
+        let (start, len) = match mint_range(self.rows.len(), count) {
+            Some(range) => range,
+            None => self.prime_range(first(), count),
+        };
         Run {
             start,
             len,
@@ -761,11 +826,11 @@ impl<T: Row> ListBuf<T> {
         if count == 0 {
             return Run::EMPTY;
         }
-        let run = into.mint_run(count);
-        match self.items.get(mark.index()..) {
-            Some(frame) => into.rows.extend_from_slice(frame),
-            None => store_miss(),
-        }
+        let Some(frame) = self.items.get(mark.index()..) else {
+            store_miss();
+        };
+        let run = into.mint_run(count, || frame.first());
+        into.rows.extend_from_slice(frame);
         self.items.truncate(mark.index());
         run
     }
@@ -773,14 +838,17 @@ impl<T: Row> ListBuf<T> {
     /// Moves the frame above `mark` into `into` and truncates the stack back to `mark`. An
     /// empty frame returns [`Run::EMPTY`] and does not touch `into`.
     #[inline]
-    pub fn flush_move(&mut self, mark: ListMark<T::Family>, into: &mut Store<T>) -> Run<T::Family> {
+    pub fn flush_move(&mut self, mark: ListMark<T::Family>, into: &mut Store<T>) -> Run<T::Family>
+    where
+        T: Clone,
+    {
         #[cfg(feature = "_internal_store_check")]
         self.live.pop_through(mark.seq);
         let count = self.len_since(mark);
         if count == 0 {
             return Run::EMPTY;
         }
-        let run = into.mint_run(count);
+        let run = into.mint_run(count, || self.items.get(mark.index()));
         into.rows.extend(self.items.drain(mark.index()..));
         run
     }
@@ -862,7 +930,9 @@ impl TextPool {
         if text.is_empty() {
             return PoolText::EMPTY;
         }
-        let (start, len) = mint_range(self.text.len(), text.len());
+        let Some((start, len)) = mint_range(self.text.len(), text.len()) else {
+            store_overflow();
+        };
         self.text.push_str(text);
         PoolText {
             start,
@@ -912,10 +982,8 @@ mod tests {
         type Family = Alpha;
     }
 
-    const SENTINEL: Node<'static> = Node("sentinel");
-
     fn store() -> Store<Node<'static>> {
-        Store::new(SENTINEL)
+        Store::new()
     }
 
     /// An id with an arbitrary index: only the mint and the round trip read one this way.
@@ -957,22 +1025,68 @@ mod tests {
     };
 
     #[test]
-    fn push_mints_row_indices_past_the_sentinel() {
+    fn a_new_store_is_empty_and_allocates_nothing() {
+        let nodes = store();
+        assert!(nodes.rows.is_empty());
+        assert_eq!(nodes.rows.capacity(), 0);
+        let nodes: Store<Node<'static>> = Store::default();
+        assert_eq!(nodes.rows.capacity(), 0);
+        let sized: Store<Node<'static>> = Store::with_capacity(8);
+        assert!(sized.rows.is_empty());
+        assert_eq!(sized.rows.capacity(), 8);
+    }
+
+    #[test]
+    fn the_first_push_primes_slot_zero_and_mints_index_one() {
         let mut nodes = store();
         let a = nodes.push(Node("a"));
+        assert_eq!(a.index(), 1);
+        assert_eq!(
+            nodes.rows,
+            [Node("a"), Node("a")],
+            "the first row is written twice, into slot 0 and slot 1"
+        );
         let b = nodes.push(Node("b"));
-        assert_eq!((a.index(), b.index()), (1, 2));
+        assert_eq!(b.index(), 2);
         assert_eq!(*nodes.get(a), Node("a"));
         assert_eq!(*nodes.get(b), Node("b"));
     }
 
     #[test]
-    fn the_empty_run_is_readable_because_slot_zero_exists() {
+    fn the_first_flush_primes_slot_zero_then_places_its_run_at_one() {
+        let mut nodes = store();
+        let mut scratch = ListBuf::new();
+        let mark = scratch.mark();
+        scratch.push(Node("a"));
+        scratch.push(Node("b"));
+        let run = scratch.flush_move(mark, &mut nodes);
+        assert_eq!((run.start.get(), run.len()), (1, 2));
+        assert_eq!(nodes.rows, [Node("a"), Node("a"), Node("b")]);
+        assert_eq!(texts(&nodes, run), ["a", "b"]);
+
+        let mut copied = store();
+        let mark = scratch.mark();
+        scratch.push(Node("c"));
+        let run = scratch.flush_copy(mark, &mut copied);
+        assert_eq!((run.start.get(), run.len()), (1, 1));
+        assert_eq!(copied.rows, [Node("c"), Node("c")]);
+        assert_eq!(copied.push(Node("d")).index(), 2);
+    }
+
+    #[cfg(not(feature = "_internal_store_check"))]
+    #[test]
+    #[should_panic(expected = "store miss")]
+    fn a_read_of_a_store_never_written_misses() {
+        store().get(id_at(1));
+    }
+
+    #[test]
+    fn the_empty_run_reads_empty_in_a_store_never_written() {
         let nodes = store();
         assert_eq!(Run::<Alpha>::EMPTY.start.get(), 1);
-        assert_eq!(nodes.rows.len(), 1);
-        assert_eq!(nodes.rows.get(Run::<Alpha>::EMPTY.range()), Some(&[][..]));
+        assert!(nodes.rows.is_empty());
         assert_eq!(nodes.slice(Run::EMPTY), &[]);
+        assert_eq!(nodes.view().slice(Run::EMPTY), &[]);
         assert!(Run::<Alpha>::EMPTY.is_empty());
         assert_eq!(Run::<Alpha>::EMPTY.len(), 0);
     }
@@ -988,6 +1102,18 @@ mod tests {
         assert_eq!(scratch.flush_copy(copied, &mut nodes), Run::EMPTY);
         assert_eq!(scratch.flush_move(moved, &mut nodes), Run::EMPTY);
         assert_eq!((nodes.rows.len(), nodes.rows.capacity()), (rows, capacity));
+    }
+
+    #[test]
+    fn an_empty_frame_leaves_a_store_never_written_unprimed() {
+        let mut nodes = store();
+        let mut scratch = ListBuf::new();
+        let moved = scratch.mark();
+        let copied = scratch.mark();
+        assert_eq!(scratch.flush_copy(copied, &mut nodes), Run::EMPTY);
+        assert_eq!(scratch.flush_move(moved, &mut nodes), Run::EMPTY);
+        assert!(nodes.rows.is_empty());
+        assert_eq!(nodes.rows.capacity(), 0);
     }
 
     #[test]
@@ -1048,7 +1174,7 @@ mod tests {
         let mut nodes = store();
         let a = nodes.push(Node("a"));
         let b = nodes.push(Node("b"));
-        let mut ids: Store<Id<Alpha>> = Store::new(Id::SENTINEL);
+        let mut ids: Store<Id<Alpha>> = Store::new();
         let mut scratch = ListBuf::new();
         let mark = scratch.mark();
         scratch.push(a);
@@ -1057,7 +1183,7 @@ mod tests {
         assert_eq!(ids.slice(run), &[a, b]);
 
         // A list with holes is the same store shape over an `Option` of the id.
-        let mut holes: Store<Option<Id<Alpha>>> = Store::new(None);
+        let mut holes: Store<Option<Id<Alpha>>> = Store::new();
         let mut scratch = ListBuf::new();
         let mark = scratch.mark();
         scratch.push(Some(a));
@@ -1091,7 +1217,7 @@ mod tests {
     }
 
     #[test]
-    fn reset_keeps_the_sentinel_and_capacity() {
+    fn reset_keeps_slot_zero_and_capacity() {
         let mut nodes = store();
         let mut scratch = ListBuf::with_capacity(8);
         let mark = scratch.mark();
@@ -1102,9 +1228,26 @@ mod tests {
         let capacity = nodes.rows.capacity();
 
         nodes.reset();
-        assert_eq!(nodes.rows, [SENTINEL]);
+        assert_eq!(
+            nodes.rows,
+            [Node("x")],
+            "slot 0 stays, primed by the first write"
+        );
         assert_eq!(nodes.rows.capacity(), capacity);
         assert_eq!(nodes.push(Node("y")).index(), 1);
+        assert_eq!(
+            nodes.rows,
+            [Node("x"), Node("y")],
+            "a reset store does not prime again"
+        );
+
+        let mut unwritten = store();
+        unwritten.reset();
+        assert!(
+            unwritten.rows.is_empty(),
+            "a reset of a store never written is a no-op"
+        );
+        assert_eq!(unwritten.rows.capacity(), 0);
 
         let scratch_capacity = scratch.items.capacity();
         scratch.reset();
@@ -1114,17 +1257,27 @@ mod tests {
 
     #[test]
     fn recycle_keeps_capacity_across_a_lifetime_change() {
-        fn into_shorter<'a>(store: Store<Node<'static>>, text: &'a str) -> Store<Node<'a>> {
-            store.recycle(Node(text))
+        fn into_shorter<'a>(store: Store<Node<'static>>, _text: &'a str) -> Store<Node<'a>> {
+            store.recycle()
         }
 
-        let mut nodes = Store::with_capacity(SENTINEL, 32);
+        let mut nodes = Store::with_capacity(32);
         nodes.push(Node("a"));
         let capacity = nodes.rows.capacity();
         let owned = String::from("short lived");
-        let recycled = into_shorter(nodes, &owned);
+        let mut recycled = into_shorter(nodes, &owned);
         assert_eq!(recycled.rows.capacity(), capacity);
-        assert_eq!(recycled.rows, [Node("short lived")]);
+        assert!(
+            recycled.rows.is_empty(),
+            "a recycled store is empty, slot 0 included"
+        );
+        assert_eq!(
+            recycled.push(Node(&owned)).index(),
+            1,
+            "its next write primes again"
+        );
+        assert_eq!(recycled.rows, [Node("short lived"), Node("short lived")]);
+        assert_eq!(recycled.rows.capacity(), capacity);
 
         let mut scratch: ListBuf<Node<'static>> = ListBuf::with_capacity(32);
         let mark = scratch.mark();
@@ -1138,38 +1291,68 @@ mod tests {
 
     #[test]
     fn minting_reaches_the_last_index() {
-        assert_eq!(mint_index(1).get(), 1);
-        assert_eq!(mint_index(SLOT_LIMIT - 1).get(), u32::MAX - 1);
+        assert_eq!(mint_index(1).map(NonZeroU32::get), Some(1));
+        assert_eq!(
+            mint_index(SLOT_LIMIT - 1).map(NonZeroU32::get),
+            Some(u32::MAX - 1)
+        );
     }
 
     #[test]
-    #[should_panic(expected = "store overflow")]
-    fn minting_past_the_last_index_overflows() {
-        mint_index(SLOT_LIMIT);
+    fn minting_past_the_last_index_is_refused() {
+        assert_eq!(mint_index(SLOT_LIMIT), None);
     }
 
     #[test]
-    #[should_panic(expected = "store overflow")]
-    fn a_wrapped_length_overflows_instead_of_wrapping_the_id() {
-        mint_index(u32::MAX as usize + 2);
+    fn a_wrapped_length_is_refused_instead_of_wrapping_the_id() {
+        assert_eq!(mint_index(u32::MAX as usize + 1), None);
+        assert_eq!(mint_index(u32::MAX as usize + 2), None);
+    }
+
+    #[test]
+    fn minting_at_slot_zero_is_refused_for_the_priming_arm() {
+        assert_eq!(mint_index(0), None);
+        assert_eq!(mint_range(0, 2), None);
     }
 
     #[test]
     fn a_run_may_end_at_the_top_of_the_index_space() {
-        let (start, len) = mint_range(SLOT_LIMIT - 3, 3);
-        assert_eq!((start.get(), len), (u32::MAX - 3, 3));
+        let range = mint_range(SLOT_LIMIT - 3, 3).map(|(start, len)| (start.get(), len));
+        assert_eq!(range, Some((u32::MAX - 3, 3)));
     }
 
     #[test]
-    #[should_panic(expected = "store overflow")]
-    fn a_run_past_the_top_of_the_index_space_overflows() {
-        mint_range(SLOT_LIMIT - 3, 4);
+    fn a_run_past_the_top_of_the_index_space_is_refused() {
+        assert_eq!(mint_range(SLOT_LIMIT - 3, 4), None);
     }
 
     #[test]
-    #[should_panic(expected = "store overflow")]
     fn a_run_whose_end_overflows_usize_is_refused() {
-        mint_range(usize::MAX, 2);
+        assert_eq!(mint_range(usize::MAX, 2), None);
+    }
+
+    // The refused arms on a written store are the overflow: a mint refuses a written store only
+    // past the last index, which a test cannot allocate, so these call the arms directly.
+    #[test]
+    #[should_panic(expected = "store overflow")]
+    fn a_refused_push_on_a_written_store_overflows() {
+        let mut nodes = store();
+        nodes.push(Node("a"));
+        nodes.prime_after_first_push();
+    }
+
+    #[test]
+    #[should_panic(expected = "store overflow")]
+    fn a_refused_flush_on_a_written_store_overflows() {
+        let mut nodes = store();
+        nodes.push(Node("a"));
+        nodes.prime_range(Some(&Node("b")), 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "store overflow")]
+    fn a_refused_flush_that_cannot_fit_after_priming_overflows() {
+        store().prime_range(Some(&Node("a")), SLOT_LIMIT);
     }
 
     #[test]
@@ -1313,24 +1496,6 @@ mod tests {
     }
 
     #[test]
-    fn the_id_sentinel_is_past_every_mintable_index() {
-        assert_eq!(Id::<Alpha>::SENTINEL.index(), u32::MAX as usize);
-        assert_ne!(
-            Id::<Alpha>::SENTINEL.index(),
-            mint_index(SLOT_LIMIT - 1).get() as usize
-        );
-        let mut nodes = store();
-        assert_ne!(nodes.push(Node("a")), Id::SENTINEL);
-    }
-
-    #[cfg(not(feature = "_internal_store_check"))]
-    #[test]
-    #[should_panic(expected = "store miss")]
-    fn the_id_sentinel_reads_as_a_miss() {
-        store().get(Id::SENTINEL);
-    }
-
-    #[test]
     fn an_id_survives_the_return_word() {
         for index in [1, 2, 0x8000_0000, u32::MAX - 1] {
             let id = id_at(index);
@@ -1459,7 +1624,7 @@ mod tests {
         #[should_panic(expected = "store stamp mismatch")]
         fn an_id_retained_across_recycle_is_rejected() {
             let (nodes, id) = two_row_store();
-            let mut recycled: Store<Node<'_>> = nodes.recycle(SENTINEL);
+            let mut recycled: Store<Node<'_>> = nodes.recycle();
             recycled.push(Node("c"));
             recycled.push(Node("d"));
             recycled.get(id);
@@ -1532,8 +1697,7 @@ mod tests {
 
         #[test]
         fn equality_with_an_unminted_handle_is_no_error() {
-            let (nodes, id) = two_row_store();
-            assert_ne!(id, Id::SENTINEL);
+            let (nodes, _) = two_row_store();
             let (_nodes, run) = run_of_two();
             assert_ne!(run, Run::EMPTY);
             assert_eq!(nodes.slice(Run::EMPTY), &[]);
