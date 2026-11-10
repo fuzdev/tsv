@@ -460,7 +460,7 @@ pub struct Identifier<'arena> {
 #[derive(Debug, Clone)]
 pub struct IdentifierParamExtra<'arena> {
     pub type_annotation: Option<TSTypeAnnotation>,
-    pub decorators: Option<&'arena [Decorator]>,
+    pub decorators: Option<DecoList<'arena>>,
 }
 
 impl<'arena> Identifier<'arena> {
@@ -476,7 +476,9 @@ impl<'arena> Identifier<'arena> {
     /// `view`.
     #[inline]
     pub fn decorators(&self, view: AstView<'arena>) -> Option<&'arena [Decorator]> {
-        view.opt_param_extra(self.extra).and_then(|e| e.decorators)
+        view.opt_param_extra(self.extra)
+            .and_then(|e| e.decorators)
+            .map(|list| view.decorators(list))
     }
 
     /// The name channel, reassembled from the flattened fields.

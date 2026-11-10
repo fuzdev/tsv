@@ -6,7 +6,7 @@
 use tsv_lang::Span;
 
 use super::{
-    ClassMemList, Decorator, ExprId, FunctionExpression, HeritageList, Identifier, Run, StmtId,
+    ClassMemList, DecoList, ExprId, FunctionExpression, HeritageList, Identifier, Run, StmtId,
     TSIndexSignature, TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 
@@ -17,7 +17,7 @@ use super::{
 #[derive(Debug, Clone)]
 pub struct ClassDeclaration<'arena> {
     /// Decorators applied to this class
-    pub decorators: Option<&'arena [Decorator]>,
+    pub decorators: Option<DecoList<'arena>>,
     /// Class name (required for declarations, optional for export default)
     pub id: Option<Identifier<'arena>>,
     /// Optional superclass expression (for `extends`)
@@ -44,7 +44,7 @@ pub struct ClassDeclaration<'arena> {
 #[derive(Debug, Clone)]
 pub struct ClassExpression<'arena> {
     /// Decorators applied to this class
-    pub decorators: Option<&'arena [Decorator]>,
+    pub decorators: Option<DecoList<'arena>>,
     /// Class name (always optional for expressions)
     pub id: Option<Identifier<'arena>>,
     /// Optional superclass expression (for `extends`)
@@ -96,7 +96,7 @@ pub struct StaticBlock<'arena> {
     /// Decorators in front of the block (`@a static {}`). No decorator grammar
     /// reaches a static block (tsc's checker reports TS1206); acorn keeps the list
     /// and tsv defers the error, so the list is kept and printed.
-    pub decorators: Option<&'arena [Decorator]>,
+    pub decorators: Option<DecoList<'arena>>,
     pub body: Run<StmtId>,
     pub span: Span,
 }
@@ -169,7 +169,7 @@ pub struct TSParameterProperty {
 #[expect(clippy::struct_excessive_bools)] // independent flags, not a state machine
 pub struct MethodDefinition<'arena> {
     /// Decorators applied to this method
-    pub decorators: Option<&'arena [Decorator]>,
+    pub decorators: Option<DecoList<'arena>>,
     /// Method name (key)
     pub key: ExprId,
     /// Method implementation (value)
@@ -214,7 +214,7 @@ pub enum PropertyModifier {
 #[derive(Debug, Clone)]
 pub struct PropertyDefinition<'arena> {
     /// Decorators applied to this property
-    pub decorators: Option<&'arena [Decorator]>,
+    pub decorators: Option<DecoList<'arena>>,
     /// Property name (key)
     pub key: ExprId,
     /// Type annotation (e.g., `: number` in `a: number = 0;`)

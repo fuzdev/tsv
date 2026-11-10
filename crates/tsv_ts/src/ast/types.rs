@@ -7,7 +7,7 @@ use crate::lexer::KeywordKind;
 use tsv_lang::Span;
 
 use super::{
-    CtorTypeId, Decorator, Expr, ExprId, IdentName, Identifier, ImportTypeId, IndexParamList,
+    CtorTypeId, DecoList, Expr, ExprId, IdentName, Identifier, ImportTypeId, IndexParamList,
     InferTypeId, Literal, MethodKind, QualNameId, QuasiList, Run, TyId, TypeMemberList,
     TypeParamList, UnaryExpression,
 };
@@ -601,7 +601,7 @@ pub struct TSIndexSignature<'arena> {
     /// Decorators in front of a class index signature (`@a [k: string]: T;`).
     /// No decorator grammar reaches one (tsc's checker reports TS1206); acorn keeps
     /// the list and tsv defers the error. Always `None` in a type literal or interface.
-    pub decorators: Option<&'arena [Decorator]>,
+    pub decorators: Option<DecoList<'arena>>,
     pub is_static: bool,
     pub readonly: bool,
     pub span: Span,

@@ -2,11 +2,11 @@
 
 use crate::ast::{
     Accessibility, BlockStatement, ClassBody, ClassDeclaration, ClassExpression, ClassMember,
-    Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind, ExportNamedDeclaration,
-    ExprId, Expression, ExpressionKind, FunctionExpression, HeritageList, Identifier, Literal,
-    LiteralValue, MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Run,
-    Statement, StatementKind, StaticBlock, TSIndexSignature, TSTypeParameterDeclaration,
-    TSTypeParameterInstantiation,
+    DecoList, Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind,
+    ExportNamedDeclaration, ExprId, Expression, ExpressionKind, FunctionExpression, HeritageList,
+    Identifier, Literal, LiteralValue, MethodDefinition, MethodKind, PropertyDefinition,
+    PropertyModifier, Run, Statement, StatementKind, StaticBlock, TSIndexSignature,
+    TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::{push_row, push_spanned};
@@ -40,7 +40,7 @@ pub(in crate::parser) enum DecoratorListKind {
 #[expect(clippy::struct_excessive_bools)] // independent modifier flags, not a state machine
 struct ClassMemberHeader<'arena> {
     start: usize,
-    decorators: &'arena [Decorator],
+    decorators: DecoList<'arena>,
     accessibility: Option<Accessibility>,
     is_static: bool,
     is_declare: bool,
@@ -556,7 +556,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_class_expression_from(
         &mut self,
         start: usize,
-        decorators: Option<&'arena [Decorator]>,
+        decorators: Option<DecoList<'arena>>,
         r#abstract: bool,
     ) -> Result<ExprRet, Error> {
         // Consume 'class' keyword
@@ -813,7 +813,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // decorators too — acorn accepts them and prettier formats the body form; the
         // TS1206 ("Decorators are not valid here") ambient early-error is deferred to
         // the diagnostics layer.
-        let decorators = self
+        let decorators: DecoList<'arena> = self
             .parse_decorators(DecoratorListKind::Class)?
             .into_bump_slice();
 
@@ -1456,7 +1456,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_class_index_signature(
         &mut self,
         start: usize,
-        decorators: &'arena [Decorator],
+        decorators: DecoList<'arena>,
         is_static: bool,
         readonly: bool,
     ) -> Result<ClassMember<'arena>, Error> {
