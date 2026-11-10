@@ -41,7 +41,7 @@ pub(super) fn type_args_should_wrap_for_return_type(
             // Unions/intersections can break internally
             TSType::Union(_) | TSType::Intersection(_) => true,
             // Function/constructor types can break params internally
-            TSType::Function(_) | TSType::Constructor(_) => true,
+            TSType::Function(_) | TSType::Constructor(..) => true,
             // Nested TypeReference with multiple type args can break
             TSType::TypeReference(r) => r
                 .type_arguments
@@ -413,13 +413,13 @@ pub(in crate::printer) fn type_needs_parens_for_indexed_access_object(
             | TSType::TypeQuery(_)
             | TSType::TypeOperator(_)
             | TSType::Conditional(_)
-            | TSType::Infer(_)
+            | TSType::Infer(..)
             | TSType::Function(_)
             | TSType::TypePredicate(ast::TSTypePredicate {
                 type_annotation: Some(_),
                 ..
             })
-            | TSType::Constructor(_)
+            | TSType::Constructor(..)
     ) || authored_pair_leads_with_bare_negative_literal(p, ts_type)
         || (is_negative_literal(ts_type) && p.negative_literal_array_run_pairs(ts_type))
 }
@@ -446,13 +446,13 @@ pub(in crate::printer) fn type_needs_parens_for_array_element(
             | TSType::TypeQuery(_)
             | TSType::TypeOperator(_)
             | TSType::Conditional(_)
-            | TSType::Infer(_)
+            | TSType::Infer(..)
             | TSType::Function(_)
             | TSType::TypePredicate(ast::TSTypePredicate {
                 type_annotation: Some(_),
                 ..
             })
-            | TSType::Constructor(_)
+            | TSType::Constructor(..)
     ) || is_negative_literal(inner)
         || authored_pair_leads_with_bare_negative_literal(p, ts_type)
 }
@@ -531,13 +531,13 @@ pub(super) fn type_needs_parens_for_optional_element(
             | TSType::Intersection(_)
             | TSType::TypeOperator(_)
             | TSType::Conditional(_)
-            | TSType::Infer(_)
+            | TSType::Infer(..)
             | TSType::Function(_)
             | TSType::TypePredicate(ast::TSTypePredicate {
                 type_annotation: Some(_),
                 ..
             })
-            | TSType::Constructor(_)
+            | TSType::Constructor(..)
     )
 }
 
@@ -553,7 +553,7 @@ pub(super) fn type_needs_parens_for_conditional_check(
     let inner = unwrap_parenthesized(p.view, ts_type);
     matches!(
         inner,
-        TSType::Function(_) | TSType::Constructor(_) | TSType::Conditional(_)
+        TSType::Function(_) | TSType::Constructor(..) | TSType::Conditional(_)
     ) || is_right_open_predicate(p, inner)
 }
 
@@ -575,7 +575,7 @@ pub(super) fn type_needs_parens_for_conditional_extends(
     match unwrap_parenthesized(printer.view, ts_type) {
         TSType::Conditional(_) => true,
         TSType::Function(f) => return_type_is_constrained_infer(printer.view, &f.return_type),
-        TSType::Constructor(c) => return_type_is_constrained_infer(printer.view, &c.return_type),
+        TSType::Constructor(_, c) => return_type_is_constrained_infer(printer.view, &c.return_type),
         _ => false,
     }
 }
@@ -588,7 +588,7 @@ pub(super) fn type_needs_parens_for_conditional_extends(
 /// function/constructor return in a conditional extends-type — see
 /// `return_type_is_constrained_infer`). A bare `infer U` forces neither.
 pub(super) fn is_constrained_infer(ts_type: &TSType<'_>) -> bool {
-    matches!(ts_type, TSType::Infer(i) if i.type_parameter.constraint.is_some())
+    matches!(ts_type, TSType::Infer(_, i) if i.type_parameter.constraint.is_some())
 }
 
 /// True when a function/constructor return type — descending through a `p is X`
@@ -620,9 +620,9 @@ fn return_type_is_constrained_infer(
         }
     }
     match ty {
-        TSType::Infer(_) => is_constrained_infer(ty),
+        TSType::Infer(..) => is_constrained_infer(ty),
         TSType::Function(f) => return_type_is_constrained_infer(view, &f.return_type),
-        TSType::Constructor(c) => return_type_is_constrained_infer(view, &c.return_type),
+        TSType::Constructor(_, c) => return_type_is_constrained_infer(view, &c.return_type),
         _ => false,
     }
 }
@@ -647,13 +647,13 @@ pub(super) fn type_needs_parens_for_prefix_operator(p: &Printer<'_>, ts_type: &T
             | TSType::Intersection(_)
             | TSType::TypeOperator(_)
             | TSType::Conditional(_)
-            | TSType::Infer(_)
+            | TSType::Infer(..)
             | TSType::Function(_)
             | TSType::TypePredicate(ast::TSTypePredicate {
                 type_annotation: Some(_),
                 ..
             })
-            | TSType::Constructor(_)
+            | TSType::Constructor(..)
     )
 }
 
@@ -737,7 +737,7 @@ pub(super) fn type_needs_parens_in_union_or_intersection(
         TSType::Union(_)
         | TSType::Intersection(_)
         | TSType::Function(_)
-        | TSType::Constructor(_)
+        | TSType::Constructor(..)
         | TSType::Conditional(_) => true,
         other => is_constrained_infer(other) || is_right_open_predicate(p, other),
     }
@@ -898,7 +898,7 @@ fn type_holds_brace_type(view: AstView<'_>, ty: &TSType<'_>) -> bool {
             view.run(f.params),
             Some(&f.return_type),
         ),
-        TSType::Constructor(c) => signature_holds_brace_type(
+        TSType::Constructor(_, c) => signature_holds_brace_type(
             view,
             c.type_parameters.as_ref(),
             view.run(c.params),
@@ -916,10 +916,10 @@ fn type_holds_brace_type(view: AstView<'_>, ty: &TSType<'_>) -> bool {
         TSType::TypeOperator(o) => type_holds_brace_type(view, view.ty(o.type_annotation)),
         // An import type's options object (`import('m', { with: … })`) is an expression,
         // not a type; only its type arguments are walked.
-        TSType::Import(i) => type_arguments_hold_brace_type(view, i.type_arguments.as_ref()),
+        TSType::Import(_, i) => type_arguments_hold_brace_type(view, i.type_arguments.as_ref()),
         TSType::TypeQuery(q) => {
             type_arguments_hold_brace_type(view, q.type_arguments.as_ref())
-                || matches!(&q.expr_name, ast::TSTypeQueryExprName::Import(i)
+                || matches!(&q.expr_name, ast::TSTypeQueryExprName::Import(_, i)
                     if type_arguments_hold_brace_type(view, i.type_arguments.as_ref()))
         }
         TSType::IndexedAccess(i) => {
@@ -929,6 +929,6 @@ fn type_holds_brace_type(view: AstView<'_>, ty: &TSType<'_>) -> bool {
         TSType::Rest(r) => type_holds_brace_type(view, view.ty(r.type_annotation)),
         TSType::Optional(o) => type_holds_brace_type(view, view.ty(o.type_annotation)),
         TSType::NamedTupleMember(n) => type_holds_brace_type(view, view.ty(n.element_type)),
-        TSType::Infer(i) => type_parameter_holds_brace_type(view, &i.type_parameter),
+        TSType::Infer(_, i) => type_parameter_holds_brace_type(view, &i.type_parameter),
     }
 }

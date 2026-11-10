@@ -525,7 +525,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let end = operand.span().end;
         // the pair the printer adds around a bare operand that is itself a prefix operator
         // (`keyof (keyof T)`, `keyof (infer U)`), a level of the output's nesting
-        if matches!(operand, TSType::TypeOperator(_) | TSType::Infer(_)) {
+        if matches!(operand, TSType::TypeOperator(_) | TSType::Infer(..)) {
             self.printer_pair()?;
         }
 
@@ -607,7 +607,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             },
             span: Span::new(start as u32, end),
         });
-        Ok(self.push_ty_ret(TSType::Infer(infer)))
+        Ok(self.push_ty_ret(TSType::Infer(infer.span, infer)))
     }
 
     /// Check if current position starts an index signature: `[key: type]: T`
@@ -710,7 +710,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<TSImportType<'_>>(1);
         let import = self.arena.alloc(import);
-        Ok(self.push_ty_ret(TSType::Import(import)))
+        Ok(self.push_ty_ret(TSType::Import(import.span, import)))
     }
 
     /// Parse import type body after `import` keyword has been consumed.
@@ -780,7 +780,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let import_start = self.current_pos().0;
             self.advance()?; // consume 'import'
             let import = self.parse_import_type_body(import_start)?;
-            TSTypeQueryExprName::Import(self.alloc(import))
+            TSTypeQueryExprName::Import(import.span, self.alloc(import))
         } else {
             // Parse entity name: identifier or qualified name
             let entity_name = self.parse_type_entity_name()?;
@@ -894,11 +894,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let right =
                 Identifier::simple(right_name, Span::new(right_start as u32, right_end as u32));
 
-            result = TSEntityName::QualifiedName(self.alloc(TSQualifiedName {
-                left: result,
-                right,
-                span: Span::new(id_start as u32, right_end as u32),
-            }));
+            let span = Span::new(id_start as u32, right_end as u32);
+            result = TSEntityName::QualifiedName(
+                span,
+                self.alloc(TSQualifiedName {
+                    left: result,
+                    right,
+                    span,
+                }),
+            );
         }
 
         Ok(result)
@@ -1122,7 +1126,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return_type,
             span: Span::new(start as u32, end),
         });
-        Ok(self.push_ty_ret(TSType::Constructor(constructor)))
+        Ok(self.push_ty_ret(TSType::Constructor(constructor.span, constructor)))
     }
 
     /// Parse function type parameters, up to (not including) the closing `)`.
@@ -2060,12 +2064,12 @@ fn type_takes_pair(ty: &TSType<'_>, position: TypePairPosition) -> bool {
         TSType::Union(_)
             | TSType::Intersection(_)
             | TSType::Function(_)
-            | TSType::Constructor(_)
+            | TSType::Constructor(..)
             | TSType::Conditional(_)
     );
     match position {
         TypePairPosition::Member => {
-            looser || matches!(ty, TSType::Infer(i) if i.type_parameter.constraint.is_some())
+            looser || matches!(ty, TSType::Infer(_, i) if i.type_parameter.constraint.is_some())
         }
         TypePairPosition::Suffix => {
             looser
@@ -2073,12 +2077,12 @@ fn type_takes_pair(ty: &TSType<'_>, position: TypePairPosition) -> bool {
                     ty,
                     TSType::TypeQuery(_)
                         | TSType::TypeOperator(_)
-                        | TSType::Infer(_)
+                        | TSType::Infer(..)
                         | TSType::Literal(TSLiteralType::UnaryExpression(_))
                 )
         }
         TypePairPosition::Optional => {
-            looser || matches!(ty, TSType::TypeOperator(_) | TSType::Infer(_))
+            looser || matches!(ty, TSType::TypeOperator(_) | TSType::Infer(..))
         }
     }
 }

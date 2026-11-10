@@ -83,7 +83,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
             write_type_annotation(w, &f.return_type, ctx);
             close_node(w, "TSFunctionType", f.span, ctx);
         }
-        ast::TSType::Constructor(c) => {
+        ast::TSType::Constructor(_, c) => {
             node_header(w, "TSConstructorType", c.span, ctx);
             w.raw(",\"abstract\":");
             w.bool(c.abstract_);
@@ -188,16 +188,16 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
             write_type(w, ctx.view.ty(o.type_annotation), ctx);
             close_node(w, "TSTypeOperator", o.span, ctx);
         }
-        ast::TSType::Import(i) => write_import_type(w, i, ctx),
+        ast::TSType::Import(_, i) => write_import_type(w, i, ctx),
         ast::TSType::TypeQuery(q) => {
             node_header(w, "TSTypeQuery", q.span, ctx);
             w.raw(",\"exprName\":");
             match &q.expr_name {
                 ast::TSTypeQueryExprName::EntityName(entity) => match entity {
                     ast::TSEntityName::Identifier(id) => write_identifier_plain(w, id, ctx),
-                    ast::TSEntityName::QualifiedName(qn) => write_qualified_name(w, qn, ctx),
+                    ast::TSEntityName::QualifiedName(_, qn) => write_qualified_name(w, qn, ctx),
                 },
-                ast::TSTypeQueryExprName::Import(i) => write_import_type(w, i, ctx),
+                ast::TSTypeQueryExprName::Import(_, i) => write_import_type(w, i, ctx),
             }
             write_type_arguments_field(w, q.type_arguments.as_ref(), ctx);
             close_node(w, "TSTypeQuery", q.span, ctx);
@@ -226,7 +226,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
             write_type(w, ctx.view.ty(n.element_type), ctx);
             close_node(w, "TSNamedTupleMember", n.span, ctx);
         }
-        ast::TSType::Infer(i) => {
+        ast::TSType::Infer(_, i) => {
             node_header(w, "TSInferType", i.span, ctx);
             w.raw(",\"typeParameter\":");
             write_type_parameter(w, &i.type_parameter, ctx);
@@ -344,7 +344,7 @@ fn write_keyword_type(w: &mut JsonWriter, kw: &ast::TSKeywordType, ctx: &Ctx<'_>
 pub(super) fn write_entity_name(w: &mut JsonWriter, name: &ast::TSEntityName<'_>, ctx: &Ctx<'_>) {
     match name {
         ast::TSEntityName::Identifier(id) => write_identifier_plain(w, id, ctx),
-        ast::TSEntityName::QualifiedName(qn) => write_qualified_name(w, qn, ctx),
+        ast::TSEntityName::QualifiedName(_, qn) => write_qualified_name(w, qn, ctx),
     }
 }
 
@@ -363,7 +363,7 @@ fn write_qualified_name(w: &mut JsonWriter, qn: &ast::TSQualifiedName<'_>, ctx: 
         w.raw(",\"left\":");
         spine.push(node);
         match &node.left {
-            ast::TSEntityName::QualifiedName(left) => node = left,
+            ast::TSEntityName::QualifiedName(_, left) => node = left,
             ast::TSEntityName::Identifier(id) => {
                 write_identifier_plain(w, id, ctx);
                 break;
