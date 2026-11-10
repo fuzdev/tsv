@@ -137,14 +137,18 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
                 write_exported_declaration(w, d, ctx, is_type_export);
             });
             w.raw(",\"specifiers\":");
-            write_array(w, export_decl.specifiers, |w, s| {
+            write_array(w, ctx.view.export_specs(export_decl.specifiers), |w, s| {
                 write_export_specifier(w, s, ctx);
             });
             w.raw(",\"source\":");
             write_or_null(w, export_decl.source.as_ref(), |w, s| {
                 write_literal(w, s, ctx);
             });
-            write_attributes_field(w, export_decl.attributes, ctx);
+            write_attributes_field(
+                w,
+                export_decl.attributes.map(|a| ctx.view.import_attrs(a)),
+                ctx,
+            );
             close_node(w, "ExportNamedDeclaration", export_span, ctx);
         }
         &ast::StatementKind::ExportDefaultDeclaration(export_decl) => {
@@ -172,7 +176,11 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
             });
             w.raw(",\"source\":");
             write_literal(w, &export_decl.source, ctx);
-            write_attributes_field(w, export_decl.attributes, ctx);
+            write_attributes_field(
+                w,
+                export_decl.attributes.map(|a| ctx.view.import_attrs(a)),
+                ctx,
+            );
             close_node(w, "ExportAllDeclaration", stmt.span, ctx);
         }
         &ast::StatementKind::TSExportAssignment(export_assign) => {
@@ -197,12 +205,16 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
                 w.token(phase);
             }
             w.raw(",\"specifiers\":");
-            write_array(w, import_decl.specifiers, |w, s| {
+            write_array(w, ctx.view.import_specs(import_decl.specifiers), |w, s| {
                 write_import_specifier(w, s, ctx);
             });
             w.raw(",\"source\":");
             write_literal(w, &import_decl.source, ctx);
-            write_attributes_field(w, import_decl.attributes, ctx);
+            write_attributes_field(
+                w,
+                import_decl.attributes.map(|a| ctx.view.import_attrs(a)),
+                ctx,
+            );
             close_node(w, "ImportDeclaration", stmt.span, ctx);
         }
         &ast::StatementKind::TSImportEqualsDeclaration(import_eq) => {
@@ -406,7 +418,7 @@ pub(super) fn write_variable_declaration(
         w.raw(",\"declare\":true");
     }
     w.raw(",\"declarations\":");
-    write_array(w, var_decl.declarations, |w, d| {
+    write_array(w, ctx.view.declarators(var_decl.declarations), |w, d| {
         node_header(w, "VariableDeclarator", d.span, ctx);
         w.raw(",\"id\":");
         write_expression(w, ctx.view.expr(d.id), ctx);

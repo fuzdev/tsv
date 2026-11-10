@@ -89,8 +89,9 @@ impl<'a> Printer<'a> {
         // Svelte compiler's type erasure filters out `import { type X, Y }`'s
         // type-only specifiers) would otherwise be judged against the *original*
         // source text, including the specifiers that no longer exist.
-        if decl
-            .specifiers
+        if self
+            .view
+            .import_specs(decl.specifiers)
             .iter()
             .any(|spec| matches!(spec, ast::ImportSpecifier::Named(_)))
         {

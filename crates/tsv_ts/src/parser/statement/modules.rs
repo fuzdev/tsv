@@ -1328,9 +1328,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `None` when there is no `with` clause; `Some(vec)` when one is present —
     /// `Some([])` for an empty `with {}`, which is preserved (acorn/prettier
     /// keep it).
-    fn parse_import_attributes(
-        &mut self,
-    ) -> Result<Option<&'arena [ImportAttribute<'arena>]>, Error> {
+    fn parse_import_attributes(&mut self) -> Result<Option<ImportAttrList<'arena>>, Error> {
         // The `WithClause`'s own `with` token. It is the reserved word (a `ReservedWord`
         // barred from every name position — see `KeywordKind::With`), spelled out by this
         // production rather than read as an identifier, so match the keyword token.

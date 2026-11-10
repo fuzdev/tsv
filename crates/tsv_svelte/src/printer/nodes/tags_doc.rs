@@ -79,7 +79,7 @@ impl<'a> Printer<'a> {
         let decl = &tag.declaration;
         // The gap is named by `tsv_ts`, not spelled here: it is the same range the statement
         // path claims, and the two claimants must agree on it exactly.
-        let gap = tsv_ts::__private::declaration_terminator_gap(decl);
+        let gap = tsv_ts::__private::declaration_terminator_gap(self.view, decl);
         // `closer_owns_break` is false: this run is emitted at the tag's own level, outside
         // whatever `indent(…)` the declarator list built, so a `//`'s own `hardline` is
         // already the break the `;}` needs.
@@ -100,7 +100,8 @@ impl<'a> Printer<'a> {
         // `{let r = a || b /* c */;}`); and a run the value defers to the embed end, which
         // only the render settles — a hugged arrow's run reaches it only while its call
         // stays flat — so that `;` is keyed on whether the embed end flushed.
-        let bare_declarator = decl.declarations.len() == 1 && decl.declarations[0].init.is_none();
+        let bare_declarator = decl.declarations.len() == 1
+            && self.view.declarators(decl.declarations)[0].init.is_none();
         let semicolon = if bare_declarator
             || trailing.gap_run
             || !self.gap_known_comment_free(decl.span.start, decl.span.end)

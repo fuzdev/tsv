@@ -145,8 +145,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // as acorn-typescript's call repairs.
         let close_brace = after_close - 1;
         let statement =
-            self.parse_ts_statement(tag_content, tag_content_start, |this, _, stmt| {
-                this.reject_declaration_tag_statement(stmt, tag_content_start, close_brace)
+            self.parse_ts_statement(tag_content, tag_content_start, |this, view, stmt| {
+                this.reject_declaration_tag_statement(view, stmt, tag_content_start, close_brace)
             })?;
         let tsv_ts::ast::StatementKind::VariableDeclaration(declaration) = statement.kind else {
             // Refused inside the parse; this arm only names the shape.
@@ -167,6 +167,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// re-read as acorn-typescript's. `close_brace` is the tag's `}`.
     fn reject_declaration_tag_statement(
         &self,
+        view: AstView<'_>,
         statement: &tsv_ts::ast::Statement<'arena>,
         tag_content_start: usize,
         close_brace: usize,
@@ -178,8 +179,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Svelte (like acorn) rejects a `const` declarator with no initializer;
         // tsv_ts's parser is more permissive, so enforce it here.
         if declaration.kind.as_str() == "const"
-            && declaration
-                .declarations
+            && view
+                .declarators(declaration.declarations)
                 .iter()
                 .any(|decl| decl.init.is_none())
         {

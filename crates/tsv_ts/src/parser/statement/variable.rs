@@ -91,7 +91,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_declarator_list(
         &mut self,
         site: DeclaratorSite,
-    ) -> Result<(&'arena [VariableDeclarator], u32), Error> {
+    ) -> Result<(DeclaratorList<'arena>, u32), Error> {
         // one wire level each: the `VariableDeclarator` over its pattern and initializer
         let first = self.nested(1, |p| p.parse_declarator(site))?;
         let mut end = first.span.end;

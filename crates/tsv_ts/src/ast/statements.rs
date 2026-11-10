@@ -7,10 +7,11 @@
 use tsv_lang::Span;
 
 use super::{
-    CatchId, ClassDeclId, DeclareFnId, EnumDeclId, ExportAllId, ExportAssignId, ExportDefaultId,
-    ExportNamedId, Expr, ExprId, Expression, FnDeclId, ForHeadId, ForLeftId, Identifier,
-    ImportDeclId, ImportEqualsId, InterfaceDeclId, ModuleDeclId, Run, StmtId,
-    TSNamespaceExportDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration, TypeAliasId,
+    CaseList, CatchId, ClassDeclId, DeclaratorList, DeclareFnId, EnumDeclId, ExportAllId,
+    ExportAssignId, ExportDefaultId, ExportNamedId, Expr, ExprId, Expression, FnDeclId, ForHeadId,
+    ForLeftId, Identifier, ImportDeclId, ImportEqualsId, InterfaceDeclId, ModuleDeclId, Run,
+    StmtId, TSNamespaceExportDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration,
+    TypeAliasId,
 };
 
 /// Statement node: the span every variant shares, beside the variant itself.
@@ -336,7 +337,7 @@ pub struct WithStatement {
 #[derive(Debug, Clone)]
 pub struct SwitchStatement<'arena> {
     pub discriminant: ExprId,
-    pub cases: &'arena [SwitchCase],
+    pub cases: CaseList<'arena>,
 }
 
 /// Switch case: `case test: consequent` or `default: consequent`
@@ -481,7 +482,7 @@ impl VariableDeclarationKind {
 #[derive(Debug, Clone)]
 pub struct VariableDeclaration<'arena> {
     pub kind: VariableDeclarationKind,
-    pub declarations: &'arena [VariableDeclarator],
+    pub declarations: DeclaratorList<'arena>,
     /// Whether this is an ambient declaration (`declare const x: T;`)
     pub declare: bool,
     pub span: Span,

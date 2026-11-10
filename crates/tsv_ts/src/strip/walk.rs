@@ -322,7 +322,10 @@ impl<'s, 'b> Walk<'s, 'b> {
         if !self.collects_static() {
             return;
         }
-        let attributes = self.attributes_clause(import.source.span.end, import.attributes);
+        let attributes = self.attributes_clause(
+            import.source.span.end,
+            import.attributes.map(|a| self.view.import_attrs(a)),
+        );
         self.record(
             ImportRecordKind::Static,
             span,
@@ -348,7 +351,10 @@ impl<'s, 'b> Walk<'s, 'b> {
         if !self.collects_static() {
             return;
         }
-        let attributes = self.attributes_clause(source.span.end, export.attributes);
+        let attributes = self.attributes_clause(
+            source.span.end,
+            export.attributes.map(|a| self.view.import_attrs(a)),
+        );
         self.record(
             ImportRecordKind::ReExport,
             span,
@@ -368,7 +374,10 @@ impl<'s, 'b> Walk<'s, 'b> {
         } else {
             TypeOnly::No
         };
-        let attributes = self.attributes_clause(export.source.span.end, export.attributes);
+        let attributes = self.attributes_clause(
+            export.source.span.end,
+            export.attributes.map(|a| self.view.import_attrs(a)),
+        );
         self.record(
             ImportRecordKind::ReExport,
             span,
@@ -772,7 +781,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             StatementKind::SwitchStatement(s) => {
                 self.expr(self.view.expr(s.discriminant));
-                for case in s.cases {
+                for case in self.view.cases(s.cases) {
                     if let Some(test) = case.test {
                         self.expr(self.view.expr(test));
                     }
@@ -834,12 +843,16 @@ impl<'s, 'b> Walk<'s, 'b> {
             StatementKind::ReturnStatement(s) => s.argument.map_or(Tail::Closed, |argument| {
                 self.unterminated_tail(self.view.expr(argument), end)
             }),
-            StatementKind::VariableDeclaration(decl) => match decl.declarations.last() {
-                Some(declarator) if !decl.declare => declarator.init.map_or(Tail::Closed, |init| {
-                    self.unterminated_tail(self.view.expr(init), end)
-                }),
-                _ => Tail::Closed,
-            },
+            StatementKind::VariableDeclaration(decl) => {
+                match self.view.declarators(decl.declarations).last() {
+                    Some(declarator) if !decl.declare => {
+                        declarator.init.map_or(Tail::Closed, |init| {
+                            self.unterminated_tail(self.view.expr(init), end)
+                        })
+                    }
+                    _ => Tail::Closed,
+                }
+            }
             &StatementKind::ExportNamedDeclaration(export) => {
                 let export = self.view.export_named(export);
                 export.declaration.map_or(Tail::Closed, |declaration| {
@@ -910,7 +923,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         if decl.kind == VariableDeclarationKind::AwaitUsing && self.top_level_await() {
             self.module_syntax = true;
         }
-        for declarator in decl.declarations {
+        for declarator in self.view.declarators(decl.declarations) {
             self.expr(self.view.expr(declarator.id));
             if declarator.definite {
                 // `let a!: T` — the `!` follows the name, ahead of the annotation
@@ -955,7 +968,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             return self.statement_kind(declaration, outer, position);
         }
         let mut every_type = !export.specifiers.is_empty();
-        for specifier in export.specifiers {
+        for specifier in self.view.export_specs(export.specifiers) {
             if specifier.export_kind == ExportKind::Type {
                 let end = self.src.end_with_trailing_comma(specifier.span.end);
                 self.blank(specifier.span.start, end);
@@ -1020,7 +1033,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             return false;
         }
         let mut every_type = !import.specifiers.is_empty();
-        for specifier in import.specifiers {
+        for specifier in self.view.import_specs(import.specifiers) {
             match specifier {
                 ImportSpecifier::Named(named) if named.import_kind == ImportKind::Type => {
                     let end = self.src.end_with_trailing_comma(named.span.end);

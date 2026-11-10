@@ -212,8 +212,7 @@ fn collect_imports(view: AstView<'_>, body: Run<StmtId>, named_specs: &mut Vec<u
             // 0-named (default/namespace-only) imports belong in the spill-rate
             // denominator.
             let n = view
-                .import_decl(decl)
-                .specifiers
+                .import_specs(view.import_decl(decl).specifiers)
                 .iter()
                 .filter(|s| matches!(s, ImportSpecifier::Named(_)))
                 .count();
