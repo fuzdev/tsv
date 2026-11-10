@@ -6,7 +6,7 @@
 use crate::ast::AstView;
 use tsv_lang::Span;
 
-use super::{Decorator, ExprId, Property, Run, TSTypeAnnotation};
+use super::{Decorator, ExprId, PatPropList, Property, Run, TSTypeAnnotation};
 
 /// Object pattern for destructuring: `{a, b}`, `{a: x, b: y}`, `{...rest}`
 ///
@@ -21,7 +21,7 @@ use super::{Decorator, ExprId, Property, Run, TSTypeAnnotation};
 /// - Rest: `{...rest}` (collect remaining properties)
 #[derive(Debug, Clone)]
 pub struct ObjectPattern<'arena> {
-    pub properties: &'arena [ObjectPatternProperty],
+    pub properties: PatPropList<'arena>,
     /// Optional destructuring-pattern parameter (`{a}?`). Only ever set in a
     /// parameter position; the `?` extends the expression's span and precedes `type_annotation`.
     pub optional: bool,

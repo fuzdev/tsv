@@ -422,12 +422,11 @@ impl<'s, 'b> Walk<'s, 'b> {
             {
                 Some(string_contents(literal.span))
             }
-            ExpressionKind::TemplateLiteral(template) if template.expressions.is_empty() => {
-                template
-                    .quasis
-                    .first()
-                    .map(|quasi| byte_span(quasi.raw_span))
-            }
+            ExpressionKind::TemplateLiteral(template) if template.expressions.is_empty() => self
+                .view
+                .quasis(template.quasis)
+                .first()
+                .map(|quasi| byte_span(quasi.raw_span)),
             _ => None,
         };
         self.record(
@@ -1262,7 +1261,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             ExpressionKind::MetaProperty(_) => self.meta_property(e.span),
             ExpressionKind::Identifier(id) => self.identifier(id),
             ExpressionKind::ObjectExpression(object) => {
-                for property in object.properties {
+                for property in self.view.obj_props(object.properties) {
                     match property {
                         ObjectProperty::Property(property) => self.property(property),
                         ObjectProperty::SpreadElement(spread) => {
@@ -1350,7 +1349,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             ExpressionKind::ObjectPattern(pattern) => {
                 self.decorators(pattern.decorators);
-                for property in pattern.properties {
+                for property in self.view.pat_props(pattern.properties) {
                     match property {
                         ObjectPatternProperty::Property(property) => self.property(property),
                         ObjectPatternProperty::RestElement(rest) => self.rest_element(rest),

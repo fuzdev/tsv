@@ -1788,7 +1788,7 @@ fn write_custom_element_props(
     use tsv_ts::ast::{Expression, ExpressionKind, LiteralValue, ObjectProperty};
     w.raw("{");
     let mut first_prop = true;
-    for prop in props_obj.properties {
+    for prop in ctx.view.obj_props(props_obj.properties) {
         let ObjectProperty::Property(p) = prop else {
             continue;
         };
@@ -1809,7 +1809,7 @@ fn write_custom_element_props(
         w.string(key.name(ctx.source));
         w.raw(":{");
         let mut first_attr = true;
-        for inner_prop in inner.properties {
+        for inner_prop in ctx.view.obj_props(inner.properties) {
             let ObjectProperty::Property(ip) = inner_prop else {
                 continue;
             };
@@ -1871,7 +1871,7 @@ fn write_custom_element_field(w: &mut JsonWriter, attrs: &[ast::AttributeNode<'_
             let mut props: Option<&Expression<'_>> = None;
             let mut shadow: Option<&Expression<'_>> = None;
             let mut extend: Option<&Expression<'_>> = None;
-            for prop in obj.properties {
+            for prop in ctx.view.obj_props(obj.properties) {
                 if let ObjectProperty::Property(p) = prop
                     && let ExpressionKind::Identifier(key) = &ctx.view.expr(p.key).kind
                 {

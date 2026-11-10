@@ -69,25 +69,32 @@ fn any_expression_child<'e>(
                 || decorators_any(view, assign.decorators, &mut visit)
         }
         ExpressionKind::ObjectExpression(object) => {
-            object.properties.iter().any(|property| match property {
-                ObjectProperty::Property(property) => {
-                    visit(view.expr(property.key), Other)
-                        || visit(view.expr(property.value), PropertyValue)
-                }
-                ObjectProperty::SpreadElement(spread) => visit(view.expr(spread.argument), Other),
-            })
+            view.obj_props(object.properties)
+                .iter()
+                .any(|property| match property {
+                    ObjectProperty::Property(property) => {
+                        visit(view.expr(property.key), Other)
+                            || visit(view.expr(property.value), PropertyValue)
+                    }
+                    ObjectProperty::SpreadElement(spread) => {
+                        visit(view.expr(spread.argument), Other)
+                    }
+                })
         }
         ExpressionKind::ObjectPattern(object) => {
             decorators_any(view, object.decorators, &mut visit)
-                || object.properties.iter().any(|property| match property {
-                    ObjectPatternProperty::Property(property) => {
-                        visit(view.expr(property.key), Other)
-                            || visit(view.expr(property.value), Other)
-                    }
-                    ObjectPatternProperty::RestElement(rest) => {
-                        visit(view.expr(rest.argument), Other)
-                    }
-                })
+                || view
+                    .pat_props(object.properties)
+                    .iter()
+                    .any(|property| match property {
+                        ObjectPatternProperty::Property(property) => {
+                            visit(view.expr(property.key), Other)
+                                || visit(view.expr(property.value), Other)
+                        }
+                        ObjectPatternProperty::RestElement(rest) => {
+                            visit(view.expr(rest.argument), Other)
+                        }
+                    })
         }
         ExpressionKind::ArrayExpression(array) => view
             .opt_list(array.elements)

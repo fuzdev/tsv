@@ -567,18 +567,21 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
         ast::ExpressionKind::ObjectPattern(pattern) => {
             pattern.decorators.unwrap_or_default().is_empty()
                 && annotation_is_flat(view, pattern.type_annotation.as_ref())
-                && pattern.properties.iter().all(|property| match property {
-                    ast::ObjectPatternProperty::Property(property) => {
-                        !property.computed
-                            && !property.method
-                            && is_bare_identifier(view, view.expr(property.key))
-                            && is_bare_identifier(view, view.expr(property.value))
-                    }
-                    ast::ObjectPatternProperty::RestElement(rest) => {
-                        rest.type_annotation.is_none()
-                            && is_bare_identifier(view, view.expr(rest.argument))
-                    }
-                })
+                && view
+                    .pat_props(pattern.properties)
+                    .iter()
+                    .all(|property| match property {
+                        ast::ObjectPatternProperty::Property(property) => {
+                            !property.computed
+                                && !property.method
+                                && is_bare_identifier(view, view.expr(property.key))
+                                && is_bare_identifier(view, view.expr(property.value))
+                        }
+                        ast::ObjectPatternProperty::RestElement(rest) => {
+                            rest.type_annotation.is_none()
+                                && is_bare_identifier(view, view.expr(rest.argument))
+                        }
+                    })
         }
         ast::ExpressionKind::ArrayPattern(pattern) => {
             pattern.decorators.unwrap_or_default().is_empty()

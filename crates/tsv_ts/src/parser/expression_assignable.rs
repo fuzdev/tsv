@@ -4,8 +4,8 @@
 
 use crate::ast::{
     ArrayPattern, AssignmentOperator, AssignmentPattern, AstView, ExprId, Expression,
-    ExpressionKind, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, PropertyKind,
-    RestElement, Run,
+    ExpressionKind, ObjPropList, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property,
+    PropertyKind, RestElement, Run,
 };
 use tsv_lang::{Error, Span};
 
@@ -68,7 +68,7 @@ enum CoverShape<'arena> {
     Identifier,
     Member,
     Object {
-        properties: &'arena [ObjectProperty],
+        properties: ObjPropList<'arena>,
         spread_trailing_comma: bool,
     },
     Array {
@@ -257,18 +257,34 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 );
                 // `{...a,}` — trailing comma after the rest property.
                 if spread_trailing_comma {
-                    let error_span = source_properties.last().map_or(span, ObjectProperty::span);
+                    let error_span = self
+                        .stores
+                        .view()
+                        .obj_props(source_properties)
+                        .last()
+                        .map_or(span, ObjectProperty::span);
                     return Err(self.rest_trailing_comma_error(error_span.start_usize()));
                 }
 
+                // Copied out one at a time, an id-only row: each conversion pushes, so no read
+                // through the view can span one.
+                let property_at = |parser: &Self, i: usize| {
+                    parser
+                        .stores
+                        .view()
+                        .obj_props(source_properties)
+                        .get(i)
+                        .cloned()
+                };
                 let mut properties = self.bvec();
                 let last_index = source_properties.len().saturating_sub(1);
-                for (i, prop) in source_properties.iter().enumerate() {
+                let mut i = 0;
+                while let Some(prop) = property_at(self, i) {
                     // A rest property must be the last property in an object
                     // destructuring pattern (`ObjectBindingPattern` /
                     // `ObjectAssignmentPattern` place the rest last, with no
                     // trailing comma allowed after it).
-                    if let ObjectProperty::SpreadElement(spread) = prop
+                    if let ObjectProperty::SpreadElement(spread) = &prop
                         && i != last_index
                     {
                         return Err(self.error_msg_at(
@@ -276,7 +292,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             spread.span.start_usize(),
                         ));
                     }
-                    properties.push(self.object_property_to_pattern(prop, context)?);
+                    properties.push(self.object_property_to_pattern(&prop, context)?);
+                    i += 1;
                 }
 
                 Ok(Some(Expression {

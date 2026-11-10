@@ -82,8 +82,8 @@ pub(crate) fn ternary_test_takes_pair(expr: &ast::Expression<'_>) -> bool {
 /// When a template literal contains embedded newlines in its quasi strings,
 /// it should be treated as "multiline" for formatting purposes. This is used
 /// to force ternaries to break when their consequent or alternate is multiline.
-fn is_multiline_template_literal(expr: &ast::Expression<'_>) -> bool {
-    matches!(&expr.kind, ast::ExpressionKind::TemplateLiteral(t) if template_literal_has_newlines(t))
+fn is_multiline_template_literal(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
+    matches!(&expr.kind, ast::ExpressionKind::TemplateLiteral(t) if template_literal_has_newlines(view, t))
 }
 
 /// Prettier's `shouldExtraIndentForConditionalExpression` (`print/ternary.js`), asked
@@ -620,9 +620,10 @@ impl<'a> Printer<'a> {
         // Check for multiline template literals in test, consequent, or alternate
         // Template literals with embedded newlines should force the ternary to break,
         // even though those newlines don't appear in the doc structure.
-        let has_multiline_template = is_multiline_template_literal(self.view.expr(cond.test))
-            || is_multiline_template_literal(self.view.expr(cond.consequent))
-            || is_multiline_template_literal(self.view.expr(cond.alternate));
+        let has_multiline_template =
+            is_multiline_template_literal(self.view, self.view.expr(cond.test))
+                || is_multiline_template_literal(self.view, self.view.expr(cond.consequent))
+                || is_multiline_template_literal(self.view, self.view.expr(cond.alternate));
 
         // Comments the parser stripped along with the test's grouping parens
         // (`(/* c */ a ?? b) ? x : y`) live in the gap between the conditional's own start

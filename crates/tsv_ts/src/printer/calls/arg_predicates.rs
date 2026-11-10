@@ -633,7 +633,7 @@ pub(crate) fn is_simple_call_argument(
             // cooked, which equals raw); only a `Decoded` cooked can introduce a
             // newline raw lacks (a `\n` escape) — and it owns its string, so this
             // stays source-free.
-            let has_newline = template.quasis.iter().any(|q| {
+            let has_newline = view.quasis(template.quasis).iter().any(|q| {
                 q.has_newline
                     || matches!(&q.cooked, ast::TemplateCooked::Decoded(c) if c.contains('\n'))
             });
@@ -647,14 +647,19 @@ pub(crate) fn is_simple_call_argument(
         }
 
         // Objects: simple if all properties are non-computed and values are simple
-        ExpressionKind::ObjectExpression(obj) => obj.properties.iter().all(|prop| match prop {
-            ast::ObjectProperty::Property(p) => {
-                !p.computed
-                    && (p.shorthand || is_simple_call_argument(view, view.expr(p.value), depth - 1))
-            }
-            // Spread properties are not simple
-            ast::ObjectProperty::SpreadElement(_) => false,
-        }),
+        ExpressionKind::ObjectExpression(obj) => {
+            view.obj_props(obj.properties)
+                .iter()
+                .all(|prop| match prop {
+                    ast::ObjectProperty::Property(p) => {
+                        !p.computed
+                            && (p.shorthand
+                                || is_simple_call_argument(view, view.expr(p.value), depth - 1))
+                    }
+                    // Spread properties are not simple
+                    ast::ObjectProperty::SpreadElement(_) => false,
+                })
+        }
 
         // Arrays: simple if all elements are simple (None = hole, which is simple)
         ExpressionKind::ArrayExpression(arr) => view.opt_list(arr.elements).iter().all(|elem| {
