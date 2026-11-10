@@ -859,8 +859,8 @@ impl<'a> Printer<'a> {
                 // are told (see the ⚠️ further down). Asking it twice is how the emitter and
                 // the seam would come to disagree about one operand.
                 let operand_rule = type_operator_operand_rule(o.operator);
-                let operand_pair =
-                    prefix_operator_shell_pair(self, o.operator, self.view.ty(o.type_annotation));
+                let operand_type = self.view.ty(o.type_annotation);
+                let operand_pair = prefix_operator_shell_pair(self, o.operator, operand_type);
                 let needs_parens = operand_pair == ShellPair::Kept;
                 // Comments between keyword and operand type
                 let keyword_end = o.span.start + o.operator.as_str().len() as u32;
@@ -873,12 +873,12 @@ impl<'a> Printer<'a> {
                 // told the same operand rule (`type_operator_operand_rule`) the layouts below
                 // apply, so a bare operand that needs them gets them re-synthesized and a
                 // source-parenthesized one freezes whole.
-                if self.single_child_frozen(keyword_end, self.view.ty(o.type_annotation)) {
+                if self.single_child_frozen(keyword_end, operand_type) {
                     return self.build_keyword_hang_doc(
                         o.operator.as_str(),
                         keyword_end,
-                        self.view.ty(o.type_annotation).span().start,
-                        self.build_frozen_head_doc(self.view.ty(o.type_annotation), operand_rule),
+                        operand_type.span().start,
+                        self.build_frozen_head_doc(operand_type, operand_rule),
                     );
                 }
                 // A line comment, a multiline block, or a block run whose break is forced
@@ -916,17 +916,15 @@ impl<'a> Printer<'a> {
                 // hoisting made the glued and isolated spellings of one comment disagree
                 // across a pass. Asked of the UNWRAPPED operand, the shape the pair would
                 // be re-minted around; a `//` hoists either way.
-                let hang = self.keyword_value_stripped_paren_hang_with_pair(
-                    self.view.ty(o.type_annotation),
-                    operand_pair,
-                );
+                let hang =
+                    self.keyword_value_stripped_paren_hang_with_pair(operand_type, operand_pair);
                 let (operand_hang_start, operand_hang_type) = (hang.value_start, hang.value_type);
                 // Type position: a trailing block lifted from the shell trails the
                 // operand inline.
                 let hang_value_doc = || {
                     self.with_stripped_shell_value(
                         hang.claimed_shell,
-                        self.view.ty(o.type_annotation),
+                        operand_type,
                         operand_hang_type,
                         TrailingBlock::Inline,
                         || {
@@ -1164,7 +1162,8 @@ impl<'a> Printer<'a> {
             TSType::NamedTupleMember(n) => {
                 let mut parts = smallvec![self.identifier_name_doc(&n.label)];
                 let label_end = n.label.span.end;
-                let type_start = self.view.ty(n.element_type).span().start;
+                let element_type = self.view.ty(n.element_type);
+                let type_start = element_type.span().start;
                 // Comments between label and `?` (e.g., `[a /* c */?: T]`)
                 let after_modifier = if n.optional {
                     self.push_modifier_marker_doc(&mut parts, label_end, b'?')
@@ -1198,18 +1197,14 @@ impl<'a> Printer<'a> {
                 // the placement floor reads it as inert and the next pass loses the freeze.
                 let frozen_tail = after_colon.and_then(|after_colon| {
                     let (gap_end, value_doc) =
-                        if self.single_child_frozen(after_colon, self.view.ty(n.element_type)) {
-                            (
-                                type_start,
-                                self.build_frozen_single_child_doc(self.view.ty(n.element_type)),
-                            )
+                        if self.single_child_frozen(after_colon, element_type) {
+                            (type_start, self.build_frozen_single_child_doc(element_type))
                         } else {
-                            let inner =
-                                self.paren_interior_routed_inner(self.view.ty(n.element_type))?;
+                            let inner = self.paren_interior_routed_inner(element_type)?;
                             (
                                 inner.span().start,
                                 self.build_routed_inner_doc(
-                                    self.view.ty(n.element_type),
+                                    element_type,
                                     inner,
                                     RoutedScope::Transparent,
                                 ),
@@ -1228,7 +1223,7 @@ impl<'a> Printer<'a> {
                     );
                     // A long union/intersection element hangs after `:` (redundant parens
                     // stripped first); everything else stays inline after `: `.
-                    match self.unwrap_redundant_parens(self.view.ty(n.element_type)) {
+                    match self.unwrap_redundant_parens(element_type) {
                         TSType::Union(u) => {
                             let type_doc = self.build_union_type_doc(u);
                             d.concat(&[
@@ -1244,7 +1239,7 @@ impl<'a> Printer<'a> {
                         _ => d.concat(&[
                             d.text(": "),
                             comments_doc,
-                            self.build_type_doc(self.view.ty(n.element_type)),
+                            self.build_type_doc(element_type),
                         ]),
                     }
                 });
@@ -1811,14 +1806,13 @@ impl<'a> Printer<'a> {
             // The ONE link whose own arm owns a routed shell's run (see the ⚠️ above):
             // `array_type_head` keeps the pair and emits the interior run inside it.
             TSType::Array(a) => {
+                let element_type = self.view.ty(a.element_type);
                 return self.leading_edge_shell_step(
-                    self.view.ty(a.element_type),
+                    element_type,
                     self.required_paren_pair_opens_for_leading_run(
-                        self.view.ty(a.element_type),
+                        element_type,
                         type_needs_parens_for_array_element,
-                    ) || self
-                        .paren_interior_routed_inner(self.view.ty(a.element_type))
-                        .is_some(),
+                    ) || self.paren_interior_routed_inner(element_type).is_some(),
                     run,
                 );
             }
@@ -3330,8 +3324,9 @@ impl<'a> Printer<'a> {
     fn build_parenthesized_type_unwrap_doc(&self, p: &TSParenthesizedType<'_>) -> DocId {
         let d = self.d();
         let paren_open = p.span.start;
-        let inner_start = self.view.ty(p.type_annotation).span().start;
-        let inner_end = self.view.ty(p.type_annotation).span().end;
+        let inner_type = self.view.ty(p.type_annotation);
+        let inner_start = inner_type.span().start;
+        let inner_end = inner_type.span().end;
         let paren_close = p.span.end;
         let (mut has_leading, has_trailing) = self.paren_inner_comment_flags(p);
         // The enclosing keyword→value gap already claims this shell's leading run: the
@@ -3360,7 +3355,7 @@ impl<'a> Printer<'a> {
         if !has_leading && !has_trailing {
             return match routed_under_claim {
                 Some(inner) => self.build_frozen_single_child_doc(inner),
-                None => self.build_type_doc(self.view.ty(p.type_annotation)),
+                None => self.build_type_doc(inner_type),
             };
         }
 
@@ -3400,14 +3395,11 @@ impl<'a> Printer<'a> {
             // retains STOPS the leading-edge descent ([`Self::head_layer_peels`]), because
             // this pair prints its `(` ahead of everything inside it — so this is the
             // innermost gap that can own the run, and the only one.
-            let (edge_claim, run_start) =
-                self.leading_edge_claim_and_start(false, self.view.ty(p.type_annotation));
+            let (edge_claim, run_start) = self.leading_edge_claim_and_start(false, inner_type);
             return self.build_open_paren_shell_doc(
                 paren_open,
                 run_start,
-                self.with_claimed_shell_leading_run(edge_claim, || {
-                    self.build_type_doc(self.view.ty(p.type_annotation))
-                }),
+                self.with_claimed_shell_leading_run(edge_claim, || self.build_type_doc(inner_type)),
                 inner_end,
                 paren_close,
             );
@@ -3430,7 +3422,7 @@ impl<'a> Printer<'a> {
         // Asked of the effective inner ([`Self::unwrap_redundant_parens`]): a comment-free
         // layer between this shell and the union (`(/*1*/ (| A // c⏎| B))`) strips too,
         // and the run is glued across it all the same.
-        let effective_inner = self.unwrap_redundant_parens(self.view.ty(p.type_annotation));
+        let effective_inner = self.unwrap_redundant_parens(inner_type);
         let handoff = if has_leading {
             self.union_seam_run_handoff(paren_open + 1, effective_inner)
         } else {
@@ -3456,7 +3448,7 @@ impl<'a> Printer<'a> {
         // themselves ([`StrippedParenHang::routed`]).
         parts.push(match (handoff, effective_inner) {
             (Some(_), TSType::Union(u)) => self.build_union_value_doc(paren_open + 1, u).doc,
-            _ => self.build_type_doc(self.view.ty(p.type_annotation)),
+            _ => self.build_type_doc(inner_type),
         });
 
         // Trailing comments: between inner type and `)`. A block stays inline; a line

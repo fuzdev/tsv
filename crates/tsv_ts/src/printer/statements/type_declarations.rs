@@ -173,7 +173,8 @@ impl<'a> Printer<'a> {
             .type_parameters
             .as_ref()
             .map_or(decl.id.span.end, |tp| tp.span.end);
-        let type_start = self.view.ty(decl.type_annotation).span().start;
+        let annotation_type = self.view.ty(decl.type_annotation);
+        let type_start = annotation_type.span().start;
         let eq_pos = self.find_equals_position(header_end, type_start);
 
         // Comments between name and type params: `type A/* c */ <T> = T`. The
@@ -229,7 +230,7 @@ impl<'a> Printer<'a> {
         // it pulls an own-line block up onto the value's line and eats the blank —
         // disagreeing with every other `;` in the language (docs/comments.md §Trailing
         // and dangling runs).
-        let value_end = self.view.ty(decl.type_annotation).span().end;
+        let value_end = annotation_type.span().end;
         self.push_semicolon_with_gap_comments(&mut parts, value_end, span.end, false, clause_tail);
 
         d.concat(&parts)
@@ -391,6 +392,7 @@ impl<'a> Printer<'a> {
         lead_space: bool,
     ) -> DocId {
         let d = self.d();
+        let annotation_type = self.view.ty(decl.type_annotation);
         // A redundant paren shell around the RHS whose leading gap holds a line comment
         // (`type A = (/* b */ // c\n Z)`, and the double-nested form) strips to the same
         // fixed point the bare `type A = /* b */ // c\n Z` settles on. Widen the `=`→value
@@ -412,7 +414,7 @@ impl<'a> Printer<'a> {
         // whole leading run through the force-break emission below, and the paren-stripped
         // INNER freezes — so the shelled and bare authorings reach one fixed point. The
         // head carries that verdict as `routed`, which the union hand-off below reads.
-        let head = self.keyword_value_head(eq_pos + 1, self.view.ty(decl.type_annotation));
+        let head = self.keyword_value_head(eq_pos + 1, annotation_type);
         let type_start = head.value_start;
         let value_type = head.value_type;
         let mut parts: DocBuf = smallvec![d.text(if lead_space { " =" } else { "=" })];
@@ -534,7 +536,7 @@ impl<'a> Printer<'a> {
                 // pair a stripped shell owes whatever builds inside it.
                 self.with_stripped_shell_value(
                     head.claimed_shell,
-                    self.view.ty(decl.type_annotation),
+                    annotation_type,
                     head.value_type,
                     TrailingBlock::Inline,
                     || self.build_union_value_doc(eq_pos + 1, u).doc,
@@ -646,7 +648,7 @@ impl<'a> Printer<'a> {
             let build_value = || -> DocId {
                 self.with_stripped_shell_value(
                     head.claimed_shell,
-                    self.view.ty(decl.type_annotation),
+                    annotation_type,
                     head.value_type,
                     TrailingBlock::Inline,
                     || self.build_type_doc(value_type),
@@ -657,7 +659,7 @@ impl<'a> Printer<'a> {
             let build_intersection = |i: &ast::TSIntersectionType<'_>| -> DocId {
                 self.with_stripped_shell_value(
                     head.claimed_shell,
-                    self.view.ty(decl.type_annotation),
+                    annotation_type,
                     head.value_type,
                     TrailingBlock::Inline,
                     || self.intersection_hanging_with_indent(i),

@@ -154,6 +154,7 @@ impl<'a> Printer<'a> {
         annotation: &ast::TSTypeAnnotation<'_>,
         parens: AnnotationParens,
     ) -> DocId {
+        let annotation_type = self.view.ty(annotation.type_annotation);
         // Check for comments between `:` and the type
         let colon_end = annotation.span.start + 1; // After the `:`
         // A redundant paren shell with a leading line-comment run (`: (// c\n T)`) strips
@@ -168,7 +169,7 @@ impl<'a> Printer<'a> {
         // A shell one SUFFIX down (`: (⏎// c⏎A)[]`) widens the window too, but hands the
         // value back whole — there is nothing to substitute — and names its own leading
         // run as this gap's to emit (`hang.claimed_shell`).
-        let hang = self.keyword_value_stripped_paren_hang(self.view.ty(annotation.type_annotation));
+        let hang = self.keyword_value_stripped_paren_hang(annotation_type);
         let (type_start, ty) = (hang.value_start, hang.value_type);
 
         // Zero-comment gate over the `:`→type gap, computed once and reused by every
@@ -193,12 +194,8 @@ impl<'a> Printer<'a> {
             // in-shell directive (`: (⏎// prettier-ignore⏎ T)`) routes the same way —
             // the shell strips and the paren-stripped inner freezes
             // (`paren_interior_routed_inner`).
-            if self.member_gap_frozen(
-                colon_end,
-                self.view.ty(annotation.type_annotation).span().start,
-            ) || self
-                .paren_interior_routed_inner(self.view.ty(annotation.type_annotation))
-                .is_some()
+            if self.member_gap_frozen(colon_end, annotation_type.span().start)
+                || self.paren_interior_routed_inner(annotation_type).is_some()
             {
                 return self.build_annotation_own_line_directive_doc(annotation, parens);
             }
@@ -221,7 +218,7 @@ impl<'a> Printer<'a> {
             // inline before the terminator.
             let type_doc = self.with_stripped_shell_value(
                 hang.claimed_shell,
-                self.view.ty(annotation.type_annotation),
+                annotation_type,
                 ty,
                 TrailingBlock::Inline,
                 || self.build_annotation_value_doc(ty, parens),
@@ -247,7 +244,7 @@ impl<'a> Printer<'a> {
             // annotation that stripped nothing.
             self.with_stripped_shell_value(
                 hang.claimed_shell,
-                self.view.ty(annotation.type_annotation),
+                annotation_type,
                 ty,
                 TrailingBlock::Inline,
                 || match value_type {
