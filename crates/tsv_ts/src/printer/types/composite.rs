@@ -236,9 +236,11 @@ impl<'a> Printer<'a> {
     /// Structure: `check extends extends_type [indent: line, "? ", true_type, line, ": ", false_type]`
     pub(super) fn build_conditional_type_doc_inner(&self, c: &TSConditionalType<'_>) -> DocId {
         let d = self.d();
+        let extends_type = self.view.ty(c.extends_type);
 
-        let extends_type_end = self.view.ty(c.extends_type).span().end;
-        let true_type_end = self.view.ty(c.true_type).span().end;
+        let extends_type_end = extends_type.span().end;
+        let true_type = self.view.ty(c.true_type);
+        let true_type_end = true_type.span().end;
         // An alone-on-line format-ignore directive in either branch gap (previous node's
         // span end → branch span start, the `?`/`:` inside the window) forces the broken
         // layout: the own-line-preserving emission + freeze live there, and the flat
@@ -248,9 +250,10 @@ impl<'a> Printer<'a> {
         // starts widen — and handed to the broken builder, which routes each branch on it:
         // the window a freeze is read on is the branch's OWN, never the widened one, so an
         // in-shell directive stays the shell's business.
+        let false_type = self.view.ty(c.false_type);
         let routes = BranchRoutes {
-            true_route: self.branch_route(extends_type_end, self.view.ty(c.true_type)),
-            false_route: self.branch_route(true_type_end, self.view.ty(c.false_type)),
+            true_route: self.branch_route(extends_type_end, true_type),
+            false_route: self.branch_route(true_type_end, false_type),
         };
         // A redundant shell at a branch's leading printed EDGE strips, so its `//` lands in
         // the `?`/`:`→branch gap and the reparse finds it there. Widening the branch START
@@ -258,9 +261,9 @@ impl<'a> Printer<'a> {
         // comment scans off these two positions — and the branch doc then declines the
         // shell's own copy ([`Printer::leading_edge_claim_and_start`]).
         let (true_claim, true_type_start) =
-            self.branch_claim_and_start(routes.true_route, self.view.ty(c.true_type));
+            self.branch_claim_and_start(routes.true_route, true_type);
         let (false_claim, false_type_start) =
-            self.branch_claim_and_start(routes.false_route, self.view.ty(c.false_type));
+            self.branch_claim_and_start(routes.false_route, false_type);
 
         // Find ? and : token positions for comment categorization. These positions only
         // bound the comment scans below, so a conditional type with no comment anywhere in
@@ -273,7 +276,7 @@ impl<'a> Printer<'a> {
         // union branch with an authored leading pipe starts at the `|`, and a block
         // glued after it (`: | /* c */ {…}`) is the `:` seam's hug question
         // (`build_conditional_branch_tail_doc`), which needs the `:` position to ask.
-        let false_gate_end = match unwrap_parenthesized(self.view, self.view.ty(c.false_type)) {
+        let false_gate_end = match unwrap_parenthesized(self.view, false_type) {
             TSType::Union(u) => self
                 .view
                 .ty_list(u.types)
@@ -304,7 +307,7 @@ impl<'a> Printer<'a> {
         // BRANCH's shell needs no term of its own: the branch start is widened over a
         // claimed shell ([`Self::branch_claim_and_start`]), so the gap scans below see it.
         let extends_paren_has_leading_line_comment =
-            self.stripped_paren_has_leading_line_comment(self.view.ty(c.extends_type));
+            self.stripped_paren_has_leading_line_comment(extends_type);
         // In the `?`/`:`→branch gaps, only a comment that HANGS its branch breaks the
         // layout: a line comment, or a multiline block the author broke after
         // (`comments_force_own_line_between` — the shared keyword→value gate). A glued
@@ -338,8 +341,8 @@ impl<'a> Printer<'a> {
         let needs_breaking = has_breaking_comments_around_question
             || has_breaking_comments_after_colon
             || has_trailing_line_comment_on_true
-            || self.nested_branch_shell_forces_break(self.view.ty(c.true_type))
-            || self.nested_branch_shell_forces_break(self.view.ty(c.false_type))
+            || self.nested_branch_shell_forces_break(true_type)
+            || self.nested_branch_shell_forces_break(false_type)
             || routes.any();
 
         if needs_breaking {
@@ -353,14 +356,11 @@ impl<'a> Printer<'a> {
         // true_type: if it's a conditional (possibly wrapped in parens), don't wrap in group.
         // Add parens for readability only when flat (single-line), not when broken (multi-line).
         let true_type_doc = || {
-            if let TSType::Conditional(inner) =
-                unwrap_parenthesized(self.view, self.view.ty(c.true_type))
-            {
+            if let TSType::Conditional(inner) = unwrap_parenthesized(self.view, true_type) {
                 // Nested conditional in true position:
                 // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
                 // - Broken: no parens (the line breaks provide clarity)
-                let inner_doc =
-                    self.build_nested_conditional_branch_doc(self.view.ty(c.true_type), inner);
+                let inner_doc = self.build_nested_conditional_branch_doc(true_type, inner);
                 if d.will_break(inner_doc) {
                     // Inner doc forces breaking — use broken layout directly
                     inner_doc
@@ -368,13 +368,13 @@ impl<'a> Printer<'a> {
                     d.if_break(inner_doc, d.parens(inner_doc))
                 }
             } else {
-                self.build_type_doc(self.view.ty(c.true_type))
+                self.build_type_doc(true_type)
             }
         };
 
         // No parens needed for nested conditionals in false position (right-associative),
         // so the false branch is the plain branch doc in both layouts.
-        let false_type_doc = || self.build_conditional_branch_doc(self.view.ty(c.false_type));
+        let false_type_doc = || self.build_conditional_branch_doc(false_type);
 
         // Comments trailing on extends_type (between extends_type and ?). The mirror
         // of `trailing_on_true` below: this path assembles the conditional from its
@@ -398,12 +398,13 @@ impl<'a> Printer<'a> {
         } else {
             d.empty()
         };
+        let check_type = self.view.ty(c.check_type);
 
         // Build extends_type doc - unions need special handling to avoid trailing space
         // after "extends" when the union breaks (e.g., `T extends\n\t| A\n\t| B`)
         // Comments around `extends`: `check /* c1 */ extends /* c2 */ extends_type`
-        let check_type_end = self.view.ty(c.check_type).span().end;
-        let extends_type_start = self.view.ty(c.extends_type).span().start;
+        let check_type_end = check_type.span().end;
+        let extends_type_start = extends_type.span().start;
         let extends_kw_start = find_char_skipping_comments(
             self.source.as_bytes(),
             check_type_end as usize,
@@ -424,7 +425,7 @@ impl<'a> Printer<'a> {
         let true_arm = self.with_claimed_shell_leading_run(true_claim, || {
             self.build_conditional_arm_doc(
                 "?",
-                self.view.ty(c.true_type),
+                true_type,
                 true_type_doc,
                 question_pos,
                 true_type_start,
@@ -433,7 +434,7 @@ impl<'a> Printer<'a> {
         let false_arm = self.with_claimed_shell_leading_run(false_claim, || {
             self.build_conditional_arm_doc(
                 ":",
-                self.view.ty(c.false_type),
+                false_type,
                 false_type_doc,
                 colon_pos,
                 false_type_start,
@@ -441,7 +442,7 @@ impl<'a> Printer<'a> {
         });
 
         d.concat(&[
-            self.build_conditional_check_doc(self.view.ty(c.check_type)),
+            self.build_conditional_check_doc(check_type),
             comments_before_extends,
             d.text(" extends"),
             extends_type_doc,
@@ -1133,9 +1134,11 @@ impl<'a> Printer<'a> {
         routes: BranchRoutes<'_>,
     ) -> DocId {
         let d = self.d();
+        let extends_type = self.view.ty(c.extends_type);
 
-        let extends_type_end = self.view.ty(c.extends_type).span().end;
-        let true_type_end = self.view.ty(c.true_type).span().end;
+        let extends_type_end = extends_type.span().end;
+        let true_type = self.view.ty(c.true_type);
+        let true_type_end = true_type.span().end;
 
         // An alone-on-line format-ignore directive in a branch gap (previous node's
         // span end → branch span start, the `?`/`:` inside the window) ROUTES that
@@ -1164,14 +1167,14 @@ impl<'a> Printer<'a> {
         // and the branch doc declines the shell's own copy of what they now cover. A
         // ROUTED branch takes neither — it is the verbatim slice, which already carries
         // the shell (see the ⚠️ on `Printer::leading_edge_claim_and_start`).
-        let (true_claim, true_type_start) =
-            self.branch_claim_and_start(true_route, self.view.ty(c.true_type));
-        let (false_claim, false_type_start) =
-            self.branch_claim_and_start(false_route, self.view.ty(c.false_type));
+        let (true_claim, true_type_start) = self.branch_claim_and_start(true_route, true_type);
+        let false_type = self.view.ty(c.false_type);
+        let (false_claim, false_type_start) = self.branch_claim_and_start(false_route, false_type);
+        let check_type = self.view.ty(c.check_type);
 
         // Find `extends` keyword position (reused for both extends_type_doc and comments_before_extends)
-        let check_type_end = self.view.ty(c.check_type).span().end;
-        let extends_type_start = self.view.ty(c.extends_type).span().start;
+        let check_type_end = check_type.span().end;
+        let extends_type_start = extends_type.span().start;
         let extends_kw_start = find_char_skipping_comments(
             self.source.as_bytes(),
             check_type_end as usize,
@@ -1192,7 +1195,7 @@ impl<'a> Printer<'a> {
                 extends_type_end,
                 true_type_start,
                 "?",
-                self.build_routed_branch_doc(true_route, self.view.ty(c.true_type)),
+                self.build_routed_branch_doc(true_route, true_type),
             );
             q_parts.push(branch);
             trailing
@@ -1230,7 +1233,7 @@ impl<'a> Printer<'a> {
             self.push_breaking_conditional_branch(
                 &mut q_parts,
                 after_q_start,
-                self.view.ty(c.true_type),
+                true_type,
                 true_type_start,
                 true_claim,
             );
@@ -1245,7 +1248,7 @@ impl<'a> Printer<'a> {
                 true_type_end,
                 false_type_start,
                 ":",
-                self.build_routed_branch_doc(false_route, self.view.ty(c.false_type)),
+                self.build_routed_branch_doc(false_route, false_type),
             );
             q_parts.push(trailing);
             q_parts.push(branch);
@@ -1271,7 +1274,7 @@ impl<'a> Printer<'a> {
             self.push_breaking_conditional_branch(
                 &mut q_parts,
                 colon_end,
-                self.view.ty(c.false_type),
+                false_type,
                 false_type_start,
                 false_claim,
             );
@@ -1282,7 +1285,7 @@ impl<'a> Printer<'a> {
             self.build_comments_between(check_type_end, extends_kw_start, CommentSpacing::Leading);
 
         d.concat(&[
-            self.build_conditional_check_doc(self.view.ty(c.check_type)),
+            self.build_conditional_check_doc(check_type),
             comments_before_extends,
             d.text(" extends"),
             extends_type_doc,
@@ -1540,11 +1543,9 @@ impl<'a> Printer<'a> {
         // just the `K in ...` binding — the value keeps formatting normally, and the
         // directive itself is emitted by the bracket's own comment machinery (the
         // line-comment break shell, or the inline loop below).
+        let constraint = self.view.ty(m.type_parameter.constraint);
         if self.mapped_gap_frozen(bracket_pos + 1, param_name_start) {
-            interior_parts.push(self.raw_source_range(
-                param_name_start,
-                self.view.ty(m.type_parameter.constraint).span().end,
-            ));
+            interior_parts.push(self.raw_source_range(param_name_start, constraint.span().end));
         } else {
             interior_parts
                 .push(self.ident_name_doc(m.type_parameter.name, m.type_parameter.span.start));
@@ -1560,19 +1561,19 @@ impl<'a> Printer<'a> {
                 name_end,
                 "in ",
                 " in ",
-                self.view.ty(m.type_parameter.constraint),
+                constraint,
             );
         }
 
         // as clause: `as NewKeyType`
         // Track the end of the last element inside brackets (for bracket-close comments)
-        let mut last_inner_end = self.view.ty(m.type_parameter.constraint).span().end;
+        let mut last_inner_end = constraint.span().end;
         if let Some(name_type) = self.view.opt_ty(m.name_type) {
             // Comments around the `as` keyword: `Constraint /* c1 */ as /* c2 */ NewKey`
             // — the same clause shape as key→`in` above, same emitter.
             self.push_mapped_keyword_clause(
                 &mut interior_parts,
-                self.view.ty(m.type_parameter.constraint).span().end,
+                constraint.span().end,
                 "as ",
                 " as ",
                 name_type,
@@ -2079,14 +2080,16 @@ impl<'a> Printer<'a> {
         // answer would blind every gate it guards — same axis note as
         // `build_type_arguments_doc`; equivalent today, since ownership is set only
         // in expression position and a `[…]` window holds types).
+        let element_types = self.view.ty_list(t.element_types);
         if !self.has_comments_on_page_between(t.span.start, t.span.end) {
             let mut parts = DocBuf::new();
-            for (i, &elem) in self.view.ty_list(t.element_types).iter().enumerate() {
+            for (i, &elem) in element_types.iter().enumerate() {
+                let elem = self.view.ty(elem);
                 if i > 0 {
                     parts.push(d.text(","));
                     parts.push(d.line());
                 }
-                parts.push(self.build_tuple_element_doc(self.view.ty(elem), multi_element));
+                parts.push(self.build_tuple_element_doc(elem, multi_element));
             }
             return d.group(bracketed_list_body(
                 d,
@@ -2140,7 +2143,7 @@ impl<'a> Printer<'a> {
                 });
         if has_leading_line_comment
             || self.has_line_comments_in_delimited_list(
-                self.view.ty_list(t.element_types),
+                element_types,
                 |&ty| self.tuple_elem(self.view.ty(ty)).span(),
                 t.span.end - 1,
             )
@@ -2152,7 +2155,7 @@ impl<'a> Printer<'a> {
                 .any(|&e| self.leading_edge_shell_line_comment(self.tuple_elem(self.view.ty(e))))
             || self.has_own_line_block_comments_in_bracket_list(
                 t.span,
-                self.view.ty_list(t.element_types),
+                element_types,
                 |&ty| self.tuple_elem(self.view.ty(ty)).span(),
             )
         {
@@ -2167,7 +2170,8 @@ impl<'a> Printer<'a> {
         // past where the comma was (no trailing comma; prettier relocates before; see
         // conformance_prettier_ts_comments.md §Comment relocation).
         let mut last_after_comma = DocBuf::new();
-        for (i, &elem) in self.view.ty_list(t.element_types).iter().enumerate() {
+        for (i, &elem) in element_types.iter().enumerate() {
+            let elem = self.view.ty(elem);
             if i > 0 {
                 parts.push(d.text(","));
                 parts.push(d.line());
@@ -2177,12 +2181,7 @@ impl<'a> Printer<'a> {
             // (the directive itself is emitted by the gap emitter below); a
             // multi-line frozen slice forces the broken layout (a verbatim span is
             // `will_break`-opaque, so the forcing is explicit).
-            let frozen = self.list_member_frozen(
-                t.span.start + 1,
-                self.view.ty_list(t.element_types),
-                i,
-                false,
-            );
+            let frozen = self.list_member_frozen(t.span.start + 1, element_types, i, false);
 
             // The `[`/`,`→element gap is this seam's: a block run glued to a union
             // element's first member is handed into the union
@@ -2190,7 +2189,7 @@ impl<'a> Printer<'a> {
             // once the element breaks (`union_hug_gap_block_comment_container`); the
             // gap emitter then stops at the claim so exactly one of the two prints it.
             let handed = (!frozen)
-                .then(|| self.union_seam_run_handoff(prev_end, self.view.ty(elem)))
+                .then(|| self.union_seam_run_handoff(prev_end, elem))
                 .flatten();
 
             // Add inline leading block comments (after previous comma or `[`). A union
@@ -2199,27 +2198,27 @@ impl<'a> Printer<'a> {
             // separator keeps that break when the tuple breaks (prettier's soft `line`);
             // glued onto the union, the broke-after block came back as the glued
             // spelling, which the next pass binds to the first member and declines.
-            if matches!(self.view.ty(elem), TSType::Union(_)) && handed.is_none() && !frozen {
+            if matches!(elem, TSType::Union(_)) && handed.is_none() && !frozen {
                 self.push_leading_comment_run(
                     &mut parts,
-                    self.comments_to_emit_between(prev_end, self.view.ty(elem).span().start),
-                    self.view.ty(elem).span().start,
+                    self.comments_to_emit_between(prev_end, elem.span().start),
+                    elem.span().start,
                     LeadingGlue::Adjacent,
                 );
             } else if handed.is_some() || frozen {
                 let leading = self.build_inline_comments_between_doc_trailing_space(
                     prev_end,
-                    handed.unwrap_or_else(|| self.view.ty(elem).span().start),
+                    handed.unwrap_or_else(|| elem.span().start),
                 );
                 parts.push(leading);
             }
 
             if frozen {
-                if self.frozen_list_member_multiline(self.view.ty(elem)) {
+                if self.frozen_list_member_multiline(elem) {
                     force_break = true;
                 }
-                parts.push(self.build_frozen_list_member_doc(self.view.ty(elem)));
-            } else if let TSType::Union(u) = self.view.ty(elem) {
+                parts.push(self.build_frozen_list_member_doc(elem));
+            } else if let TSType::Union(u) = elem {
                 parts.push(self.build_union_value_doc(prev_end, u).doc);
             } else {
                 // The array family's element: its leading run plus the element in one
@@ -2229,19 +2228,15 @@ impl<'a> Printer<'a> {
                 // multi-line block, whose forced break opens the group. The kind-keyed space
                 // this replaced glued the element onto a multi-line block's closing line.
                 parts.push(self.build_list_element_group_from_comments(
-                    self.comments_to_emit_between(prev_end, self.view.ty(elem).span().start),
-                    self.view.ty(elem).span().start,
-                    self.build_tuple_element_doc(self.view.ty(elem), multi_element),
+                    self.comments_to_emit_between(prev_end, elem.span().start),
+                    elem.span().start,
+                    self.build_tuple_element_doc(elem, multi_element),
                 ));
             }
 
-            let elem_end = self.view.ty(elem).span().end;
+            let elem_end = elem.span().end;
             prev_end = if i + 1 < t.element_types.len() {
-                let next_start = self
-                    .view
-                    .ty(self.view.ty_list(t.element_types)[i + 1])
-                    .span()
-                    .start;
+                let next_start = self.view.ty(element_types[i + 1]).span().start;
                 self.push_item_trailing_run(&mut parts, elem_end, next_start)
             } else {
                 let before_close = t.span.end - 1;
@@ -2388,14 +2383,13 @@ impl<'a> Printer<'a> {
     /// ([`Self::build_postfix_type_doc`]).
     pub(super) fn array_type_head(&self, arr: &TSArrayType<'_>) -> ArrayTypeHead {
         let d = self.d();
+        let element_type = self.view.ty(arr.element_type);
         // A comment-free parenthesized union element EXPANDS its parens when it breaks
         // (`(⏎\t| A⏎\t| B⏎)[]`) instead of gluing the leading `|` to the `(`. Any other
         // parenthesized element (conditional / function / intersection) keeps glued
         // parens and breaks internally (`(T extends X⏎\t? Y⏎\t: Z)[]`). See the shared
         // `build_expanded_parenthesized_union_opt`.
-        if let Some(union_doc) =
-            self.build_expanded_parenthesized_union_opt(self.view.ty(arr.element_type))
-        {
+        if let Some(union_doc) = self.build_expanded_parenthesized_union_opt(element_type) {
             return ArrayTypeHead::Whole(d.concat(&[union_doc, self.build_array_suffix_doc(arr)]));
         }
         // An alone-on-line format-ignore directive INSIDE a paren-shell element
@@ -2407,16 +2401,13 @@ impl<'a> Printer<'a> {
         // holds a comment, and comment preservation outranks redundant-paren removal
         // under a freeze. Trailing shell-gap comments are lifted after the inner
         // (`with_stripped_paren_trailing`), so every shell comment prints once.
-        if let Some(inner) = self.paren_interior_routed_inner(self.view.ty(arr.element_type)) {
-            let value_doc = self.build_routed_inner_doc(
-                self.view.ty(arr.element_type),
-                inner,
-                RoutedScope::Transparent,
-            );
+        if let Some(inner) = self.paren_interior_routed_inner(element_type) {
+            let value_doc =
+                self.build_routed_inner_doc(element_type, inner, RoutedScope::Transparent);
             let mut parts: DocBuf = smallvec![d.text("(")];
             self.append_keyword_value_line_comments(
                 &mut parts,
-                self.view.ty(arr.element_type).span().start + 1,
+                element_type.span().start + 1,
                 inner.span().start,
                 value_doc,
             );
@@ -2428,8 +2419,7 @@ impl<'a> Printer<'a> {
         // A bare negative literal leading the element's run of indexed accesses takes a
         // pair of its own (`-1[K][]` → `(-1)[K][]`): recorded here, ahead of the element's
         // build, for the indexed-access object rule that prints it.
-        if let Some(literal) = array_run_negative_literal(self.view, self.view.ty(arr.element_type))
-        {
+        if let Some(literal) = array_run_negative_literal(self.view, element_type) {
             self.negative_literal_pair_targets.mark(literal.span());
         }
         // The `[]` suffix rides OUTSIDE the required-pair decision — the shell may already

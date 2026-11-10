@@ -465,23 +465,20 @@ impl<'a> Printer<'a> {
         has_comments: bool,
         rescan: ShiftRescan,
     ) -> DocId {
+        let params = self.view.ty_list(args.params);
         // The only layout that can glue the pair: the expansion builder starts every
         // argument on its own line, and a function type never takes the inline hug.
         let open_separated = rescan == ShiftRescan::Never
-            && self.angle_open_meets_angle(
-                args.span.start + 1,
-                self.view.ty(self.view.ty_list(args.params)[0]),
-            );
+            && self.angle_open_meets_angle(args.span.start + 1, self.view.ty(params[0]));
         self.build_angle_list_doc(
             args.span,
             args.params.len(),
-            |i| self.view.ty(self.view.ty_list(args.params)[i]).span(),
+            |i| self.view.ty(params[i]).span(),
             |i, frozen, gap_start| {
+                let param = self.view.ty(params[i]);
                 if frozen {
-                    self.build_frozen_list_member_doc(
-                        self.view.ty(self.view.ty_list(args.params)[i]),
-                    )
-                } else if let TSType::Union(u) = self.view.ty(self.view.ty_list(args.params)[i]) {
+                    self.build_frozen_list_member_doc(param)
+                } else if let TSType::Union(u) = param {
                     // The `<`/`,`→argument gap is this seam's: a block run glued to
                     // the union's first member is handed in (`build_union_value_doc`),
                     // declining the hug and landing after the pipe once the argument
@@ -489,16 +486,11 @@ impl<'a> Printer<'a> {
                     // emitter stopped at the claim below.
                     self.build_union_value_doc(gap_start, u).doc
                 } else {
-                    self.build_type_arg_doc(self.view.ty(self.view.ty_list(args.params)[i]), true)
+                    self.build_type_arg_doc(param, true)
                 }
             },
-            |i, gap_start| {
-                self.union_seam_run_handoff(
-                    gap_start,
-                    self.view.ty(self.view.ty_list(args.params)[i]),
-                )
-            },
-            |i| self.frozen_list_member_multiline(self.view.ty(self.view.ty_list(args.params)[i])),
+            |i, gap_start| self.union_seam_run_handoff(gap_start, self.view.ty(params[i])),
+            |i| self.frozen_list_member_multiline(self.view.ty(params[i])),
             has_comments,
             open_separated,
         )

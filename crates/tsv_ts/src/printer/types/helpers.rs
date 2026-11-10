@@ -249,26 +249,22 @@ pub(in crate::printer) fn is_huggable_type(view: AstView<'_>, ts_type: &TSType<'
 /// (see [`Printer::type_arg_union_prints_hugged`](super::super::Printer::type_arg_union_prints_hugged)
 /// for the one shape that does).
 pub(super) fn union_hug_shape(view: AstView<'_>, union: &TSUnionType<'_>) -> bool {
-    // Find exactly one object-like type
-    let mut object_idx = None;
-    for (i, &t) in view.ty_list(union.types).iter().enumerate() {
-        if is_object_like_type(view, view.ty(t)) {
-            if object_idx.is_some() {
+    // Exactly one object-like member, and every other member a void type: one pass, each
+    // member resolved once
+    let mut has_object = false;
+    for &t in view.ty_list(union.types) {
+        let member = view.ty(t);
+        if is_object_like_type(view, member) {
+            if has_object {
                 // More than one object-like type — don't hug
                 return false;
             }
-            object_idx = Some(i);
+            has_object = true;
+        } else if !is_void_type(view, member) {
+            return false;
         }
     }
-    let Some(obj_idx) = object_idx else {
-        return false;
-    };
-
-    // All non-object members must be void types
-    view.ty_list(union.types)
-        .iter()
-        .enumerate()
-        .all(|(i, &t)| i == obj_idx || is_void_type(view, view.ty(t)))
+    has_object
 }
 
 /// Check if a type is "object-like" for union hugging purposes.
