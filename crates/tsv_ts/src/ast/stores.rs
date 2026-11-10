@@ -29,7 +29,7 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Deref;
 
-use tsv_lang::store::{Id, ListBuf, ListMark, Row, Store};
+use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, Row, Store};
 
 use super::{
     ArrowFunctionExpression, AstView, CatchClause, ClassDeclaration, ClassExpression, ClassMember,
@@ -303,11 +303,11 @@ macro_rules! value_runs {
                 }
             }
 
-            /// The current tops of the scratch stacks.
+            /// The current tops of the scratch stacks, their heights left for `group` to check.
             #[inline]
-            pub(crate) fn marks(&self) -> RunMarks {
+            pub(crate) fn marks(&self, group: &mut MarkGroup) -> RunMarks {
                 RunMarks {
-                    $($field: self.$scratch.mark(),)*
+                    $($field: self.$scratch.mark_in(group),)*
                 }
             }
 
@@ -466,17 +466,21 @@ pub(crate) struct ScratchMarks {
 }
 
 impl AstStores<'_> {
-    /// The current tops of the scratch stacks.
+    /// The current tops of the scratch stacks, every height checked against the `u32` a mark
+    /// holds by one [`MarkGroup`].
     #[inline]
     pub(crate) fn scratch_marks(&self) -> ScratchMarks {
-        ScratchMarks {
-            exprs: self.expr_scratch.mark(),
-            lists: self.expr_list_scratch.mark(),
-            opt_lists: self.expr_opt_scratch.mark(),
-            stmt_lists: self.stmt_list_scratch.mark(),
-            ty_lists: self.ty_list_scratch.mark(),
-            runs: self.runs.marks(),
-        }
+        let mut group = MarkGroup::new();
+        let marks = ScratchMarks {
+            exprs: self.expr_scratch.mark_in(&mut group),
+            lists: self.expr_list_scratch.mark_in(&mut group),
+            opt_lists: self.expr_opt_scratch.mark_in(&mut group),
+            stmt_lists: self.stmt_list_scratch.mark_in(&mut group),
+            ty_lists: self.ty_list_scratch.mark_in(&mut group),
+            runs: self.runs.marks(&mut group),
+        };
+        group.check();
+        marks
     }
 
     /// Truncates the scratch stacks to `marks`, discarding the frames opened since. The
