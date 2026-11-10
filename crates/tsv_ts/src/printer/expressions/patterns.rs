@@ -83,7 +83,7 @@ struct PatternTail<'a> {
     /// Just past the closing `}`/`]` — see [`Printer::pattern_body_end`].
     body_end: u32,
     optional: bool,
-    type_annotation: Option<&'a ast::TSTypeAnnotation<'a>>,
+    type_annotation: Option<&'a ast::TSTypeAnnotation>,
     /// The pattern is a HUGGED sole parameter ([`Printer::build_hugged_object_pattern_doc`]),
     /// so an object-type literal annotating it prints without a group of its own too.
     hugged: bool,
@@ -543,7 +543,7 @@ impl<'a> Printer<'a> {
         &self,
         span: Span,
         optional: bool,
-        type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
+        type_annotation: Option<&ast::TSTypeAnnotation>,
         last_content_end: u32,
         closing: u8,
     ) -> u32 {
@@ -1203,7 +1203,7 @@ impl<'a> Printer<'a> {
     ///
     /// String keys that are valid identifiers are normalized to unquoted form:
     /// `{"key": value}` → `{key: value}`
-    fn build_object_pattern_property_doc(&self, prop: &ObjectPatternProperty<'_>) -> DocId {
+    fn build_object_pattern_property_doc(&self, prop: &ObjectPatternProperty) -> DocId {
         // A property is a list element: a run its default deferred out of a stripped pair
         // flushes at its comma.
         self.build_list_element_doc(prop.span().start, || {
@@ -1211,10 +1211,7 @@ impl<'a> Printer<'a> {
         })
     }
 
-    fn build_object_pattern_property_doc_uncounted(
-        &self,
-        prop: &ObjectPatternProperty<'_>,
-    ) -> DocId {
+    fn build_object_pattern_property_doc_uncounted(&self, prop: &ObjectPatternProperty) -> DocId {
         let d = self.d();
         match prop {
             ObjectPatternProperty::Property(p) => {
@@ -1887,7 +1884,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a rest element
-    pub(super) fn build_rest_element_doc(&self, rest: &ast::RestElement<'_>) -> DocId {
+    pub(super) fn build_rest_element_doc(&self, rest: &ast::RestElement) -> DocId {
         let d = self.d();
         // Comments between `...` and the argument (e.g., `.../* c */ args`). Skipped on
         // the comment-free path — rest/spread elements are everywhere (`f(...xs)`,

@@ -132,7 +132,7 @@ impl<'a> Printer<'a> {
     /// [`build_type_annotation_doc`]: Self::build_type_annotation_doc
     pub(crate) fn build_type_annotation_doc_public(
         &self,
-        annotation: &ast::TSTypeAnnotation<'_>,
+        annotation: &ast::TSTypeAnnotation,
     ) -> DocId {
         self.build_type_annotation_doc(annotation)
     }
@@ -141,7 +141,7 @@ impl<'a> Printer<'a> {
     /// [`AnnotationParens::AsWritten`] entry to [`Self::build_type_annotation_doc_parens`].
     pub(in crate::printer) fn build_type_annotation_doc(
         &self,
-        annotation: &ast::TSTypeAnnotation<'_>,
+        annotation: &ast::TSTypeAnnotation,
     ) -> DocId {
         self.build_type_annotation_doc_parens(annotation, AnnotationParens::AsWritten)
     }
@@ -151,7 +151,7 @@ impl<'a> Printer<'a> {
     /// passes anything but [`AnnotationParens::AsWritten`].
     fn build_type_annotation_doc_parens(
         &self,
-        annotation: &ast::TSTypeAnnotation<'_>,
+        annotation: &ast::TSTypeAnnotation,
         parens: AnnotationParens,
     ) -> DocId {
         let annotation_type = self.view.ty(annotation.type_annotation);
@@ -294,7 +294,7 @@ impl<'a> Printer<'a> {
     /// reads as the arrow's own — a freeze that unmakes the disambiguation it froze.
     fn build_annotation_own_line_directive_doc(
         &self,
-        annotation: &ast::TSTypeAnnotation<'_>,
+        annotation: &ast::TSTypeAnnotation,
         parens: AnnotationParens,
     ) -> DocId {
         let colon_end = annotation.span.start + 1;
@@ -416,7 +416,7 @@ impl<'a> Printer<'a> {
         &self,
         colon_end: u32,
         type_start: u32,
-        u: &ast::TSUnionType<'_>,
+        u: &ast::TSUnionType,
         gap_may_have_comments: bool,
     ) -> DocId {
         // A glued block run between `:` and a union with no authored leading `|` is
@@ -558,7 +558,7 @@ impl<'a> Printer<'a> {
     /// Returns doc starting with `: ` (the annotation prefix).
     pub(in crate::printer) fn build_type_annotation_doc_wrapping(
         &self,
-        annotation: &ast::TSTypeAnnotation<'_>,
+        annotation: &ast::TSTypeAnnotation,
     ) -> DocId {
         self.build_type_annotation_doc_with_wrapping(annotation, true, AnnotationParens::AsWritten)
     }
@@ -572,7 +572,7 @@ impl<'a> Printer<'a> {
     /// Simple cases like `Promise<void>` should NOT wrap - we want params to break first.
     pub(in crate::printer) fn build_type_annotation_doc_for_return_type(
         &self,
-        annotation: &ast::TSTypeAnnotation<'_>,
+        annotation: &ast::TSTypeAnnotation,
     ) -> DocId {
         self.build_type_annotation_doc_with_wrapping(annotation, false, AnnotationParens::AsWritten)
     }
@@ -584,7 +584,7 @@ impl<'a> Printer<'a> {
     /// token that cannot be mistaken for a `=>`, so they keep the `AsWritten` entry.
     pub(in crate::printer) fn build_arrow_return_type_annotation_doc(
         &self,
-        annotation: &ast::TSTypeAnnotation<'_>,
+        annotation: &ast::TSTypeAnnotation,
     ) -> DocId {
         self.build_type_annotation_doc_with_wrapping(
             annotation,
@@ -618,7 +618,7 @@ impl<'a> Printer<'a> {
     /// `None` leaves the annotation to the ordinary emitters.
     pub(in crate::printer) fn build_arrow_return_nested_tail_doc(
         &self,
-        annotation: &ast::TSTypeAnnotation<'_>,
+        annotation: &ast::TSTypeAnnotation,
     ) -> Option<DocId> {
         let d = self.d();
         let TSType::Parenthesized(p) = self.view.ty(annotation.type_annotation) else {
@@ -759,7 +759,7 @@ impl<'a> Printer<'a> {
     /// When false, only wraps if type args would benefit from breaking.
     fn build_type_annotation_doc_with_wrapping(
         &self,
-        annotation: &ast::TSTypeAnnotation<'_>,
+        annotation: &ast::TSTypeAnnotation,
         always_wrap: bool,
         parens: AnnotationParens,
     ) -> DocId {
@@ -900,7 +900,7 @@ impl<'a> Printer<'a> {
     /// has no line-comment handling and would otherwise drop them.
     fn build_intersection_type_annotation_doc(
         &self,
-        intersection: &ast::TSIntersectionType<'_>,
+        intersection: &ast::TSIntersectionType,
         colon_end: u32,
     ) -> DocId {
         let d = self.d();

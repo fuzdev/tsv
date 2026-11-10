@@ -70,7 +70,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::Equals)?;
 
         // Parse the type
-        let type_annotation = self.parse_type()?;
+        let type_annotation = self.parse_type()?.id();
         let end = self.semicolon_end()?;
 
         #[cfg(feature = "_internal_ast_census")]
@@ -496,7 +496,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (type predicates included via `parse_return_type_annotation`).
     pub(in crate::parser) fn parse_optional_return_type(
         &mut self,
-    ) -> Result<Option<TSTypeAnnotation<'arena>>, Error> {
+    ) -> Result<Option<TSTypeAnnotation>, Error> {
         if self.check(&TokenKind::Colon) {
             Ok(Some(self.parse_return_type_annotation()?))
         } else {
@@ -509,7 +509,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// This expects the colon to NOT be consumed yet.
     pub(in crate::parser) fn parse_return_type_annotation(
         &mut self,
-    ) -> Result<TSTypeAnnotation<'arena>, Error> {
+    ) -> Result<TSTypeAnnotation, Error> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
         // one wire level: the `TSTypeAnnotation` (the depth limit's count)
@@ -522,7 +522,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_return_type_inner(
         &mut self,
         start: u32,
-    ) -> Result<TSTypeAnnotation<'arena>, Error> {
+    ) -> Result<TSTypeAnnotation, Error> {
         // The predicate itself starts at the first token after `:`, not at `:`
         let predicate_start = self.current_pos().0 as u32;
 
@@ -560,8 +560,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 // Parse the type; two wire levels: the `TSTypePredicate` and the
                 // `TSTypeAnnotation` its type sits in
-                let type_node = self.nested(2, Self::parse_type)?;
-                let end = type_node.span().end;
+                let type_node = self.nested(2, Self::parse_type)?.id();
+                let end = self.ty(type_node).span().end;
 
                 let predicate = TSTypePredicate {
                     parameter_name,
@@ -571,7 +571,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 };
 
                 return Ok(TSTypeAnnotation {
-                    type_annotation: self.alloc(TSType::TypePredicate(predicate)),
+                    type_annotation: self.push_ty(TSType::TypePredicate(predicate)),
                     span: Span::new(start, end),
                 });
             }
@@ -592,7 +592,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 };
 
                 return Ok(TSTypeAnnotation {
-                    type_annotation: self.alloc(TSType::TypePredicate(predicate)),
+                    type_annotation: self.push_ty(TSType::TypePredicate(predicate)),
                     span: Span::new(start, id_end as u32),
                 });
             }
@@ -606,8 +606,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         // Regular type annotation
-        let type_node = self.parse_type()?;
-        let end = type_node.span().end;
+        let type_node = self.parse_type()?.id();
+        let end = self.ty(type_node).span().end;
 
         Ok(TSTypeAnnotation {
             type_annotation: type_node,

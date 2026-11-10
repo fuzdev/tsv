@@ -110,7 +110,7 @@ fn linearize_chain<'a>(
 /// Returns whether the chain holds a long-curried pair ([`finalize_chain_nodes`]).
 pub(crate) fn linearize_chain_from_call_into<'a>(
     view: AstView<'a>,
-    call: &'a ast::CallExpression<'_>,
+    call: &'a ast::CallExpression,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -443,7 +443,7 @@ fn mark_own_call_layout(nodes: &mut [ChainNode<'_>], printer: &Printer<'_>) -> b
 /// `printMemberChain` redirect below it.
 fn template_preempts_chain_redirect(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
 ) -> bool {
     call.arguments.len() == 1
@@ -607,7 +607,7 @@ pub(crate) fn member_object_paren_leading_start(
 /// inside the parens for ([`paren_pair_keeps_leading_run`]).
 pub(crate) fn call_callee_paren_leading_start(
     view: AstView<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
 ) -> Option<u32> {
     let callee = view.expr(call.callee);
@@ -684,7 +684,7 @@ enum PendingLink<'a> {
     /// A call: push its node, after handing an IIFE callee base its leading `(` where the
     /// walk descended into the callee ([`finish_call_callee`]).
     Call {
-        call: &'a ast::CallExpression<'a>,
+        call: &'a ast::CallExpression,
         span: Span,
         /// Whether the walk descended into the callee — `false` where the callee stopped it as
         /// a base of its own ([`call_callee_step`]).
@@ -1045,8 +1045,8 @@ fn member_object_step<'a>(
 /// wrong place or lose the comments between the expression and the `<`.
 pub(crate) fn transparent_instantiation_callee<'a>(
     view: AstView<'a>,
-    call: &'a ast::CallExpression<'a>,
-) -> Option<&'a ast::TSInstantiationExpression<'a>> {
+    call: &'a ast::CallExpression,
+) -> Option<&'a ast::TSInstantiationExpression> {
     match &view.expr(call.callee).kind {
         ExpressionKind::TSInstantiationExpression(inst)
             if call.optional && call.type_arguments.is_none() =>
@@ -1079,7 +1079,7 @@ pub(crate) fn transparent_instantiation_callee<'a>(
 /// is the `>`.
 pub(crate) fn transparent_callee_sealed_chain<'a>(
     view: AstView<'a>,
-    call: &'a ast::CallExpression<'a>,
+    call: &'a ast::CallExpression,
 ) -> Option<(&'a Expression<'a>, u32)> {
     let inst = transparent_instantiation_callee(view, call)?;
     let open = view.expr(call.callee).span().start;
@@ -1095,7 +1095,7 @@ pub(crate) fn transparent_callee_sealed_chain<'a>(
 /// ([`transparent_callee_sealed_chain`]). All other callees are walked on.
 fn linearize_call_callee<'a>(
     view: AstView<'a>,
-    call: &'a ast::CallExpression<'_>,
+    call: &'a ast::CallExpression,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -1113,7 +1113,7 @@ fn linearize_call_callee<'a>(
 #[inline(always)]
 fn call_callee_step<'a>(
     view: AstView<'a>,
-    call: &'a ast::CallExpression<'_>,
+    call: &'a ast::CallExpression,
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -1149,7 +1149,7 @@ fn call_callee_step<'a>(
 #[inline(always)]
 fn finish_call_callee(
     view: AstView<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     nodes: &mut ChainNodeVec<'_>,
 ) {

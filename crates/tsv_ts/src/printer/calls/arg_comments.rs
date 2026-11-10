@@ -322,7 +322,7 @@ pub(super) fn build_arg_gap_docs(
 
 /// Check if a call expression has comments between any of its arguments
 pub(super) fn has_inter_argument_comments(
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     printer: &Printer<'_>,
 ) -> bool {
     has_inter_argument_comments_slice(printer.view.list(call.arguments), printer)
@@ -474,7 +474,7 @@ pub(super) fn any_arg_gap_has_comment_on_page(
 /// Returns true for line comments or standalone block comments (on their own line,
 /// not inline with either neighbor). Inline block comments do not force expansion.
 pub(super) fn any_comment_forces_expansion(
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     printer: &Printer<'_>,
     paren_open: u32,
@@ -667,7 +667,7 @@ pub(super) fn first_arg_has_any_comments(
 /// either between the arg and its comma, or between the last arg and the closing paren.
 /// Example: `fn(a && b, // trailing)` - the `// trailing` is a trailing comment on `a && b`
 pub(super) fn has_trailing_comments_on_args(
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     printer: &Printer<'_>,
 ) -> bool {

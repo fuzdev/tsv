@@ -286,7 +286,7 @@ fn ends_open_optional_chain(view: AstView<'_>, head: &Expression<'_>) -> bool {
 
 impl ParenContext {
     /// The [`ParenContext::Callee`] context of `call`'s callee.
-    pub(crate) fn callee_of(call: &CallExpression<'_>) -> Self {
+    pub(crate) fn callee_of(call: &CallExpression) -> Self {
         Self::Callee {
             list_joins_call: !call.optional && call.type_arguments.is_none(),
         }

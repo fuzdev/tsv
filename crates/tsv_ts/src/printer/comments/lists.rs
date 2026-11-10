@@ -1626,7 +1626,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn append_signature_end_comments(
         &self,
         parts: &mut DocBuf,
-        return_type: Option<&ast::TSTypeAnnotation<'_>>,
+        return_type: Option<&ast::TSTypeAnnotation>,
         paren_pos: Option<u32>,
         span_end: u32,
         deferred: &mut DocBuf,

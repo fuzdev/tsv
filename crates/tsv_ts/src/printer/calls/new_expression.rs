@@ -53,7 +53,7 @@ impl<'a> Printer<'a> {
     /// keeps its line instead of being pulled up to trail `new`.
     pub(super) fn build_new_doc_with_wrapping(
         &self,
-        new_expr: &ast::NewExpression<'_>,
+        new_expr: &ast::NewExpression,
         new_expr_span: Span,
     ) -> DocId {
         let callee = self.view.expr(new_expr.callee);
@@ -138,7 +138,7 @@ impl<'a> Printer<'a> {
     /// already emitted `new` and the gap's continuation supplies the separator.
     fn build_new_doc_after_keyword(
         &self,
-        new_expr: &ast::NewExpression<'_>,
+        new_expr: &ast::NewExpression,
         span: Span,
         keyword: DocId,
         frozen: Option<Span>,
@@ -266,7 +266,7 @@ impl<'a> Printer<'a> {
     /// taken it so the caller can hang this whole doc under the run.
     fn build_new_args_doc(
         &self,
-        new_expr: &ast::NewExpression<'_>,
+        new_expr: &ast::NewExpression,
         new_expr_span: Span,
         callee_with_types: DocId,
         paren_open: u32,
@@ -861,7 +861,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a new expression (for nested contexts)
-    pub(crate) fn build_new_doc(&self, new_expr: &ast::NewExpression<'_>, span: Span) -> DocId {
+    pub(crate) fn build_new_doc(&self, new_expr: &ast::NewExpression, span: Span) -> DocId {
         self.build_new_doc_with_wrapping(new_expr, span)
     }
 

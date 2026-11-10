@@ -16,10 +16,7 @@ use crate::ast;
 ///
 /// Patterns:
 /// - `require.resolve(string)` → don't break args, let assignment break
-pub(super) fn is_module_path_no_break(
-    call: &ast::CallExpression<'_>,
-    printer: &Printer<'_>,
-) -> bool {
+pub(super) fn is_module_path_no_break(call: &ast::CallExpression, printer: &Printer<'_>) -> bool {
     // Must have exactly 1 argument that is a string literal
     if call.arguments.len() != 1
         || !is_string_literal(printer.view.expr(printer.view.list(call.arguments)[0]))
@@ -50,7 +47,7 @@ pub(super) fn is_module_path_no_break(
 /// - `require.resolve.paths(string)` → break before `.paths`
 /// - `import.meta.resolve(string)` → break before `.resolve`
 pub(super) fn get_module_path_chain_break<'a>(
-    call: &'a ast::CallExpression<'a>,
+    call: &'a ast::CallExpression,
     printer: &Printer<'a>,
 ) -> Option<(&'a ast::Expression<'a>, &'a ast::Identifier<'a>)> {
     // Must have exactly 1 argument that is a string literal

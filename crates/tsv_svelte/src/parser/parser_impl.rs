@@ -807,7 +807,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<TSTypeAnnotation<'arena>, Error> {
+    ) -> Result<TSTypeAnnotation, Error> {
         let (ta, comments) = self.with_island_stores(|this, stores| {
             tsv_ts::__private::parse_type_annotation_partial(
                 source,

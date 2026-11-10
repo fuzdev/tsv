@@ -71,7 +71,7 @@ fn build_groups_flat_docs<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) 
 }
 
 /// Check if a single-arg call has an object/array that will break
-fn call_has_breaking_single_arg(call: &CallExpression<'_>, printer: &Printer<'_>) -> bool {
+fn call_has_breaking_single_arg(call: &CallExpression, printer: &Printer<'_>) -> bool {
     if call.arguments.len() != 1 {
         return false;
     }
@@ -713,7 +713,7 @@ fn groups_exceed_cutoff(
 /// long path — is not asked here; the poorly-breakable walk's own member-gap comment gate
 /// answers it, scoped the way that walk needs (a same-line gap comment only).
 pub(crate) fn call_prints_as_member_chain(
-    call: &CallExpression<'_>,
+    call: &CallExpression,
     span: Span,
     printer: &Printer<'_>,
 ) -> bool {
@@ -1554,7 +1554,7 @@ fn other_calls_have_function_arguments<'a>(
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
 ) -> bool {
-    let takes_function_argument = |call: &CallExpression<'_>| {
+    let takes_function_argument = |call: &CallExpression| {
         view.list(call.arguments).iter().any(|a| {
             matches!(
                 view.expr(*a).kind,
@@ -1562,7 +1562,7 @@ fn other_calls_have_function_arguments<'a>(
             )
         })
     };
-    let mut pending: Option<&CallExpression<'_>> = None;
+    let mut pending: Option<&CallExpression> = None;
     for call in first_groups
         .iter()
         .chain(rest_groups.iter())

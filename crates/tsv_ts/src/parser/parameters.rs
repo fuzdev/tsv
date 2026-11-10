@@ -228,7 +228,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_rest_param_tail(
         &mut self,
         arg_end: u32,
-    ) -> Result<(bool, Option<TSTypeAnnotation<'arena>>, u32), Error> {
+    ) -> Result<(bool, Option<TSTypeAnnotation>, u32), Error> {
         let optional = self.eat(TokenKind::Question)?;
         if self.check(&TokenKind::Colon) {
             let ta = self.parse_type_annotation()?;

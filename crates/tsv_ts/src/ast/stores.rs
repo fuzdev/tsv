@@ -1,6 +1,5 @@
-//! The stores a parse's expressions and statements live in, and the type stores that nothing
-//! fills yet, beside the arena that holds the rest of the tree, and the per-thread parking of
-//! their capacity.
+//! The stores a parse's expressions, statements and types live in, beside the arena that holds
+//! the rest of the tree, and the per-thread parking of their capacity.
 //!
 //! [`AstStores`] is one document's: every parse of a document, embedded islands included,
 //! appends to the same one, so an id means the same row wherever in the document it is
@@ -110,15 +109,8 @@ pub struct AstStores<'arena> {
     pub(crate) stmts: Store<Statement<'arena>>,
     pub(crate) stmt_lists: Store<StmtId>,
     pub(crate) stmt_list_scratch: ListBuf<StmtId>,
-    // TODO: the type stores ride the stores' lifecycle (`new`, `park`, the scratch marks) but
-    // nothing pushes a row or reads one yet: types are still arena nodes. The type parser's
-    // construction fills them and the view's type accessors read them.
     pub(crate) tys: Store<TSType<'arena>>,
-    // TODO: no list is flushed here until the type parser builds its lists as id runs; the
-    // view's `ty_list` reads them.
     pub(crate) ty_lists: Store<TyId>,
-    // TODO: no type list frame opens on this stack until the type parser's list builders
-    // push their elements' ids here.
     pub(crate) ty_list_scratch: ListBuf<TyId>,
 }
 

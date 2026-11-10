@@ -711,7 +711,7 @@ impl<'a> Printer<'a> {
     /// ```
     pub(in crate::printer) fn build_type_parameter_instantiation_doc(
         &self,
-        inst: &ast::TSTypeParameterInstantiation<'_>,
+        inst: &ast::TSTypeParameterInstantiation,
     ) -> DocId {
         let d = self.d();
         if inst.params.is_empty() {
@@ -815,7 +815,7 @@ impl<'a> Printer<'a> {
     /// `has_comments` is the caller's whole-`<…>` window answer.
     pub(in crate::printer) fn sole_nullable_reference_union_routes(
         &self,
-        args: &ast::TSTypeParameterInstantiation<'_>,
+        args: &ast::TSTypeParameterInstantiation,
         has_comments: bool,
     ) -> bool {
         args.params.len() == 1
@@ -845,7 +845,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn after_operator_nullable_union_doc(
         &self,
         value_doc: DocId,
-        args: Option<&ast::TSTypeParameterInstantiation<'_>>,
+        args: Option<&ast::TSTypeParameterInstantiation>,
     ) -> Option<DocId> {
         let value_broken = self.value_with_nullable_union_broken(value_doc, args?)?;
         Some(after_operator_head_gated(self.d(), value_doc, value_broken))
@@ -886,7 +886,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn value_type_arguments<'v>(
         view: AstView<'v>,
         value: &'v ast::Expression<'v>,
-    ) -> Option<&'v ast::TSTypeParameterInstantiation<'v>> {
+    ) -> Option<&'v ast::TSTypeParameterInstantiation> {
         use ast::ExpressionKind as Kind;
         // A loop down the chain, not a recursion: a chain is as long as the spine limit lets
         // it be, and a frame per link is what the stack contract prices. The innermost list
@@ -1161,7 +1161,7 @@ impl<'a> Printer<'a> {
     /// first.
     fn sole_type_arg_hug<'t>(
         &self,
-        inst: &ast::TSTypeParameterInstantiation<'t>,
+        inst: &ast::TSTypeParameterInstantiation,
         has_comments: bool,
     ) -> Option<SoleTypeArgHug<'t>>
     where
@@ -1205,7 +1205,7 @@ impl<'a> Printer<'a> {
     /// break.
     pub(in crate::printer) fn sole_type_arg_hug_break(
         &self,
-        inst: &ast::TSTypeParameterInstantiation<'_>,
+        inst: &ast::TSTypeParameterInstantiation,
     ) -> Option<AssumedBreak> {
         let has_comments = self.has_comments_on_page_between(inst.span.start, inst.span.end);
         if self.type_arguments_force_expansion(inst, has_comments) {

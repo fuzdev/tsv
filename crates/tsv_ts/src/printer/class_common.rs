@@ -126,7 +126,7 @@ impl<'a> Printer<'a> {
         id: Option<&ast::Identifier<'_>>,
         type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
         super_class: Option<&ast::Expression<'_>>,
-        super_type_parameters: Option<&ast::TSTypeParameterInstantiation<'_>>,
+        super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
         implements: &[ast::TSInterfaceHeritage<'_>],
     ) -> ClassHeritagePositions {
         let pre_heritage_end = type_parameters.map_or_else(
@@ -186,7 +186,7 @@ impl<'a> Printer<'a> {
         &self,
         positions: &ClassHeritagePositions,
         super_class: Option<&ast::Expression<'_>>,
-        super_type_parameters: Option<&ast::TSTypeParameterInstantiation<'_>>,
+        super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
         implements: &[ast::TSInterfaceHeritage<'_>],
     ) -> ClassHeaderLayout {
         // The extends→`implements` gap exists only with both clauses present, which is
@@ -277,7 +277,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn should_class_group_mode(
         &self,
         super_class: Option<&ast::Expression<'_>>,
-        super_type_parameters: Option<&ast::TSTypeParameterInstantiation<'_>>,
+        super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
         implements: &[ast::TSInterfaceHeritage<'_>],
     ) -> bool {
         let mut count = if super_class.is_some() { 1 } else { 0 };
@@ -304,7 +304,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_class_extends_doc(
         &self,
         super_class: Option<&ast::Expression<'_>>,
-        super_type_parameters: Option<&ast::TSTypeParameterInstantiation<'_>>,
+        super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
         extends_keyword_start: Option<u32>,
     ) -> Option<DocId> {
         let d = self.d();
@@ -388,7 +388,7 @@ impl<'a> Printer<'a> {
     fn build_super_class_doc(
         &self,
         super_class: &ast::Expression<'_>,
-        super_type_parameters: Option<&ast::TSTypeParameterInstantiation<'_>>,
+        super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
     ) -> DocId {
         // The ordinary dispatch — a binary superclass takes the continuation-indent
         // default. The parens below are the PRINTER's and stay outside the operand's own

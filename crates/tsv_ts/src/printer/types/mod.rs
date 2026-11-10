@@ -55,7 +55,7 @@ pub(super) use super::comments::BlankRule;
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
 use crate::ast::{
-    TSImportType, TSIndexedAccessType, TSIntersectionType, TSParenthesizedType, TSType, TyEdge,
+    TSImportType, TSIndexedAccessType, TSIntersectionType, TSParenthesizedType, TSType, TyId,
 };
 use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
 use crate::printer::ignore::{RoutedScope, is_freeze_target};
@@ -232,9 +232,9 @@ enum HeadStep<'t> {
 /// object: an array type's `[]` suffix, built ahead of its element, or an indexed access,
 /// whose suffix is built after its object.
 #[derive(Clone, Copy)]
-enum PostfixLevel<'a, 't> {
+enum PostfixLevel<'a> {
     Array(DocId),
-    IndexedAccess(&'a TSIndexedAccessType<'t>),
+    IndexedAccess(&'a TSIndexedAccessType),
 }
 
 /// What an array type's own arms make of it ([`Printer::array_type_head`]).
@@ -371,7 +371,7 @@ impl<'a> Printer<'a> {
     /// which every type's build recurses through.
     #[inline(never)]
     fn build_postfix_type_doc(&self, ts_type: &TSType<'_>) -> DocId {
-        let mut levels: SmallVec<[PostfixLevel<'_, '_>; 4]> = SmallVec::new();
+        let mut levels: SmallVec<[PostfixLevel<'_>; 4]> = SmallVec::new();
         let mut node = ts_type;
         let head_doc = loop {
             let (child, needs_parens): (&TSType<'_>, TypeParenRule) = match node {
@@ -423,7 +423,7 @@ impl<'a> Printer<'a> {
     /// Everything an indexed access type prints after its object's doc — the
     /// object→`[` gap, the bracketed index and the index→`]` gap — pushed onto `parts`,
     /// which already ends with that doc ([`Self::build_postfix_type_doc`]).
-    fn push_indexed_access_suffix(&self, parts: &mut DocBuf, i: &TSIndexedAccessType<'_>) {
+    fn push_indexed_access_suffix(&self, parts: &mut DocBuf, i: &TSIndexedAccessType) {
         let d = self.d();
         // A transparent one-member composite index is its member here, the `|`
         // dropped and its head gap folded into the `[`→index gap
@@ -1960,7 +1960,7 @@ impl<'a> Printer<'a> {
     /// carve-out that rule is built around. Read the coarse way, one extra pair from the
     /// author (`((⏎// c⏎B)[] // t⏎)`) stopped the descent at a node that prints nothing and
     /// the leading run went unseen at every reader of this seam.
-    fn head_layer_peels(&self, p: &TSParenthesizedType<'_>) -> bool {
+    fn head_layer_peels(&self, p: &TSParenthesizedType) -> bool {
         !self.paren_inner_comment_flags(p).0 && !self.paren_shell_retains_for_trailing_run(p)
     }
 
@@ -2164,7 +2164,7 @@ impl<'a> Printer<'a> {
     /// the comment from that `(`'s own gap and prints the opened shape, so the two passes
     /// disagreed — at the optional tuple element, the union member, the array element, the
     /// indexed-access object and the conditional check type, all off this one decline.
-    fn intersection_member_run_owned_downstream(&self, i: &TSIntersectionType<'_>) -> bool {
+    fn intersection_member_run_owned_downstream(&self, i: &TSIntersectionType) -> bool {
         // Both facts derive from the one node, so the member and the member-parens rule
         // asked about it cannot come from different intersections.
         let Some(first) = self
@@ -2227,7 +2227,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn composite_head_region_claimed(
         &self,
         span_start: u32,
-        types: &[TyEdge<'_>],
+        types: &[TyId],
     ) -> bool {
         // Keyed on the member's OWN start: a claim over only the composite's head gap
         // ends there ([`HeadRegion::region_end`]), and a claim that also covers the
@@ -2676,7 +2676,7 @@ impl<'a> Printer<'a> {
     /// queries on whichever axis its question needs.
     pub(in crate::printer) fn paren_inner_comment_flags(
         &self,
-        p: &TSParenthesizedType<'_>,
+        p: &TSParenthesizedType,
     ) -> (bool, bool) {
         let inner = self.view.ty(p.type_annotation).span();
         (
@@ -2979,7 +2979,7 @@ impl<'a> Printer<'a> {
     }
 
     /// The [`Self::paren_retains_for_trailing_run`] answer for an already-matched shell.
-    fn paren_shell_retains_for_trailing_run(&self, p: &TSParenthesizedType<'_>) -> bool {
+    fn paren_shell_retains_for_trailing_run(&self, p: &TSParenthesizedType) -> bool {
         // A **line** comment retains the shell wherever it sits (one carve-out below): a
         // trailing run of single-line blocks stays inline and the shell still strips. The
         // question is asked as the line-comment one directly, not as a
@@ -3273,7 +3273,7 @@ impl<'a> Printer<'a> {
     /// and no format-ignore directive in the composite's head gap freezes it — a frozen
     /// sole member is the composite's own verbatim slice, `|` included
     /// (`union_prettier_ignore_single_member`), so the seam must keep seeing the composite.
-    fn sole_member_peels(&self, head: u32, types: &[TyEdge<'_>]) -> bool {
+    fn sole_member_peels(&self, head: u32, types: &[TyId]) -> bool {
         types.len() == 1 && self.composite_leading_run_freeze(head, types).is_none()
     }
 
@@ -3321,7 +3321,7 @@ impl<'a> Printer<'a> {
     /// `flush_break` to break exactly the group the deferred run flushes in:
     /// `(a // comment\n) | b` → `| a // comment\n| b`
     /// `(a // comment\n) & b` → `a & // comment\nb`
-    fn build_parenthesized_type_unwrap_doc(&self, p: &TSParenthesizedType<'_>) -> DocId {
+    fn build_parenthesized_type_unwrap_doc(&self, p: &TSParenthesizedType) -> DocId {
         let d = self.d();
         let paren_open = p.span.start;
         let inner_type = self.view.ty(p.type_annotation);

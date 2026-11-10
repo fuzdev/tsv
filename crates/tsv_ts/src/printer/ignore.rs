@@ -72,7 +72,7 @@ use super::types::TrailingBlock;
 use super::types::helpers::{TypeParenRule, outermost_paren, paren_shell_gaps};
 use super::unwrap_parenthesized;
 use crate::ast::AstView;
-use crate::ast::{self, Comment, TSType, TyEdge};
+use crate::ast::{self, Comment, TSType, TyId};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -276,7 +276,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn composite_leading_run_freeze(
         &self,
         node_start: u32,
-        types: &[TyEdge<'_>],
+        types: &[TyId],
     ) -> Option<LeadingRunFreeze> {
         if !self.has_format_ignore {
             return None;
@@ -463,7 +463,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_frozen_annotation_head_doc(
         &self,
         gap_start: u32,
-        annotation: &ast::TSTypeAnnotation<'_>,
+        annotation: &ast::TSTypeAnnotation,
     ) -> Option<DocId> {
         if !self.has_format_ignore {
             return None;
@@ -488,7 +488,7 @@ impl<'a> Printer<'a> {
         &self,
         gap_start: u32,
         marker: Option<u8>,
-        annotation: Option<&ast::TSTypeAnnotation<'_>>,
+        annotation: Option<&ast::TSTypeAnnotation>,
     ) -> Option<(DocId, u32)> {
         if !self.has_format_ignore {
             return None;
@@ -561,7 +561,7 @@ impl<'a> Printer<'a> {
     /// reads to freeze its stripped inner cannot come apart.
     pub(in crate::printer) fn paren_shell_routed_inner<'t>(
         &self,
-        shell: &'t ast::TSParenthesizedType<'t>,
+        shell: &'t ast::TSParenthesizedType,
     ) -> Option<&'t TSType<'t>>
     where
         'a: 't,
@@ -1121,7 +1121,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn list_member_frozen(
         &self,
         container_start: u32,
-        types: &[TyEdge<'_>],
+        types: &[TyId],
         i: usize,
         freeze_first: bool,
     ) -> bool {

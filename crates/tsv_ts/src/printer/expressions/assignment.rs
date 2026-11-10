@@ -455,10 +455,7 @@ fn unwrap_expression<'a>(view: AstView<'a>, mut expr: &'a Expression<'a>) -> &'a
 ///
 /// The function answers `true` for every call whose `<…>` doc force-breaks, which keeps
 /// the `is_poorly_breakable_chain` debug_assert sound.
-fn is_call_with_complex_type_arguments(
-    call: &ast::CallExpression<'_>,
-    printer: &Printer<'_>,
-) -> bool {
+fn is_call_with_complex_type_arguments(call: &ast::CallExpression, printer: &Printer<'_>) -> bool {
     use ast::TSType;
     let Some(type_args) = &call.type_arguments else {
         return false;
@@ -948,11 +945,7 @@ fn arg_is_multiline_string(view: AstView<'_>, expr: &Expression<'_>, source: &st
 ///
 /// Uses the comment region between the callee end and call span end to find any comments
 /// in the argument area (covers leading, trailing, and inter-argument comments).
-fn call_arg_has_comments(
-    call: &ast::CallExpression<'_>,
-    span: Span,
-    printer: &Printer<'_>,
-) -> bool {
+fn call_arg_has_comments(call: &ast::CallExpression, span: Span, printer: &Printer<'_>) -> bool {
     if call.arguments.is_empty() {
         return false;
     }

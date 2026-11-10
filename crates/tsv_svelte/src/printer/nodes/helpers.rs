@@ -546,7 +546,7 @@ impl<'a> Printer<'a> {
     /// Property dispatcher for a binding `ObjectPattern`.
     fn build_object_pattern_property_doc(
         &self,
-        prop: &tsv_ts::ast::ObjectPatternProperty<'_>,
+        prop: &tsv_ts::ast::ObjectPatternProperty,
     ) -> DocId {
         match prop {
             tsv_ts::ast::ObjectPatternProperty::Property(p) => self.build_pattern_property_kv(
@@ -670,7 +670,7 @@ impl<'a> Printer<'a> {
     fn append_pattern_type_annotation(
         &self,
         pattern: DocId,
-        type_annotation: Option<&tsv_ts::ast::TSTypeAnnotation<'_>>,
+        type_annotation: Option<&tsv_ts::ast::TSTypeAnnotation>,
     ) -> DocId {
         let Some(annotation) = type_annotation else {
             return pattern;

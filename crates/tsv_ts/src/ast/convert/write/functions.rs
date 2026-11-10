@@ -106,7 +106,7 @@ pub(super) fn write_function_expression(
 /// `parseNewCallee` before the argument list is parsed.
 pub(super) fn write_new_expression(
     w: &mut JsonWriter,
-    new_expr: &ast::NewExpression<'_>,
+    new_expr: &ast::NewExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -130,7 +130,7 @@ pub(super) fn write_new_expression(
 /// and `force_optional` for acorn-typescript's `?.<T>(...)` path, which marks the callee
 /// node itself optional; the decorator spine strip walks call → callee.
 pub(super) fn call_callee_flags(
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     callee_chain: ChainState,
     strip_optional: bool,
 ) -> ExprFlags {
@@ -150,7 +150,7 @@ pub(super) fn call_callee_flags(
 /// wins over force (`true`), which wins over the computed value.
 pub(super) fn write_call_expression_tail(
     w: &mut JsonWriter,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     ctx: &Ctx<'_>,
     callee_chain: ChainState,

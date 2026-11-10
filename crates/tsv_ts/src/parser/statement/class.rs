@@ -87,7 +87,7 @@ struct ClassHead<'arena> {
     id: Option<Identifier<'arena>>,
     type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     super_class: Option<ExprId>,
-    super_type_parameters: Option<TSTypeParameterInstantiation<'arena>>,
+    super_type_parameters: Option<TSTypeParameterInstantiation>,
     implements: &'arena [TSInterfaceHeritage<'arena>],
     body: ClassBody<'arena>,
 }
@@ -475,7 +475,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `(None, None)` when there is no `extends`.
     fn parse_optional_extends_clause(
         &mut self,
-    ) -> Result<(Option<ExprId>, Option<TSTypeParameterInstantiation<'arena>>), Error> {
+    ) -> Result<(Option<ExprId>, Option<TSTypeParameterInstantiation>), Error> {
         if !matches!(
             self.current_kind(),
             TokenKind::Keyword(KeywordKind::Extends)

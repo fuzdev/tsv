@@ -913,7 +913,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript angle-bracket type assertion: `<Type>expr`
     fn build_ts_type_assertion_doc(
         &self,
-        type_assert: &crate::ast::TSTypeAssertion<'_>,
+        type_assert: &crate::ast::TSTypeAssertion,
         type_assert_span: Span,
     ) -> DocId {
         let expression = self.view.expr(type_assert.expression);
@@ -1558,7 +1558,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript instantiation expression
     fn build_ts_instantiation_doc(
         &self,
-        inst_expr: &crate::ast::TSInstantiationExpression<'_>,
+        inst_expr: &crate::ast::TSInstantiationExpression,
         span: Span,
     ) -> DocId {
         let expression = self.view.expr(inst_expr.expression);
@@ -1602,7 +1602,7 @@ impl<'a> Printer<'a> {
     /// The builder and this read the same context, so they cannot part on the pair.
     pub(crate) fn instantiation_operand_prints_pair(
         &self,
-        inst_expr: &crate::ast::TSInstantiationExpression<'_>,
+        inst_expr: &crate::ast::TSInstantiationExpression,
         span: Span,
     ) -> bool {
         self.needs_parens(
@@ -1618,7 +1618,7 @@ impl<'a> Printer<'a> {
     /// join the chain.
     pub(crate) fn instantiation_operand_context(
         &self,
-        inst_expr: &crate::ast::TSInstantiationExpression<'_>,
+        inst_expr: &crate::ast::TSInstantiationExpression,
         span: Span,
     ) -> ParenContext {
         let second_list_pair = self.instantiation_keeps_pair(

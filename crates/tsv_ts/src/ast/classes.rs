@@ -24,7 +24,7 @@ pub struct ClassDeclaration<'arena> {
     /// Optional superclass expression (for `extends`)
     pub super_class: Option<ExprId>,
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
-    pub super_type_parameters: Option<TSTypeParameterInstantiation<'arena>>,
+    pub super_type_parameters: Option<TSTypeParameterInstantiation>,
     /// Implements clause for declare class: `implements Foo, Bar`
     pub implements: &'arena [TSInterfaceHeritage<'arena>],
     /// Class body containing methods and properties
@@ -51,7 +51,7 @@ pub struct ClassExpression<'arena> {
     /// Optional superclass expression (for `extends`)
     pub super_class: Option<ExprId>,
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
-    pub super_type_parameters: Option<TSTypeParameterInstantiation<'arena>>,
+    pub super_type_parameters: Option<TSTypeParameterInstantiation>,
     /// Implements clause: `implements Foo, Bar`
     pub implements: &'arena [TSInterfaceHeritage<'arena>],
     /// Class body containing methods and properties
@@ -219,7 +219,7 @@ pub struct PropertyDefinition<'arena> {
     /// Property name (key)
     pub key: ExprId,
     /// Type annotation (e.g., `: number` in `a: number = 0;`)
-    pub type_annotation: Option<TSTypeAnnotation<'arena>>,
+    pub type_annotation: Option<TSTypeAnnotation>,
     /// Optional initial value
     pub value: Option<ExprId>,
     /// Accessibility modifier (public, private, protected)

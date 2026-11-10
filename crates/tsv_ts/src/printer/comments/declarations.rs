@@ -747,7 +747,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_binding_type_annotation_doc(
         &self,
         marker_end: u32,
-        type_ann: &ast::TSTypeAnnotation<'_>,
+        type_ann: &ast::TSTypeAnnotation,
         wrap: bool,
     ) -> DocId {
         self.build_binding_type_annotation_doc_with(marker_end, type_ann, || {
@@ -778,7 +778,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_binding_type_annotation_doc_with(
         &self,
         marker_end: u32,
-        type_ann: &ast::TSTypeAnnotation<'_>,
+        type_ann: &ast::TSTypeAnnotation,
         build_annotation: impl FnOnce() -> DocId,
     ) -> DocId {
         let d = self.d();
@@ -822,7 +822,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_rest_element_tail_doc(
         &self,
         parts: &mut DocBuf,
-        rest: &ast::RestElement<'_>,
+        rest: &ast::RestElement,
         wrap: bool,
     ) {
         let binding_end = self.view.expr(rest.argument).span().end;

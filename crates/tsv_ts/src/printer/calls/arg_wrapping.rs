@@ -2957,7 +2957,7 @@ pub(super) fn append_type_args_with_gap_comments(
     printer: &Printer<'_>,
     callee: DocId,
     callee_end: u32,
-    type_arguments: Option<&ast::TSTypeParameterInstantiation<'_>>,
+    type_arguments: Option<&ast::TSTypeParameterInstantiation>,
 ) -> DocId {
     let d = printer.d();
     match type_arguments {

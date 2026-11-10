@@ -84,7 +84,7 @@ const BP_UNARY: u8 = 29;
 // ⚠️ The frame is what the id buys as much as the return. LLVM gives each sret call
 // site its own stack slot and does not merge them across match arms, and a frame is sized
 // once for its widest arm — so a dispatcher with N arms that each call a `parse_*` returning
-// a bare `Expression` (72 B) reserves N × 72 B at **every** recursion level, whichever arm
+// a bare `Expression` (56 B) reserves N × 56 B at **every** recursion level, whichever arm
 // it takes. `Parser::parse_prefix_expression` and `Parser::parse_primary_expression` are
 // those dispatchers, and both sit on the paren / call / member / object-literal cycle, so
 // their slots set the stack every nesting level costs, which the depth limits' margin is
@@ -545,8 +545,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
         }
         self.advance()?; // consume `as` / `satisfies`
-        let type_annotation = self.parse_type()?;
-        let span = Span::new(expr_start as u32, type_annotation.span().end);
+        let type_annotation = self.parse_type()?.id();
+        let span = Span::new(expr_start as u32, self.ty(type_annotation).span().end);
         let expr = if is_as {
             Expression {
                 span,
@@ -1214,9 +1214,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `<` behind `?.` or a decorator has no operator reading to fall back to, which
     /// the other standalone positions have (`parse_instantiation_expression`, the
     /// `new` callee arm — [`Parser::parse_type_arguments_or_rewind`]).
-    fn parse_type_arguments_before_call(
-        &mut self,
-    ) -> Result<TSTypeParameterInstantiation<'arena>, Error> {
+    fn parse_type_arguments_before_call(&mut self) -> Result<TSTypeParameterInstantiation, Error> {
         let type_args = self.parse_type_parameter_instantiation()?;
         if *self.current_kind() != TokenKind::ParenOpen {
             return Err(self.error_expected_after("'('", "type arguments in optional call"));
@@ -2516,7 +2514,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse <Type> (`<<` splits when the assertion type is a generic
         // function type: `<<T>() => R>x`)
         self.expect_less_than_in_type()?; // consume '<'
-        let type_annotation = self.parse_type()?;
+        let type_annotation = self.parse_type()?.id();
         self.expect(&TokenKind::GreaterThan)?; // consume '>'
         let operand_token = self.current_pos().0;
 
@@ -2650,7 +2648,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_type_arguments_or_rewind(
         &mut self,
         operand: Option<(ExprId, u32)>,
-    ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, Error> {
+    ) -> Result<Option<TSTypeParameterInstantiation>, Error> {
         let lt = self.current.start;
         if self.type_arguments_abandoned_at(lt) {
             return Ok(None);
@@ -2692,7 +2690,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         lt: u32,
         checkpoint: &Checkpoint<'arena>,
-    ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, Error> {
+    ) -> Result<Option<TSTypeParameterInstantiation>, Error> {
         let (start, first) = self.parse_type_argument_list_head()?;
         if !self.check(&TokenKind::Comma) {
             // no separator: the lookahead graded everything this list holds
@@ -2846,7 +2844,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &self,
         expr: ExprId,
         start: u32,
-    ) -> (ExprId, Option<TSTypeParameterInstantiation<'arena>>) {
+    ) -> (ExprId, Option<TSTypeParameterInstantiation>) {
         match &self.expr(expr).kind {
             ExpressionKind::TSInstantiationExpression(inst)
                 if Self::is_bare_instantiation(self.expr(expr), start) =>
@@ -3226,7 +3224,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         heritage: bool,
         is_async_function: bool,
         callee_start: u32,
-    ) -> Result<(ExprId, Option<TSTypeParameterInstantiation<'arena>>), Error> {
+    ) -> Result<(ExprId, Option<TSTypeParameterInstantiation>), Error> {
         let callee_parsed = self.parse_new_callee(is_async_function)?.id();
 
         // A bare arrow is an `AssignmentExpression`, never the `MemberExpression` a `new`
@@ -3244,7 +3242,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // (`new Foo<T>`x``, part of the callee) when a template follows — consumed
         // in the loop — otherwise it is the `new`'s own (`new Foo<T>()`) and this
         // holds it for the argument parse below.
-        let mut type_arguments: Option<TSTypeParameterInstantiation<'arena>> = None;
+        let mut type_arguments: Option<TSTypeParameterInstantiation> = None;
         loop {
             match self.current_kind() {
                 TokenKind::Dot => {
@@ -3563,7 +3561,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         tag: ExprId,
         tag_start: u32,
-        type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
+        type_arguments: Option<TSTypeParameterInstantiation>,
     ) -> Result<ExprRet, Error> {
         // one wire level: the quasi's `TemplateLiteral` under its tag node
         let template = self.nested(1, |p| p.parse_template_literal(true))?;
@@ -3582,7 +3580,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         tag: ExprId,
         tag_start: u32,
-        type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
+        type_arguments: Option<TSTypeParameterInstantiation>,
         quasi: TemplateLiteral<'arena>,
     ) -> ExprRet {
         let end = quasi.span.end;

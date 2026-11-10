@@ -29,7 +29,7 @@ impl<'a> Printer<'a> {
 
     pub(crate) fn print_call_args(
         &self,
-        call: &ast::CallExpression<'_>,
+        call: &ast::CallExpression,
         span: Span,
         facts: ChainCall,
     ) -> DocId {
@@ -38,7 +38,7 @@ impl<'a> Printer<'a> {
 
     pub(crate) fn print_call_args_expanded(
         &self,
-        call: &ast::CallExpression<'_>,
+        call: &ast::CallExpression,
         span: Span,
         facts: ChainCall,
     ) -> DocId {

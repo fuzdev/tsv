@@ -1420,19 +1420,14 @@ impl<'s, 'b> Walk<'s, 'b> {
         self.expr(self.view.expr(property.value));
     }
 
-    fn rest_element(&mut self, rest: &RestElement<'_>) {
+    fn rest_element(&mut self, rest: &RestElement) {
         self.expr(self.view.expr(rest.argument));
         self.pattern_tail(rest.span, rest.optional, rest.type_annotation.as_ref());
     }
 
     /// A destructuring pattern's optional `?` (the last `?` ahead of its annotation, past
     /// the pattern's closing bracket) and annotation.
-    fn pattern_tail(
-        &mut self,
-        span: Span,
-        optional: bool,
-        annotation: Option<&TSTypeAnnotation<'_>>,
-    ) {
+    fn pattern_tail(&mut self, span: Span, optional: bool, annotation: Option<&TSTypeAnnotation>) {
         if optional {
             let end = annotation.map_or(span.end, |a| a.span.start);
             if let Some(question) = self.src.rfind_char(span.start, end, b'?') {
@@ -1450,7 +1445,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
     }
 
-    fn type_arguments(&mut self, arguments: Option<&TSTypeParameterInstantiation<'_>>) {
+    fn type_arguments(&mut self, arguments: Option<&TSTypeParameterInstantiation>) {
         if let Some(arguments) = arguments {
             self.blank_span(arguments.span);
         }
@@ -2007,7 +2002,7 @@ struct FunctionView<'n, 'a> {
     params: &'n [Expression<'n>],
     /// The parameter list's `(`; `None` for a bare arrow parameter (`x => x`).
     params_open: Option<u32>,
-    return_type: Option<&'n TSTypeAnnotation<'a>>,
+    return_type: Option<&'n TSTypeAnnotation>,
     body: FunctionBody<'n>,
     arrow: bool,
 }
@@ -2061,7 +2056,7 @@ struct ClassView<'n, 'a> {
     r#abstract: bool,
     type_parameters: Option<&'n TSTypeParameterDeclaration<'a>>,
     super_class: Option<&'n Expression<'n>>,
-    super_type_parameters: Option<&'n TSTypeParameterInstantiation<'a>>,
+    super_type_parameters: Option<&'n TSTypeParameterInstantiation>,
     implements: &'a [TSInterfaceHeritage<'a>],
     body: &'n ClassBody<'a>,
 }

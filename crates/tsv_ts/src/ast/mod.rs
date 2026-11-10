@@ -7,8 +7,8 @@
 //!
 //! ## Arena allocation
 //!
-//! Expressions and statements are rows of per-document stores ([`AstStores`]), named by
-//! id and read through an [`AstView`]. The rest of the tree is allocated in a per-parse
+//! Expressions, statements and types are rows of per-document stores ([`AstStores`]), named
+//! by id and read through an [`AstView`]. The rest of the tree is allocated in a per-parse
 //! [`bumpalo::Bump`] supplied by the caller: its recursive children are `&'arena T<'arena>`
 //! (not `Box`), its child collections `&'arena [T<'arena>]` (not `Vec`), and decoded strings
 //! are `&'arena str` (not `String`) — freed wholesale when the `Bump` drops, with no
@@ -35,7 +35,7 @@ pub(crate) use stores::ScratchMarks;
 pub use stores::{AstStores, Expr, ExprId, Parsed, Stmt, StmtId, Ty, TyId, with_stores};
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
-pub use view::{AstView, OptTyEdge, ParsedRef, TyEdge, TyList};
+pub use view::{AstView, ParsedRef};
 
 //
 // Re-exports from submodules
@@ -122,13 +122,13 @@ pub use expressions::{
 // widest (`ClassExpression` / `FunctionExpression` / `ArrowFunctionExpression` /
 // `MetaProperty` / `TaggedTemplateExpression`, together ~3% of expressions, of which
 // the widest two are ~0.02%), `TSType`'s three widest (`TSImportType`,
-// `TSConstructorType`, `TSInferType`, taking it 112 → 80), `Statement`'s DECLARATION
-// heads and its four loop / `try` heads one level down (`ast/statements.rs`). Two
-// of those declaration heads — `ImportDeclaration` and `ExportNamedDeclaration` — are
-// boxed despite NOT being rare (6.8–11.7% and 2.4–4.0% of statements): they are
-// simply the last two rungs of the ladder, and a boxed head's construction copies the
-// same bytes into the arena that it would have moved into the enum, so the cost is
-// one bump pointer against 24 bytes off every other statement slot.
+// `TSConstructorType`, `TSInferType`, so the inline variants set its pinned width below),
+// `Statement`'s DECLARATION heads and its four loop / `try` heads one level down
+// (`ast/statements.rs`). Two of those declaration heads — `ImportDeclaration` and
+// `ExportNamedDeclaration` — are boxed despite NOT being rare (6.8–11.7% and 2.4–4.0%
+// of statements): they are simply the last two rungs of the ladder, and a boxed head's
+// construction copies the same bytes into the arena that it would have moved into the
+// enum, so the cost is one bump pointer against 24 bytes off every other statement slot.
 //
 // The LIST-ELEMENT containers whose own width was inline `Expression`s —
 // `Property` (an object literal's `key: value`, and a destructuring pattern's),
@@ -140,7 +140,7 @@ pub use expressions::{
 // expression spine already returns a pushed row's id, so an inline slot would be a COPY
 // OUT of the store rather than a place the node lives. Naming the slots by id removes
 // that copy instead of adding a row, and takes the element every object-literal and
-// declarator list moves from 160 B to 20 (`ObjectPatternProperty` 32, its `RestElement`
+// declarator list moves from 160 B to 20 (`ObjectPatternProperty` 28, its `RestElement`
 // arm setting it). `CatchClause` keeps its inline `param` deliberately: it is built by
 // the parser as an owned value rather than through the spine, so an id there would ADD a
 // row, and `CatchClause` is reached only through `Option<&CatchClause>` so its width sets
@@ -150,7 +150,10 @@ pub use expressions::{
 // runs over the expression store itself (`Run<Expr>`), `CatchClause`'s case. The
 // statement lists — program, block, `case`, static-block and namespace bodies — hold ids
 // too (`Run<StmtId>`), as the single statement edges do (`StmtId`): every statement is a
-// row of the statement store.
+// row of the statement store. So do the type lists — union and intersection members, tuple
+// elements, template-literal interpolations, type arguments (`Run<TyId>`) — and the single
+// type edges (`TyId`): the type ladder pushes every type it parses, so each is a row of the
+// type store.
 //
 // `Expression` and `Statement` are each a header over their variant (`span` +
 // `ExpressionKind` / `StatementKind`), so a span read is a field load rather than a
@@ -165,9 +168,9 @@ pub use expressions::{
 // 4 B) in `tsv_wasm`, the crate compiled for wasm32, and `Expression`'s and `Statement`'s
 // `Option` must stay niche-packed on both.
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Expression<'static>>() == 64);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Expression<'static>>() == 56);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind<'static>>() == 56);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind<'static>>() == 48);
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Expression<'static>>>() == size_of::<Expression<'static>>());
 #[cfg(all(test, target_pointer_width = "64"))]
@@ -181,14 +184,27 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Property>() == 2
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ObjectProperty>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () =
-    assert!(tsv_lang::store::STORE_CHECK || size_of::<ObjectPatternProperty<'static>>() == 32);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ObjectPatternProperty>() == 28);
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<VariableDeclarator>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<SwitchCase>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType<'static>>() == 80);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType<'static>>() == 72);
+// The type-edge holders every type annotation and type-argument list rides inline in: their
+// `Option`s fold into the id's niche and the run's, so an absent annotation or list costs no
+// width in any of the nodes that hold one.
+#[cfg(test)]
+const _: () = assert!(
+    tsv_lang::store::STORE_CHECK
+        || size_of::<Option<TSTypeAnnotation>>() == size_of::<TSTypeAnnotation>()
+);
+#[cfg(test)]
+const _: () = assert!(
+    tsv_lang::store::STORE_CHECK
+        || size_of::<Option<TSTypeParameterInstantiation>>()
+            == size_of::<TSTypeParameterInstantiation>()
+);
 
 //
 // Foundational Types (defined here, used everywhere)
@@ -426,14 +442,14 @@ pub struct Identifier<'arena> {
 /// pointer) for every reference.
 #[derive(Debug, Clone)]
 pub struct IdentifierParamExtra<'arena> {
-    pub type_annotation: Option<TSTypeAnnotation<'arena>>,
+    pub type_annotation: Option<TSTypeAnnotation>,
     pub decorators: Option<&'arena [Decorator]>,
 }
 
 impl<'arena> Identifier<'arena> {
     /// The type annotation, if this is a typed binding (`None` for a reference).
     #[inline]
-    pub fn type_annotation(&self) -> Option<&TSTypeAnnotation<'arena>> {
+    pub fn type_annotation(&self) -> Option<&TSTypeAnnotation> {
         self.extra.and_then(|e| e.type_annotation.as_ref())
     }
 

@@ -684,7 +684,7 @@ AST node per arm multiplies that node's size by its arm count, at every level. T
 no `parse_*` on the expression cycle hands its caller a bare `Expression` by value, and no
 `parse_*` on the type ladder a bare `TSType`: a node builder either places the node at its
 own tail (`Parser::push_ret` into the expression store, leaving the caller a word-wide
-`ExprRet`, and `Parser::alloc` into the arena for types, leaving an 8-byte reference) or
+`ExprRet`, and `Parser::push_ty_ret` into the type store, leaving a word-wide `TyRet`) or
 returns its own concrete node struct, whose wrapping temporary the
 compiler merges with its sibling arms'. The printer answers the same pressure the same
 way — the chain entry points fill a caller-owned `ChainNodeVec` rather than returning one.

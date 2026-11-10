@@ -978,7 +978,7 @@ tied to the program lifetime. Recursive children are `&'arena T<'arena>` (not
 strings are `&'arena str`, so a whole parse is one bump-allocated graph freed
 wholesale when the arena drops, with no per-node `Drop`.
 
-**`Expression` and `Statement` nodes are the exceptions: they live in `AstStores`**
+**`Expression`, `Statement` and `TSType` nodes are the exceptions: they live in `AstStores`**
 (`ast/stores.rs`), one per document, kept beside the tree in a `Parsed` and shared across a Svelte component's
 embedded islands. An edge to an expression is an `ExprId`, an index into the
 `Store<Expression>`; a child list is a `Run` over a store of ids (`Run<ExprId>`: call and
@@ -986,13 +986,15 @@ embedded islands. An edge to an expression is an `ExprId`, an index into the
 array-pattern elements) or a value run over the expression store itself (`Run<Expr>`:
 parameter lists). A statement edge is a `StmtId` into the `Store<Statement>`, and every
 statement list (a program's, a block's, a `case`'s, a static block's, a namespace's body) a
-`Run<StmtId>`. A reader reaches them through an `AstView`, one word holding a
+`Run<StmtId>`. A type edge is a `TyId` into the `Store<TSType>`, and every type list (union
+and intersection members, tuple elements, type arguments, template-literal types) a
+`Run<TyId>`. A reader reaches them through an `AstView`, one word holding a
 reference to the stores; a store row, once pushed, is never edited or truncated, so a parser
 that replaces a node (a cover-grammar conversion, an annotated binding pattern) appends the
-new row and the old one is orphaned. `TSType` and the boxed expression and statement
-payloads (`ArrowFunctionExpression`, `FunctionDeclaration` and their fellows) remain arena
-nodes. The rest of this section describes the arena-held layout the stores were built to
-keep.
+new row and the old one is orphaned. The boxed expression, statement and type payloads
+(`ArrowFunctionExpression`, `FunctionDeclaration`, `TSImportType` and their fellows) remain
+arena nodes. The rest of this section describes the arena-held layout the stores were built
+to keep.
 
 
 ```rust
@@ -1040,12 +1042,12 @@ size on its own taxes the whole tree, while a pointer chase is paid only where t
 variant is actually spelled. Where such a variant is also **rare**, it holds its
 payload by `&'arena` reference:
 
-- `Expression` is **64 B**, not 176 — `ClassExpression`, `FunctionExpression`,
+- `Expression` is **56 B**, not 176 — `ClassExpression`, `FunctionExpression`,
   `ArrowFunctionExpression`, `MetaProperty` and `TaggedTemplateExpression` are boxed.
   Together they are ~3% of expressions in real source (the two widest, ~0.02%). The
   next-widest variant is `CallExpression`, and it is 14–21% of expressions, which is
   where the ladder stops. `Expression` is a header over its variant —
-  `struct Expression { span, kind: ExpressionKind }` (`ExpressionKind` 56 B) — so reading
+  `struct Expression { span, kind: ExpressionKind }` (`ExpressionKind` 48 B) — so reading
   an expression's span is a field load rather than a dispatch over the variants. A
   variant struct carries no span of its own unless some node also holds that type
   outside an `Expression` (`Identifier`, `Literal`, `TemplateLiteral`, `RestElement`,
@@ -1056,15 +1058,14 @@ payload by `&'arena` reference:
   but the pattern wrapper's (an optional or annotated parameter's `?` / `: T` extension in
   the parameter parser), which lands on array and object patterns, carrying no second span.
   On wasm32 `Expression` is 48 B.
-- `TSType` is **80 B**, not 112 — `TSImportType`, `TSConstructorType` and
-  `TSInferType` are boxed. No field holds a `TSType` by value: the type parser's deep
-  precedence ladder returns an `&'arena TSType` allocated at each builder's tail
+- `TSType` is **72 B** — `TSImportType`, `TSConstructorType` and `TSInferType` are
+  boxed. No field holds a `TSType` by value: the type parser's deep precedence ladder
+  pushes each type to the type store at its builder's tail and returns the row's id
   (`Parser::parse_type`) — the second rule below, applied to a return instead of a
-  field — and every holder keeps that reference, the slices included (union and
-  intersection members, tuple elements, type arguments and template-literal types are
-  `&'arena [&'arena TSType]`, a pointer-width element — 8 B native, 4 B on wasm32 —
-  where a by-value one would be the whole node), so the width is paid once per type
-  node, by its own allocation.
+  field — and every holder keeps that id, the lists included (union and intersection
+  members, tuple elements, type arguments and template-literal types are `Run<TyId>`, a
+  4 B element on both targets, where a by-value one would be the whole node), so the
+  width is paid once per type, by its row.
 - `Statement`'s rare declaration heads are boxed for the same reason
   (`TSTypeAliasDeclaration`, `ExportDefaultDeclaration`, `ClassDeclaration`,
   `FunctionDeclaration`, `TSInterfaceDeclaration`, `TSDeclareFunction`,

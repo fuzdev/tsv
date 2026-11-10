@@ -234,7 +234,7 @@ impl<'a> Printer<'a> {
     /// This is used for nested conditionals which should inherit breaking from their parent.
     ///
     /// Structure: `check extends extends_type [indent: line, "? ", true_type, line, ": ", false_type]`
-    pub(super) fn build_conditional_type_doc_inner(&self, c: &TSConditionalType<'_>) -> DocId {
+    pub(super) fn build_conditional_type_doc_inner(&self, c: &TSConditionalType) -> DocId {
         let d = self.d();
         let extends_type = self.view.ty(c.extends_type);
 
@@ -474,7 +474,7 @@ impl<'a> Printer<'a> {
     fn build_nested_conditional_branch_doc(
         &self,
         branch: &TSType<'_>,
-        inner: &TSConditionalType<'_>,
+        inner: &TSConditionalType,
     ) -> DocId {
         let d = self.d();
         let Some((leading, trailing)) =
@@ -816,7 +816,7 @@ impl<'a> Printer<'a> {
     /// ([`Printer::stripped_paren_hang_has_breaking_leading_run`]) gates the collector, so
     /// a comment-free conditional — the overwhelming case — allocates nothing here; the
     /// collector's own emptiness is the `len` test's.
-    fn extends_relocatable_run(&self, c: &TSConditionalType<'_>) -> Option<CommentVec<'_>> {
+    fn extends_relocatable_run(&self, c: &TSConditionalType) -> Option<CommentVec<'_>> {
         if !self.stripped_paren_hang_has_breaking_leading_run(self.view.ty(c.extends_type)) {
             return None;
         }
@@ -837,7 +837,7 @@ impl<'a> Printer<'a> {
     /// `extends_kw_end` is the position after the `extends` keyword (caller already found it).
     fn build_conditional_type_extends_doc(
         &self,
-        c: &TSConditionalType<'_>,
+        c: &TSConditionalType,
         extends_kw_end: u32,
     ) -> DocId {
         let d = self.d();
@@ -1130,7 +1130,7 @@ impl<'a> Printer<'a> {
     /// before `?` or `:` operators.
     fn build_conditional_type_doc_with_line_comments(
         &self,
-        c: &TSConditionalType<'_>,
+        c: &TSConditionalType,
         routes: BranchRoutes<'_>,
     ) -> DocId {
         let d = self.d();
@@ -2063,7 +2063,7 @@ impl<'a> Printer<'a> {
     /// the gaps this loop scans must stop at the shell, not inside it. Unwrapping the spans
     /// here without also unwrapping the docs would double-print every one of those comments
     /// ([`comments.md`](../../../../docs/comments.md) hazard 3).
-    pub(super) fn build_tuple_type_doc(&self, t: &TSTupleType<'_>) -> DocId {
+    pub(super) fn build_tuple_type_doc(&self, t: &TSTupleType) -> DocId {
         let d = self.d();
         if t.element_types.is_empty() {
             return self.build_empty_brackets_inline_with_comments_doc(t.span);
@@ -2269,7 +2269,7 @@ impl<'a> Printer<'a> {
     /// so this builder's gap emitters and the item docs agree on where each element starts —
     /// see [`Self::build_tuple_type_doc`]'s expansion gate for why a paren shell must not
     /// reach here.
-    fn build_tuple_type_doc_with_line_comments(&self, t: &TSTupleType<'_>) -> DocId {
+    fn build_tuple_type_doc_with_line_comments(&self, t: &TSTupleType) -> DocId {
         let d = self.d();
         // The union-element paren rule's own term ([`Self::build_tuple_element_doc`]).
         let multi_element = t.element_types.len() > 1;
@@ -2381,7 +2381,7 @@ impl<'a> Printer<'a> {
     /// An array type's own arms (e.g., `number[]`): the whole doc where a terminal arm
     /// builds it, else the `[]` suffix its element is followed by
     /// ([`Self::build_postfix_type_doc`]).
-    pub(super) fn array_type_head(&self, arr: &TSArrayType<'_>) -> ArrayTypeHead {
+    pub(super) fn array_type_head(&self, arr: &TSArrayType) -> ArrayTypeHead {
         let d = self.d();
         let element_type = self.view.ty(arr.element_type);
         // A comment-free parenthesized union element EXPANDS its parens when it breaks
@@ -2458,7 +2458,7 @@ impl<'a> Printer<'a> {
     /// the `)` lands here. An element the author left bare (`typeof x /* c */[]`)
     /// has no source `)` in the region at all: the comment simply follows the one the
     /// printer synthesizes.
-    fn build_array_suffix_doc(&self, arr: &TSArrayType<'_>) -> DocId {
+    fn build_array_suffix_doc(&self, arr: &TSArrayType) -> DocId {
         let d = self.d();
         match self.array_suffix_layout(arr) {
             ArraySuffixLayout::Fused => d.text("[]"),
@@ -2496,10 +2496,7 @@ impl<'a> Printer<'a> {
     /// starts past the element's span either way, so folding paren-ness in here only
     /// ever excluded routes from the split — which is how three of them came to drop
     /// their comment.
-    pub(in crate::printer) fn array_suffix_layout(
-        &self,
-        arr: &TSArrayType<'_>,
-    ) -> ArraySuffixLayout {
+    pub(in crate::printer) fn array_suffix_layout(&self, arr: &TSArrayType) -> ArraySuffixLayout {
         let elem_end = self.view.ty(arr.element_type).span().end;
         if self.has_comments_on_page_between(elem_end, arr.span.end)
             // The `[` is FOUND, never computed from `arr.span.end - 2`: the brackets

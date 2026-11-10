@@ -21,7 +21,7 @@ pub(super) fn pattern_header(
     w: &mut JsonWriter,
     node_type: &'static str,
     span: Span,
-    type_annotation: Option<&ast::TSTypeAnnotation<'_>>,
+    type_annotation: Option<&ast::TSTypeAnnotation>,
     ctx: &Ctx<'_>,
 ) {
     match type_annotation {
@@ -105,7 +105,7 @@ pub(super) fn write_object_pattern(
 }
 
 /// Emits a `RestElement` node.
-pub(super) fn write_rest_element(w: &mut JsonWriter, rest: &ast::RestElement<'_>, ctx: &Ctx<'_>) {
+pub(super) fn write_rest_element(w: &mut JsonWriter, rest: &ast::RestElement, ctx: &Ctx<'_>) {
     node_header(w, "RestElement", rest.span, ctx);
     w.raw(",\"argument\":");
     write_expression(w, ctx.view.expr(rest.argument), ctx);

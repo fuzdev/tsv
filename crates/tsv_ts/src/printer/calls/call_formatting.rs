@@ -69,7 +69,7 @@ use tsv_lang::doc::arena::DocId;
 /// and the shape is unchanged.
 pub(super) fn build_call_doc_with_wrapping(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
 ) -> DocId {
     let d = printer.d();
@@ -99,7 +99,7 @@ struct CallHead {
     ungroup_args: bool,
 }
 
-fn build_call_head(printer: &Printer<'_>, call: &ast::CallExpression<'_>, span: Span) -> CallHead {
+fn build_call_head(printer: &Printer<'_>, call: &ast::CallExpression, span: Span) -> CallHead {
     let d = printer.d();
 
     // Read before the callee is built, which re-arms the target for the callee's own span.
@@ -314,7 +314,7 @@ enum TestCall {
 /// `?.`-fusion verdicts), never for its doc.
 fn build_call_args_doc(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     callee: DocId,
     head: &CallHead,
@@ -744,7 +744,7 @@ fn push_lone_arg_trailing_comments(
 /// trailing comments, which defer to the general comment path — so the caller falls through.
 fn try_single_arg_comment_paths(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     callee: DocId,
     paren_open: u32,
@@ -862,7 +862,7 @@ fn try_single_arg_comment_paths(
 /// through to standard wrapping.
 fn try_single_arg_hug(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     callee: DocId,
 ) -> Option<DocId> {
     let arguments = printer.view.list(call.arguments);
@@ -1130,7 +1130,7 @@ fn build_ternary_arrow_hug_states(
 /// so the caller falls through to the blank-line / default layout.
 fn build_call_with_arg_comments(
     printer: &Printer<'_>,
-    call: &ast::CallExpression<'_>,
+    call: &ast::CallExpression,
     span: Span,
     callee: DocId,
     paren_open: u32,
