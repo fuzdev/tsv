@@ -1699,8 +1699,9 @@ impl<'a> Printer<'a> {
             // comment in — so the shared dotted-pair printer emits the name, the dot and
             // the gaps together (it needs the left doc, hence holding it until here).
             // Pushing name + `d.text(".")` scans neither gap and drops what's in it.
-            match &decl.body {
-                Some(ast::TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
+            match decl.body.as_ref() {
+                Some(&ast::TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
+                    let nested = self.view.module_decl(nested);
                     let name_end = decl.id.span().end;
                     parts.push(self.build_dotted_pair_doc(
                         name_doc,

@@ -11,10 +11,10 @@ use super::super::Parser;
 use super::ModuleItemContext;
 
 /// End offset of a module declaration body (block or nested declaration).
-fn module_body_end(body: &TSModuleDeclarationBody<'_>) -> u32 {
+fn module_body_end<'a>(view: AstView<'a>, body: &TSModuleDeclarationBody<'a>) -> u32 {
     match body {
         TSModuleDeclarationBody::TSModuleBlock(b) => b.span.end,
-        TSModuleDeclarationBody::TSModuleDeclaration(n) => n.span.end,
+        &TSModuleDeclarationBody::TSModuleDeclaration(n) => view.module_decl(n).span.end,
     }
 }
 
@@ -839,7 +839,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } else {
             // Full body: `{ statements }`
             let block = self.parse_module_block(declare)?;
-            let end = module_body_end(&block);
+            let end = module_body_end(self.stores.view(), &block);
             (Some(block), end)
         };
 
@@ -906,7 +906,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // string-literal arm takes, terminated by ASI rather than a literal `;`.
         let (body, end) = if matches!(self.current_kind(), TokenKind::BraceOpen) {
             let block = self.parse_module_block(declare)?;
-            let end = module_body_end(&block);
+            let end = module_body_end(self.stores.view(), &block);
             (Some(block), end)
         } else {
             (None, self.semicolon_end()?)
@@ -943,7 +943,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             p.parse_module_declaration_inner(nested_start as u32, kind)
         })?;
         let body = TSModuleDeclarationBody::TSModuleDeclaration(self.alloc(nested));
-        let end = module_body_end(&body);
+        let end = module_body_end(self.stores.view(), &body);
 
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<TSModuleDeclaration<'_>>(1);
@@ -990,7 +990,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         // Calculate end position based on body
-        let end = module_body_end(&body);
+        let end = module_body_end(self.stores.view(), &body);
 
         Ok(TSModuleDeclaration {
             id: TSModuleName::Identifier(id),

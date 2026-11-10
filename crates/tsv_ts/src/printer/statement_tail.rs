@@ -93,7 +93,8 @@ impl<'a> Printer<'a> {
         'a: 's,
     {
         match &stmt.kind {
-            ast::StatementKind::ExportNamedDeclaration(decl) => {
+            &ast::StatementKind::ExportNamedDeclaration(decl) => {
+                let decl = self.view.export_named(decl);
                 self.view.opt_stmt(decl.declaration)
             }
             ast::StatementKind::LabeledStatement(stmt) => Some(self.view.stmt(stmt.body)),
@@ -230,7 +231,8 @@ impl<'a> Printer<'a> {
             // (`export default function main(): void;`) is printed by its own signature
             // printer, which keeps the gap. Reading it as one kind double-printed every
             // ambient default overload.
-            if let ast::StatementKind::ExportDefaultDeclaration(decl) = &stmt.kind {
+            if let &ast::StatementKind::ExportDefaultDeclaration(decl) = &stmt.kind {
+                let decl = self.view.export_default(decl);
                 return matches!(decl.declaration, ast::ExportDefaultValue::Expression(_));
             }
             let inner = match self.delegated_statement(stmt) {

@@ -94,7 +94,8 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
         ast::StatementKind::VariableDeclaration(var_decl) => {
             write_variable_declaration(w, var_decl, ctx, false);
         }
-        ast::StatementKind::TSTypeAliasDeclaration(type_alias) => {
+        &ast::StatementKind::TSTypeAliasDeclaration(type_alias) => {
+            let type_alias = ctx.view.type_alias(type_alias);
             write_type_alias_declaration(w, type_alias, stmt.span, ctx);
         }
         ast::StatementKind::ReturnStatement(ret) => {
@@ -108,22 +109,25 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
         ast::StatementKind::BlockStatement(block) => {
             write_block_statement(w, block, ctx);
         }
-        ast::StatementKind::FunctionDeclaration(func_decl) => {
+        &ast::StatementKind::FunctionDeclaration(func_decl) => {
+            let func_decl = ctx.view.fn_decl(func_decl);
             write_function_declaration(w, func_decl, ctx);
         }
-        ast::StatementKind::ClassDeclaration(class_decl) => {
+        &ast::StatementKind::ClassDeclaration(class_decl) => {
+            let class_decl = ctx.view.class_decl(class_decl);
             write_class_declaration(w, class_decl, ctx, false);
         }
-        ast::StatementKind::ExportNamedDeclaration(export_decl) => {
+        &ast::StatementKind::ExportNamedDeclaration(export_decl) => {
+            let export_decl = ctx.view.export_named(export_decl);
             let is_type_export = matches!(export_decl.export_kind, ast::ExportKind::Type);
             let start = export_start(
                 ctx.source,
                 stmt.span.start,
-                matches!(ctx.view.opt_stmt(export_decl.declaration), Some(ast::Statement {
+                matches!(ctx.view.opt_stmt(export_decl.declaration), Some(&ast::Statement {
                     kind: ast::StatementKind::ClassDeclaration(class),
                     ..
                 })
-                    if class.decorators.is_some()),
+                    if ctx.view.class_decl(class).decorators.is_some()),
             );
             let export_span = Span::new(start, stmt.span.end);
             node_header(w, "ExportNamedDeclaration", export_span, ctx);
@@ -143,7 +147,8 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
             write_attributes_field(w, export_decl.attributes, ctx);
             close_node(w, "ExportNamedDeclaration", export_span, ctx);
         }
-        ast::StatementKind::ExportDefaultDeclaration(export_decl) => {
+        &ast::StatementKind::ExportDefaultDeclaration(export_decl) => {
+            let export_decl = ctx.view.export_default(export_decl);
             let start = export_start(
                 ctx.source,
                 stmt.span.start,
@@ -157,7 +162,8 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
             write_export_default_value(w, &export_decl.declaration, ctx);
             close_node(w, "ExportDefaultDeclaration", export_span, ctx);
         }
-        ast::StatementKind::ExportAllDeclaration(export_decl) => {
+        &ast::StatementKind::ExportAllDeclaration(export_decl) => {
+            let export_decl = ctx.view.export_all(export_decl);
             node_header(w, "ExportAllDeclaration", stmt.span, ctx);
             write_export_kind_field(w, export_decl.export_kind, ctx);
             w.raw(",\"exported\":");
@@ -169,7 +175,8 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
             write_attributes_field(w, export_decl.attributes, ctx);
             close_node(w, "ExportAllDeclaration", stmt.span, ctx);
         }
-        ast::StatementKind::TSExportAssignment(export_assign) => {
+        &ast::StatementKind::TSExportAssignment(export_assign) => {
+            let export_assign = ctx.view.export_assign(export_assign);
             node_header(w, "TSExportAssignment", stmt.span, ctx);
             w.raw(",\"expression\":");
             write_expression(w, ctx.view.expr(export_assign.expression), ctx);
@@ -181,7 +188,8 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
             write_identifier_plain(w, &ns_export.id, ctx);
             close_node(w, "TSNamespaceExportDeclaration", stmt.span, ctx);
         }
-        ast::StatementKind::ImportDeclaration(import_decl) => {
+        &ast::StatementKind::ImportDeclaration(import_decl) => {
+            let import_decl = ctx.view.import_decl(import_decl);
             node_header(w, "ImportDeclaration", stmt.span, ctx);
             write_import_kind_field(w, import_decl.import_kind, ctx);
             if let Some(phase) = import_decl.phase.as_str() {
@@ -197,7 +205,8 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
             write_attributes_field(w, import_decl.attributes, ctx);
             close_node(w, "ImportDeclaration", stmt.span, ctx);
         }
-        ast::StatementKind::TSImportEqualsDeclaration(import_eq) => {
+        &ast::StatementKind::TSImportEqualsDeclaration(import_eq) => {
+            let import_eq = ctx.view.import_equals(import_eq);
             node_header(w, "TSImportEqualsDeclaration", stmt.span, ctx);
             w.raw(",\"importKind\":");
             w.token(match import_eq.import_kind {
@@ -268,16 +277,20 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
         ast::StatementKind::DebuggerStatement(_) => {
             write_bare_node(w, "DebuggerStatement", stmt.span, ctx);
         }
-        ast::StatementKind::TSInterfaceDeclaration(iface) => {
+        &ast::StatementKind::TSInterfaceDeclaration(iface) => {
+            let iface = ctx.view.interface_decl(iface);
             write_interface_declaration(w, iface, ctx, false);
         }
-        ast::StatementKind::TSDeclareFunction(func) => {
+        &ast::StatementKind::TSDeclareFunction(func) => {
+            let func = ctx.view.declare_fn(func);
             write_declare_function(w, func, ctx, false);
         }
-        ast::StatementKind::TSEnumDeclaration(enum_decl) => {
+        &ast::StatementKind::TSEnumDeclaration(enum_decl) => {
+            let enum_decl = ctx.view.enum_decl(enum_decl);
             write_enum_declaration(w, enum_decl, stmt.span, ctx);
         }
-        ast::StatementKind::TSModuleDeclaration(module_decl) => {
+        &ast::StatementKind::TSModuleDeclaration(module_decl) => {
+            let module_decl = ctx.view.module_decl(module_decl);
             write_module_declaration(w, module_decl, ctx);
         }
     }
@@ -311,7 +324,8 @@ pub(super) fn write_module_declaration(
                 });
                 close_node(w, "TSModuleBlock", block.span, ctx);
             }
-            ast::TSModuleDeclarationBody::TSModuleDeclaration(nested) => {
+            &ast::TSModuleDeclarationBody::TSModuleDeclaration(nested) => {
+                let nested = ctx.view.module_decl(nested);
                 write_module_declaration(w, nested, ctx);
             }
         }
@@ -358,13 +372,16 @@ fn write_exported_declaration(
         ast::StatementKind::VariableDeclaration(var_decl) => {
             write_variable_declaration(w, var_decl, ctx, true);
         }
-        ast::StatementKind::ClassDeclaration(class_decl) => {
+        &ast::StatementKind::ClassDeclaration(class_decl) => {
+            let class_decl = ctx.view.class_decl(class_decl);
             write_class_declaration(w, class_decl, ctx, is_type_export);
         }
-        ast::StatementKind::TSInterfaceDeclaration(iface) => {
+        &ast::StatementKind::TSInterfaceDeclaration(iface) => {
+            let iface = ctx.view.interface_decl(iface);
             write_interface_declaration(w, iface, ctx, true);
         }
-        ast::StatementKind::TSDeclareFunction(func) => {
+        &ast::StatementKind::TSDeclareFunction(func) => {
+            let func = ctx.view.declare_fn(func);
             write_declare_function(w, func, ctx, true);
         }
         _ => write_statement(w, stmt, ctx),
