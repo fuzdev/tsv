@@ -550,6 +550,7 @@ impl<'a> Printer<'a> {
                     next_printed_stmt_start(self.view, consequent, i, inline_comment_boundary)
                         == inline_comment_boundary;
                 let slot = self.orphan_semi_slot(
+                    stmt,
                     consequent,
                     i,
                     inline_comment_boundary,
@@ -665,7 +666,9 @@ impl<'a> Printer<'a> {
             // instead (`b1(); /* c */ let d1 = 1;`, `b1(); /* c */ case 2:`), emitted
             // by that statement's leading run / the switch's between-case run.
             let claim_end = if body_has_comments {
-                self.statement_claim_end_with(consequent, i, next_case_start, || stmt_gap_start)
+                self.statement_claim_end_with(stmt, consequent, i, next_case_start, || {
+                    stmt_gap_start
+                })
             } else {
                 u32::MAX
             };
@@ -675,7 +678,7 @@ impl<'a> Printer<'a> {
             // here exactly as it does in a block body.
             let printed_tail = self.printed_tail(
                 stmt_gap_start,
-                statement_gap_floor(self.view, consequent, i),
+                statement_gap_floor(self.view, stmt, consequent, i),
             );
             // Where the content-line run ends, and whether it leaves the terminator gap EMPTY
             // behind it — two comment queries the `deferred_tail_landing` arms below are the
