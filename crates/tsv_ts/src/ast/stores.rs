@@ -1,5 +1,6 @@
-//! The stores a parse's expressions and statements live in, beside the arena that holds the
-//! rest of the tree, and the per-thread parking of their capacity.
+//! The stores a parse's expressions and statements live in, and the type stores that nothing
+//! fills yet, beside the arena that holds the rest of the tree, and the per-thread parking of
+//! their capacity.
 //!
 //! [`AstStores`] is one document's: every parse of a document, embedded islands included,
 //! appends to the same one, so an id means the same row wherever in the document it is
@@ -20,7 +21,7 @@ use tsv_lang::store::{Id, ListBuf, ListMark, Row, Store};
 
 use super::{
     EmptyStatement, Expression, ExpressionKind, Program, Span, Statement, StatementKind,
-    ThisExpression,
+    TSThisType, TSType, ThisExpression,
 };
 
 /// The family tag of [`Expression`] rows, naming them without their lifetime.
@@ -71,8 +72,31 @@ const STMT_SENTINEL: Statement<'static> = Statement {
     kind: StatementKind::EmptyStatement(EmptyStatement),
 };
 
-/// One document's expression and statement stores and the scratch stacks that build their
-/// lists.
+/// The family tag of [`TSType`] rows, naming them without their lifetime.
+pub enum Ty {}
+
+impl Row for TSType<'_> {
+    type Family = Ty;
+}
+
+/// A handle to one [`TSType`] row.
+pub type TyId = Id<Ty>;
+
+#[cfg(test)]
+const _: () = {
+    use tsv_lang::store::{Run, STORE_CHECK};
+    assert!(STORE_CHECK || size_of::<TyId>() == 4);
+    assert!(STORE_CHECK || size_of::<Option<TyId>>() == 4);
+    assert!(STORE_CHECK || size_of::<Run<TyId>>() == 8);
+};
+
+/// Slot 0 of the type store. No id reaches it, so its contents are never read.
+const TY_SENTINEL: TSType<'static> = TSType::ThisType(TSThisType {
+    span: Span { start: 0, end: 0 },
+});
+
+/// One document's expression, statement and type stores and the scratch stacks that build
+/// their lists.
 ///
 /// A fresh one allocates one one-row buffer per store, for its sentinel, and nothing for the
 /// scratch stacks.
@@ -86,6 +110,16 @@ pub struct AstStores<'arena> {
     pub(crate) stmts: Store<Statement<'arena>>,
     pub(crate) stmt_lists: Store<StmtId>,
     pub(crate) stmt_list_scratch: ListBuf<StmtId>,
+    // TODO: the type stores ride the stores' lifecycle (`new`, `park`, the scratch marks) but
+    // nothing pushes a row or reads one yet: types are still arena nodes. The type parser's
+    // construction fills them and the view's type accessors read them.
+    pub(crate) tys: Store<TSType<'arena>>,
+    // TODO: no list is flushed here until the type parser builds its lists as id runs; the
+    // view's `ty_list` reads them.
+    pub(crate) ty_lists: Store<TyId>,
+    // TODO: no type list frame opens on this stack until the type parser's list builders
+    // push their elements' ids here.
+    pub(crate) ty_list_scratch: ListBuf<TyId>,
 }
 
 /// The tops of the scratch stacks, taken together: a speculation's or a discarded parse's
@@ -96,6 +130,7 @@ pub(crate) struct ScratchMarks {
     lists: ListMark<ExprId>,
     opt_lists: ListMark<Option<ExprId>>,
     stmt_lists: ListMark<StmtId>,
+    ty_lists: ListMark<TyId>,
 }
 
 impl AstStores<'_> {
@@ -107,6 +142,7 @@ impl AstStores<'_> {
             lists: self.expr_list_scratch.mark(),
             opt_lists: self.expr_opt_scratch.mark(),
             stmt_lists: self.stmt_list_scratch.mark(),
+            ty_lists: self.ty_list_scratch.mark(),
         }
     }
 
@@ -119,6 +155,7 @@ impl AstStores<'_> {
         self.expr_list_scratch.truncate(marks.lists);
         self.expr_opt_scratch.truncate(marks.opt_lists);
         self.stmt_list_scratch.truncate(marks.stmt_lists);
+        self.ty_list_scratch.truncate(marks.ty_lists);
     }
 
     /// Whether the scratch stacks stand at `marks`.
@@ -128,6 +165,7 @@ impl AstStores<'_> {
             && self.expr_list_scratch.len_since(marks.lists) == 0
             && self.expr_opt_scratch.len_since(marks.opt_lists) == 0
             && self.stmt_list_scratch.len_since(marks.stmt_lists) == 0
+            && self.ty_list_scratch.len_since(marks.ty_lists) == 0
     }
 
     /// Empty stores for one document.
@@ -143,6 +181,9 @@ impl AstStores<'_> {
             stmts: Store::new(STMT_SENTINEL),
             stmt_lists: Store::new(Id::SENTINEL),
             stmt_list_scratch: ListBuf::new(),
+            tys: Store::new(TY_SENTINEL),
+            ty_lists: Store::new(Id::SENTINEL),
+            ty_list_scratch: ListBuf::new(),
         }
     }
 
@@ -163,6 +204,9 @@ impl AstStores<'_> {
             stmts,
             mut stmt_lists,
             mut stmt_list_scratch,
+            tys,
+            mut ty_lists,
+            mut ty_list_scratch,
         } = self;
         expr_lists.reset();
         expr_opt_lists.reset();
@@ -170,6 +214,8 @@ impl AstStores<'_> {
         expr_opt_scratch.reset();
         stmt_lists.reset();
         stmt_list_scratch.reset();
+        ty_lists.reset();
+        ty_list_scratch.reset();
         AstStores {
             exprs: exprs.recycle(EXPR_SENTINEL),
             expr_lists,
@@ -180,6 +226,9 @@ impl AstStores<'_> {
             stmts: stmts.recycle(STMT_SENTINEL),
             stmt_lists,
             stmt_list_scratch,
+            tys: tys.recycle(TY_SENTINEL),
+            ty_lists,
+            ty_list_scratch,
         }
     }
 }
@@ -270,6 +319,22 @@ mod tests {
         );
         assert_eq!(
             stores.stmt_lists.push(Id::SENTINEL).index(),
+            1,
+            "the id lists rewind"
+        );
+    }
+
+    #[test]
+    fn a_park_rewinds_the_type_stores() {
+        let mut stores = AstStores::new();
+        stores.tys.push(TY_SENTINEL);
+        stores.tys.push(TY_SENTINEL);
+        stores.ty_lists.push(Id::SENTINEL);
+        stores.ty_lists.push(Id::SENTINEL);
+        let mut stores = stores.park();
+        assert_eq!(stores.tys.push(TY_SENTINEL).index(), 1, "the rows rewind");
+        assert_eq!(
+            stores.ty_lists.push(Id::SENTINEL).index(),
             1,
             "the id lists rewind"
         );

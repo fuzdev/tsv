@@ -32,7 +32,7 @@ mod types;
 mod view;
 
 pub(crate) use stores::ScratchMarks;
-pub use stores::{AstStores, Expr, ExprId, Parsed, Stmt, StmtId, with_stores};
+pub use stores::{AstStores, Expr, ExprId, Parsed, Stmt, StmtId, Ty, TyId, with_stores};
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
 pub use view::{AstView, ParsedRef};
