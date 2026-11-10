@@ -1,5 +1,6 @@
-//! The stores a parse's expressions live in, beside the arena that holds the rest of the
-//! tree, and the per-thread parking of their capacity.
+//! The stores a parse's expressions live in, and the statement stores that nothing fills yet,
+//! beside the arena that holds the rest of the tree, and the per-thread parking of their
+//! capacity.
 //!
 //! [`AstStores`] is one document's: every parse of a document, embedded islands included,
 //! appends to the same one, so an id means the same row wherever in the document it is
@@ -18,7 +19,10 @@ use std::ops::Deref;
 
 use tsv_lang::store::{Id, ListBuf, ListMark, Row, Store};
 
-use super::{Expression, ExpressionKind, Program, Span, ThisExpression};
+use super::{
+    EmptyStatement, Expression, ExpressionKind, Program, Span, Statement, StatementKind,
+    ThisExpression,
+};
 
 /// The family tag of [`Expression`] rows, naming them without their lifetime.
 pub enum Expr {}
@@ -44,7 +48,32 @@ const EXPR_SENTINEL: Expression<'static> = Expression {
     kind: ExpressionKind::ThisExpression(ThisExpression),
 };
 
-/// One document's expression stores and the scratch stacks that build their lists.
+/// The family tag of [`Statement`] rows, naming them without their lifetime.
+pub enum Stmt {}
+
+impl Row for Statement<'_> {
+    type Family = Stmt;
+}
+
+/// A handle to one [`Statement`] row.
+pub type StmtId = Id<Stmt>;
+
+#[cfg(test)]
+const _: () = {
+    use tsv_lang::store::{Run, STORE_CHECK};
+    assert!(STORE_CHECK || size_of::<StmtId>() == 4);
+    assert!(STORE_CHECK || size_of::<Option<StmtId>>() == 4);
+    assert!(STORE_CHECK || size_of::<Run<StmtId>>() == 8);
+};
+
+/// Slot 0 of the statement store. No id reaches it, so its contents are never read.
+const STMT_SENTINEL: Statement<'static> = Statement {
+    span: Span { start: 0, end: 0 },
+    kind: StatementKind::EmptyStatement(EmptyStatement),
+};
+
+/// One document's expression and statement stores and the scratch stacks that build their
+/// lists.
 ///
 /// A fresh one allocates one one-row buffer per store, for its sentinel, and nothing for the
 /// scratch stacks.
@@ -55,15 +84,22 @@ pub struct AstStores<'arena> {
     pub(crate) expr_scratch: ListBuf<Expression<'arena>>,
     pub(crate) expr_list_scratch: ListBuf<ExprId>,
     pub(crate) expr_opt_scratch: ListBuf<Option<ExprId>>,
+    // TODO: the statement stores ride the stores' lifecycle (`new`, `park`, the scratch marks)
+    // but nothing pushes a row or reads one yet: statements are still arena nodes. The parser's
+    // statement construction fills them and the view's statement accessors read them.
+    pub(crate) stmts: Store<Statement<'arena>>,
+    pub(crate) stmt_lists: Store<StmtId>,
+    pub(crate) stmt_list_scratch: ListBuf<StmtId>,
 }
 
-/// The tops of the three scratch stacks, taken together: a speculation's or a discarded
-/// parse's restore point.
+/// The tops of the scratch stacks, taken together: a speculation's or a discarded parse's
+/// restore point.
 #[derive(Clone, Copy)]
 pub(crate) struct ScratchMarks {
     exprs: ListMark<Expr>,
     lists: ListMark<ExprId>,
     opt_lists: ListMark<Option<ExprId>>,
+    stmt_lists: ListMark<StmtId>,
 }
 
 impl AstStores<'_> {
@@ -74,6 +110,7 @@ impl AstStores<'_> {
             exprs: self.expr_scratch.mark(),
             lists: self.expr_list_scratch.mark(),
             opt_lists: self.expr_opt_scratch.mark(),
+            stmt_lists: self.stmt_list_scratch.mark(),
         }
     }
 
@@ -85,6 +122,7 @@ impl AstStores<'_> {
         self.expr_scratch.truncate(marks.exprs);
         self.expr_list_scratch.truncate(marks.lists);
         self.expr_opt_scratch.truncate(marks.opt_lists);
+        self.stmt_list_scratch.truncate(marks.stmt_lists);
     }
 
     /// Whether the scratch stacks stand at `marks`.
@@ -93,6 +131,7 @@ impl AstStores<'_> {
         self.expr_scratch.len_since(marks.exprs) == 0
             && self.expr_list_scratch.len_since(marks.lists) == 0
             && self.expr_opt_scratch.len_since(marks.opt_lists) == 0
+            && self.stmt_list_scratch.len_since(marks.stmt_lists) == 0
     }
 
     /// Empty stores for one document.
@@ -105,6 +144,9 @@ impl AstStores<'_> {
             expr_scratch: ListBuf::new(),
             expr_list_scratch: ListBuf::new(),
             expr_opt_scratch: ListBuf::new(),
+            stmts: Store::new(STMT_SENTINEL),
+            stmt_lists: Store::new(Id::SENTINEL),
+            stmt_list_scratch: ListBuf::new(),
         }
     }
 
@@ -122,11 +164,16 @@ impl AstStores<'_> {
             expr_scratch,
             mut expr_list_scratch,
             mut expr_opt_scratch,
+            stmts,
+            mut stmt_lists,
+            mut stmt_list_scratch,
         } = self;
         expr_lists.reset();
         expr_opt_lists.reset();
         expr_list_scratch.reset();
         expr_opt_scratch.reset();
+        stmt_lists.reset();
+        stmt_list_scratch.reset();
         AstStores {
             exprs: exprs.recycle(EXPR_SENTINEL),
             expr_lists,
@@ -134,6 +181,9 @@ impl AstStores<'_> {
             expr_scratch: expr_scratch.recycle(),
             expr_list_scratch,
             expr_opt_scratch,
+            stmts: stmts.recycle(STMT_SENTINEL),
+            stmt_lists,
+            stmt_list_scratch,
         }
     }
 }
@@ -207,6 +257,26 @@ mod tests {
         assert_eq!(with_a_row(&mut stores), 1);
         let mut stores = take_back(stores.park(), &bump);
         assert_eq!(with_a_row(&mut stores), 1, "the park rewinds");
+    }
+
+    #[test]
+    fn a_park_rewinds_the_statement_stores() {
+        let mut stores = AstStores::new();
+        stores.stmts.push(STMT_SENTINEL);
+        stores.stmts.push(STMT_SENTINEL);
+        stores.stmt_lists.push(Id::SENTINEL);
+        stores.stmt_lists.push(Id::SENTINEL);
+        let mut stores = stores.park();
+        assert_eq!(
+            stores.stmts.push(STMT_SENTINEL).index(),
+            1,
+            "the rows rewind"
+        );
+        assert_eq!(
+            stores.stmt_lists.push(Id::SENTINEL).index(),
+            1,
+            "the id lists rewind"
+        );
     }
 
     #[test]
