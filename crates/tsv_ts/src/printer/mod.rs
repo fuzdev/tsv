@@ -1291,7 +1291,7 @@ impl<'a> Printer<'a> {
             E::ConditionalExpression(cond) => {
                 reaches(self.view.expr(cond.test)) || reaches(self.view.expr(cond.alternate))
             }
-            E::ArrowFunctionExpression(arrow) => match &arrow.body {
+            &E::ArrowFunctionExpression(arrow) => match &self.view.arrow_fn(arrow).body {
                 ast::ArrowFunctionBody::Expression(body) => reaches(self.view.expr(*body)),
                 ast::ArrowFunctionBody::BlockStatement(_) => false,
             },
@@ -2424,7 +2424,7 @@ impl<'a> Printer<'a> {
                     }
                     Err(close) => return close,
                 },
-                K::ArrowFunctionExpression(arrow) => match arrow.body {
+                &K::ArrowFunctionExpression(arrow) => match self.view.arrow_fn(arrow).body {
                     ast::ArrowFunctionBody::Expression(body)
                         if stop_at_printed_pair
                             && matches!(self.view.expr(body).kind, K::ConditionalExpression(_)) =>
@@ -2469,7 +2469,9 @@ impl<'a> Printer<'a> {
             return false;
         }
         let head_end = match &parent.kind {
-            K::ArrowFunctionExpression(arrow) => expressions::functions::arrow_token_end(arrow),
+            &K::ArrowFunctionExpression(arrow) => {
+                expressions::functions::arrow_token_end(self.view.arrow_fn(arrow))
+            }
             K::ConditionalExpression(conditional) => {
                 match self.find_char_outside_comments(
                     self.view.expr(conditional.consequent).span().end,

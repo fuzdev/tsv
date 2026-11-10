@@ -220,8 +220,8 @@ pub(crate) fn choose_layout(
     }
 
     // Decorated class expression → break after operator (`const C =\n\t@dec\n\tclass {}`).
-    if let ExpressionKind::ClassExpression(c) = &right_expr.kind
-        && class_expr_has_decorators(c)
+    if let &ExpressionKind::ClassExpression(c) = &right_expr.kind
+        && class_expr_has_decorators(printer.view.class_expr(c))
     {
         return AssignmentLayout::BreakAfterOperator;
     }
@@ -256,7 +256,7 @@ pub(crate) fn choose_layout(
     // lookup is a breakable group — welding the unbreakable RHS to the operator would
     // force the overflow into the assignment *target*, splitting `params[⏎ 'key'⏎] =`.
     // Prettier instead falls through to `fluid` and breaks after the `=`.
-    if is_simple_value(right_expr) && !can_break_left {
+    if is_simple_value(printer.view, right_expr) && !can_break_left {
         return AssignmentLayout::NeverBreakAfterOperator;
     }
 
@@ -303,7 +303,7 @@ pub fn should_inline_logical_expression(view: AstView<'_>, binary: &ast::BinaryE
 ///   const f = (): H => (y) => expr        // a return type with no parameters
 pub(crate) fn is_curried_arrow_chain_that_breaks(view: AstView<'_>, expr: &Expression<'_>) -> bool {
     is_curried_arrow_chain(view, expr)
-        && matches!(&expr.kind, ExpressionKind::ArrowFunctionExpression(arrow) if arrow_chain_should_break(view, arrow))
+        && matches!(&expr.kind, &ExpressionKind::ArrowFunctionExpression(arrow) if arrow_chain_should_break(view, view.arrow_fn(arrow)))
 }
 
 /// A curried chain that OWNS its break after the operator of the assignment it is the value
@@ -323,9 +323,9 @@ pub(crate) fn is_curried_arrow_chain_owning_break(
 /// assignment RHS through the arrow-chain layout regardless of whether any head
 /// triggers the chain break.
 pub(crate) fn is_curried_arrow_chain(view: AstView<'_>, expr: &Expression<'_>) -> bool {
-    if let ExpressionKind::ArrowFunctionExpression(arrow) = &expr.kind {
+    if let &ExpressionKind::ArrowFunctionExpression(arrow) = &expr.kind {
         matches!(
-            &arrow.body,
+            &view.arrow_fn(arrow).body,
             ast::ArrowFunctionBody::Expression(body)
                 if matches!(view.expr(*body).kind, ExpressionKind::ArrowFunctionExpression(_))
         )
@@ -372,9 +372,9 @@ pub(crate) fn arrow_chain_should_break(
 
     // Check inner arrow if body is an arrow
     if let ast::ArrowFunctionBody::Expression(body) = &arrow.body
-        && let ExpressionKind::ArrowFunctionExpression(inner) = &view.expr(*body).kind
+        && let &ExpressionKind::ArrowFunctionExpression(inner) = &view.expr(*body).kind
     {
-        return arrow_chain_should_break(view, inner);
+        return arrow_chain_should_break(view, view.arrow_fn(inner));
     }
 
     false
@@ -1013,7 +1013,7 @@ fn is_member_only_chain(view: AstView<'_>, expr: &Expression<'_>) -> bool {
 /// UNDECORATED class is on the list because a decorated one never reaches it: prettier's
 /// `shouldBreakAfterOperator` answers it first, as both of tsv's layout twins do
 /// (`class_expr_has_decorators`).
-pub(crate) fn is_simple_value(expr: &Expression<'_>) -> bool {
+pub(crate) fn is_simple_value(view: AstView<'_>, expr: &Expression<'_>) -> bool {
     matches!(
         &expr.kind,
         ExpressionKind::Literal(lit) if matches!(
@@ -1024,7 +1024,7 @@ pub(crate) fn is_simple_value(expr: &Expression<'_>) -> bool {
     ) || matches!(
         expr.kind,
         ExpressionKind::TemplateLiteral(_) | ExpressionKind::TaggedTemplateExpression(_)
-    ) || matches!(&expr.kind, ExpressionKind::ClassExpression(c) if !class_expr_has_decorators(c))
+    ) || matches!(expr.kind, ExpressionKind::ClassExpression(c) if !class_expr_has_decorators(view.class_expr(c)))
 }
 
 /// The RHS comment / freeze / stripped-paren-boundary controls for
@@ -1155,7 +1155,8 @@ impl<'a> Printer<'a> {
         // thirds of the asks. A gated bool rather than a lazy cell: this frame sits on the
         // object-literal recursion (property → value → property), where a memo cell's
         // extra words cost ~1% of the nesting depth the formatter survives.
-        let can_break_left = (left == AssignmentLeft::ShortKey || is_simple_value(right_expr))
+        let can_break_left = (left == AssignmentLeft::ShortKey
+            || is_simple_value(self.view, right_expr))
             && d.can_break(left_doc);
         let mut layout = choose_layout(right_expr, left, can_break_left, self);
 

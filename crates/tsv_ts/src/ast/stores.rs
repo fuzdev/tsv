@@ -540,11 +540,15 @@ try {
         for &id in view.stmt_list(parsed.program.body) {
             match &view.stmt(id).kind {
                 StatementKind::ExpressionStatement(s) => match &view.expr(s.expression).kind {
-                    ExpressionKind::ArrowFunctionExpression(x) => push!(arrow_fns, *x),
-                    ExpressionKind::FunctionExpression(x) => push!(fn_exprs, *x),
-                    ExpressionKind::ClassExpression(x) => push!(class_exprs, *x),
-                    ExpressionKind::TaggedTemplateExpression(x) => push!(tagged_tpls, *x),
-                    ExpressionKind::MetaProperty(x) => push!(meta_props, *x),
+                    &ExpressionKind::ArrowFunctionExpression(x) => {
+                        push!(arrow_fns, *view.arrow_fn(x));
+                    }
+                    &ExpressionKind::FunctionExpression(x) => push!(fn_exprs, *view.fn_expr(x)),
+                    &ExpressionKind::ClassExpression(x) => push!(class_exprs, *view.class_expr(x)),
+                    &ExpressionKind::TaggedTemplateExpression(x) => {
+                        push!(tagged_tpls, *view.tagged_tpl(x));
+                    }
+                    &ExpressionKind::MetaProperty(x) => push!(meta_props, *view.meta_prop(x)),
                     other => panic!("an unexpected expression: {other:?}"),
                 },
                 &StatementKind::TSTypeAliasDeclaration(x) => {

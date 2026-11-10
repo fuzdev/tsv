@@ -635,7 +635,7 @@ impl<'a> Printer<'a> {
         let decorated_class_expr = needs_parens
             && matches!(
                 &expression.kind,
-                ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c)
+                &ExpressionKind::ClassExpression(c) if class_expr_has_decorators(self.view.class_expr(c))
             );
 
         // Which grouping `)` this print retains and emits the expression→`)` gap inside.

@@ -121,7 +121,7 @@ fn left_side_child<'e>(
         ExpressionKind::CallExpression(call) => view.expr(call.callee),
         ExpressionKind::MemberExpression(member) => view.expr(member.object),
         ExpressionKind::TSNonNullExpression(non_null) => view.expr(non_null.expression),
-        ExpressionKind::TaggedTemplateExpression(tagged) => view.expr(tagged.tag),
+        &ExpressionKind::TaggedTemplateExpression(tagged) => view.expr(view.tagged_tpl(tagged).tag),
         ExpressionKind::ConditionalExpression(cond) => view.expr(cond.test),
         ExpressionKind::BinaryExpression(binary) => view.expr(binary.left),
         ExpressionKind::AssignmentExpression(assign) => view.expr(assign.left),
@@ -220,7 +220,9 @@ pub(in crate::printer) fn leading_decorated_class<'e>(
     let mut node = expr;
     loop {
         match &node.kind {
-            ExpressionKind::ClassExpression(class) if class_expr_has_decorators(class) => {
+            &ExpressionKind::ClassExpression(class)
+                if class_expr_has_decorators(view.class_expr(class)) =>
+            {
                 return Some(node);
             }
             ExpressionKind::SequenceExpression(_) => return None,
@@ -663,8 +665,8 @@ impl<'a> Printer<'a> {
             }
             // The tag's required pair keeps its run at the call's two shapes — a function
             // tag and a sealed optional chain (`` ( // c⏎a?.b())`x` ``).
-            ExpressionKind::TaggedTemplateExpression(tagged) => {
-                tag_paren_leading_start(self.view, tagged, expr.span)
+            &ExpressionKind::TaggedTemplateExpression(tagged) => {
+                tag_paren_leading_start(self.view, self.view.tagged_tpl(tagged), expr.span)
                     .is_none()
                     .then_some(child)
             }

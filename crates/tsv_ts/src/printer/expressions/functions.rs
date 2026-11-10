@@ -59,14 +59,14 @@ use tsv_lang::source_scan::has_newline_before_position;
 /// is the one prettier gates on `!shouldBreakChain`, and it renders differently besides —
 /// parens in the flat form only ([`ternary_body_parens_group`]) — so each printer states it
 /// as its own arm.
-fn arrow_body_always_hugs(expr: &ast::Expression<'_>, source: &str) -> bool {
+fn arrow_body_always_hugs(view: AstView<'_>, expr: &ast::Expression<'_>, source: &str) -> bool {
     matches!(
         expr.kind,
         ast::ExpressionKind::SequenceExpression(_)
             | ast::ExpressionKind::ObjectExpression(_)
             | ast::ExpressionKind::ArrayExpression(_)
             | ast::ExpressionKind::ArrowFunctionExpression(_)
-    ) || (is_multiline_template_expression(expr)
+    ) || (is_multiline_template_expression(view, expr)
         && !has_newline_before_position(source, expr.span().start))
 }
 
@@ -103,7 +103,9 @@ fn leftmost_arrow_body_parens_span(view: AstView<'_>, expr: &ast::Expression<'_>
     let leftmost = leftmost_no_lookahead(view, expr);
     match &leftmost.kind {
         ast::ExpressionKind::ObjectExpression(_) => Some(leftmost.span),
-        ast::ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c) => {
+        &ast::ExpressionKind::ClassExpression(c)
+            if class_expr_has_decorators(view.class_expr(c)) =>
+        {
             Some(leftmost.span)
         }
         _ => None,
@@ -220,8 +222,8 @@ fn walk_arrow_chain<'a>(
         gap_start = Some(arrow_token_end(current));
         match &current.body {
             ast::ArrowFunctionBody::Expression(b) => match &view.expr(*b).kind {
-                ast::ExpressionKind::ArrowFunctionExpression(inner) => {
-                    current = inner;
+                &ast::ExpressionKind::ArrowFunctionExpression(inner) => {
+                    current = view.arrow_fn(inner);
                     current_span = view.expr(*b).span;
                 }
                 _ => break &current.body,
@@ -785,14 +787,15 @@ fn function_return_type_break(
 
 /// [`FlatSoleParamLiteral`] for `arg`, or `None`.
 pub(in crate::printer) fn flat_sole_param_literal<'a>(
-    printer: &Printer<'_>,
+    printer: &Printer<'a>,
     arg: &'a ast::Expression<'a>,
 ) -> Option<FlatSoleParamLiteral<'a>> {
     if printer.canonical {
         return None;
     }
-    let (literal, body, is_arrow, return_break) = match &arg.kind {
+    let (literal, body, is_arrow, return_break) = match arg.kind {
         ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
+            let arrow = printer.view.arrow_fn(arrow);
             let ast::ArrowFunctionBody::BlockStatement(body) = &arrow.body else {
                 return None;
             };
@@ -805,6 +808,7 @@ pub(in crate::printer) fn flat_sole_param_literal<'a>(
             (literal, body, true, None)
         }
         ast::ExpressionKind::FunctionExpression(func) => {
+            let func = printer.view.fn_expr(func);
             let literal = sole_param_object_type(
                 printer,
                 printer.view.run(func.params),
@@ -878,9 +882,10 @@ pub(in crate::printer) fn function_return_hug_break(
     if printer.canonical {
         return None;
     }
-    let ast::ExpressionKind::FunctionExpression(func) = &arg.kind else {
+    let &ast::ExpressionKind::FunctionExpression(func) = &arg.kind else {
         return None;
     };
+    let func = printer.view.fn_expr(func);
     if func.params.len() > 1
         || !crate::printer::types::function_types::type_params_allow_grouping(
             func.type_parameters.as_ref(),
@@ -1039,12 +1044,12 @@ pub(in crate::printer) fn callback_signature_refuses_hug(
     arg: &ast::Expression<'_>,
     arg_count: usize,
 ) -> bool {
-    match &arg.kind {
+    match arg.kind {
         ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
-            arrow_signature_refuses_hug(printer, arrow, arg.span)
+            arrow_signature_refuses_hug(printer, printer.view.arrow_fn(arrow), arg.span)
         }
         ast::ExpressionKind::FunctionExpression(func) => {
-            function_signature_refuses_hug(printer, func, arg_count)
+            function_signature_refuses_hug(printer, printer.view.fn_expr(func), arg_count)
         }
         _ => false,
     }
@@ -1799,8 +1804,8 @@ impl<'a> Printer<'a> {
         // Check if body arrow has trailing param comments (forces break)
         let body_arrow_param_comment_forces_break = matches!(
             &expr.kind,
-            ast::ExpressionKind::ArrowFunctionExpression(body_arrow)
-                if self.arrow_trailing_param_comment_forces_break(body_arrow)
+            &ast::ExpressionKind::ArrowFunctionExpression(body_arrow)
+                if self.arrow_trailing_param_comment_forces_break(self.view.arrow_fn(body_arrow))
         );
 
         // Inline block comments don't prevent hugging — only own-line comments do.
@@ -2301,12 +2306,13 @@ impl<'a> Printer<'a> {
         }
         let mut current = arrow;
         while let ast::ArrowFunctionBody::Expression(body) = &current.body
-            && let ast::ExpressionKind::ArrowFunctionExpression(inner) = &self.view.expr(*body).kind
+            && let &ast::ExpressionKind::ArrowFunctionExpression(inner) =
+                &self.view.expr(*body).kind
         {
             if self.relational_sibling_pair_is_kept(self.view.expr(*body)) {
                 return true;
             }
-            current = inner;
+            current = self.view.arrow_fn(inner);
         }
         false
     }
@@ -3515,7 +3521,7 @@ impl<'a> Printer<'a> {
     /// gives a hoisted left-spine run (`Printer::left_spine_shell_has_own_line_comment`).
     /// The one predicate all three hug sites read, so they cannot part on it.
     fn arrow_body_hugs(&self, expr: &ast::Expression<'_>) -> bool {
-        arrow_body_always_hugs(expr, self.source)
+        arrow_body_always_hugs(self.view, expr, self.source)
             && !self.left_spine_shell_has_own_line_comment(expr)
     }
 

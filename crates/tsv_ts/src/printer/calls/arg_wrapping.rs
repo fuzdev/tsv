@@ -343,7 +343,9 @@ pub(super) fn classify_chain_arg(view: AstView<'_>, arg: &ast::Expression<'_>) -
         // Arrow functions: prettier's couldExpandArg keys on the body type and
         // looks through the return-type annotation, so arrows are classified by
         // their body regardless of any return type.
-        ast::ExpressionKind::ArrowFunctionExpression(arrow) => classify_arrow_body(view, arrow),
+        &ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
+            classify_arrow_body(view, view.arrow_fn(arrow))
+        }
         // Everything else needs soft wrapping so the call can break
         // before the argument, giving the argument a fresh line to fit on
         _ => ChainArgKind::NeedsSoftWrap,
@@ -442,7 +444,9 @@ fn classify_expression_body(view: AstView<'_>, expr: &ast::Expression<'_>) -> Ch
         // Ternaries hug but need trailing comma wrapper
         ast::ExpressionKind::ConditionalExpression(_) => ChainArgKind::NeedsWrapper,
         // Nested arrows inherit their body's classification
-        ast::ExpressionKind::ArrowFunctionExpression(inner) => classify_arrow_body(view, inner),
+        &ast::ExpressionKind::ArrowFunctionExpression(inner) => {
+            classify_arrow_body(view, view.arrow_fn(inner))
+        }
         // Everything else needs soft wrap
         _ => ChainArgKind::NeedsSoftWrap,
     }
@@ -517,11 +521,11 @@ pub(super) fn prebuild_expand_last_break_body(
     printer: &Printer<'_>,
     last_arg: Option<&ast::Expression<'_>>,
 ) -> Option<(u32, DocId)> {
-    if let Some(ast::Expression {
+    if let Some(&ast::Expression {
         kind: ast::ExpressionKind::ArrowFunctionExpression(arrow),
         ..
     }) = last_arg
-        && let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+        && let ast::ArrowFunctionBody::Expression(body_expr) = &printer.view.arrow_fn(arrow).body
         && (arrow_body_is_call_through_non_null(printer.view, printer.view.expr(*body_expr))
             || matches!(
                 printer.view.expr(*body_expr).kind,
@@ -583,10 +587,10 @@ fn terminal_arrow<'a>(
         let ast::ArrowFunctionBody::Expression(body) = &current.body else {
             return (current, span);
         };
-        let ast::ExpressionKind::ArrowFunctionExpression(inner) = &view.expr(*body).kind else {
+        let &ast::ExpressionKind::ArrowFunctionExpression(inner) = &view.expr(*body).kind else {
             return (current, span);
         };
-        current = inner;
+        current = view.arrow_fn(inner);
         span = Some(view.expr(*body).span);
     }
 }
@@ -654,10 +658,10 @@ pub(super) fn prebuild_expand_last_obj_array_body(
     last_arg: Option<&ast::Expression<'_>>,
 ) -> Option<(u32, DocId)> {
     let d = printer.d();
-    let ast::ExpressionKind::ArrowFunctionExpression(arrow) = &(last_arg?).kind else {
+    let &ast::ExpressionKind::ArrowFunctionExpression(arrow) = &(last_arg?).kind else {
         return None;
     };
-    let body_expr = arrow_terminal_expression_body(printer.view, arrow)?;
+    let body_expr = arrow_terminal_expression_body(printer.view, printer.view.arrow_fn(arrow))?;
     if !matches!(
         body_expr.kind,
         ast::ExpressionKind::ObjectExpression(_) | ast::ExpressionKind::ArrayExpression(_)
@@ -894,9 +898,10 @@ pub(super) fn last_arg_arrow_gap_break(
     printer: &Printer<'_>,
     last_arg: &ast::Expression<'_>,
 ) -> Option<ArrowGapBreak> {
-    let ast::ExpressionKind::ArrowFunctionExpression(outer) = &last_arg.kind else {
+    let &ast::ExpressionKind::ArrowFunctionExpression(outer) = &last_arg.kind else {
         return None;
     };
+    let outer = printer.view.arrow_fn(outer);
     // The softline is appended for every body KIND, but only inside a printing prettier
     // reaches with `expandLastArg` — which `shouldExpandLastArg` gates on `couldExpandArg`.
     // A body it would not expand (a member, an identifier, a binary, a template) never gets
@@ -1210,12 +1215,15 @@ fn prebuild_arrow_gap_break_body(
     if let Some(obj) = prebuild_expand_last_obj_array_body(printer, last_arg) {
         return Some(obj);
     }
-    let ast::ExpressionKind::ArrowFunctionExpression(arrow) = &(last_arg?).kind else {
+    let &ast::ExpressionKind::ArrowFunctionExpression(arrow) = &(last_arg?).kind else {
         return None;
     };
     // The TERMINAL arrow's body, for the same reason every other hug question walks there:
     // under `expandLastArg` a curried argument is a plain run of signatures ending in it.
-    match &terminal_arrow(printer.view, arrow).0.body {
+    match &terminal_arrow(printer.view, printer.view.arrow_fn(arrow))
+        .0
+        .body
+    {
         ast::ArrowFunctionBody::BlockStatement(block) => {
             Some((block.span.start, printer.arrow_block_body_doc(block)))
         }
@@ -1588,8 +1596,8 @@ impl<'a> AssumedParamHug<'a> {
         let return_hug = function_return_hug_break(printer, arg);
         let body = match (&flat, &arg.kind) {
             (Some(flat), _) => flat.body,
-            (None, ast::ExpressionKind::FunctionExpression(func)) if return_hug.is_some() => {
-                &func.body
+            (None, &ast::ExpressionKind::FunctionExpression(func)) if return_hug.is_some() => {
+                &printer.view.fn_expr(func).body
             }
             _ => return None,
         };
@@ -2278,12 +2286,14 @@ fn prebuild_callback_block_body(
     printer: &Printer<'_>,
     arg: &ast::Expression<'_>,
 ) -> Option<(u32, DocId)> {
-    let (body, is_arrow) = match &arg.kind {
-        ast::ExpressionKind::ArrowFunctionExpression(arrow) => match &arrow.body {
-            ast::ArrowFunctionBody::BlockStatement(block) => (block, true),
-            ast::ArrowFunctionBody::Expression(_) => return None,
-        },
-        ast::ExpressionKind::FunctionExpression(func) => (&func.body, false),
+    let (body, is_arrow) = match arg.kind {
+        ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
+            match &printer.view.arrow_fn(arrow).body {
+                ast::ArrowFunctionBody::BlockStatement(block) => (block, true),
+                ast::ArrowFunctionBody::Expression(_) => return None,
+            }
+        }
+        ast::ExpressionKind::FunctionExpression(func) => (&printer.view.fn_expr(func).body, false),
         _ => return None,
     };
     Some((
@@ -2894,7 +2904,7 @@ pub(super) fn should_expand_first_arg(printer: &Printer<'_>, args: &[ast::ExprId
     }
 
     // First arg must be a function with block body
-    if !is_block_function(printer.view.expr(args[0])) {
+    if !is_block_function(printer.view, printer.view.expr(args[0])) {
         return false;
     }
 
@@ -2943,9 +2953,9 @@ pub(super) fn first_arg_signature_refuses_expand_first(
 ) -> bool {
     matches!(
         printer.view.opt(args.first().copied()),
-        Some(ast::Expression { span, kind: ast::ExpressionKind::ArrowFunctionExpression(arrow) })
-            if arrow_signature_refuses_hug(printer, arrow, *span)
-                || printer.arrow_empty_params_hold_comments(arrow)
+        Some(&ast::Expression { span, kind: ast::ExpressionKind::ArrowFunctionExpression(arrow) })
+            if arrow_signature_refuses_hug(printer, printer.view.arrow_fn(arrow), span)
+                || printer.arrow_empty_params_hold_comments(printer.view.arrow_fn(arrow))
     )
 }
 
@@ -3118,7 +3128,7 @@ fn sole_template_on_its_own_line_commented(
 /// first: nearly no call has the shape, and a call without it is answered here.
 #[inline]
 pub(super) fn is_sole_multiline_template_arg(view: AstView<'_>, args: &[ast::ExprId]) -> bool {
-    matches!(args, [arg] if is_multiline_template_expression(view.expr(*arg)))
+    matches!(args, [arg] if is_multiline_template_expression(view, view.expr(*arg)))
 }
 
 /// Single multiline-template argument on the same line as `(` — hug it,

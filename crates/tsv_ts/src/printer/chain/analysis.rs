@@ -447,7 +447,10 @@ fn template_preempts_chain_redirect(
     span: Span,
 ) -> bool {
     call.arguments.len() == 1
-        && is_multiline_template_expression(printer.view.expr(printer.view.list(call.arguments)[0]))
+        && is_multiline_template_expression(
+            printer.view,
+            printer.view.expr(printer.view.list(call.arguments)[0]),
+        )
         && !sole_template_on_its_own_line(
             printer,
             call_paren_open(printer, call, span),
@@ -2208,8 +2211,8 @@ mod tests {
             ExpressionKind::TSInstantiationExpression(inst) => {
                 chain_roots(view, view.expr(inst.expression), out);
             }
-            ExpressionKind::TaggedTemplateExpression(tagged) => {
-                chain_roots(view, view.expr(tagged.tag), out);
+            &ExpressionKind::TaggedTemplateExpression(tagged) => {
+                chain_roots(view, view.expr(view.tagged_tpl(tagged).tag), out);
             }
             _ => {}
         }

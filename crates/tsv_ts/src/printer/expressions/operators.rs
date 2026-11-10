@@ -2009,7 +2009,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let decorated_class = matches!(
             &operand.kind,
-            ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c)
+            &ExpressionKind::ClassExpression(c) if class_expr_has_decorators(self.view.class_expr(c))
         );
         if decorated_class {
             self.build_break_open_parens(inner)

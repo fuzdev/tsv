@@ -386,17 +386,20 @@ impl<'a> Printer<'a> {
             // (a ternary's, an object's, an assignment's) that would hold it. Only an arrow
             // ending where the tail does can reach it. A body the statement's own walk reaches
             // is claimed before the build, which this leaves be.
-            ExpressionKind::ArrowFunctionExpression(arrow) => {
+            &ExpressionKind::ArrowFunctionExpression(arrow) => {
+                let arrow = self.view.arrow_fn(arrow);
                 if self.statement_tail_ends_at(expr.span.end) {
                     self.without_statement_tail(|| self.build_arrow_doc(arrow, expr.span))
                 } else {
                     self.build_arrow_doc(arrow, expr.span)
                 }
             }
-            ExpressionKind::FunctionExpression(func) => {
-                self.maybe_wrap_expr_stmt_paren(func.span, self.build_function_doc(func))
-            }
-            ExpressionKind::ClassExpression(class_expr) => {
+            &ExpressionKind::FunctionExpression(func) => self.maybe_wrap_expr_stmt_paren(
+                self.view.fn_expr(func).span,
+                self.build_function_doc(self.view.fn_expr(func)),
+            ),
+            &ExpressionKind::ClassExpression(class_expr) => {
+                let class_expr = self.view.class_expr(class_expr);
                 let doc = self.build_class_expression_doc(class_expr, expr.span);
                 // A DECORATED class expression at the leftmost position of an arrow body
                 // takes the same pair its object twin above takes, and for the same
@@ -422,8 +425,8 @@ impl<'a> Printer<'a> {
             }
             ExpressionKind::SpreadElement(spread) => self.build_spread_doc(spread),
             ExpressionKind::TemplateLiteral(template) => self.build_template_literal_doc(template),
-            ExpressionKind::TaggedTemplateExpression(tagged) => {
-                self.build_tagged_template_doc(tagged, expr.span)
+            &ExpressionKind::TaggedTemplateExpression(tagged) => {
+                self.build_tagged_template_doc(self.view.tagged_tpl(tagged), expr.span)
             }
             ExpressionKind::AwaitExpression(await_expr) => {
                 self.build_await_doc(await_expr, expr.span)
@@ -485,7 +488,9 @@ impl<'a> Printer<'a> {
             ExpressionKind::ImportExpression(import_expr) => {
                 self.build_import_expression_doc(import_expr, expr.span)
             }
-            ExpressionKind::MetaProperty(meta) => self.build_meta_property_doc(meta),
+            &ExpressionKind::MetaProperty(meta) => {
+                self.build_meta_property_doc(self.view.meta_prop(meta))
+            }
             ExpressionKind::TSParameterProperty(param_prop) => {
                 self.build_ts_parameter_property_doc(param_prop, expr.span)
             }

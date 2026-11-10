@@ -131,7 +131,9 @@ fn ends_at_base_closer(view: AstView<'_>, expr: &tsv_ts::ast::Expression<'_>) ->
         | E::ClassExpression(_) => true,
         // Only a BLOCK body ends on a delimiter; an expression body ends wherever that
         // expression ends (`() => a &&⏎\tb`), one indent in.
-        E::ArrowFunctionExpression(a) => matches!(a.body, ArrowFunctionBody::BlockStatement(_)),
+        &E::ArrowFunctionExpression(a) => {
+            matches!(view.arrow_fn(a).body, ArrowFunctionBody::BlockStatement(_))
+        }
         // Transparent wrappers — see the doc comment above.
         E::UnaryExpression(u) => ends_at_base_closer(view, view.expr(u.argument)),
         E::AwaitExpression(a) => ends_at_base_closer(view, view.expr(a.argument)),

@@ -230,9 +230,10 @@ fn single_arrow_expression_body<'a>(
         return None;
     }
     let arg = view.expr(view.list(call.arguments)[0]);
-    let ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind else {
+    let &ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind else {
         return None;
     };
+    let arrow = view.arrow_fn(arrow);
     match &arrow.body {
         ast::ArrowFunctionBody::Expression(body) => Some((arrow, arg.span, view.expr(*body))),
         ast::ArrowFunctionBody::BlockStatement(_) => None,
@@ -765,8 +766,8 @@ fn build_chain_args_force_expand(
         // this is the chain path answering the question the same way rather than
         // differently.
         let flat_sig = call.arguments.len() == 1
-            && matches!(&printer.view.expr(*arg).kind, ExpressionKind::ArrowFunctionExpression(arrow)
-                if arrow.body.is_expression() && !is_curried_arrow_chain(printer.view, printer.view.expr(*arg)));
+            && matches!(&printer.view.expr(*arg).kind, &ExpressionKind::ArrowFunctionExpression(arrow)
+                if printer.view.arrow_fn(arrow).body.is_expression() && !is_curried_arrow_chain(printer.view, printer.view.expr(*arg)));
         let build_arg = || build_joined_argument_doc(printer, paren_open, arguments, i);
         arg_parts.push(if flat_sig {
             build_flat_params_arg_doc(printer, build_arg)
@@ -928,7 +929,8 @@ fn build_chain_args_single(
     //
     // Leading comments on the arg block expand-last (prettier's shouldExpandLastArg
     // returns false when hasComment(lastArg, Leading)).
-    if let ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
+    if let &ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
+        && let arrow = printer.view.arrow_fn(arrow)
         && let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && arrow_body_is_call_through_non_null(printer.view, printer.view.expr(*body_expr))
         // `has_any_comment_text`: refusing the hug is a LAYOUT decision, so it must see a
@@ -992,7 +994,8 @@ fn build_chain_args_single(
     // couldExpandArg keys on the body type (looking through the return-type
     // annotation), so typed-return arrows are eligible.
     // Leading comments block expand-last (prettier's shouldExpandLastArg).
-    if let ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
+    if let &ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
+        && let arrow = printer.view.arrow_fn(arrow)
         && let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && is_ternary_arrow_body(printer.view.expr(*body_expr))
         // `has_any_comment_text`: see above — a layout gate counts an owned comment.
@@ -1040,7 +1043,8 @@ fn build_chain_args_single(
     // Leading comments block expand-last (prettier's shouldExpandLastArg).
     // The layout itself is shared with the non-chain and `new` spellings — see
     // [`build_single_arrow_hug_doc`].
-    if let ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
+    if let &ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
+        && let arrow = printer.view.arrow_fn(arrow)
         && arrow_body_expands_internally(printer.view, arrow)
         // `has_any_comment_text` (on page), not `has_any_comments` (to emit): an owned
         // leading comment defeats the expand-last hug just like an ordinary one, so the
@@ -1074,9 +1078,11 @@ fn build_chain_args_single(
     // A block-bodied arrow the block-arrow arm below may hug takes its body built once, for
     // the convergence state that arm admits ([`AssumedParamHug`]).
     let assumed = match &arg.kind {
-        ExpressionKind::ArrowFunctionExpression(arrow)
-            if matches!(arrow.body, ast::ArrowFunctionBody::BlockStatement(_))
-                && !(has_leading_comment_on_page || last_arg_commented) =>
+        &ExpressionKind::ArrowFunctionExpression(arrow)
+            if matches!(
+                printer.view.arrow_fn(arrow).body,
+                ast::ArrowFunctionBody::BlockStatement(_)
+            ) && !(has_leading_comment_on_page || last_arg_commented) =>
         {
             AssumedParamHug::new(printer, arg)
         }
@@ -1122,8 +1128,9 @@ fn build_chain_args_single(
     // guard is about the arrow's *body* kind, not about the callee, and reading it as the
     // whole gate is what left the `function` twin ungated here.
     let callback_signature_refuses = match &arg.kind {
-        ExpressionKind::ArrowFunctionExpression(arrow) => {
-            !arrow.body.is_expression() && callback_signature_refuses_hug(printer, arg, 1)
+        &ExpressionKind::ArrowFunctionExpression(arrow) => {
+            !printer.view.arrow_fn(arrow).body.is_expression()
+                && callback_signature_refuses_hug(printer, arg, 1)
         }
         ExpressionKind::FunctionExpression(_) => callback_signature_refuses_hug(printer, arg, 1),
         _ => false,
@@ -1144,7 +1151,7 @@ fn build_chain_args_single(
     //    `printCallExpression`, above that redirect — never runs for it. The two states
     //    that separate are `` a.b(`x⏎y`).c() `` (a link, expands) and `` a(`x⏎y`).b() ``
     //    (prettier's chain BASE, printed with `print()`, hugs).
-    let template_expands = is_multiline_template_expression(arg)
+    let template_expands = is_multiline_template_expression(printer.view, arg)
         && (sole_template_on_its_own_line(printer, paren_open, arg_start) || !own_call_layout);
 
     if template_expands {
@@ -1188,7 +1195,7 @@ fn build_chain_args_single(
     // decided it by what THAT run prints ahead of the backtick. The list's run keeps a
     // block the callee→`(` gap relocated on a line of its own where the plain call glues it
     // (`[] /* c */⏎(`⏎`).b()` printed `[](/* c */⏎`⏎`).b()`, which the next pass expands).
-    if is_multiline_template_expression(arg) {
+    if is_multiline_template_expression(printer.view, arg) {
         let leading = if has_leading_comments {
             printer.build_rhs_comments_glued_opt(paren_open, arg_start)
         } else {
@@ -1210,8 +1217,11 @@ fn build_chain_args_single(
     // the hugged first line (e.g., `fn((params) => {`) fits.
     //
     // Exception: a commented argument is never hugged — see the arm below.
-    if let ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
-        && matches!(arrow.body, ast::ArrowFunctionBody::BlockStatement(_))
+    if let &ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
+        && matches!(
+            printer.view.arrow_fn(arrow).body,
+            ast::ArrowFunctionBody::BlockStatement(_)
+        )
     {
         let state_expand = d.concat(&[
             prefix,
@@ -1293,8 +1303,8 @@ fn build_chain_args_single(
     // hug that mangled `arr.map(…)` while `fn(…)` stayed correct was precisely two of them
     // disagreeing. See `arrow_signature_refuses_hug`, which also answers a break the
     // signature's own docs carry.
-    let signature_forces_break = matches!(&arg.kind, ExpressionKind::ArrowFunctionExpression(arrow)
-            if arrow_signature_refuses_hug(printer, arrow, arg.span));
+    let signature_forces_break = matches!(&arg.kind, &ExpressionKind::ArrowFunctionExpression(arrow)
+            if arrow_signature_refuses_hug(printer, printer.view.arrow_fn(arrow), arg.span));
     let kind = if has_leading_comment_on_page || signature_forces_break {
         ChainArgKind::NeedsSoftWrap
     } else {
@@ -1429,7 +1439,7 @@ fn build_chain_args_multi(
     // will_break() recurses into the block body's hardlines and forces break
     // without trying fits(). conditional_group uses fits() directly.
     if call.arguments.len() >= 2
-        && arguments.last().is_some_and(|arg| is_block_function(printer.view.expr(*arg)))
+        && arguments.last().is_some_and(|arg| is_block_function(printer.view, printer.view.expr(*arg)))
         && !comments_force_expansion
         // `has_any_comment_text`, not `has_any_comments`: refusing the expand-last hug is a
         // LAYOUT decision, so it must see a comment the last argument owns and prints
@@ -1494,8 +1504,8 @@ fn build_chain_args_multi(
     if call.arguments.len() >= 2
         && !comments_force_expansion
         && !(has_any_comments && last_arg_commented)
-        && let Some(Expression { span: arrow_span, kind: ExpressionKind::ArrowFunctionExpression(arrow) }) = printer.view.opt(arguments.last().copied())
-        && let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+        && let Some(&Expression { span: arrow_span, kind: ExpressionKind::ArrowFunctionExpression(arrow) }) = printer.view.opt(arguments.last().copied())
+        && let ast::ArrowFunctionBody::Expression(body_expr) = &printer.view.arrow_fn(arrow).body
         // …and it reads the body through prettier's `stripChainElementWrappers`, so a call
         // reached through a trailing `!` is expandable too — the same pair the plain-call /
         // `new` twin asks ([`try_expand_last_arg`]). Asking the bare node kind here declined
@@ -1504,7 +1514,7 @@ fn build_chain_args_multi(
         && (arrow_body_is_call_through_non_null(printer.view, printer.view.expr(*body_expr)) || is_ternary_arrow_body(printer.view.expr(*body_expr)))
         // The reassembling arm's refusal pair, which bites here exactly as it does in the
         // single-argument arms above (`arrow_hug_refused_by_comments`).
-        && !arrow_hug_refused_by_comments(printer, arrow, *arrow_span, printer.view.expr(*body_expr))
+        && !arrow_hug_refused_by_comments(printer, printer.view.arrow_fn(arrow), arrow_span, printer.view.expr(*body_expr))
     {
         // Expand-last arrow with a call body: build the body ONCE and inject it so the
         // whole-arrow arg doc reuses it (the break-body state below reuses it too) —
@@ -1525,7 +1535,7 @@ fn build_chain_args_multi(
             return with_chain_head(d, head, bail);
         }
 
-        let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, *arrow_span);
+        let sig_doc = build_hugged_arrow_sig_doc(printer, printer.view.arrow_fn(arrow), arrow_span);
         // Reuse the pre-built call body (see above); conditional bodies build fresh.
         let body_doc = body_reuse.map_or_else(
             || printer.build_arrow_arg_body_doc_unclaimed(printer.view.expr(*body_expr)),
@@ -1533,7 +1543,7 @@ fn build_chain_args_multi(
         );
         let body_doc = prepend_arrow_body_comments(
             printer,
-            arrow,
+            printer.view.arrow_fn(arrow),
             printer.view.expr(*body_expr).span().start,
             body_doc,
         );
@@ -1549,7 +1559,11 @@ fn build_chain_args_multi(
                 &head_parts,
                 sig_doc,
                 body_doc,
-                arrow_body_breaks_after_space(printer, arrow, printer.view.expr(*body_expr)),
+                arrow_body_breaks_after_space(
+                    printer,
+                    printer.view.arrow_fn(arrow),
+                    printer.view.expr(*body_expr),
+                ),
                 last_arg_doc,
                 all_args_broken,
             ),
@@ -1566,7 +1580,8 @@ fn build_chain_args_multi(
         && !comments_force_expansion
         && !(has_any_comments && last_arg_commented)
         && let Some(last_arg) = arguments.last()
-        && let ExpressionKind::ArrowFunctionExpression(arrow) = &printer.view.expr(*last_arg).kind
+        && let &ExpressionKind::ArrowFunctionExpression(arrow) = &printer.view.expr(*last_arg).kind
+        && let arrow = printer.view.arrow_fn(arrow)
         && arrow_body_expands_internally(printer.view, arrow)
         // A signature that will break — the hug renders the prefix and the signature run on
         // one line. NOT the body-tail question its reassembling siblings ask

@@ -150,8 +150,8 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &ast::Property, ctx: &Ctx
     write_expression(w, ctx.view.expr(prop.key), ctx);
     let getset = !matches!(prop.kind, ast::PropertyKind::Init);
     let generic_method = prop.method
-        && matches!(&ctx.view.expr(prop.value).kind, ast::ExpressionKind::FunctionExpression(f)
-            if f.type_parameters.is_some());
+        && matches!(&ctx.view.expr(prop.value).kind, &ast::ExpressionKind::FunctionExpression(f)
+            if ctx.view.fn_expr(f).type_parameters.is_some());
     if (getset || generic_method) && !ctx.vanilla_acorn {
         w.raw(",\"kind\":\"");
         w.raw(prop.kind.as_str());
@@ -186,13 +186,13 @@ fn write_property_value(w: &mut JsonWriter, prop: &ast::Property, ctx: &Ctx<'_>)
     let method_value = prop.method || !matches!(prop.kind, ast::PropertyKind::Init);
     match (ctx.view.expr(prop.value), method_value) {
         (
-            ast::Expression {
+            &ast::Expression {
                 kind: ast::ExpressionKind::FunctionExpression(f),
                 ..
             },
             true,
         ) => {
-            write_function_expression(w, f, ctx, true);
+            write_function_expression(w, ctx.view.fn_expr(f), ctx, true);
         }
         (
             ast::Expression {

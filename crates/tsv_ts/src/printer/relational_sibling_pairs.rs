@@ -126,7 +126,8 @@ fn any_expression_child<'e>(
                 || visit(view.expr(cond.consequent), Other)
                 || visit(view.expr(cond.alternate), Other)
         }
-        ExpressionKind::ArrowFunctionExpression(arrow) => {
+        &ExpressionKind::ArrowFunctionExpression(arrow) => {
+            let arrow = view.arrow_fn(arrow);
             view.run(arrow.params)
                 .iter()
                 .any(|child| visit(child, Other))
@@ -135,11 +136,12 @@ fn any_expression_child<'e>(
                     ArrowFunctionBody::BlockStatement(_) => false,
                 }
         }
-        ExpressionKind::FunctionExpression(function) => view
-            .run(function.params)
+        &ExpressionKind::FunctionExpression(function) => view
+            .run(view.fn_expr(function).params)
             .iter()
             .any(|child| visit(child, Other)),
-        ExpressionKind::ClassExpression(class) => {
+        &ExpressionKind::ClassExpression(class) => {
+            let class = view.class_expr(class);
             decorators_any(view, class.decorators, &mut visit)
                 || class
                     .super_class
@@ -161,7 +163,8 @@ fn any_expression_child<'e>(
             .list(template.expressions)
             .iter()
             .any(|child| visit(view.expr(*child), TemplateExpression)),
-        ExpressionKind::TaggedTemplateExpression(tagged) => {
+        &ExpressionKind::TaggedTemplateExpression(tagged) => {
+            let tagged = view.tagged_tpl(tagged);
             visit(view.expr(tagged.tag), Other)
                 || view
                     .list(tagged.quasi.expressions)
@@ -565,7 +568,8 @@ impl<'a> Printer<'a> {
                     self.mark_region_bare(expr.span());
                 }
             }
-            ExpressionKind::ArrowFunctionExpression(arrow) => {
+            &ExpressionKind::ArrowFunctionExpression(arrow) => {
+                let arrow = self.view.arrow_fn(arrow);
                 // `params_start` is the parameter list's `(`: absent, the lone parameter
                 // was written bare.
                 if arrow.params_start.is_none() {
@@ -666,7 +670,9 @@ impl<'a> Printer<'a> {
             node = match &node.kind {
                 ExpressionKind::MemberExpression(member) => self.view.expr(member.object),
                 ExpressionKind::CallExpression(call) => self.view.expr(call.callee),
-                ExpressionKind::TaggedTemplateExpression(tagged) => self.view.expr(tagged.tag),
+                &ExpressionKind::TaggedTemplateExpression(tagged) => {
+                    self.view.expr(self.view.tagged_tpl(tagged).tag)
+                }
                 ExpressionKind::TSNonNullExpression(non_null) => {
                     self.view.expr(non_null.expression)
                 }

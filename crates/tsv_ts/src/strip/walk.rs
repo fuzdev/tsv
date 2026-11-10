@@ -1145,7 +1145,9 @@ impl<'s, 'b> Walk<'s, 'b> {
                 ExpressionKind::CallExpression(call) => (call.callee, false),
                 ExpressionKind::NewExpression(new) => (new.callee, false),
                 ExpressionKind::MemberExpression(member) => (member.object, false),
-                ExpressionKind::TaggedTemplateExpression(tagged) => (tagged.tag, false),
+                &ExpressionKind::TaggedTemplateExpression(tagged) => {
+                    (self.view.tagged_tpl(tagged).tag, false)
+                }
                 ExpressionKind::TSInstantiationExpression(instantiation) => {
                     (instantiation.expression, false)
                 }
@@ -1211,7 +1213,8 @@ impl<'s, 'b> Walk<'s, 'b> {
                 }
             }
             ExpressionKind::MemberExpression(member) => self.expr(self.view.expr(member.property)),
-            ExpressionKind::TaggedTemplateExpression(tagged) => {
+            &ExpressionKind::TaggedTemplateExpression(tagged) => {
+                let tagged = self.view.tagged_tpl(tagged);
                 self.type_arguments(tagged.type_arguments.as_ref());
                 for expression in self.view.list(tagged.quasi.expressions) {
                     let expression = self.view.expr(*expression);
@@ -1300,14 +1303,17 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.expr(self.view.expr(conditional.consequent));
                 self.expr(self.view.expr(conditional.alternate));
             }
-            ExpressionKind::ArrowFunctionExpression(arrow) => {
-                self.function(FunctionView::arrow(self.view, arrow));
+            &ExpressionKind::ArrowFunctionExpression(arrow) => {
+                self.function(FunctionView::arrow(self.view, self.view.arrow_fn(arrow)));
             }
-            ExpressionKind::FunctionExpression(func) => {
-                self.function(FunctionView::expression(self.view, func));
+            &ExpressionKind::FunctionExpression(func) => {
+                self.function(FunctionView::expression(self.view, self.view.fn_expr(func)));
             }
-            ExpressionKind::ClassExpression(class) => {
-                self.class(ClassView::expression(self.view, class), e.span.start);
+            &ExpressionKind::ClassExpression(class) => {
+                self.class(
+                    ClassView::expression(self.view, self.view.class_expr(class)),
+                    e.span.start,
+                );
             }
             ExpressionKind::SpreadElement(spread) => self.expr(self.view.expr(spread.argument)),
             ExpressionKind::TemplateLiteral(template) => {
@@ -1316,7 +1322,8 @@ impl<'s, 'b> Walk<'s, 'b> {
                     self.expr(expression);
                 }
             }
-            ExpressionKind::TaggedTemplateExpression(tagged) => {
+            &ExpressionKind::TaggedTemplateExpression(tagged) => {
+                let tagged = self.view.tagged_tpl(tagged);
                 self.link_operand(self.view.expr(tagged.tag));
                 self.type_arguments(tagged.type_arguments.as_ref());
                 for expression in self.view.list(tagged.quasi.expressions) {
@@ -2119,7 +2126,7 @@ fn expression_tail(view: AstView<'_>, e: &Expression<'_>, end: u32) -> Tail {
         ExpressionKind::YieldExpression(e) => e.argument.map_or(Tail::Closed, |argument| {
             expression_tail(view, view.expr(argument), end)
         }),
-        ExpressionKind::ArrowFunctionExpression(arrow) => match &arrow.body {
+        &ExpressionKind::ArrowFunctionExpression(arrow) => match &view.arrow_fn(arrow).body {
             ArrowFunctionBody::Expression(body) => expression_tail(view, view.expr(*body), end),
             ArrowFunctionBody::BlockStatement(_) => Tail::Closed,
         },

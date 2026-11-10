@@ -626,13 +626,16 @@ impl<'a> CalleeParens<'a> {
 
     /// The pair itself, around a body from [`Self::build_body_doc`].
     pub(super) fn build_doc(&self, printer: &Printer<'_>, body: DocId) -> DocId {
-        match self {
+        match *self {
             // A decorated class breaks its pair open, as at every other position that pairs
             // one (`new (⏎\t@dec⏎\tclass {}⏎)()`): the decorator owns its own line either way.
-            Self::Welded(ast::Expression {
+            Self::Welded(&ast::Expression {
                 kind: ast::ExpressionKind::ClassExpression(class_expr),
                 ..
-            }) if crate::printer::decorators::class_expr_has_decorators(class_expr) => {
+            }) if crate::printer::decorators::class_expr_has_decorators(
+                printer.view.class_expr(class_expr),
+            ) =>
+            {
                 printer.build_break_open_parens(body)
             }
             Self::Welded(_) => printer.arena().parens(body),
@@ -1023,7 +1026,7 @@ impl<'a> Printer<'a> {
                 && self.view.list(call
                     .arguments
                     ).last()
-                    .is_some_and(|arg| is_block_function(self.view.expr(*arg)))
+                    .is_some_and(|arg| is_block_function(self.view, self.view.expr(*arg)))
                 && !any_arg_empty_line
                 && !(call_has_comments
                     && any_comment_forces_expansion(call, span, self, paren_open))

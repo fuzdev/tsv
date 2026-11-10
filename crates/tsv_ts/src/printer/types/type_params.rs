@@ -929,13 +929,15 @@ impl<'a> Printer<'a> {
                     value = view.expr(cast.expression);
                     continue;
                 }
-                Kind::ArrowFunctionExpression(arrow) => match arrow.return_type.as_ref() {
-                    Some(return_type) => match view.ty(return_type.type_annotation) {
-                        TSType::TypeReference(reference) => reference.type_arguments.as_ref(),
-                        _ => None,
-                    },
-                    None => None,
-                },
+                &Kind::ArrowFunctionExpression(arrow) => {
+                    match view.arrow_fn(arrow).return_type.as_ref() {
+                        Some(return_type) => match view.ty(return_type.type_annotation) {
+                            TSType::TypeReference(reference) => reference.type_arguments.as_ref(),
+                            _ => None,
+                        },
+                        None => None,
+                    }
+                }
                 _ => None,
             };
             return head.or(found);

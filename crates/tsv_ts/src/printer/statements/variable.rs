@@ -436,7 +436,7 @@ impl<'a> Printer<'a> {
 
         // Decorated class expression → break after operator, each decorator
         // on its own line (`const C =\n\t@dec\n\tclass {}`).
-        let is_decorated_class_expr = matches!(&init.kind, ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c));
+        let is_decorated_class_expr = matches!(&init.kind, &ExpressionKind::ClassExpression(c) if class_expr_has_decorators(self.view.class_expr(c)));
 
         // Expressions that need break-after-operator layout:
         // group([left, " =", indent([line, right])])
@@ -673,7 +673,7 @@ impl<'a> Printer<'a> {
                 }
                 None => hang_after_operator(d, init_doc),
             });
-        } else if is_layout_eligible && !is_simple_value(init) {
+        } else if is_layout_eligible && !is_simple_value(self.view, init) {
             // Fluid layout (default for layout-eligible values)
             //
             // Matches prettier's chooseLayout default: when no special layout
