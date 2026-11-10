@@ -187,7 +187,7 @@ pub(super) fn write_class_declaration(
     if class_decl.r#abstract {
         w.raw(",\"abstract\":true");
     }
-    write_decorators_field(w, class_decl.decorators, ctx);
+    write_decorators_field(w, ctx.view.opt_decorators(class_decl.decorators), ctx);
     w.raw(",\"id\":");
     write_or_null(w, class_decl.id.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
@@ -217,7 +217,7 @@ pub(super) fn write_class_expression(
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "ClassExpression", span, ctx);
-    write_decorators_field(w, class_expr.decorators, ctx);
+    write_decorators_field(w, ctx.view.opt_decorators(class_expr.decorators), ctx);
     if class_expr.r#abstract {
         w.raw(",\"abstract\":true");
     }
@@ -274,7 +274,7 @@ fn write_class_body(w: &mut JsonWriter, body: &ast::ClassBody<'_>, ctx: &Ctx<'_>
             });
             // acorn-typescript attaches a member's decorators once it has built it,
             // so a static block's list follows its `body`.
-            write_decorators_field(w, block.decorators, ctx);
+            write_decorators_field(w, ctx.view.opt_decorators(block.decorators), ctx);
             close_node(w, "StaticBlock", block.span, ctx);
         }
         ast::ClassMember::IndexSignature(sig) => {
@@ -405,7 +405,7 @@ fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition<'_
         w,
         &mut mods,
         method.is_static,
-        modifier_scan_start(method.decorators, method.span),
+        modifier_scan_start(ctx.view.opt_decorators(method.decorators), method.span),
         ctx.view.expr(method.key).span().start,
         ctx,
     );
@@ -450,7 +450,7 @@ fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition<'_
     }
     // Close the `value` function node, then the `MethodDefinition`.
     close_node(w, value_type, value_span, ctx);
-    write_decorators_field(w, method.decorators, ctx);
+    write_decorators_field(w, ctx.view.opt_decorators(method.decorators), ctx);
     close_node(w, "MethodDefinition", method.span, ctx);
 }
 
@@ -492,7 +492,7 @@ fn write_property_definition(
         w,
         &mut mods,
         prop.is_static,
-        modifier_scan_start(prop.decorators, prop.span),
+        modifier_scan_start(ctx.view.opt_decorators(prop.decorators), prop.span),
         ctx.view.expr(prop.key).span().start,
         ctx,
     );
@@ -511,7 +511,7 @@ fn write_property_definition(
     write_or_null(w, prop.value.as_ref(), |w, v| {
         write_expression(w, ctx.view.expr(*v), ctx);
     });
-    write_decorators_field(w, prop.decorators, ctx);
+    write_decorators_field(w, ctx.view.opt_decorators(prop.decorators), ctx);
     close_node(w, "PropertyDefinition", prop.span, ctx);
 }
 

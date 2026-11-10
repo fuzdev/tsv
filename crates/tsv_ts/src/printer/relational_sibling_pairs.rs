@@ -66,7 +66,7 @@ fn any_expression_child<'e>(
         ExpressionKind::AssignmentPattern(assign) => {
             visit(view.expr(assign.left), Other)
                 || visit(view.expr(assign.right), Other)
-                || decorators_any(view, assign.decorators, &mut visit)
+                || decorators_any(view, view.opt_decorators(assign.decorators), &mut visit)
         }
         ExpressionKind::ObjectExpression(object) => {
             view.obj_props(object.properties)
@@ -82,7 +82,7 @@ fn any_expression_child<'e>(
                 })
         }
         ExpressionKind::ObjectPattern(object) => {
-            decorators_any(view, object.decorators, &mut visit)
+            decorators_any(view, view.opt_decorators(object.decorators), &mut visit)
                 || view
                     .pat_props(object.properties)
                     .iter()
@@ -102,7 +102,7 @@ fn any_expression_child<'e>(
             .flatten()
             .any(|child| visit(view.expr(*child), Element { list_end: None })),
         ExpressionKind::ArrayPattern(array) => {
-            decorators_any(view, array.decorators, &mut visit)
+            decorators_any(view, view.opt_decorators(array.decorators), &mut visit)
                 || view
                     .opt_list(array.elements)
                     .iter()
@@ -149,7 +149,7 @@ fn any_expression_child<'e>(
             .any(|child| visit(child, Other)),
         &ExpressionKind::ClassExpression(class) => {
             let class = view.class_expr(class);
-            decorators_any(view, class.decorators, &mut visit)
+            decorators_any(view, view.opt_decorators(class.decorators), &mut visit)
                 || class
                     .super_class
                     .is_some_and(|child| visit(view.expr(child), Other))

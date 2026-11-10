@@ -436,7 +436,7 @@ impl<'a> Printer<'a> {
 
         // Decorated class expression → break after operator, each decorator
         // on its own line (`const C =\n\t@dec\n\tclass {}`).
-        let is_decorated_class_expr = matches!(&init.kind, &ExpressionKind::ClassExpression(c) if class_expr_has_decorators(self.view.class_expr(c)));
+        let is_decorated_class_expr = matches!(&init.kind, &ExpressionKind::ClassExpression(c) if class_expr_has_decorators(self.view, self.view.class_expr(c)));
 
         // Expressions that need break-after-operator layout:
         // group([left, " =", indent([line, right])])

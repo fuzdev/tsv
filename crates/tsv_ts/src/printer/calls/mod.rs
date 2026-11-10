@@ -633,6 +633,7 @@ impl<'a> CalleeParens<'a> {
                 kind: ast::ExpressionKind::ClassExpression(class_expr),
                 ..
             }) if crate::printer::decorators::class_expr_has_decorators(
+                printer.view,
                 printer.view.class_expr(class_expr),
             ) =>
             {

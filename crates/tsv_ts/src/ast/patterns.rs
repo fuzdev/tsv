@@ -6,7 +6,7 @@
 use crate::ast::AstView;
 use tsv_lang::Span;
 
-use super::{Decorator, ExprId, PatPropList, Property, Run, TSTypeAnnotation};
+use super::{DecoList, ExprId, PatPropList, Property, Run, TSTypeAnnotation};
 
 /// Object pattern for destructuring: `{a, b}`, `{a: x, b: y}`, `{...rest}`
 ///
@@ -29,7 +29,7 @@ pub struct ObjectPattern<'arena> {
     /// Parameter decorators (`@dec { a }: T`). Only set in a parameter position;
     /// emitted last in the wire, matching acorn (which attaches a parameter's
     /// decorators to its top-level binding node).
-    pub decorators: Option<&'arena [Decorator]>,
+    pub decorators: Option<DecoList<'arena>>,
 }
 
 /// Object pattern property - either a regular property or a rest element
@@ -100,7 +100,7 @@ pub struct ArrayPattern<'arena> {
     pub type_annotation: Option<TSTypeAnnotation>,
     /// Parameter decorators (`@dec [a]: T`). Only set in a parameter position;
     /// emitted last in the wire, matching acorn.
-    pub decorators: Option<&'arena [Decorator]>,
+    pub decorators: Option<DecoList<'arena>>,
 }
 
 /// Assignment pattern for default values in destructuring: `a = 1`
@@ -120,7 +120,7 @@ pub struct AssignmentPattern<'arena> {
     /// Parameter decorators (`@dec a = 1`, `@dec { a } = {}`). Only set in a
     /// parameter position; emitted last in the wire — acorn attaches a decorated
     /// default parameter's decorators to the `AssignmentPattern`, not its `left`.
-    pub decorators: Option<&'arena [Decorator]>,
+    pub decorators: Option<DecoList<'arena>>,
 }
 
 /// Rest element in destructuring: `...rest`

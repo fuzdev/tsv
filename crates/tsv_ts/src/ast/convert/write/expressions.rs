@@ -434,7 +434,11 @@ fn write_expression_full_dispatch(
                 w.raw(",\"optional\":true");
             }
             write_type_annotation_field(w, arr.type_annotation.as_ref(), ctx);
-            super::declarations::write_decorators_field(w, arr.decorators, ctx);
+            super::declarations::write_decorators_field(
+                w,
+                ctx.view.opt_decorators(arr.decorators),
+                ctx,
+            );
             close_node(w, "ArrayPattern", expr.span, ctx);
         }
         ast::ExpressionKind::AssignmentPattern(pattern) => {

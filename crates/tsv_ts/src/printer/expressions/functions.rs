@@ -104,7 +104,7 @@ fn leftmost_arrow_body_parens_span(view: AstView<'_>, expr: &ast::Expression<'_>
     match &leftmost.kind {
         ast::ExpressionKind::ObjectExpression(_) => Some(leftmost.span),
         &ast::ExpressionKind::ClassExpression(c)
-            if class_expr_has_decorators(view.class_expr(c)) =>
+            if class_expr_has_decorators(view, view.class_expr(c)) =>
         {
             Some(leftmost.span)
         }
@@ -565,7 +565,9 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
                 && annotation_is_flat(view, id.type_annotation(view))
         }
         ast::ExpressionKind::ObjectPattern(pattern) => {
-            pattern.decorators.unwrap_or_default().is_empty()
+            view.opt_decorators(pattern.decorators)
+                .unwrap_or_default()
+                .is_empty()
                 && annotation_is_flat(view, pattern.type_annotation.as_ref())
                 && view
                     .pat_props(pattern.properties)
@@ -584,7 +586,9 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
                     })
         }
         ast::ExpressionKind::ArrayPattern(pattern) => {
-            pattern.decorators.unwrap_or_default().is_empty()
+            view.opt_decorators(pattern.decorators)
+                .unwrap_or_default()
+                .is_empty()
                 && annotation_is_flat(view, pattern.type_annotation.as_ref())
                 && view.opt_list(pattern.elements).iter().all(|element| {
                     element
@@ -603,7 +607,9 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
                 && annotation_is_flat(view, rest.type_annotation.as_ref())
         }
         ast::ExpressionKind::AssignmentPattern(default) => {
-            default.decorators.unwrap_or_default().is_empty()
+            view.opt_decorators(default.decorators)
+                .unwrap_or_default()
+                .is_empty()
                 && matches!(
                     &view.expr(default.left).kind,
                     ast::ExpressionKind::Identifier(id)
@@ -4703,7 +4709,7 @@ impl<'a> Printer<'a> {
         // `abstract` one (`export default @dec abstract class {}`) leads with that
         // modifier, and the `class` keyword follows it.
         let first_keyword_start = self.find_keyword_after_decorators(
-            class_expr.decorators,
+            self.view.opt_decorators(class_expr.decorators),
             if class_expr.r#abstract {
                 "abstract"
             } else {
@@ -4739,8 +4745,10 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
 
         // Leading decorators (`@dec class {}`), each on its own line.
-        if let Some(dec_doc) = self.build_decorators_doc(class_expr.decorators, first_keyword_start)
-        {
+        if let Some(dec_doc) = self.build_decorators_doc(
+            self.view.opt_decorators(class_expr.decorators),
+            first_keyword_start,
+        ) {
             parts.push(dec_doc);
         }
 

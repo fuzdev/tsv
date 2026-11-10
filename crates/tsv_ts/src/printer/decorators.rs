@@ -630,9 +630,9 @@ fn param_decorators<'arena>(
 ) -> Option<&'arena [ast::Decorator]> {
     let decorators = match &expr.kind {
         ast::ExpressionKind::Identifier(id) => id.decorators(view),
-        ast::ExpressionKind::ObjectPattern(obj) => obj.decorators,
-        ast::ExpressionKind::ArrayPattern(arr) => arr.decorators,
-        ast::ExpressionKind::AssignmentPattern(ap) => ap.decorators,
+        ast::ExpressionKind::ObjectPattern(obj) => view.opt_decorators(obj.decorators),
+        ast::ExpressionKind::ArrayPattern(arr) => view.opt_decorators(arr.decorators),
+        ast::ExpressionKind::AssignmentPattern(ap) => view.opt_decorators(ap.decorators),
         ast::ExpressionKind::TSParameterProperty(pp) => {
             param_decorators(view, view.expr(pp.parameter))
         }
@@ -668,8 +668,11 @@ pub(in crate::printer) fn non_empty_decorators(
 /// that has ruled out a decorated class. That assignment seam is one of six askers —
 /// `needs_parens`, the class-body, statement, variable-declarator and expression-dispatch
 /// paths ask it too — which is why it lives here rather than beside any one of them.
-pub(in crate::printer) fn class_expr_has_decorators(c: &ast::ClassExpression<'_>) -> bool {
-    non_empty_decorators(c.decorators).is_some()
+pub(in crate::printer) fn class_expr_has_decorators(
+    view: AstView<'_>,
+    c: &ast::ClassExpression<'_>,
+) -> bool {
+    non_empty_decorators(view.opt_decorators(c.decorators)).is_some()
 }
 
 /// Whether `expr` is a bare-decorator member chain: an identifier, or a

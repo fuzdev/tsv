@@ -11,8 +11,8 @@ use tsv_lang::store::Run;
 
 use super::stores::PayloadStores;
 use super::{
-    AstStores, CatchClause, CatchId, Expr, ExprId, Expression, ForHeadId, ForInit,
-    IdentifierParamExtra, ParamExtraId, Parsed, Program, Statement, StmtId, TSType, TyId,
+    AstStores, CatchClause, CatchId, DecoList, Decorator, Expr, ExprId, Expression, ForHeadId,
+    ForInit, IdentifierParamExtra, ParamExtraId, Parsed, Program, Statement, StmtId, TSType, TyId,
 };
 
 /// The read access every consumer of the tree holds: resolves edges and lists.
@@ -112,6 +112,12 @@ impl<'a> AstView<'a> {
     #[inline]
     pub fn opt_param_extra(self, id: Option<ParamExtraId>) -> Option<&'a IdentifierParamExtra<'a>> {
         id.map(|id| self.param_extra(id))
+    }
+
+    /// The decorators of `list`, when the holder has a list: absent and empty are distinct.
+    #[inline]
+    pub fn opt_decorators(self, list: Option<DecoList<'a>>) -> Option<&'a [Decorator]> {
+        list.map(|list| self.decorators(list))
     }
 
     /// The payload stores, for the accessors their macro declares beside them.

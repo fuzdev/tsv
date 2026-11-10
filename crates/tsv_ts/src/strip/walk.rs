@@ -1361,7 +1361,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.expr(self.view.expr(assignment.right));
             }
             ExpressionKind::ObjectPattern(pattern) => {
-                self.decorators(pattern.decorators);
+                self.decorators(self.view.opt_decorators(pattern.decorators));
                 for property in self.view.pat_props(pattern.properties) {
                     match property {
                         ObjectPatternProperty::Property(property) => self.property(property),
@@ -1371,14 +1371,14 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.pattern_tail(e.span, pattern.optional, pattern.type_annotation.as_ref());
             }
             ExpressionKind::ArrayPattern(pattern) => {
-                self.decorators(pattern.decorators);
+                self.decorators(self.view.opt_decorators(pattern.decorators));
                 for element in self.view.opt_list(pattern.elements).iter().flatten() {
                     self.expr(self.view.expr(*element));
                 }
                 self.pattern_tail(e.span, pattern.optional, pattern.type_annotation.as_ref());
             }
             ExpressionKind::AssignmentPattern(pattern) => {
-                self.decorators(pattern.decorators);
+                self.decorators(self.view.opt_decorators(pattern.decorators));
                 self.expr(self.view.expr(pattern.left));
                 self.expr(self.view.expr(pattern.right));
             }
@@ -1745,7 +1745,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             ClassMember::StaticBlock(block) => {
                 // a decorated block's decorators stay, as any member's do (their type
                 // arguments blank)
-                self.decorators(block.decorators);
+                self.decorators(self.view.opt_decorators(block.decorators));
                 self.enter_function();
                 self.statement_list(block.body, false);
                 self.leave_function();
@@ -1765,7 +1765,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             self.blank_statement(property.span, Position::List);
             return false;
         }
-        self.decorators(property.decorators);
+        self.decorators(self.view.opt_decorators(property.decorators));
         let kept = [
             property.is_static.then_some(b"static".as_slice()),
             property.accessor.then_some(b"accessor".as_slice()),
@@ -1776,7 +1776,10 @@ impl<'s, 'b> Walk<'s, 'b> {
             && kept.iter().all(Option::is_none)
             && self.is_operator_key(key, property.computed);
         self.member_modifiers(MemberModifiers {
-            from: decorators_end(property.decorators, property.span.start),
+            from: decorators_end(
+                self.view.opt_decorators(property.decorators),
+                property.span.start,
+            ),
             to: key.span.start,
             decorated: property.decorators.is_some(),
             semicolon: property.computed || operator_key,
@@ -1831,7 +1834,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             self.blank_signature(method.span, Position::List);
             return false;
         }
-        self.decorators(method.decorators);
+        self.decorators(self.view.opt_decorators(method.decorators));
         let kept = [
             method.is_static.then_some(b"static".as_slice()),
             func.r#async.then_some(b"async".as_slice()),
@@ -1846,7 +1849,10 @@ impl<'s, 'b> Walk<'s, 'b> {
             && kept.iter().all(Option::is_none)
             && self.is_operator_key(key, method.computed);
         self.member_modifiers(MemberModifiers {
-            from: decorators_end(method.decorators, method.span.start),
+            from: decorators_end(
+                self.view.opt_decorators(method.decorators),
+                method.span.start,
+            ),
             to: key.span.start,
             decorated: method.decorators.is_some(),
             semicolon: method.computed || generator || operator_key,
@@ -2088,7 +2094,7 @@ impl<'n, 'a> FunctionView<'n, 'a> {
 
 /// The parts of a class the walk reads, from a declaration or an expression.
 struct ClassView<'n, 'a> {
-    decorators: Option<&'a [Decorator]>,
+    decorators: Option<&'n [Decorator]>,
     r#abstract: bool,
     type_parameters: Option<&'n TSTypeParameterDeclaration<'a>>,
     super_class: Option<&'n Expression<'n>>,
@@ -2100,7 +2106,7 @@ struct ClassView<'n, 'a> {
 impl<'n, 'a> ClassView<'n, 'a> {
     fn declaration(view: AstView<'n>, class: &'n ClassDeclaration<'a>) -> Self {
         Self {
-            decorators: class.decorators,
+            decorators: view.opt_decorators(class.decorators),
             r#abstract: class.r#abstract,
             type_parameters: class.type_parameters.as_ref(),
             super_class: view.opt(class.super_class),
@@ -2112,7 +2118,7 @@ impl<'n, 'a> ClassView<'n, 'a> {
 
     fn expression(view: AstView<'n>, class: &'n ClassExpression<'a>) -> Self {
         Self {
-            decorators: class.decorators,
+            decorators: view.opt_decorators(class.decorators),
             r#abstract: class.r#abstract,
             type_parameters: class.type_parameters.as_ref(),
             super_class: view.opt(class.super_class),

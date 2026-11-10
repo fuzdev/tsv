@@ -221,7 +221,7 @@ pub(in crate::printer) fn leading_decorated_class<'e>(
     loop {
         match &node.kind {
             &ExpressionKind::ClassExpression(class)
-                if class_expr_has_decorators(view.class_expr(class)) =>
+                if class_expr_has_decorators(view, view.class_expr(class)) =>
             {
                 return Some(node);
             }

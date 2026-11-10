@@ -349,7 +349,10 @@ impl<'a> Printer<'a> {
         export_keyword_end: u32,
     ) -> Option<DocId> {
         let d = self.d();
-        let decorators = class.decorators.filter(|dec| !dec.is_empty())?;
+        let decorators = self
+            .view
+            .opt_decorators(class.decorators)
+            .filter(|dec| !dec.is_empty())?;
         let continuation = self.build_class_declaration_without_decorators_doc(class);
         let export_first = decorators[0].span.start > span.start;
 
@@ -365,13 +368,20 @@ impl<'a> Printer<'a> {
         let next_after_decorators = if export_first {
             self.class_declaration_keyword_start(class)
         } else {
-            self.find_keyword_after_decorators(class.decorators, "export", span.start)
+            self.find_keyword_after_decorators(
+                self.view.opt_decorators(class.decorators),
+                "export",
+                span.start,
+            )
         };
 
         // `decorators` is non-empty, so this is always `Some`; the `?` keeps the code off
         // `expect()` (clippy::expect_used) and falls back to the plain declaration path in
         // the (unreachable) `None` case.
-        let dec_doc = self.build_decorators_doc(class.decorators, next_after_decorators)?;
+        let dec_doc = self.build_decorators_doc(
+            self.view.opt_decorators(class.decorators),
+            next_after_decorators,
+        )?;
         if export_first {
             // `export` on its own line, then the (always own-line) decorators, then the
             // class. A comment between `export` and the first decorator is rare but must be
@@ -706,9 +716,13 @@ impl<'a> Printer<'a> {
     ) -> Option<DocId> {
         let d = self.d();
         if let ast::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration {
-            let export_start =
-                self.find_keyword_after_decorators(class.decorators, "export", span.start);
-            let dec_doc = self.build_decorators_doc(class.decorators, export_start)?;
+            let export_start = self.find_keyword_after_decorators(
+                self.view.opt_decorators(class.decorators),
+                "export",
+                span.start,
+            );
+            let dec_doc = self
+                .build_decorators_doc(self.view.opt_decorators(class.decorators), export_start)?;
             // `export default` word by word, bounded by the class's own first keyword:
             // both the gap *inside* the keyword and the one after it are positions an
             // author can comment in. Emitting the two words as one fixed text scans
@@ -743,8 +757,7 @@ impl<'a> Printer<'a> {
         };
         let decorators = self
             .view
-            .class_expr(class_expr)
-            .decorators
+            .opt_decorators(self.view.class_expr(class_expr).decorators)
             .filter(|dec| !dec.is_empty())?;
         // An authored pair makes the class an expression where the bare spelling is a
         // declaration to tsc (an export assignment, which binds no name in the module

@@ -418,8 +418,9 @@ impl<'a> Printer<'a> {
         // Returns the exact DocId the `parts.len() == 1` tail would.
         let extra = self.view.opt_param_extra(id.extra);
         let type_annotation = extra.and_then(|e| e.type_annotation.as_ref());
-        let decorators = extra
-            .and_then(|e| e.decorators)
+        let decorators = self
+            .view
+            .opt_decorators(extra.and_then(|e| e.decorators))
             .filter(|_| !skip_decorators);
         if decorators.is_none() && !id.optional && type_annotation.is_none() {
             return self.identifier_name_doc(id);

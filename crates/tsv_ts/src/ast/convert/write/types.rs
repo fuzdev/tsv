@@ -605,7 +605,7 @@ pub(super) fn write_index_signature(
     }
     // A class index signature's decorators come last, as acorn-typescript attaches
     // them once it has built the member.
-    write_decorators_field(w, sig.decorators, ctx);
+    write_decorators_field(w, ctx.view.opt_decorators(sig.decorators), ctx);
     close_node(w, "TSIndexSignature", sig.span, ctx);
 }
 

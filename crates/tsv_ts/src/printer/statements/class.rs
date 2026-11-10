@@ -66,7 +66,11 @@ impl<'a> Printer<'a> {
         } else {
             "class"
         };
-        self.find_keyword_after_decorators(decl.decorators, first_keyword, decl.span.start)
+        self.find_keyword_after_decorators(
+            self.view.opt_decorators(decl.decorators),
+            first_keyword,
+            decl.span.start,
+        )
     }
 
     /// Core implementation for class declaration doc building
@@ -115,7 +119,8 @@ impl<'a> Printer<'a> {
 
         // Decorators, each on its own line.
         if include_decorators
-            && let Some(dec_doc) = self.build_decorators_doc(decl.decorators, keyword_start)
+            && let Some(dec_doc) =
+                self.build_decorators_doc(self.view.opt_decorators(decl.decorators), keyword_start)
         {
             parts.push(dec_doc);
         }
@@ -364,8 +369,14 @@ impl<'a> Printer<'a> {
         // own span opens at its first decorator, so the `BlockStatement` wrapper starts
         // at the `static` after them, exactly where an undecorated block's span starts;
         // a comment inside a decorator is the decorator's, never the block's.
-        let static_start = self.member_decorator_boundary(block.decorators, block.span.start);
-        let decorators_doc = self.build_class_member_decorators_doc(block.decorators, static_start);
+        let static_start = self.member_decorator_boundary(
+            self.view.opt_decorators(block.decorators),
+            block.span.start,
+        );
+        let decorators_doc = self.build_class_member_decorators_doc(
+            self.view.opt_decorators(block.decorators),
+            static_start,
+        );
         // Create a BlockStatement wrapper to reuse existing doc building logic
         let block_stmt = ast::BlockStatement {
             body: block.body,
@@ -416,10 +427,12 @@ impl<'a> Printer<'a> {
         let mut parts = smallvec![];
 
         // Decorators (inline or own-line depending on original source)
-        let next_token_start = self.member_decorator_boundary(prop.decorators, prop.span.start);
-        if let Some(dec_doc) =
-            self.build_class_member_decorators_doc(prop.decorators, next_token_start)
-        {
+        let next_token_start = self
+            .member_decorator_boundary(self.view.opt_decorators(prop.decorators), prop.span.start);
+        if let Some(dec_doc) = self.build_class_member_decorators_doc(
+            self.view.opt_decorators(prop.decorators),
+            next_token_start,
+        ) {
             parts.push(dec_doc);
         }
 
@@ -744,10 +757,14 @@ impl<'a> Printer<'a> {
         let mut parts = smallvec![];
 
         // Decorators (inline or own-line depending on original source)
-        let next_token_start = self.member_decorator_boundary(method.decorators, method.span.start);
-        if let Some(dec_doc) =
-            self.build_class_member_decorators_doc(method.decorators, next_token_start)
-        {
+        let next_token_start = self.member_decorator_boundary(
+            self.view.opt_decorators(method.decorators),
+            method.span.start,
+        );
+        if let Some(dec_doc) = self.build_class_member_decorators_doc(
+            self.view.opt_decorators(method.decorators),
+            next_token_start,
+        ) {
             parts.push(dec_doc);
         }
 

@@ -102,7 +102,7 @@ pub(super) fn write_object_pattern(
         w.raw(",\"optional\":true");
     }
     write_type_annotation_field(w, obj.type_annotation.as_ref(), ctx);
-    write_decorators_field(w, obj.decorators, ctx);
+    write_decorators_field(w, ctx.view.opt_decorators(obj.decorators), ctx);
     close_node(w, "ObjectPattern", span, ctx);
 }
 
@@ -234,6 +234,6 @@ pub(super) fn write_assignment_pattern(
     write_expression(w, ctx.view.expr(pattern.left), ctx);
     w.raw(",\"right\":");
     write_expression(w, ctx.view.expr(pattern.right), ctx);
-    write_decorators_field(w, pattern.decorators, ctx);
+    write_decorators_field(w, ctx.view.opt_decorators(pattern.decorators), ctx);
     close_node(w, "AssignmentPattern", span, ctx);
 }

@@ -562,8 +562,11 @@ impl<'a> Printer<'a> {
         // A class index signature's decorators (inline or own-line as authored, like
         // any member's). The signature proper starts at the first token after them, so
         // a `[` inside a decorator's arguments is never taken for the opening bracket.
-        let sig_start = self.member_decorator_boundary(idx.decorators, idx.span.start);
-        if let Some(dec_doc) = self.build_class_member_decorators_doc(idx.decorators, sig_start) {
+        let sig_start = self
+            .member_decorator_boundary(self.view.opt_decorators(idx.decorators), idx.span.start);
+        if let Some(dec_doc) = self
+            .build_class_member_decorators_doc(self.view.opt_decorators(idx.decorators), sig_start)
+        {
             parts.push(dec_doc);
         }
 

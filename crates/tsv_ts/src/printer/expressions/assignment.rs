@@ -221,7 +221,7 @@ pub(crate) fn choose_layout(
 
     // Decorated class expression → break after operator (`const C =\n\t@dec\n\tclass {}`).
     if let &ExpressionKind::ClassExpression(c) = &right_expr.kind
-        && class_expr_has_decorators(printer.view.class_expr(c))
+        && class_expr_has_decorators(printer.view, printer.view.class_expr(c))
     {
         return AssignmentLayout::BreakAfterOperator;
     }
@@ -1026,7 +1026,7 @@ pub(crate) fn is_simple_value(view: AstView<'_>, expr: &Expression<'_>) -> bool 
     ) || matches!(
         expr.kind,
         ExpressionKind::TemplateLiteral(_) | ExpressionKind::TaggedTemplateExpression(_)
-    ) || matches!(expr.kind, ExpressionKind::ClassExpression(c) if !class_expr_has_decorators(view.class_expr(c)))
+    ) || matches!(expr.kind, ExpressionKind::ClassExpression(c) if !class_expr_has_decorators(view, view.class_expr(c)))
 }
 
 /// The RHS comment / freeze / stripped-paren-boundary controls for

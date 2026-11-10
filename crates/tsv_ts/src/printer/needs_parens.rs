@@ -598,7 +598,9 @@ pub(super) fn needs_parens(
             // undecorated `class {}` opens one fine and stays bare, as prettier keeps it.
             // The same leftmost-token question a composite body asks through
             // `leftmost_arrow_body_parens_span`, at the body's own root.
-            &ExpressionKind::ClassExpression(c) => class_expr_has_decorators(view.class_expr(c)),
+            &ExpressionKind::ClassExpression(c) => {
+                class_expr_has_decorators(view, view.class_expr(c))
+            }
             _ => false,
         },
 
@@ -635,7 +637,7 @@ pub(super) fn needs_parens(
                 // expression stays unwrapped (prettier keeps `extends class {}`).
                 || matches!(
                     &stripped.kind,
-                    &ExpressionKind::ClassExpression(c) if class_expr_has_decorators(view.class_expr(c))
+                    &ExpressionKind::ClassExpression(c) if class_expr_has_decorators(view, view.class_expr(c))
                 )
         }
 

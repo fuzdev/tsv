@@ -416,7 +416,7 @@ impl<'a> Printer<'a> {
                 // `(class {}).foo` keeps the flat wrap.
                 if self.leftmost_pair_target.get() == Some(expr.span)
                     || (self.expr_stmt_paren_target.get() == Some(expr.span)
-                        && class_expr_has_decorators(class_expr))
+                        && class_expr_has_decorators(self.view, class_expr))
                 {
                     self.build_break_open_parens(doc)
                 } else {
@@ -448,17 +448,17 @@ impl<'a> Printer<'a> {
                 self.build_assignment_doc(assign, expr.span)
             }
             ExpressionKind::ObjectPattern(obj) => self.with_param_decorators(
-                obj.decorators,
+                self.view.opt_decorators(obj.decorators),
                 self.build_object_pattern_doc(obj, expr.span),
                 expr.span.start,
             ),
             ExpressionKind::ArrayPattern(arr) => self.with_param_decorators(
-                arr.decorators,
+                self.view.opt_decorators(arr.decorators),
                 self.build_array_pattern_doc(arr, expr.span),
                 expr.span.start,
             ),
             ExpressionKind::AssignmentPattern(pattern) => self.with_param_decorators(
-                pattern.decorators,
+                self.view.opt_decorators(pattern.decorators),
                 self.build_assignment_pattern_doc(pattern, expr.span),
                 expr.span.start,
             ),
@@ -781,7 +781,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_function_parameter_doc(&self, expr: &Expression<'_>) -> DocId {
         match &expr.kind {
             ExpressionKind::ObjectPattern(obj) => self.with_param_decorators(
-                obj.decorators,
+                self.view.opt_decorators(obj.decorators),
                 self.build_object_pattern_doc_with_context(
                     obj,
                     expr.span,
@@ -2346,7 +2346,7 @@ impl<'a> Printer<'a> {
             ),
             ExpressionKind::AssignmentPattern(ap) => (
                 self.build_assignment_pattern_doc(ap, parameter.span),
-                ap.decorators,
+                self.view.opt_decorators(ap.decorators),
             ),
             _ => (self.build_expression_doc(parameter), None),
         };
