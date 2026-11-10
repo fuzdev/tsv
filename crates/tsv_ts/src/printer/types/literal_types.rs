@@ -112,7 +112,8 @@ impl<'a> Printer<'a> {
                 // interpolation's, and a `//` there hangs the type exactly as one written
                 // after a bare `${` does.
                 let t = self.transparent_value(self.view.ty(t));
-                let dollar_brace_end = Self::interp_dollar_brace_end(&template.quasis[i]);
+                let dollar_brace_end =
+                    Self::interp_dollar_brace_end(&self.view.quasis(template.quasis)[i]);
                 // The builder's own widening over a routed paren shell
                 // ([`Self::interp_type_and_freeze`]) — the gap this gate measures is the one it
                 // moves.
@@ -120,7 +121,7 @@ impl<'a> Printer<'a> {
                 self.comments_force_own_line_between(dollar_brace_end, t.span().start)
                     || self.interp_trailing_gap_forces_break(
                         t.span().end,
-                        template.quasis[i + 1].span.start,
+                        self.view.quasis(template.quasis)[i + 1].span.start,
                     )
             })
     }
@@ -257,7 +258,7 @@ impl<'a> Printer<'a> {
             SmallVec::with_capacity(template.types.len());
         let mut pos: usize = 1; // Start after backtick
 
-        for (i, quasi) in template.quasis.iter().enumerate() {
+        for (i, quasi) in self.view.quasis(template.quasis).iter().enumerate() {
             // Visual columns, not bytes: a CJK char is 3 bytes but 2 columns, so a
             // byte sum would break a template whose rendered width is well under print width.
             pos += visual_width(quasi.raw(self.source), TAB_WIDTH);
@@ -278,7 +279,7 @@ impl<'a> Printer<'a> {
                 let type_end = t.span().end;
                 // The closing `}`: the next quasi's span opens there (its `raw_span` opens
                 // past it), so `type_end`→here is the interpolation's trailing gap.
-                let close_brace = template.quasis[i + 1].span.start;
+                let close_brace = self.view.quasis(template.quasis)[i + 1].span.start;
                 // A comment that hangs the type drops the type below it — a `//` can't
                 // swallow it, and a multiline block's authored break isn't reflowed. Same
                 // gate as the emitter's per-comment rule, so the two can't disagree. Where
@@ -359,7 +360,7 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = smallvec![d.text("`")];
         let mut interp_iter = interps.into_iter();
 
-        for quasi in template.quasis {
+        for quasi in self.view.quasis(template.quasis) {
             // Template raw text is a verbatim source slice (`raw_span`) — emit it
             // without allocating.
             parts.push(d.source_span(quasi.raw_span, self.source));

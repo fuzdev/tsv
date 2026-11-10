@@ -47,7 +47,9 @@ pub(super) fn write_template_literal(
         ctx,
     );
     w.raw(",\"quasis\":");
-    write_array(w, template.quasis, |w, q| write_template_element(w, q, ctx));
+    write_array(w, ctx.view.quasis(template.quasis), |w, q| {
+        write_template_element(w, q, ctx);
+    });
     close_node(w, "TemplateLiteral", template.span, ctx);
 }
 
@@ -92,7 +94,7 @@ pub(super) fn write_object_pattern(
 ) {
     pattern_header(w, "ObjectPattern", span, obj.type_annotation.as_ref(), ctx);
     w.raw(",\"properties\":");
-    write_array(w, obj.properties, |w, p| match p {
+    write_array(w, ctx.view.pat_props(obj.properties), |w, p| match p {
         ast::ObjectPatternProperty::Property(p) => write_property(w, p, ctx),
         ast::ObjectPatternProperty::RestElement(r) => write_rest_element(w, r, ctx),
     });

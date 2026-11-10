@@ -862,9 +862,11 @@ fn is_short_arg(view: AstView<'_>, expr: &Expression<'_>, source: &str) -> bool 
         // Prettier: node.quasis[0].value.raw.length <= threshold && !includes("\n") (line 464-468)
         ExpressionKind::TemplateLiteral(template) => {
             template.expressions.is_empty()
-                && !template.quasis.is_empty()
-                && template.quasis[0].raw(source).len() <= threshold
-                && !crate::printer::template_literal_has_newlines(template)
+                && view
+                    .quasis(template.quasis)
+                    .first()
+                    .is_some_and(|quasi| quasi.raw(source).len() <= threshold)
+                && !crate::printer::template_literal_has_newlines(view, template)
         }
 
         // Prettier: CallExpression with 0 args + Identifier callee (line 475-481)

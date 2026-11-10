@@ -263,7 +263,7 @@ pub(crate) fn object_pattern_should_expand(
 fn pattern_nesting_depth(view: AstView<'_>, obj: &ast::ObjectPattern<'_>) -> usize {
     let mut max_depth = 1;
 
-    for prop in obj.properties {
+    for prop in view.pat_props(obj.properties) {
         match prop {
             ast::ObjectPatternProperty::Property(p) => {
                 let nested_depth = match &view.expr(p.value).kind {
@@ -318,8 +318,11 @@ fn array_pattern_nesting_depth(view: AstView<'_>, arr: &ast::ArrayPattern<'_>) -
 /// Check if a template literal contains newlines in its content
 ///
 /// Matches Prettier's `templateLiteralHasNewLines` function
-pub(crate) fn template_literal_has_newlines(template: &ast::TemplateLiteral<'_>) -> bool {
-    template.quasis.iter().any(|q| q.has_newline)
+pub(crate) fn template_literal_has_newlines(
+    view: AstView<'_>,
+    template: &ast::TemplateLiteral<'_>,
+) -> bool {
+    view.quasis(template.quasis).iter().any(|q| q.has_newline)
 }
 
 /// Check if an expression is a template literal (or tagged template) with embedded newlines.
@@ -331,9 +334,9 @@ pub(crate) fn is_multiline_template_expression(
     expr: &ast::Expression<'_>,
 ) -> bool {
     match &expr.kind {
-        ast::ExpressionKind::TemplateLiteral(t) => template_literal_has_newlines(t),
+        ast::ExpressionKind::TemplateLiteral(t) => template_literal_has_newlines(view, t),
         &ast::ExpressionKind::TaggedTemplateExpression(t) => {
-            template_literal_has_newlines(&view.tagged_tpl(t).quasi)
+            template_literal_has_newlines(view, &view.tagged_tpl(t).quasi)
         }
         _ => false,
     }

@@ -765,8 +765,9 @@ impl<'a> Printer<'a> {
             // made where the opening delimiter is printed, so it lands inside any type
             // annotation rather than between the pattern and its `: T`.
             ExpressionKind::ObjectPattern(obj) => {
-                let entries: SmallVec<[(u32, u32, DocId); 8]> = obj
-                    .properties
+                let entries: SmallVec<[(u32, u32, DocId); 8]> = self
+                    .view
+                    .pat_props(obj.properties)
                     .iter()
                     .map(|p| {
                         let s = p.span();
@@ -783,8 +784,9 @@ impl<'a> Printer<'a> {
                 self.append_pattern_type_annotation(braces, obj.type_annotation.as_ref())
             }
             ExpressionKind::ObjectExpression(obj) => {
-                let entries: SmallVec<[(u32, u32, DocId); 8]> = obj
-                    .properties
+                let entries: SmallVec<[(u32, u32, DocId); 8]> = self
+                    .view
+                    .obj_props(obj.properties)
                     .iter()
                     .map(|p| {
                         let s = p.span();

@@ -8,8 +8,8 @@ use tsv_lang::{Comment, Span};
 
 use super::{
     ArrayPattern, ArrowFnId, AssignmentPattern, BlockStatement, ClassExprId, Expr, ExprId,
-    FnExprId, Identifier, Literal, MetaPropId, ObjectPattern, PrivateIdentifier, RestElement, Run,
-    TSParameterProperty, TSTypeAnnotation, TSTypeParameterDeclaration,
+    FnExprId, Identifier, Literal, MetaPropId, ObjPropList, ObjectPattern, PrivateIdentifier,
+    QuasiList, RestElement, Run, TSParameterProperty, TSTypeAnnotation, TSTypeParameterDeclaration,
     TSTypeParameterInstantiation, TaggedTplId, TyId,
 };
 
@@ -403,7 +403,7 @@ impl<'arena> ParenthesizedExpression {
 
 #[derive(Debug, Clone)]
 pub struct ObjectExpression<'arena> {
-    pub properties: &'arena [ObjectProperty],
+    pub properties: ObjPropList<'arena>,
     /// `true` when a trailing comma follows a final spread property (`{...a,}`).
     /// Valid in an object *literal*, but a syntax error once the literal is
     /// refined to an object pattern — the grammar's rest property admits no
@@ -998,7 +998,7 @@ pub struct Property {
 /// - expressions: [b, d]
 #[derive(Debug, Clone)]
 pub struct TemplateLiteral<'arena> {
-    pub quasis: &'arena [TemplateElement<'arena>],
+    pub quasis: QuasiList<'arena>,
     pub expressions: Run<ExprId>,
     pub span: Span,
 }

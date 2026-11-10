@@ -100,7 +100,7 @@ pub(in crate::printer) fn is_compound_target_value(expr: &Expression<'_>) -> boo
 /// prettier's `shouldBreak` for an `ObjectPattern` (`print/object.js`): some property's
 /// value is directly an object or array pattern. A default (`a: [b] = c`) is not one.
 fn compound_target_object_breaks(view: AstView<'_>, obj: &ast::ObjectExpression<'_>) -> bool {
-    obj.properties.iter().any(|prop| {
+    view.obj_props(obj.properties).iter().any(|prop| {
         matches!(
             prop,
             ast::ObjectProperty::Property(p)
@@ -152,8 +152,9 @@ impl<'a> Printer<'a> {
         // span, so a comment it follows is not standalone — see `StandaloneGlue` for why
         // the type literal answers this differently.
         let has_standalone_block_comment = has_comments && {
-            let property_spans: SmallVec<[_; 8]> = obj
-                .properties
+            let property_spans: SmallVec<[_; 8]> = self
+                .view
+                .obj_props(obj.properties)
                 .iter()
                 .map(ast::ObjectProperty::span)
                 .collect();
@@ -197,7 +198,7 @@ impl<'a> Printer<'a> {
         //
         // A compound target takes the pattern's own break instead, which the same group
         // carries ([`compound_target_object_breaks`]).
-        let first_prop_start = obj.properties[0].span().start;
+        let first_prop_start = self.view.obj_props(obj.properties)[0].span().start;
         let has_source_newline = match role {
             LiteralRole::Expression => {
                 self.has_newline_between(obj_span.start + 1, first_prop_start)
@@ -241,7 +242,7 @@ impl<'a> Printer<'a> {
             // via has_source_newline, not the must_break conditions above).
             let must_break = must_break || brace_pull_pos.is_some();
 
-            for (i, prop) in obj.properties.iter().enumerate() {
+            for (i, prop) in self.view.obj_props(obj.properties).iter().enumerate() {
                 let prop_start = prop.span().start;
                 let is_first = i == 0;
 
@@ -331,8 +332,9 @@ impl<'a> Printer<'a> {
                 // on every pass.
                 let prop_end =
                     Self::element_claim_anchor(frozen_span, self.property_printed_end(prop, role));
-                let upper_bound = obj
-                    .properties
+                let upper_bound = self
+                    .view
+                    .obj_props(obj.properties)
                     .get(i + 1)
                     .map_or(obj_span.end, |next| next.span().start);
 
@@ -409,15 +411,16 @@ impl<'a> Printer<'a> {
             // of this scan is how the comment-bearing path above and this one came to answer
             // that differently. With no comment in the gap the bound is the next property
             // either way, so the two spellings agree by construction.
-            let gap_blank: SmallVec<[bool; 8]> = obj
-                .properties
+            let gap_blank: SmallVec<[bool; 8]> = self
+                .view
+                .obj_props(obj.properties)
                 .windows(2)
                 .map(|pair| {
                     self.item_gap_has_blank_line(pair[0].value_end(self.view), pair[1].span().start)
                 })
                 .collect();
 
-            for (i, prop) in obj.properties.iter().enumerate() {
+            for (i, prop) in self.view.obj_props(obj.properties).iter().enumerate() {
                 // Check for blank line before this property (preserved in multiline).
                 let has_blank_before = i > 0 && gap_blank[i - 1];
 
@@ -497,7 +500,7 @@ impl<'a> Printer<'a> {
         }
 
         let mut parts: DocBuf = DocBuf::new();
-        for (i, prop) in obj.properties.iter().enumerate() {
+        for (i, prop) in self.view.obj_props(obj.properties).iter().enumerate() {
             // Comment-free past the gate, so the per-property comment queries are dead.
             let prop_doc = self.build_object_property_doc(prop, false, LiteralRole::Expression);
             parts.push(prop_doc);
@@ -597,13 +600,17 @@ impl<'a> Printer<'a> {
         obj: &ast::ObjectExpression<'_>,
         span: Span,
     ) -> bool {
-        obj.properties.iter().any(|prop| match prop {
-            ast::ObjectProperty::Property(p) if !p.shorthand && !p.method => {
-                let key_region_end = self.property_key_region_end(p);
-                key_region_end <= span.start && span.end <= self.find_colon_after(key_region_end)
-            }
-            _ => false,
-        })
+        self.view
+            .obj_props(obj.properties)
+            .iter()
+            .any(|prop| match prop {
+                ast::ObjectProperty::Property(p) if !p.shorthand && !p.method => {
+                    let key_region_end = self.property_key_region_end(p);
+                    key_region_end <= span.start
+                        && span.end <= self.find_colon_after(key_region_end)
+                }
+                _ => false,
+            })
     }
 
     /// Where a regular property's KEY region ends: past the `]` of a computed key, else at

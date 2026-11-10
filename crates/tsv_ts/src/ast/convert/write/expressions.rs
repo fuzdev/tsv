@@ -290,7 +290,7 @@ fn write_expression_full_dispatch(
         ast::ExpressionKind::ObjectExpression(obj) => {
             node_header(w, "ObjectExpression", expr.span, ctx);
             w.raw(",\"properties\":");
-            super::write_body_array(w, obj.properties, ctx, |w, p| {
+            super::write_body_array(w, ctx.view.obj_props(obj.properties), ctx, |w, p| {
                 write_object_property(w, p, ctx);
             });
             close_node(w, "ObjectExpression", expr.span, ctx);

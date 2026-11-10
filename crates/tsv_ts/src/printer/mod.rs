@@ -1898,16 +1898,20 @@ impl<'a> Printer<'a> {
     pub(crate) fn is_complex_destructuring_target(&self, expr: &ast::Expression<'_>) -> bool {
         if let ast::ExpressionKind::ObjectExpression(obj) = &expr.kind {
             return obj.properties.len() > 2
-                && obj.properties.iter().any(|prop| match prop {
-                    ast::ObjectProperty::Property(p) => {
-                        !p.shorthand
-                            || matches!(
-                                self.view.expr(p.value).kind,
-                                ast::ExpressionKind::AssignmentExpression(_)
-                            )
-                    }
-                    ast::ObjectProperty::SpreadElement(_) => false,
-                });
+                && self
+                    .view
+                    .obj_props(obj.properties)
+                    .iter()
+                    .any(|prop| match prop {
+                        ast::ObjectProperty::Property(p) => {
+                            !p.shorthand
+                                || matches!(
+                                    self.view.expr(p.value).kind,
+                                    ast::ExpressionKind::AssignmentExpression(_)
+                                )
+                        }
+                        ast::ObjectProperty::SpreadElement(_) => false,
+                    });
         }
         let ast::ExpressionKind::ObjectPattern(obj) = &expr.kind else {
             return false;
@@ -1918,7 +1922,7 @@ impl<'a> Printer<'a> {
         }
 
         // At least one property has a default value or is not shorthand
-        obj.properties.iter().any(|prop| {
+        self.view.pat_props(obj.properties).iter().any(|prop| {
             match prop {
                 ast::ObjectPatternProperty::Property(p) => {
                     // Has default if value is AssignmentPattern

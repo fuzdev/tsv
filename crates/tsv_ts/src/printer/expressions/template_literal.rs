@@ -55,7 +55,7 @@ impl<'a> Printer<'a> {
 
         let mut previous_quasi_indent_size: usize = 0;
 
-        for (i, quasi) in template.quasis.iter().enumerate() {
+        for (i, quasi) in self.view.quasis(template.quasis).iter().enumerate() {
             // Template content — split at newlines and join with literalline
             // (matches Prettier's replaceEndOfLine(node.value.raw) for TemplateElement).
             // Using literalline makes will_break() propagate correctly through
@@ -65,7 +65,7 @@ impl<'a> Printer<'a> {
             // Interpolation
             if i < template.expressions.len() {
                 let expr = self.view.expr(self.view.list(template.expressions)[i]);
-                let next_quasi = &template.quasis[i + 1];
+                let next_quasi = &self.view.quasis(template.quasis)[i + 1];
 
                 // Calculate indent size from quasi text (Prettier's getIndentSize)
                 let text = quasi.raw(self.source);

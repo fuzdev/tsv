@@ -287,7 +287,9 @@ fn write_literal_type(w: &mut JsonWriter, lit: &ast::TSLiteralType<'_>, ctx: &Ct
                 write_type(w, ctx.view.ty(t), ctx);
             });
             w.raw(",\"quasis\":");
-            write_array(w, template.quasis, |w, q| write_template_element(w, q, ctx));
+            write_array(w, ctx.view.quasis(template.quasis), |w, q| {
+                write_template_element(w, q, ctx);
+            });
             // Close the inner `TemplateLiteral`, then the `TSLiteralType`.
             close_node(w, "TemplateLiteral", template.span, ctx);
             close_node(w, "TSLiteralType", template.span, ctx);

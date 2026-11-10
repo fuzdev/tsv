@@ -8,7 +8,7 @@ use tsv_lang::Span;
 
 use super::{
     CtorTypeId, Decorator, Expr, ExprId, IdentName, Identifier, ImportTypeId, InferTypeId, Literal,
-    MethodKind, QualNameId, Run, TemplateElement, TyId, UnaryExpression,
+    MethodKind, QualNameId, QuasiList, Run, TyId, UnaryExpression,
 };
 
 /// TypeScript type annotation node (e.g., `: number` in `const a: number = 5`)
@@ -335,7 +335,7 @@ impl<'arena> TSLiteralType<'arena> {
 /// Used in TypeScript template literal types.
 #[derive(Debug, Clone)]
 pub struct TemplateLiteralType<'arena> {
-    pub quasis: &'arena [TemplateElement<'arena>],
+    pub quasis: QuasiList<'arena>,
     pub types: Run<TyId>,
     pub span: Span,
 }

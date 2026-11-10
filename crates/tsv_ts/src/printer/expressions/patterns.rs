@@ -575,8 +575,9 @@ impl<'a> Printer<'a> {
     ) -> PatternTail<'t> {
         let optional = obj.optional;
         let type_annotation = obj.type_annotation.as_ref();
-        let last_content_end = obj
-            .properties
+        let last_content_end = self
+            .view
+            .pat_props(obj.properties)
             .last()
             .map_or(span.start + 1, |p| p.span().end);
         PatternTail {
@@ -752,7 +753,8 @@ impl<'a> Printer<'a> {
             // gap scan above — see the array pattern's twin.
             let rest_interior_expands = has_comments
                 && self.paren_interior_forces_expansion(
-                    obj.properties
+                    self.view
+                        .pat_props(obj.properties)
                         .last()
                         .and_then(|property| property.paren_interior(self.view)),
                 );
@@ -773,7 +775,7 @@ impl<'a> Printer<'a> {
                 // Track previous end for comment detection (start after `{`)
                 let mut prev_end = obj_span.start + 1;
 
-                for (i, prop) in obj.properties.iter().enumerate() {
+                for (i, prop) in self.view.pat_props(obj.properties).iter().enumerate() {
                     // Check for leading comments before this property. Gated on the
                     // object-wide comment flag: with no comment in the pattern span, the
                     // per-property gap is empty too, so skip the `empty()` leading child
@@ -795,8 +797,9 @@ impl<'a> Printer<'a> {
                     let is_last = i == obj.properties.len() - 1;
 
                     // Collect trailing comments (stop at next property or type annotation)
-                    let upper_bound = obj
-                        .properties
+                    let upper_bound = self
+                        .view
+                        .pat_props(obj.properties)
                         .get(i + 1)
                         .map_or(boundary, |next| next.span().start);
                     let trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
@@ -1032,7 +1035,7 @@ impl<'a> Printer<'a> {
         self.collection_formatting_hints(
             obj_span.start,
             boundary,
-            obj.properties,
+            self.view.pat_props(obj.properties),
             has_comments,
             ObjectPatternProperty::span,
             |property| property.value_end(self.view),
@@ -1052,10 +1055,14 @@ impl<'a> Printer<'a> {
         boundary: u32,
     ) -> bool {
         let span = Span::new(obj_span.start, boundary);
-        self.has_own_line_block_comments_in_bracket_list(span, obj.properties, |prop| {
-            // The property's PRINTED span — see the array pattern's twin.
-            Span::new(prop.span().start, prop.value_end(self.view))
-        })
+        self.has_own_line_block_comments_in_bracket_list(
+            span,
+            self.view.pat_props(obj.properties),
+            |prop| {
+                // The property's PRINTED span — see the array pattern's twin.
+                Span::new(prop.span().start, prop.value_end(self.view))
+            },
+        )
     }
 
     /// Build doc for empty object pattern: `{}` with optional `?` + type annotation
@@ -1101,7 +1108,7 @@ impl<'a> Printer<'a> {
         // line when the pattern expands (divergence from prettier, which relocates
         // it to its own line as the first property's leading comment). See
         // conformance_prettier_ts_comments.md §Comment relocation (Object destructuring `{`).
-        let first_prop_start = obj.properties[0].span().start;
+        let first_prop_start = self.view.pat_props(obj.properties)[0].span().start;
         let (brace_line_prefix, brace_pull_pos) = if has_comments {
             self.delimiter_line_comment_prefix(span.start, first_prop_start)
         } else {
@@ -1112,7 +1119,7 @@ impl<'a> Printer<'a> {
         let mut prev_end = span.start + 1;
 
         let mut prop_parts = DocBuf::new();
-        for (i, prop) in obj.properties.iter().enumerate() {
+        for (i, prop) in self.view.pat_props(obj.properties).iter().enumerate() {
             // Handle leading comments before this property (with blank line preservation)
             let prop_start = prop.span().start;
             let leading_comments: CommentVec<'_> = if has_comments {
@@ -1141,8 +1148,9 @@ impl<'a> Printer<'a> {
             let is_last = i == obj.properties.len() - 1;
 
             // Collect trailing comments (stop at next property or type annotation)
-            let upper_bound = obj
-                .properties
+            let upper_bound = self
+                .view
+                .pat_props(obj.properties)
                 .get(i + 1)
                 .map_or(boundary, |next| next.span().start);
             // A rest's stripped-paren interior (a frozen one printed it verbatim): the run
@@ -1169,7 +1177,7 @@ impl<'a> Printer<'a> {
                 // express it: counting the newlines in the gap, a blank *after* a
                 // comma the author pushed onto its own line (`a1⏎,⏎⏎b1`) reads as an author
                 // blank and was preserved, where prettier collapses it.
-                let next_start = obj.properties[i + 1].span().start;
+                let next_start = self.view.pat_props(obj.properties)[i + 1].span().start;
                 self.push_item_blank_separator(&mut prop_parts, trailing.end_pos, next_start);
             }
 
@@ -1968,11 +1976,12 @@ impl Printer<'_> {
                 let boundary = self.object_pattern_tail(obj, expr.span).body_end;
                 self.object_pattern_has_own_line_block_comments(obj, expr.span, boundary)
                     || self.paren_interior_forces_expansion(
-                        obj.properties
+                        self.view
+                            .pat_props(obj.properties)
                             .last()
                             .and_then(|property| property.paren_interior(self.view)),
                     )
-                    || obj.properties.iter().any(|p| match p {
+                    || self.view.pat_props(obj.properties).iter().any(|p| match p {
                         ObjectPatternProperty::Property(p) => {
                             self.pattern_own_line_block_breaks(self.view.expr(p.value))
                         }
