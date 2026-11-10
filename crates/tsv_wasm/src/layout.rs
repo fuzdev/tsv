@@ -14,7 +14,7 @@ use tsv_svelte::ast::{AttributeNode, Element, ExpressionTag, FragmentNode};
 use tsv_ts::Error;
 use tsv_ts::ast::{
     Expr, ExprId, Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, Property,
-    Statement, StatementKind, StmtId, SwitchCase, TSType, VariableDeclarator,
+    Statement, StatementKind, StmtId, SwitchCase, TSType, TyId, VariableDeclarator,
 };
 
 // `DocContext` rides inline in `DocNode::WithContext`; see its native pin in `tsv_lang`
@@ -64,6 +64,9 @@ const _: () = assert!(size_of::<Run<ExprId>>() == 8);
 const _: () = assert!(size_of::<StmtId>() == 4);
 const _: () = assert!(size_of::<Option<StmtId>>() == 4);
 const _: () = assert!(size_of::<Run<StmtId>>() == 8);
+const _: () = assert!(size_of::<TyId>() == 4);
+const _: () = assert!(size_of::<Option<TyId>>() == 4);
+const _: () = assert!(size_of::<Run<TyId>>() == 8);
 const _: () = assert!(size_of::<Id<Family>>() == 4);
 const _: () = assert!(size_of::<Option<Id<Family>>>() == 4);
 const _: () = assert!(size_of::<Run<Family>>() == 8);
