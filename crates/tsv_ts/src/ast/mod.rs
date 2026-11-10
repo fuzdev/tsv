@@ -32,7 +32,16 @@ mod types;
 mod view;
 
 pub(crate) use stores::ScratchMarks;
-pub use stores::{AstStores, Expr, ExprId, Parsed, Stmt, StmtId, Ty, TyId, with_stores};
+pub use stores::{
+    ArrowFn, ArrowFnId, AstStores, Catch, CatchId, ClassDecl, ClassDeclId, ClassExpr, ClassExprId,
+    CtorType, CtorTypeId, DeclareFn, DeclareFnId, EnumDecl, EnumDeclId, ExportAll, ExportAllId,
+    ExportAssign, ExportAssignId, ExportDefault, ExportDefaultId, ExportNamed, ExportNamedId, Expr,
+    ExprId, FnDecl, FnDeclId, FnExpr, FnExprId, ForHead, ForHeadId, ForLeft, ForLeftId, ImportDecl,
+    ImportDeclId, ImportEquals, ImportEqualsId, ImportType, ImportTypeId, InferType, InferTypeId,
+    InterfaceDecl, InterfaceDeclId, MetaProp, MetaPropId, ModuleDecl, ModuleDeclId, ParamExtra,
+    ParamExtraId, Parsed, QualName, QualNameId, Stmt, StmtId, TaggedTpl, TaggedTplId, Ty, TyId,
+    TypeAlias, TypeAliasId, with_stores,
+};
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
 pub use view::{AstView, ParsedRef};
