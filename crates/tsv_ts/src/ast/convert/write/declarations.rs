@@ -200,7 +200,7 @@ pub(super) fn write_class_declaration(
         class_decl.type_parameters.as_ref().map(|tp| tp.span),
         ctx,
     );
-    write_implements_field(w, class_decl.implements, ctx);
+    write_implements_field(w, ctx.view.heritages(class_decl.implements), ctx);
     w.raw(",\"body\":");
     write_class_body(w, &class_decl.body, ctx);
     if class_decl.declare && declare_last {
@@ -233,7 +233,7 @@ pub(super) fn write_class_expression(
         class_expr.type_parameters.as_ref().map(|tp| tp.span),
         ctx,
     );
-    write_implements_field(w, class_expr.implements, ctx);
+    write_implements_field(w, ctx.view.heritages(class_expr.implements), ctx);
     w.raw(",\"body\":");
     write_class_body(w, &class_expr.body, ctx);
     close_node(w, "ClassExpression", span, ctx);
@@ -259,7 +259,7 @@ fn write_implements_field(
 fn write_class_body(w: &mut JsonWriter, body: &ast::ClassBody<'_>, ctx: &Ctx<'_>) {
     node_header(w, "ClassBody", body.span, ctx);
     w.raw(",\"body\":");
-    write_array(w, body.body, |w, m| match m {
+    write_array(w, ctx.view.class_members(body.body), |w, m| match m {
         ast::ClassMember::MethodDefinition(method) => {
             write_method_definition(w, method, ctx);
         }
@@ -525,7 +525,9 @@ pub(super) fn write_type_parameter_declaration(
 ) {
     node_header(w, "TSTypeParameterDeclaration", params.span, ctx);
     w.raw(",\"params\":");
-    write_array(w, params.params, |w, p| write_type_parameter(w, p, ctx));
+    write_array(w, ctx.view.type_params(params.params), |w, p| {
+        write_type_parameter(w, p, ctx);
+    });
     if let Some(pos) = params.trailing_comma {
         w.raw(",\"extra\":{\"trailingComma\":");
         w.u32(ctx.pos(pos));

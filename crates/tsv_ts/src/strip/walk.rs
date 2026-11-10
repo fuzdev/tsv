@@ -1715,7 +1715,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         // open: the last member left standing is a field whose initializer has no `;`,
         // which a following `[`, `*`, `in` or `instanceof` would continue
         let outer_open = std::mem::replace(&mut self.open, Tail::Closed);
-        for member in body.body {
+        for member in self.view.class_members(body.body) {
             let span = member.span();
             self.statement_end = Some(span.end);
             if self.class_member(member) {
@@ -1879,7 +1879,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     #[inline(never)]
     fn enum_initializers(&mut self, decl: &TSEnumDeclaration<'_>) {
         self.enter_function();
-        for member in decl.members {
+        for member in self.view.enum_members(decl.members) {
             if let Some(initializer) = self.view.opt(member.initializer) {
                 self.expr(initializer);
             }
@@ -2093,7 +2093,7 @@ struct ClassView<'n, 'a> {
     type_parameters: Option<&'n TSTypeParameterDeclaration<'a>>,
     super_class: Option<&'n Expression<'n>>,
     super_type_parameters: Option<&'n TSTypeParameterInstantiation>,
-    implements: &'a [TSInterfaceHeritage<'a>],
+    implements: &'n [TSInterfaceHeritage<'n>],
     body: &'n ClassBody<'a>,
 }
 
@@ -2105,7 +2105,7 @@ impl<'n, 'a> ClassView<'n, 'a> {
             type_parameters: class.type_parameters.as_ref(),
             super_class: view.opt(class.super_class),
             super_type_parameters: class.super_type_parameters.as_ref(),
-            implements: class.implements,
+            implements: view.heritages(class.implements),
             body: &class.body,
         }
     }
@@ -2117,7 +2117,7 @@ impl<'n, 'a> ClassView<'n, 'a> {
             type_parameters: class.type_parameters.as_ref(),
             super_class: view.opt(class.super_class),
             super_type_parameters: class.super_type_parameters.as_ref(),
-            implements: class.implements,
+            implements: view.heritages(class.implements),
             body: &class.body,
         }
     }

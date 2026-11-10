@@ -6,9 +6,8 @@
 use tsv_lang::Span;
 
 use super::{
-    Decorator, ExprId, FunctionExpression, Identifier, Run, StmtId, TSIndexSignature,
-    TSInterfaceHeritage, TSTypeAnnotation, TSTypeParameterDeclaration,
-    TSTypeParameterInstantiation,
+    ClassMemList, Decorator, ExprId, FunctionExpression, HeritageList, Identifier, Run, StmtId,
+    TSIndexSignature, TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 
 /// Class declaration: `class Foo { ... }` or `class Foo extends Bar { ... }`
@@ -26,7 +25,7 @@ pub struct ClassDeclaration<'arena> {
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
     pub super_type_parameters: Option<TSTypeParameterInstantiation>,
     /// Implements clause for declare class: `implements Foo, Bar`
-    pub implements: &'arena [TSInterfaceHeritage<'arena>],
+    pub implements: HeritageList<'arena>,
     /// Class body containing methods and properties
     pub body: ClassBody<'arena>,
     /// Whether this is a declare class (ambient declaration)
@@ -53,7 +52,7 @@ pub struct ClassExpression<'arena> {
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
     pub super_type_parameters: Option<TSTypeParameterInstantiation>,
     /// Implements clause: `implements Foo, Bar`
-    pub implements: &'arena [TSInterfaceHeritage<'arena>],
+    pub implements: HeritageList<'arena>,
     /// Class body containing methods and properties
     pub body: ClassBody<'arena>,
     /// Whether this is an abstract class
@@ -67,7 +66,7 @@ pub struct ClassExpression<'arena> {
 /// Contains the methods and properties of a class.
 #[derive(Debug, Clone)]
 pub struct ClassBody<'arena> {
-    pub body: &'arena [ClassMember<'arena>],
+    pub body: ClassMemList<'arena>,
     pub span: Span,
 }
 

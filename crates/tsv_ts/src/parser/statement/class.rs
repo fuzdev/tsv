@@ -3,9 +3,9 @@
 use crate::ast::{
     Accessibility, BlockStatement, ClassBody, ClassDeclaration, ClassExpression, ClassMember,
     Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind, ExportNamedDeclaration,
-    ExprId, Expression, ExpressionKind, FunctionExpression, Identifier, Literal, LiteralValue,
-    MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Run, Statement,
-    StatementKind, StaticBlock, TSIndexSignature, TSInterfaceHeritage, TSTypeParameterDeclaration,
+    ExprId, Expression, ExpressionKind, FunctionExpression, HeritageList, Identifier, Literal,
+    LiteralValue, MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Run,
+    Statement, StatementKind, StaticBlock, TSIndexSignature, TSTypeParameterDeclaration,
     TSTypeParameterInstantiation,
 };
 use crate::lexer::{KeywordKind, TokenKind};
@@ -89,7 +89,7 @@ struct ClassHead<'arena> {
     type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     super_class: Option<ExprId>,
     super_type_parameters: Option<TSTypeParameterInstantiation>,
-    implements: &'arena [TSInterfaceHeritage<'arena>],
+    implements: HeritageList<'arena>,
     body: ClassBody<'arena>,
 }
 
@@ -622,7 +622,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (super_class, super_type_parameters) = p.parse_optional_extends_clause()?;
 
             // Parse optional `implements` clause
-            let implements: &'arena [_] = if p.eat_contextual_keyword("implements")? {
+            let implements: HeritageList<'arena> = if p.eat_contextual_keyword("implements")? {
                 p.parse_interface_heritage_list()?.into_bump_slice()
             } else {
                 &[]

@@ -99,7 +99,7 @@ impl<'a> Printer<'a> {
         t: &TSTypeLiteral<'_>,
         comments_present: bool,
     ) -> (Option<DocId>, Option<u32>) {
-        match t.members.first() {
+        match self.view.type_members(t.members).first() {
             Some(first) if comments_present => {
                 self.delimiter_line_comment_prefix(t.span.start, first.span().start)
             }
@@ -888,7 +888,7 @@ impl<'a> Printer<'a> {
             // honored for a union-member / parenthesized-intersection object type.
             self.build_member_list_docs_into(
                 &mut member_parts,
-                t.members,
+                self.view.type_members(t.members),
                 self.type_literal_member_body(
                     t,
                     comments_present,
@@ -908,7 +908,7 @@ impl<'a> Printer<'a> {
             // object's interior leading comment is dropped (`{ /* c */ a: 1 } | B`).
             // Mirrors the width-aware branch of `build_type_literal_doc_inner`.
             self.push_width_aware_type_literal_opener(&mut member_parts, t, comments_present);
-            for (i, m) in t.members.iter().enumerate() {
+            for (i, m) in self.view.type_members(t.members).iter().enumerate() {
                 self.push_width_aware_type_member(&mut member_parts, t, i, m, comments_present);
             }
         }
@@ -931,7 +931,7 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
         member_parts.push(d.line());
-        if comments_present && let Some(first) = t.members.first() {
+        if comments_present && let Some(first) = self.view.type_members(t.members).first() {
             member_parts.extend(
                 self.build_type_literal_leading_comments_inline(t.span.start, first.span().start),
             );
@@ -981,7 +981,8 @@ impl<'a> Printer<'a> {
             // and between the members when flat — where the emission is
             // byte-identical to the trailing form, so only the broken layout moves.
             if comments_present {
-                let prev_content_end = t.members[i - 1].content_end(self.source);
+                let prev_content_end =
+                    self.view.type_members(t.members)[i - 1].content_end(self.source);
                 let claim_end = self.type_member_claim_end(prev_content_end, Some(m.span().start));
                 for comment in self.comments_to_emit_between(claim_end, m.span().start) {
                     member_parts.push(self.build_comment_doc(comment));
@@ -996,14 +997,18 @@ impl<'a> Printer<'a> {
         // The claim stops at the split: a comment hugging the next member's start
         // leads it, emitted ahead of that member in its own segment above — without
         // the bound both segments would print it.
-        let upper_bound = t
-            .members
+        let upper_bound = self
+            .view
+            .type_members(t.members)
             .get(i + 1)
             .map_or(t.span.end, |next| next.span().start);
         let trailing: CommentVec<'_> = if comments_present {
             let claim_end = self.type_member_claim_end(
                 member_content_end,
-                t.members.get(i + 1).map(|n| n.span().start),
+                self.view
+                    .type_members(t.members)
+                    .get(i + 1)
+                    .map(|n| n.span().start),
             );
             self.comments_to_emit_between(member_content_end, upper_bound)
                 .filter(|c| c.span.start < claim_end)
@@ -1092,7 +1097,7 @@ impl<'a> Printer<'a> {
             // collapsing the object literal written the same way (`StandaloneGlue`).
             || (comments_present && {
                 let member_spans: SmallVec<[_; 8]> =
-                    obj.members.iter().map(TSTypeElement::span).collect();
+                    self.view.type_members(obj.members).iter().map(TSTypeElement::span).collect();
                 self.has_standalone_block_comment(
                     obj.span.start,
                     obj.span.end,
@@ -1107,9 +1112,13 @@ impl<'a> Printer<'a> {
     /// `is_brace_block_multiline`).
     pub(in crate::printer) fn literal_authored_expanded(&self, obj: &TSTypeLiteral<'_>) -> bool {
         super::super::is_brace_block_multiline(self.source, obj.span)
-            || obj.members.first().is_some_and(|m| {
-                self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
-            })
+            || self
+                .view
+                .type_members(obj.members)
+                .first()
+                .is_some_and(|m| {
+                    self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
+                })
     }
 
     /// Whether a blank line separates two of `obj`'s members — measured past the gap's
@@ -1119,7 +1128,7 @@ impl<'a> Printer<'a> {
         &self,
         obj: &TSTypeLiteral<'_>,
     ) -> bool {
-        obj.members.windows(2).any(|pair| {
+        self.view.type_members(obj.members).windows(2).any(|pair| {
             let next_start = pair[1].span().start;
             self.has_blank_line_between(
                 self.blank_scan_start(pair[0].span().end, next_start),
@@ -1270,7 +1279,7 @@ impl<'a> Printer<'a> {
             let mut member_parts = d.pooled_docbuf();
             self.build_member_list_docs_into(
                 &mut member_parts,
-                t.members,
+                self.view.type_members(t.members),
                 self.type_literal_member_body(
                     t,
                     comments_present,
@@ -1291,7 +1300,7 @@ impl<'a> Printer<'a> {
             // padding sits before the comment (`{ /* c */ a }`, not `{/* c */ a }`).
             let mut member_parts = d.pooled_docbuf();
             self.push_width_aware_type_literal_opener(&mut member_parts, t, comments_present);
-            for (i, m) in t.members.iter().enumerate() {
+            for (i, m) in self.view.type_members(t.members).iter().enumerate() {
                 self.push_width_aware_type_member(&mut member_parts, t, i, m, comments_present);
             }
             parts.push(d.indent(d.concat(&member_parts)));

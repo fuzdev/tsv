@@ -949,12 +949,16 @@ impl<'a> Printer<'a> {
             .map_or(decl.id.span.end, |tp| tp.span.end);
         // Use `extends` keyword position (not first heritage item start) so
         // heritage leading comments only cover name-to-extends, not extends-to-item
-        let extends_keyword_start = decl
-            .extends
-            .first()
-            .and_then(|e| self.find_keyword_in_range(pre_heritage_end, e.span.start, "extends"));
-        let first_extends_start =
-            extends_keyword_start.or_else(|| decl.extends.first().map(|e| e.span.start));
+        let extends_keyword_start =
+            self.view.heritages(decl.extends).first().and_then(|e| {
+                self.find_keyword_in_range(pre_heritage_end, e.span.start, "extends")
+            });
+        let first_extends_start = extends_keyword_start.or_else(|| {
+            self.view
+                .heritages(decl.extends)
+                .first()
+                .map(|e| e.span.start)
+        });
 
         // Comments between name/type-params and extends force group mode
         let has_heritage_comments = first_extends_start.is_some_and(|ext_start| {
@@ -1000,7 +1004,7 @@ impl<'a> Printer<'a> {
         let extends_doc = if !decl.extends.is_empty() {
             Some(self.build_heritage_clause_doc(
                 HeritageKeyword::Extends,
-                decl.extends,
+                self.view.heritages(decl.extends),
                 group_mode,
                 extends_keyword_start,
             ))
@@ -1056,7 +1060,7 @@ impl<'a> Printer<'a> {
         };
 
         // Handle comments between header and body: interface B /* comment */ {
-        let header_end = if let Some(last_ext) = decl.extends.last() {
+        let header_end = if let Some(last_ext) = self.view.heritages(decl.extends).last() {
             last_ext.span.end
         } else if let Some(tp) = &decl.type_parameters {
             tp.span.end
@@ -1082,7 +1086,7 @@ impl<'a> Printer<'a> {
             // relocates it to its own line as the first member's leading
             // comment). See conformance_prettier_ts_comments.md §Comment relocation
             // (Class/interface/enum body `{`).
-            let first_member_start = decl.body.body[0].span().start;
+            let first_member_start = self.view.type_members(decl.body.body)[0].span().start;
             let (brace_line_prefix, delimiter_pull_pos) =
                 self.delimiter_line_comment_prefix(decl.body.span.start, first_member_start);
             parts.push(d.text("{"));
@@ -1090,7 +1094,7 @@ impl<'a> Printer<'a> {
                 parts.push(prefix);
             }
             parts.push(d.indent(d.concat(&[self.build_type_elements_doc(
-                decl.body.body,
+                self.view.type_members(decl.body.body),
                 decl.body.span.start,
                 decl.body.span.end,
                 delimiter_pull_pos,
@@ -1335,7 +1339,7 @@ impl<'a> Printer<'a> {
             // relocates it to its own line as the first member's leading
             // comment). See conformance_prettier_ts_comments.md §Comment relocation
             // (Class/interface/enum body `{`). `body_start - 1` is the `{`.
-            let first_member_start = decl.members[0].span.start;
+            let first_member_start = self.view.enum_members(decl.members)[0].span.start;
             let (brace_line_prefix, delimiter_pull_pos) =
                 self.delimiter_line_comment_prefix(body_start - 1, first_member_start);
 
@@ -1364,7 +1368,7 @@ impl<'a> Printer<'a> {
             let body_has_comments =
                 self.has_comments_to_emit_between(body_span.start, body_span.end);
 
-            for (i, member) in decl.members.iter().enumerate() {
+            for (i, member) in self.view.enum_members(decl.members).iter().enumerate() {
                 let member_start = member.span.start;
                 let is_first = i == 0;
                 let is_last = i == decl.members.len() - 1;
@@ -1417,8 +1421,9 @@ impl<'a> Printer<'a> {
                 // `docs/comments.md` §The element-comma seam.
                 let member_end =
                     Self::element_claim_anchor(frozen_span, member.printed_end(self.view));
-                let upper_bound = decl
-                    .members
+                let upper_bound = self
+                    .view
+                    .enum_members(decl.members)
                     .get(i + 1)
                     .map_or(body_end, |next| next.span.start);
 

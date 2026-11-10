@@ -71,7 +71,9 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
         ast::TSType::TypeLiteral(t) => {
             node_header(w, "TSTypeLiteral", t.span, ctx);
             w.raw(",\"members\":");
-            write_array(w, t.members, |w, m| write_type_element(w, m, ctx));
+            write_array(w, ctx.view.type_members(t.members), |w, m| {
+                write_type_element(w, m, ctx);
+            });
             close_node(w, "TSTypeLiteral", t.span, ctx);
         }
         ast::TSType::Function(f) => {
@@ -581,7 +583,7 @@ pub(super) fn write_index_signature(
         w.raw(",\"readonly\":true");
     }
     w.raw(",\"parameters\":");
-    write_array(w, sig.parameters, |w, p| {
+    write_array(w, ctx.view.index_params(sig.parameters), |w, p| {
         // Index-signature parameters carry the binding's optional flag and
         // type annotation, never decorators.
         write_identifier_parts(
@@ -629,7 +631,7 @@ pub(super) fn write_interface_declaration(
     write_type_parameters_field(w, iface.type_parameters.as_ref(), ctx);
     if !iface.extends.is_empty() {
         w.raw(",\"extends\":");
-        write_array(w, iface.extends, |w, h| {
+        write_array(w, ctx.view.heritages(iface.extends), |w, h| {
             // Node type "TSExpressionWithTypeArguments"; the expression is an
             // entity name.
             node_header(w, "TSExpressionWithTypeArguments", h.span, ctx);
@@ -645,7 +647,9 @@ pub(super) fn write_interface_declaration(
     w.raw(",\"body\":");
     node_header(w, "TSInterfaceBody", iface.body.span, ctx);
     w.raw(",\"body\":");
-    write_array(w, iface.body.body, |w, m| write_type_element(w, m, ctx));
+    write_array(w, ctx.view.type_members(iface.body.body), |w, m| {
+        write_type_element(w, m, ctx);
+    });
     close_node(w, "TSInterfaceBody", iface.body.span, ctx);
     if iface.declare && exported {
         w.raw(",\"declare\":true");
@@ -701,7 +705,7 @@ pub(super) fn write_enum_declaration(
     w.raw(",\"id\":");
     write_identifier_plain(w, &enum_decl.id, ctx);
     w.raw(",\"members\":");
-    write_array(w, enum_decl.members, |w, member| {
+    write_array(w, ctx.view.enum_members(enum_decl.members), |w, member| {
         node_header(w, "TSEnumMember", member.span, ctx);
         w.raw(",\"id\":");
         match &member.id {

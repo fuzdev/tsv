@@ -570,7 +570,11 @@ impl<'a> Printer<'a> {
         // Locate the opening `[`, skipping comments so a `[` inside one (e.g.
         // `readonly /* [ */ [k]`) isn't matched. Bounded at the first parameter so
         // a `[` in the key type can't be mistaken for it.
-        let first_param_start = idx.parameters.first().map(|p| p.span.start);
+        let first_param_start = self
+            .view
+            .index_params(idx.parameters)
+            .first()
+            .map(|p| p.span.start);
         let bracket_bound = first_param_start.unwrap_or(idx.span.end);
         let bracket_open_pos = find_char_skipping_comments(
             self.source.as_bytes(),
@@ -597,8 +601,9 @@ impl<'a> Printer<'a> {
         // Build the key parameter docs. The `: keyType` is delegated to the
         // shared annotation printer so a union/intersection key breaks with the
         // leading-`|` / hanging-`&` layout.
-        let param_docs: DocBuf = idx
-            .parameters
+        let param_docs: DocBuf = self
+            .view
+            .index_params(idx.parameters)
             .iter()
             .map(|param| {
                 // An alone-on-line directive in the `[`→key gap freezes the key
@@ -633,7 +638,11 @@ impl<'a> Printer<'a> {
 
         // The closing `]`, located outside comments so a `]` glyph inside a
         // comment before it (`[key: string /* ] */]`) isn't mistaken for it.
-        let search_start = idx.parameters.last().map_or(sig_start, |p| p.span.end);
+        let search_start = self
+            .view
+            .index_params(idx.parameters)
+            .last()
+            .map_or(sig_start, |p| p.span.end);
         let bracket_close_pos = self.find_char_outside_comments(search_start, idx.span.end, b']');
 
         // Build `[key: type]` as a group that can break when key type is long
