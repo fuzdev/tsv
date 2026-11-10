@@ -271,16 +271,16 @@ pub(super) fn try_expand_last_arg(
         // Expression arrow with a call / conditional body: the head arguments stay inline and
         // only the body breaks after `=>` (`fn({ a: 1 }, (x) =>⏎\tcall(x, …)⏎)`).
         if let Some(&ast::Expression { span: arrow_span, kind: ast::ExpressionKind::ArrowFunctionExpression(arrow) }) = last_arg
-            && let ast::ArrowFunctionBody::Expression(body_expr) = &printer.view.arrow_fn(arrow).body
+            && let arrow = printer.view.arrow_fn(arrow)
+            && let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body
             && (arrow_body_is_call_through_non_null(printer.view, printer.view.expr(*body_expr))
                 || matches!(printer.view.expr(*body_expr).kind, ast::ExpressionKind::ConditionalExpression(_)))
             // The reassembling arm's refusal pair, which holds at every one of these states —
             // and the same question the eligibility gate above already answered to let this
             // block be entered at all.
-            && !(has_comments && arrow_hug_refused_by_comments(printer, printer.view.arrow_fn(arrow), arrow_span, printer.view.expr(*body_expr)))
+            && !(has_comments && arrow_hug_refused_by_comments(printer, arrow, arrow_span, printer.view.expr(*body_expr)))
         {
-            let sig_doc =
-                build_hugged_arrow_sig_doc(printer, printer.view.arrow_fn(arrow), arrow_span);
+            let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, arrow_span);
             // Reuse the pre-built call body (see above); conditional bodies build fresh.
             let body_doc = body_reuse.map_or_else(
                 || printer.build_arrow_arg_body_doc(printer.view.expr(*body_expr)),
@@ -288,7 +288,7 @@ pub(super) fn try_expand_last_arg(
             );
             let body_doc = prepend_arrow_body_comments(
                 printer,
-                printer.view.arrow_fn(arrow),
+                arrow,
                 printer.view.expr(*body_expr).span().start,
                 body_doc,
             );
@@ -300,11 +300,7 @@ pub(super) fn try_expand_last_arg(
                 &head_parts,
                 sig_doc,
                 body_doc,
-                arrow_body_breaks_after_space(
-                    printer,
-                    printer.view.arrow_fn(arrow),
-                    printer.view.expr(*body_expr),
-                ),
+                arrow_body_breaks_after_space(printer, arrow, printer.view.expr(*body_expr)),
                 last_arg_doc,
                 all_args_broken,
             ));

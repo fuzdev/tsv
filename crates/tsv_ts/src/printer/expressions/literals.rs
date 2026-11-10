@@ -416,8 +416,12 @@ impl<'a> Printer<'a> {
         // Skips the single-element `parts` Vec the slow path heap-allocates and
         // the name-end scan that only the modifier/annotation branches consume.
         // Returns the exact DocId the `parts.len() == 1` tail would.
-        let render_decorators = !skip_decorators && id.decorators(self.view).is_some();
-        if !render_decorators && !id.optional && id.type_annotation(self.view).is_none() {
+        let extra = self.view.opt_param_extra(id.extra);
+        let type_annotation = extra.and_then(|e| e.type_annotation.as_ref());
+        let decorators = extra
+            .and_then(|e| e.decorators)
+            .filter(|_| !skip_decorators);
+        if decorators.is_none() && !id.optional && type_annotation.is_none() {
             return self.identifier_name_doc(id);
         }
 
@@ -430,7 +434,7 @@ impl<'a> Printer<'a> {
 
         // Type annotation, handling a before-`:` comment between the name (and any
         // `?`) and `:` — line → indented continuation, block → inline before `:`.
-        if let Some(type_annotation) = id.type_annotation(self.view) {
+        if let Some(type_annotation) = type_annotation {
             parts.push(self.build_binding_type_annotation_doc(
                 after_modifier,
                 type_annotation,
@@ -445,7 +449,7 @@ impl<'a> Printer<'a> {
         // author newline after any of them), preserving any comment authored between a
         // decorator and the binding (`@dec /* c */ x`). `id.span.start` is the name — the
         // boundary for that after-decorator scan, since acorn stores the decorators before it.
-        if render_decorators && let Some(decorators) = id.decorators(self.view) {
+        if let Some(decorators) = decorators {
             self.with_param_decorators(Some(decorators), inner, id.span.start)
         } else {
             inner
