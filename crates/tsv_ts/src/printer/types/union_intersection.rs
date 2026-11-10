@@ -12,6 +12,7 @@ use super::helpers::{
     unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer, TrailingBlock};
+use crate::ast::AstView;
 use crate::ast::{
     Comment, TSIntersectionType, TSParenthesizedType, TSType, TSTypeLiteral, TSUnionType,
 };
@@ -237,8 +238,8 @@ pub(super) fn union_member_parens(member_count: usize) -> TypeParenRule {
 /// `build_parenthesized_intersection_trailing_object_doc`, and function /
 /// constructor / conditional parens let their inner type supply the indent and
 /// ride the closing `)` on the inner's last line (`) => void)`).
-fn is_paren_union_member(ts_type: &TSType<'_>) -> bool {
-    matches!(unwrap_parenthesized(ts_type), TSType::Union(_))
+fn is_paren_union_member(view: AstView<'_>, ts_type: &TSType<'_>) -> bool {
+    matches!(unwrap_parenthesized(view, ts_type), TSType::Union(_))
 }
 
 /// Which composite's member seam a lifted trailing run is being asked about. The two
@@ -399,7 +400,7 @@ impl<'a> Printer<'a> {
         if self.paren_shell_retains_for_trailing_run(shell) {
             return None;
         }
-        let (leading_gap, _) = paren_shell_gaps(shell);
+        let (leading_gap, _) = paren_shell_gaps(self.view, shell);
         let end = self
             .stripped_shell_hoist_composite_head(t, own_line)
             .unwrap_or(leading_gap.end);
@@ -631,16 +632,23 @@ impl<'a> Printer<'a> {
         has_comments: bool,
         freeze_first: bool,
     ) -> IntersectionMemberFacts {
-        let frozen =
-            self.list_member_frozen(intersection.span.start, intersection.types, i, freeze_first);
-        let Some(prev) = i.checked_sub(1).map(|p| intersection.types[p]) else {
+        let frozen = self.list_member_frozen(
+            intersection.span.start,
+            self.view.ty_list(intersection.types),
+            i,
+            freeze_first,
+        );
+        let Some(prev) = self.view.opt_ty(
+            i.checked_sub(1)
+                .map(|p| self.view.ty_list(intersection.types)[p]),
+        ) else {
             return IntersectionMemberFacts {
                 frozen,
                 separator: None,
                 shell_run: None,
             };
         };
-        let member = intersection.types[i];
+        let member = self.view.ty(self.view.ty_list(intersection.types)[i]);
         let separator = has_comments
             .then(|| {
                 find_separator_position(self.source, prev.span().end, member.span().start, b'&')
@@ -715,7 +723,7 @@ impl<'a> Printer<'a> {
         t: &TSType<'_>,
         own_line: ShellRunOwnLine,
     ) -> Option<u32> {
-        let inner = unwrap_parenthesized(t);
+        let inner = unwrap_parenthesized(self.view, t);
         self.shell_head_past_operator(t).filter(|&end| {
             let head: CommentVec<'_> = self
                 .comments_to_emit_between(inner.span().start, end)
@@ -1193,7 +1201,7 @@ impl<'a> Printer<'a> {
         if !member_parens(self, t) {
             return MemberPairLayout::None;
         }
-        if is_paren_union_member(t) {
+        if is_paren_union_member(self.view, t) {
             return MemberPairLayout::ParenUnion;
         }
         if seam == MemberSeam::Union && self.aligned_trailing_object_shell(t).is_some() {
@@ -1253,7 +1261,10 @@ impl<'a> Printer<'a> {
         member_parens: TypeParenRule,
         seam: MemberSeam,
         has_leading_comments: bool,
-    ) -> Option<&'t TSType<'t>> {
+    ) -> Option<&'t TSType<'t>>
+    where
+        'a: 't,
+    {
         // A pair whose printed form leaves the run at the SEAM — redundant, or required
         // and flat ([`Self::member_seam_trailing_shell`]).
         let shell = self.member_seam_trailing_shell(t, member_parens, seam)?;
@@ -1267,7 +1278,7 @@ impl<'a> Printer<'a> {
         if has_leading_comments {
             return None;
         }
-        let (_, trailing) = paren_shell_gaps(shell);
+        let (_, trailing) = paren_shell_gaps(self.view, shell);
         // A run a retained arrow-return shell claims is that shell's to print.
         if self.type_trailing_gap_claimed(trailing.start, shell.span.end) {
             return None;
@@ -1286,7 +1297,7 @@ impl<'a> Printer<'a> {
         if !run.any(|c| !c.is_block) {
             return None;
         }
-        Some(unwrap_parenthesized(t))
+        Some(unwrap_parenthesized(self.view, t))
     }
 
     /// Whether a union member carries LEADING comments — prettier's
@@ -1357,11 +1368,12 @@ impl<'a> Printer<'a> {
     }
 
     fn union_member_has_leading_comments(&self, union: &TSUnionType<'_>, i: usize) -> bool {
-        let member = union.types[i];
+        let member = self.view.ty(self.view.ty_list(union.types)[i]);
         let member_start = member.span().start;
-        if self
-            .has_comments_to_emit_between(member_start, unwrap_parenthesized(member).span().start)
-        {
+        if self.has_comments_to_emit_between(
+            member_start,
+            unwrap_parenthesized(self.view, member).span().start,
+        ) {
             return true;
         }
         // The same run one link DOWN, at the member's leading printed EDGE
@@ -1420,7 +1432,7 @@ impl<'a> Printer<'a> {
     /// ([`Printer::leading_edge_shell_line_comment_claim`]), so the emission and the
     /// composite's decline name one region.
     fn later_member_transparent_head_line_comment_claim(&self, t: &TSType<'_>) -> Option<Span> {
-        self.transparent_sole_member(unwrap_parenthesized(t))?;
+        self.transparent_sole_member(unwrap_parenthesized(self.view, t))?;
         self.leading_edge_shell_line_comment_claim(t)
     }
 
@@ -1440,7 +1452,10 @@ impl<'a> Printer<'a> {
         &self,
         t: &'t TSType<'t>,
         member_parens: TypeParenRule,
-    ) -> Option<&'t TSType<'t>> {
+    ) -> Option<&'t TSType<'t>>
+    where
+        'a: 't,
+    {
         self.member_hoisted_trailing_shell(t, member_parens, MemberSeam::Intersection, false)
     }
 
@@ -1521,7 +1536,7 @@ impl<'a> Printer<'a> {
         member_doc: DocId,
     ) -> DocId {
         if let Some(shell) = outermost_paren(member) {
-            let (leading, _) = paren_shell_gaps(shell);
+            let (leading, _) = paren_shell_gaps(self.view, shell);
             if !self.shell_leading_run_claimed(shell.span.start, leading.end) {
                 self.push_paren_shell_leading_run(
                     parts,
@@ -1548,11 +1563,17 @@ impl<'a> Printer<'a> {
         intersection: &'t TSIntersectionType<'t>,
         member_parens: TypeParenRule,
         has_comments: bool,
-    ) -> Option<&'t TSType<'t>> {
+    ) -> Option<&'t TSType<'t>>
+    where
+        'a: 't,
+    {
         if !has_comments {
             return None;
         }
-        self.intersection_member_hoisted_shell(intersection.types[0], member_parens)
+        self.intersection_member_hoisted_shell(
+            self.view.ty(self.view.ty_list(intersection.types)[0]),
+            member_parens,
+        )
     }
 
     /// Prettier's `hasLeadingOwnLineComment(originalText, node)` disjunct
@@ -1594,7 +1615,7 @@ impl<'a> Printer<'a> {
         let Some(shell) = self.boundary_relocating_shell(prev) else {
             return false;
         };
-        let (_, trailing) = paren_shell_gaps(shell);
+        let (_, trailing) = paren_shell_gaps(self.view, shell);
         self.comments_to_emit_between(trailing.start, trailing.end)
             .any(|c| !self.comment_follows_content_on_its_line(c) && !self.comment_hugs_next(c))
     }
@@ -1655,7 +1676,7 @@ impl<'a> Printer<'a> {
         let Some(shell) = self.boundary_relocating_shell(cur) else {
             return false;
         };
-        let (leading, _) = paren_shell_gaps(shell);
+        let (leading, _) = paren_shell_gaps(self.view, shell);
         self.comments_to_emit_between(leading.start, leading.end)
             .any(|c| !self.comment_hugs_next(c))
     }
@@ -1730,9 +1751,18 @@ impl<'a> Printer<'a> {
         if i == 0 {
             return union.span.start;
         }
-        let prev_end = union.types[i - 1].span().end;
-        find_separator_position(self.source, prev_end, union.types[i].span().start, b'|')
-            .map_or(prev_end, |sep| sep + 1)
+        let prev_end = self
+            .view
+            .ty(self.view.ty_list(union.types)[i - 1])
+            .span()
+            .end;
+        find_separator_position(
+            self.source,
+            prev_end,
+            self.view.ty(self.view.ty_list(union.types)[i]).span().start,
+            b'|',
+        )
+        .map_or(prev_end, |sep| sep + 1)
     }
 
     /// Build a Doc for a union type: `A | B | C` or `| A\n| B\n| C`
@@ -1844,7 +1874,10 @@ impl<'a> Printer<'a> {
         gap_start: u32,
         union: &TSUnionType<'_>,
     ) -> bool {
-        let Some(first) = union.types.first() else {
+        let Some(first) = self
+            .view
+            .opt_ty(self.view.ty_list(union.types).first().copied())
+        else {
             return false;
         };
         // Only a block the author SEPARATED from the union's head declines the seam's
@@ -1899,7 +1932,7 @@ impl<'a> Printer<'a> {
         if !comments.iter().all(|c| c.is_block)
             || !self.is_same_line(last.span.end, self.blank_scan_end_after(last, head_start))
             || self
-                .composite_leading_run_freeze(union.span.start, union.types)
+                .composite_leading_run_freeze(union.span.start, self.view.ty_list(union.types))
                 .is_some()
         {
             return None;
@@ -1916,7 +1949,7 @@ impl<'a> Printer<'a> {
         if union.types.is_empty() {
             return d.empty();
         }
-        let first_member_start = union.types[0].span().start;
+        let first_member_start = self.view.ty(self.view.ty_list(union.types)[0]).span().start;
         // Where the first member's leading run STARTS: the handed run's start when the
         // enclosing seam handed one in ([`Self::union_external_leading_run_start`]), else
         // the union's own head. One run from there to the member, whichever layout emits
@@ -1929,7 +1962,8 @@ impl<'a> Printer<'a> {
         // document-level flag — the in-span `has_comments` gate below cannot see an
         // out-of-span directive. `freeze_first` is applied in the main loop and the
         // single-member branch.
-        let leading_freeze = self.composite_leading_run_freeze(union.span.start, union.types);
+        let leading_freeze =
+            self.composite_leading_run_freeze(union.span.start, self.view.ty_list(union.types));
         let (freeze_first, freeze_first_multiline) =
             LeadingRunFreeze::first_member_flags(leading_freeze);
 
@@ -1944,9 +1978,14 @@ impl<'a> Printer<'a> {
         // whole-freeze). Handles the hug path too (a lone object hugs), which is why this
         // precedes it.
         if union.types.len() == 1
-            && self.list_member_frozen(union.span.start, union.types, 0, freeze_first)
+            && self.list_member_frozen(
+                union.span.start,
+                self.view.ty_list(union.types),
+                0,
+                freeze_first,
+            )
             && !matches!(
-                unwrap_parenthesized(union.types[0]),
+                unwrap_parenthesized(self.view, self.view.ty(self.view.ty_list(union.types)[0])),
                 TSType::Union(_) | TSType::Intersection(_)
             )
         {
@@ -1972,7 +2011,8 @@ impl<'a> Printer<'a> {
         // the hug's leading run, the multiline route, the collapse's own leading emitter —
         // stands down under it: the seam's emitter prints that run, and a second copy here
         // is a DOUBLE-PRINT (docs/comments.md hazard 3).
-        let head_region_claimed = self.composite_head_region_claimed(union.span.start, union.types);
+        let head_region_claimed =
+            self.composite_head_region_claimed(union.span.start, self.view.ty_list(union.types));
         let has_leading_run =
             !head_region_claimed && (has_comments || external_run_start.is_some());
 
@@ -2021,7 +2061,7 @@ impl<'a> Printer<'a> {
                     LeadingGlue::AdjacentValueGap,
                 );
             }
-            for (i, t) in union.types.iter().enumerate() {
+            for (i, &t) in self.view.ty_list(union.types).iter().enumerate() {
                 if i > 0 {
                     parts.push(d.text(" | "));
                 }
@@ -2030,12 +2070,16 @@ impl<'a> Printer<'a> {
                 // The hug path can't hold a composite member (only object-like huggables),
                 // so `build_frozen_member_doc` freezes it verbatim without the collapse
                 // question the len==1 branch answers below.
-                let frozen =
-                    self.list_member_frozen(union.span.start, union.types, i, freeze_first);
+                let frozen = self.list_member_frozen(
+                    union.span.start,
+                    self.view.ty_list(union.types),
+                    i,
+                    freeze_first,
+                );
                 if frozen {
-                    parts.push(self.build_frozen_member_doc(t, member_parens));
+                    parts.push(self.build_frozen_member_doc(self.view.ty(t), member_parens));
                 } else {
-                    parts.push(self.build_type_doc_maybe_parens(t, member_parens));
+                    parts.push(self.build_type_doc_maybe_parens(self.view.ty(t), member_parens));
                 }
             }
             return d.concat(&parts);
@@ -2049,7 +2093,11 @@ impl<'a> Printer<'a> {
         //   the comment is a line comment, so the multiline layout is required.
 
         if has_comments && !head_region_claimed {
-            let first_type_start = union.types.first().map(|t| t.span().start);
+            let first_type_start = self
+                .view
+                .ty_list(union.types)
+                .first()
+                .map(|&t| self.view.ty(t).span().start);
             let has_leading_line_comments = first_type_start
                 .is_some_and(|start| self.has_line_comments_between(union.span.start, start));
             // A line comment inside a member's parens (before the — possibly nested —
@@ -2076,16 +2124,21 @@ impl<'a> Printer<'a> {
             // the same comment does not take. Routing and emission ask one predicate,
             // which is the discipline this module keeps paying for.
             let has_paren_inner_leading_line_comments = union.types.len() > 1
-                && union.types.iter().enumerate().any(|(i, t)| {
-                    self.union_member_paren_leading_line_comment(t)
-                        || (i > 0
-                            && self
-                                .member_shell_own_line_run_region(
-                                    t,
-                                    ShellRunOwnLine::PrecedingMember,
-                                )
-                                .is_some())
-                });
+                && self
+                    .view
+                    .ty_list(union.types)
+                    .iter()
+                    .enumerate()
+                    .any(|(i, &t)| {
+                        self.union_member_paren_leading_line_comment(self.view.ty(t))
+                            || (i > 0
+                                && self
+                                    .member_shell_own_line_run_region(
+                                        self.view.ty(t),
+                                        ShellRunOwnLine::PrecedingMember,
+                                    )
+                                    .is_some())
+                    });
             if has_leading_line_comments
                 || self.union_has_own_line_member_comment(union)
                 || has_paren_inner_leading_line_comments
@@ -2107,7 +2160,7 @@ impl<'a> Printer<'a> {
         // single-member predicate here, so any required parens come from the parent one
         // level up.
         if union.types.len() == 1 {
-            let member = union.types[0];
+            let member = self.view.ty(self.view.ty_list(union.types)[0]);
             // A single-member union collapses to its member. When frozen, the resolution
             // is handled above, at the leaf/object arm of the `len() == 1` branch (whole
             // union frozen, `|` kept); a composite sole member falls through here and
@@ -2155,7 +2208,12 @@ impl<'a> Printer<'a> {
         // comment through `printComments`, outside the `group(members)` `printUnionType`
         // returns; this is that shape. The broken layout is unaffected: the run still lands
         // ahead of the `if_break` pipe, which is where prettier puts it.
-        let first_frozen = self.list_member_frozen(union.span.start, union.types, 0, freeze_first);
+        let first_frozen = self.list_member_frozen(
+            union.span.start,
+            self.view.ty_list(union.types),
+            0,
+            freeze_first,
+        );
         let union_bound_end = if first_frozen {
             run_start
         } else {
@@ -2172,9 +2230,9 @@ impl<'a> Printer<'a> {
         // member.
         let mut freeze_multiline = freeze_first_multiline;
 
-        for (i, t) in union.types.iter().enumerate() {
-            let type_start = t.span().start;
-            let type_end = t.span().end;
+        for (i, &t) in self.view.ty_list(union.types).iter().enumerate() {
+            let type_start = self.view.ty(t).span().start;
+            let type_end = self.view.ty(t).span().end;
 
             // Rule A member freeze: the first member via a leading-run directive
             // (`freeze_first`, before `span.start`) or an alone-on-line directive in the
@@ -2183,8 +2241,13 @@ impl<'a> Printer<'a> {
             // before this loop (the one-sided `union_has_own_line_member_comment` gate —
             // broader than the placement floor), so the i>0 half of this ask is expected
             // never to fire here; it stays for the one-predicate discipline.
-            let frozen = self.list_member_frozen(union.span.start, union.types, i, freeze_first);
-            if self.frozen_member_forces_break(frozen, t, member_parens) {
+            let frozen = self.list_member_frozen(
+                union.span.start,
+                self.view.ty_list(union.types),
+                i,
+                freeze_first,
+            );
+            if self.frozen_member_forces_break(frozen, self.view.ty(t), member_parens) {
                 freeze_multiline = true;
             }
 
@@ -2202,7 +2265,11 @@ impl<'a> Printer<'a> {
                 // member; changing the separator here would only reshape that
                 // already-divergent form, not match Prettier.
                 if has_comments {
-                    let prev_type_end = union.types[i - 1].span().end;
+                    let prev_type_end = self
+                        .view
+                        .ty(self.view.ty_list(union.types)[i - 1])
+                        .span()
+                        .end;
                     self.push_post_separator_block_comments(&mut parts, prev_type_end, type_start);
                 }
             } else {
@@ -2259,7 +2326,9 @@ impl<'a> Printer<'a> {
             // instead of reformatting it. Same offset shape, so it aligns with the
             // reformatted siblings in the broken layout.
             if frozen {
-                parts.push(self.build_frozen_union_member_offset_doc(t, member_parens));
+                parts.push(
+                    self.build_frozen_union_member_offset_doc(self.view.ty(t), member_parens),
+                );
             } else {
                 // A comment-free union pays none of the hoist's questions: the one window
                 // search above (`has_comments`) already proved no gap in this union holds
@@ -2271,16 +2340,20 @@ impl<'a> Printer<'a> {
                     // it is emitted above), and it is always glued after the `| `, so it
                     // counts whatever the source spelling.
                     let has_leading = self.union_member_has_leading_run(union, i, run_start);
-                    self.build_union_member_doc(t, member_parens, has_leading)
+                    self.build_union_member_doc(self.view.ty(t), member_parens, has_leading)
                 } else {
-                    self.build_union_member_offset_doc(t, member_parens)
+                    self.build_union_member_offset_doc(self.view.ty(t), member_parens)
                 });
             }
 
             // Add trailing block comments after this type (before the next `|` separator)
             if has_comments {
                 if i + 1 < union.types.len() {
-                    let next_type_start = union.types[i + 1].span().start;
+                    let next_type_start = self
+                        .view
+                        .ty(self.view.ty_list(union.types)[i + 1])
+                        .span()
+                        .start;
                     self.push_pre_separator_block_comments(
                         &mut parts,
                         type_end,
@@ -2387,8 +2460,8 @@ impl<'a> Printer<'a> {
         &self,
         intersection: &TSIntersectionType<'_>,
     ) -> DocId {
-        let boundary_owns_expansion = intersection_has_huggable_last_type(intersection)
-            || intersection_has_expanding_first_type(intersection);
+        let boundary_owns_expansion = intersection_has_huggable_last_type(self.view, intersection)
+            || intersection_has_expanding_first_type(self.view, intersection);
         // A hanging caller trails a prefix (`= …`), so the hoist keeps its continuation indent.
         self.build_intersection_type_doc(intersection, !boundary_owns_expansion, false)
     }
@@ -2421,12 +2494,12 @@ impl<'a> Printer<'a> {
         // Recomputed rather than threaded — gated on `has_format_ignore`, so it costs
         // nothing in the common case.
         let freeze_first = self
-            .composite_leading_run_freeze(union.span.start, union.types)
+            .composite_leading_run_freeze(union.span.start, self.view.ty_list(union.types))
             .is_some();
 
-        for (i, t) in union.types.iter().enumerate() {
-            let type_start = t.span().start;
-            let type_end = t.span().end;
+        for (i, &t) in self.view.ty_list(union.types).iter().enumerate() {
+            let type_start = self.view.ty(t).span().start;
+            let type_end = self.view.ty(t).span().end;
 
             // A LATER member that is a REDUNDANT parenthesized type (`a | (// c⏎ b)`): its
             // leading line comment can't stay "inside" parens the comment-free rule strips,
@@ -2442,11 +2515,15 @@ impl<'a> Printer<'a> {
             // here so the redundant-paren leading run below is suppressed for a frozen
             // member — its comments ride out INSIDE the frozen verbatim slice, so emitting
             // the run separately too would DOUBLE-PRINT them (`| (// c⏎ b)` frozen).
-            let frozen_member =
-                self.list_member_frozen(union.span.start, union.types, i, freeze_first);
+            let frozen_member = self.list_member_frozen(
+                union.span.start,
+                self.view.ty_list(union.types),
+                i,
+                freeze_first,
+            );
 
             let stripped_paren_leading = if i > 0 && !frozen_member {
-                self.stripped_redundant_paren_member_leading_run(t)
+                self.stripped_redundant_paren_member_leading_run(self.view.ty(t))
             } else {
                 smallvec![]
             };
@@ -2469,7 +2546,8 @@ impl<'a> Printer<'a> {
             // shell) and for one whose redundant-paren run was hoisted above — either
             // way another emitter owns those bytes.
             let run_owned_above = frozen_member || !stripped_paren_leading.is_empty();
-            let (edge_claim, gap_end) = self.union_member_leading_claim(run_owned_above, i == 0, t);
+            let (edge_claim, gap_end) =
+                self.union_member_leading_claim(run_owned_above, i == 0, self.view.ty(t));
 
             // The **first** member's leading-comment run, built here rather than at the
             // `| ` prefix below so the arm that emits it decides whether it takes the
@@ -2492,7 +2570,11 @@ impl<'a> Printer<'a> {
 
             if i > 0 {
                 // Get previous type end and find the pipe position
-                let prev_type_end = union.types[i - 1].span().end;
+                let prev_type_end = self
+                    .view
+                    .ty(self.view.ty_list(union.types)[i - 1])
+                    .span()
+                    .end;
 
                 // Collect comments between previous type and this type's pipe
                 if let Some(pipe_pos) =
@@ -2647,7 +2729,9 @@ impl<'a> Printer<'a> {
             // preserves the arm chain's consume-by-move invariant.
             if frozen_member {
                 parts.extend(first_leading);
-                parts.push(self.build_frozen_union_member_offset_doc(t, member_parens));
+                parts.push(
+                    self.build_frozen_union_member_offset_doc(self.view.ty(t), member_parens),
+                );
             } else if !stripped_paren_leading.is_empty() {
                 // Redundant-paren member: its leading run was already emitted before the
                 // `| ` above, so render the member as its fully STRIPPED inner — building
@@ -2657,14 +2741,17 @@ impl<'a> Printer<'a> {
                 // member), extended only to keep the consume-by-move invariant the arm
                 // chain relies on.
                 parts.extend(first_leading);
-                let inner = unwrap_parenthesized(t);
+                let inner = unwrap_parenthesized(self.view, self.view.ty(t));
                 // The hoist's own widened window, read from the same resolver: a
                 // transparent composite whose head gap rode out with the shell's run must
                 // decline its copy ([`Printer::composite_head_region_claimed`]). `None` —
                 // the ordinary case — leaves the build exactly as it was.
                 let hoist_claim = self
-                    .stripped_shell_hoist_composite_head(t, ShellRunOwnLine::PrecedingMember)
-                    .map(|end| Span::new(t.span().start, end));
+                    .stripped_shell_hoist_composite_head(
+                        self.view.ty(t),
+                        ShellRunOwnLine::PrecedingMember,
+                    )
+                    .map(|end| Span::new(self.view.ty(t).span().start, end));
                 let member_doc = self.with_claimed_shell_leading_run(hoist_claim, || {
                     self.build_union_member_offset_doc(inner, member_parens)
                 });
@@ -2673,7 +2760,7 @@ impl<'a> Printer<'a> {
                 // pure-line / mixed cases (no comment in the trailing gap).
                 parts.push(self.with_stripped_paren_trailing(
                     member_doc,
-                    t,
+                    self.view.ty(t),
                     inner,
                     TrailingBlock::Inline,
                 ));
@@ -2700,7 +2787,7 @@ impl<'a> Printer<'a> {
                 // The pair the shells collapse into is the outermost, and
                 // `build_parenthesized_union_doc`'s window already spans from it to the
                 // union, so any nesting depth emits the whole run.
-                self.paren_union_line_comment_member(t, member_parens)
+                self.paren_union_line_comment_member(self.view.ty(t), member_parens)
             {
                 // `first_leading` is non-empty only for the first member (see its
                 // declaration); a later member's leading comments were emitted on their
@@ -2742,7 +2829,7 @@ impl<'a> Printer<'a> {
                 // must not be indented by a neighbour's comment.
                 let has_leading = self.union_member_has_leading_run(union, i, run_start);
                 parts.push(self.with_claimed_shell_leading_run(edge_claim, || {
-                    self.build_union_member_doc(t, member_parens, has_leading)
+                    self.build_union_member_doc(self.view.ty(t), member_parens, has_leading)
                 }));
             }
 
@@ -2774,8 +2861,8 @@ impl<'a> Printer<'a> {
     pub(crate) fn type_arg_union_prints_hugged(&self, gap_start: u32, ty: &TSType<'_>) -> bool {
         // `union_seam_hugs` subsumes `union_hug_shape`, so the shape is not re-tested
         // here — the brace clause is the only thing this position adds.
-        matches!(unwrap_parenthesized(ty), TSType::Union(u)
-            if self.union_seam_hugs(gap_start, u) && union_has_brace_member(u))
+        matches!(unwrap_parenthesized(self.view, ty), TSType::Union(u)
+            if self.union_seam_hugs(gap_start, u) && union_has_brace_member(self.view, u))
     }
 
     /// The run a seam's list emitter must LEAVE to a union item: `Some(run start)` when
@@ -2861,10 +2948,13 @@ impl<'a> Printer<'a> {
     /// [`Self::union_seam_hugs`], beside the doc it governs; the two parent positions ask
     /// [`Self::union_prints_hugged`] (`Parent`).
     fn union_prints_hugged_with(&self, union: &TSUnionType<'_>, gap: UnionLeadingGap) -> bool {
-        if !union_hug_shape(union) {
+        if !union_hug_shape(self.view, union) {
             return false;
         }
-        let Some(first) = union.types.first() else {
+        let Some(first) = self
+            .view
+            .opt_ty(self.view.ty_list(union.types).first().copied())
+        else {
             return false;
         };
         let first_start = first.span().start;
@@ -2936,13 +3026,12 @@ impl<'a> Printer<'a> {
     ///
     /// **Axis**: on-page, like every other clause of that layout gate.
     fn union_member_shell_holds_comment(&self, union: &TSUnionType<'_>) -> bool {
-        union
-            .types
+        self.view
+            .ty_list(union.types)
             .iter()
-            .copied()
-            .filter_map(outermost_paren)
+            .filter_map(|&member| outermost_paren(self.view.ty(member)))
             .any(|shell| {
-                let (leading, trailing) = paren_shell_gaps(shell);
+                let (leading, trailing) = paren_shell_gaps(self.view, shell);
                 self.has_comments_on_page_between(leading.start, leading.end)
                     || self.has_comments_on_page_between(trailing.start, trailing.end)
             })
@@ -2966,10 +3055,12 @@ impl<'a> Printer<'a> {
         if !self.has_comments_to_emit_between(union.span.start, union.span.end) {
             return false;
         }
-        union
-            .types
-            .windows(2)
-            .any(|pair| self.has_comments_to_emit_between(pair[0].span().end, pair[1].span().start))
+        self.view.ty_list(union.types).windows(2).any(|pair| {
+            self.has_comments_to_emit_between(
+                self.view.ty(pair[0]).span().end,
+                self.view.ty(pair[1]).span().start,
+            )
+        })
     }
 
     /// True when an **own-line comment** sits between two consecutive members —
@@ -2990,8 +3081,11 @@ impl<'a> Printer<'a> {
         if !self.has_comments_to_emit_between(union.span.start, union.span.end) {
             return false;
         }
-        union.types.windows(2).any(|pair| {
-            let (prev_end, next_start) = (pair[0].span().end, pair[1].span().start);
+        self.view.ty_list(union.types).windows(2).any(|pair| {
+            let (prev_end, next_start) = (
+                self.view.ty(pair[0]).span().end,
+                self.view.ty(pair[1]).span().start,
+            );
             self.comments_on_page_between(prev_end, next_start)
                 .any(|c| self.is_own_line_comment(c))
         })
@@ -3030,11 +3124,17 @@ impl<'a> Printer<'a> {
         if !self.has_comments_to_emit_between(intersection.span.start, intersection.span.end) {
             return false;
         }
-        intersection.types.windows(2).any(|pair| {
-            let (prev_end, next_start) = (pair[0].span().end, pair[1].span().start);
-            self.comments_on_page_between(prev_end, next_start)
-                .any(|c| self.comment_isolated_on_its_line(c))
-        })
+        self.view
+            .ty_list(intersection.types)
+            .windows(2)
+            .any(|pair| {
+                let (prev_end, next_start) = (
+                    self.view.ty(pair[0]).span().end,
+                    self.view.ty(pair[1]).span().start,
+                );
+                self.comments_on_page_between(prev_end, next_start)
+                    .any(|c| self.comment_isolated_on_its_line(c))
+            })
     }
 
     /// True when the intersection must use the multiline, comment-aware layout
@@ -3074,11 +3174,16 @@ impl<'a> Printer<'a> {
     ) -> bool {
         let member_parens = union_member_parens(intersection.types.len());
         self.intersection_has_isolated_member_comment(intersection)
-            || intersection.types.iter().enumerate().any(|(i, t)| {
-                self.paren_union_line_comment_member(t, member_parens)
-                    .is_some()
-                    && (i > 0 || !self.first_member_shell_run_claimed(t))
-            })
+            || self
+                .view
+                .ty_list(intersection.types)
+                .iter()
+                .enumerate()
+                .any(|(i, &t)| {
+                    self.paren_union_line_comment_member(self.view.ty(t), member_parens)
+                        .is_some()
+                        && (i > 0 || !self.first_member_shell_run_claimed(self.view.ty(t)))
+                })
     }
 
     /// The paren-union member shape a leading `//` is answered in FOUR times: the routing
@@ -3125,12 +3230,15 @@ impl<'a> Printer<'a> {
         &self,
         t: &'t TSType<'t>,
         member_parens: TypeParenRule,
-    ) -> Option<(&'t TSParenthesizedType<'t>, &'t TSUnionType<'t>)> {
+    ) -> Option<(&'t TSParenthesizedType<'t>, &'t TSUnionType<'t>)>
+    where
+        'a: 't,
+    {
         if !member_parens(self, t) {
             return None;
         }
         let p = outermost_paren(t)?;
-        let TSType::Union(union) = unwrap_parenthesized(t) else {
+        let TSType::Union(union) = unwrap_parenthesized(self.view, t) else {
             return None;
         };
         self.stripped_paren_hang_has_breaking_leading_run(t)
@@ -3166,7 +3274,7 @@ impl<'a> Printer<'a> {
         // at a transparent composite's dropped operator instead.
         self.shell_leading_run_claimed(
             first_member.span().start,
-            unwrap_parenthesized(first_member).span().start,
+            unwrap_parenthesized(self.view, first_member).span().start,
         )
     }
 
@@ -3239,8 +3347,11 @@ impl<'a> Printer<'a> {
         &'t TSIntersectionType<'t>,
         &'t TSTypeLiteral<'t>,
         Option<Span>,
-    )> {
-        let unwrapped = unwrap_parenthesized(ts_type);
+    )>
+    where
+        'a: 't,
+    {
+        let unwrapped = unwrap_parenthesized(self.view, ts_type);
         let TSType::Intersection(intersection) = unwrapped else {
             return None;
         };
@@ -3253,7 +3364,10 @@ impl<'a> Printer<'a> {
         if intersection.types.len() < 2 {
             return None;
         }
-        let TSType::TypeLiteral(obj) = unwrap_parenthesized(intersection.types.last()?) else {
+        let TSType::TypeLiteral(obj) = unwrap_parenthesized(
+            self.view,
+            self.view.ty(*self.view.ty_list(intersection.types).last()?),
+        ) else {
             return None;
         };
         // The shell's own `(` gap owns a redundant head shell's run (see the doc above);
@@ -3325,8 +3439,10 @@ impl<'a> Printer<'a> {
         // whole-intersection arm — the intersection first member behaves like every
         // other honored list position.) Gated on the document-level flag; the in-span `has_comments`
         // gate below cannot see an out-of-span directive.
-        let leading_freeze =
-            self.composite_leading_run_freeze(intersection.span.start, intersection.types);
+        let leading_freeze = self.composite_leading_run_freeze(
+            intersection.span.start,
+            self.view.ty_list(intersection.types),
+        );
         let freeze_first = leading_freeze.is_some();
 
         // Single-member-intersection collapse under a freeze — the union's rule, mirrored
@@ -3337,9 +3453,17 @@ impl<'a> Printer<'a> {
         // `&` → idempotent); a composite sole member is TRANSPARENT for directive binding
         // — fall through and build it normally so its own Rule A applies inside.
         if intersection.types.len() == 1
-            && self.list_member_frozen(intersection.span.start, intersection.types, 0, freeze_first)
+            && self.list_member_frozen(
+                intersection.span.start,
+                self.view.ty_list(intersection.types),
+                0,
+                freeze_first,
+            )
             && !matches!(
-                unwrap_parenthesized(intersection.types[0]),
+                unwrap_parenthesized(
+                    self.view,
+                    self.view.ty(self.view.ty_list(intersection.types)[0])
+                ),
                 TSType::Union(_) | TSType::Intersection(_)
             )
         {
@@ -3366,8 +3490,10 @@ impl<'a> Printer<'a> {
         // this builder's (see `Printer::composite_head_region_claimed`). Every route below
         // that would emit the gap stands down; the member's own shell run is already
         // declined by the hoist's `first_member_shell_run_claimed`.
-        let head_region_claimed =
-            self.composite_head_region_claimed(intersection.span.start, intersection.types);
+        let head_region_claimed = self.composite_head_region_claimed(
+            intersection.span.start,
+            self.view.ty_list(intersection.types),
+        );
 
         // A LINE comment in the leading-`&` gap `[span.start, first.start)` can't be
         // carried by the compact path's block-only extraction (a `//` runs to EOL), and
@@ -3377,8 +3503,11 @@ impl<'a> Printer<'a> {
         // Route through the leading-gap run emitter, which owns the WHOLE gap run.
         if has_comments
             && !head_region_claimed
-            && let Some(first_member) = intersection.types.first()
-            && self.has_line_comments_between(intersection.span.start, first_member.span().start)
+            && let Some(&first_member) = self.view.ty_list(intersection.types).first()
+            && self.has_line_comments_between(
+                intersection.span.start,
+                self.view.ty(first_member).span().start,
+            )
         {
             return self.build_intersection_leading_gap_line_comment_doc(
                 intersection,
@@ -3411,10 +3540,10 @@ impl<'a> Printer<'a> {
         // leading-`&` gap holding a comment of its own
         // ([`Printer::head_stripped_paren_shell`]'s ⚠️), leaving this the innermost gap
         // that can own the run.
-        if has_comments && let Some(first_member) = intersection.types.first() {
+        if has_comments && let Some(&first_member) = self.view.ty_list(intersection.types).first() {
             let first_frozen = self.list_member_frozen(
                 intersection.span.start,
-                intersection.types,
+                self.view.ty_list(intersection.types),
                 0,
                 freeze_first,
             );
@@ -3453,7 +3582,7 @@ impl<'a> Printer<'a> {
                 } else {
                     self.comments_to_emit_between(
                         intersection.span.start,
-                        first_member.span().start,
+                        self.view.ty(first_member).span().start,
                     )
                     .collect()
                 };
@@ -3557,7 +3686,7 @@ impl<'a> Printer<'a> {
 
         // Build first type separately (not indented)
         let mut first_parts = DocBuf::new();
-        let first_type = intersection.types[0];
+        let first_type = self.view.ty(self.view.ty_list(intersection.types)[0]);
         let first_type_start = first_type.span().start;
         let first_type_end = first_type.span().end;
 
@@ -3579,8 +3708,12 @@ impl<'a> Printer<'a> {
         // Rule A first-member freeze: emit `types[0]` verbatim (paren-transparent). Frozen
         // via a leading-run directive (`freeze_first`) or an alone-on-line directive
         // in the in-span leading gap after a leading `&`.
-        let first_frozen =
-            self.list_member_frozen(intersection.span.start, intersection.types, 0, freeze_first);
+        let first_frozen = self.list_member_frozen(
+            intersection.span.start,
+            self.view.ty_list(intersection.types),
+            0,
+            freeze_first,
+        );
         // A stripped shell's trailing run lifted off the FIRST member, held back from its
         // doc so the loop can build it inside the continuation `indent` when the boundary
         // takes one ([`Self::member_hoisted_trailing_shell`]). Held unconditionally and
@@ -3606,7 +3739,11 @@ impl<'a> Printer<'a> {
         // Add trailing block comments after first type
         if intersection.types.len() > 1 {
             if has_comments {
-                let next_type_start = intersection.types[1].span().start;
+                let next_type_start = self
+                    .view
+                    .ty(self.view.ty_list(intersection.types)[1])
+                    .span()
+                    .start;
                 self.push_pre_separator_block_comments(
                     &mut first_parts,
                     first_type_end,
@@ -3685,16 +3822,23 @@ impl<'a> Printer<'a> {
         let mut freeze_multiline = freeze_first_multiline
             || self.frozen_member_forces_break(first_frozen, first_type, member_parens);
         for i in 1..intersection.types.len() {
-            let prev_type = intersection.types[i - 1];
-            let prev_is_object = is_huggable_type(prev_type);
-            let cur_is_object = is_huggable_type(intersection.types[i]);
+            let prev_type = self.view.ty(self.view.ty_list(intersection.types)[i - 1]);
+            let prev_is_object = is_huggable_type(self.view, prev_type);
+            let cur_is_object = is_huggable_type(
+                self.view,
+                self.view.ty(self.view.ty_list(intersection.types)[i]),
+            );
             let neither_is_object = !prev_is_object && !cur_is_object;
             // Everything the boundary rules below read about this member, resolved once
             // by the seam the forced-multiline twin also calls
             // ([`Self::intersection_member_facts`]).
             let facts = self.intersection_member_facts(intersection, i, has_comments, false);
             let frozen = facts.frozen;
-            if self.frozen_member_forces_break(frozen, intersection.types[i], member_parens) {
+            if self.frozen_member_forces_break(
+                frozen,
+                self.view.ty(self.view.ty_list(intersection.types)[i]),
+                member_parens,
+            ) {
                 freeze_multiline = true;
             }
 
@@ -3728,7 +3872,7 @@ impl<'a> Printer<'a> {
             if !breaks
                 && self.intersection_boundary_opens_for_shell_run(
                     prev_type,
-                    intersection.types[i],
+                    self.view.ty(self.view.ty_list(intersection.types)[i]),
                     facts.shell_run.as_ref(),
                     held_trailing_run.is_some() || (i > 1 && prev_indent_member),
                 )
@@ -3846,9 +3990,13 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let freeze_first = leading_freeze.is_some();
-        let first_member = intersection.types[0];
-        let first_frozen =
-            self.list_member_frozen(intersection.span.start, intersection.types, 0, freeze_first);
+        let first_member = self.view.ty(self.view.ty_list(intersection.types)[0]);
+        let first_frozen = self.list_member_frozen(
+            intersection.span.start,
+            self.view.ty_list(intersection.types),
+            0,
+            freeze_first,
+        );
         let head = self.intersection_first_member_head_run(intersection, first_frozen);
         // To-emit axis: this is the gap's emitter (docs/comments.md).
         let mut run: CommentVec<'_> = self
@@ -3912,7 +4060,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let member_parens = union_member_parens(intersection.types.len());
-        let types = &intersection.types;
+        let types = self.view.ty_list(intersection.types);
         let last = types.len() - 1;
 
         // Rule A first-member freeze in the forced-multiline path (recomputed, gated on
@@ -3930,7 +4078,7 @@ impl<'a> Printer<'a> {
         // trailing `&` is emitted by the next member's iteration (it sits on this line).
         // The leading-gap route claims the whole gap run, so nothing is emitted here.
         let mut parts = DocBuf::new();
-        let first = &types[0];
+        let first = self.view.ty(types[0]);
         if leading_gap == LeadingGap::Emit {
             parts.push(self.build_comments_between_filtered(
                 intersection.span.start,
@@ -3971,8 +4119,8 @@ impl<'a> Printer<'a> {
         // queued at (the compact loop's own `prev_indent_member`).
         let mut prev_indent_member = false;
         for i in 1..types.len() {
-            let prev = &types[i - 1];
-            let cur = &types[i];
+            let prev = self.view.ty(types[i - 1]);
+            let cur = self.view.ty(types[i]);
             let prev_end = prev.span().end;
             let cur_start = cur.span().start;
             let is_last = i == last;
@@ -4027,8 +4175,8 @@ impl<'a> Printer<'a> {
             // ⚠️ The order matters beyond which arm prints: only the THIRD arm latches
             // `was_indented`, so moving the own-line-comment test out of the second arm
             // would change every later boundary. It stays where prettier asks it.
-            let prev_obj = is_huggable_type(prev);
-            let cur_obj = is_huggable_type(cur);
+            let prev_obj = is_huggable_type(self.view, prev);
+            let cur_obj = is_huggable_type(self.view, cur);
             let (mut should_break, mut indent_member) = if prev_obj && cur_obj {
                 (false, was_indented)
             } else if (!prev_obj && !cur_obj) || leading_run_ends_line {
@@ -4392,17 +4540,20 @@ impl<'a> Printer<'a> {
         // Both facts derive from the one node, so a caller cannot pair a first member with
         // another intersection's member-parens rule.
         let member_parens = union_member_parens(intersection.types.len());
-        let Some(first_member) = intersection.types.first() else {
+        let Some(first_member) = self
+            .view
+            .opt_ty(self.view.ty_list(intersection.types).first().copied())
+        else {
             return smallvec![];
         };
         let Some(shell) = outermost_paren(first_member) else {
             return smallvec![];
         };
-        let inner = unwrap_parenthesized(first_member);
+        let inner = unwrap_parenthesized(self.view, first_member);
         // The hoist's window is [`paren_shell_gaps`]' deep leading half — the one spelling
         // of "the author's shell", so this collector cannot drift from the predicates that
         // decide the strip below.
-        let (leading, _) = paren_shell_gaps(shell);
+        let (leading, _) = paren_shell_gaps(self.view, shell);
         // An ENCLOSING gap may already own this run: the intersection's first member is a
         // descent link of the leading-edge seam (`Printer::head_stripped_paren_shell`), so
         // at a gap that claimed it the hoist here would be a second emitter for one comment.
@@ -4482,7 +4633,10 @@ impl<'a> Printer<'a> {
                 claimed_shell: self.intersection_first_member_shell_claim(intersection),
             };
         }
-        let Some(first_member) = intersection.types.first() else {
+        let Some(first_member) = self
+            .view
+            .opt_ty(self.view.ty_list(intersection.types).first().copied())
+        else {
             return empty;
         };
         // An ENCLOSING gap may already own the edge shell's run — the whole intersection
@@ -4556,8 +4710,11 @@ impl<'a> Printer<'a> {
         &self,
         intersection: &TSIntersectionType<'_>,
     ) -> Option<Span> {
-        let shell = outermost_paren(intersection.types.first()?)?;
-        let (leading, _) = paren_shell_gaps(shell);
+        let shell = outermost_paren(
+            self.view
+                .ty(*self.view.ty_list(intersection.types).first()?),
+        )?;
+        let (leading, _) = paren_shell_gaps(self.view, shell);
         Some(Span::new(shell.span.start, leading.end))
     }
 
@@ -4597,7 +4754,7 @@ impl<'a> Printer<'a> {
         member_parens: TypeParenRule,
         facts: IntersectionMemberFacts,
     ) -> IntersectionMemberBody {
-        let t = intersection.types[i];
+        let t = self.view.ty(self.view.ty_list(intersection.types)[i]);
         let type_start = t.span().start;
         let type_end = t.span().end;
         let is_last = i == intersection.types.len() - 1;
@@ -4661,7 +4818,11 @@ impl<'a> Printer<'a> {
         // Trailing block comments + `&` separator (or end-of-intersection comments)
         if !is_last {
             if has_comments {
-                let next_type_start = intersection.types[i + 1].span().start;
+                let next_type_start = self
+                    .view
+                    .ty(self.view.ty_list(intersection.types)[i + 1])
+                    .span()
+                    .start;
                 self.push_pre_separator_block_comments(&mut parts, type_end, next_type_start, b'&');
             }
             parts.push(self.d().text(" &"));

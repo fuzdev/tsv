@@ -33,7 +33,7 @@ pub(super) fn write_type_annotation(
     };
     node_header(w, "TSTypeAnnotation", type_annotation.span, ctx);
     w.raw(",\"typeAnnotation\":");
-    write_type(w, type_annotation.type_annotation, ctx);
+    write_type(w, ctx.view.ty(type_annotation.type_annotation), ctx);
     close_node(w, "TSTypeAnnotation", type_annotation.span, ctx);
 }
 
@@ -48,13 +48,17 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
         ast::TSType::Union(u) => {
             node_header(w, "TSUnionType", u.span, ctx);
             w.raw(",\"types\":");
-            write_array(w, u.types, |w, t| write_type(w, t, ctx));
+            write_array(w, ctx.view.ty_list(u.types), |w, &t| {
+                write_type(w, ctx.view.ty(t), ctx);
+            });
             close_node(w, "TSUnionType", u.span, ctx);
         }
         ast::TSType::Intersection(i) => {
             node_header(w, "TSIntersectionType", i.span, ctx);
             w.raw(",\"types\":");
-            write_array(w, i.types, |w, t| write_type(w, t, ctx));
+            write_array(w, ctx.view.ty_list(i.types), |w, &t| {
+                write_type(w, ctx.view.ty(t), ctx);
+            });
             close_node(w, "TSIntersectionType", i.span, ctx);
         }
         ast::TSType::TypeReference(r) => {
@@ -93,13 +97,15 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
         ast::TSType::Tuple(t) => {
             node_header(w, "TSTupleType", t.span, ctx);
             w.raw(",\"elementTypes\":");
-            write_array(w, t.element_types, |w, e| write_type(w, e, ctx));
+            write_array(w, ctx.view.ty_list(t.element_types), |w, &e| {
+                write_type(w, ctx.view.ty(e), ctx);
+            });
             close_node(w, "TSTupleType", t.span, ctx);
         }
         ast::TSType::Parenthesized(p) => {
             node_header(w, "TSParenthesizedType", p.span, ctx);
             w.raw(",\"typeAnnotation\":");
-            write_type(w, p.type_annotation, ctx);
+            write_type(w, ctx.view.ty(p.type_annotation), ctx);
             close_node(w, "TSParenthesizedType", p.span, ctx);
         }
         ast::TSType::TypePredicate(p) => {
@@ -115,13 +121,13 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
             // the `is T` forms assign the annotation first and stamp
             // `asserts` last. The annotation node is synthesized around the
             // type's own span (there is no `:` in `x is T`).
-            match &p.type_annotation {
+            match p.type_annotation {
                 Some(t) => {
                     w.raw(",\"typeAnnotation\":");
-                    node_header(w, "TSTypeAnnotation", t.span(), ctx);
+                    node_header(w, "TSTypeAnnotation", ctx.view.ty(t).span(), ctx);
                     w.raw(",\"typeAnnotation\":");
-                    write_type(w, t, ctx);
-                    close_node(w, "TSTypeAnnotation", t.span(), ctx);
+                    write_type(w, ctx.view.ty(t), ctx);
+                    close_node(w, "TSTypeAnnotation", ctx.view.ty(t).span(), ctx);
                     w.raw(",\"asserts\":");
                     w.bool(p.asserts);
                 }
@@ -136,13 +142,13 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
         ast::TSType::Conditional(c) => {
             node_header(w, "TSConditionalType", c.span, ctx);
             w.raw(",\"checkType\":");
-            write_type(w, c.check_type, ctx);
+            write_type(w, ctx.view.ty(c.check_type), ctx);
             w.raw(",\"extendsType\":");
-            write_type(w, c.extends_type, ctx);
+            write_type(w, ctx.view.ty(c.extends_type), ctx);
             w.raw(",\"trueType\":");
-            write_type(w, c.true_type, ctx);
+            write_type(w, ctx.view.ty(c.true_type), ctx);
             w.raw(",\"falseType\":");
-            write_type(w, c.false_type, ctx);
+            write_type(w, ctx.view.ty(c.false_type), ctx);
             close_node(w, "TSConditionalType", c.span, ctx);
         }
         ast::TSType::Mapped(m) => {
@@ -158,15 +164,17 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
             node_header(w, "TSTypeParameter", m.type_parameter.span, ctx);
             write_name_field(w, m.type_parameter.name, m.type_parameter.span.start, ctx);
             w.raw(",\"constraint\":");
-            write_type(w, m.type_parameter.constraint, ctx);
+            write_type(w, ctx.view.ty(m.type_parameter.constraint), ctx);
             close_node(w, "TSTypeParameter", m.type_parameter.span, ctx);
             w.raw(",\"nameType\":");
-            write_or_null(w, m.name_type.as_ref(), |w, t| write_type(w, t, ctx));
+            write_or_null(w, m.name_type.as_ref(), |w, &t| {
+                write_type(w, ctx.view.ty(t), ctx);
+            });
             if let Some(modifier) = m.optional {
                 w.raw(",\"optional\":");
                 write_mapped_type_modifier(w, modifier);
             }
-            if let Some(t) = &m.type_annotation {
+            if let Some(t) = ctx.view.opt_ty(m.type_annotation) {
                 w.raw(",\"typeAnnotation\":");
                 write_type(w, t, ctx);
             }
@@ -177,7 +185,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
             w.raw(",\"operator\":");
             w.token(o.operator.as_str());
             w.raw(",\"typeAnnotation\":");
-            write_type(w, o.type_annotation, ctx);
+            write_type(w, ctx.view.ty(o.type_annotation), ctx);
             close_node(w, "TSTypeOperator", o.span, ctx);
         }
         ast::TSType::Import(i) => write_import_type(w, i, ctx),
@@ -197,13 +205,13 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
         ast::TSType::Rest(r) => {
             node_header(w, "TSRestType", r.span, ctx);
             w.raw(",\"typeAnnotation\":");
-            write_type(w, r.type_annotation, ctx);
+            write_type(w, ctx.view.ty(r.type_annotation), ctx);
             close_node(w, "TSRestType", r.span, ctx);
         }
         ast::TSType::Optional(o) => {
             node_header(w, "TSOptionalType", o.span, ctx);
             w.raw(",\"typeAnnotation\":");
-            write_type(w, o.type_annotation, ctx);
+            write_type(w, ctx.view.ty(o.type_annotation), ctx);
             close_node(w, "TSOptionalType", o.span, ctx);
         }
         ast::TSType::NamedTupleMember(n) => {
@@ -215,7 +223,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
             w.raw(",\"optional\":");
             w.bool(n.optional);
             w.raw(",\"elementType\":");
-            write_type(w, n.element_type, ctx);
+            write_type(w, ctx.view.ty(n.element_type), ctx);
             close_node(w, "TSNamedTupleMember", n.span, ctx);
         }
         ast::TSType::Infer(i) => {
@@ -269,7 +277,9 @@ fn write_literal_type(w: &mut JsonWriter, lit: &ast::TSLiteralType<'_>, ctx: &Ct
             // expressions are types.
             node_header(w, "TemplateLiteral", template.span, ctx);
             w.raw(",\"expressions\":");
-            write_array(w, template.types, |w, t| write_type(w, t, ctx));
+            write_array(w, ctx.view.ty_list(template.types), |w, &t| {
+                write_type(w, ctx.view.ty(t), ctx);
+            });
             w.raw(",\"quasis\":");
             write_array(w, template.quasis, |w, q| write_template_element(w, q, ctx));
             // Close the inner `TemplateLiteral`, then the `TSLiteralType`.
@@ -391,13 +401,13 @@ fn write_postfix_type_chain(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: 
                 node_header(w, "TSArrayType", arr.span, ctx);
                 w.raw(",\"elementType\":");
                 spine.push(PostfixTypeLink::Array(arr));
-                node = arr.element_type;
+                node = ctx.view.ty(arr.element_type);
             }
             ast::TSType::IndexedAccess(i) => {
                 node_header(w, "TSIndexedAccessType", i.span, ctx);
                 w.raw(",\"objectType\":");
                 spine.push(PostfixTypeLink::IndexedAccess(i));
-                node = i.object_type;
+                node = ctx.view.ty(i.object_type);
             }
             _ => {
                 write_type(w, node, ctx);
@@ -410,7 +420,7 @@ fn write_postfix_type_chain(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: 
             PostfixTypeLink::Array(arr) => close_node(w, "TSArrayType", arr.span, ctx),
             PostfixTypeLink::IndexedAccess(i) => {
                 w.raw(",\"indexType\":");
-                write_type(w, i.index_type, ctx);
+                write_type(w, ctx.view.ty(i.index_type), ctx);
                 close_node(w, "TSIndexedAccessType", i.span, ctx);
             }
         }
@@ -425,7 +435,9 @@ pub(super) fn write_type_parameter_instantiation(
 ) {
     node_header(w, "TSTypeParameterInstantiation", params.span, ctx);
     w.raw(",\"params\":");
-    write_array(w, params.params, |w, p| write_type(w, p, ctx));
+    write_array(w, ctx.view.ty_list(params.params), |w, &p| {
+        write_type(w, ctx.view.ty(p), ctx);
+    });
     close_node(w, "TSTypeParameterInstantiation", params.span, ctx);
 }
 

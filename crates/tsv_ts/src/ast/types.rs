@@ -7,8 +7,8 @@ use crate::lexer::KeywordKind;
 use tsv_lang::Span;
 
 use super::{
-    Decorator, Expr, ExprId, IdentName, Identifier, Literal, MethodKind, Run, TemplateElement,
-    UnaryExpression,
+    Decorator, Expr, ExprId, IdentName, Identifier, Literal, MethodKind, OptTyEdge, Run,
+    TemplateElement, TyEdge, TyList, UnaryExpression,
 };
 
 /// TypeScript type annotation node (e.g., `: number` in `const a: number = 5`)
@@ -17,7 +17,7 @@ use super::{
 /// entire annotation (`: number`), while the inner type covers just the type (`number`).
 #[derive(Debug, Clone)]
 pub struct TSTypeAnnotation<'arena> {
-    pub type_annotation: &'arena TSType<'arena>,
+    pub type_annotation: TyEdge<'arena>,
     pub span: Span,
 }
 
@@ -125,7 +125,7 @@ impl<'arena> TSType<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSArrayType<'arena> {
     /// The element type of the array
-    pub element_type: &'arena TSType<'arena>,
+    pub element_type: TyEdge<'arena>,
     pub span: Span,
 }
 
@@ -133,9 +133,9 @@ pub struct TSArrayType<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSIndexedAccessType<'arena> {
     /// The object type being indexed
-    pub object_type: &'arena TSType<'arena>,
+    pub object_type: TyEdge<'arena>,
     /// The index type
-    pub index_type: &'arena TSType<'arena>,
+    pub index_type: TyEdge<'arena>,
     pub span: Span,
 }
 
@@ -296,7 +296,7 @@ impl TSKeywordKind {
 pub struct TSTypeAliasDeclaration<'arena> {
     pub id: Identifier<'arena>,
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
-    pub type_annotation: &'arena TSType<'arena>,
+    pub type_annotation: TyEdge<'arena>,
     pub declare: bool,
 }
 
@@ -337,7 +337,7 @@ impl<'arena> TSLiteralType<'arena> {
 #[derive(Debug, Clone)]
 pub struct TemplateLiteralType<'arena> {
     pub quasis: &'arena [TemplateElement<'arena>],
-    pub types: &'arena [&'arena TSType<'arena>],
+    pub types: TyList<'arena>,
     pub span: Span,
 }
 
@@ -348,14 +348,14 @@ pub struct TemplateLiteralType<'arena> {
 /// Union type: `A | B | C`
 #[derive(Debug, Clone)]
 pub struct TSUnionType<'arena> {
-    pub types: &'arena [&'arena TSType<'arena>],
+    pub types: TyList<'arena>,
     pub span: Span,
 }
 
 /// Intersection type: `A & B & C`
 #[derive(Debug, Clone)]
 pub struct TSIntersectionType<'arena> {
-    pub types: &'arena [&'arena TSType<'arena>],
+    pub types: TyList<'arena>,
     pub span: Span,
 }
 
@@ -394,7 +394,7 @@ pub struct TSQualifiedName<'arena> {
 /// Type parameter instantiation: `<T, U>` (for type arguments)
 #[derive(Debug, Clone)]
 pub struct TSTypeParameterInstantiation<'arena> {
-    pub params: &'arena [&'arena TSType<'arena>],
+    pub params: TyList<'arena>,
     pub span: Span,
 }
 
@@ -480,8 +480,8 @@ impl TSTypeParameterModifiers {
 #[derive(Debug, Clone)]
 pub struct TSTypeParameter<'arena> {
     pub name: Identifier<'arena>,
-    pub constraint: Option<&'arena TSType<'arena>>,
-    pub default: Option<&'arena TSType<'arena>>,
+    pub constraint: OptTyEdge<'arena>,
+    pub default: OptTyEdge<'arena>,
     /// `const` / `in` / `out`, in source order — see [`TSTypeParameterModifiers`].
     pub modifiers: TSTypeParameterModifiers,
     pub span: Span,
@@ -632,7 +632,7 @@ pub struct TSConstructorType<'arena> {
 /// Tuple type: `[T, U, V]`
 #[derive(Debug, Clone)]
 pub struct TSTupleType<'arena> {
-    pub element_types: &'arena [&'arena TSType<'arena>],
+    pub element_types: TyList<'arena>,
     pub span: Span,
 }
 
@@ -640,7 +640,7 @@ pub struct TSTupleType<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSRestType<'arena> {
     /// The type being spread
-    pub type_annotation: &'arena TSType<'arena>,
+    pub type_annotation: TyEdge<'arena>,
     pub span: Span,
 }
 
@@ -648,7 +648,7 @@ pub struct TSRestType<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSOptionalType<'arena> {
     /// The type that is optional
-    pub type_annotation: &'arena TSType<'arena>,
+    pub type_annotation: TyEdge<'arena>,
     pub span: Span,
 }
 
@@ -658,7 +658,7 @@ pub struct TSNamedTupleMember<'arena> {
     /// The label identifier
     pub label: Identifier<'arena>,
     /// The element type
-    pub element_type: &'arena TSType<'arena>,
+    pub element_type: TyEdge<'arena>,
     /// Whether this element is optional (label?: T)
     pub optional: bool,
     pub span: Span,
@@ -684,17 +684,17 @@ pub struct TSThisType {
 /// Parenthesized type: `(T)`
 #[derive(Debug, Clone)]
 pub struct TSParenthesizedType<'arena> {
-    pub type_annotation: &'arena TSType<'arena>,
+    pub type_annotation: TyEdge<'arena>,
     pub span: Span,
 }
 
 /// Conditional type: `T extends U ? V : W`
 #[derive(Debug, Clone)]
 pub struct TSConditionalType<'arena> {
-    pub check_type: &'arena TSType<'arena>,
-    pub extends_type: &'arena TSType<'arena>,
-    pub true_type: &'arena TSType<'arena>,
-    pub false_type: &'arena TSType<'arena>,
+    pub check_type: TyEdge<'arena>,
+    pub extends_type: TyEdge<'arena>,
+    pub true_type: TyEdge<'arena>,
+    pub false_type: TyEdge<'arena>,
     pub span: Span,
 }
 
@@ -707,7 +707,7 @@ pub struct TSTypePredicate<'arena> {
     pub parameter_name: Identifier<'arena>,
     /// The type being asserted (e.g., `string` in `x is string`)
     /// None for `asserts x` without `is T`
-    pub type_annotation: Option<&'arena TSType<'arena>>,
+    pub type_annotation: OptTyEdge<'arena>,
     /// Whether this is an assertion predicate (`asserts x is T`)
     pub asserts: bool,
     pub span: Span,
@@ -732,9 +732,9 @@ pub struct TSMappedType<'arena> {
     /// The type parameter with constraint: `K in keyof T`
     pub type_parameter: TSMappedTypeParameter<'arena>,
     /// Optional key remapping: `as NewK`
-    pub name_type: Option<&'arena TSType<'arena>>,
+    pub name_type: OptTyEdge<'arena>,
     /// The value type
-    pub type_annotation: Option<&'arena TSType<'arena>>,
+    pub type_annotation: OptTyEdge<'arena>,
     /// Readonly modifier: `readonly`, `+readonly`, `-readonly`, or absent
     pub readonly: Option<TSMappedTypeModifier>,
     /// Optional modifier: `?`, `+?`, `-?`, or absent
@@ -751,7 +751,7 @@ pub struct TSMappedTypeParameter<'arena> {
     /// so the verbatim name is the leading `raw_len` bytes at `span.start`.
     pub name: IdentName<'arena>,
     /// The constraint type (e.g., `keyof T`)
-    pub constraint: &'arena TSType<'arena>,
+    pub constraint: TyEdge<'arena>,
     pub span: Span,
 }
 
@@ -761,7 +761,7 @@ pub struct TSTypeOperator<'arena> {
     /// The operator: "keyof", "unique", "readonly"
     pub operator: TSTypeOperatorKind,
     /// The type being operated on
-    pub type_annotation: &'arena TSType<'arena>,
+    pub type_annotation: TyEdge<'arena>,
     pub span: Span,
 }
 

@@ -5,10 +5,29 @@
 //! the stores, and every read of one goes through the view. The view is one word: a walk
 //! reaches a row through a load of the store's slice header and an indexed load, and holds one
 //! register for the view.
+//!
+//! Type edges and lists are read through the view too, spelled with the aliases here while the
+//! tree still holds them as references and slices.
 
 use tsv_lang::store::Run;
 
-use super::{AstStores, Expr, ExprId, Expression, Parsed, Program, Statement, StmtId};
+use super::{AstStores, Expr, ExprId, Expression, Parsed, Program, Statement, StmtId, TSType};
+
+/// One edge to a type held in the tree: an annotation's type, an operand of a type operator,
+/// a conditional's four branches, a type parameter's constraint and default, an assertion's
+/// type, and the rest of the type grammar's single children.
+// TODO: `TyId`.
+pub type TyEdge<'a> = &'a TSType<'a>;
+
+/// A type edge that may be absent.
+// TODO: `Option<TyId>`.
+pub type OptTyEdge<'a> = Option<TyEdge<'a>>;
+
+/// A type list: a union's or an intersection's members, a tuple's elements, a template
+/// literal type's interpolations, a type-argument list. Its elements are edges, each read
+/// through [`AstView::ty`].
+// TODO: `Run<TyId>`.
+pub type TyList<'a> = &'a [TyEdge<'a>];
 
 /// The read access every consumer of the tree holds: resolves edges and lists.
 ///
@@ -70,6 +89,27 @@ impl<'a> AstView<'a> {
     #[inline]
     pub fn stmt_list(self, list: Run<StmtId>) -> &'a [StmtId] {
         self.stores.stmt_lists.slice(list)
+    }
+
+    /// The type `edge` names: once edges are ids, the row of the type store it indexes, a miss
+    /// ending in the store's shared cold path.
+    #[inline]
+    pub fn ty(self, edge: TyEdge<'a>) -> &'a TSType<'a> {
+        edge
+    }
+
+    /// The type `edge` names, when it is present.
+    #[inline]
+    pub fn opt_ty(self, edge: OptTyEdge<'a>) -> Option<&'a TSType<'a>> {
+        edge
+    }
+
+    /// The edges of `list`, each resolved through [`Self::ty`]: once lists are id runs, the
+    /// run's ids in the type-list store. A union's or an intersection's members, a tuple's
+    /// elements, a template literal type's interpolations, a type-argument list.
+    #[inline]
+    pub fn ty_list(self, list: TyList<'a>) -> &'a [TyEdge<'a>] {
+        list
     }
 }
 

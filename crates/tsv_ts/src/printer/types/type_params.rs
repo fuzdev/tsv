@@ -305,7 +305,7 @@ impl<'a> Printer<'a> {
         // Track where we are for finding comments after the name
         let mut prev_end = param.name.span.end;
 
-        if let Some(constraint) = &param.constraint {
+        if let Some(constraint) = self.view.opt_ty(param.constraint) {
             // The shared keyword→value head. Resolving it needs the keyword's position,
             // so the `extends` byte scan comes first — and only on the comment-bearing
             // path: a comment-free parameter takes the scan-free head, which is why the
@@ -341,7 +341,7 @@ impl<'a> Printer<'a> {
             prev_end = constraint.span().end;
         }
 
-        if let Some(default) = &param.default {
+        if let Some(default) = self.view.opt_ty(param.default) {
             // The `=` mirror of the constraint above, same head and same scan gate:
             // `<T = (// c⏎ U)>` (and the double-nested form) strips to the same hang as
             // bare `<T = // c⏎ U>`. A mixed / trailing shell hoists losslessly too — the
@@ -553,7 +553,7 @@ impl<'a> Printer<'a> {
         // bare — for the `infer` case not a layout difference but output the canonical
         // parser REJECTS (the `?` rebinds).
         let conditional_constraint = matches!(
-            unwrap_parenthesized(head.value_type),
+            unwrap_parenthesized(self.view, head.value_type),
             TSType::Conditional(_)
         ) && slot == TypeParamSlot::Constraint
             && !self.paren_retains_for_trailing_run(head.child);
@@ -565,7 +565,7 @@ impl<'a> Printer<'a> {
             // the same partition `build_hang_value_doc` performs for every other arm.
             // Building the pair by hand without that lift DROPPED the trailing comment
             // ([`comments.md`](../../../../docs/comments.md) hazard 1).
-            let inner = unwrap_parenthesized(head.value_type);
+            let inner = unwrap_parenthesized(self.view, head.value_type);
             // The re-emitted pair is a THIRD emitter for a leading-edge shell's run
             // (`K extends (⏎// c⏎L) extends M ? N : O`): the run belongs to the `extends`
             // gap, which the emitter below owns, so the shell declines its copy for the
@@ -773,7 +773,7 @@ impl<'a> Printer<'a> {
         // multiline path above, so only inline block comments remain — the shared
         // `build_single_type_arg_inline` preserves them.
         if inst.params.len() == 1
-            && is_simple_type_arg(inst.params[0])
+            && is_simple_type_arg(self.view, self.view.ty(self.view.ty_list(inst.params)[0]))
             && !self.single_type_arg_run_breaks_after(inst, has_comments)
         {
             return self.build_single_type_arg_inline(inst, has_comments);
@@ -819,7 +819,10 @@ impl<'a> Printer<'a> {
         has_comments: bool,
     ) -> bool {
         args.params.len() == 1
-            && self.type_arg_is_nullable_reference_union(args.span.start + 1, args.params[0])
+            && self.type_arg_is_nullable_reference_union(
+                args.span.start + 1,
+                self.view.ty(self.view.ty_list(args.params)[0]),
+            )
             && !self.single_type_arg_run_breaks_after(args, has_comments)
     }
 
@@ -927,7 +930,7 @@ impl<'a> Printer<'a> {
                     continue;
                 }
                 Kind::ArrowFunctionExpression(arrow) => match arrow.return_type.as_ref() {
-                    Some(return_type) => match return_type.type_annotation {
+                    Some(return_type) => match view.ty(return_type.type_annotation) {
                         TSType::TypeReference(reference) => reference.type_arguments.as_ref(),
                         _ => None,
                     },
@@ -1160,10 +1163,14 @@ impl<'a> Printer<'a> {
         &self,
         inst: &ast::TSTypeParameterInstantiation<'t>,
         has_comments: bool,
-    ) -> Option<SoleTypeArgHug<'t>> {
-        let [ty] = inst.params else {
+    ) -> Option<SoleTypeArgHug<'t>>
+    where
+        'a: 't,
+    {
+        let &[ty] = self.view.ty_list(inst.params) else {
             return None;
         };
+        let ty = self.view.ty(ty);
         if self.single_type_arg_run_breaks_after(inst, has_comments) {
             return None;
         }
@@ -1211,11 +1218,13 @@ impl<'a> Printer<'a> {
             SoleTypeArgHug::TypeLiteral(_) => None,
             SoleTypeArgHug::Mapped(mapped) => Some(AssumedBreak::MappedType(mapped.span.start)),
             SoleTypeArgHug::Union(TSType::Union(union)) => {
-                union.types.iter().find_map(|member| match member {
-                    TSType::TypeLiteral(literal) if !literal.members.is_empty() => {
-                        Some(AssumedBreak::TypeLiteral(literal.span.start))
+                self.view.ty_list(union.types).iter().find_map(|&member| {
+                    match self.view.ty(member) {
+                        TSType::TypeLiteral(literal) if !literal.members.is_empty() => {
+                            Some(AssumedBreak::TypeLiteral(literal.span.start))
+                        }
+                        _ => None,
                     }
-                    _ => None,
                 })
             }
             SoleTypeArgHug::Union(_) => None,

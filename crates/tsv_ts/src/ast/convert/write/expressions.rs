@@ -445,7 +445,7 @@ fn write_expression_full_dispatch(
         ast::ExpressionKind::TSTypeAssertion(type_assert) => {
             node_header(w, "TSTypeAssertion", expr.span, ctx);
             w.raw(",\"typeAnnotation\":");
-            write_type(w, type_assert.type_annotation, ctx);
+            write_type(w, ctx.view.ty(type_assert.type_annotation), ctx);
             w.raw(",\"expression\":");
             write_expression(w, ctx.view.expr(type_assert.expression), ctx);
             close_node(w, "TSTypeAssertion", expr.span, ctx);
@@ -455,7 +455,7 @@ fn write_expression_full_dispatch(
             w.raw(",\"expression\":");
             write_expression(w, ctx.view.expr(as_expr.expression), ctx);
             w.raw(",\"typeAnnotation\":");
-            write_type(w, as_expr.type_annotation, ctx);
+            write_type(w, ctx.view.ty(as_expr.type_annotation), ctx);
             close_node(w, "TSAsExpression", expr.span, ctx);
         }
         ast::ExpressionKind::TSSatisfiesExpression(sat_expr) => {
@@ -463,7 +463,7 @@ fn write_expression_full_dispatch(
             w.raw(",\"expression\":");
             write_expression(w, ctx.view.expr(sat_expr.expression), ctx);
             w.raw(",\"typeAnnotation\":");
-            write_type(w, sat_expr.type_annotation, ctx);
+            write_type(w, ctx.view.ty(sat_expr.type_annotation), ctx);
             close_node(w, "TSSatisfiesExpression", expr.span, ctx);
         }
         ast::ExpressionKind::TSInstantiationExpression(inst_expr) => {

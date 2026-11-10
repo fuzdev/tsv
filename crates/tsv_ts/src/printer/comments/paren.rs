@@ -721,12 +721,14 @@ impl<'a> Printer<'a> {
     {
         use ast::ExpressionKind;
         let (operand, boundary) = match &expr.kind {
-            ExpressionKind::TSAsExpression(cast) => {
-                (cast.expression, cast.type_annotation.span().start)
-            }
-            ExpressionKind::TSSatisfiesExpression(cast) => {
-                (cast.expression, cast.type_annotation.span().start)
-            }
+            ExpressionKind::TSAsExpression(cast) => (
+                cast.expression,
+                self.view.ty(cast.type_annotation).span().start,
+            ),
+            ExpressionKind::TSSatisfiesExpression(cast) => (
+                cast.expression,
+                self.view.ty(cast.type_annotation).span().start,
+            ),
             ExpressionKind::UpdateExpression(update) if !update.prefix => {
                 (update.argument, expr.span().end)
             }

@@ -8,8 +8,8 @@ use tsv_lang::{Comment, Span};
 
 use super::{
     ArrayPattern, AssignmentPattern, BlockStatement, ClassExpression, Expr, ExprId, Identifier,
-    Literal, ObjectPattern, PrivateIdentifier, RestElement, Run, TSParameterProperty, TSType,
-    TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
+    Literal, ObjectPattern, PrivateIdentifier, RestElement, Run, TSParameterProperty,
+    TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation, TyEdge,
 };
 
 /// Expression node: the span every variant shares, beside the variant itself.
@@ -1194,7 +1194,7 @@ pub struct Super;
 #[derive(Debug, Clone)]
 pub struct TSTypeAssertion<'arena> {
     /// The target type
-    pub type_annotation: &'arena TSType<'arena>,
+    pub type_annotation: TyEdge<'arena>,
     /// The expression being type-asserted
     pub expression: ExprId,
 }
@@ -1210,7 +1210,7 @@ pub struct TSAsExpression<'arena> {
     /// The expression being type-asserted
     pub expression: ExprId,
     /// The target type
-    pub type_annotation: &'arena TSType<'arena>,
+    pub type_annotation: TyEdge<'arena>,
 }
 
 /// TypeScript `satisfies` expression: `expr satisfies Type`
@@ -1225,7 +1225,7 @@ pub struct TSSatisfiesExpression<'arena> {
     /// The expression being checked
     pub expression: ExprId,
     /// The type to satisfy
-    pub type_annotation: &'arena TSType<'arena>,
+    pub type_annotation: TyEdge<'arena>,
 }
 
 /// TypeScript instantiation expression: `f<T>`, `SomeClass<number>`

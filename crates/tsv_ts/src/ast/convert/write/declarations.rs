@@ -66,7 +66,7 @@ pub(super) fn write_type_alias_declaration(
     write_identifier_plain(w, &type_alias.id, ctx);
     write_type_parameters_field(w, type_alias.type_parameters.as_ref(), ctx);
     w.raw(",\"typeAnnotation\":");
-    write_type(w, type_alias.type_annotation, ctx);
+    write_type(w, ctx.view.ty(type_alias.type_annotation), ctx);
     if type_alias.declare {
         w.raw(",\"declare\":true");
     }
@@ -555,11 +555,11 @@ pub(super) fn write_type_parameter(
         w.raw("\":true");
     }
     write_name_field(w, param.name.ident_name(), param.name.span.start, ctx);
-    if let Some(c) = &param.constraint {
+    if let Some(c) = ctx.view.opt_ty(param.constraint) {
         w.raw(",\"constraint\":");
         write_type(w, c, ctx);
     }
-    if let Some(d) = &param.default {
+    if let Some(d) = ctx.view.opt_ty(param.default) {
         w.raw(",\"default\":");
         write_type(w, d, ctx);
     }

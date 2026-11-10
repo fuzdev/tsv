@@ -10,6 +10,7 @@ use super::helpers::{
     is_huggable_type, type_args_should_wrap_for_return_type, unwrap_parenthesized,
 };
 use super::{BlankRule, CommentSpacing, Printer, UnionValueDoc};
+use crate::ast::AstView;
 use crate::ast::{self, TSConstructorType, TSFunctionType, TSType};
 use crate::printer::comments::LeadingGlue;
 use smallvec::smallvec;
@@ -29,6 +30,7 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 /// matching it means unwrapping. tsv KEEPS the paren node (it decides the output parens),
 /// so a raw read would print `(a: ({ … }))` with its group where prettier strips both.
 fn get_type_literal_from_identifier<'a>(
+    view: AstView<'a>,
     expr: &'a ast::Expression<'a>,
 ) -> Option<(
     &'a ast::Identifier<'a>,
@@ -36,13 +38,12 @@ fn get_type_literal_from_identifier<'a>(
     &'a ast::TSTypeLiteral<'a>,
 )> {
     match &expr.kind {
-        ast::ExpressionKind::Identifier(id) => {
-            id.type_annotation()
-                .and_then(|ann| match unwrap_parenthesized(ann.type_annotation) {
-                    TSType::TypeLiteral(t) => Some((id, ann, t)),
-                    _ => None,
-                })
-        }
+        ast::ExpressionKind::Identifier(id) => id.type_annotation().and_then(|ann| {
+            match unwrap_parenthesized(view, view.ty(ann.type_annotation)) {
+                TSType::TypeLiteral(t) => Some((id, ann, t)),
+                _ => None,
+            }
+        }),
         _ => None,
     }
 }
@@ -70,11 +71,12 @@ pub(in crate::printer) fn type_params_allow_grouping(
 /// Returns true when the return type is an object type (TypeLiteral/Mapped)
 /// or the return type doc will break across lines.
 pub(in crate::printer) fn return_type_triggers_grouping(
+    view: AstView<'_>,
     return_type: &ast::TSTypeAnnotation<'_>,
     return_type_doc: DocId,
     d: &DocArena,
 ) -> bool {
-    is_huggable_type(return_type.type_annotation) || d.will_break(return_type_doc)
+    is_huggable_type(view, view.ty(return_type.type_annotation)) || d.will_break(return_type_doc)
 }
 
 /// Prettier's `shouldGroupFunctionParameters`: wrap params in their own group
@@ -86,6 +88,7 @@ pub(in crate::printer) fn return_type_triggers_grouping(
 /// (function declarations, class methods), function/constructor TYPES, and the
 /// type-member / bodyless (`declare`, overload) signatures.
 pub(in crate::printer) fn should_group_function_parameters(
+    view: AstView<'_>,
     params: &[ast::Expression<'_>],
     type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
     return_type: Option<&ast::TSTypeAnnotation<'_>>,
@@ -101,7 +104,7 @@ pub(in crate::printer) fn should_group_function_parameters(
     if !type_params_allow_grouping(type_parameters) {
         return false;
     }
-    return_type.is_some_and(|rt| return_type_triggers_grouping(rt, rt_doc, d))
+    return_type.is_some_and(|rt| return_type_triggers_grouping(view, rt, rt_doc, d))
 }
 
 /// Wrap `params_doc` in its own group when `should_group_function_parameters` holds,
@@ -110,6 +113,7 @@ pub(in crate::printer) fn should_group_function_parameters(
 /// signatures, and function/constructor types) share this guard so a single param
 /// hugs (stays flat) while a will-break return type breaks.
 pub(in crate::printer) fn group_params_if_should(
+    view: AstView<'_>,
     params_doc: DocId,
     params: &[ast::Expression<'_>],
     type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
@@ -117,7 +121,14 @@ pub(in crate::printer) fn group_params_if_should(
     return_type_doc: Option<DocId>,
     d: &DocArena,
 ) -> DocId {
-    if should_group_function_parameters(params, type_parameters, return_type, return_type_doc, d) {
+    if should_group_function_parameters(
+        view,
+        params,
+        type_parameters,
+        return_type,
+        return_type_doc,
+        d,
+    ) {
         d.group(params_doc)
     } else {
         params_doc
@@ -142,7 +153,10 @@ impl<'a> Printer<'a> {
         annotation: &ast::TSTypeAnnotation<'_>,
         inner: tsv_lang::Span,
     ) -> bool {
-        !self.has_comments_to_emit_between(inner.end, annotation.type_annotation.span().end)
+        !self.has_comments_to_emit_between(
+            inner.end,
+            self.view.ty(annotation.type_annotation).span().end,
+        )
     }
 
     /// The hugged sole parameter's doc — WITHOUT its parens — for an identifier whose
@@ -175,7 +189,7 @@ impl<'a> Printer<'a> {
         window_has_comments: bool,
     ) -> Option<DocId> {
         let d = self.d();
-        let (id, type_ann, type_literal) = get_type_literal_from_identifier(param)?;
+        let (id, type_ann, type_literal) = get_type_literal_from_identifier(self.view, param)?;
         // A decorated parameter never reaches here — the shared gate declines the hug for
         // one outright — but this arm has no emitter for a decorator, so a caller that ever
         // did reach it would DROP one rather than lay it out differently. Asked through
@@ -217,8 +231,11 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn hugged_param_annotation_literal<'t>(
         &self,
         type_ann: &'t ast::TSTypeAnnotation<'t>,
-    ) -> Option<&'t ast::TSTypeLiteral<'t>> {
-        match unwrap_parenthesized(type_ann.type_annotation) {
+    ) -> Option<&'t ast::TSTypeLiteral<'t>>
+    where
+        'a: 't,
+    {
+        match unwrap_parenthesized(self.view, self.view.ty(type_ann.type_annotation)) {
             TSType::TypeLiteral(t) if self.paren_shell_trailing_gap_empty(type_ann, t.span) => {
                 Some(t)
             }
@@ -327,7 +344,7 @@ impl<'a> Printer<'a> {
         // are emitted by it (see `leading_paren_unwrapped`) — that is what makes
         // `() => // c⏎T` and `() => (// c⏎T)` reach the same fixed point instead of the
         // shell's own flush hang.
-        let return_ty = self.leading_paren_unwrapped(return_type.type_annotation);
+        let return_ty = self.leading_paren_unwrapped(self.view.ty(return_type.type_annotation));
         // The `=>`→return freeze verdict, read on the return type's OWN start — it
         // decides the widening below, so it can never be read from the widened window it
         // decides ([`Printer::leading_edge_claim_and_start`]).
@@ -479,7 +496,7 @@ impl<'a> Printer<'a> {
             TSType::TypeReference(r)
                 if r.type_arguments
                     .as_ref()
-                    .is_some_and(type_args_should_wrap_for_return_type) =>
+                    .is_some_and(|args| type_args_should_wrap_for_return_type(self.view, args)) =>
             {
                 // The type reference's own type arguments wrap internally when too wide.
                 let type_doc = self.build_type_doc(return_ty);
@@ -707,6 +724,7 @@ impl<'a> Printer<'a> {
 
         let params_doc = d.concat(&self.build_function_params_doc(params, paren_search_start));
         let params_doc = group_params_if_should(
+            self.view,
             params_doc,
             params,
             type_parameters,
@@ -879,6 +897,7 @@ impl<'a> Printer<'a> {
         // object/mapped type (or otherwise will-breaks) hugs — the params stay flat
         // and the return type breaks, instead of the params breaking.
         let params_doc = group_params_if_should(
+            self.view,
             params_doc,
             params,
             type_parameters,

@@ -1140,7 +1140,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                         .assertion_head(
                             node.span,
                             self.view.expr(assertion.expression),
-                            assertion.type_annotation,
+                            self.view.ty(assertion.type_annotation),
                             b"as",
                         )
                         .is_none();
@@ -1151,7 +1151,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                         .assertion_head(
                             node.span,
                             self.view.expr(assertion.expression),
-                            assertion.type_annotation,
+                            self.view.ty(assertion.type_annotation),
                             b"satisfies",
                         )
                         .is_none();
@@ -1213,7 +1213,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             ExpressionKind::TSAsExpression(assertion) => {
                 let blank_from = self.assertion_blank_start(
                     self.view.expr(assertion.expression),
-                    assertion.type_annotation,
+                    self.view.ty(assertion.type_annotation),
                     b"as",
                 );
                 self.assertion_tail(link.span, blank_from);
@@ -1221,7 +1221,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             ExpressionKind::TSSatisfiesExpression(assertion) => {
                 let blank_from = self.assertion_blank_start(
                     self.view.expr(assertion.expression),
-                    assertion.type_annotation,
+                    self.view.ty(assertion.type_annotation),
                     b"satisfies",
                 );
                 self.assertion_tail(link.span, blank_from);
@@ -1357,7 +1357,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.assertion(
                     e.span,
                     self.view.expr(assertion.expression),
-                    assertion.type_annotation,
+                    self.view.ty(assertion.type_annotation),
                     b"as",
                 );
             }
@@ -1365,7 +1365,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.assertion(
                     e.span,
                     self.view.expr(assertion.expression),
-                    assertion.type_annotation,
+                    self.view.ty(assertion.type_annotation),
                     b"satisfies",
                 );
             }
@@ -1536,12 +1536,14 @@ impl<'s, 'b> Walk<'s, 'b> {
         let mut base = operand;
         loop {
             let (inner, ty, keyword): (&Expression<'_>, &TSType<'_>, &[u8]) = match &base.kind {
-                ExpressionKind::TSAsExpression(a) => {
-                    (self.view.expr(a.expression), a.type_annotation, b"as")
-                }
+                ExpressionKind::TSAsExpression(a) => (
+                    self.view.expr(a.expression),
+                    self.view.ty(a.type_annotation),
+                    b"as",
+                ),
                 ExpressionKind::TSSatisfiesExpression(s) => (
                     self.view.expr(s.expression),
-                    s.type_annotation,
+                    self.view.ty(s.type_annotation),
                     b"satisfies",
                 ),
                 _ => break,

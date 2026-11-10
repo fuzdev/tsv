@@ -796,16 +796,18 @@ impl<'a> Printer<'a> {
         let ExpressionKind::Identifier(ident) = &self.view.expr(declarator.id).kind else {
             return None;
         };
-        let args = match self.unwrap_redundant_parens(ident.type_annotation()?.type_annotation) {
+        let args = match self
+            .unwrap_redundant_parens(self.view.ty(ident.type_annotation()?.type_annotation))
+        {
             ast::TSType::TypeReference(reference) => reference.type_arguments.as_ref(),
             ast::TSType::TypeQuery(query) => query.type_arguments.as_ref(),
             ast::TSType::Import(import) => import.type_arguments.as_ref(),
             _ => None,
         }?;
         let sole_object_type = matches!(
-            args.params,
-            [param] if matches!(
-                self.unwrap_redundant_parens(param),
+            self.view.ty_list(args.params),
+            &[param] if matches!(
+                self.unwrap_redundant_parens(self.view.ty(param)),
                 ast::TSType::TypeLiteral(_) | ast::TSType::Mapped(_)
             )
         );

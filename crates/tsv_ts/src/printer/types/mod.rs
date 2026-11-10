@@ -55,7 +55,7 @@ pub(super) use super::comments::BlankRule;
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
 use crate::ast::{
-    TSImportType, TSIndexedAccessType, TSIntersectionType, TSParenthesizedType, TSType,
+    TSImportType, TSIndexedAccessType, TSIntersectionType, TSParenthesizedType, TSType, TyEdge,
 };
 use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
 use crate::printer::ignore::{RoutedScope, is_freeze_target};
@@ -379,7 +379,10 @@ impl<'a> Printer<'a> {
                     ArrayTypeHead::Whole(doc) => break doc,
                     ArrayTypeHead::Element { suffix } => {
                         levels.push(PostfixLevel::Array(suffix));
-                        (arr.element_type, type_needs_parens_for_array_element)
+                        (
+                            self.view.ty(arr.element_type),
+                            type_needs_parens_for_array_element,
+                        )
                     }
                 },
                 TSType::IndexedAccess(i) => {
@@ -387,10 +390,15 @@ impl<'a> Printer<'a> {
                     // A comment-free parenthesized union OBJECT expands its parens when it
                     // breaks (`(⏎\t| A⏎\t| B⏎)[K]`); any other object keeps the existing
                     // layout. See the shared `build_expanded_parenthesized_union_opt`.
-                    if let Some(doc) = self.build_expanded_parenthesized_union_opt(i.object_type) {
+                    if let Some(doc) =
+                        self.build_expanded_parenthesized_union_opt(self.view.ty(i.object_type))
+                    {
                         break doc;
                     }
-                    (i.object_type, type_needs_parens_for_indexed_access_object)
+                    (
+                        self.view.ty(i.object_type),
+                        type_needs_parens_for_indexed_access_object,
+                    )
                 }
                 _ => break self.build_type_doc_probed(node),
             };
@@ -420,9 +428,9 @@ impl<'a> Printer<'a> {
         // A transparent one-member composite index is its member here, the `|`
         // dropped and its head gap folded into the `[`→index gap
         // ([`Self::transparent_value`]).
-        let index_type = self.transparent_value(i.index_type);
+        let index_type = self.transparent_value(self.view.ty(i.index_type));
         let index_type_start = index_type.span().start;
-        let bracket_area_start = i.object_type.span().end;
+        let bracket_area_start = self.view.ty(i.object_type).span().end;
         // The access `[`, located outside comments so a `[` glyph inside a
         // comment before it (`A /* [ */[K]`) isn't mistaken for the bracket.
         let bracket_open =
@@ -543,7 +551,7 @@ impl<'a> Printer<'a> {
         // measured from the UNION's end, since a paren shell the arm strips holds
         // its trailing gap inside `index_type`'s span, where a `]`-gap window
         // cannot see it (the shell's leading gap rides `prepend_rhs_comments`).
-        let index_inner = unwrap_parenthesized(index_type);
+        let index_inner = unwrap_parenthesized(self.view, index_type);
         let (index_doc, index_comments) = match (index_inner, bracket_open) {
             (TSType::Union(u), Some(bp))
                 if !self.union_seam_hugs(bp + 1, u)
@@ -691,7 +699,7 @@ impl<'a> Printer<'a> {
                     ));
                 }
                 parts.push(self.identifier_name_doc(&p.parameter_name));
-                if let Some(type_ann) = &p.type_annotation {
+                if let Some(type_ann) = self.view.opt_ty(p.type_annotation) {
                     // A transparent one-member composite is its member here, the `|`
                     // dropped and its head gap folded into the `is`→type gap
                     // ([`Self::transparent_value`]).
@@ -851,7 +859,8 @@ impl<'a> Printer<'a> {
                 // are told (see the ⚠️ further down). Asking it twice is how the emitter and
                 // the seam would come to disagree about one operand.
                 let operand_rule = type_operator_operand_rule(o.operator);
-                let operand_pair = prefix_operator_shell_pair(self, o.operator, o.type_annotation);
+                let operand_pair =
+                    prefix_operator_shell_pair(self, o.operator, self.view.ty(o.type_annotation));
                 let needs_parens = operand_pair == ShellPair::Kept;
                 // Comments between keyword and operand type
                 let keyword_end = o.span.start + o.operator.as_str().len() as u32;
@@ -864,12 +873,12 @@ impl<'a> Printer<'a> {
                 // told the same operand rule (`type_operator_operand_rule`) the layouts below
                 // apply, so a bare operand that needs them gets them re-synthesized and a
                 // source-parenthesized one freezes whole.
-                if self.single_child_frozen(keyword_end, o.type_annotation) {
+                if self.single_child_frozen(keyword_end, self.view.ty(o.type_annotation)) {
                     return self.build_keyword_hang_doc(
                         o.operator.as_str(),
                         keyword_end,
-                        o.type_annotation.span().start,
-                        self.build_frozen_head_doc(o.type_annotation, operand_rule),
+                        self.view.ty(o.type_annotation).span().start,
+                        self.build_frozen_head_doc(self.view.ty(o.type_annotation), operand_rule),
                     );
                 }
                 // A line comment, a multiline block, or a block run whose break is forced
@@ -907,15 +916,17 @@ impl<'a> Printer<'a> {
                 // hoisting made the glued and isolated spellings of one comment disagree
                 // across a pass. Asked of the UNWRAPPED operand, the shape the pair would
                 // be re-minted around; a `//` hoists either way.
-                let hang = self
-                    .keyword_value_stripped_paren_hang_with_pair(o.type_annotation, operand_pair);
+                let hang = self.keyword_value_stripped_paren_hang_with_pair(
+                    self.view.ty(o.type_annotation),
+                    operand_pair,
+                );
                 let (operand_hang_start, operand_hang_type) = (hang.value_start, hang.value_type);
                 // Type position: a trailing block lifted from the shell trails the
                 // operand inline.
                 let hang_value_doc = || {
                     self.with_stripped_shell_value(
                         hang.claimed_shell,
-                        o.type_annotation,
+                        self.view.ty(o.type_annotation),
                         operand_hang_type,
                         TrailingBlock::Inline,
                         || {
@@ -1073,7 +1084,7 @@ impl<'a> Printer<'a> {
                 // level shallower — two fixed points for one program
                 // (`tuple/rest_single_member_head_line_comment`).
                 let dots_end = r.span.start + "...".len() as u32;
-                let ty = self.transparent_value(r.type_annotation);
+                let ty = self.transparent_value(self.view.ty(r.type_annotation));
                 let type_start = ty.span().start;
                 // The `...`→type head, the type-side twin of a spread's `...`→argument gap
                 // ([`Self::build_spread_doc`]): an own-line directive freezes the element
@@ -1130,7 +1141,7 @@ impl<'a> Printer<'a> {
                 // upstream — so it takes the variant that keeps the run inside the parens
                 // rather than the shared entry point, which declines it.
                 let inner = self.build_optional_element_type_doc(
-                    o.type_annotation,
+                    self.view.ty(o.type_annotation),
                     type_needs_parens_for_optional_element,
                 );
                 let mut parts: DocBuf = smallvec![inner];
@@ -1143,13 +1154,17 @@ impl<'a> Printer<'a> {
                 // Only a *same-line block* comment can be here — the `?` is a
                 // `[no LineTerminator here]` position, so the emitter's line-comment
                 // branch is unreachable from this caller (`parse_tuple_element_inner`).
-                self.push_modifier_marker_doc(&mut parts, o.type_annotation.span().end, b'?');
+                self.push_modifier_marker_doc(
+                    &mut parts,
+                    self.view.ty(o.type_annotation).span().end,
+                    b'?',
+                );
                 d.concat(&parts)
             }
             TSType::NamedTupleMember(n) => {
                 let mut parts = smallvec![self.identifier_name_doc(&n.label)];
                 let label_end = n.label.span.end;
-                let type_start = n.element_type.span().start;
+                let type_start = self.view.ty(n.element_type).span().start;
                 // Comments between label and `?` (e.g., `[a /* c */?: T]`)
                 let after_modifier = if n.optional {
                     self.push_modifier_marker_doc(&mut parts, label_end, b'?')
@@ -1183,17 +1198,18 @@ impl<'a> Printer<'a> {
                 // the placement floor reads it as inert and the next pass loses the freeze.
                 let frozen_tail = after_colon.and_then(|after_colon| {
                     let (gap_end, value_doc) =
-                        if self.single_child_frozen(after_colon, n.element_type) {
+                        if self.single_child_frozen(after_colon, self.view.ty(n.element_type)) {
                             (
                                 type_start,
-                                self.build_frozen_single_child_doc(n.element_type),
+                                self.build_frozen_single_child_doc(self.view.ty(n.element_type)),
                             )
                         } else {
-                            let inner = self.paren_interior_routed_inner(n.element_type)?;
+                            let inner =
+                                self.paren_interior_routed_inner(self.view.ty(n.element_type))?;
                             (
                                 inner.span().start,
                                 self.build_routed_inner_doc(
-                                    n.element_type,
+                                    self.view.ty(n.element_type),
                                     inner,
                                     RoutedScope::Transparent,
                                 ),
@@ -1212,7 +1228,7 @@ impl<'a> Printer<'a> {
                     );
                     // A long union/intersection element hangs after `:` (redundant parens
                     // stripped first); everything else stays inline after `: `.
-                    match self.unwrap_redundant_parens(n.element_type) {
+                    match self.unwrap_redundant_parens(self.view.ty(n.element_type)) {
                         TSType::Union(u) => {
                             let type_doc = self.build_union_type_doc(u);
                             d.concat(&[
@@ -1228,7 +1244,7 @@ impl<'a> Printer<'a> {
                         _ => d.concat(&[
                             d.text(": "),
                             comments_doc,
-                            self.build_type_doc(n.element_type),
+                            self.build_type_doc(self.view.ty(n.element_type)),
                         ]),
                     }
                 });
@@ -1355,7 +1371,7 @@ impl<'a> Printer<'a> {
         };
         // Both halves come from [`paren_shell_gaps`] — the one spelling of this window, so
         // this collector cannot drift from the predicates that gate the same strip.
-        let (leading, trailing) = paren_shell_gaps(shell);
+        let (leading, trailing) = paren_shell_gaps(self.view, shell);
         let lead: CommentVec<'_> = self
             .comments_to_emit_between(leading.start, leading.end)
             .collect();
@@ -1423,7 +1439,7 @@ impl<'a> Printer<'a> {
     ) -> bool {
         tsv_lang::fanout_probe::predicate();
         outermost_paren(ty).is_some_and(|shell| {
-            let (leading, _) = paren_shell_gaps(shell);
+            let (leading, _) = paren_shell_gaps(self.view, shell);
             match run {
                 EdgeRun::Breaking => {
                     self.has_line_comments_between(leading.start, leading.end)
@@ -1486,7 +1502,10 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn keyword_value_stripped_paren_hang<'t>(
         &self,
         value: &'t TSType<'t>,
-    ) -> StrippedParenHang<'t> {
+    ) -> StrippedParenHang<'t>
+    where
+        'a: 't,
+    {
         self.keyword_value_stripped_paren_hang_with_pair(value, ShellPair::Stripped)
     }
 
@@ -1496,7 +1515,10 @@ impl<'a> Printer<'a> {
         &self,
         value: &'t TSType<'t>,
         pair: ShellPair,
-    ) -> StrippedParenHang<'t> {
+    ) -> StrippedParenHang<'t>
+    where
+        'a: 't,
+    {
         // A transparent one-member composite IS its member at this seam: the operator is
         // dropped, so its head gap (`: |⏎/* c */⏎{…}`) is the keyword→value gap the caller
         // emits, and the member is what it lays out and builds. Substituted here, ahead of
@@ -1524,14 +1546,14 @@ impl<'a> Printer<'a> {
         if !retains_for_trailing_run
             && let Some(inner) = self
                 .paren_interior_routed_inner(value)
-                .filter(|inner| is_freeze_target(inner))
+                .filter(|inner| is_freeze_target(self.view, inner))
         {
             return StrippedParenHang::for_value(inner, true);
         }
         if !retains_for_trailing_run
             && self.stripped_paren_hang_has_breaking_leading_run_with_pair(value, pair)
         {
-            let inner = unwrap_parenthesized(value);
+            let inner = unwrap_parenthesized(self.view, value);
             // The shell is substituted away, but a **transparent** composite inside it
             // still prints as its member, so its dropped operator's gap is this seam's
             // too: the window reaches the member and the composite's own head-gap emitter
@@ -1780,38 +1802,43 @@ impl<'a> Printer<'a> {
     /// type, an optional element's type) — the head to descend into, so the memoized entry
     /// point ([`Self::head_stripped_paren_shell`]) iterates a chain of them (`A[][]…`,
     /// `A['k']['k']…`) rather than spending a frame per link.
-    fn head_stripped_paren_shell_step<'t>(&self, ty: &'t TSType<'t>, run: EdgeRun) -> HeadStep<'t> {
+    fn head_stripped_paren_shell_step<'t>(&self, ty: &'t TSType<'t>, run: EdgeRun) -> HeadStep<'t>
+    where
+        'a: 't,
+    {
         tsv_lang::fanout_probe::predicate();
         let found = match ty {
             // The ONE link whose own arm owns a routed shell's run (see the ⚠️ above):
             // `array_type_head` keeps the pair and emits the interior run inside it.
             TSType::Array(a) => {
                 return self.leading_edge_shell_step(
-                    a.element_type,
+                    self.view.ty(a.element_type),
                     self.required_paren_pair_opens_for_leading_run(
-                        a.element_type,
+                        self.view.ty(a.element_type),
                         type_needs_parens_for_array_element,
-                    ) || self.paren_interior_routed_inner(a.element_type).is_some(),
+                    ) || self
+                        .paren_interior_routed_inner(self.view.ty(a.element_type))
+                        .is_some(),
                     run,
                 );
             }
             TSType::IndexedAccess(i) => {
                 return self.required_pair_head_shell_step(
-                    i.object_type,
+                    self.view.ty(i.object_type),
                     type_needs_parens_for_indexed_access_object,
                     run,
                 );
             }
             TSType::Conditional(c) => {
                 return self.required_pair_head_shell_step(
-                    c.check_type,
+                    self.view.ty(c.check_type),
                     type_needs_parens_for_conditional_check,
                     run,
                 );
             }
             TSType::Optional(o) => {
                 return self.required_pair_head_shell_step(
-                    o.type_annotation,
+                    self.view.ty(o.type_annotation),
                     type_needs_parens_for_optional_element,
                     run,
                 );
@@ -1826,12 +1853,15 @@ impl<'a> Printer<'a> {
                 // only place that can ask. Every other freeze is the enclosing gap's and
                 // arrives as `frozen` at [`Self::leading_edge_claim_and_start`].
                 if self
-                    .composite_leading_run_freeze(i.span.start, i.types)
+                    .composite_leading_run_freeze(i.span.start, self.view.ty_list(i.types))
                     .is_some()
                 {
                     return HeadStep::Answer(None);
                 }
-                let Some(first) = i.types.first() else {
+                let Some(first) = self
+                    .view
+                    .opt_ty(self.view.ty_list(i.types).first().copied())
+                else {
                     return HeadStep::Answer(None);
                 };
                 // ⚠️ A **leading-operator** MULTI-member intersection (`& /* c */ (⏎// d⏎A) & B`,
@@ -1878,15 +1908,17 @@ impl<'a> Printer<'a> {
             // gap's own indent. A MULTI-member union is NOT a link — see the ⚠️ above; the
             // union's own member loop claims its first member's shell instead. A FROZEN
             // head declines exactly as the intersection link does (`sole_member_peels`).
-            TSType::Union(u) if self.sole_member_peels(u.span.start, u.types) => {
-                let Some(first) = u.types.first() else {
+            TSType::Union(u)
+                if self.sole_member_peels(u.span.start, self.view.ty_list(u.types)) =>
+            {
+                let Some(&first) = self.view.ty_list(u.types).first() else {
                     return HeadStep::Answer(None);
                 };
                 // The collapse builds the member with `union_member_parens(1)`, which
                 // requires no pair of its own, so nothing downstream of this gap emits the
                 // run.
-                self.leading_edge_shell(first, false, run)
-                    .or_else(|| self.composite_head_gap_region(u.span.start, first))
+                self.leading_edge_shell(self.view.ty(first), false, run)
+                    .or_else(|| self.composite_head_gap_region(u.span.start, self.view.ty(first)))
                     .map(|head| head.opened_at(u.span.start))
             }
             // The region opens at the peeled layer's own `(`: a reader below asks
@@ -1895,7 +1927,7 @@ impl<'a> Printer<'a> {
             // here is what lets `(| /* c */ a) & b`'s intersection see the `=` seam's
             // claim over the composite's head, instead of hoisting the run a second time.
             TSType::Parenthesized(p) if self.head_layer_peels(p) => self
-                .head_stripped_paren_shell(p.type_annotation, run)
+                .head_stripped_paren_shell(self.view.ty(p.type_annotation), run)
                 .map(|head| head.opened_at(p.span.start)),
             // The one shape where the region covers the shell of the node ASKED ABOUT
             // rather than one inside it: a layer the peel above declines because it holds
@@ -1960,7 +1992,7 @@ impl<'a> Printer<'a> {
     /// parenthesized one stops the walk, since that layer prints its own `(` ahead of
     /// everything inside it ([`HeadRegion::region_end`]).
     fn shell_printed_head_start(&self, shell: &TSType<'_>) -> u32 {
-        let mut cur = unwrap_parenthesized(shell);
+        let mut cur = unwrap_parenthesized(self.view, shell);
         let mut start = cur.span().start;
         while let Some(sole) = self.transparent_sole_member(cur) {
             if self
@@ -2002,7 +2034,7 @@ impl<'a> Printer<'a> {
     /// question two ways.
     fn shell_head_past_operator(&self, shell: &TSType<'_>) -> Option<u32> {
         let head = self.shell_printed_head_start(shell);
-        (head > unwrap_parenthesized(shell).span().start).then_some(head)
+        (head > unwrap_parenthesized(self.view, shell).span().start).then_some(head)
     }
 
     /// A shell whose own leading run is the claim: the region runs from the shell's `(` to
@@ -2141,10 +2173,13 @@ impl<'a> Printer<'a> {
     fn intersection_member_run_owned_downstream(&self, i: &TSIntersectionType<'_>) -> bool {
         // Both facts derive from the one node, so the member and the member-parens rule
         // asked about it cannot come from different intersections.
-        let Some(first) = i.types.first() else {
+        let Some(first) = self
+            .view
+            .opt_ty(self.view.ty_list(i.types).first().copied())
+        else {
             return false;
         };
-        if matches!(unwrap_parenthesized(first), TSType::Union(_)) {
+        if matches!(unwrap_parenthesized(self.view, first), TSType::Union(_)) {
             return self
                 .paren_union_line_comment_member(first, union_member_parens(i.types.len()))
                 .is_some();
@@ -2198,15 +2233,15 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn composite_head_region_claimed(
         &self,
         span_start: u32,
-        types: &[&TSType<'_>],
+        types: &[TyEdge<'_>],
     ) -> bool {
         // Keyed on the member's OWN start: a claim over only the composite's head gap
         // ends there ([`HeadRegion::region_end`]), and a claim that also covers the
         // member's shell contains it a fortiori.
         types.len() == 1
-            && types
-                .first()
-                .is_some_and(|first| self.shell_leading_run_claimed(span_start, first.span().start))
+            && types.first().is_some_and(|&first| {
+                self.shell_leading_run_claimed(span_start, self.view.ty(first).span().start)
+            })
     }
 
     /// Whether the leading gap of the shell at `paren_open` wrapping a type at
@@ -2420,7 +2455,10 @@ impl<'a> Printer<'a> {
         &self,
         gap_start: u32,
         child: &'t TSType<'t>,
-    ) -> KeywordValueHead<'t> {
+    ) -> KeywordValueHead<'t>
+    where
+        'a: 't,
+    {
         let frozen = self.single_child_frozen(gap_start, child);
         let hang = if frozen {
             StrippedParenHang::for_value(child, false)
@@ -2646,7 +2684,7 @@ impl<'a> Printer<'a> {
         &self,
         p: &TSParenthesizedType<'_>,
     ) -> (bool, bool) {
-        let inner = p.type_annotation.span();
+        let inner = self.view.ty(p.type_annotation).span();
         (
             self.has_comments_to_emit_between(p.span.start, inner.start),
             !self.type_trailing_gap_claimed(inner.end, p.span.end)
@@ -2825,7 +2863,7 @@ impl<'a> Printer<'a> {
         if self.stripped_paren_hang_has_breaking_leading_run(ty)
             && let Some(shell) = outermost_paren(ty)
         {
-            let (leading, trailing) = paren_shell_gaps(shell);
+            let (leading, trailing) = paren_shell_gaps(self.view, shell);
             // The same "no enclosing gap" licence the EDGE arm below takes, and for the
             // same reason: an intersection's first-member HOIST claims exactly this
             // window (it emits the run above the whole intersection and hands the member
@@ -2874,7 +2912,7 @@ impl<'a> Printer<'a> {
             RequiredParenRun::Shell { leading, trailing } => self.build_open_paren_shell_doc(
                 leading.start,
                 leading.end,
-                self.build_type_doc(unwrap_parenthesized(ty)),
+                self.build_type_doc(unwrap_parenthesized(self.view, ty)),
                 trailing.start,
                 trailing.end,
             ),
@@ -2961,7 +2999,7 @@ impl<'a> Printer<'a> {
         // sitting one layer in) called `((⏎// c⏎A // t⏎))` stripped while the inner pair
         // retained and printed the leading run itself, beside the enclosing gap's copy —
         // a DOUBLE-PRINT.
-        let (_, trailing) = paren_shell_gaps(p);
+        let (_, trailing) = paren_shell_gaps(self.view, p);
         if self.type_trailing_gap_claimed(trailing.start, p.span.end) {
             return false;
         }
@@ -3156,10 +3194,13 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn unwrap_redundant_parens<'t>(
         &self,
         ty: &'t TSType<'t>,
-    ) -> &'t TSType<'t> {
+    ) -> &'t TSType<'t>
+    where
+        'a: 't,
+    {
         match ty {
             TSType::Parenthesized(p) if self.paren_inner_comment_flags(p) == (false, false) => {
-                self.unwrap_redundant_parens(p.type_annotation)
+                self.unwrap_redundant_parens(self.view.ty(p.type_annotation))
             }
             other => match self.transparent_sole_member(other) {
                 Some(member) => self.unwrap_redundant_parens(member),
@@ -3173,14 +3214,17 @@ impl<'a> Printer<'a> {
     /// builds where the source spelled `| A`. Parens are NOT peeled: a shell is its own
     /// emitter ([`Self::unwrap_redundant_parens`] is the layout-decision peel that also
     /// crosses comment-free shells).
-    pub(in crate::printer) fn transparent_value<'t>(&self, ty: &'t TSType<'t>) -> &'t TSType<'t> {
+    pub(in crate::printer) fn transparent_value<'t>(&self, ty: &'t TSType<'t>) -> &'t TSType<'t>
+    where
+        'a: 't,
+    {
         let mut ty = ty;
         loop {
             if let Some(member) = self.transparent_sole_member(ty) {
                 ty = member;
             } else if let TSType::Parenthesized(p) = ty
                 && self.paren_inner_comment_flags(p) == (false, false)
-                && self.shell_wraps_transparent_composite(p.type_annotation)
+                && self.shell_wraps_transparent_composite(self.view.ty(p.type_annotation))
             {
                 // A comment-free shell around a transparent composite (`: (|⏎/* c */⏎A)`)
                 // is redundant around the member it prints as, and left on it hid the
@@ -3188,7 +3232,7 @@ impl<'a> Printer<'a> {
                 // while the shell's doc printed the run by the composite's rules — the
                 // very two-pass break the peel above closes. The shell's own gaps hold
                 // nothing, so nothing is lost with it.
-                ty = p.type_annotation;
+                ty = self.view.ty(p.type_annotation);
             } else {
                 return ty;
             }
@@ -3201,7 +3245,7 @@ impl<'a> Printer<'a> {
         match ty {
             TSType::Parenthesized(p) => {
                 self.paren_inner_comment_flags(p) == (false, false)
-                    && self.shell_wraps_transparent_composite(p.type_annotation)
+                    && self.shell_wraps_transparent_composite(self.view.ty(p.type_annotation))
             }
             other => self.transparent_sole_member(other).is_some(),
         }
@@ -3212,11 +3256,20 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn transparent_sole_member<'t>(
         &self,
         ty: &'t TSType<'t>,
-    ) -> Option<&'t TSType<'t>> {
+    ) -> Option<&'t TSType<'t>>
+    where
+        'a: 't,
+    {
         match ty {
-            TSType::Union(u) if self.sole_member_peels(u.span.start, u.types) => Some(u.types[0]),
-            TSType::Intersection(i) if self.sole_member_peels(i.span.start, i.types) => {
-                Some(i.types[0])
+            TSType::Union(u)
+                if self.sole_member_peels(u.span.start, self.view.ty_list(u.types)) =>
+            {
+                Some(self.view.ty(self.view.ty_list(u.types)[0]))
+            }
+            TSType::Intersection(i)
+                if self.sole_member_peels(i.span.start, self.view.ty_list(i.types)) =>
+            {
+                Some(self.view.ty(self.view.ty_list(i.types)[0]))
             }
             _ => None,
         }
@@ -3226,7 +3279,7 @@ impl<'a> Printer<'a> {
     /// and no format-ignore directive in the composite's head gap freezes it — a frozen
     /// sole member is the composite's own verbatim slice, `|` included
     /// (`union_prettier_ignore_single_member`), so the seam must keep seeing the composite.
-    fn sole_member_peels(&self, head: u32, types: &[&TSType<'_>]) -> bool {
+    fn sole_member_peels(&self, head: u32, types: &[TyEdge<'_>]) -> bool {
         types.len() == 1 && self.composite_leading_run_freeze(head, types).is_none()
     }
 
@@ -3254,10 +3307,15 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn leading_paren_unwrapped<'t>(
         &self,
         ty: &'t TSType<'t>,
-    ) -> &'t TSType<'t> {
+    ) -> &'t TSType<'t>
+    where
+        'a: 't,
+    {
         match ty {
             TSType::Parenthesized(p) if self.paren_inner_comment_flags(p).1 => ty,
-            TSType::Parenthesized(p) => self.leading_paren_unwrapped(p.type_annotation),
+            TSType::Parenthesized(p) => {
+                self.leading_paren_unwrapped(self.view.ty(p.type_annotation))
+            }
             other => other,
         }
     }
@@ -3272,8 +3330,8 @@ impl<'a> Printer<'a> {
     fn build_parenthesized_type_unwrap_doc(&self, p: &TSParenthesizedType<'_>) -> DocId {
         let d = self.d();
         let paren_open = p.span.start;
-        let inner_start = p.type_annotation.span().start;
-        let inner_end = p.type_annotation.span().end;
+        let inner_start = self.view.ty(p.type_annotation).span().start;
+        let inner_end = self.view.ty(p.type_annotation).span().end;
         let paren_close = p.span.end;
         let (mut has_leading, has_trailing) = self.paren_inner_comment_flags(p);
         // The enclosing keyword→value gap already claims this shell's leading run: the
@@ -3302,7 +3360,7 @@ impl<'a> Printer<'a> {
         if !has_leading && !has_trailing {
             return match routed_under_claim {
                 Some(inner) => self.build_frozen_single_child_doc(inner),
-                None => self.build_type_doc(p.type_annotation),
+                None => self.build_type_doc(self.view.ty(p.type_annotation)),
             };
         }
 
@@ -3343,12 +3401,12 @@ impl<'a> Printer<'a> {
             // this pair prints its `(` ahead of everything inside it — so this is the
             // innermost gap that can own the run, and the only one.
             let (edge_claim, run_start) =
-                self.leading_edge_claim_and_start(false, p.type_annotation);
+                self.leading_edge_claim_and_start(false, self.view.ty(p.type_annotation));
             return self.build_open_paren_shell_doc(
                 paren_open,
                 run_start,
                 self.with_claimed_shell_leading_run(edge_claim, || {
-                    self.build_type_doc(p.type_annotation)
+                    self.build_type_doc(self.view.ty(p.type_annotation))
                 }),
                 inner_end,
                 paren_close,
@@ -3372,7 +3430,7 @@ impl<'a> Printer<'a> {
         // Asked of the effective inner ([`Self::unwrap_redundant_parens`]): a comment-free
         // layer between this shell and the union (`(/*1*/ (| A // c⏎| B))`) strips too,
         // and the run is glued across it all the same.
-        let effective_inner = self.unwrap_redundant_parens(p.type_annotation);
+        let effective_inner = self.unwrap_redundant_parens(self.view.ty(p.type_annotation));
         let handoff = if has_leading {
             self.union_seam_run_handoff(paren_open + 1, effective_inner)
         } else {
@@ -3398,7 +3456,7 @@ impl<'a> Printer<'a> {
         // themselves ([`StrippedParenHang::routed`]).
         parts.push(match (handoff, effective_inner) {
             (Some(_), TSType::Union(u)) => self.build_union_value_doc(paren_open + 1, u).doc,
-            _ => self.build_type_doc(p.type_annotation),
+            _ => self.build_type_doc(self.view.ty(p.type_annotation)),
         });
 
         // Trailing comments: between inner type and `)`. A block stays inline; a line

@@ -2,6 +2,7 @@
 // plus shared entity-name helpers
 
 use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
+use crate::ast::AstView;
 use crate::ast::{self, TSType};
 use crate::printer::statements::function::FunctionHeadModifier;
 use crate::printer::types::helpers::{
@@ -33,8 +34,8 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 /// function type / reference directly. Matching the shell node instead answered "not
 /// generic" for `(<T>() => …)`, which flipped the alias from break-after-`=` to `fluid` on
 /// the authored form alone — the stripped output then took the other layout (F1).
-fn is_generic_type(ts_type: &TSType<'_>) -> bool {
-    match unwrap_parenthesized(ts_type) {
+fn is_generic_type(view: AstView<'_>, ts_type: &TSType<'_>) -> bool {
+    match unwrap_parenthesized(view, ts_type) {
         TSType::Function(f) => f.type_parameters.is_some(),
         TSType::TypeReference(r) => r.type_arguments.is_some(),
         _ => false,
@@ -44,8 +45,12 @@ fn is_generic_type(ts_type: &TSType<'_>) -> bool {
 /// Check if we should break before the conditional type in a type alias.
 /// Returns true if either checkType or extendsType has type parameters.
 /// This matches prettier's `shouldBreakBeforeConditionalType` in assignment.js.
-fn should_break_before_conditional_type(conditional: &ast::TSConditionalType<'_>) -> bool {
-    is_generic_type(conditional.check_type) || is_generic_type(conditional.extends_type)
+fn should_break_before_conditional_type(
+    view: AstView<'_>,
+    conditional: &ast::TSConditionalType<'_>,
+) -> bool {
+    is_generic_type(view, view.ty(conditional.check_type))
+        || is_generic_type(view, view.ty(conditional.extends_type))
 }
 
 /// Returns true if the type has its own internal breaking mechanism
@@ -98,8 +103,9 @@ fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType<'_>) -> bo
         // authored, so answering from the bare source would hang a sign-gap `//`
         // (`-// c⏎1[]`) after `=` on the first pass and hug it on the second.
         TSType::Array(a) => {
-            matches!(a.element_type, TSType::Parenthesized(_))
-                || is_negative_literal(a.element_type)
+            let element = printer.view.ty(a.element_type);
+            matches!(element, TSType::Parenthesized(_))
+                || is_negative_literal(element)
                 || matches!(printer.array_suffix_layout(a), ArraySuffixLayout::Split { .. })
         }
         // An indexed access whose index→`]` gap holds a line comment breaks inside the
@@ -109,7 +115,7 @@ fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType<'_>) -> bo
         // input never breaks here, so this disjunct cannot move any input the old
         // enumeration covered.
         TSType::IndexedAccess(i) => {
-            printer.has_line_comments_between(i.index_type.span().end, i.span.end)
+            printer.has_line_comments_between(printer.view.ty(i.index_type).span().end, i.span.end)
         }
         _ => false,
     }
@@ -167,7 +173,7 @@ impl<'a> Printer<'a> {
             .type_parameters
             .as_ref()
             .map_or(decl.id.span.end, |tp| tp.span.end);
-        let type_start = decl.type_annotation.span().start;
+        let type_start = self.view.ty(decl.type_annotation).span().start;
         let eq_pos = self.find_equals_position(header_end, type_start);
 
         // Comments between name and type params: `type A/* c */ <T> = T`. The
@@ -223,7 +229,7 @@ impl<'a> Printer<'a> {
         // it pulls an own-line block up onto the value's line and eats the blank —
         // disagreeing with every other `;` in the language (docs/comments.md §Trailing
         // and dangling runs).
-        let value_end = decl.type_annotation.span().end;
+        let value_end = self.view.ty(decl.type_annotation).span().end;
         self.push_semicolon_with_gap_comments(&mut parts, value_end, span.end, false, clause_tail);
 
         d.concat(&parts)
@@ -277,13 +283,17 @@ impl<'a> Printer<'a> {
                 // The operand's own [`ShellPair`] travels with both reads: a shell whose
                 // pair this position re-mints is not stripped, so a gate that assumed it was
                 // would force a break for a hang that never fires.
-                let pair = prefix_operator_shell_pair(self, o.operator, o.type_annotation);
+                let pair =
+                    prefix_operator_shell_pair(self, o.operator, self.view.ty(o.type_annotation));
                 let hang_start = self
-                    .keyword_value_stripped_paren_hang_with_pair(o.type_annotation, pair)
+                    .keyword_value_stripped_paren_hang_with_pair(
+                        self.view.ty(o.type_annotation),
+                        pair,
+                    )
                     .value_start;
                 self.comments_force_own_line_between(kw_end, hang_start)
                     || self.stripped_paren_hang_has_breaking_leading_run_with_pair(
-                        o.type_annotation,
+                        self.view.ty(o.type_annotation),
                         pair,
                     )
             }
@@ -300,12 +310,16 @@ impl<'a> Printer<'a> {
                 // construct over, so it is asked the same way — holding only
                 // the frozen-bracket route below would have the two positions disagree.
                 self.required_paren_pair_opens(
-                    i.object_type,
+                    self.view.ty(i.object_type),
                     type_needs_parens_for_indexed_access_object,
                 ) || (self.has_format_ignore && {
-                    let index_start = i.index_type.span().start;
-                    self.find_char_outside_comments(i.object_type.span().end, index_start, b'[')
-                        .is_some_and(|bp| self.member_gap_frozen(bp + 1, index_start))
+                    let index_start = self.view.ty(i.index_type).span().start;
+                    self.find_char_outside_comments(
+                        self.view.ty(i.object_type).span().end,
+                        index_start,
+                        b'[',
+                    )
+                    .is_some_and(|bp| self.member_gap_frozen(bp + 1, index_start))
                 })
             }
             // The paren-interior frozen-route array element
@@ -315,9 +329,10 @@ impl<'a> Printer<'a> {
             // retained trailing run is the same fact, asked through the seam that decides
             // it (`required_paren_pair_opens`) rather than restated here.
             TSType::Array(a) => {
-                self.paren_interior_routed_inner(a.element_type).is_some()
+                self.paren_interior_routed_inner(self.view.ty(a.element_type))
+                    .is_some()
                     || self.required_paren_pair_opens(
-                        a.element_type,
+                        self.view.ty(a.element_type),
                         type_needs_parens_for_array_element,
                     )
             }
@@ -329,9 +344,11 @@ impl<'a> Printer<'a> {
             // A single-member union / intersection prints transparently as its member
             // (prettier drops the node in postprocess), so the `=` asks the member —
             // `= | (A // c)` collapses to the retained shell, which hugs.
-            TSType::Union(u) if u.types.len() == 1 => self.value_owns_its_comment_break(u.types[0]),
+            TSType::Union(u) if u.types.len() == 1 => {
+                self.value_owns_its_comment_break(self.view.ty(self.view.ty_list(u.types)[0]))
+            }
             TSType::Intersection(x) if x.types.len() == 1 => {
-                self.value_owns_its_comment_break(x.types[0])
+                self.value_owns_its_comment_break(self.view.ty(self.view.ty_list(x.types)[0]))
             }
             TSType::Literal(ast::TSLiteralType::TemplateLiteral(t)) => {
                 self.template_literal_type_breaks_for_comment(t)
@@ -350,10 +367,10 @@ impl<'a> Printer<'a> {
         let mut base = ty;
         loop {
             base = match base {
-                TSType::IndexedAccess(i) => i.object_type,
-                TSType::Array(a) => a.element_type,
-                TSType::TypeOperator(o) => o.type_annotation,
-                TSType::Parenthesized(p) => p.type_annotation,
+                TSType::IndexedAccess(i) => self.view.ty(i.object_type),
+                TSType::Array(a) => self.view.ty(a.element_type),
+                TSType::TypeOperator(o) => self.view.ty(o.type_annotation),
+                TSType::Parenthesized(p) => self.view.ty(p.type_annotation),
                 _ => break,
             };
         }
@@ -395,7 +412,7 @@ impl<'a> Printer<'a> {
         // whole leading run through the force-break emission below, and the paren-stripped
         // INNER freezes — so the shelled and bare authorings reach one fixed point. The
         // head carries that verdict as `routed`, which the union hand-off below reads.
-        let head = self.keyword_value_head(eq_pos + 1, decl.type_annotation);
+        let head = self.keyword_value_head(eq_pos + 1, self.view.ty(decl.type_annotation));
         let type_start = head.value_start;
         let value_type = head.value_type;
         let mut parts: DocBuf = smallvec![d.text(if lead_space { " =" } else { "=" })];
@@ -517,7 +534,7 @@ impl<'a> Printer<'a> {
                 // pair a stripped shell owes whatever builds inside it.
                 self.with_stripped_shell_value(
                     head.claimed_shell,
-                    decl.type_annotation,
+                    self.view.ty(decl.type_annotation),
                     head.value_type,
                     TrailingBlock::Inline,
                     || self.build_union_value_doc(eq_pos + 1, u).doc,
@@ -629,7 +646,7 @@ impl<'a> Printer<'a> {
             let build_value = || -> DocId {
                 self.with_stripped_shell_value(
                     head.claimed_shell,
-                    decl.type_annotation,
+                    self.view.ty(decl.type_annotation),
                     head.value_type,
                     TrailingBlock::Inline,
                     || self.build_type_doc(value_type),
@@ -640,7 +657,7 @@ impl<'a> Printer<'a> {
             let build_intersection = |i: &ast::TSIntersectionType<'_>| -> DocId {
                 self.with_stripped_shell_value(
                     head.claimed_shell,
-                    decl.type_annotation,
+                    self.view.ty(decl.type_annotation),
                     head.value_type,
                     TrailingBlock::Inline,
                     || self.intersection_hanging_with_indent(i),
@@ -748,7 +765,7 @@ impl<'a> Printer<'a> {
                     parts.push(hang(make_rhs(type_doc)));
                 }
             } else if let TSType::Conditional(cond) = value_type
-                && should_break_before_conditional_type(cond)
+                && should_break_before_conditional_type(self.view, cond)
             {
                 // A conditional whose check or extends half is generic breaks after `=`
                 // (prettier's `shouldBreakBeforeConditionalType`, a `shouldBreakAfterOperator`
@@ -792,7 +809,7 @@ impl<'a> Printer<'a> {
                 parts.push(fluid(make_rhs(build_intersection(i))));
             } else if let TSType::Parenthesized(p) = value_type
                 && matches!(
-                    unwrap_parenthesized(p.type_annotation),
+                    unwrap_parenthesized(self.view, self.view.ty(p.type_annotation)),
                     TSType::Intersection(_)
                 )
             {
