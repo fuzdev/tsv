@@ -490,8 +490,9 @@ impl<'a> Printer<'a> {
             .map(|c| c.span.end)
     }
 
-    /// Decide the slot the dropped `EmptyStatement` at `body[index]` opens — the shared half
-    /// of both statement walks' orphan arm. See [`OrphanSemiSlot`] for why it is one type.
+    /// Decide the slot the dropped `EmptyStatement` `stmt` (at `slots[index]`) opens — the
+    /// shared half of both statement walks' orphan arm. See [`OrphanSemiSlot`] for why it is
+    /// one type.
     ///
     /// `list_end` is the far edge of the walk's own window (a body's `}`, a case's boundary)
     /// and `tail_target` the construct past the list's end that a gap comment could still
@@ -505,16 +506,18 @@ impl<'a> Printer<'a> {
     /// them back from. Claiming them at consequent level printed a form that was not its own
     /// fixed point (`case 1: fn1();⏎// c⏎;` dedented on the second pass). A block body has no
     /// such seam past its end, so its slots always claim.
+    #[expect(clippy::too_many_arguments)] // the walk's own resolved `stmt` rides beside its slot
     pub(in crate::printer) fn orphan_semi_slot(
         &self,
-        body: &[ast::StmtSlot<'_>],
+        stmt: &ast::Statement<'_>,
+        slots: &[ast::StmtSlot<'_>],
         index: usize,
         list_end: u32,
         tail_target: Option<u32>,
         cursor: OrphanSemiCursor,
         claims: bool,
     ) -> OrphanSemiSlot<'_> {
-        let stmt_end = self.view.stmt_slot(&body[index]).span().end;
+        let stmt_end = stmt.span().end;
         // Zero-comment fast gate, the list's own: with no comment anywhere in its window
         // every query below is provably empty, so the slot reaches exactly its own `;` and
         // claims nothing. The block walk had this; the consequent's copy ran the searches
@@ -527,14 +530,14 @@ impl<'a> Printer<'a> {
                 claims,
             };
         }
-        let next_start = body
+        let next_start = slots
             .get(index + 1)
             .map_or(list_end, |s| self.view.stmt_slot(s).span().start);
         // A comment hugging the next printed statement's start leads it
         // (`a(); ; /* c */ b();`) — or, past the last one, the construct at `tail_target` (a
         // consequent's next `case` label). The orphan run must stop at the claim split so
         // that leading run still finds it.
-        let claim_end = self.statement_claim_end(body, index, tail_target);
+        let claim_end = self.statement_claim_end(stmt, slots, index, tail_target);
         // A dropped `;` owns no terminator gap, so its own run reads one line.
         let search_end = self
             .find_end_with_trailing_comments(stmt_end, u32::MAX)
@@ -835,6 +838,7 @@ impl<'a> Printer<'a> {
                 // A block body has no seam past its end that could re-place a trailing run's
                 // comments, so every slot here claims — [`Printer::orphan_semi_slot`].
                 let mut slot = self.orphan_semi_slot(
+                    stmt,
                     body,
                     i,
                     body_end,
@@ -985,8 +989,14 @@ impl<'a> Printer<'a> {
                 // clamped to the same split ([`Printer::push_statement_trailing_run`]) — so
                 // a handed-over comment stays ahead of it for the next statement's
                 // leading run to find.
-                prev_end =
-                    self.push_statement_trailing_run(body_parts, body, i, body_end, stmt_frozen);
+                prev_end = self.push_statement_trailing_run(
+                    body_parts,
+                    stmt,
+                    body,
+                    i,
+                    body_end,
+                    stmt_frozen,
+                );
             } else {
                 prev_end = stmt_end;
             }

@@ -92,23 +92,24 @@ pub(crate) fn next_printed_stmt<'s>(
         .find(|s| !matches!(&s.kind, ast::StatementKind::EmptyStatement(_)))
 }
 
-/// The slot floor for `body[index]`'s trailing gap: past the last dropped
-/// `EmptyStatement` between it and the next printed statement, else the statement's
+/// The slot floor for `stmt`'s trailing gap, where `stmt` is `slots[index]`: past the last
+/// dropped `EmptyStatement` between it and the next printed statement, else the statement's
 /// own end. A comment before a dropped `;` binds inside its own slot and trails the
 /// content before it (`a(); /* c */ ; b();` — prettier reads it the same way), so the
 /// leads-next scan ([`Printer::trailing_claim_end`](super::Printer::trailing_claim_end))
 /// must not reach back across one.
 pub(crate) fn statement_gap_floor(
     view: AstView<'_>,
-    body: &[ast::StmtSlot<'_>],
+    stmt: &ast::Statement<'_>,
+    slots: &[ast::StmtSlot<'_>],
     index: usize,
 ) -> u32 {
-    body[index + 1..]
+    slots[index + 1..]
         .iter()
         .map(|s| view.stmt_slot(s))
         .take_while(|s| matches!(&s.kind, ast::StatementKind::EmptyStatement(_)))
         .last()
-        .map_or_else(|| view.stmt_slot(&body[index]).span().end, |s| s.span().end)
+        .map_or_else(|| stmt.span().end, |s| s.span().end)
 }
 
 /// Check if an expression is a module path call that should use fluid assignment wrapping
