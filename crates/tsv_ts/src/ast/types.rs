@@ -7,8 +7,8 @@ use crate::lexer::KeywordKind;
 use tsv_lang::Span;
 
 use super::{
-    Decorator, Expr, ExprId, IdentName, Identifier, Literal, MethodKind, Run, TemplateElement,
-    TyId, UnaryExpression,
+    CtorTypeEdge, Decorator, Expr, ExprId, IdentName, Identifier, ImportTypeEdge, InferTypeEdge,
+    Literal, MethodKind, QualNameEdge, Run, TemplateElement, TyId, UnaryExpression,
 };
 
 /// TypeScript type annotation node (e.g., `: number` in `const a: number = 5`)
@@ -57,7 +57,7 @@ pub enum TSType<'arena> {
     /// Function types: `(x: T) => U`
     Function(TSFunctionType<'arena>),
     /// Constructor types: `new () => T` or `abstract new <T>() => T`
-    Constructor(Span, &'arena TSConstructorType<'arena>),
+    Constructor(Span, CtorTypeEdge<'arena>),
     /// Tuple types: `[T, U]`
     Tuple(TSTupleType),
     /// Parenthesized types: `(T)`
@@ -71,7 +71,7 @@ pub enum TSType<'arena> {
     /// Type operators: `keyof T`, `unique symbol`, `readonly T`
     TypeOperator(TSTypeOperator),
     /// Import types: `import('module')` or `import('module').Foo<T>`
-    Import(Span, &'arena TSImportType<'arena>),
+    Import(Span, ImportTypeEdge<'arena>),
     /// Type query: `typeof x`, `typeof Foo.bar`, `typeof import("module")`
     TypeQuery(TSTypeQuery<'arena>),
     /// Indexed access types: `T[K]`, `Obj["key"]`, `T[keyof T]`
@@ -83,7 +83,7 @@ pub enum TSType<'arena> {
     /// Named tuple member: `label: T` or `label?: T`
     NamedTupleMember(TSNamedTupleMember<'arena>),
     /// Infer type: `infer U` (in conditional types)
-    Infer(Span, &'arena TSInferType<'arena>),
+    Infer(Span, InferTypeEdge<'arena>),
     /// This type: `this` (in type position)
     ThisType(TSThisType),
 }
@@ -371,7 +371,7 @@ pub enum TSEntityName<'arena> {
     Identifier(Identifier<'arena>),
     /// The qualified name's span inline beside the reference, so [`TSEntityName::span`]
     /// reads it without the hop.
-    QualifiedName(Span, &'arena TSQualifiedName<'arena>),
+    QualifiedName(Span, QualNameEdge<'arena>),
 }
 
 impl<'arena> TSEntityName<'arena> {
@@ -808,7 +808,7 @@ pub enum TSTypeQueryExprName<'arena> {
     /// Entity name (Identifier or QualifiedName): `typeof x`, `typeof Foo.bar`
     EntityName(TSEntityName<'arena>),
     /// Import type: `typeof import("module")`, its span inline beside the reference.
-    Import(Span, &'arena TSImportType<'arena>),
+    Import(Span, ImportTypeEdge<'arena>),
 }
 
 impl<'arena> TSTypeQueryExprName<'arena> {

@@ -575,7 +575,9 @@ pub(super) fn type_needs_parens_for_conditional_extends(
     match unwrap_parenthesized(printer.view, ts_type) {
         TSType::Conditional(_) => true,
         TSType::Function(f) => return_type_is_constrained_infer(printer.view, &f.return_type),
-        TSType::Constructor(_, c) => return_type_is_constrained_infer(printer.view, &c.return_type),
+        &TSType::Constructor(_, c) => {
+            return_type_is_constrained_infer(printer.view, &printer.view.ctor_type(c).return_type)
+        }
         _ => false,
     }
 }
@@ -587,8 +589,8 @@ pub(super) fn type_needs_parens_for_conditional_extends(
 /// and it abuts a trailing conditional `?` (so it needs parens as a nested
 /// function/constructor return in a conditional extends-type — see
 /// `return_type_is_constrained_infer`). A bare `infer U` forces neither.
-pub(super) fn is_constrained_infer(ts_type: &TSType<'_>) -> bool {
-    matches!(ts_type, TSType::Infer(_, i) if i.type_parameter.constraint.is_some())
+pub(super) fn is_constrained_infer(view: AstView<'_>, ts_type: &TSType<'_>) -> bool {
+    matches!(*ts_type, TSType::Infer(_, i) if view.infer_type(i).type_parameter.constraint.is_some())
 }
 
 /// True when a function/constructor return type — descending through a `p is X`
@@ -620,9 +622,11 @@ fn return_type_is_constrained_infer(
         }
     }
     match ty {
-        TSType::Infer(..) => is_constrained_infer(ty),
+        TSType::Infer(..) => is_constrained_infer(view, ty),
         TSType::Function(f) => return_type_is_constrained_infer(view, &f.return_type),
-        TSType::Constructor(_, c) => return_type_is_constrained_infer(view, &c.return_type),
+        &TSType::Constructor(_, c) => {
+            return_type_is_constrained_infer(view, &view.ctor_type(c).return_type)
+        }
         _ => false,
     }
 }
@@ -739,7 +743,7 @@ pub(super) fn type_needs_parens_in_union_or_intersection(
         | TSType::Function(_)
         | TSType::Constructor(..)
         | TSType::Conditional(_) => true,
-        other => is_constrained_infer(other) || is_right_open_predicate(p, other),
+        other => is_constrained_infer(p.view, other) || is_right_open_predicate(p, other),
     }
 }
 
@@ -898,12 +902,15 @@ fn type_holds_brace_type(view: AstView<'_>, ty: &TSType<'_>) -> bool {
             view.run(f.params),
             Some(&f.return_type),
         ),
-        TSType::Constructor(_, c) => signature_holds_brace_type(
-            view,
-            c.type_parameters.as_ref(),
-            view.run(c.params),
-            Some(&c.return_type),
-        ),
+        &TSType::Constructor(_, c) => {
+            let c = view.ctor_type(c);
+            signature_holds_brace_type(
+                view,
+                c.type_parameters.as_ref(),
+                view.run(c.params),
+                Some(&c.return_type),
+            )
+        }
         &TSType::Parenthesized(TSParenthesizedType {
             type_annotation, ..
         }) => type_holds_brace_type(view, view.ty(type_annotation)),
@@ -916,11 +923,13 @@ fn type_holds_brace_type(view: AstView<'_>, ty: &TSType<'_>) -> bool {
         TSType::TypeOperator(o) => type_holds_brace_type(view, view.ty(o.type_annotation)),
         // An import type's options object (`import('m', { with: … })`) is an expression,
         // not a type; only its type arguments are walked.
-        TSType::Import(_, i) => type_arguments_hold_brace_type(view, i.type_arguments.as_ref()),
+        &TSType::Import(_, i) => {
+            type_arguments_hold_brace_type(view, view.import_type(i).type_arguments.as_ref())
+        }
         TSType::TypeQuery(q) => {
             type_arguments_hold_brace_type(view, q.type_arguments.as_ref())
-                || matches!(&q.expr_name, ast::TSTypeQueryExprName::Import(_, i)
-                    if type_arguments_hold_brace_type(view, i.type_arguments.as_ref()))
+                || matches!(&q.expr_name, &ast::TSTypeQueryExprName::Import(_, i)
+                    if type_arguments_hold_brace_type(view, view.import_type(i).type_arguments.as_ref()))
         }
         TSType::IndexedAccess(i) => {
             type_holds_brace_type(view, view.ty(i.object_type))
@@ -929,6 +938,8 @@ fn type_holds_brace_type(view: AstView<'_>, ty: &TSType<'_>) -> bool {
         TSType::Rest(r) => type_holds_brace_type(view, view.ty(r.type_annotation)),
         TSType::Optional(o) => type_holds_brace_type(view, view.ty(o.type_annotation)),
         TSType::NamedTupleMember(n) => type_holds_brace_type(view, view.ty(n.element_type)),
-        TSType::Infer(_, i) => type_parameter_holds_brace_type(view, &i.type_parameter),
+        &TSType::Infer(_, i) => {
+            type_parameter_holds_brace_type(view, &view.infer_type(i).type_parameter)
+        }
     }
 }

@@ -394,10 +394,10 @@ impl<'a> Printer<'a> {
                     self.build_arrow_doc(arrow, expr.span)
                 }
             }
-            &ExpressionKind::FunctionExpression(func) => self.maybe_wrap_expr_stmt_paren(
-                self.view.fn_expr(func).span,
-                self.build_function_doc(self.view.fn_expr(func)),
-            ),
+            &ExpressionKind::FunctionExpression(func) => {
+                let func = self.view.fn_expr(func);
+                self.maybe_wrap_expr_stmt_paren(func.span, self.build_function_doc(func))
+            }
             &ExpressionKind::ClassExpression(class_expr) => {
                 let class_expr = self.view.class_expr(class_expr);
                 let doc = self.build_class_expression_doc(class_expr, expr.span);

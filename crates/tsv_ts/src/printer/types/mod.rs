@@ -679,7 +679,7 @@ impl<'a> Printer<'a> {
             }
             TSType::TypeLiteral(t) => self.build_type_literal_doc(t),
             TSType::Function(f) => self.build_function_type_doc(f),
-            TSType::Constructor(_, c) => self.build_constructor_type_doc(c),
+            &TSType::Constructor(_, c) => self.build_constructor_type_doc(self.view.ctor_type(c)),
             TSType::Tuple(t) => self.build_tuple_type_doc(t),
             // Parenthesized types: unwrap, preserving any comments inside the parens.
             // Parent contexts (IndexedAccess, Array, TypeOperator) add parens when
@@ -996,7 +996,7 @@ impl<'a> Printer<'a> {
                 parts.push(operand_doc);
                 d.concat(&parts)
             }
-            TSType::Import(_, i) => self.build_import_type_doc(i),
+            &TSType::Import(_, i) => self.build_import_type_doc(self.view.import_type(i)),
             TSType::TypeQuery(q) => {
                 // Comments between `typeof` and the expression
                 let typeof_end = q.span.start + "typeof".len() as u32;
@@ -1266,7 +1266,8 @@ impl<'a> Printer<'a> {
                 parts.push(tail);
                 d.concat(&parts)
             }
-            TSType::Infer(_, i) => {
+            &TSType::Infer(_, i) => {
+                let i = self.view.infer_type(i);
                 // Comments between `infer` and the type parameter name
                 let infer_end = i.span.start + "infer".len() as u32;
                 let name_start = i.type_parameter.name.span.start;

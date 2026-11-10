@@ -596,6 +596,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<TSInferType<'_>>(1);
+        let span = Span::new(start as u32, end);
         let infer = self.arena.alloc(TSInferType {
             type_parameter: TSTypeParameter {
                 name,
@@ -605,9 +606,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 modifiers: TSTypeParameterModifiers::default(),
                 span: Span::new(name_start, end),
             },
-            span: Span::new(start as u32, end),
+            span,
         });
-        Ok(self.push_ty_ret(TSType::Infer(infer.span, infer)))
+        Ok(self.push_ty_ret(TSType::Infer(span, infer)))
     }
 
     /// Check if current position starts an index signature: `[key: type]: T`
@@ -709,8 +710,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let import = self.parse_import_type_body(start)?;
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<TSImportType<'_>>(1);
+        let span = import.span;
         let import = self.arena.alloc(import);
-        Ok(self.push_ty_ret(TSType::Import(import.span, import)))
+        Ok(self.push_ty_ret(TSType::Import(span, import)))
     }
 
     /// Parse import type body after `import` keyword has been consumed.
@@ -1119,14 +1121,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<TSConstructorType<'_>>(1);
+        let span = Span::new(start as u32, end);
         let constructor = self.arena.alloc(TSConstructorType {
             abstract_: is_abstract,
             type_parameters,
             params,
             return_type,
-            span: Span::new(start as u32, end),
+            span,
         });
-        Ok(self.push_ty_ret(TSType::Constructor(constructor.span, constructor)))
+        Ok(self.push_ty_ret(TSType::Constructor(span, constructor)))
     }
 
     /// Parse function type parameters, up to (not including) the closing `)`.
@@ -2046,7 +2049,7 @@ fn bare_type_takes_pair(view: AstView<'_>, ts_type: TyId, position: TypePairPosi
         return false;
     }
     loop {
-        if type_takes_pair(ty, position) {
+        if type_takes_pair(view, ty, position) {
             return true;
         }
         ty = match ty {
@@ -2058,7 +2061,7 @@ fn bare_type_takes_pair(view: AstView<'_>, ts_type: TyId, position: TypePairPosi
 }
 
 /// [`bare_type_takes_pair`]'s rule for one type.
-fn type_takes_pair(ty: &TSType<'_>, position: TypePairPosition) -> bool {
+fn type_takes_pair(view: AstView<'_>, ty: &TSType<'_>, position: TypePairPosition) -> bool {
     let looser = matches!(
         ty,
         TSType::Union(_)
@@ -2069,7 +2072,9 @@ fn type_takes_pair(ty: &TSType<'_>, position: TypePairPosition) -> bool {
     );
     match position {
         TypePairPosition::Member => {
-            looser || matches!(ty, TSType::Infer(_, i) if i.type_parameter.constraint.is_some())
+            looser
+                || matches!(*ty, TSType::Infer(_, i)
+                    if view.infer_type(i).type_parameter.constraint.is_some())
         }
         TypePairPosition::Suffix => {
             looser

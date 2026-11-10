@@ -801,7 +801,9 @@ impl<'a> Printer<'a> {
         {
             ast::TSType::TypeReference(reference) => reference.type_arguments.as_ref(),
             ast::TSType::TypeQuery(query) => query.type_arguments.as_ref(),
-            ast::TSType::Import(_, import) => import.type_arguments.as_ref(),
+            &ast::TSType::Import(_, import) => {
+                self.view.import_type(import).type_arguments.as_ref()
+            }
             _ => None,
         }?;
         let sole_object_type = matches!(
