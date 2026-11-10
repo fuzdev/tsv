@@ -6,7 +6,7 @@
 use tsv_lang::Span;
 
 use super::{
-    Decorator, ExprId, FunctionExpression, Identifier, Statement, TSIndexSignature,
+    Decorator, ExprId, FunctionExpression, Identifier, StmtList, TSIndexSignature,
     TSInterfaceHeritage, TSTypeAnnotation, TSTypeParameterDeclaration,
     TSTypeParameterInstantiation,
 };
@@ -98,7 +98,7 @@ pub struct StaticBlock<'arena> {
     /// reaches a static block (tsc's checker reports TS1206); acorn keeps the list
     /// and tsv defers the error, so the list is kept and printed.
     pub decorators: Option<&'arena [Decorator]>,
-    pub body: &'arena [Statement<'arena>],
+    pub body: StmtList<'arena>,
     pub span: Span,
 }
 

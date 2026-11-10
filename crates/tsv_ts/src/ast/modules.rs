@@ -7,7 +7,7 @@ use crate::ast::AstView;
 use tsv_lang::Span;
 
 use super::{
-    ClassDeclaration, ExprId, FunctionDeclaration, Identifier, Literal, Statement,
+    ClassDeclaration, ExprId, FunctionDeclaration, Identifier, Literal, OptStmtEdge,
     TSDeclareFunction, TSEntityName, TSInterfaceDeclaration,
 };
 
@@ -16,7 +16,7 @@ use super::{
 pub struct ExportNamedDeclaration<'arena> {
     /// The declaration being exported (VariableDeclaration, FunctionDeclaration, ClassDeclaration)
     /// None when using specifiers
-    pub declaration: Option<&'arena Statement<'arena>>,
+    pub declaration: OptStmtEdge<'arena>,
     /// Export specifiers: `export { a, b as c }`
     pub specifiers: &'arena [ExportSpecifier<'arena>],
     /// Re-export source: `export { x } from "y"` or None for local exports

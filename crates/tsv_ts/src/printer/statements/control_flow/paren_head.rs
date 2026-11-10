@@ -52,7 +52,7 @@ impl<'a> Printer<'a> {
             ParenHeadKind::WHILE,
             span.start,
             self.view.expr(stmt.test),
-            stmt.body,
+            self.view.stmt(stmt.body),
             ctx,
         )
     }
@@ -80,7 +80,7 @@ impl<'a> Printer<'a> {
             ParenHeadKind::WITH,
             span.start,
             self.view.expr(stmt.object),
-            stmt.body,
+            self.view.stmt(stmt.body),
             ctx,
         )
     }
@@ -143,11 +143,12 @@ impl<'a> Printer<'a> {
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
-        let is_block = matches!(&stmt.body.kind, StatementKind::BlockStatement(_));
+        let body = self.view.stmt(stmt.body);
+        let is_block = matches!(&body.kind, StatementKind::BlockStatement(_));
 
         // Check for comments between `do` keyword and body
         let do_end = span.start + "do".len() as u32;
-        let body_start = stmt.body.span().start;
+        let body_start = body.span().start;
         // The body's container facts: the `while` CONTINUES on the tail's flush line,
         // and the body is wrapped in an indent by the broken header→body arm and by the
         // comment-free clause arm (a non-block, non-empty body) below — a block body and
@@ -156,13 +157,13 @@ impl<'a> Printer<'a> {
         let gap_has_comments = self.has_comments_to_emit_between(do_end, body_start);
         let gap_breaks_body =
             gap_has_comments && self.header_to_body_gap_breaks(do_end, body_start) && !is_block;
-        let is_empty = matches!(&stmt.body.kind, StatementKind::EmptyStatement(_));
+        let is_empty = matches!(&body.kind, StatementKind::EmptyStatement(_));
         let is_clause = !gap_has_comments && !is_block && !is_empty;
         let body_ctx = ctx.clause_body(true, gap_breaks_body || is_clause);
         // A loop body collapses its empty block form (`do {} while (cond)`) — unless an
         // own-line directive in the `do`→body gap freezes it.
-        let body_doc = self.build_statement_head_doc(do_end, stmt.body, || {
-            self.build_collapsing_body_doc(stmt.body, body_ctx)
+        let body_doc = self.build_statement_head_doc(do_end, body, || {
+            self.build_collapsing_body_doc(body, body_ctx)
         });
 
         let mut parts = if gap_has_comments {
@@ -204,7 +205,7 @@ impl<'a> Printer<'a> {
 
         // Find the while keyword position for comment handling
         // Search forward from body end, skipping over comments to find the actual keyword
-        let body_end = stmt.body.span().end;
+        let body_end = body.span().end;
         let test_start = self.view.expr(stmt.test).span().start;
         let while_pos = self.find_keyword_in_range(body_end, test_start, "while");
 
@@ -217,7 +218,7 @@ impl<'a> Printer<'a> {
                 body_end,
                 while_start,
                 is_block,
-                self.terminator_defers_comment(stmt.body.span().start, body_end),
+                self.terminator_defers_comment(body.span().start, body_end),
             );
         } else {
             parts.push(if is_block { d.text(" ") } else { d.hardline() });

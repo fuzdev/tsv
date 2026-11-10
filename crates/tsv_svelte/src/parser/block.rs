@@ -9,7 +9,7 @@ use crate::whitespace::is_svelte_ws;
 use bumpalo::Bump;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
 use tsv_lang::{Error, Span};
-use tsv_ts::__private::TopLevelAs;
+use tsv_ts::__private::{TopLevelAs, first_function_declaration};
 use tsv_ts::ast::ExprId;
 use tsv_ts::ast::{AstStores, Expression, ExpressionKind};
 
@@ -266,17 +266,6 @@ fn await_head_clause(after_expr: &str) -> Option<(AwaitClause, &str)> {
     }
     strip_head_keyword_or_final(after_expr, "catch")
         .map(|error_str| (AwaitClause::Catch, error_str))
-}
-
-/// The `function f…` declaration a `{#snippet}` head's wrapper parses to. `None` only for a
-/// wrapper that produced no such statement, which the caller reports as an error.
-fn snippet_signature<'arena>(
-    program: &tsv_ts::ast::Program<'arena>,
-) -> Option<&'arena tsv_ts::ast::FunctionDeclaration<'arena>> {
-    match program.body.first().map(|stmt| &stmt.kind) {
-        Some(tsv_ts::ast::StatementKind::FunctionDeclaration(func)) => Some(*func),
-        _ => None,
-    }
 }
 
 /// Return type for parse_each_binding: (context, index, key, consumed_end).
@@ -1616,17 +1605,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                             .all(|(a, b)| a.span == b.span),
                     "a snippet head's paren-free and preserved parses collected different comments"
                 );
-                let wire = snippet_signature(&preserved)
+                let wire = first_function_declaration(self.ts_stores(), &preserved)
                     .ok_or_else(signature_error)?
                     .params;
-                let func = snippet_signature(&plain).ok_or_else(signature_error)?;
+                let func = first_function_declaration(self.ts_stores(), &plain)
+                    .ok_or_else(signature_error)?;
                 self.snippet_wire_parameters.push(SnippetWireParameters {
                     snippet_start: start as u32,
                     parameters: wire,
                 });
                 (plain, func)
             } else {
-                let func = snippet_signature(&preserved).ok_or_else(signature_error)?;
+                let func = first_function_declaration(self.ts_stores(), &preserved)
+                    .ok_or_else(signature_error)?;
                 (preserved, func)
             };
             // The comments (and their `owned_by_node` claims) are the paren-free tree's —

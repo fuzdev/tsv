@@ -8,10 +8,10 @@ use tsv_lang::Span;
 
 use super::{
     ClassDeclaration, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration, Expr,
-    ExprId, Expression, Identifier, ImportDeclaration, Run, TSDeclareFunction, TSEnumDeclaration,
-    TSExportAssignment, TSImportEqualsDeclaration, TSInterfaceDeclaration, TSModuleDeclaration,
-    TSNamespaceExportDeclaration, TSTypeAliasDeclaration, TSTypeAnnotation,
-    TSTypeParameterDeclaration,
+    ExprId, Expression, Identifier, ImportDeclaration, OptStmtEdge, Run, StmtEdge, StmtList,
+    TSDeclareFunction, TSEnumDeclaration, TSExportAssignment, TSImportEqualsDeclaration,
+    TSInterfaceDeclaration, TSModuleDeclaration, TSNamespaceExportDeclaration,
+    TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration,
 };
 
 /// Statement node: the span every variant shares, beside the variant itself.
@@ -216,7 +216,7 @@ pub struct ExpressionStatement {
 /// - Loop bodies (future)
 #[derive(Debug, Clone)]
 pub struct BlockStatement<'arena> {
-    pub body: &'arena [Statement<'arena>],
+    pub body: StmtList<'arena>,
     pub span: Span,
 }
 
@@ -236,8 +236,8 @@ pub struct ReturnStatement {
 #[derive(Debug, Clone)]
 pub struct IfStatement<'arena> {
     pub test: ExprId,
-    pub consequent: &'arena Statement<'arena>,
-    pub alternate: Option<&'arena Statement<'arena>>,
+    pub consequent: StmtEdge<'arena>,
+    pub alternate: OptStmtEdge<'arena>,
 }
 
 /// For statement: `for (init; test; update) body`
@@ -259,7 +259,7 @@ pub struct ForStatement<'arena> {
     pub test: Option<ExprId>,
     /// Update expression (or None)
     pub update: Option<ExprId>,
-    pub body: &'arena Statement<'arena>,
+    pub body: StmtEdge<'arena>,
 }
 
 /// For statement initialization - either a variable declaration or expression
@@ -280,7 +280,7 @@ pub struct ForInStatement<'arena> {
     /// Left side: variable declaration or expression pattern
     pub left: &'arena ForInOfLeft<'arena>,
     pub right: ExprId,
-    pub body: &'arena Statement<'arena>,
+    pub body: StmtEdge<'arena>,
 }
 
 /// For-of statement: `for (left of right) body`
@@ -293,7 +293,7 @@ pub struct ForOfStatement<'arena> {
     pub right: ExprId,
     /// Whether this is `for await (... of ...)`
     pub r#await: bool,
-    pub body: &'arena Statement<'arena>,
+    pub body: StmtEdge<'arena>,
 }
 
 /// Left side of for-in/for-of: either a variable declaration or expression pattern
@@ -310,13 +310,13 @@ pub enum ForInOfLeft<'arena> {
 #[derive(Debug, Clone)]
 pub struct WhileStatement<'arena> {
     pub test: ExprId,
-    pub body: &'arena Statement<'arena>,
+    pub body: StmtEdge<'arena>,
 }
 
 /// Do-while statement: `do body while (test)`
 #[derive(Debug, Clone)]
 pub struct DoWhileStatement<'arena> {
-    pub body: &'arena Statement<'arena>,
+    pub body: StmtEdge<'arena>,
     pub test: ExprId,
 }
 
@@ -324,7 +324,7 @@ pub struct DoWhileStatement<'arena> {
 #[derive(Debug, Clone)]
 pub struct WithStatement<'arena> {
     pub object: ExprId,
-    pub body: &'arena Statement<'arena>,
+    pub body: StmtEdge<'arena>,
 }
 
 /// Switch statement: `switch (discriminant) { cases }`
@@ -339,7 +339,7 @@ pub struct SwitchStatement<'arena> {
 pub struct SwitchCase<'arena> {
     /// Test expression, or None for `default:`
     pub test: Option<ExprId>,
-    pub consequent: &'arena [Statement<'arena>],
+    pub consequent: StmtList<'arena>,
     pub span: Span,
 }
 
@@ -389,7 +389,7 @@ pub struct ContinueStatement<'arena> {
 #[derive(Debug, Clone)]
 pub struct LabeledStatement<'arena> {
     pub label: Identifier<'arena>,
-    pub body: &'arena Statement<'arena>,
+    pub body: StmtEdge<'arena>,
 }
 
 /// Empty statement: `;`

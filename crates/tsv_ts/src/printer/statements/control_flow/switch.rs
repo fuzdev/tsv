@@ -291,6 +291,7 @@ impl<'a> Printer<'a> {
     ) -> (DocId, u32) {
         let d = self.d();
         let mut parts = DocBuf::new();
+        let consequent = self.view.stmt_list(case.consequent);
 
         // case X: or default:
         let case_label_end = self.get_case_label_end(case);
@@ -440,14 +441,16 @@ impl<'a> Printer<'a> {
         // CONSEQUENT statement is deliberately not on that rule — the label keeps the
         // hug (`case 7: /* block */ {`, the cataloged divergence), so the bound applies
         // only where no consequent exists and the "next" is a sibling label.
-        let first_stmt_start = case.consequent.first().map(|s| s.span().start);
+        let first_stmt_start = consequent
+            .first()
+            .map(|s| self.view.stmt_slot(s).span().start);
         // The hug below is prettier's `printSwitchCase` rule: the case keeps its block on the
         // label line only when that block is the consequent's ONLY printed statement (the
         // dropped `;`s do not count). A block followed by anything else is one statement of a
         // list, which takes the consequent's own indented lines like every other.
-        let printed_statements = case
-            .consequent
+        let printed_statements = consequent
             .iter()
+            .map(|s| self.view.stmt_slot(s))
             .filter(|s| !matches!(&s.kind, StatementKind::EmptyStatement(_)))
             .count();
         // Such a block leaves the label's line, and a run of block comments the author glued
@@ -459,7 +462,7 @@ impl<'a> Printer<'a> {
         let glued_run_leads_block = printed_statements > 1
             && first_stmt_start.is_some_and(|start| {
                 matches!(
-                    case.consequent.first().map(|s| &s.kind),
+                    consequent.first().map(|s| &self.view.stmt_slot(s).kind),
                     Some(StatementKind::BlockStatement(_))
                 ) && {
                     let mut gap_start = case_label_end;
@@ -526,7 +529,8 @@ impl<'a> Printer<'a> {
 
         let label_parts_len = parts.len();
 
-        for (i, stmt) in case.consequent.iter().enumerate() {
+        for (i, stmt) in consequent.iter().enumerate() {
+            let stmt = self.view.stmt_slot(stmt);
             let stmt_start = stmt.span().start;
 
             // Standalone EmptyStatements are dropped entirely (Prettier's
@@ -543,10 +547,10 @@ impl<'a> Printer<'a> {
                 // statement, so a `;` in the middle of a run of them answers for the whole
                 // run rather than for its immediate neighbour.
                 let trailing_semi_run =
-                    next_printed_stmt_start(case.consequent, i, inline_comment_boundary)
+                    next_printed_stmt_start(self.view, consequent, i, inline_comment_boundary)
                         == inline_comment_boundary;
                 let slot = self.orphan_semi_slot(
-                    case.consequent,
+                    consequent,
                     i,
                     inline_comment_boundary,
                     next_case_start,
@@ -624,7 +628,8 @@ impl<'a> Printer<'a> {
             // ([`Printer::statement_emitted_end`]).
             let frozen = self.gap_frozen_span(prev_end, stmt.span());
             let stmt_gap_start = self.statement_emitted_end(stmt, frozen.is_some());
-            let next_bound = next_printed_stmt_start(case.consequent, i, inline_comment_boundary);
+            let next_bound =
+                next_printed_stmt_start(self.view, consequent, i, inline_comment_boundary);
             // Deferring hands the `;` line's comments to the NEXT statement's leading run,
             // so it needs one to exist. For the last statement of a consequent there is no
             // such run; its `;`-line comments land own-line at CASE-LABEL indent instead —
@@ -660,9 +665,7 @@ impl<'a> Printer<'a> {
             // instead (`b1(); /* c */ let d1 = 1;`, `b1(); /* c */ case 2:`), emitted
             // by that statement's leading run / the switch's between-case run.
             let claim_end = if body_has_comments {
-                self.statement_claim_end_with(case.consequent, i, next_case_start, || {
-                    stmt_gap_start
-                })
+                self.statement_claim_end_with(consequent, i, next_case_start, || stmt_gap_start)
             } else {
                 u32::MAX
             };
@@ -670,8 +673,10 @@ impl<'a> Printer<'a> {
             // ([`Printer::printed_tail`]) — neither a `;` the author detached nor a dropped
             // one begins a new output line, so a comment past either trails the statement
             // here exactly as it does in a block body.
-            let printed_tail =
-                self.printed_tail(stmt_gap_start, statement_gap_floor(case.consequent, i));
+            let printed_tail = self.printed_tail(
+                stmt_gap_start,
+                statement_gap_floor(self.view, consequent, i),
+            );
             // Where the content-line run ends, and whether it leaves the terminator gap EMPTY
             // behind it — two comment queries the `deferred_tail_landing` arms below are the
             // only readers of, so they are asked only there.

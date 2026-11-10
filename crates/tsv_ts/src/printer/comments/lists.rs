@@ -547,13 +547,13 @@ impl<'a> Printer<'a> {
     /// emitted end, reaches the same spelling through [`Self::statement_claim_end_with`].
     pub(crate) fn statement_claim_end(
         &self,
-        body: &[ast::Statement<'_>],
+        body: &[ast::StmtSlot<'_>],
         index: usize,
         tail_target: Option<u32>,
     ) -> u32 {
         // Only the orphan arm asks here, and an orphan `;` is never frozen.
         self.statement_claim_end_with(body, index, tail_target, || {
-            self.statement_emitted_end(&body[index], false)
+            self.statement_emitted_end(self.view.stmt_slot(&body[index]), false)
         })
     }
 
@@ -564,12 +564,12 @@ impl<'a> Printer<'a> {
     /// the same statement a second time is the cost this saves.
     pub(crate) fn statement_claim_end_with(
         &self,
-        body: &[ast::Statement<'_>],
+        body: &[ast::StmtSlot<'_>],
         index: usize,
         tail_target: Option<u32>,
         emitted_end: impl FnOnce() -> u32,
     ) -> u32 {
-        match next_printed_stmt(body, index)
+        match next_printed_stmt(self.view, body, index)
             .map(|s| s.span().start)
             .or(tail_target)
         {
@@ -603,12 +603,12 @@ impl<'a> Printer<'a> {
     /// is read only when nothing was raised.
     fn statement_gap_scan_start(
         &self,
-        body: &[ast::Statement<'_>],
+        body: &[ast::StmtSlot<'_>],
         index: usize,
         emitted_end: impl FnOnce() -> u32,
     ) -> u32 {
-        let floor = statement_gap_floor(body, index);
-        if floor == body[index].span().end {
+        let floor = statement_gap_floor(self.view, body, index);
+        if floor == self.view.stmt_slot(&body[index]).span().end {
             emitted_end()
         } else {
             floor
@@ -727,7 +727,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_statement_trailing_run(
         &self,
         parts: &mut DocBuf,
-        body: &[ast::Statement<'_>],
+        body: &[ast::StmtSlot<'_>],
         index: usize,
         list_end: u32,
         frozen: bool,
@@ -737,14 +737,14 @@ impl<'a> Printer<'a> {
         // statement's own trailing run past a `;` puts the cursor above a comment written
         // before it — which that `;`'s orphan run then cannot find, a DROP. Raising is the
         // claim SCAN's rule, not the anchor's.
-        let stmt_end = self.statement_emitted_end(&body[index], frozen);
-        let bound = next_printed_stmt_start(body, index, list_end);
+        let stmt_end = self.statement_emitted_end(self.view.stmt_slot(&body[index]), frozen);
+        let bound = next_printed_stmt_start(self.view, body, index, list_end);
         self.push_trailing_run(
             parts,
             stmt_end,
             bound,
             self.statement_claim_end_with(body, index, None, || stmt_end),
-            self.printed_tail(stmt_end, statement_gap_floor(body, index)),
+            self.printed_tail(stmt_end, statement_gap_floor(self.view, body, index)),
         )
     }
 

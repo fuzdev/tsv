@@ -2271,8 +2271,10 @@ mod tests {
             let program = crate::__private::parse(source, &arena).expect("parses");
             let view = program.view();
             let mut roots = Vec::new();
-            for statement in program.body {
-                if let ast::StatementKind::ExpressionStatement(statement) = &statement.kind {
+            for statement in view.stmt_list(program.body) {
+                if let ast::StatementKind::ExpressionStatement(statement) =
+                    &view.stmt_slot(statement).kind
+                {
                     chain_roots(view, view.expr(statement.expression), &mut roots);
                 }
             }

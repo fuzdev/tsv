@@ -1235,7 +1235,7 @@ impl<'a> Printer<'a> {
     /// authored, terminator included, which is both lossless and the only reparsable answer.
     fn frozen_statement_slice(&self, stmt: &ast::Statement<'_>) -> (Span, bool) {
         let span = stmt.span();
-        let terminator = Self::statement_terminator(stmt);
+        let terminator = self.statement_terminator(stmt);
         if terminator == StatementTerminator::Never {
             return (span, false);
         }
