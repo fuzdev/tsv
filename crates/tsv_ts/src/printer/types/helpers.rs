@@ -798,7 +798,7 @@ fn type_element_holds_brace_type(view: AstView<'_>, member: &ast::TSTypeElement<
             annotation_holds_brace_type(view, i.type_annotation.as_ref())
                 || i.parameters
                     .iter()
-                    .any(|param| annotation_holds_brace_type(view, param.type_annotation()))
+                    .any(|param| annotation_holds_brace_type(view, param.type_annotation(view)))
         }
     }
 }
@@ -857,7 +857,9 @@ fn type_arguments_hold_brace_type(
 fn param_holds_brace_type(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
     use ast::ExpressionKind;
     match &param.kind {
-        ExpressionKind::Identifier(id) => annotation_holds_brace_type(view, id.type_annotation()),
+        ExpressionKind::Identifier(id) => {
+            annotation_holds_brace_type(view, id.type_annotation(view))
+        }
         ExpressionKind::ObjectPattern(p) => {
             annotation_holds_brace_type(view, p.type_annotation.as_ref())
         }

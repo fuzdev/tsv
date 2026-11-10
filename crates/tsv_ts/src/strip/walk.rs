@@ -726,7 +726,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 true
             }
             StatementKind::ForStatement(s) => {
-                if let Some(init) = s.init {
+                if let Some(init) = self.view.opt_for_head(s.init) {
                     match init {
                         ForInit::VariableDeclaration(decl) => self.variable_declaration(decl),
                         ForInit::Expression(e) => self.expr(self.view.expr(*e)),
@@ -742,7 +742,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 true
             }
             StatementKind::ForInStatement(s) => {
-                self.for_left(s.left);
+                self.for_left(self.view.for_left(s.left));
                 self.expr(self.view.expr(s.right));
                 self.nested_statement(self.view.stmt(s.body));
                 true
@@ -751,7 +751,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 if s.r#await && self.top_level_await() {
                     self.module_syntax = true;
                 }
-                self.for_left(s.left);
+                self.for_left(self.view.for_left(s.left));
                 self.expr(self.view.expr(s.right));
                 self.nested_statement(self.view.stmt(s.body));
                 true
@@ -784,7 +784,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             StatementKind::TryStatement(s) => {
                 self.block(&s.block);
-                if let Some(handler) = s.handler {
+                if let Some(handler) = self.view.opt_catch(s.handler) {
                     if let Some(param) = &handler.param {
                         self.expr(param);
                     }
@@ -1417,9 +1417,9 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// arguments in them), the optional `?` and the annotation blank. A reference carries
     /// none of these.
     fn identifier(&mut self, id: &Identifier<'_>) {
-        let decorators = id.decorators();
+        let decorators = id.decorators(self.view);
         self.decorators(decorators);
-        let annotation = id.type_annotation();
+        let annotation = id.type_annotation(self.view);
         if id.optional {
             let from = decorators
                 .and_then(<[Decorator]>::last)

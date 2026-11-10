@@ -91,7 +91,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 param
             }
             ExpressionKind::Identifier(id) => {
-                let type_annotation = id.type_annotation().cloned();
+                let type_annotation = id.type_annotation(self.stores.view()).cloned();
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::mint::<IdentifierParamExtra<'arena>>(1);
                 id.extra = Some(arena.alloc(IdentifierParamExtra {

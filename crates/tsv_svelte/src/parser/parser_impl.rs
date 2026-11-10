@@ -845,7 +845,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             )
         })?;
         debug_assert!(
-            tsv_ts::__private::pattern_type_annotation(self.ts_view().expr(pattern)).is_none(),
+            tsv_ts::__private::pattern_type_annotation(
+                self.ts_view(),
+                self.ts_view().expr(pattern)
+            )
+            .is_none(),
             "a block pattern's `: T` is its own sub-parse (`parse_block_pattern`)"
         );
         self.expression_comments.extend_from_slice(comments);

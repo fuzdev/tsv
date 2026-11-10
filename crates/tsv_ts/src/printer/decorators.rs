@@ -629,7 +629,7 @@ fn param_decorators<'arena>(
     expr: &ast::Expression<'arena>,
 ) -> Option<&'arena [ast::Decorator]> {
     let decorators = match &expr.kind {
-        ast::ExpressionKind::Identifier(id) => id.decorators(),
+        ast::ExpressionKind::Identifier(id) => id.decorators(view),
         ast::ExpressionKind::ObjectPattern(obj) => obj.decorators,
         ast::ExpressionKind::ArrayPattern(arr) => arr.decorators,
         ast::ExpressionKind::AssignmentPattern(ap) => ap.decorators,

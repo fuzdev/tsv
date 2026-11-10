@@ -709,7 +709,7 @@ impl<'a> Printer<'a> {
             ExpressionKind::ObjectPattern(_) | ExpressionKind::ArrayPattern(_)
         ) && !self.gap_known_comment_free(
             expr.span.start,
-            tsv_ts::__private::pattern_binding_end(expr),
+            tsv_ts::__private::pattern_binding_end(self.view, expr),
         ) && let Some(doc) = tsv_ts::__private::build_block_pattern_broken_doc(
             self.d(),
             expr,

@@ -705,7 +705,7 @@ pub(crate) fn is_simple_call_argument(
 /// [`super::arg_wrapping::ArgOpener::lone_hug_ladder`] rather than asking this.
 pub(super) fn lone_arg_params_render_flat(view: AstView<'_>, arg: &Expression<'_>) -> bool {
     matches!(&arg.kind, &ExpressionKind::FunctionExpression(func) if view.run(view.fn_expr(func).params).iter().all(|param| {
-        matches!(&param.kind, ExpressionKind::Identifier(id) if id.type_annotation().is_none())
+        matches!(&param.kind, ExpressionKind::Identifier(id) if id.type_annotation(view).is_none())
     }))
 }
 

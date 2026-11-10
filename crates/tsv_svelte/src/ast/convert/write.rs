@@ -1246,7 +1246,8 @@ fn write_const_tag(w: &mut JsonWriter, tag: &ast::ConstTag, ctx: &Ctx<'_>) {
         // The document has template comments: each of the tag's acorn parses takes its
         // own attach — the id's (pattern, annotation) pair, then the init, split at the
         // end of the binding (see `attach_const_tag_init`).
-        let id_attach = attach_binding_pattern(ctx.view.expr(tag.id), ctx.attach_inputs());
+        let id_attach =
+            attach_binding_pattern(ctx.view, ctx.view.expr(tag.id), ctx.attach_inputs());
         let init_attach = attach_const_tag_init(ctx.view, tag, ctx.attach_inputs());
         write_const_declaration(
             w,
@@ -1992,7 +1993,7 @@ fn write_value_attributes(
 /// necessarily starts inside the binding, and asking wider would only build an
 /// attach with nothing in its queue.
 fn write_pattern_island(w: &mut JsonWriter, expr: &tsv_ts::ast::Expression<'_>, ctx: &Ctx<'_>) {
-    let window = pattern_comment_window(expr);
+    let window = pattern_comment_window(ctx.view, expr);
     if !ctx.any_comment_in(window.start, window.end) {
         write_pattern_embedded(
             w,
@@ -2001,7 +2002,7 @@ fn write_pattern_island(w: &mut JsonWriter, expr: &tsv_ts::ast::Expression<'_>, 
         );
         return;
     }
-    let attach = attach_binding_pattern(expr, ctx.attach_inputs());
+    let attach = attach_binding_pattern(ctx.view, expr, ctx.attach_inputs());
     let (mode, annotation_mode) = attach.modes();
     write_pattern_embedded(w, expr, ctx.embed_pattern(mode, annotation_mode));
 }

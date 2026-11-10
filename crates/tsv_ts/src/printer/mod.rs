@@ -1809,7 +1809,7 @@ impl<'a> Printer<'a> {
     ///
     /// Example: `Map<string, Array<number>>` - Map has 2 params, second has nested generic
     pub(crate) fn id_has_complex_type_annotation(&self, expr: &ast::Expression<'_>) -> bool {
-        crate::__private::pattern_type_annotation(expr)
+        crate::__private::pattern_type_annotation(self.view, expr)
             .is_some_and(|ann| self.type_has_complex_annotation(self.view.ty(ann.type_annotation)))
     }
 

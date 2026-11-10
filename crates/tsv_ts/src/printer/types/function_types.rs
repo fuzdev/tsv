@@ -38,7 +38,7 @@ fn get_type_literal_from_identifier<'a>(
     &'a ast::TSTypeLiteral<'a>,
 )> {
     match &expr.kind {
-        ast::ExpressionKind::Identifier(id) => id.type_annotation().and_then(|ann| {
+        ast::ExpressionKind::Identifier(id) => id.type_annotation(view).and_then(|ann| {
             match unwrap_parenthesized(view, view.ty(ann.type_annotation)) {
                 TSType::TypeLiteral(t) => Some((id, ann, t)),
                 _ => None,

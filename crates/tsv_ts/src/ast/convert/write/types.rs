@@ -587,7 +587,7 @@ pub(super) fn write_index_signature(
             p.span,
             p.ident_name(),
             p.optional,
-            p.type_annotation(),
+            p.type_annotation(ctx.view),
             None,
             ctx,
         );

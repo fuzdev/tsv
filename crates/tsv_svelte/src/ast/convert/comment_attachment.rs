@@ -241,6 +241,7 @@ fn comment_ending_at<'a>(template_comments: &[&'a Comment], end: u32) -> Option<
 /// root fallback: each parse's root is a wrapper the wire discards (the `= 1` assignment,
 /// the `_ as` expression), and a comment inside a window starts before that wrapper ends.
 pub(super) fn attach_binding_pattern<'a>(
+    view: AstView<'_>,
     pattern: &tsv_ts::ast::Expression<'_>,
     attach: AttachInputs<'a>,
 ) -> BindingAttach<'a> {
@@ -261,7 +262,8 @@ pub(super) fn attach_binding_pattern<'a>(
     };
     BindingAttach {
         pattern: island(pattern.span()),
-        annotation: tsv_ts::__private::pattern_type_annotation(pattern).map(|ann| island(ann.span)),
+        annotation: tsv_ts::__private::pattern_type_annotation(view, pattern)
+            .map(|ann| island(ann.span)),
     }
 }
 
@@ -292,10 +294,13 @@ impl BindingAttach<'_> {
 /// attach windows: a pre-check narrower than either silently DROPS a comment (the attach
 /// is never built, and nothing else emits it); a wider one only wastes a build. It is
 /// also where a `{@const}`'s init window begins ([`attach_const_tag_init`]).
-pub(super) fn pattern_comment_window(pattern: &tsv_ts::ast::Expression<'_>) -> Span {
+pub(super) fn pattern_comment_window(
+    view: AstView<'_>,
+    pattern: &tsv_ts::ast::Expression<'_>,
+) -> Span {
     Span::new(
         pattern.span().start,
-        tsv_ts::__private::pattern_binding_end(pattern),
+        tsv_ts::__private::pattern_binding_end(view, pattern),
     )
 }
 
@@ -319,7 +324,7 @@ pub(super) fn attach_const_tag_init<'a>(
     tag: &ast::ConstTag,
     attach: AttachInputs<'a>,
 ) -> CommentAttach<'a> {
-    let binding_end = pattern_comment_window(view.expr(tag.id)).end;
+    let binding_end = pattern_comment_window(view, view.expr(tag.id)).end;
     attach_expression(
         attach,
         binding_end,

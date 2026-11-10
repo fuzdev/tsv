@@ -36,7 +36,7 @@ pub(super) fn write_for_statement(
 ) {
     node_header(w, "ForStatement", span, ctx);
     w.raw(",\"init\":");
-    match &for_stmt.init {
+    match ctx.view.opt_for_head(for_stmt.init) {
         Some(ast::ForInit::VariableDeclaration(decl)) => {
             write_variable_declaration(w, decl, ctx, false);
         }
@@ -75,7 +75,7 @@ pub(super) fn write_for_in_statement(
 ) {
     node_header(w, "ForInStatement", span, ctx);
     w.raw(",\"left\":");
-    write_for_in_of_left(w, for_in.left, ctx);
+    write_for_in_of_left(w, ctx.view.for_left(for_in.left), ctx);
     w.raw(",\"right\":");
     write_expression(w, ctx.view.expr(for_in.right), ctx);
     w.raw(",\"body\":");
@@ -95,7 +95,7 @@ pub(super) fn write_for_of_statement(
     w.raw(",\"await\":");
     w.bool(for_of.r#await);
     w.raw(",\"left\":");
-    write_for_in_of_left(w, for_of.left, ctx);
+    write_for_in_of_left(w, ctx.view.for_left(for_of.left), ctx);
     w.raw(",\"right\":");
     write_expression(w, ctx.view.expr(for_of.right), ctx);
     w.raw(",\"body\":");
@@ -187,7 +187,7 @@ pub(super) fn write_try_statement(
     w.raw(",\"block\":");
     write_block_statement(w, &try_stmt.block, ctx);
     w.raw(",\"handler\":");
-    write_or_null(w, try_stmt.handler.as_ref(), |w, clause| {
+    write_or_null(w, ctx.view.opt_catch(try_stmt.handler), |w, clause| {
         node_header(w, "CatchClause", clause.span, ctx);
         w.raw(",\"param\":");
         write_or_null(w, clause.param.as_ref(), |w, p| write_expression(w, p, ctx));

@@ -7,11 +7,11 @@
 use tsv_lang::Span;
 
 use super::{
-    ClassDeclEdge, ClassDeclaration, DeclareFnEdge, EnumDeclEdge, ExportAllEdge, ExportAssignEdge,
-    ExportDefaultEdge, ExportNamedEdge, Expr, ExprId, Expression, FnDeclEdge, Identifier,
-    ImportDeclEdge, ImportEqualsEdge, InterfaceDeclEdge, ModuleDeclEdge, Run, StmtId,
-    TSDeclareFunction, TSInterfaceDeclaration, TSModuleDeclaration, TSNamespaceExportDeclaration,
-    TSTypeAnnotation, TSTypeParameterDeclaration, TypeAliasEdge,
+    CatchEdge, ClassDeclEdge, ClassDeclaration, DeclareFnEdge, EnumDeclEdge, ExportAllEdge,
+    ExportAssignEdge, ExportDefaultEdge, ExportNamedEdge, Expr, ExprId, Expression, FnDeclEdge,
+    ForHeadEdge, ForLeftEdge, Identifier, ImportDeclEdge, ImportEqualsEdge, InterfaceDeclEdge,
+    ModuleDeclEdge, Run, StmtId, TSDeclareFunction, TSInterfaceDeclaration, TSModuleDeclaration,
+    TSNamespaceExportDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration, TypeAliasEdge,
 };
 
 /// Statement node: the span every variant shares, beside the variant itself.
@@ -254,7 +254,7 @@ pub struct IfStatement {
 #[derive(Debug, Clone)]
 pub struct ForStatement<'arena> {
     /// Initialization: variable declaration or expression (or None)
-    pub init: Option<&'arena ForInit<'arena>>,
+    pub init: Option<ForHeadEdge<'arena>>,
     /// Test condition (or None for infinite loop)
     pub test: Option<ExprId>,
     /// Update expression (or None)
@@ -278,7 +278,7 @@ pub enum ForInit<'arena> {
 #[derive(Debug, Clone)]
 pub struct ForInStatement<'arena> {
     /// Left side: variable declaration or expression pattern
-    pub left: &'arena ForInOfLeft<'arena>,
+    pub left: ForLeftEdge<'arena>,
     pub right: ExprId,
     pub body: StmtId,
 }
@@ -289,7 +289,7 @@ pub struct ForInStatement<'arena> {
 #[derive(Debug, Clone)]
 pub struct ForOfStatement<'arena> {
     /// Left side: variable declaration or expression pattern
-    pub left: &'arena ForInOfLeft<'arena>,
+    pub left: ForLeftEdge<'arena>,
     pub right: ExprId,
     /// Whether this is `for await (... of ...)`
     pub r#await: bool,
@@ -349,7 +349,7 @@ pub struct TryStatement<'arena> {
     pub block: BlockStatement,
     /// Arena reference rather than an inline `CatchClause` (104 B on its own) for the
     /// density reason on `ForStatement`.
-    pub handler: Option<&'arena CatchClause<'arena>>,
+    pub handler: Option<CatchEdge<'arena>>,
     pub finalizer: Option<BlockStatement>,
 }
 

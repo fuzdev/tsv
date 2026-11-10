@@ -1052,7 +1052,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// present, are folded in separately by the parameter-list caller
     /// (`attach_param_decorators`).
     #[inline]
-    fn typed_extra(&self, ta: TSTypeAnnotation) -> &'arena IdentifierParamExtra<'arena> {
+    fn typed_extra(&self, ta: TSTypeAnnotation) -> ParamExtraEdge<'arena> {
         self.alloc(IdentifierParamExtra {
             type_annotation: Some(ta),
             decorators: None,

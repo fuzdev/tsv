@@ -613,7 +613,7 @@ impl<'a> Printer<'a> {
                     return self.build_frozen_span_doc(param.span);
                 }
                 let mut param_parts: DocBuf = smallvec![self.identifier_name_doc(param)];
-                if let Some(type_ann) = param.type_annotation() {
+                if let Some(type_ann) = param.type_annotation(self.view) {
                     // The `: keyType` annotation, handling a before-`:` comment between
                     // the key name and `:` — line → indented continuation (the hardline
                     // also breaks the bracket group), block → inline (`[key /* c */ : T]`).

@@ -561,8 +561,8 @@ fn params_cannot_force_break(
 fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
     match &param.kind {
         ast::ExpressionKind::Identifier(id) => {
-            id.decorators().unwrap_or_default().is_empty()
-                && annotation_is_flat(view, id.type_annotation())
+            id.decorators(view).unwrap_or_default().is_empty()
+                && annotation_is_flat(view, id.type_annotation(view))
         }
         ast::ExpressionKind::ObjectPattern(pattern) => {
             pattern.decorators.unwrap_or_default().is_empty()
@@ -571,12 +571,12 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
                     ast::ObjectPatternProperty::Property(property) => {
                         !property.computed
                             && !property.method
-                            && is_bare_identifier(view.expr(property.key))
-                            && is_bare_identifier(view.expr(property.value))
+                            && is_bare_identifier(view, view.expr(property.key))
+                            && is_bare_identifier(view, view.expr(property.value))
                     }
                     ast::ObjectPatternProperty::RestElement(rest) => {
                         rest.type_annotation.is_none()
-                            && is_bare_identifier(view.expr(rest.argument))
+                            && is_bare_identifier(view, view.expr(rest.argument))
                     }
                 })
         }
@@ -589,14 +589,14 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
                         .is_none_or(|element| match &view.expr(*element).kind {
                             ast::ExpressionKind::RestElement(rest) => {
                                 rest.type_annotation.is_none()
-                                    && is_bare_identifier(view.expr(rest.argument))
+                                    && is_bare_identifier(view, view.expr(rest.argument))
                             }
-                            _ => is_bare_identifier(view.expr(*element)),
+                            _ => is_bare_identifier(view, view.expr(*element)),
                         })
                 })
         }
         ast::ExpressionKind::RestElement(rest) => {
-            is_bare_identifier(view.expr(rest.argument))
+            is_bare_identifier(view, view.expr(rest.argument))
                 && annotation_is_flat(view, rest.type_annotation.as_ref())
         }
         ast::ExpressionKind::AssignmentPattern(default) => {
@@ -604,8 +604,8 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
                 && matches!(
                     &view.expr(default.left).kind,
                     ast::ExpressionKind::Identifier(id)
-                        if id.decorators().unwrap_or_default().is_empty()
-                            && annotation_is_flat(view, id.type_annotation())
+                        if id.decorators(view).unwrap_or_default().is_empty()
+                            && annotation_is_flat(view, id.type_annotation(view))
                 )
                 && matches!(
                     view.expr(default.right).kind,
@@ -617,11 +617,12 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
 }
 
 /// An identifier with no annotation and no decorator — a pattern's leaf.
-fn is_bare_identifier(expr: &ast::Expression<'_>) -> bool {
+fn is_bare_identifier(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
     matches!(
         &expr.kind,
         ast::ExpressionKind::Identifier(id)
-            if id.type_annotation().is_none() && id.decorators().unwrap_or_default().is_empty()
+            if id.type_annotation(view).is_none()
+                && id.decorators(view).unwrap_or_default().is_empty()
     )
 }
 
@@ -713,7 +714,7 @@ fn sole_param_object_type<'a>(
         return None;
     };
     let annotation = match &param.kind {
-        ast::ExpressionKind::Identifier(id) => id.type_annotation(),
+        ast::ExpressionKind::Identifier(id) => id.type_annotation(printer.view),
         ast::ExpressionKind::ObjectPattern(pattern) => pattern.type_annotation.as_ref(),
         ast::ExpressionKind::ArrayPattern(pattern) => pattern.type_annotation.as_ref(),
         _ => None,
@@ -1001,7 +1002,7 @@ fn function_signature_refuses_hug(
                 .view
                 .run(func.params)
                 .iter()
-                .all(is_untyped_identifier_param))
+                .all(|param| is_untyped_identifier_param(printer.view, param)))
     {
         return false;
     }
@@ -1028,8 +1029,8 @@ fn function_signature_refuses_hug(
 
 /// A parameter `printFunction` counts toward its "every parameter is an untyped identifier"
 /// test.
-fn is_untyped_identifier_param(param: &ast::Expression<'_>) -> bool {
-    matches!(&param.kind, ast::ExpressionKind::Identifier(id) if id.type_annotation().is_none())
+fn is_untyped_identifier_param(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
+    matches!(&param.kind, ast::ExpressionKind::Identifier(id) if id.type_annotation(view).is_none())
 }
 
 /// Whether a callback argument of a plain call with `arg_count` arguments refuses the
@@ -1074,7 +1075,7 @@ pub(in crate::printer) fn callback_signature_refuses_hug(
 fn has_huggable_type_annotation(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
     match &expr.kind {
         ast::ExpressionKind::Identifier(id) => id
-            .type_annotation()
+            .type_annotation(view)
             .is_some_and(|ann| is_huggable_type(view, view.ty(ann.type_annotation))),
         _ => false,
     }
@@ -1218,7 +1219,7 @@ impl<'a> Printer<'a> {
         let ast::ExpressionKind::Identifier(id) = &param.kind else {
             return false;
         };
-        id.type_annotation().is_some_and(|ann| {
+        id.type_annotation(self.view).is_some_and(|ann| {
             let colon_end = ann.span.start + 1;
             self.member_gap_frozen(colon_end, self.view.ty(ann.type_annotation).span().start)
                 || self

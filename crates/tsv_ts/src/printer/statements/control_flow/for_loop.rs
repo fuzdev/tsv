@@ -286,7 +286,11 @@ impl<'a> Printer<'a> {
                     .as_ref()
                     .map(|u| self.view.expr(*u).span().end)
                     .or_else(|| stmt.test.as_ref().map(|t| self.view.expr(*t).span().end))
-                    .or_else(|| stmt.init.as_ref().map(|i| self.get_for_init_span_end(i)))
+                    .or_else(|| {
+                        self.view
+                            .opt_for_head(stmt.init)
+                            .map(|i| self.get_for_init_span_end(i))
+                    })
                     .unwrap_or(span.start + "for ".len() as u32)
             },
             |p| p + 1,
@@ -489,7 +493,7 @@ impl<'a> Printer<'a> {
 
         let mut spans = ForHeaderSpans {
             open_paren,
-            init_start: stmt.init.as_ref().map(|i| match i {
+            init_start: self.view.opt_for_head(stmt.init).map(|i| match i {
                 ast::ForInit::VariableDeclaration(d) => d.span.start,
                 ast::ForInit::Expression(e) => self.view.expr(*e).span().start,
             }),
@@ -615,7 +619,7 @@ impl<'a> Printer<'a> {
                 inner_parts.push(d.line());
             }
         }
-        if let Some(init) = &stmt.init {
+        if let Some(init) = self.view.opt_for_head(stmt.init) {
             // Each clause is built with its own END recorded, so a value shell that closes
             // there knows the `;` behind it SEPARATES clauses
             // ([`Printer::shell_closes_for_clause`]). The header is where the three ends are
@@ -926,7 +930,9 @@ impl<'a> Printer<'a> {
     /// place so the two scan call sites and the `ForHeaderSpans` build cannot disagree.
     fn for_clause_ends(&self, stmt: &ast::ForStatement<'_>) -> (Option<u32>, Option<u32>) {
         (
-            stmt.init.as_ref().map(|i| self.get_for_init_span_end(i)),
+            self.view
+                .opt_for_head(stmt.init)
+                .map(|i| self.get_for_init_span_end(i)),
             stmt.test.as_ref().map(|t| self.view.expr(*t).span().end),
         )
     }
@@ -1345,7 +1351,7 @@ impl<'a> Printer<'a> {
         ctx: StatementContext,
     ) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
-            stmt.left,
+            self.view.for_left(stmt.left),
             self.view.expr(stmt.right),
             self.view.stmt(stmt.body),
             span.start,
@@ -1363,7 +1369,7 @@ impl<'a> Printer<'a> {
         ctx: StatementContext,
     ) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
-            stmt.left,
+            self.view.for_left(stmt.left),
             self.view.expr(stmt.right),
             self.view.stmt(stmt.body),
             span.start,
